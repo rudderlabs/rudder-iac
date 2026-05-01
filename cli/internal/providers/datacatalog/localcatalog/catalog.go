@@ -176,6 +176,10 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 		switch v := value.(type) {
 		case string:
 			if strings.HasPrefix(v, "#/") {
+				if IncludeRegex.MatchString(v) {
+					continue
+				}
+
 				urnRef, err := convertPathToURN(v)
 				if err != nil {
 					return err
@@ -192,6 +196,10 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 				switch itemVal := item.(type) {
 				case string:
 					if strings.HasPrefix(itemVal, "#/") {
+						if IncludeRegex.MatchString(itemVal) {
+							continue
+						}
+
 						urnRef, err := convertPathToURN(itemVal)
 						if err != nil {
 							return err

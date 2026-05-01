@@ -20,6 +20,8 @@ type ExperimentalConfig struct {
 	Transformations bool `mapstructure:"transformations"`
 	// DataGraph enables data graph operations (sync, validate, import)
 	DataGraph bool `mapstructure:"dataGraph"`
+	// EventRuleIncludes enables including event rules from other tracking plans
+	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

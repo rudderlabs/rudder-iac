@@ -39,8 +39,10 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name            string
-	LocalID         string
+	Name    string
+	LocalID string
+	// RuleLocalID is the tracking-plan event_rule id this row was expanded from (direct rule or included rule).
+	RuleLocalID     string
 	Ref             string
 	Description     string
 	CategoryRef     *string
@@ -75,7 +77,7 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event" validate:"required"`
+	Event      *TPRuleEvent      `json:"event,omitempty"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
@@ -215,6 +217,7 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
+		RuleLocalID:     rule.LocalID,
 		Ref:             rule.Event,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,

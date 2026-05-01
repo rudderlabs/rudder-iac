@@ -50,6 +50,7 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		assert.Equal(t, "track", tp.EventProps[0].Type)
 		assert.Equal(t, "properties", tp.EventProps[0].IdentitySection)
 		assert.False(t, tp.EventProps[0].AllowUnplanned)
+		assert.Equal(t, "signup-rule", tp.EventProps[0].RuleLocalID)
 	})
 
 	t.Run("expands multiple rules with event refs", func(t *testing.T) {
@@ -107,6 +108,119 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		require.Len(t, tp.EventProps, 1)
 		assert.Equal(t, "User Login", tp.EventProps[0].Name)
 		assert.Equal(t, "login", tp.EventProps[0].LocalID)
+	})
+
+	t.Run("expands includes wildcard and merges with directly defined rules", func(t *testing.T) {
+		tp := &TrackingPlanV1{
+			LocalID: "api_tracking",
+			Rules: []*TPRuleV1{
+				{Type: "event_rule", LocalID: "direct", Event: "#event:api_tracking"},
+				{Type: "event_rule", LocalID: "include", Includes: &TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/*"}},
+			},
+		}
+		dc := &DataCatalog{
+			Events: []EventV1{
+				{LocalID: "api_tracking", Name: "API Tracking", Type: "track"},
+				{LocalID: "checkout", Name: "Checkout", Type: "track"},
+				{LocalID: "page_view", Name: "Page View", Type: "page"},
+			},
+			TrackingPlans: []*TrackingPlanV1{
+				{
+					LocalID: "common_rules",
+					Rules: []*TPRuleV1{
+						{Type: "event_rule", LocalID: "checkout_rule", Event: "#event:checkout"},
+						{Type: "event_rule", LocalID: "page_rule", Event: "#event:page_view"},
+					},
+				},
+			},
+			Properties:     []PropertyV1{},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
+			ReferenceMap:   make(map[string]string),
+			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
+		}
+
+		err := tp.ExpandRefs(dc)
+		require.NoError(t, err)
+		require.Len(t, tp.EventProps, 3)
+		assert.Equal(t, "api_tracking", tp.EventProps[0].LocalID)
+		assert.Equal(t, "checkout", tp.EventProps[1].LocalID)
+		assert.Equal(t, "page_view", tp.EventProps[2].LocalID)
+	})
+
+	t.Run("expands include specific rule", func(t *testing.T) {
+		tp := &TrackingPlanV1{
+			LocalID: "api_tracking",
+			Rules: []*TPRuleV1{
+				{Type: "event_rule", LocalID: "include", Includes: &TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/checkout_rule"}},
+			},
+		}
+		dc := &DataCatalog{
+			Events: []EventV1{
+				{LocalID: "checkout", Name: "Checkout", Type: "track"},
+				{LocalID: "page_view", Name: "Page View", Type: "page"},
+			},
+			TrackingPlans: []*TrackingPlanV1{
+				{
+					LocalID: "common_rules",
+					Rules: []*TPRuleV1{
+						{Type: "event_rule", LocalID: "checkout_rule", Event: "#event:checkout"},
+						{Type: "event_rule", LocalID: "page_rule", Event: "#event:page_view"},
+					},
+				},
+			},
+			Properties:     []PropertyV1{},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
+			ReferenceMap:   make(map[string]string),
+			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
+		}
+
+		err := tp.ExpandRefs(dc)
+		require.NoError(t, err)
+		require.Len(t, tp.EventProps, 1)
+		assert.Equal(t, "checkout", tp.EventProps[0].LocalID)
+		assert.Equal(t, "checkout_rule", tp.EventProps[0].RuleLocalID)
+	})
+
+	t.Run("single-level include behavior ignores nested include rules", func(t *testing.T) {
+		tp := &TrackingPlanV1{
+			LocalID: "api_tracking",
+			Rules: []*TPRuleV1{
+				{Type: "event_rule", LocalID: "include", Includes: &TPRuleIncludes{Ref: "#/tp/common_rules/event_rule/*"}},
+			},
+		}
+		dc := &DataCatalog{
+			Events: []EventV1{
+				{LocalID: "checkout", Name: "Checkout", Type: "track"},
+				{LocalID: "page_view", Name: "Page View", Type: "page"},
+			},
+			TrackingPlans: []*TrackingPlanV1{
+				{
+					LocalID: "common_rules",
+					Rules: []*TPRuleV1{
+						{Type: "event_rule", LocalID: "checkout_rule", Event: "#event:checkout"},
+						{Type: "event_rule", LocalID: "nested_include", Includes: &TPRuleIncludes{Ref: "#/tp/second_level/event_rule/*"}},
+					},
+				},
+				{
+					LocalID: "second_level",
+					Rules: []*TPRuleV1{
+						{Type: "event_rule", LocalID: "page_rule", Event: "#event:page_view"},
+					},
+				},
+			},
+			Properties:     []PropertyV1{},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
+			ReferenceMap:   make(map[string]string),
+			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
+		}
+
+		err := tp.ExpandRefs(dc)
+		require.NoError(t, err)
+		require.Len(t, tp.EventProps, 1)
+		assert.Equal(t, "checkout", tp.EventProps[0].LocalID)
 	})
 
 	t.Run("errors when rule has neither event nor includes", func(t *testing.T) {
