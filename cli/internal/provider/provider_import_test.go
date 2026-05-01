@@ -42,7 +42,7 @@ func TestExampleImport(t *testing.T) {
 	_, err = b.CreateBook("Book B", wB.ID, "")
 	require.NoError(t, err)
 
-	err = importer.WorkspaceImport(context.Background(), proj, provider)
+	err = importer.WorkspaceImport(context.Background(), proj, provider, importer.ImportOptions{})
 	require.NoError(t, err, "Failed to import workspace")
 
 	assertDirContents(t, testDir)

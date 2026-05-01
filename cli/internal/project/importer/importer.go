@@ -20,6 +20,25 @@ const (
 	ImportedDir = "imported"
 )
 
+// FilterOption specifies which resources to import based on their management status.
+type FilterOption string
+
+const (
+	// FilterUnmanaged imports only resources without external IDs (not yet managed by IaC).
+	FilterUnmanaged FilterOption = "unmanaged"
+	// FilterManaged imports only resources with external IDs (already managed by IaC).
+	FilterManaged FilterOption = "managed"
+	// FilterAll imports all resources regardless of their management status.
+	FilterAll FilterOption = "all"
+)
+
+// ImportOptions configures the workspace import behavior.
+type ImportOptions struct {
+	// Filter determines which resources to import based on their management status.
+	// Defaults to FilterUnmanaged if not specified.
+	Filter FilterOption
+}
+
 var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 
 type ImportProvider interface {
@@ -36,7 +55,13 @@ type Project interface {
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
-	p ImportProvider) error {
+	p ImportProvider,
+	opts ImportOptions,
+) error {
+	// Default to unmanaged if no filter specified
+	if opts.Filter == "" {
+		opts.Filter = FilterUnmanaged
+	}
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -64,9 +89,10 @@ func WorkspaceImport(
 		return fmt.Errorf("initializing namer: %w", err)
 	}
 
-	importable, err := p.LoadImportable(ctx, idNamer)
+	// Load resources based on filter option
+	importable, err := loadResourcesForImport(ctx, p, opts.Filter, idNamer, remoteCollection)
 	if err != nil {
-		return fmt.Errorf("loading importable resources: %w", err)
+		return fmt.Errorf("loading resources for import: %w", err)
 	}
 
 	if importable.Len() == 0 {
@@ -92,6 +118,46 @@ func WorkspaceImport(
 	}
 
 	return nil
+}
+
+// loadResourcesForImport loads resources based on the filter option.
+// - FilterUnmanaged: loads only unmanaged resources (without external IDs)
+// - FilterManaged: loads only managed resources (with external IDs), using existing IDs
+// - FilterAll: combines both managed and unmanaged resources
+func loadResourcesForImport(
+	ctx context.Context,
+	p ImportProvider,
+	filter FilterOption,
+	idNamer namer.Namer,
+	remoteCollection *resources.RemoteResources,
+) (*resources.RemoteResources, error) {
+	switch filter {
+	case FilterUnmanaged:
+		return p.LoadImportable(ctx, idNamer)
+
+	case FilterManaged:
+		return loadManagedForExport(remoteCollection)
+
+	case FilterAll:
+		unmanaged, err := p.LoadImportable(ctx, idNamer)
+		if err != nil {
+			return nil, fmt.Errorf("loading unmanaged resources: %w", err)
+		}
+		managed, err := loadManagedForExport(remoteCollection)
+		if err != nil {
+			return nil, fmt.Errorf("loading managed resources: %w", err)
+		}
+		return unmanaged.Merge(managed)
+
+	default:
+		return nil, fmt.Errorf("unknown filter option: %s", filter)
+	}
+}
+
+// loadManagedForExport returns the remote collection as-is since it already contains
+// managed resources with their existing external IDs from LoadResourcesFromRemote.
+func loadManagedForExport(remoteCollection *resources.RemoteResources) (*resources.RemoteResources, error) {
+	return remoteCollection, nil
 }
 
 func initNamer(graph *resources.Graph) (namer.Namer, error) {
