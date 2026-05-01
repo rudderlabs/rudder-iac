@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -47,6 +48,18 @@ The --on-conflict flag controls how to handle resources that already exist local
 			$ rudder-cli import workspace --location </path/to/project_dir> --filter all --on-conflict keep-both
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			cfg := config.GetConfig()
+
+			// Check if experimental flag is enabled for non-default options
+			if !cfg.ExperimentalFlags.ImportFilter {
+				if filter != "unmanaged" {
+					return fmt.Errorf("--filter flag requires experimental feature 'importFilter' to be enabled. Run: rudder-cli experimental enable importFilter")
+				}
+				if onConflict != "keep-local" {
+					return fmt.Errorf("--on-conflict flag requires experimental feature 'importFilter' to be enabled. Run: rudder-cli experimental enable importFilter")
+				}
+			}
+
 			// Validate filter option
 			switch importer.FilterOption(filter) {
 			case importer.FilterUnmanaged, importer.FilterManaged, importer.FilterAll:
