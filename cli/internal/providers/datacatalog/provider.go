@@ -308,7 +308,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			)),
 			resources.WithAdditionalMetadata(map[string]any{
 				"ruleIdToEventId": lo.SliceToMap(tp.Rules, func(rule *localcatalog.TPRuleV1) (string, string) {
-					return rule.LocalID, rule.Event
+					return rule.LocalID, strings.TrimPrefix(rule.Event, "#event:")
 				}),
 			}),
 		)
