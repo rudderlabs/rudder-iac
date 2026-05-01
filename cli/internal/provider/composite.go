@@ -394,5 +394,24 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
+// ProviderNames returns the names of all registered providers
+func (p *CompositeProvider) ProviderNames() []string {
+	return maps.Keys(p.Providers)
+}
+
+// ResourceTypesForProviders returns all resource types supported by the specified
+// provider names. If a provider name is not found, it returns an error.
+func (p *CompositeProvider) ResourceTypesForProviders(names []string) ([]string, error) {
+	var types []string
+	for _, name := range names {
+		provider, ok := p.Providers[name]
+		if !ok {
+			return nil, fmt.Errorf("unknown provider: %s", name)
+		}
+		types = append(types, provider.SupportedTypes()...)
+	}
+	return types, nil
+}
+
 // Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
 var _ RuleProvider = (*CompositeProvider)(nil)
