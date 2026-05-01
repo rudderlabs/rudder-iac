@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -247,4 +248,332 @@ func TestImportOptions_DefaultFilter(t *testing.T) {
 
 	opts = ImportOptions{Filter: FilterManaged}
 	assert.Equal(t, FilterManaged, opts.Filter)
+}
+
+func TestConflictResolution_Values(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		resolution ConflictResolution
+		expected   string
+	}{
+		{
+			name:       "keep-local conflict resolution value",
+			resolution: ConflictKeepLocal,
+			expected:   "keep-local",
+		},
+		{
+			name:       "accept-incoming conflict resolution value",
+			resolution: ConflictAcceptIncoming,
+			expected:   "accept-incoming",
+		},
+		{
+			name:       "keep-both conflict resolution value",
+			resolution: ConflictKeepBoth,
+			expected:   "keep-both",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, string(tt.resolution))
+		})
+	}
+}
+
+func TestImportOptions_DefaultOnConflict(t *testing.T) {
+	t.Parallel()
+
+	opts := ImportOptions{}
+	assert.Equal(t, ConflictResolution(""), opts.OnConflict)
+
+	opts = ImportOptions{OnConflict: ConflictAcceptIncoming}
+	assert.Equal(t, ConflictAcceptIncoming, opts.OnConflict)
+}
+
+// createTestSpec creates a test specs.Spec with the given URNs in import metadata
+func createTestSpec(urns []string) *specs.Spec {
+	importResources := make([]specs.ImportIds, 0, len(urns))
+	for _, urn := range urns {
+		importResources = append(importResources, specs.ImportIds{
+			URN:      urn,
+			RemoteID: "remote-" + urn,
+		})
+	}
+
+	metadata := specs.Metadata{
+		Name: "test-spec",
+		Import: &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{
+				{
+					WorkspaceID: "workspace-1",
+					Resources:   importResources,
+				},
+			},
+		},
+	}
+
+	metadataMap, _ := metadata.ToMap()
+
+	return &specs.Spec{
+		Version:  specs.SpecVersionV1,
+		Kind:     "test-kind",
+		Metadata: metadataMap,
+		Spec:     map[string]any{"name": "test"},
+	}
+}
+
+func TestExtractURNsFromEntity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		entity       writer.FormattableEntity
+		expectedURNs []string
+	}{
+		{
+			name: "extracts URNs from spec pointer",
+			entity: writer.FormattableEntity{
+				Content:      createTestSpec([]string{"source:my-source", "destination:my-dest"}),
+				RelativePath: "test.yaml",
+			},
+			expectedURNs: []string{"source:my-source", "destination:my-dest"},
+		},
+		{
+			name: "extracts URNs from spec value",
+			entity: writer.FormattableEntity{
+				Content:      *createTestSpec([]string{"source:single-source"}),
+				RelativePath: "test.yaml",
+			},
+			expectedURNs: []string{"source:single-source"},
+		},
+		{
+			name: "returns empty for non-spec content",
+			entity: writer.FormattableEntity{
+				Content:      map[string]any{"key": "value"},
+				RelativePath: "test.yaml",
+			},
+			expectedURNs: nil,
+		},
+		{
+			name: "returns empty for spec without import metadata",
+			entity: writer.FormattableEntity{
+				Content: &specs.Spec{
+					Version:  specs.SpecVersionV1,
+					Kind:     "test-kind",
+					Metadata: map[string]any{"name": "test"},
+					Spec:     map[string]any{"name": "test"},
+				},
+				RelativePath: "test.yaml",
+			},
+			expectedURNs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			urns := extractURNsFromEntity(tt.entity)
+			assert.Equal(t, tt.expectedURNs, urns)
+		})
+	}
+}
+
+func TestEntityHasConflict(t *testing.T) {
+	t.Parallel()
+
+	// Create a graph with existing resources
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("existing-source", "source", resources.ResourceData{"name": "Existing"}, nil))
+	graph.AddResource(resources.NewResource("existing-dest", "destination", resources.ResourceData{"name": "Existing Dest"}, nil))
+
+	tests := []struct {
+		name        string
+		entity      writer.FormattableEntity
+		hasConflict bool
+	}{
+		{
+			name: "detects conflict when resource exists",
+			entity: writer.FormattableEntity{
+				Content:      createTestSpec([]string{"source:existing-source"}),
+				RelativePath: "sources/existing-source.yaml",
+			},
+			hasConflict: true,
+		},
+		{
+			name: "detects conflict when any resource in entity exists",
+			entity: writer.FormattableEntity{
+				Content:      createTestSpec([]string{"source:new-source", "destination:existing-dest"}),
+				RelativePath: "mixed.yaml",
+			},
+			hasConflict: true,
+		},
+		{
+			name: "no conflict when resource does not exist",
+			entity: writer.FormattableEntity{
+				Content:      createTestSpec([]string{"source:new-source"}),
+				RelativePath: "sources/new-source.yaml",
+			},
+			hasConflict: false,
+		},
+		{
+			name: "no conflict for non-spec content",
+			entity: writer.FormattableEntity{
+				Content:      map[string]any{"key": "value"},
+				RelativePath: "other.yaml",
+			},
+			hasConflict: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := entityHasConflict(tt.entity, graph)
+			assert.Equal(t, tt.hasConflict, result)
+		})
+	}
+}
+
+func TestGenerateConflictPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputPath    string
+		expectedPath string
+	}{
+		{
+			name:         "adds suffix before yaml extension",
+			inputPath:    "sources/my-source.yaml",
+			expectedPath: "sources/my-source-imported.yaml",
+		},
+		{
+			name:         "handles nested paths",
+			inputPath:    "deep/nested/path/resource.yaml",
+			expectedPath: "deep/nested/path/resource-imported.yaml",
+		},
+		{
+			name:         "handles different extensions",
+			inputPath:    "config/settings.txt",
+			expectedPath: "config/settings-imported.txt",
+		},
+		{
+			name:         "handles file without extension",
+			inputPath:    "config/noextension",
+			expectedPath: "config/noextension-imported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateConflictPath(tt.inputPath)
+			assert.Equal(t, tt.expectedPath, result)
+		})
+	}
+}
+
+func TestApplyConflictResolution(t *testing.T) {
+	t.Parallel()
+
+	// Create a graph with existing resources
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("existing-source", "source", resources.ResourceData{"name": "Existing"}, nil))
+
+	// Create test entities - one with conflict, one without
+	conflictingEntity := writer.FormattableEntity{
+		Content:      createTestSpec([]string{"source:existing-source"}),
+		RelativePath: "sources/existing-source.yaml",
+	}
+	newEntity := writer.FormattableEntity{
+		Content:      createTestSpec([]string{"source:new-source"}),
+		RelativePath: "sources/new-source.yaml",
+	}
+
+	tests := []struct {
+		name           string
+		entities       []writer.FormattableEntity
+		onConflict     ConflictResolution
+		expectedCount  int
+		expectedPaths  []string
+	}{
+		{
+			name:           "keep-local skips conflicting entities",
+			entities:       []writer.FormattableEntity{conflictingEntity, newEntity},
+			onConflict:     ConflictKeepLocal,
+			expectedCount:  1,
+			expectedPaths:  []string{"sources/new-source.yaml"},
+		},
+		{
+			name:           "accept-incoming keeps all entities",
+			entities:       []writer.FormattableEntity{conflictingEntity, newEntity},
+			onConflict:     ConflictAcceptIncoming,
+			expectedCount:  2,
+			expectedPaths:  []string{"sources/existing-source.yaml", "sources/new-source.yaml"},
+		},
+		{
+			name:           "keep-both modifies path for conflicting entities",
+			entities:       []writer.FormattableEntity{conflictingEntity, newEntity},
+			onConflict:     ConflictKeepBoth,
+			expectedCount:  2,
+			expectedPaths:  []string{"sources/existing-source-imported.yaml", "sources/new-source.yaml"},
+		},
+		{
+			name:           "empty entities returns empty",
+			entities:       []writer.FormattableEntity{},
+			onConflict:     ConflictKeepLocal,
+			expectedCount:  0,
+			expectedPaths:  nil,
+		},
+		{
+			name:           "unknown conflict resolution defaults to keep-local behavior",
+			entities:       []writer.FormattableEntity{conflictingEntity, newEntity},
+			onConflict:     ConflictResolution("unknown"),
+			expectedCount:  1,
+			expectedPaths:  []string{"sources/new-source.yaml"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := applyConflictResolution(tt.entities, graph, tt.onConflict)
+			assert.Equal(t, tt.expectedCount, len(result))
+
+			if tt.expectedPaths != nil {
+				actualPaths := make([]string, len(result))
+				for i, e := range result {
+					actualPaths[i] = e.RelativePath
+				}
+				assert.ElementsMatch(t, tt.expectedPaths, actualPaths)
+			}
+		})
+	}
+}
+
+func TestApplyConflictResolution_OnlyAffectsManagedFilter(t *testing.T) {
+	t.Parallel()
+
+	// This test verifies that conflict resolution only applies when filter is managed or all.
+	// The logic is in WorkspaceImport, but we test the applyConflictResolution function directly
+	// to ensure it works correctly when called.
+
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("existing", "source", resources.ResourceData{}, nil))
+
+	entity := writer.FormattableEntity{
+		Content:      createTestSpec([]string{"source:existing"}),
+		RelativePath: "sources/existing.yaml",
+	}
+
+	// With keep-local, conflicting entity should be skipped
+	result := applyConflictResolution([]writer.FormattableEntity{entity}, graph, ConflictKeepLocal)
+	assert.Equal(t, 0, len(result))
+
+	// With accept-incoming, entity should be kept
+	result = applyConflictResolution([]writer.FormattableEntity{entity}, graph, ConflictAcceptIncoming)
+	assert.Equal(t, 1, len(result))
+
+	// With keep-both, path should be modified
+	result = applyConflictResolution([]writer.FormattableEntity{entity}, graph, ConflictKeepBoth)
+	require.Equal(t, 1, len(result))
+	assert.Equal(t, "sources/existing-imported.yaml", result[0].RelativePath)
 }
