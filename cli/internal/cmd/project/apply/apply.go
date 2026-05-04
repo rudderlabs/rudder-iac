@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -103,6 +104,13 @@ func NewCmdApply() *cobra.Command {
 				return err
 			}
 
+			fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"Workspace: %s (%s)\n",
+				formatWorkspaceField(workspace.Name, "Unknown workspace"),
+				formatWorkspaceField(workspace.ID, "unknown"),
+			)
+
 			// Apply the changes
 			err = s.Sync(context.Background(), graph)
 			if err != nil {
@@ -124,4 +132,12 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 
 	return cmd
+}
+
+func formatWorkspaceField(value string, fallback string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	return trimmed
 }
