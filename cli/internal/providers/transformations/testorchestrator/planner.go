@@ -1,7 +1,6 @@
 package testorchestrator
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/samber/lo"
@@ -56,7 +55,7 @@ func NewPlanner(graph *resources.Graph) *Planner {
 }
 
 // BuildPlan determines which transformations to test based on mode and remote graph
-func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
+func (p *Planner) BuildPlan(remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
 	var (
 		transformations = p.graph.ResourcesByType(ttypes.TransformationResourceType)
 		libraries       = p.graph.ResourcesByType(ttypes.LibraryResourceType)
