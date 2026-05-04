@@ -34,6 +34,10 @@ func (r *planReporter) ReportPlan(plan *planner.Plan) {
 	fmt.Fprint(r.getWriter(), renderDiff(plan.Diff))
 }
 
+func (r *planReporter) ReportWorkspace(name string, id string) {
+	fmt.Fprintf(r.getWriter(), "Workspace: %s (%s)\n\n", name, id)
+}
+
 func renderDiff(diff *differ.Diff) string {
 	b := &strings.Builder{}
 

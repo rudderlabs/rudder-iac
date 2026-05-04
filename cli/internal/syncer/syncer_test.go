@@ -83,6 +83,11 @@ func TestSyncerCreate(t *testing.T) {
 	}, provider.OperationLog)
 
 	// Verify reporter calls
+	assert.Len(t, mockReporter.ReportWorkspaceCalls, 1, "ReportWorkspace should be called once")
+	assert.Equal(t, testutils.WorkspaceCall{
+		Name: "Test Workspace",
+		ID:   "test-workspace-id",
+	}, mockReporter.ReportWorkspaceCalls[0], "ReportWorkspace should be called with workspace context")
 	assert.Len(t, mockReporter.ReportPlanCalls, 1, "ReportPlan should be called once")
 	assert.Equal(t, 0, mockReporter.AskConfirmationCalls, "AskConfirmation should not be called in non-interactive mode")
 	assert.Len(t, mockReporter.SyncStartedCalls, 1, "SyncStarted should be called once")
@@ -205,6 +210,11 @@ func TestSyncerDelete(t *testing.T) {
 	}, provider.OperationLog)
 
 	// Verify reporter calls
+	assert.Len(t, mockReporter.ReportWorkspaceCalls, 1, "ReportWorkspace should be called once")
+	assert.Equal(t, testutils.WorkspaceCall{
+		Name: "Test Workspace",
+		ID:   "test-workspace-id",
+	}, mockReporter.ReportWorkspaceCalls[0], "ReportWorkspace should be called with workspace context")
 	assert.Len(t, mockReporter.ReportPlanCalls, 1, "ReportPlan should be called once")
 	assert.Equal(t, 0, mockReporter.AskConfirmationCalls, "AskConfirmation should not be called in non-interactive mode")
 	assert.Len(t, mockReporter.SyncStartedCalls, 1, "SyncStarted should be called once")

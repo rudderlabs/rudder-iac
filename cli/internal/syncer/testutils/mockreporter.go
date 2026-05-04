@@ -15,12 +15,18 @@ type MockReporter struct {
 	ConfirmError    error
 
 	// Call tracking
+	ReportWorkspaceCalls []WorkspaceCall
 	ReportPlanCalls      []*planner.Plan
 	AskConfirmationCalls int
 	SyncStartedCalls     []int
 	SyncCompletedCalls   int
 	TaskStartedCalls     []TaskCall
 	TaskCompletedCalls   []TaskCompletionCall
+}
+
+type WorkspaceCall struct {
+	Name string
+	ID   string
 }
 
 type TaskCall struct {
@@ -37,12 +43,22 @@ type TaskCompletionCall struct {
 // NewMockReporter creates a new MockReporter with default confirmation response of true
 func NewMockReporter() *MockReporter {
 	return &MockReporter{
+		ReportWorkspaceCalls: make([]WorkspaceCall, 0),
 		ConfirmResponse:      true,
 		ReportPlanCalls:      make([]*planner.Plan, 0),
 		SyncStartedCalls:     make([]int, 0),
 		TaskStartedCalls:     make([]TaskCall, 0),
 		TaskCompletedCalls:   make([]TaskCompletionCall, 0),
 	}
+}
+
+func (m *MockReporter) ReportWorkspace(name string, id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ReportWorkspaceCalls = append(m.ReportWorkspaceCalls, WorkspaceCall{
+		Name: name,
+		ID:   id,
+	})
 }
 
 func (m *MockReporter) ReportPlan(plan *planner.Plan) {
@@ -93,6 +109,7 @@ func (m *MockReporter) TaskCompleted(taskId string, description string, err erro
 func (m *MockReporter) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.ReportWorkspaceCalls = make([]WorkspaceCall, 0)
 	m.ReportPlanCalls = make([]*planner.Plan, 0)
 	m.AskConfirmationCalls = 0
 	m.SyncStartedCalls = make([]int, 0)

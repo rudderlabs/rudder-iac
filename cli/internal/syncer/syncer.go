@@ -98,6 +98,7 @@ func WithAskConfirmation(askConfirmation bool) Option {
 }
 
 type SyncReporter interface {
+	ReportWorkspace(name string, id string)
 	ReportPlan(plan *planner.Plan)
 	AskConfirmation() (bool, error)
 	SyncStarted(totalTasks int)
@@ -138,6 +139,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	spinner.Stop()
 
+	s.reporter.ReportWorkspace(s.workspace.Name, s.workspace.ID)
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
