@@ -1,7 +1,9 @@
 package syncer_test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -10,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/testutils"
 	internalTestutils "github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,6 +25,21 @@ func mockWorkspace() *client.Workspace {
 		Status:      "ACTIVE",
 		Region:      "US",
 	}
+}
+
+// captureUIOutput redirects ui.Print* output to a buffer for the duration of
+// the current test and returns the buffer. The previous writer is restored on
+// test cleanup.
+func captureUIOutput(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	ui.SetWriter(&buf)
+	t.Cleanup(ui.RestoreWriter)
+	return &buf
+}
+
+func expectedWorkspaceHeader(workspace *client.Workspace) string {
+	return fmt.Sprintf("Workspace: %s (%s)\n\n", ui.Bold(workspace.Name), workspace.ID)
 }
 
 func TestSyncerCreate(t *testing.T) {
@@ -58,7 +76,9 @@ func TestSyncerCreate(t *testing.T) {
 	}
 
 	mockReporter := testutils.NewMockReporter()
-	s, err := syncer.New(provider, mockWorkspace(), syncer.WithReporter(mockReporter))
+	workspace := mockWorkspace()
+	uiOutput := captureUIOutput(t)
+	s, err := syncer.New(provider, workspace, syncer.WithReporter(mockReporter))
 	require.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph)
@@ -82,12 +102,9 @@ func TestSyncerCreate(t *testing.T) {
 		}}},
 	}, provider.OperationLog)
 
-	// Verify reporter calls
-	assert.Len(t, mockReporter.ReportWorkspaceCalls, 1, "ReportWorkspace should be called once")
-	assert.Equal(t, testutils.WorkspaceCall{
-		Name: "Test Workspace",
-		ID:   "test-workspace-id",
-	}, mockReporter.ReportWorkspaceCalls[0], "ReportWorkspace should be called with workspace context")
+	// Workspace header is printed by the syncer (not the reporter) with the
+	// workspace name in bold.
+	assert.Contains(t, uiOutput.String(), expectedWorkspaceHeader(workspace))
 	assert.Len(t, mockReporter.ReportPlanCalls, 1, "ReportPlan should be called once")
 	assert.Equal(t, 0, mockReporter.AskConfirmationCalls, "AskConfirmation should not be called in non-interactive mode")
 	assert.Len(t, mockReporter.SyncStartedCalls, 1, "SyncStarted should be called once")
@@ -176,7 +193,9 @@ func TestSyncerDelete(t *testing.T) {
 	targetGraph := resources.NewGraph()
 
 	mockReporter := testutils.NewMockReporter()
-	s, err := syncer.New(provider, mockWorkspace(), syncer.WithReporter(mockReporter))
+	workspace := mockWorkspace()
+	uiOutput := captureUIOutput(t)
+	s, err := syncer.New(provider, workspace, syncer.WithReporter(mockReporter))
 	require.NoError(t, err)
 
 	err = s.Sync(context.Background(), targetGraph)
@@ -209,12 +228,9 @@ func TestSyncerDelete(t *testing.T) {
 		}}},
 	}, provider.OperationLog)
 
-	// Verify reporter calls
-	assert.Len(t, mockReporter.ReportWorkspaceCalls, 1, "ReportWorkspace should be called once")
-	assert.Equal(t, testutils.WorkspaceCall{
-		Name: "Test Workspace",
-		ID:   "test-workspace-id",
-	}, mockReporter.ReportWorkspaceCalls[0], "ReportWorkspace should be called with workspace context")
+	// Workspace header is printed by the syncer (not the reporter) with the
+	// workspace name in bold.
+	assert.Contains(t, uiOutput.String(), expectedWorkspaceHeader(workspace))
 	assert.Len(t, mockReporter.ReportPlanCalls, 1, "ReportPlan should be called once")
 	assert.Equal(t, 0, mockReporter.AskConfirmationCalls, "AskConfirmation should not be called in non-interactive mode")
 	assert.Len(t, mockReporter.SyncStartedCalls, 1, "SyncStarted should be called once")

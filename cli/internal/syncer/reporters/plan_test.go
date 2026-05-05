@@ -263,17 +263,6 @@ func TestPrintablePropertyRef(t *testing.T) {
 	})
 }
 
-func TestPlanReporter_ReportWorkspace(t *testing.T) {
-	var buf bytes.Buffer
-
-	r := &planReporter{}
-	r.SetWriter(&buf)
-
-	r.ReportWorkspace("Test Workspace", "test-workspace-id")
-
-	assert.Equal(t, "Workspace: Test Workspace (test-workspace-id)\n\n", buf.String())
-}
-
 func enableNestedDiffs(t *testing.T) {
 	t.Helper()
 
