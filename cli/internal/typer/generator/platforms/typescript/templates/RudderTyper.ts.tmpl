@@ -1,12 +1,55 @@
 {{ template "disclaimer.tmpl" . }}
-import type { ApiOptions, RudderAnalytics } from "@rudderstack/analytics-js";
+import type {
+    ApiOptions,
+    RudderAnalytics,
+{{- if .UsesSDKApiObject }}
+    ApiObject as SDKApiObject,
+{{- end }}
+{{- if .UsesSDKIdentifyTraits }}
+    IdentifyTraits as SDKIdentifyTraits,
+{{- end }}
+} from "@rudderstack/analytics-js";
+{{- if .PropertyEnums }}
+
+// ===== Property Enums =====
+
+{{ range $i, $a := .PropertyEnums }}{{ if $i }}
+{{ end }}{{ template "typealias.tmpl" $a -}}
+{{ end -}}
+{{ end }}
+{{- if or .CustomTypeAliases .CustomInterfaces }}
+
+// ===== Custom Types =====
+
+{{ range $i, $a := .CustomTypeAliases }}{{ if $i }}
+{{ end }}{{ template "typealias.tmpl" $a -}}
+{{ end -}}
+{{- if and .CustomTypeAliases .CustomInterfaces }}
+
+{{ end -}}
+{{ range $i, $a := .CustomInterfaces }}{{ if $i }}
+
+{{ end }}{{ template "interface.tmpl" $a -}}
+{{ end -}}
+{{ end }}
+{{- if .NestedInterfaces }}
+
+// ===== Nested Object Types =====
+
+{{ range $i, $a := .NestedInterfaces }}{{ if $i }}
+
+{{ end }}{{ template "interface.tmpl" $a -}}
+{{ end -}}
+{{ end }}
 {{- if .Interfaces }}
 
-// ===== Event Traits =====
-{{- range .Interfaces }}
-{{ template "interface.tmpl" . }}
-{{- end }}
-{{- end }}
+// ===== Event Types =====
+
+{{ range $i, $a := .Interfaces }}{{ if $i }}
+
+{{ end }}{{ template "interface.tmpl" $a -}}
+{{ end -}}
+{{ end }}
 
 // ===== RudderTyper =====
 
