@@ -356,7 +356,7 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "Empty Event No Additional Props",
-            undefined,
+            {},
             this.withRudderTyperContext(options),
         );
     }

@@ -76,7 +76,7 @@ func TestBuildTrackMethod_EmptyAllowUnplanned(t *testing.T) {
 }
 
 func TestBuildTrackMethod_EmptyDisallowUnplanned(t *testing.T) {
-	// Empty schema, additionalProperties: false → no props arg, pass undefined.
+	// Empty schema, additionalProperties: false → no props arg, pass {}.
 	rule := trackRule("Closed Empty Event", "", plan.ObjectSchema{
 		Properties:           map[string]plan.PropertySchema{},
 		AdditionalProperties: false,
@@ -90,7 +90,7 @@ func TestBuildTrackMethod_EmptyDisallowUnplanned(t *testing.T) {
 
 	require.Len(t, method.SDKArguments, 2)
 	assert.Equal(t, `"Closed Empty Event"`, method.SDKArguments[0].Value)
-	assert.Equal(t, "undefined", method.SDKArguments[1].Value)
+	assert.Equal(t, "{}", method.SDKArguments[1].Value)
 	assert.False(t, ctx.UsesSDKApiObject, "no cast needed when no props arg is emitted")
 }
 

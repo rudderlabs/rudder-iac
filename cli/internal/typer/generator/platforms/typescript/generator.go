@@ -942,7 +942,9 @@ func buildTrackMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 
 	default:
 		// Empty schema, additionalProperties: false → no props arg at all.
-		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "undefined"})
+		// Emit an empty object literal so the wire payload is `properties: {}`
+		// regardless of how the SDK serializes an `undefined` properties arg.
+		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "{}"})
 	}
 
 	return method, nil
