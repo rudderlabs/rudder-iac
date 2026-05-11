@@ -19,6 +19,13 @@ type TSInterface struct {
 	Properties []TSInterfaceProperty
 }
 
+// TSTypeAlias → export type Alias = Type;
+type TSTypeAlias struct {
+	Alias   string
+	Type    string
+	Comment string
+}
+
 // TSMethodArgument is one parameter on a RudderTyper method.
 type TSMethodArgument struct {
 	Name     string
@@ -39,12 +46,24 @@ type TSAnalyticsMethod struct {
 	Comment         string
 	EventName       string
 	MethodArguments []TSMethodArgument
-	SDKMethodName   string // "identify" for now; future: "track", "screen", "group"
+	SDKMethodName   string // "identify", "track", etc.
 	SDKArguments    []TSSDKArgument
 }
 
 // TSContext is the root data object passed to RudderTyper.ts.tmpl.
 type TSContext struct {
+	// PropertyEnums and CustomTypeAliases are emitted as `export type X = ...`
+	// declarations. PropertyEnums covers property-level enum constraints; the
+	// other slice covers primitive / array / enum custom types.
+	PropertyEnums      []TSTypeAlias
+	CustomTypeAliases  []TSTypeAlias
+	// CustomInterfaces holds object custom types, emitted as `export interface`.
+	CustomInterfaces []TSInterface
+	// NestedInterfaces holds inline-schema nested objects from event rules,
+	// hoisted to top-level interfaces named `{EventInterface}{PropertyPath}`.
+	// Ordered deepest-first so a reader sees leaf shapes before composites.
+	NestedInterfaces []TSInterface
+	// Interfaces holds top-level event interfaces (track props, identify traits).
 	Interfaces       []TSInterface
 	AnalyticsMethods []TSAnalyticsMethod
 	// EventContext is the ruddertyper provenance map injected into every event's
@@ -55,4 +74,9 @@ type TSContext struct {
 	TrackingPlanID      string
 	TrackingPlanVersion int
 	TrackingPlanURL     string
+	// UsesSDKApiObject is true when at least one method passes a typed object to
+	// the SDK (track props or identify traits) and therefore needs the aliased
+	// SDK type imports for the strict cast.
+	UsesSDKApiObject     bool
+	UsesSDKIdentifyTraits bool
 }
