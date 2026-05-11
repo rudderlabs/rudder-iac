@@ -118,6 +118,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("User Signed Up");
     expect(event.properties).toEqual({
       active: false,
@@ -157,6 +158,7 @@ describe("RudderTyper.track", () => {
 
     const events = await interceptor.waitForEvents(4);
 
+    expect(events.map((e) => e.type)).toEqual(["track", "track", "track", "track"]);
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
@@ -226,6 +228,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("User Signed Up");
     expect(event.properties).toEqual({
       active: true,
@@ -268,6 +271,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe('Product "Premium" Clicked');
     expect(event.properties).toEqual({
       specialField: "value with \"quotes\" and \\path",
@@ -282,6 +286,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("$Variable$String");
     expect(event.properties).toEqual({ dollarField: "$variable_name" });
   });
@@ -293,6 +298,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("$eventWithNameCamelCase$!");
     expect(event.properties).toEqual({});
   });
@@ -304,6 +310,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("eventWithNameCamelCase");
     expect(event.properties).toEqual({ active: true });
   });
@@ -315,6 +322,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("Empty Event No Additional Props");
     expect(event.properties).toEqual({});
   });
@@ -330,6 +338,7 @@ describe("RudderTyper.track", () => {
 
     const [event] = await interceptor.waitForEvents(1);
 
+    expect(event.type).toBe("track");
     expect(event.event).toBe("Empty Event With Additional Props");
     expect(event.properties).toEqual({
       arbitrary: "value",
