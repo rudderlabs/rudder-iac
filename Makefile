@@ -70,6 +70,11 @@ typer-swift-update-testdata: ## Update test data for Swift code generation
 	go run cli/internal/typer/generator/platforms/swift/testutils/generate_reference_plan.go \
 	  > cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift
 
+.PHONY: typer-typescript-update-testdata
+typer-typescript-update-testdata: ## Update test data for TypeScript code generation
+	go run cli/internal/typer/generator/platforms/typescript/testutils/generate_reference_plan.go \
+	  > cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts
+
 .PHONY: typer-swift-validate
 typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
 	mkdir -p cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper

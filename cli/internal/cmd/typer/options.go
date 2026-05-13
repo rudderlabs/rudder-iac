@@ -30,7 +30,7 @@ func newCmdOptions() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&platform, "platform", "", fmt.Sprintf("Platform to show options for (%s, %s)", platformKotlin, platformSwift))
+	cmd.Flags().StringVar(&platform, "platform", "", fmt.Sprintf("Platform to show options for (%s, %s, %s)", platformKotlin, platformSwift, platformTypeScript))
 	cmd.MarkFlagRequired("platform")
 	return cmd
 }
