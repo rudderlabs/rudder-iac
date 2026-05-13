@@ -208,13 +208,13 @@ func TestBuildInterfaceWithNested_OptionalMultiType(t *testing.T) {
 	ctx := &TSContext{}
 	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
 	require.NoError(t, err)
-	require.Len(t, iface.Properties, 1)
 
-	assert.Equal(t, TSInterfaceProperty{
-		Name:     "value",
-		Type:     "string | number",
-		Optional: true,
-	}, iface.Properties[0])
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "value", Type: "string | number", Optional: true},
+		},
+	}, iface)
 }
 
 func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
@@ -248,20 +248,21 @@ func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
 	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
 	require.NoError(t, err)
 
-	require.Len(t, iface.Properties, 1)
-	assert.Equal(t, TSInterfaceProperty{
-		Name: "details",
-		Type: "ParentDetails",
-	}, iface.Properties[0])
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "details", Type: "ParentDetails"},
+		},
+	}, iface)
 
-	require.Len(t, ctx.NestedInterfaces, 1)
-	nested := ctx.NestedInterfaces[0]
-	assert.Equal(t, "ParentDetails", nested.Name)
-	require.Len(t, nested.Properties, 1)
-	assert.Equal(t, TSInterfaceProperty{
-		Name: "value",
-		Type: "string | number",
-	}, nested.Properties[0])
+	assert.Equal(t, []TSInterface{
+		{
+			Name: "ParentDetails",
+			Properties: []TSInterfaceProperty{
+				{Name: "value", Type: "string | number"},
+			},
+		},
+	}, ctx.NestedInterfaces)
 }
 
 func TestIsValidTSIdentifier(t *testing.T) {
