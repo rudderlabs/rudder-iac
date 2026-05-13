@@ -7,6 +7,7 @@
 import type {
     ApiOptions,
     RudderAnalytics,
+    ApiCallback,
     ApiObject as SDKApiObject,
     IdentifyTraits as SDKIdentifyTraits,
 } from "@rudderstack/analytics-js";
@@ -145,12 +146,28 @@ export interface UserSignedUpContext {
 
 // ===== Event Types =====
 
+/** Group association event */
+export interface GroupTraits {
+    /** User active status */
+    active: CustomTypeActive;
+    /** User account status */
+    status?: CustomTypeStatus;
+}
+
+
 /** User identification event */
 export interface IdentifyTraits {
     /** User active status */
     active?: CustomTypeActive;
     /** User's email address */
     email: CustomTypeEmail;
+}
+
+
+/** Page view event */
+export interface PageProperties {
+    /** User profile data */
+    profile: CustomTypeUserProfile;
 }
 
 
@@ -293,23 +310,128 @@ export class RudderTyper {
         this.analytics = analytics;
     }
 
+    public group(
+        groupId: string,
+        traits?: GroupTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public group(
+        traits?: GroupTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
     /**
-     * User identification event
-     *
-     * @param userId - The user identifier
-     * @param traits - The traits to include with this event
-     * @param options - Optional ApiOptions for additional event configuration
+     * Group association event
      */
+    public group(
+        groupIdOrTraits?: string | GroupTraits,
+        traitsOrOptions?: GroupTraits | ApiOptions,
+        optionsOrCallback?: ApiOptions | ApiCallback,
+        callback?: ApiCallback,
+    ): void {
+        if (typeof groupIdOrTraits === "string") {
+            this.analytics.group(
+                groupIdOrTraits,
+                undefined,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as Record<string, unknown>),
+                callback,
+            );
+        } else {
+            this.analytics.group(
+                undefined,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as Record<string, unknown>),
+                optionsOrCallback as ApiCallback | undefined,
+            );
+        }
+    }
+
     public identify(
         userId: string,
         traits?: IdentifyTraits,
         options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public identify(
+        traits?: IdentifyTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    /**
+     * User identification event
+     */
+    public identify(
+        userIdOrTraits?: string | IdentifyTraits,
+        traitsOrOptions?: IdentifyTraits | ApiOptions,
+        optionsOrCallback?: ApiOptions | ApiCallback,
+        callback?: ApiCallback,
     ): void {
-        this.analytics.identify(
-            userId,
-            traits as unknown as SDKIdentifyTraits,
-            this.withRudderTyperContext(options),
-        );
+        if (typeof userIdOrTraits === "string") {
+            this.analytics.identify(
+                userIdOrTraits,
+                traitsOrOptions as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
+                callback,
+            );
+        } else {
+            this.analytics.identify(
+                userIdOrTraits as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
+                optionsOrCallback as ApiCallback | undefined,
+            );
+        }
+    }
+
+    public page(
+        category: string,
+        name: string,
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public page(
+        name: string,
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public page(
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    /**
+     * Page view event
+     */
+    public page(
+        arg0?: string | PageProperties,
+        arg1?: string | PageProperties | ApiOptions,
+        arg2?: PageProperties | ApiOptions | ApiCallback,
+        arg3?: ApiOptions | ApiCallback,
+        arg4?: ApiCallback,
+    ): void {
+        if (typeof arg0 === "string" && typeof arg1 === "string") {
+            this.analytics.page(
+                arg0,
+                arg1,
+                arg2 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg3 as ApiOptions | undefined),
+                arg4,
+            );
+        } else if (typeof arg0 === "string") {
+            this.analytics.page(
+                arg0,
+                arg1 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg2 as ApiOptions | undefined),
+                arg3 as ApiCallback | undefined,
+            );
+        } else {
+            this.analytics.page(
+                arg0 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg1 as ApiOptions | undefined),
+                arg2 as ApiCallback | undefined,
+            );
+        }
     }
 
     /**
@@ -317,15 +439,18 @@ export class RudderTyper {
      *
      * @param props - The properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackVariableString(
         props: VariableString,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "$Variable$String",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -334,15 +459,18 @@ export class RudderTyper {
      *
      * @param props - The properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEventWithNameCamelCase(
         props: EventWithNameCamelCase,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "$eventWithNameCamelCase$!",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -350,14 +478,17 @@ export class RudderTyper {
      * Empty event schema with additionalProperties false
      *
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEmptyEventNoAdditionalProps(
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "Empty Event No Additional Props",
             {},
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -366,15 +497,18 @@ export class RudderTyper {
      *
      * @param props - Additional properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEmptyEventWithAdditionalProps(
         props?: Record<string, unknown>,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "Empty Event With Additional Props",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -383,15 +517,18 @@ export class RudderTyper {
      *
      * @param props - The properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackProductPremiumClicked(
         props: ProductPremiumClicked,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "Product \"Premium\" Clicked",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -400,15 +537,18 @@ export class RudderTyper {
      *
      * @param props - The properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackUserSignedUp(
         props: UserSignedUp,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "User Signed Up",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
@@ -417,20 +557,23 @@ export class RudderTyper {
      *
      * @param props - The properties to include with this event
      * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEventWithNameCamelCase1(
         props: EventWithNameCamelCase1,
         options?: ApiOptions,
+        callback?: ApiCallback,
     ): void {
         this.analytics.track(
             "eventWithNameCamelCase",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
-    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
-        const rudderTyperContext = {
+    private withRudderTyperContext(options?: ApiOptions, contextTraits?: Record<string, unknown>): ApiOptions {
+        const rudderTyperContext: Record<string, unknown> = {
             ruddertyper: {
                 "platform": "typescript",
                 "rudderCLIVersion": "1.0.0",
@@ -438,6 +581,9 @@ export class RudderTyper {
                 "trackingPlanVersion": 13,
             },
         };
+        if (contextTraits) {
+            rudderTyperContext["traits"] = contextTraits;
+        }
         return {
             ...(options ?? {}),
             context: {

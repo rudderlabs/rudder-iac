@@ -40,7 +40,31 @@ type TSSDKArgument struct {
 	Value string
 }
 
+// TSOverloadSignature is one typed signature for an overloaded method.
+// Overloaded methods (identify, group, page) emit one declaration per
+// signature followed by a single implementation whose parameter types are
+// unions covering every overload — the spec calls for multiple SDK-aligned
+// call shapes per non-track event.
+type TSOverloadSignature struct {
+	Arguments []TSMethodArgument
+}
+
+// TSDispatcherBranch is one if/else branch inside the implementation body of an overloaded method.
+// Condition is the JS guard (e.g. `typeof arg0 === "string"`); empty for
+// the fallback else. SDKArguments are the args passed to the SDK in this branch.
+type TSDispatcherBranch struct {
+	Condition    string
+	SDKArguments []TSSDKArgument
+}
+
 // TSAnalyticsMethod is one method on the generated RudderTyper class.
+//
+// Simple methods (track) use MethodArguments + SDKArguments.
+// Overloaded methods (identify, group, page) use Overloads for the public
+// signatures and DispatcherBranches for the implementation body. In
+// TypeScript, a single function implements all overloaded signatures, so
+// the body needs if/else branches to inspect the arguments at runtime and
+// forward to the correct SDK call shape.
 type TSAnalyticsMethod struct {
 	Name            string
 	Comment         string
@@ -48,6 +72,12 @@ type TSAnalyticsMethod struct {
 	MethodArguments []TSMethodArgument
 	SDKMethodName   string // "identify", "track", etc.
 	SDKArguments    []TSSDKArgument
+	Overloads       []TSOverloadSignature
+	DispatcherBranches []TSDispatcherBranch
+	// AddDataToContext mirrors Kotlin/Swift: when true, traits are routed
+	// into options.context.traits instead of the SDK's traits parameter.
+	// Set when the plan rule uses IdentitySectionContextTraits.
+	AddDataToContext bool
 }
 
 // TSContext is the root data object passed to RudderTyper.ts.tmpl.
@@ -77,6 +107,11 @@ type TSContext struct {
 	// UsesSDKApiObject is true when at least one method passes a typed object to
 	// the SDK (track props or identify traits) and therefore needs the aliased
 	// SDK type imports for the strict cast.
-	UsesSDKApiObject     bool
+	UsesSDKApiObject      bool
 	UsesSDKIdentifyTraits bool
+	// UsesApiCallback is true when any generated method accepts an
+	// `ApiCallback` parameter (per the spec, all methods accept one). Pulled
+	// from the SDK rather than defined locally so the callback signature stays
+	// in sync with whatever shape the SDK accepts.
+	UsesApiCallback bool
 }

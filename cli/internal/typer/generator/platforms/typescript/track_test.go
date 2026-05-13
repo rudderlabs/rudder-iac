@@ -32,27 +32,24 @@ func TestBuildTrackMethod_NonEmptySchema(t *testing.T) {
 	ctx := &TSContext{}
 	method, err := buildTrackMethod(rule, ctx, newTestRegistry())
 	require.NoError(t, err)
-	require.NotNil(t, method)
 
-	assert.Equal(t, "trackUserSignedUp", method.Name)
-	assert.Equal(t, "track", method.SDKMethodName)
-	assert.Equal(t, "User Signed Up", method.EventName)
-
-	require.Len(t, method.MethodArguments, 1)
-	assert.Equal(t, TSMethodArgument{
-		Name:    "props",
-		Type:    "UserSignedUp",
-		Comment: "The properties to include with this event",
-	}, method.MethodArguments[0])
-
-	require.Len(t, method.SDKArguments, 2)
-	assert.Equal(t, `"User Signed Up"`, method.SDKArguments[0].Value)
-	assert.Equal(t, "props as unknown as SDKApiObject", method.SDKArguments[1].Value)
+	assert.Equal(t, &TSAnalyticsMethod{
+		Name:          "trackUserSignedUp",
+		Comment:       "Triggered on signup",
+		EventName:     "User Signed Up",
+		SDKMethodName: "track",
+		MethodArguments: []TSMethodArgument{
+			{Name: "props", Type: "UserSignedUp", Comment: "The properties to include with this event"},
+		},
+		SDKArguments: []TSSDKArgument{
+			{Value: `"User Signed Up"`},
+			{Value: "props as unknown as SDKApiObject"},
+		},
+	}, method)
 	assert.True(t, ctx.UsesSDKApiObject)
 }
 
 func TestBuildTrackMethod_EmptyAllowUnplanned(t *testing.T) {
-	// Empty schema with additionalProperties: true → optional generic props arg.
 	rule := trackRule("Open Schema Event", "", plan.ObjectSchema{
 		Properties:           map[string]plan.PropertySchema{},
 		AdditionalProperties: true,
@@ -62,21 +59,22 @@ func TestBuildTrackMethod_EmptyAllowUnplanned(t *testing.T) {
 	method, err := buildTrackMethod(rule, ctx, newTestRegistry())
 	require.NoError(t, err)
 
-	require.Len(t, method.MethodArguments, 1)
-	assert.Equal(t, TSMethodArgument{
-		Name:     "props",
-		Type:     "Record<string, unknown>",
-		Comment:  "Additional properties to include with this event",
-		Optional: true,
-	}, method.MethodArguments[0])
-
-	require.Len(t, method.SDKArguments, 2)
-	assert.Equal(t, "props as unknown as SDKApiObject", method.SDKArguments[1].Value)
+	assert.Equal(t, &TSAnalyticsMethod{
+		Name:          "trackOpenSchemaEvent",
+		EventName:     "Open Schema Event",
+		SDKMethodName: "track",
+		MethodArguments: []TSMethodArgument{
+			{Name: "props", Type: "Record<string, unknown>", Comment: "Additional properties to include with this event", Optional: true},
+		},
+		SDKArguments: []TSSDKArgument{
+			{Value: `"Open Schema Event"`},
+			{Value: "props as unknown as SDKApiObject"},
+		},
+	}, method)
 	assert.True(t, ctx.UsesSDKApiObject)
 }
 
 func TestBuildTrackMethod_EmptyDisallowUnplanned(t *testing.T) {
-	// Empty schema, additionalProperties: false → no props arg, pass {}.
 	rule := trackRule("Closed Empty Event", "", plan.ObjectSchema{
 		Properties:           map[string]plan.PropertySchema{},
 		AdditionalProperties: false,
@@ -86,18 +84,19 @@ func TestBuildTrackMethod_EmptyDisallowUnplanned(t *testing.T) {
 	method, err := buildTrackMethod(rule, ctx, newTestRegistry())
 	require.NoError(t, err)
 
-	assert.Empty(t, method.MethodArguments, "no props arg for closed empty schema")
-
-	require.Len(t, method.SDKArguments, 2)
-	assert.Equal(t, `"Closed Empty Event"`, method.SDKArguments[0].Value)
-	assert.Equal(t, "{}", method.SDKArguments[1].Value)
-	assert.False(t, ctx.UsesSDKApiObject, "no cast needed when no props arg is emitted")
+	assert.Equal(t, &TSAnalyticsMethod{
+		Name:          "trackClosedEmptyEvent",
+		EventName:     "Closed Empty Event",
+		SDKMethodName: "track",
+		SDKArguments: []TSSDKArgument{
+			{Value: `"Closed Empty Event"`},
+			{Value: "{}"},
+		},
+	}, method)
+	assert.False(t, ctx.UsesSDKApiObject)
 }
 
 func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
-	// Special characters in the event name must survive into the SDK call as a
-	// quoted, escaped string literal — the generated method name is sanitised
-	// but the wire-level event name is preserved verbatim.
 	rule := trackRule(`Product "Premium" Clicked`, "", plan.ObjectSchema{
 		Properties: map[string]plan.PropertySchema{
 			"id": {Property: plan.Property{Name: "id", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
@@ -108,8 +107,18 @@ func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
 	method, err := buildTrackMethod(rule, ctx, newTestRegistry())
 	require.NoError(t, err)
 
-	assert.Equal(t, "trackProductPremiumClicked", method.Name)
-	assert.Equal(t, `"Product \"Premium\" Clicked"`, method.SDKArguments[0].Value)
+	assert.Equal(t, &TSAnalyticsMethod{
+		Name:          "trackProductPremiumClicked",
+		EventName:     `Product "Premium" Clicked`,
+		SDKMethodName: "track",
+		MethodArguments: []TSMethodArgument{
+			{Name: "props", Type: "ProductPremiumClicked", Comment: "The properties to include with this event"},
+		},
+		SDKArguments: []TSSDKArgument{
+			{Value: `"Product \"Premium\" Clicked"`},
+			{Value: "props as unknown as SDKApiObject"},
+		},
+	}, method)
 }
 
 func TestProcessEventRules_SkipsVariants(t *testing.T) {
@@ -140,9 +149,12 @@ func TestProcessEventRules_SkipsVariants(t *testing.T) {
 }
 
 func TestProcessEventRules_SkipsUnsupportedEventTypes(t *testing.T) {
+	// Screen is the only event type analytics-js does not expose as a direct
+	// SDK call (it's a mobile-only concept), so a screen rule must be skipped
+	// without emitting a method. Page rules used to be skipped too, but page
+	// is now supported via the SDK's page() API.
 	tp := &plan.TrackingPlan{
 		Rules: []plan.EventRule{
-			{Event: plan.Event{EventType: plan.EventTypePage}, Section: plan.IdentitySectionProperties},
 			{Event: plan.Event{EventType: plan.EventTypeScreen}, Section: plan.IdentitySectionProperties},
 			*trackRule("Allowed", "", plan.ObjectSchema{
 				Properties: map[string]plan.PropertySchema{
@@ -334,29 +346,6 @@ func TestBuildEventInterface_HoistsNestedSchemas(t *testing.T) {
 	assert.Equal(t, "OrderPlacedContextLocation", locationProp.Type)
 }
 
-func TestBuildIdentifyMethod_StrictCast(t *testing.T) {
-	// The identify cast is `traits as unknown as SDKIdentifyTraits` — narrower
-	// than `as any` because the destination type is bounded to the SDK's own
-	// IdentifyTraits, while still bypassing the structural mismatch (the SDK
-	// type has an open index signature that our generated interface lacks).
-	rule := &plan.EventRule{
-		Event:   plan.Event{EventType: plan.EventTypeIdentify, Description: "User identification"},
-		Section: plan.IdentitySectionTraits,
-		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-			"email": {Property: plan.Property{Name: "email", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
-		}},
-	}
-
-	ctx := &TSContext{}
-	method, err := buildIdentifyMethod(rule, ctx, newTestRegistry())
-	require.NoError(t, err)
-
-	require.Len(t, method.SDKArguments, 2)
-	assert.Equal(t, "userId", method.SDKArguments[0].Value)
-	assert.Equal(t, "traits as unknown as SDKIdentifyTraits", method.SDKArguments[1].Value)
-	assert.True(t, ctx.UsesSDKIdentifyTraits)
-}
-
 func TestEmptyObjectType_RespectsAdditionalProperties(t *testing.T) {
 	// Empty schemas split on `additionalProperties`: open ones become
 	// `Record<string, unknown>` (any extra keys allowed); closed ones become
@@ -458,23 +447,3 @@ func TestResolveArrayType_WrapsItemErrors(t *testing.T) {
 	assert.Equal(t, "Array<string | unknown>", got)
 }
 
-func TestBuildIdentifyMethod_EmptySchema_NoTraitsArg(t *testing.T) {
-	// An identify rule with no traits emits a method that passes `undefined`
-	// to the SDK rather than a typed argument — so the SDK type alias import
-	// is not pulled in.
-	rule := &plan.EventRule{
-		Event:   plan.Event{EventType: plan.EventTypeIdentify},
-		Section: plan.IdentitySectionTraits,
-		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
-	}
-
-	ctx := &TSContext{}
-	method, err := buildIdentifyMethod(rule, ctx, newTestRegistry())
-	require.NoError(t, err)
-
-	require.Len(t, method.MethodArguments, 1, "only userId, no traits arg")
-	assert.Equal(t, "userId", method.MethodArguments[0].Name)
-	require.Len(t, method.SDKArguments, 2)
-	assert.Equal(t, "undefined", method.SDKArguments[1].Value)
-	assert.False(t, ctx.UsesSDKIdentifyTraits)
-}

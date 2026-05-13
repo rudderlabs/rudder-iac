@@ -32,6 +32,45 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
+func TestGenerateSingleBranchDispatcher(t *testing.T) {
+	ctx := &typescript.TSContext{
+		EventContext:     map[string]string{"platform": `"typescript"`},
+		UsesApiCallback:  true,
+		TrackingPlanName: "test",
+		TrackingPlanID:   "tp_1",
+		AnalyticsMethods: []typescript.TSAnalyticsMethod{{
+			Name:          "group",
+			Comment:       "test",
+			SDKMethodName: "group",
+			Overloads: []typescript.TSOverloadSignature{{
+				Arguments: []typescript.TSMethodArgument{
+					{Name: "groupId", Type: "string"},
+					{Name: "options", Type: "ApiOptions", Optional: true},
+					{Name: "callback", Type: "ApiCallback", Optional: true},
+				},
+			}},
+			MethodArguments: []typescript.TSMethodArgument{
+				{Name: "groupId", Type: "string"},
+				{Name: "options", Type: "ApiOptions", Optional: true},
+				{Name: "callback", Type: "ApiCallback", Optional: true},
+			},
+			DispatcherBranches: []typescript.TSDispatcherBranch{{
+				SDKArguments: []typescript.TSSDKArgument{
+					{Value: "groupId"},
+					{Value: "undefined"},
+					{Value: "this.withRudderTyperContext(options)"},
+					{Value: "callback"},
+				},
+			}},
+		}},
+	}
+
+	file, err := typescript.GenerateFile("test.ts", ctx)
+	assert.NoError(t, err)
+	assert.Contains(t, file.Content, "        this.analytics.group(\n            groupId,\n            undefined,\n            this.withRudderTyperContext(options),\n            callback,\n        );")
+	assert.NotContains(t, file.Content, "if (typeof", "single branch must not emit if/else")
+}
+
 func TestGenerateWithCustomOutputFileName(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
