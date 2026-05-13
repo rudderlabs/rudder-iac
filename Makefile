@@ -81,3 +81,10 @@ typer-swift-validate: ## Validate generated Swift code against the RudderStack S
 	cp cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift \
 	   cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper/RudderTyper.swift
 	cd cli/internal/typer/generator/platforms/swift/testdata/validator && swift test --disable-swift-testing
+
+.PHONY: typer-typescript-validate
+typer-typescript-validate: ## Validate generated TypeScript code against the RudderStack JS SDK
+	mkdir -p cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper
+	cp cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts \
+	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts
+	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && npm ci && npm run typecheck && npm test
