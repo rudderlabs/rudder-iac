@@ -95,8 +95,8 @@ export class RudderTyper {
     }
 {{- end }}
 {{ end }}
-    private withRudderTyperContext(options?: ApiOptions, contextTraits?: Record<string, unknown>): ApiOptions {
-        const rudderTyperContext: Record<string, unknown> = {
+    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+        const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
 {{- range $key, $value := .EventContext }}
                 "{{ escapeString $key }}": {{ $value }},
@@ -109,7 +109,7 @@ export class RudderTyper {
         return {
             ...(options ?? {}),
             context: {
-                ...((options?.context ?? {}) as Record<string, unknown>),
+                ...((options?.context ?? {}) as SDKApiObject),
                 ...rudderTyperContext,
             },
         };

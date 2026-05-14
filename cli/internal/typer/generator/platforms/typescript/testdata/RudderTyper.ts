@@ -334,13 +334,13 @@ export class RudderTyper {
             this.analytics.group(
                 groupIdOrTraits,
                 undefined,
-                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as Record<string, unknown>),
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject),
                 callback,
             );
         } else {
             this.analytics.group(
-                undefined,
-                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as Record<string, unknown>),
+                null,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject),
                 optionsOrCallback as ApiCallback | undefined,
             );
         }
@@ -572,8 +572,8 @@ export class RudderTyper {
         );
     }
 
-    private withRudderTyperContext(options?: ApiOptions, contextTraits?: Record<string, unknown>): ApiOptions {
-        const rudderTyperContext: Record<string, unknown> = {
+    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+        const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
                 "platform": "typescript",
                 "rudderCLIVersion": "1.0.0",
@@ -587,7 +587,7 @@ export class RudderTyper {
         return {
             ...(options ?? {}),
             context: {
-                ...((options?.context ?? {}) as Record<string, unknown>),
+                ...((options?.context ?? {}) as SDKApiObject),
                 ...rudderTyperContext,
             },
         };
