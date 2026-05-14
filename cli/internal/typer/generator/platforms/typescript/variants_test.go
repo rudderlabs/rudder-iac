@@ -312,9 +312,9 @@ func TestBuildVariantGroup_MissingDiscriminator(t *testing.T) {
 		Cases:         []plan.VariantCase{{Match: []any{"a"}, Schema: plan.ObjectSchema{}}},
 	}
 
-	_, err := buildVariantGroup("Foo", "", baseSchema, variant, newTestRegistry())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `discriminator "kind" not found in base schema of "Foo"`)
+	group, err := buildVariantGroup("Foo", "", baseSchema, variant, newTestRegistry())
+	require.NoError(t, err, "missing discriminator is silently accepted, matching Kotlin")
+	assert.Equal(t, "FooCaseA | FooDefault", group.UnionAlias.Type)
 }
 
 func TestFormatMatchValueForName(t *testing.T) {
