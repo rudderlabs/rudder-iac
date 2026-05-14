@@ -301,6 +301,22 @@ func TestBuildVariantGroup_EnumDiscriminatorInDefault(t *testing.T) {
 	}, ifaceByName["EventCaseMobile"], "named case uses literal")
 }
 
+func TestBuildVariantGroup_MissingDiscriminator(t *testing.T) {
+	baseSchema := &plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"name": {Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+		},
+	}
+	variant := &plan.Variant{
+		Discriminator: "kind",
+		Cases:         []plan.VariantCase{{Match: []any{"a"}, Schema: plan.ObjectSchema{}}},
+	}
+
+	_, err := buildVariantGroup("Foo", "", baseSchema, variant, newTestRegistry())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `discriminator "kind" not found in base schema of "Foo"`)
+}
+
 func TestFormatMatchValueForName(t *testing.T) {
 	tests := []struct {
 		input    any

@@ -60,6 +60,10 @@ func buildVariantGroup(
 	variant *plan.Variant,
 	nr *core.NameRegistry,
 ) (*TSVariantGroup, error) {
+	if _, exists := baseSchema.Properties[variant.Discriminator]; !exists {
+		return nil, fmt.Errorf("discriminator %q not found in base schema of %q", variant.Discriminator, parentName)
+	}
+
 	var caseInterfaces []TSInterface
 	var unionParts []string
 
@@ -97,7 +101,8 @@ func buildVariantGroup(
 	defaultSchema := variant.DefaultSchema
 	if defaultSchema == nil {
 		defaultSchema = &plan.ObjectSchema{
-			Properties: map[string]plan.PropertySchema{},
+			Properties:           map[string]plan.PropertySchema{},
+			AdditionalProperties: false,
 		}
 	}
 

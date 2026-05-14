@@ -437,8 +437,8 @@ func buildEnumUnion(values []any) string {
 //   - bare primitive → `export type CustomTypeFoo = string` (preserved as a
 //     named alias so the IR's intent — e.g. "email" — survives to the output)
 //
-// Variant custom types are skipped with a warning; properties referring to
-// them resolve to the underlying primitive via resolveCustomTypeReference.
+// Variant custom types are emitted as discriminated unions via
+// processCustomTypeVariant (case interfaces + union type alias).
 func processCustomTypesIntoContext(p *plan.TrackingPlan, ctx *TSContext, nr *core.NameRegistry) error {
 	customTypes := p.ExtractAllCustomTypes()
 
