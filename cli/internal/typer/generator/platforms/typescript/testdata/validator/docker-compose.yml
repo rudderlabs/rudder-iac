@@ -1,0 +1,11 @@
+services:
+  validator:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - validator-node-modules:/app/node_modules
+    command: sh -c "npm ci && npm run typecheck && npm test"
+
+volumes:
+  validator-node-modules:
