@@ -151,6 +151,12 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     const events = await interceptor.waitForEvents(4);
 
     expect(events.map((e) => e.type)).toEqual(["track", "track", "track", "track"]);
+    expect(events.map((e) => e.event)).toEqual([
+      "User Signed Up",
+      "User Signed Up",
+      "User Signed Up",
+      "User Signed Up",
+    ]);
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
@@ -230,6 +236,11 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     const events = await interceptor.waitForEvents(3);
 
     expect(events.map((e) => e.type)).toEqual(["track", "track", "track"]);
+    expect(events.map((e) => e.event)).toEqual([
+      "User Signed Up",
+      "User Signed Up",
+      "User Signed Up",
+    ]);
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
