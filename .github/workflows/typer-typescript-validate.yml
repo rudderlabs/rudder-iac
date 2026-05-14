@@ -1,0 +1,54 @@
+name: typer typescript validate
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "cli/internal/typer/generator/platforms/typescript/**"
+      - ".github/workflows/typer-typescript-validate.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cli/internal/typer/generator/platforms/typescript/**"
+      - ".github/workflows/typer-typescript-validate.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typer-typescript-validate:
+    name: validate generated TypeScript against RudderStack JS SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: setup go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: regenerate golden file
+        run: make typer-typescript-update-testdata
+
+      - name: assert golden file is unchanged
+        run: |
+          if ! git diff --exit-code cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts; then
+            echo "::error::Golden file is out of date. Run 'make typer-typescript-update-testdata' locally and commit the changes."
+            exit 1
+          fi
+
+      - name: run typer-typescript-validate
+        run: make typer-typescript-validate
