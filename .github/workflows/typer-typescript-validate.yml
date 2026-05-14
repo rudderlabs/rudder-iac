@@ -6,12 +6,18 @@ on:
       - "release/*"
     paths:
       - "cli/internal/typer/generator/platforms/typescript/**"
+      - "cli/internal/typer/generator/core/**"
+      - "cli/internal/typer/plan/**"
+      - "Makefile"
       - ".github/workflows/typer-typescript-validate.yml"
   pull_request:
     branches:
       - main
     paths:
       - "cli/internal/typer/generator/platforms/typescript/**"
+      - "cli/internal/typer/generator/core/**"
+      - "cli/internal/typer/plan/**"
+      - "Makefile"
       - ".github/workflows/typer-typescript-validate.yml"
 
 concurrency:
