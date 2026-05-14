@@ -92,27 +92,6 @@ export interface CustomTypeAddressDetails {
 }
 
 
-/** Feature configuration with variants based on multi-type flag */
-export interface CustomTypeFeatureConfig {
-    /** Feature flag that can be boolean or string */
-    featureFlag: boolean | string;
-}
-
-
-/** Page context with variants based on page type */
-export interface CustomTypePageContext {
-    /** Type of page */
-    pageType: string;
-}
-
-
-/** User access with variants based on active status */
-export interface CustomTypeUserAccess {
-    /** User active status */
-    active: CustomTypeActive;
-}
-
-
 /** User profile information */
 export interface CustomTypeUserProfile {
     /** User's email address */
@@ -122,6 +101,158 @@ export interface CustomTypeUserProfile {
     /** User's last name */
     lastName?: string;
 }
+
+
+// ===== Variant Types =====
+
+/** Feature in beta (string 'beta') */
+export interface CustomTypeFeatureConfigCaseBeta {
+    /** Feature flag that can be boolean or string */
+    featureFlag: "beta";
+    /** User tags as array of strings */
+    tags?: string[];
+}
+
+
+/** Feature disabled (boolean false) */
+export interface CustomTypeFeatureConfigCaseFalse {
+    /** Feature flag that can be boolean or string */
+    featureFlag: false;
+    /** User's first name */
+    firstName?: string;
+}
+
+
+/** Feature enabled (boolean true) */
+export interface CustomTypeFeatureConfigCaseTrue {
+    /** User's age */
+    age?: CustomTypeAge;
+    /** Feature flag that can be boolean or string */
+    featureFlag: true;
+}
+
+
+/** Default case */
+export interface CustomTypeFeatureConfigDefault {
+    /** Feature flag that can be boolean or string */
+    featureFlag: boolean | string;
+}
+
+
+/** Feature configuration with variants based on multi-type flag */
+export type CustomTypeFeatureConfig = CustomTypeFeatureConfigCaseBeta | CustomTypeFeatureConfigCaseFalse | CustomTypeFeatureConfigCaseTrue | CustomTypeFeatureConfigDefault;
+
+
+/** Home page variant with no additional properties */
+export interface CustomTypePageContextCaseHome {
+    /** Type of page */
+    pageType: "home";
+}
+
+
+/** Product page variant */
+export interface CustomTypePageContextCaseProduct {
+    /** Type of page */
+    pageType: "product";
+    /** Product identifier */
+    productId: string;
+}
+
+
+/** Search page variant */
+export interface CustomTypePageContextCaseSearch {
+    /** Type of page */
+    pageType: "search";
+    /** Search query */
+    query: string;
+}
+
+
+/** Default case */
+export interface CustomTypePageContextDefault {
+    /** Additional page data */
+    pageData?: Record<string, unknown>;
+    /** Type of page */
+    pageType: string;
+}
+
+
+/** Page context with variants based on page type */
+export type CustomTypePageContext = CustomTypePageContextCaseHome | CustomTypePageContextCaseProduct | CustomTypePageContextCaseSearch | CustomTypePageContextDefault;
+
+
+/** Inactive user access */
+export interface CustomTypeUserAccessCaseFalse {
+    /** User active status */
+    active: false;
+    /** User account status */
+    status: CustomTypeStatus;
+}
+
+
+/** Active user access */
+export interface CustomTypeUserAccessCaseTrue {
+    /** User active status */
+    active: true;
+    /** User's email address */
+    email: CustomTypeEmail;
+}
+
+
+/** Default case */
+export interface CustomTypeUserAccessDefault {
+    /** User active status */
+    active: CustomTypeActive;
+}
+
+
+/** User access with variants based on active status */
+export type CustomTypeUserAccess = CustomTypeUserAccessCaseFalse | CustomTypeUserAccessCaseTrue | CustomTypeUserAccessDefault;
+
+
+/** Desktop page view */
+export interface EventWithVariantsCaseDesktop {
+    /** Type of device */
+    deviceType: "desktop";
+    /** User's first name */
+    firstName: string;
+    /** User's last name */
+    lastName?: string;
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+}
+
+
+/** Mobile device page view */
+export interface EventWithVariantsCaseMobile {
+    /** Type of device */
+    deviceType: "mobile";
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** User tags as array of strings */
+    tags?: string[];
+}
+
+
+/** Default case */
+export interface EventWithVariantsDefault {
+    /** Type of device */
+    deviceType: PropertyDeviceType;
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** A field with no explicit type (treated as any) */
+    untypedField?: unknown;
+}
+
+
+/** Example event to demonstrate variants */
+export type EventWithVariants = EventWithVariantsCaseDesktop | EventWithVariantsCaseMobile | EventWithVariantsDefault;
 
 
 // ===== Nested Object Types =====
@@ -506,6 +637,26 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "Empty Event With Additional Props",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Example event to demonstrate variants
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEventWithVariants(
+        props: EventWithVariants,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "Event With Variants",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
             callback,
