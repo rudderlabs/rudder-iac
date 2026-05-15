@@ -1,6 +1,7 @@
 package client_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -40,6 +41,62 @@ func TestAPIError_Error(t *testing.T) {
 				ErrorCode:      "INTERNAL_ERROR",
 			},
 			want: "http status code: 500, error code: 'INTERNAL_ERROR', error: 'Internal server error'",
+		},
+		{
+			name: "details with single field",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "request validation failed",
+				Details:        json.RawMessage(`{"mappings":"Array must contain at least 1 element(s)"}`),
+			},
+			want: "http status code: 400, error code: '', error: 'request validation failed' (mappings: Array must contain at least 1 element(s))",
+		},
+		{
+			name: "details with multiple fields renders sorted by key",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "request validation failed",
+				Details:        json.RawMessage(`{"name":"Required","mappings":"Array must contain at least 1 element(s)"}`),
+			},
+			want: "http status code: 400, error code: '', error: 'request validation failed' (mappings: Array must contain at least 1 element(s), name: Required)",
+		},
+		{
+			name: "empty details object is omitted",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "Invalid request",
+				ErrorCode:      "BAD_REQUEST",
+				Details:        json.RawMessage(`{}`),
+			},
+			want: "http status code: 400, error code: 'BAD_REQUEST', error: 'Invalid request'",
+		},
+		{
+			name: "null details is omitted",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "Invalid request",
+				ErrorCode:      "BAD_REQUEST",
+				Details:        json.RawMessage(`null`),
+			},
+			want: "http status code: 400, error code: 'BAD_REQUEST', error: 'Invalid request'",
+		},
+		{
+			name: "nil details is omitted",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "Invalid request",
+				ErrorCode:      "BAD_REQUEST",
+			},
+			want: "http status code: 400, error code: 'BAD_REQUEST', error: 'Invalid request'",
+		},
+		{
+			name: "non-object details falls back to raw JSON",
+			apiError: &client.APIError{
+				HTTPStatusCode: 400,
+				Message:        "request validation failed",
+				Details:        json.RawMessage(`["a","b"]`),
+			},
+			want: `http status code: 400, error code: '', error: 'request validation failed' (details: ["a","b"])`,
 		},
 	}
 
