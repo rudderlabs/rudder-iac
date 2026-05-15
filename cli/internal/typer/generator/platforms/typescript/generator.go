@@ -1060,7 +1060,6 @@ func buildIdentityCallMethod(spec identityCallSpec) *TSAnalyticsMethod {
 		Overloads:          overloads,
 		MethodArguments:    impl,
 		DispatcherBranches: buildIdentityCallBranches(spec),
-		AddDataToContext:   spec.AddDataToContext,
 	}
 }
 
