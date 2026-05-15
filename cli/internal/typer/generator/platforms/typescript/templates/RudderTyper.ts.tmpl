@@ -35,6 +35,20 @@ import type {
 {{ end }}{{ template "interface.tmpl" $a -}}
 {{ end -}}
 {{ end }}
+{{- if .VariantTypes }}
+
+// ===== Variant Types =====
+
+{{ range $gi, $group := .VariantTypes }}{{ if $gi }}
+
+{{ end }}{{ range $ci, $iface := $group.CaseInterfaces }}{{ if $ci }}
+
+{{ end }}{{ template "interface.tmpl" $iface -}}
+{{ end }}
+
+{{ template "typealias.tmpl" $group.UnionAlias -}}
+{{ end -}}
+{{ end }}
 {{- if .NestedInterfaces }}
 
 // ===== Nested Object Types =====

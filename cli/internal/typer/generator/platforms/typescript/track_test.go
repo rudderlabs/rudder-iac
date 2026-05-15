@@ -122,16 +122,28 @@ func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
 	}, method)
 }
 
-func TestProcessEventRules_SkipsVariants(t *testing.T) {
-	// A track rule with variants must be skipped without producing an interface
-	// or method, but the rest of the plan should still process normally.
+func TestProcessEventRules_EmitsVariants(t *testing.T) {
 	tp := &plan.TrackingPlan{
 		Rules: []plan.EventRule{
-			*trackRule("Has Variants", "", plan.ObjectSchema{
+			*trackRule("Has Variants", "event with disc", plan.ObjectSchema{
 				Properties: map[string]plan.PropertySchema{
 					"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
 				},
-			}, plan.Variant{Discriminator: "kind"}),
+			}, plan.Variant{
+				Discriminator: "kind",
+				Cases: []plan.VariantCase{
+					{
+						DisplayName: "Alpha",
+						Match:       []any{"alpha"},
+						Description: "Alpha case",
+						Schema: plan.ObjectSchema{
+							Properties: map[string]plan.PropertySchema{
+								"score": {Property: plan.Property{Name: "score", Types: []plan.PropertyType{plan.PrimitiveTypeInteger}}, Required: true},
+							},
+						},
+					},
+				},
+			}),
 			*trackRule("Plain Event", "", plan.ObjectSchema{
 				Properties: map[string]plan.PropertySchema{
 					"id": {Property: plan.Property{Name: "id", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
@@ -143,10 +155,19 @@ func TestProcessEventRules_SkipsVariants(t *testing.T) {
 	ctx := &TSContext{}
 	require.NoError(t, processEventRules(tp, ctx, newTestRegistry()))
 
-	assert.Len(t, ctx.AnalyticsMethods, 1, "variant rule skipped")
-	assert.Equal(t, "trackPlainEvent", ctx.AnalyticsMethods[0].Name)
-	assert.Len(t, ctx.Interfaces, 1)
+	assert.Len(t, ctx.AnalyticsMethods, 2, "variant rule produces a method")
+	assert.Equal(t, "trackHasVariants", ctx.AnalyticsMethods[0].Name)
+	assert.Equal(t, "trackPlainEvent", ctx.AnalyticsMethods[1].Name)
+
+	assert.Len(t, ctx.Interfaces, 1, "plain event still gets an interface")
 	assert.Equal(t, "PlainEvent", ctx.Interfaces[0].Name)
+
+	require.Len(t, ctx.VariantTypes, 1)
+	group := ctx.VariantTypes[0]
+	assert.Equal(t, "HasVariants", group.UnionAlias.Alias)
+	require.Len(t, group.CaseInterfaces, 2, "one named case + default")
+	assert.Equal(t, "HasVariantsCaseAlpha", group.CaseInterfaces[0].Name)
+	assert.Equal(t, "HasVariantsDefault", group.CaseInterfaces[1].Name)
 }
 
 func TestProcessEventRules_SkipsUnsupportedEventTypes(t *testing.T) {
@@ -220,9 +241,7 @@ func TestProcessCustomTypesIntoContext_Categories(t *testing.T) {
 	assert.Equal(t, "User profile", interfaces["CustomTypeProfile"].Comment)
 }
 
-func TestProcessCustomTypesIntoContext_VariantsEmitBaseOnly(t *testing.T) {
-	// Custom types with variants are emitted using the base schema only — the
-	// variant cases are skipped (out of scope for this ticket).
+func TestProcessCustomTypesIntoContext_VariantsEmitDiscriminatedUnion(t *testing.T) {
 	pageCT := &plan.CustomType{
 		Name:        "page",
 		Description: "Page context",
@@ -230,7 +249,20 @@ func TestProcessCustomTypesIntoContext_VariantsEmitBaseOnly(t *testing.T) {
 		Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
 			"page_type": {Property: plan.Property{Name: "page_type", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
 		}},
-		Variants: []plan.Variant{{Discriminator: "page_type"}},
+		Variants: []plan.Variant{{
+			Discriminator: "page_type",
+			Cases: []plan.VariantCase{
+				{
+					DisplayName: "Search",
+					Match:       []any{"search"},
+					Description: "Search page",
+					Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+						"query": {Property: plan.Property{Name: "query", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
+					}},
+				},
+			},
+			DefaultSchema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
+		}},
 	}
 
 	tp := &plan.TrackingPlan{
@@ -246,11 +278,27 @@ func TestProcessCustomTypesIntoContext_VariantsEmitBaseOnly(t *testing.T) {
 	ctx := &TSContext{}
 	require.NoError(t, processCustomTypesIntoContext(tp, ctx, newTestRegistry()))
 
-	require.Len(t, ctx.CustomInterfaces, 1)
-	iface := ctx.CustomInterfaces[0]
-	assert.Equal(t, "CustomTypePage", iface.Name)
-	require.Len(t, iface.Properties, 1, "only the base discriminator field, no variant fields")
-	assert.Equal(t, "pageType", iface.Properties[0].Name)
+	assert.Empty(t, ctx.CustomInterfaces, "variant types go to VariantTypes, not CustomInterfaces")
+
+	require.Len(t, ctx.VariantTypes, 1)
+	group := ctx.VariantTypes[0]
+	assert.Equal(t, "CustomTypePage", group.UnionAlias.Alias)
+	assert.Equal(t, "CustomTypePageCaseSearch | CustomTypePageDefault", group.UnionAlias.Type)
+
+	require.Len(t, group.CaseInterfaces, 2)
+	assert.Equal(t, "CustomTypePageCaseSearch", group.CaseInterfaces[0].Name)
+	assert.Equal(t, "CustomTypePageDefault", group.CaseInterfaces[1].Name)
+
+	// Case interface has discriminator as literal + case-specific property
+	searchIface := group.CaseInterfaces[0]
+	require.Len(t, searchIface.Properties, 2)
+	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: `"search"`, Comment: "", Optional: false}, searchIface.Properties[0])
+	assert.Equal(t, TSInterfaceProperty{Name: "query", Type: "string", Comment: "", Optional: false}, searchIface.Properties[1])
+
+	// Default interface has discriminator with original type
+	defaultIface := group.CaseInterfaces[1]
+	require.Len(t, defaultIface.Properties, 1)
+	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: "string", Comment: "", Optional: false}, defaultIface.Properties[0])
 }
 
 func TestProcessPropertyEnumsIntoContext(t *testing.T) {

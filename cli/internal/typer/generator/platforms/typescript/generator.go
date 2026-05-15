@@ -333,16 +333,6 @@ func resolveMultiType(types []plan.PropertyType, nr *core.NameRegistry) (string,
 // registered alias (so the IR's intent — "this is the email type" — survives
 // to the generated output rather than collapsing to an anonymous `string`).
 func resolveCustomTypeReference(ct *plan.CustomType, nr *core.NameRegistry) (string, error) {
-	if len(ct.Variants) > 0 {
-		// Variants out of scope — fall back to the underlying primitive.
-		// This keeps consumers that only need the discriminator field working,
-		// and lets a future ticket layer in variant emission without changing
-		// callers.
-		if ct.Type == plan.PrimitiveTypeObject {
-			return resolveCustomTypeName(ct, nr)
-		}
-		return mapPrimitiveToTSType(ct.Type)
-	}
 	return resolveCustomTypeName(ct, nr)
 }
 
@@ -447,8 +437,8 @@ func buildEnumUnion(values []any) string {
 //   - bare primitive → `export type CustomTypeFoo = string` (preserved as a
 //     named alias so the IR's intent — e.g. "email" — survives to the output)
 //
-// Variant custom types are skipped with a warning; properties referring to
-// them resolve to the underlying primitive via resolveCustomTypeReference.
+// Variant custom types are emitted as discriminated unions via
+// processCustomTypeVariant (case interfaces + union type alias).
 func processCustomTypesIntoContext(p *plan.TrackingPlan, ctx *TSContext, nr *core.NameRegistry) error {
 	customTypes := p.ExtractAllCustomTypes()
 
@@ -462,8 +452,7 @@ func processCustomTypesIntoContext(p *plan.TrackingPlan, ctx *TSContext, nr *cor
 		ct := customTypes[name]
 
 		if len(ct.Variants) > 0 {
-			ui.PrintWarning(fmt.Sprintf("custom type %q has variants (not yet supported for typescript), emitting base schema only", ct.Name))
-			if err := emitCustomTypeBaseOnly(ct, ctx, nr); err != nil {
+			if err := processCustomTypeVariant(ct, ctx, nr); err != nil {
 				return err
 			}
 			continue
@@ -520,32 +509,6 @@ func emitCustomType(ct *plan.CustomType, ctx *TSContext, nr *core.NameRegistry) 
 	}
 }
 
-// emitCustomTypeBaseOnly handles custom types that have variants. Variants are
-// out of scope, but we emit the base schema (object or alias) so properties
-// referencing the type resolve to a sensible shape rather than disappearing.
-func emitCustomTypeBaseOnly(ct *plan.CustomType, ctx *TSContext, nr *core.NameRegistry) error {
-	if ct.Type != plan.PrimitiveTypeObject {
-		return emitCustomType(ct, ctx, nr)
-	}
-	typeName, err := getOrRegisterCustomTypeName(ct, nr)
-	if err != nil {
-		return err
-	}
-	if isEmptySchema(ct.Schema) {
-		ctx.CustomTypeAliases = append(ctx.CustomTypeAliases, TSTypeAlias{
-			Alias:   typeName,
-			Type:    emptyObjectType(ct.Schema),
-			Comment: ct.Description,
-		})
-		return nil
-	}
-	iface, err := buildInterfaceFromSchema(typeName, ct.Description, ct.Schema, nr)
-	if err != nil {
-		return err
-	}
-	ctx.CustomInterfaces = append(ctx.CustomInterfaces, *iface)
-	return nil
-}
 
 func emitCustomObjectType(ct *plan.CustomType, typeName string, ctx *TSContext, nr *core.NameRegistry) error {
 	if isEmptySchema(ct.Schema) {
@@ -664,7 +627,9 @@ func processEventRules(p *plan.TrackingPlan, ctx *TSContext, nr *core.NameRegist
 		}
 
 		if len(rule.Variants) > 0 {
-			ui.PrintWarning(fmt.Sprintf("event %q has variants (not yet supported for typescript), skipping", rule.Event.Name))
+			if err := processEventRuleVariant(rule, ctx, nr); err != nil {
+				return err
+			}
 			continue
 		}
 

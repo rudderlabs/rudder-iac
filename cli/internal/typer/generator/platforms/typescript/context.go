@@ -80,6 +80,14 @@ type TSAnalyticsMethod struct {
 	AddDataToContext bool
 }
 
+// TSVariantGroup groups the case interfaces and union type alias for one
+// discriminated union (custom type or event rule variant). Each group
+// renders as N case interfaces followed by the union alias.
+type TSVariantGroup struct {
+	CaseInterfaces []TSInterface
+	UnionAlias     TSTypeAlias
+}
+
 // TSContext is the root data object passed to RudderTyper.ts.tmpl.
 type TSContext struct {
 	// PropertyEnums and CustomTypeAliases are emitted as `export type X = ...`
@@ -93,6 +101,9 @@ type TSContext struct {
 	// hoisted to top-level interfaces named `{EventInterface}{PropertyPath}`.
 	// Ordered deepest-first so a reader sees leaf shapes before composites.
 	NestedInterfaces []TSInterface
+	// VariantTypes holds discriminated unions — each group contains the case
+	// interfaces and the union type alias for one variant (custom type or event).
+	VariantTypes []TSVariantGroup
 	// Interfaces holds top-level event interfaces (track props, identify traits).
 	Interfaces       []TSInterface
 	AnalyticsMethods []TSAnalyticsMethod
