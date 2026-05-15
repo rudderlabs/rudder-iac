@@ -189,6 +189,82 @@ func TestResolvePropertyType_NestedOverride(t *testing.T) {
 	assert.Equal(t, "TrackUserSignedUpContext", got)
 }
 
+func TestBuildInterfaceWithNested_OptionalMultiType(t *testing.T) {
+	// Optional + multi-type must render as `prop?: A | B`, not
+	// `prop: A | B | undefined`. Optionality lives on the field marker, not in
+	// the type union — `null` belongs in the union when the plan says so,
+	// `undefined` does not. Matters under exactOptionalPropertyTypes.
+	schema := &plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"value": {
+				Property: plan.Property{
+					Name:  "value",
+					Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNumber},
+				},
+			},
+		},
+	}
+
+	ctx := &TSContext{}
+	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
+	require.NoError(t, err)
+
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "value", Type: "string | number", Optional: true},
+		},
+	}, iface)
+}
+
+func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
+	// A multi-type property inside a hoisted nested-object schema must resolve
+	// to a union on the nested interface, not collapse to `unknown` or fall
+	// back to the underlying object primitive.
+	schema := &plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"details": {
+				Property: plan.Property{
+					Name:  "details",
+					Types: []plan.PropertyType{plan.PrimitiveTypeObject},
+				},
+				Required: true,
+				Schema: &plan.ObjectSchema{
+					Properties: map[string]plan.PropertySchema{
+						"value": {
+							Property: plan.Property{
+								Name:  "value",
+								Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNumber},
+							},
+							Required: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ctx := &TSContext{}
+	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
+	require.NoError(t, err)
+
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "details", Type: "ParentDetails"},
+		},
+	}, iface)
+
+	assert.Equal(t, []TSInterface{
+		{
+			Name: "ParentDetails",
+			Properties: []TSInterfaceProperty{
+				{Name: "value", Type: "string | number"},
+			},
+		},
+	}, ctx.NestedInterfaces)
+}
+
 func TestIsValidTSIdentifier(t *testing.T) {
 	tests := []struct {
 		input    string
