@@ -62,6 +62,11 @@ var tsReservedWords = map[string]bool{
 	"static":     true,
 	"yield":      true,
 
+	// Not keywords, but `eval` and `arguments` cannot be used as binding
+	// identifiers under strict mode — and the generated file runs in strict mode.
+	"arguments": true,
+	"eval":      true,
+
 	// Contextual / TypeScript-specific
 	"any":         true,
 	"async":       true,

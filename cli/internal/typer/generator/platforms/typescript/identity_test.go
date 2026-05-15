@@ -156,7 +156,6 @@ func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
 		},
 	}, method.DispatcherBranches)
 
-	assert.True(t, method.AddDataToContext)
 	assert.False(t, ctx.UsesSDKIdentifyTraits)
 }
 
@@ -284,7 +283,6 @@ func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
 		},
 	}, method.DispatcherBranches)
 
-	assert.True(t, method.AddDataToContext)
 	assert.False(t, ctx.UsesSDKIdentifyTraits)
 }
 

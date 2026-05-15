@@ -135,7 +135,7 @@ export interface CustomTypeFeatureConfigCaseTrue {
 /** Default case */
 export interface CustomTypeFeatureConfigDefault {
     /** Feature flag that can be boolean or string */
-    featureFlag: boolean | string;
+    featureFlag: Exclude<boolean | string, true | false | "beta">;
 }
 
 
@@ -173,7 +173,7 @@ export interface CustomTypePageContextDefault {
     /** Additional page data */
     pageData?: Record<string, unknown>;
     /** Type of page */
-    pageType: string;
+    pageType: Exclude<string, "search" | "product" | "home">;
 }
 
 
@@ -202,7 +202,7 @@ export interface CustomTypeUserAccessCaseTrue {
 /** Default case */
 export interface CustomTypeUserAccessDefault {
     /** User active status */
-    active: CustomTypeActive;
+    active: Exclude<CustomTypeActive, true | false>;
 }
 
 
@@ -241,7 +241,7 @@ export interface EventWithVariantsCaseMobile {
 /** Default case */
 export interface EventWithVariantsDefault {
     /** Type of device */
-    deviceType: PropertyDeviceType;
+    deviceType: Exclude<PropertyDeviceType, "mobile" | "desktop">;
     /** Page context information */
     pageContext?: CustomTypePageContext;
     /** User profile data */

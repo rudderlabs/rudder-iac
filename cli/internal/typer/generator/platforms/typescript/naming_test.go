@@ -99,6 +99,8 @@ func TestFormatPropertyName_ReservedWords(t *testing.T) {
 		// strict-mode reserved
 		"as", "implements", "interface", "let", "package", "private", "protected",
 		"public", "static", "yield",
+		// strict-mode restricted binding identifiers
+		"arguments", "eval",
 		// contextual / TS-specific
 		"any", "async", "await", "boolean", "constructor", "declare", "from", "get",
 		"is", "keyof", "module", "namespace", "never", "number", "of", "readonly",

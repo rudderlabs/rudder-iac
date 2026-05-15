@@ -74,10 +74,6 @@ type TSAnalyticsMethod struct {
 	SDKArguments    []TSSDKArgument
 	Overloads       []TSOverloadSignature
 	DispatcherBranches []TSDispatcherBranch
-	// AddDataToContext mirrors Kotlin/Swift: when true, traits are routed
-	// into options.context.traits instead of the SDK's traits parameter.
-	// Set when the plan rule uses IdentitySectionContextTraits.
-	AddDataToContext bool
 }
 
 // TSVariantGroup groups the case interfaces and union type alias for one

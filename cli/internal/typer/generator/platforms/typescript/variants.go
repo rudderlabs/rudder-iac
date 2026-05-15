@@ -62,9 +62,12 @@ func buildVariantGroup(
 ) (*TSVariantGroup, error) {
 	var caseInterfaces []TSInterface
 	var unionParts []string
+	var coveredValues []any
 
 	for _, vc := range variant.Cases {
 		for _, matchValue := range vc.Match {
+			coveredValues = append(coveredValues, matchValue)
+
 			caseName := formatVariantCaseName(parentName, matchValue)
 			registered, err := nr.RegisterName(
 				"variant:"+parentName+":case:"+fmt.Sprintf("%v", matchValue),
@@ -76,7 +79,7 @@ func buildVariantGroup(
 
 			iface, err := buildVariantInterface(
 				registered, vc.Description, baseSchema, &vc.Schema,
-				variant.Discriminator, matchValue, nr,
+				variant.Discriminator, matchValue, nil, nr,
 			)
 			if err != nil {
 				return nil, err
@@ -104,7 +107,7 @@ func buildVariantGroup(
 
 	defaultIface, err := buildVariantInterface(
 		registeredDefault, "Default case", baseSchema, defaultSchema,
-		variant.Discriminator, nil, nr,
+		variant.Discriminator, nil, coveredValues, nr,
 	)
 	if err != nil {
 		return nil, err
@@ -127,10 +130,16 @@ func buildVariantGroup(
 	}, nil
 }
 
-// buildVariantInterface builds one case (or default) interface by merging
-// the base schema with the case/default schema. When discriminatorValue is
-// non-nil the discriminator property gets a TS literal type; when nil (the
-// default case) it keeps the original resolved type from the base schema.
+// buildVariantInterface builds one case (or default) interface by merging the
+// base schema with the case/default schema. When discriminatorValue is non-nil
+// (a named case) the discriminator property is pinned to that TS literal. When
+// nil (the default case) the discriminator is narrowed to
+// `Exclude<T, ...covered literals>` so the Default member stays structurally
+// disjoint from every named case — without this, narrowing on the
+// discriminator (in an `if` or a `switch`) cannot isolate a named case. For an
+// exhaustively-covered discriminator the Exclude collapses to `never`,
+// correctly marking Default unreachable. coveredValues is every named case's
+// match value and is consulted only for the default case.
 func buildVariantInterface(
 	name string,
 	comment string,
@@ -138,6 +147,7 @@ func buildVariantInterface(
 	caseSchema *plan.ObjectSchema,
 	discriminator string,
 	discriminatorValue any,
+	coveredValues []any,
 	nr *core.NameRegistry,
 ) (*TSInterface, error) {
 	merged := mergeSchemaProperties(baseSchema, caseSchema)
@@ -157,8 +167,10 @@ func buildVariantInterface(
 			return nil, err
 		}
 
+		isDiscriminator := propName == discriminator
+
 		var tsType string
-		if propName == discriminator && discriminatorValue != nil {
+		if isDiscriminator && discriminatorValue != nil {
 			tsType = FormatTSLiteral(discriminatorValue)
 		} else {
 			var enumName string
@@ -172,10 +184,17 @@ func buildVariantInterface(
 			if err != nil {
 				return nil, fmt.Errorf("resolving type for property %q in variant interface %q: %w", propName, name, err)
 			}
+			// Default-case discriminator: subtract every value a named case
+			// already covers so this member stays disjoint and narrows cleanly.
+			if isDiscriminator && len(coveredValues) > 0 {
+				tsType = formatExcludeType(tsType, coveredValues)
+			}
 		}
 
+		// A discriminator must be required for narrowing to work — in both
+		// named and default cases.
 		optional := !propSchema.Required
-		if propName == discriminator && discriminatorValue != nil {
+		if isDiscriminator {
 			optional = false
 		}
 
@@ -213,6 +232,23 @@ func mergeSchemaProperties(baseSchema, caseSchema *plan.ObjectSchema) map[string
 		}
 	}
 	return merged
+}
+
+// formatExcludeType wraps base in `Exclude<base, v1 | v2 | ...>`, formatting
+// each value as a TS literal and dropping duplicates. Used to narrow a
+// variant's default-case discriminator to the values no named case covers.
+func formatExcludeType(base string, values []any) string {
+	seen := make(map[string]bool, len(values))
+	lits := make([]string, 0, len(values))
+	for _, v := range values {
+		lit := FormatTSLiteral(v)
+		if seen[lit] {
+			continue
+		}
+		seen[lit] = true
+		lits = append(lits, lit)
+	}
+	return fmt.Sprintf("Exclude<%s, %s>", base, strings.Join(lits, " | "))
 }
 
 func formatVariantCaseName(parentName string, matchValue any) string {
