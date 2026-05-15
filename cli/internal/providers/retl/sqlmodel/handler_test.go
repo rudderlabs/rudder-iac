@@ -21,7 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-// createTestRETLSourceWithConfig creates a test RETL source with custom config
+// createTestRETLSourceWithConfig creates a test RETL source with custom config.
 func createTestRETLSourceWithConfig(id, name, sourceDefn, accountID string, enabled bool, config retlClient.RETLSQLModelConfig) retlClient.RETLSource {
 	return retlClient.RETLSource{
 		ID:                   id,
@@ -76,8 +76,8 @@ func createTestSpecMap(fields map[string]interface{}) *specs.Spec {
 }
 
 // mockListRetlSources creates a mock list function that returns the given sources
-func mockListRetlSources(sources ...retlClient.RETLSource) func(ctx context.Context) (*retlClient.RETLSources, error) {
-	return func(ctx context.Context) (*retlClient.RETLSources, error) {
+func mockListRetlSources(sources ...retlClient.RETLSource) func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+	return func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 		return &retlClient.RETLSources{Data: sources}, nil
 	}
 }
@@ -92,7 +92,7 @@ type mockRETLClient struct {
 	updateError                bool
 	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
-	listRetlSourcesFunc        func(ctx context.Context) (*retlClient.RETLSources, error)
+	listRetlSourcesFunc        func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
 	getRetlSourceFunc          func(ctx context.Context, sourceID string) (*retlClient.RETLSource, error)
 	submitSourcePreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getSourcePreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -160,9 +160,9 @@ func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) 
 	return nil
 }
 
-func (m *mockRETLClient) ListRetlSources(ctx context.Context, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 	if m.listRetlSourcesFunc != nil {
-		return m.listRetlSourcesFunc(ctx)
+		return m.listRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{
 		Data: []retlClient.RETLSource{
@@ -203,6 +203,38 @@ func (m *mockRETLClient) SetExternalId(ctx context.Context, sourceID string, ext
 		return m.setExternalIdFunc(ctx, sourceID, externalId)
 	}
 	return nil
+}
+
+// RETL connection methods are unused by the sqlmodel handler. Stubs fail fast
+// so that if the handler ever starts calling them, tests surface the change
+// instead of silently passing with nil responses.
+
+func unexpectedConnectionCall(method string) error {
+	return errors.New("unexpected call to mockRETLClient." + method)
+}
+
+func (m *mockRETLClient) CreateConnection(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
+	return nil, unexpectedConnectionCall("CreateConnection")
+}
+
+func (m *mockRETLClient) UpdateConnection(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
+	return nil, unexpectedConnectionCall("UpdateConnection")
+}
+
+func (m *mockRETLClient) DeleteConnection(ctx context.Context, id string) error {
+	return unexpectedConnectionCall("DeleteConnection")
+}
+
+func (m *mockRETLClient) GetConnection(ctx context.Context, id string) (*retlClient.RETLConnection, error) {
+	return nil, unexpectedConnectionCall("GetConnection")
+}
+
+func (m *mockRETLClient) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	return nil, unexpectedConnectionCall("ListConnections")
+}
+
+func (m *mockRETLClient) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
+	return unexpectedConnectionCall("SetConnectionExternalId")
 }
 
 func TestSQLModelHandler(t *testing.T) {
@@ -1201,7 +1233,7 @@ func TestSQLModelHandler(t *testing.T) {
 
 			mockClient := &mockRETLClient{
 				sourceID: "src123",
-				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+				listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 					return nil, fmt.Errorf("API error")
 				},
 			}
@@ -1473,7 +1505,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 
 			mockClient := &mockRETLClient{
-				listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) {
+				listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 					return nil, fmt.Errorf("API error listing sources")
 				},
 			}
@@ -1657,7 +1689,9 @@ func TestSQLModelHandler(t *testing.T) {
 
 		t.Run("API error", func(t *testing.T) {
 			t.Parallel()
-			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) { return nil, fmt.Errorf("api") }}
+			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+				return nil, fmt.Errorf("api")
+			}}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection, err := h.LoadImportable(context.Background(), idNamer)
 			assert.Error(t, err)
@@ -1743,8 +1777,10 @@ func TestSQLModelHandler(t *testing.T) {
 				assert.Equal(t, "Imported Model", req.Name)
 				assert.Equal(t, "acc123", req.AccountID)
 				assert.True(t, req.IsEnabled)
-				assert.Equal(t, "id", req.Config.PrimaryKey)
-				assert.Equal(t, "SELECT * FROM t", req.Config.Sql)
+				decoded, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](req.Config)
+				require.NoError(t, err)
+				assert.Equal(t, "id", decoded.PrimaryKey)
+				assert.Equal(t, "SELECT * FROM t", decoded.Sql)
 				return &retlClient.RETLSource{
 					ID:                   "remote-id",
 					Name:                 req.Name,
