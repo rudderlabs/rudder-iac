@@ -275,7 +275,7 @@ func resolvePropertyType(prop *plan.Property, enumName, nestedTypeName string, n
 		return "unknown", nil
 	}
 	if len(prop.Types) > 1 {
-		return resolveMultiType(prop.Types, nr)
+		return resolveMultiType(prop.Types, prop.ItemTypes, nr)
 	}
 
 	pt := prop.Types[0]
@@ -298,8 +298,12 @@ func resolvePropertyType(prop *plan.Property, enumName, nestedTypeName string, n
 	return "unknown", nil
 }
 
-// resolveMultiType emits `A | B | C` for a multi-type property.
-func resolveMultiType(types []plan.PropertyType, nr *core.NameRegistry) (string, error) {
+// resolveMultiType emits `A | B | C` for a multi-type property. An array
+// member is narrowed with itemTypes — `Types: [Array, Null]` with
+// `ItemTypes: [String]` renders `string[] | null` — so the union does not
+// lose item-type information; without item types the array stays open
+// (`unknown[]`).
+func resolveMultiType(types []plan.PropertyType, itemTypes []plan.PropertyType, nr *core.NameRegistry) (string, error) {
 	parts := make([]string, 0, len(types))
 	for _, t := range types {
 		var (
@@ -315,7 +319,12 @@ func resolveMultiType(types []plan.PropertyType, nr *core.NameRegistry) (string,
 				part, err = resolveCustomTypeReference(ct, nr)
 			}
 		case plan.IsPrimitiveType(t):
-			part, err = mapPrimitiveToTSType(*plan.AsPrimitiveType(t))
+			primitive := *plan.AsPrimitiveType(t)
+			if primitive == plan.PrimitiveTypeArray {
+				part, err = resolveArrayType(itemTypes, nr)
+			} else {
+				part, err = mapPrimitiveToTSType(primitive)
+			}
 		default:
 			part = "unknown"
 		}

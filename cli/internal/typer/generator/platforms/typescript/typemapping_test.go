@@ -74,23 +74,27 @@ func TestResolvePropertyType_Arrays(t *testing.T) {
 
 func TestResolvePropertyType_MultiType(t *testing.T) {
 	tests := []struct {
-		name     string
-		types    []plan.PropertyType
-		expected string
+		name      string
+		types     []plan.PropertyType
+		itemTypes []plan.PropertyType
+		expected  string
 	}{
 		{
 			"string or null",
 			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull},
+			nil,
 			"string | null",
 		},
 		{
 			"string, integer, boolean",
 			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean},
+			nil,
 			"string | number | boolean",
 		},
 		{
 			"number or null",
 			[]plan.PropertyType{plan.PrimitiveTypeNumber, plan.PrimitiveTypeNull},
+			nil,
 			"number | null",
 		},
 		{
@@ -98,13 +102,42 @@ func TestResolvePropertyType_MultiType(t *testing.T) {
 			// dedupe so the output reads `number | boolean`, not `number | number | boolean`.
 			"integer and number dedupe",
 			[]plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean},
+			nil,
 			"number | boolean",
+		},
+		{
+			// nullable typed array: the array member must keep its item type
+			// rather than collapsing to the open `unknown[]`.
+			"nullable string array",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeString},
+			"string[] | null",
+		},
+		{
+			"nullable integer array → number[] | null",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeInteger},
+			"number[] | null",
+		},
+		{
+			// array member with mixed item types still narrows via Array<...>.
+			"nullable mixed-item array",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger},
+			"Array<string | number> | null",
+		},
+		{
+			// no item types → array member stays open.
+			"nullable untyped array → unknown[] | null",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			nil,
+			"unknown[] | null",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(&plan.Property{Types: tt.types}, "", "", newTestRegistry())
+			got, err := resolvePropertyType(&plan.Property{Types: tt.types, ItemTypes: tt.itemTypes}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
