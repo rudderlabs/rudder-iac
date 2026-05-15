@@ -87,4 +87,4 @@ typer-typescript-validate: ## Validate generated TypeScript code against the Rud
 	mkdir -p cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper
 	cp cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts \
 	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts
-	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && npm ci && npm run typecheck && npm test
+	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && docker compose run --rm -T validator
