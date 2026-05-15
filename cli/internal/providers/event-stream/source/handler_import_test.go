@@ -265,6 +265,61 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "source with ocaml type",
+			setupImportable: func() *resources.RemoteResources {
+				importable := resources.NewRemoteResources()
+				importableSourceMap := map[string]*resources.RemoteResource{
+					"remote-ocaml-123": {
+						ID:         "remote-ocaml-123",
+						ExternalID: "ocaml-source-1",
+						Reference:  "#event-stream-source:ocaml-source-1",
+						Data: &sourceClient.EventStreamSource{
+							ID:          "remote-ocaml-123",
+							ExternalID:  "ocaml-source-1",
+							Name:        "OCaml Source 1",
+							Type:        "ocaml",
+							Enabled:     true,
+							WorkspaceID: "workspace-123",
+						},
+					},
+				}
+				importable.Set(source.ResourceType, importableSourceMap)
+				return importable
+			},
+			setupRemote: func() *resources.RemoteResources {
+				return resources.NewRemoteResources()
+			},
+			setupGraph: func() *resources.Graph {
+				return resources.NewGraph()
+			},
+			expectedSpec: &specs.Spec{
+				Kind:    "event-stream-source",
+				Version: specs.SpecVersionV1,
+				Spec: map[string]any{
+					"id":      "ocaml-source-1",
+					"name":    "OCaml Source 1",
+					"type":    "ocaml",
+					"enabled": true,
+				},
+				Metadata: map[string]any{
+					"name": "event-stream-source",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "workspace-123",
+								"resources": []any{
+									map[string]any{
+										"urn":       "event-stream-source:ocaml-source-1",
+										"remote_id": "remote-ocaml-123",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -57,6 +57,47 @@ func TestCreateSource(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestCreateSource_WithOcamlType(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"externalId":"ext-ocaml-123","name":"OCaml Source","type":"ocaml","enabled":true}`
+			return testutils.ValidateRequest(t, req, "POST", "/v2/event-stream-sources", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "src-ocaml-123",
+			"externalId": "ext-ocaml-123",
+			"name": "OCaml Source",
+			"type": "ocaml",
+			"enabled": true
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	eventStreamClient := esSource.NewRudderSourceStore(c)
+
+	source := &esSource.CreateSourceRequest{
+		ExternalID: "ext-ocaml-123",
+		Name:       "OCaml Source",
+		Type:       "ocaml",
+		Enabled:    true,
+	}
+
+	created, err := eventStreamClient.Create(context.Background(), source)
+	require.NoError(t, err)
+
+	assert.Equal(t, &esSource.CreateUpdateSourceResponse{
+		ID:         "src-ocaml-123",
+		ExternalID: "ext-ocaml-123",
+		Name:       "OCaml Source",
+		Type:       "ocaml",
+		Enabled:    true,
+	}, created)
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestUpdateSource(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
