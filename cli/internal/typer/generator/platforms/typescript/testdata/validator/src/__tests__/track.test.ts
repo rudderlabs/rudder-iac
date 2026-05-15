@@ -346,4 +346,20 @@ describe("RudderTyper.track", () => {
       nested: { ok: true },
     });
   });
+
+  // ---- ruddertyper context injection ----
+
+  it("merges the ruddertyper context into the dispatched track event", async () => {
+    typer.trackEmptyEventNoAdditionalProps();
+
+    const [event] = await interceptor.waitForEvents(1);
+
+    const ctx = (event.context ?? {}) as Record<string, unknown>;
+    expect(ctx.ruddertyper).toEqual({
+      platform: "typescript",
+      rudderCLIVersion: "1.0.0",
+      trackingPlanId: "plan_12345",
+      trackingPlanVersion: 13,
+    });
+  });
 });
