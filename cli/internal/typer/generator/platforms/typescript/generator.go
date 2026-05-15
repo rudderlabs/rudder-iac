@@ -108,12 +108,20 @@ func getOrRegisterPropertyEnumName(p *plan.Property, nr *core.NameRegistry) (str
 }
 
 func getOrRegisterEventInterfaceName(rule *plan.EventRule, nr *core.NameRegistry) (string, error) {
+	key := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
 	switch rule.Event.EventType {
 	case plan.EventTypeIdentify:
-		// Identify is a singleton — interface is always `IdentifyTraits` (or
-		// `IdentifyContextTraits` for context.traits). Event name is unused.
+		// Identify is a singleton — interface is always `IdentifyTraits`. The
+		// rule's section (traits vs context.traits) doesn't change the
+		// generated interface name; the routing difference is handled in
+		// the dispatcher body (AddDataToContext).
 		name := FormatTypeName("Identify", "Traits")
-		key := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
+		return nr.RegisterName(key, globalTypeScope, name)
+	case plan.EventTypeGroup:
+		// Group mirrors identify: singleton in analytics-js, one `group()`
+		// method, one `GroupTraits` interface. The section (traits vs
+		// context.traits) affects routing, not the interface name.
+		name := FormatTypeName("Group", "Traits")
 		return nr.RegisterName(key, globalTypeScope, name)
 	case plan.EventTypeTrack:
 		// Track interfaces follow the spec convention: PascalCase event name
@@ -123,7 +131,13 @@ func getOrRegisterEventInterfaceName(rule *plan.EventRule, nr *core.NameRegistry
 		if name == "" {
 			return "", fmt.Errorf("track event has empty name")
 		}
-		key := "event:" + string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section)
+		return nr.RegisterName(key, globalTypeScope, name)
+	case plan.EventTypePage:
+		// Page is a singleton in analytics-js: the SDK exposes one `page()`
+		// method with the page name passed at call time, so the typed
+		// properties interface is `PageProperties` regardless of the plan
+		// rule's name. Mirrors identify/group.
+		name := FormatTypeName("Page", "Properties")
 		return nr.RegisterName(key, globalTypeScope, name)
 	}
 	return "", fmt.Errorf("unsupported event type: %s", rule.Event.EventType)
@@ -135,11 +149,20 @@ func getOrRegisterEventMethodName(rule *plan.EventRule, nr *core.NameRegistry) (
 	switch rule.Event.EventType {
 	case plan.EventTypeIdentify:
 		methodName = "identify"
+	case plan.EventTypeGroup:
+		// Group is a singleton call in analytics-js — the SDK exposes a single
+		// `group(groupId, traits, ...)` method, so the generated wrapper is
+		// named `group` regardless of the plan rule name.
+		methodName = "group"
 	case plan.EventTypeTrack:
 		// Always prefix track methods with `track` so the call site reads
 		// `analytics.trackUserSignedUp(...)` rather than collapsing into the
 		// camelCased event name (which can collide with property accessors).
 		methodName = FormatMethodName("track", rule.Event.Name)
+	case plan.EventTypePage:
+		// Singleton page() — name lives in the call argument, not the method
+		// name. Mirrors identify/group.
+		methodName = "page"
 	default:
 		return "", fmt.Errorf("unsupported event type: %s", rule.Event.EventType)
 	}
@@ -676,18 +699,24 @@ func processOneEventRule(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 	return nil
 }
 
-// isSupportedEventType limits the v1 typer to identify and track. Other event
-// types are accepted in the plan (so existing reference plans keep validating)
-// but emit a warning and produce no output.
+// isSupportedEventType lists the event types analytics-js exposes as direct
+// SDK methods: track, identify, group, page. Screen is intentionally excluded —
+// analytics-js has no `screen()` API (mobile-only concept), so screen rules
+// emit a warning and produce no output rather than generating a method that
+// can't dispatch.
 func isSupportedEventType(t plan.EventType) bool {
-	return t == plan.EventTypeIdentify || t == plan.EventTypeTrack
+	switch t {
+	case plan.EventTypeTrack, plan.EventTypeIdentify, plan.EventTypeGroup, plan.EventTypePage:
+		return true
+	}
+	return false
 }
 
 func validateEventSection(rule *plan.EventRule) bool {
 	switch rule.Event.EventType {
-	case plan.EventTypeIdentify:
+	case plan.EventTypeIdentify, plan.EventTypeGroup:
 		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
-	case plan.EventTypeTrack:
+	case plan.EventTypeTrack, plan.EventTypePage:
 		return rule.Section == plan.IdentitySectionProperties
 	}
 	return false
@@ -842,58 +871,58 @@ func buildAnalyticsMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameReg
 	switch rule.Event.EventType {
 	case plan.EventTypeIdentify:
 		return buildIdentifyMethod(rule, ctx, nr)
+	case plan.EventTypeGroup:
+		return buildGroupMethod(rule, ctx, nr)
 	case plan.EventTypeTrack:
 		return buildTrackMethod(rule, ctx, nr)
+	case plan.EventTypePage:
+		return buildPageMethod(rule, ctx, nr)
 	}
 	return nil, fmt.Errorf("unsupported event type: %s", rule.Event.EventType)
 }
 
+// buildIdentifyMethod emits a class method wrapping analytics-js
+// `identify()`. The wrapper carries two spec-aligned overloads:
+//
+//	identify(userId, traits?, options?, callback?)
+//	identify(traits?, options?, callback?)  // anonymous
+//
+// The implementation accepts union-typed positional args and dispatches by
+// `typeof arg0 === "string"`. Schemas with no traits collapse to a simpler
+// shape (no traits arg in either overload).
 func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistry) (*TSAnalyticsMethod, error) {
 	methodName, err := getOrRegisterEventMethodName(rule, nr)
 	if err != nil {
 		return nil, err
 	}
 
-	method := &TSAnalyticsMethod{
-		Name:          methodName,
-		Comment:       rule.Event.Description,
-		EventName:     rule.Event.Name,
-		SDKMethodName: "identify",
-		MethodArguments: []TSMethodArgument{
-			{
-				Name:    "userId",
-				Type:    "string",
-				Comment: "The user identifier",
-			},
-		},
-		SDKArguments: []TSSDKArgument{
-			{Value: "userId"},
-		},
-	}
+	ctx.UsesApiCallback = true
+	addDataToContext := rule.Section == plan.IdentitySectionContextTraits
 
+	traitsType := ""
 	if !isEmptySchema(&rule.Schema) {
 		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
 		if err != nil {
 			return nil, err
 		}
-		method.MethodArguments = append(method.MethodArguments, TSMethodArgument{
-			Name:     "traits",
-			Type:     interfaceName,
-			Comment:  "The traits to include with this event",
-			Optional: true,
-		})
-		// Cast through `unknown` to the SDK's IdentifyTraits type. The SDK type
-		// has an open index signature that our generated interface lacks, so
-		// the structural cast cannot succeed directly — but going through
-		// `unknown` keeps the destination bounded to the SDK type rather than
-		// erasing to `any`.
-		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "traits as unknown as " + sdkIdentifyTraitsAlias})
-		ctx.UsesSDKIdentifyTraits = true
-	} else {
-		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "undefined"})
+		traitsType = interfaceName
+		if !addDataToContext {
+			ctx.UsesSDKIdentifyTraits = true
+		}
 	}
 
-	return method, nil
+	return buildIdentityCallMethod(identityCallSpec{
+		MethodName:       methodName,
+		Comment:          rule.Event.Description,
+		EventName:        rule.Event.Name,
+		SDKMethodName:    "identify",
+		IDParamName:      "userId",
+		IDArgName:        "userIdOrTraits",
+		TraitsType:       traitsType,
+		SDKTraitsType:    sdkIdentifyTraitsAlias,
+		AllowAnonymous:   true,
+		AddDataToContext: addDataToContext,
+	}), nil
 }
 
 func buildTrackMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistry) (*TSAnalyticsMethod, error) {
@@ -901,6 +930,10 @@ func buildTrackMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 	if err != nil {
 		return nil, err
 	}
+
+	// Track always carries a callback param per spec; mark the context so the
+	// SDK import pulls in ApiCallback. Non-track methods set the same flag.
+	ctx.UsesApiCallback = true
 
 	eventNameLiteral := fmt.Sprintf("%q", rule.Event.Name)
 
@@ -948,4 +981,432 @@ func buildTrackMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 	}
 
 	return method, nil
+}
+
+// buildGroupMethod emits a wrapper around analytics-js
+// `group(groupId, traits?, options?, callback?)`. Same shape as identify —
+// see [buildIdentifyMethod].
+func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistry) (*TSAnalyticsMethod, error) {
+	methodName, err := getOrRegisterEventMethodName(rule, nr)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx.UsesApiCallback = true
+	addDataToContext := rule.Section == plan.IdentitySectionContextTraits
+
+	traitsType := ""
+	if !isEmptySchema(&rule.Schema) {
+		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
+		if err != nil {
+			return nil, err
+		}
+		traitsType = interfaceName
+		if !addDataToContext {
+			ctx.UsesSDKIdentifyTraits = true
+		}
+	}
+
+	return buildIdentityCallMethod(identityCallSpec{
+		MethodName:       methodName,
+		Comment:          rule.Event.Description,
+		EventName:        rule.Event.Name,
+		SDKMethodName:    "group",
+		IDParamName:      "groupId",
+		IDArgName:        "groupIdOrTraits",
+		TraitsType:       traitsType,
+		SDKTraitsType:    sdkIdentifyTraitsAlias,
+		AllowAnonymous:   true,
+		AddDataToContext: addDataToContext,
+	}), nil
+}
+
+// identityCallSpec parametrises the shared overload-emitting code used by
+// identify and group. The two methods have identical shape: an optional
+// string identifier, optional typed traits, options, and callback.
+type identityCallSpec struct {
+	MethodName       string
+	Comment          string
+	EventName        string
+	SDKMethodName    string // "identify" or "group"
+	IDParamName      string // "userId" or "groupId" — name shown in the typed overloads
+	IDArgName        string // "userIdOrTraits" — name of the union-typed impl param
+	TraitsType       string // generated interface name; empty if the rule has no traits
+	SDKTraitsType    string // SDK type alias to cast to (sdkIdentifyTraitsAlias)
+	AllowAnonymous   bool   // emit the second (no-ID) overload
+	AddDataToContext bool   // traits routed into options.context.traits instead of SDK traits param
+}
+
+// buildIdentityCallMethod constructs a TSAnalyticsMethod for identify/group.
+// When the rule defines traits, two spec-aligned overloads are emitted
+// with a two-branch dispatcher. When the rule has no traits, only the
+// with-id overload is emitted with a single unconditional branch.
+func buildIdentityCallMethod(spec identityCallSpec) *TSAnalyticsMethod {
+	hasTraits := spec.TraitsType != ""
+
+	if !hasTraits {
+		return buildIdentityCallMethodNoTraits(spec)
+	}
+
+	// ===== Overload 1: (id, traits?, options?, callback?) =====
+	o1 := []TSMethodArgument{
+		{Name: spec.IDParamName, Type: "string"},
+		{Name: "traits", Type: spec.TraitsType, Optional: true},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+
+	overloads := []TSOverloadSignature{{Arguments: o1}}
+
+	// ===== Overload 2 (anonymous): (traits?, options?, callback?) =====
+	if spec.AllowAnonymous {
+		o2 := []TSMethodArgument{
+			{Name: "traits", Type: spec.TraitsType, Optional: true},
+			{Name: "options", Type: "ApiOptions", Optional: true},
+			{Name: "callback", Type: "ApiCallback", Optional: true},
+		}
+		overloads = append(overloads, TSOverloadSignature{Arguments: o2})
+	}
+
+	// ===== Implementation signature with union types =====
+	// Names like `userIdOrTraits` make the dispatcher body readable while
+	// the union types reflect both overload shapes.
+	impl := []TSMethodArgument{
+		{Name: spec.IDArgName, Type: joinUnion([]string{"string", spec.TraitsType}), Optional: true},
+		{Name: "traitsOrOptions", Type: joinUnion([]string{spec.TraitsType, "ApiOptions"}), Optional: true},
+		{Name: "optionsOrCallback", Type: joinUnion([]string{"ApiOptions", "ApiCallback"}), Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+
+	return &TSAnalyticsMethod{
+		Name:               spec.MethodName,
+		Comment:            spec.Comment,
+		EventName:          spec.EventName,
+		SDKMethodName:      spec.SDKMethodName,
+		Overloads:          overloads,
+		MethodArguments:    impl,
+		DispatcherBranches: buildIdentityCallBranches(spec),
+		AddDataToContext:   spec.AddDataToContext,
+	}
+}
+
+// buildIdentityCallMethodNoTraits emits the simpler shape used when the plan
+// rule has no traits schema. One overload, no anonymous variant, single
+// unconditional dispatcher branch.
+func buildIdentityCallMethodNoTraits(spec identityCallSpec) *TSAnalyticsMethod {
+	overloads := []TSOverloadSignature{{
+		Arguments: []TSMethodArgument{
+			{Name: spec.IDParamName, Type: "string"},
+			{Name: "options", Type: "ApiOptions", Optional: true},
+			{Name: "callback", Type: "ApiCallback", Optional: true},
+		},
+	}}
+
+	impl := []TSMethodArgument{
+		{Name: spec.IDParamName, Type: "string"},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+
+	return &TSAnalyticsMethod{
+		Name:            spec.MethodName,
+		Comment:         spec.Comment,
+		EventName:       spec.EventName,
+		SDKMethodName:   spec.SDKMethodName,
+		Overloads:       overloads,
+		MethodArguments: impl,
+		DispatcherBranches: []TSDispatcherBranch{{
+			SDKArguments: []TSSDKArgument{
+				{Value: spec.IDParamName},
+				{Value: "undefined"},
+				{Value: "this.withRudderTyperContext(options)"},
+				{Value: "callback"},
+			},
+		}},
+	}
+}
+
+// renderIdentityCallBody emits the dispatcher body for the with-traits shape
+// of identify/group. The body branches on `typeof <IDArgName> === "string"`
+// to forward to either the with-ID overload or the anonymous overload at the
+// SDK level.
+func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
+	if spec.AddDataToContext {
+		return buildIdentityCallBranchesContextTraits(spec)
+	}
+
+	traitsCast := func(argName string) string {
+		return argName + " as unknown as " + spec.SDKTraitsType
+	}
+
+	withID := TSDispatcherBranch{
+		Condition: fmt.Sprintf(`typeof %s === "string"`, spec.IDArgName),
+		SDKArguments: []TSSDKArgument{
+			{Value: spec.IDArgName},
+			{Value: traitsCast("traitsOrOptions")},
+			{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
+			{Value: "callback"},
+		},
+	}
+
+	branches := []TSDispatcherBranch{withID}
+	if spec.AllowAnonymous {
+		branches = append(branches, TSDispatcherBranch{
+			SDKArguments: []TSSDKArgument{
+				{Value: traitsCast(spec.IDArgName)},
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
+				{Value: "optionsOrCallback as ApiCallback | undefined"},
+			},
+		})
+	}
+	return branches
+}
+
+func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatcherBranch {
+	contextTraitsCast := func(argName string) string {
+		return argName + " as unknown as SDKApiObject"
+	}
+
+	withID := TSDispatcherBranch{
+		Condition: fmt.Sprintf(`typeof %s === "string"`, spec.IDArgName),
+		SDKArguments: []TSSDKArgument{
+			{Value: spec.IDArgName},
+			{Value: "undefined"},
+			{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, " + contextTraitsCast("traitsOrOptions") + ")"},
+			{Value: "callback"},
+		},
+	}
+
+	branches := []TSDispatcherBranch{withID}
+	if spec.AllowAnonymous {
+		branches = append(branches, TSDispatcherBranch{
+			SDKArguments: []TSSDKArgument{
+				{Value: "null"},
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, " + contextTraitsCast(spec.IDArgName) + ")"},
+				{Value: "optionsOrCallback as ApiCallback | undefined"},
+			},
+		})
+	}
+	return branches
+}
+
+// buildPageMethod emits a singleton `page()` wrapper around analytics-js
+// `page()`. Per the spec, page is a singleton — the page name lives in the
+// runtime call, not the method name. Three overloads cover the SDK's call
+// shapes:
+//
+//	page(category, name, properties?, options?, callback?)
+//	page(name, properties?, options?, callback?)
+//	page(properties?, options?, callback?)
+//
+// Only one page rule per plan is supported in this iteration — the singleton
+// PageProperties interface can only represent one schema. Multiple rules
+// trigger a name-registry collision (renamed `page1`, `PageProperties1`).
+func buildPageMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistry) (*TSAnalyticsMethod, error) {
+	methodName, err := getOrRegisterEventMethodName(rule, nr)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx.UsesApiCallback = true
+
+	// Determine the properties type. Three plan shapes:
+	//   non-empty schema   → typed interface (PageProperties)
+	//   empty + additional → open Record<string, unknown>
+	//   closed empty       → no properties typing (properties arg is optional & untyped)
+	var (
+		propsType    string
+		propsSDKCast string
+	)
+	emptySchema := isEmptySchema(&rule.Schema)
+	switch {
+	case !emptySchema:
+		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
+		if err != nil {
+			return nil, err
+		}
+		propsType = interfaceName
+		propsSDKCast = "as unknown as " + sdkApiObjectAlias
+		ctx.UsesSDKApiObject = true
+	case rule.Schema.AdditionalProperties:
+		propsType = openObjectType
+		propsSDKCast = "as unknown as " + sdkApiObjectAlias
+		ctx.UsesSDKApiObject = true
+	default:
+		// Closed empty: no properties param; SDK call passes undefined.
+		propsType = ""
+		propsSDKCast = ""
+	}
+
+	return buildPageCallMethod(pageCallSpec{
+		MethodName:    methodName,
+		Comment:       rule.Event.Description,
+		EventName:     rule.Event.Name,
+		SDKMethodName: "page",
+		PropertiesTy:  propsType,
+		PropsSDKCast:  propsSDKCast,
+	}), nil
+}
+
+// pageCallSpec parametrises the page overload emitter.
+type pageCallSpec struct {
+	MethodName    string
+	Comment       string
+	EventName     string
+	SDKMethodName string
+	// PropertiesTy is the typed properties interface name (or
+	// Record<string, unknown> for open empty). Empty for closed empty
+	// (the properties arg is omitted from overloads in that case).
+	PropertiesTy string
+	// PropsSDKCast is the cast applied when forwarding properties to the SDK
+	// (e.g., "as unknown as SDKApiObject | undefined"). Empty when
+	// PropertiesTy is empty.
+	PropsSDKCast string
+}
+
+// buildPageCallMethod emits page() with its three spec-aligned overloads and
+// a dispatcher body keyed on `typeof arg0 === "string"` and
+// `typeof arg1 === "string"`. The closed-empty case (no PropertiesTy) collapses
+// the properties slot out of every overload and the impl signature, so the
+// dispatcher reads options/callback from the correct positions instead of
+// shifting them by one. The wire-level properties arg in that case is `{}` —
+// mirrors track's closed-empty behaviour for a deterministic payload.
+func buildPageCallMethod(spec pageCallSpec) *TSAnalyticsMethod {
+	if spec.PropertiesTy == "" {
+		return buildPageCallMethodNoProps(spec)
+	}
+
+	// ===== Overloads (with properties) =====
+	o1 := []TSMethodArgument{
+		{Name: "category", Type: "string"},
+		{Name: "name", Type: "string"},
+		{Name: "properties", Type: spec.PropertiesTy, Optional: true},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+	o2 := []TSMethodArgument{
+		{Name: "name", Type: "string"},
+		{Name: "properties", Type: spec.PropertiesTy, Optional: true},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+	o3 := []TSMethodArgument{
+		{Name: "properties", Type: spec.PropertiesTy, Optional: true},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+
+	// 5 positional args cover the longest overload (category, name, props, options, callback).
+	impl := []TSMethodArgument{
+		{Name: "arg0", Type: joinUnion([]string{"string", spec.PropertiesTy}), Optional: true},
+		{Name: "arg1", Type: joinUnion([]string{"string", spec.PropertiesTy, "ApiOptions"}), Optional: true},
+		{Name: "arg2", Type: joinUnion([]string{spec.PropertiesTy, "ApiOptions", "ApiCallback"}), Optional: true},
+		{Name: "arg3", Type: joinUnion([]string{"ApiOptions", "ApiCallback"}), Optional: true},
+		{Name: "arg4", Type: "ApiCallback", Optional: true},
+	}
+
+	return &TSAnalyticsMethod{
+		Name:               spec.MethodName,
+		Comment:            spec.Comment,
+		EventName:          spec.EventName,
+		SDKMethodName:      spec.SDKMethodName,
+		Overloads:          []TSOverloadSignature{{Arguments: o1}, {Arguments: o2}, {Arguments: o3}},
+		MethodArguments:    impl,
+		DispatcherBranches: buildPageCallBranches(spec),
+	}
+}
+
+// buildPageCallMethodNoProps emits page() for closed-empty schemas. Every
+// overload drops the properties slot, the implementation is 4-slot, and each
+// branch forwards `{}` as the SDK's properties argument (matching the way
+// closed-empty track sends `{}` for deterministic wire shape).
+func buildPageCallMethodNoProps(spec pageCallSpec) *TSAnalyticsMethod {
+	o1 := []TSMethodArgument{
+		{Name: "category", Type: "string"},
+		{Name: "name", Type: "string"},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+	o2 := []TSMethodArgument{
+		{Name: "name", Type: "string"},
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+	o3 := []TSMethodArgument{
+		{Name: "options", Type: "ApiOptions", Optional: true},
+		{Name: "callback", Type: "ApiCallback", Optional: true},
+	}
+
+	impl := []TSMethodArgument{
+		{Name: "arg0", Type: joinUnion([]string{"string", "ApiOptions"}), Optional: true},
+		{Name: "arg1", Type: joinUnion([]string{"string", "ApiOptions", "ApiCallback"}), Optional: true},
+		{Name: "arg2", Type: joinUnion([]string{"ApiOptions", "ApiCallback"}), Optional: true},
+		{Name: "arg3", Type: "ApiCallback", Optional: true},
+	}
+
+	return &TSAnalyticsMethod{
+		Name:            spec.MethodName,
+		Comment:         spec.Comment,
+		EventName:       spec.EventName,
+		SDKMethodName:   spec.SDKMethodName,
+		Overloads:       []TSOverloadSignature{{Arguments: o1}, {Arguments: o2}, {Arguments: o3}},
+		MethodArguments: impl,
+		DispatcherBranches: []TSDispatcherBranch{
+			{
+				Condition: `typeof arg0 === "string" && typeof arg1 === "string"`,
+				SDKArguments: []TSSDKArgument{
+					{Value: "arg0"}, {Value: "arg1"}, {Value: "{}"},
+					{Value: "this.withRudderTyperContext(arg2 as ApiOptions | undefined)"},
+					{Value: "arg3"},
+				},
+			},
+			{
+				Condition: `typeof arg0 === "string"`,
+				SDKArguments: []TSSDKArgument{
+					{Value: "arg0"}, {Value: "{}"},
+					{Value: "this.withRudderTyperContext(arg1 as ApiOptions | undefined)"},
+					{Value: "arg2 as ApiCallback | undefined"},
+				},
+			},
+			{
+				SDKArguments: []TSSDKArgument{
+					{Value: "{}"},
+					{Value: "this.withRudderTyperContext(arg0 as ApiOptions | undefined)"},
+					{Value: "arg1 as ApiCallback | undefined"},
+				},
+			},
+		},
+	}
+}
+
+func buildPageCallBranches(spec pageCallSpec) []TSDispatcherBranch {
+	cast := func(argName string) string {
+		return argName + " " + spec.PropsSDKCast
+	}
+
+	return []TSDispatcherBranch{
+		{
+			Condition: `typeof arg0 === "string" && typeof arg1 === "string"`,
+			SDKArguments: []TSSDKArgument{
+				{Value: "arg0"}, {Value: "arg1"}, {Value: cast("arg2")},
+				{Value: "this.withRudderTyperContext(arg3 as ApiOptions | undefined)"},
+				{Value: "arg4"},
+			},
+		},
+		{
+			Condition: `typeof arg0 === "string"`,
+			SDKArguments: []TSSDKArgument{
+				{Value: "arg0"}, {Value: cast("arg1")},
+				{Value: "this.withRudderTyperContext(arg2 as ApiOptions | undefined)"},
+				{Value: "arg3 as ApiCallback | undefined"},
+			},
+		},
+		{
+			SDKArguments: []TSSDKArgument{
+				{Value: cast("arg0")},
+				{Value: "this.withRudderTyperContext(arg1 as ApiOptions | undefined)"},
+				{Value: "arg2 as ApiCallback | undefined"},
+			},
+		},
+	}
 }

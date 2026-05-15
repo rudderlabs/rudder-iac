@@ -2,6 +2,9 @@
 import type {
     ApiOptions,
     RudderAnalytics,
+{{- if .UsesApiCallback }}
+    ApiCallback,
+{{- end }}
 {{- if .UsesSDKApiObject }}
     ApiObject as SDKApiObject,
 {{- end }}
