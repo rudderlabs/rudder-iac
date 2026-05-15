@@ -19,6 +19,13 @@ type TSInterface struct {
 	Properties []TSInterfaceProperty
 }
 
+// TSTypeAlias → export type Alias = Type;
+type TSTypeAlias struct {
+	Alias   string
+	Type    string
+	Comment string
+}
+
 // TSMethodArgument is one parameter on a RudderTyper method.
 type TSMethodArgument struct {
 	Name     string
@@ -33,18 +40,67 @@ type TSSDKArgument struct {
 	Value string
 }
 
+// TSOverloadSignature is one typed signature for an overloaded method.
+// Overloaded methods (identify, group, page) emit one declaration per
+// signature followed by a single implementation whose parameter types are
+// unions covering every overload — the spec calls for multiple SDK-aligned
+// call shapes per non-track event.
+type TSOverloadSignature struct {
+	Arguments []TSMethodArgument
+}
+
+// TSDispatcherBranch is one if/else branch inside the implementation body of an overloaded method.
+// Condition is the JS guard (e.g. `typeof arg0 === "string"`); empty for
+// the fallback else. SDKArguments are the args passed to the SDK in this branch.
+type TSDispatcherBranch struct {
+	Condition    string
+	SDKArguments []TSSDKArgument
+}
+
 // TSAnalyticsMethod is one method on the generated RudderTyper class.
+//
+// Simple methods (track) use MethodArguments + SDKArguments.
+// Overloaded methods (identify, group, page) use Overloads for the public
+// signatures and DispatcherBranches for the implementation body. In
+// TypeScript, a single function implements all overloaded signatures, so
+// the body needs if/else branches to inspect the arguments at runtime and
+// forward to the correct SDK call shape.
 type TSAnalyticsMethod struct {
 	Name            string
 	Comment         string
 	EventName       string
 	MethodArguments []TSMethodArgument
-	SDKMethodName   string // "identify" for now; future: "track", "screen", "group"
+	SDKMethodName   string // "identify", "track", etc.
 	SDKArguments    []TSSDKArgument
+	Overloads       []TSOverloadSignature
+	DispatcherBranches []TSDispatcherBranch
+}
+
+// TSVariantGroup groups the case interfaces and union type alias for one
+// discriminated union (custom type or event rule variant). Each group
+// renders as N case interfaces followed by the union alias.
+type TSVariantGroup struct {
+	CaseInterfaces []TSInterface
+	UnionAlias     TSTypeAlias
 }
 
 // TSContext is the root data object passed to RudderTyper.ts.tmpl.
 type TSContext struct {
+	// PropertyEnums and CustomTypeAliases are emitted as `export type X = ...`
+	// declarations. PropertyEnums covers property-level enum constraints; the
+	// other slice covers primitive / array / enum custom types.
+	PropertyEnums      []TSTypeAlias
+	CustomTypeAliases  []TSTypeAlias
+	// CustomInterfaces holds object custom types, emitted as `export interface`.
+	CustomInterfaces []TSInterface
+	// NestedInterfaces holds inline-schema nested objects from event rules,
+	// hoisted to top-level interfaces named `{EventInterface}{PropertyPath}`.
+	// Ordered deepest-first so a reader sees leaf shapes before composites.
+	NestedInterfaces []TSInterface
+	// VariantTypes holds discriminated unions — each group contains the case
+	// interfaces and the union type alias for one variant (custom type or event).
+	VariantTypes []TSVariantGroup
+	// Interfaces holds top-level event interfaces (track props, identify traits).
 	Interfaces       []TSInterface
 	AnalyticsMethods []TSAnalyticsMethod
 	// EventContext is the ruddertyper provenance map injected into every event's
@@ -55,4 +111,14 @@ type TSContext struct {
 	TrackingPlanID      string
 	TrackingPlanVersion int
 	TrackingPlanURL     string
+	// UsesSDKApiObject is true when at least one method passes a typed object to
+	// the SDK (track props or identify traits) and therefore needs the aliased
+	// SDK type imports for the strict cast.
+	UsesSDKApiObject      bool
+	UsesSDKIdentifyTraits bool
+	// UsesApiCallback is true when any generated method accepts an
+	// `ApiCallback` parameter (per the spec, all methods accept one). Pulled
+	// from the SDK rather than defined locally so the callback signature stays
+	// in sync with whatever shape the SDK accepts.
+	UsesApiCallback bool
 }

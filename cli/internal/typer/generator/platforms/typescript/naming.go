@@ -6,14 +6,19 @@ import (
 )
 
 // tokenize splits a string into words by spaces, underscores, hyphens, dots,
-// and camelCase boundaries. Non-letter/digit characters are stripped from word
-// edges (but not from the middle of a token), and all tokens are lowercased.
+// dollar signs, and camelCase boundaries. Non-letter/digit characters are
+// stripped from word edges (but not from the middle of a token), and all
+// tokens are lowercased.
 //
 // Mirrors Swift's tokenize: kept separate from core.SplitIntoWords so acronym
 // runs (e.g. "XMLParser") collapse to a single token rather than splitting,
 // which keeps generated identifiers stable for plans that contain acronyms.
+//
+// `$` is included as a separator (in addition to edge-trimming) because
+// developer-supplied event names like "$Variable$String" should split into
+// distinct words rather than collapse "Variable$String" into a single token.
 func tokenize(s string) []string {
-	s = strings.NewReplacer("_", " ", "-", " ", ".", " ").Replace(s)
+	s = strings.NewReplacer("_", " ", "-", " ", ".", " ", "$", " ").Replace(s)
 
 	var spaced strings.Builder
 	runes := []rune(s)

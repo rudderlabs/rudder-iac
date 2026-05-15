@@ -3,10 +3,15 @@ package typescript
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newTestRegistry() *core.NameRegistry {
+	return core.NewNameRegistry(typescriptCollisionHandler)
+}
 
 func TestResolvePropertyType_Primitives(t *testing.T) {
 	tests := []struct {
@@ -25,7 +30,7 @@ func TestResolvePropertyType_Primitives(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(&plan.Property{Types: tt.types})
+			got, err := resolvePropertyType(&plan.Property{Types: tt.types}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -60,7 +65,7 @@ func TestResolvePropertyType_Arrays(t *testing.T) {
 			got, err := resolvePropertyType(&plan.Property{
 				Types:     []plan.PropertyType{plan.PrimitiveTypeArray},
 				ItemTypes: tt.itemTypes,
-			})
+			}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -69,23 +74,27 @@ func TestResolvePropertyType_Arrays(t *testing.T) {
 
 func TestResolvePropertyType_MultiType(t *testing.T) {
 	tests := []struct {
-		name     string
-		types    []plan.PropertyType
-		expected string
+		name      string
+		types     []plan.PropertyType
+		itemTypes []plan.PropertyType
+		expected  string
 	}{
 		{
 			"string or null",
 			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull},
+			nil,
 			"string | null",
 		},
 		{
 			"string, integer, boolean",
 			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean},
+			nil,
 			"string | number | boolean",
 		},
 		{
 			"number or null",
 			[]plan.PropertyType{plan.PrimitiveTypeNumber, plan.PrimitiveTypeNull},
+			nil,
 			"number | null",
 		},
 		{
@@ -93,13 +102,42 @@ func TestResolvePropertyType_MultiType(t *testing.T) {
 			// dedupe so the output reads `number | boolean`, not `number | number | boolean`.
 			"integer and number dedupe",
 			[]plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean},
+			nil,
 			"number | boolean",
+		},
+		{
+			// nullable typed array: the array member must keep its item type
+			// rather than collapsing to the open `unknown[]`.
+			"nullable string array",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeString},
+			"string[] | null",
+		},
+		{
+			"nullable integer array → number[] | null",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeInteger},
+			"number[] | null",
+		},
+		{
+			// array member with mixed item types still narrows via Array<...>.
+			"nullable mixed-item array",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			[]plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger},
+			"Array<string | number> | null",
+		},
+		{
+			// no item types → array member stays open.
+			"nullable untyped array → unknown[] | null",
+			[]plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull},
+			nil,
+			"unknown[] | null",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(&plan.Property{Types: tt.types})
+			got, err := resolvePropertyType(&plan.Property{Types: tt.types, ItemTypes: tt.itemTypes}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -107,6 +145,9 @@ func TestResolvePropertyType_MultiType(t *testing.T) {
 }
 
 func TestResolvePropertyType_CustomType(t *testing.T) {
+	// Custom types resolve to a registered name, not the underlying primitive.
+	// resolvePropertyType registers the name on demand if it hasn't been
+	// processed already, so callers don't have to pre-walk the plan.
 	emailCT := plan.CustomType{
 		Name: "email",
 		Type: plan.PrimitiveTypeString,
@@ -128,29 +169,133 @@ func TestResolvePropertyType_CustomType(t *testing.T) {
 		expected string
 	}{
 		{
-			"custom string-backed type → string",
+			"primitive custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{emailCT}},
-			"string",
+			"CustomTypeEmail",
 		},
 		{
-			"custom object type → open record (named aliases deferred)",
+			"object custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{openObjectCT}},
-			"Record<string, unknown>",
+			"CustomTypePageData",
 		},
 		{
-			"custom array type with primitive item",
+			"array custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{stringArrayCT}},
-			"string[]",
+			"CustomTypeTags",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(tt.prop)
+			got, err := resolvePropertyType(tt.prop, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+func TestResolvePropertyType_EnumOverride(t *testing.T) {
+	// When the surrounding interface builder has already resolved an enum alias
+	// for the property, that alias takes precedence over inline type
+	// resolution. The plan-level types are irrelevant in this case.
+	got, err := resolvePropertyType(
+		&plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}},
+		"PropertyDeviceType",
+		"",
+		newTestRegistry(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "PropertyDeviceType", got)
+}
+
+func TestResolvePropertyType_NestedOverride(t *testing.T) {
+	// When the property has an inline nested-object schema, the caller hoists
+	// it into a top-level interface and passes the registered name. That name
+	// short-circuits the underlying `object` primitive resolution.
+	got, err := resolvePropertyType(
+		&plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+		"",
+		"TrackUserSignedUpContext",
+		newTestRegistry(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "TrackUserSignedUpContext", got)
+}
+
+func TestBuildInterfaceWithNested_OptionalMultiType(t *testing.T) {
+	// Optional + multi-type must render as `prop?: A | B`, not
+	// `prop: A | B | undefined`. Optionality lives on the field marker, not in
+	// the type union — `null` belongs in the union when the plan says so,
+	// `undefined` does not. Matters under exactOptionalPropertyTypes.
+	schema := &plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"value": {
+				Property: plan.Property{
+					Name:  "value",
+					Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNumber},
+				},
+			},
+		},
+	}
+
+	ctx := &TSContext{}
+	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
+	require.NoError(t, err)
+
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "value", Type: "string | number", Optional: true},
+		},
+	}, iface)
+}
+
+func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
+	// A multi-type property inside a hoisted nested-object schema must resolve
+	// to a union on the nested interface, not collapse to `unknown` or fall
+	// back to the underlying object primitive.
+	schema := &plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"details": {
+				Property: plan.Property{
+					Name:  "details",
+					Types: []plan.PropertyType{plan.PrimitiveTypeObject},
+				},
+				Required: true,
+				Schema: &plan.ObjectSchema{
+					Properties: map[string]plan.PropertySchema{
+						"value": {
+							Property: plan.Property{
+								Name:  "value",
+								Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNumber},
+							},
+							Required: true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ctx := &TSContext{}
+	iface, err := buildInterfaceWithNested("Parent", "", schema, ctx, newTestRegistry())
+	require.NoError(t, err)
+
+	assert.Equal(t, &TSInterface{
+		Name: "Parent",
+		Properties: []TSInterfaceProperty{
+			{Name: "details", Type: "ParentDetails"},
+		},
+	}, iface)
+
+	assert.Equal(t, []TSInterface{
+		{
+			Name: "ParentDetails",
+			Properties: []TSInterfaceProperty{
+				{Name: "value", Type: "string | number"},
+			},
+		},
+	}, ctx.NestedInterfaces)
 }
 
 func TestIsValidTSIdentifier(t *testing.T) {

@@ -4,17 +4,416 @@
  * Do not modify manually.
  */
 
-import type { ApiOptions, RudderAnalytics } from "@rudderstack/analytics-js";
+import type {
+    ApiOptions,
+    RudderAnalytics,
+    ApiCallback,
+    ApiObject as SDKApiObject,
+    IdentifyTraits as SDKIdentifyTraits,
+} from "@rudderstack/analytics-js";
 
-// ===== Event Traits =====
+// ===== Property Enums =====
+
+/** Type of device */
+export type PropertyDeviceType = "mobile" | "tablet" | "desktop" | "smartTV" | "IoT-Device";
+
+/** Field with $ for testing string interpolation: $variable and ${expression} */
+export type PropertyDollarField = "$USD" | "$100" | "Price: $99.99" | "$variable_name";
+
+/** Feature enabled flag */
+export type PropertyEnabled = true | false;
+
+/** Mixed type enum */
+export type PropertyMixedValue = "active" | 1 | true | 2.5;
+
+/** Priority level */
+export type PropertyPriority = 1 | 2 | 3;
+
+/** Rating value */
+export type PropertyRating = 1.5 | 2.5 | 3.5 | 4.5 | 5;
+
+/** HTTP status with special characters */
+export type PropertyStatusCode = "200: OK" | "404: Not Found" | "500: Internal \"Server\" Error";
+
+/** Field demonstrating various Unicode characters in enum values */
+export type PropertyUnicodeEnumField = "🎯" | "✅" | "активный" | "已完成" | "ενεργός" | "café" | "!!!";
+
+
+// ===== Custom Types =====
+
+/** Whether user is active */
+export type CustomTypeActive = boolean;
+
+/** List of addresses */
+export type CustomTypeAddressList = CustomTypeAddressDetails[];
+
+/** User's age in years */
+export type CustomTypeAge = number;
+
+/** Custom type for Colors */
+export type CustomTypeColor = string;
+
+/** Custom type for email validation */
+export type CustomTypeEmail = string;
+
+/** List of email addresses */
+export type CustomTypeEmailList = CustomTypeEmail[];
+
+/** Empty object that does not allow additional properties */
+export type CustomTypeEmptyObjectNoAdditionalProps = Record<string, never>;
+
+/** Empty object that allows additional properties */
+export type CustomTypeEmptyObjectWithAdditionalProps = Record<string, unknown>;
+
+/** Custom type representing a null value */
+export type CustomTypeNullType = null;
+
+/** Custom type for phone numbers */
+export type CustomTypePhoneNumber = string;
+
+/** List of user profiles */
+export type CustomTypeProfileList = CustomTypeUserProfile[];
+
+/** User status enum */
+export type CustomTypeStatus = "pending" | "active" | "suspended" | "deleted";
+
+/** Custom type with Cyrillic name */
+export type CustomTypeТипыДанных = "активный" | "неактивный" | "pending";
+
+
+/** Address details object */
+export interface CustomTypeAddressDetails {
+    /** City name */
+    city: string;
+    /** Postal code */
+    postalCode?: string;
+    /** Street address */
+    street: string;
+}
+
+
+/** User profile information */
+export interface CustomTypeUserProfile {
+    /** User's email address */
+    email: CustomTypeEmail;
+    /** User's first name */
+    firstName: string;
+    /** User's last name */
+    lastName?: string;
+}
+
+
+// ===== Variant Types =====
+
+/** Feature in beta (string 'beta') */
+export interface CustomTypeFeatureConfigCaseBeta {
+    /** Feature flag that can be boolean or string */
+    featureFlag: "beta";
+    /** User tags as array of strings */
+    tags?: string[];
+}
+
+
+/** Feature disabled (boolean false) */
+export interface CustomTypeFeatureConfigCaseFalse {
+    /** Feature flag that can be boolean or string */
+    featureFlag: false;
+    /** User's first name */
+    firstName?: string;
+}
+
+
+/** Feature enabled (boolean true) */
+export interface CustomTypeFeatureConfigCaseTrue {
+    /** User's age */
+    age?: CustomTypeAge;
+    /** Feature flag that can be boolean or string */
+    featureFlag: true;
+}
+
+
+/** Default case */
+export interface CustomTypeFeatureConfigDefault {
+    /** Feature flag that can be boolean or string */
+    featureFlag: Exclude<boolean | string, true | false | "beta">;
+}
+
+
+/** Feature configuration with variants based on multi-type flag */
+export type CustomTypeFeatureConfig = CustomTypeFeatureConfigCaseBeta | CustomTypeFeatureConfigCaseFalse | CustomTypeFeatureConfigCaseTrue | CustomTypeFeatureConfigDefault;
+
+
+/** Home page variant with no additional properties */
+export interface CustomTypePageContextCaseHome {
+    /** Type of page */
+    pageType: "home";
+}
+
+
+/** Product page variant */
+export interface CustomTypePageContextCaseProduct {
+    /** Type of page */
+    pageType: "product";
+    /** Product identifier */
+    productId: string;
+}
+
+
+/** Search page variant */
+export interface CustomTypePageContextCaseSearch {
+    /** Type of page */
+    pageType: "search";
+    /** Search query */
+    query: string;
+}
+
+
+/** Default case */
+export interface CustomTypePageContextDefault {
+    /** Additional page data */
+    pageData?: Record<string, unknown>;
+    /** Type of page */
+    pageType: Exclude<string, "search" | "product" | "home">;
+}
+
+
+/** Page context with variants based on page type */
+export type CustomTypePageContext = CustomTypePageContextCaseHome | CustomTypePageContextCaseProduct | CustomTypePageContextCaseSearch | CustomTypePageContextDefault;
+
+
+/** Inactive user access */
+export interface CustomTypeUserAccessCaseFalse {
+    /** User active status */
+    active: false;
+    /** User account status */
+    status: CustomTypeStatus;
+}
+
+
+/** Active user access */
+export interface CustomTypeUserAccessCaseTrue {
+    /** User active status */
+    active: true;
+    /** User's email address */
+    email: CustomTypeEmail;
+}
+
+
+/** Default case */
+export interface CustomTypeUserAccessDefault {
+    /** User active status */
+    active: Exclude<CustomTypeActive, true | false>;
+}
+
+
+/** User access with variants based on active status */
+export type CustomTypeUserAccess = CustomTypeUserAccessCaseFalse | CustomTypeUserAccessCaseTrue | CustomTypeUserAccessDefault;
+
+
+/** Desktop page view */
+export interface EventWithVariantsCaseDesktop {
+    /** Type of device */
+    deviceType: "desktop";
+    /** User's first name */
+    firstName: string;
+    /** User's last name */
+    lastName?: string;
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+}
+
+
+/** Mobile device page view */
+export interface EventWithVariantsCaseMobile {
+    /** Type of device */
+    deviceType: "mobile";
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** User tags as array of strings */
+    tags?: string[];
+}
+
+
+/** Default case */
+export interface EventWithVariantsDefault {
+    /** Type of device */
+    deviceType: Exclude<PropertyDeviceType, "mobile" | "desktop">;
+    /** Page context information */
+    pageContext?: CustomTypePageContext;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** A field with no explicit type (treated as any) */
+    untypedField?: unknown;
+}
+
+
+/** Example event to demonstrate variants */
+export type EventWithVariants = EventWithVariantsCaseDesktop | EventWithVariantsCaseMobile | EventWithVariantsDefault;
+
+
+// ===== Nested Object Types =====
+
+/** demonstrates multiple levels of nesting */
+export interface UserSignedUpContextNestedContext {
+    /** Array of favorite colors using custom type */
+    favoriteColors?: CustomTypeColor[];
+    /** User profile data */
+    profile?: CustomTypeUserProfile;
+}
+
+
+/** example of object property */
+export interface UserSignedUpContext {
+    /** IP address of the user */
+    ipAddress: string;
+    /** demonstrates multiple levels of nesting */
+    nestedContext: UserSignedUpContextNestedContext;
+}
+
+
+// ===== Event Types =====
+
+/** Group association event */
+export interface GroupTraits {
+    /** User active status */
+    active: CustomTypeActive;
+    /** User account status */
+    status?: CustomTypeStatus;
+}
+
 
 /** User identification event */
 export interface IdentifyTraits {
     /** User active status */
-    active?: boolean;
+    active?: CustomTypeActive;
     /** User's email address */
-    email: string;
+    email: CustomTypeEmail;
 }
+
+
+/** Page view event */
+export interface PageProperties {
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+}
+
+
+/** Event with dollar signs to test string interpolation escaping */
+export interface VariableString {
+    /** Field with $ for testing string interpolation: $variable and ${expression} */
+    dollarField: PropertyDollarField;
+}
+
+
+/** Event with special characters that collide after sanitization */
+export interface EventWithNameCamelCase {
+    /** User's email address */
+    email?: CustomTypeEmail;
+}
+
+
+/** Triggered when user clicks on a "premium" product /\* important *\/ */
+export interface ProductPremiumClicked {
+    /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+    specialField: string;
+    /** HTTP status with special characters */
+    statusCode?: PropertyStatusCode;
+}
+
+
+/** Triggered when a user signs up */
+export interface UserSignedUp {
+    /** User active status */
+    active: CustomTypeActive;
+    /** User's addresses */
+    addresses?: CustomTypeAddressList;
+    /** User's age */
+    age?: CustomTypeAge;
+    /** An array that can contain any type of items */
+    arrayOfAny?: unknown[];
+    /** Array with items that can be string or null */
+    arrayWithNullItems?: Array<string | null>;
+    /** Array of user contacts */
+    contacts?: CustomTypeEmail[];
+    /** example of object property */
+    context?: UserSignedUpContext;
+    /** Property using custom null type */
+    customNullField?: CustomTypeNullType;
+    /** Type of device */
+    deviceType?: PropertyDeviceType;
+    /** User's email addresses */
+    emailList?: CustomTypeEmailList;
+    /** Property with empty object not allowing additional properties */
+    emptyObjectNoAdditionalProps?: CustomTypeEmptyObjectNoAdditionalProps;
+    /** Property with empty object allowing additional properties */
+    emptyObjectWithAdditionalProps?: CustomTypeEmptyObjectWithAdditionalProps;
+    /** Feature enabled flag */
+    enabled?: PropertyEnabled;
+    /** Feature configuration information */
+    featureConfig?: CustomTypeFeatureConfig;
+    /** Property with mixed unicode: café, naïve, 日本語 */
+    mixedUnicode?: string;
+    /** Mixed type enum */
+    mixedValue?: PropertyMixedValue;
+    /** An array with items that can be string or integer */
+    multiTypeArray?: Array<string | number>;
+    /** A field that can be string, integer, or boolean */
+    multiTypeField?: string | number | boolean;
+    /** Property that can be string, integer, or null */
+    multiTypeWithNull?: string | number | null;
+    /** Nested property with empty object allowing additional properties */
+    nestedEmptyObject?: Record<string, unknown>;
+    /** Nested property with empty object not allowing additional properties */
+    nestedEmptyObjectNoAdditionalProps?: Record<string, never>;
+    /** Property that is always null */
+    nullField?: null;
+    /** Property that can be number or null */
+    numberOrNull?: number | null;
+    /** An object field with no defined structure */
+    objectProperty?: Record<string, unknown>;
+    /** Array of phone numbers using custom type */
+    phoneNumbers?: CustomTypePhoneNumber[];
+    /** Priority level */
+    priority?: PropertyPriority;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** List of related user profiles */
+    profileList?: CustomTypeProfileList;
+    /** A field that can contain any type of value */
+    propertyOfAny?: unknown;
+    /** Rating value */
+    rating?: PropertyRating;
+    /** User account status */
+    status?: CustomTypeStatus;
+    /** Property that can be string or null */
+    stringOrNull?: string | null;
+    /** User tags as array of strings */
+    tags?: string[];
+    /** Property using custom type with Unicode */
+    unicodeCustomType?: CustomTypeТипыДанных;
+    /** Field demonstrating various Unicode characters in enum values */
+    unicodeEnumField?: PropertyUnicodeEnumField;
+    /** An array with no explicit item type (treated as any) */
+    untypedArray?: unknown[];
+    /** A field with no explicit type (treated as any) */
+    untypedField?: unknown;
+    /** User access information */
+    userAccess?: CustomTypeUserAccess;
+    /** Username in Chinese characters */
+    "用户名"?: string;
+}
+
+
+/** Event with camel case name */
+export interface EventWithNameCamelCase1 {
+    /** User active status */
+    active?: CustomTypeActive;
+}
+
 
 // ===== RudderTyper =====
 
@@ -42,27 +441,290 @@ export class RudderTyper {
         this.analytics = analytics;
     }
 
+    public group(
+        groupId: string,
+        traits?: GroupTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public group(
+        traits?: GroupTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
     /**
-     * User identification event
-     *
-     * @param userId - The user identifier
-     * @param traits - The traits to include with this event
-     * @param options - Optional ApiOptions for additional event configuration
+     * Group association event
      */
+    public group(
+        groupIdOrTraits?: string | GroupTraits,
+        traitsOrOptions?: GroupTraits | ApiOptions,
+        optionsOrCallback?: ApiOptions | ApiCallback,
+        callback?: ApiCallback,
+    ): void {
+        if (typeof groupIdOrTraits === "string") {
+            this.analytics.group(
+                groupIdOrTraits,
+                undefined,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject),
+                callback,
+            );
+        } else {
+            this.analytics.group(
+                null,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject),
+                optionsOrCallback as ApiCallback | undefined,
+            );
+        }
+    }
+
     public identify(
         userId: string,
         traits?: IdentifyTraits,
         options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public identify(
+        traits?: IdentifyTraits,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    /**
+     * User identification event
+     */
+    public identify(
+        userIdOrTraits?: string | IdentifyTraits,
+        traitsOrOptions?: IdentifyTraits | ApiOptions,
+        optionsOrCallback?: ApiOptions | ApiCallback,
+        callback?: ApiCallback,
     ): void {
-        this.analytics.identify(
-            userId,
-            traits as any,
+        if (typeof userIdOrTraits === "string") {
+            this.analytics.identify(
+                userIdOrTraits,
+                traitsOrOptions as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
+                callback,
+            );
+        } else {
+            this.analytics.identify(
+                userIdOrTraits as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
+                optionsOrCallback as ApiCallback | undefined,
+            );
+        }
+    }
+
+    public page(
+        category: string,
+        name: string,
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public page(
+        name: string,
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    public page(
+        properties?: PageProperties,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void;
+    /**
+     * Page view event
+     */
+    public page(
+        arg0?: string | PageProperties,
+        arg1?: string | PageProperties | ApiOptions,
+        arg2?: PageProperties | ApiOptions | ApiCallback,
+        arg3?: ApiOptions | ApiCallback,
+        arg4?: ApiCallback,
+    ): void {
+        if (typeof arg0 === "string" && typeof arg1 === "string") {
+            this.analytics.page(
+                arg0,
+                arg1,
+                arg2 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg3 as ApiOptions | undefined),
+                arg4,
+            );
+        } else if (typeof arg0 === "string") {
+            this.analytics.page(
+                arg0,
+                arg1 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg2 as ApiOptions | undefined),
+                arg3 as ApiCallback | undefined,
+            );
+        } else {
+            this.analytics.page(
+                arg0 as unknown as SDKApiObject,
+                this.withRudderTyperContext(arg1 as ApiOptions | undefined),
+                arg2 as ApiCallback | undefined,
+            );
+        }
+    }
+
+    /**
+     * Event with dollar signs to test string interpolation escaping
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackVariableString(
+        props: VariableString,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "$Variable$String",
+            props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
+            callback,
         );
     }
 
-    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
-        const rudderTyperContext = {
+    /**
+     * Event with special characters that collide after sanitization
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEventWithNameCamelCase(
+        props: EventWithNameCamelCase,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "$eventWithNameCamelCase$!",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Empty event schema with additionalProperties false
+     *
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEmptyEventNoAdditionalProps(
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "Empty Event No Additional Props",
+            {},
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Empty event schema with additionalProperties true
+     *
+     * @param props - Additional properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEmptyEventWithAdditionalProps(
+        props?: Record<string, unknown>,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "Empty Event With Additional Props",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Example event to demonstrate variants
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEventWithVariants(
+        props: EventWithVariants,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "Event With Variants",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Triggered when user clicks on a "premium" product /\* important *\/
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackProductPremiumClicked(
+        props: ProductPremiumClicked,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "Product \"Premium\" Clicked",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Triggered when a user signs up
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackUserSignedUp(
+        props: UserSignedUp,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "User Signed Up",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    /**
+     * Event with camel case name
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     * @param callback - Optional callback fired after the call is dispatched
+     */
+    public trackEventWithNameCamelCase1(
+        props: EventWithNameCamelCase1,
+        options?: ApiOptions,
+        callback?: ApiCallback,
+    ): void {
+        this.analytics.track(
+            "eventWithNameCamelCase",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+            callback,
+        );
+    }
+
+    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+        const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
                 "platform": "typescript",
                 "rudderCLIVersion": "1.0.0",
@@ -70,10 +732,13 @@ export class RudderTyper {
                 "trackingPlanVersion": 13,
             },
         };
+        if (contextTraits) {
+            rudderTyperContext["traits"] = contextTraits;
+        }
         return {
             ...(options ?? {}),
             context: {
-                ...((options?.context ?? {}) as Record<string, unknown>),
+                ...((options?.context ?? {}) as SDKApiObject),
                 ...rudderTyperContext,
             },
         };
