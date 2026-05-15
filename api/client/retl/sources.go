@@ -89,13 +89,21 @@ func (r *RudderRETLStore) GetRetlSource(ctx context.Context, id string) (*RETLSo
 	return result, nil
 }
 
-// ListRetlSources lists all RETL sources
-func (r *RudderRETLStore) ListRetlSources(ctx context.Context, hasExternalId *bool) (*RETLSources, error) {
+// ListRetlSources lists RETL sources, optionally filtered by sourceType.
+// Pass an empty sourceType to return sources of all types.
+func (r *RudderRETLStore) ListRetlSources(ctx context.Context, opts ...ListRetlSourcesOption) (*RETLSources, error) {
+	options := &ListRetlSourcesOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	path := "/v2/retl-sources"
 	query := url.Values{}
-	query.Add("sourceType", string(ModelSourceType))
-	if hasExternalId != nil {
-		query.Add("hasExternalId", strconv.FormatBool(*hasExternalId))
+	if options.SourceType != "" {
+		query.Add("sourceType", options.SourceType)
+	}
+	if options.HasExternalId != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*options.HasExternalId))
 	}
 	url := fmt.Sprintf("%s?%s", path, query.Encode())
 	resp, err := r.client.Do(ctx, "GET", url, nil)

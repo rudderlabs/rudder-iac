@@ -9,7 +9,48 @@ import (
 // RETLStore is the interface for RETL operations
 type RETLStore interface {
 	RETLSourceStore
+	RETLConnectionStore
 	PreviewStore
+}
+
+// RETLConnectionStore is the interface for RETL connection operations.
+type RETLConnectionStore interface {
+	// CreateConnection creates a new RETL connection.
+	CreateConnection(ctx context.Context, req *CreateRETLConnectionRequest) (*RETLConnection, error)
+
+	// UpdateConnection updates mutable fields of a RETL connection.
+	UpdateConnection(ctx context.Context, id string, req *UpdateRETLConnectionRequest) (*RETLConnection, error)
+
+	// DeleteConnection soft-deletes a RETL connection by ID.
+	DeleteConnection(ctx context.Context, id string) error
+
+	// GetConnection retrieves a RETL connection by ID.
+	GetConnection(ctx context.Context, id string) (*RETLConnection, error)
+
+	// ListConnections returns a paginated list of RETL connections matching the provided filters.
+	ListConnections(ctx context.Context, req *ListRETLConnectionsRequest) (*RETLConnectionsPage, error)
+
+	// SetConnectionExternalId sets the external ID for a RETL connection.
+	SetConnectionExternalId(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
+}
+
+type ListRetlSourcesOption func(*ListRetlSourcesOptions)
+
+func WithSourceType(sourceType string) ListRetlSourcesOption {
+	return func(o *ListRetlSourcesOptions) {
+		o.SourceType = sourceType
+	}
+}
+
+func WithHasExternalId(hasExternalId *bool) ListRetlSourcesOption {
+	return func(o *ListRetlSourcesOptions) {
+		o.HasExternalId = hasExternalId
+	}
+}
+
+type ListRetlSourcesOptions struct {
+	SourceType    string
+	HasExternalId *bool
 }
 
 // RETLSourceStore is the interface for RETL source operations
@@ -26,8 +67,9 @@ type RETLSourceStore interface {
 	// GetRetlSource retrieves a RETL source by ID
 	GetRetlSource(ctx context.Context, id string) (*RETLSource, error)
 
-	// ListRetlSources lists all RETL sources
-	ListRetlSources(ctx context.Context, hasExternalId *bool) (*RETLSources, error)
+	// ListRetlSources lists RETL sources, optionally filtered by sourceType.
+	// Pass an empty sourceType to return sources of all types.
+	ListRetlSources(ctx context.Context, opts ...ListRetlSourcesOption) (*RETLSources, error)
 
 	// SetExternalId sets the external ID for a RETL source
 	SetExternalId(ctx context.Context, id string, externalId string) error
