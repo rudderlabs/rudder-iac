@@ -75,6 +75,7 @@ func TestBuildTrackMethod_EmptyAllowUnplanned(t *testing.T) {
 }
 
 func TestBuildTrackMethod_EmptyDisallowUnplanned(t *testing.T) {
+	// Empty schema, additionalProperties: false → no props arg, pass {}.
 	rule := trackRule("Closed Empty Event", "", plan.ObjectSchema{
 		Properties:           map[string]plan.PropertySchema{},
 		AdditionalProperties: false,
