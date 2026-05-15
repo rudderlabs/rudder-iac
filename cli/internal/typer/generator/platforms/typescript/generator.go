@@ -1164,7 +1164,7 @@ func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 
 func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatcherBranch {
 	contextTraitsCast := func(argName string) string {
-		return argName + " as unknown as Record<string, unknown>"
+		return argName + " as unknown as SDKApiObject"
 	}
 
 	withID := TSDispatcherBranch{
@@ -1181,7 +1181,7 @@ func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatche
 	if spec.AllowAnonymous {
 		branches = append(branches, TSDispatcherBranch{
 			SDKArguments: []TSSDKArgument{
-				{Value: "undefined"},
+				{Value: "null"},
 				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, " + contextTraitsCast(spec.IDArgName) + ")"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},

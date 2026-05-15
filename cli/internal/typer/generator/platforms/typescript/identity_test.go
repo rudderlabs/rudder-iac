@@ -143,14 +143,14 @@ func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			SDKArguments: []TSSDKArgument{
 				{Value: "userIdOrTraits"},
 				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as Record<string, unknown>)"},
+				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, userIdOrTraits as unknown as Record<string, unknown>)"},
+				{Value: "null"},
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, userIdOrTraits as unknown as SDKApiObject)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
@@ -271,14 +271,14 @@ func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			SDKArguments: []TSSDKArgument{
 				{Value: "groupIdOrTraits"},
 				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as Record<string, unknown>)"},
+				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as Record<string, unknown>)"},
+				{Value: "null"},
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
