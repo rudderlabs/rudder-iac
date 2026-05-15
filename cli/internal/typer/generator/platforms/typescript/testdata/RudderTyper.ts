@@ -4,17 +4,268 @@
  * Do not modify manually.
  */
 
-import type { ApiOptions, RudderAnalytics } from "@rudderstack/analytics-js";
+import type {
+    ApiOptions,
+    RudderAnalytics,
+    ApiObject as SDKApiObject,
+    IdentifyTraits as SDKIdentifyTraits,
+} from "@rudderstack/analytics-js";
 
-// ===== Event Traits =====
+// ===== Property Enums =====
+
+/** Type of device */
+export type PropertyDeviceType = "mobile" | "tablet" | "desktop" | "smartTV" | "IoT-Device";
+
+/** Field with $ for testing string interpolation: $variable and ${expression} */
+export type PropertyDollarField = "$USD" | "$100" | "Price: $99.99" | "$variable_name";
+
+/** Feature enabled flag */
+export type PropertyEnabled = true | false;
+
+/** Mixed type enum */
+export type PropertyMixedValue = "active" | 1 | true | 2.5;
+
+/** Priority level */
+export type PropertyPriority = 1 | 2 | 3;
+
+/** Rating value */
+export type PropertyRating = 1.5 | 2.5 | 3.5 | 4.5 | 5;
+
+/** HTTP status with special characters */
+export type PropertyStatusCode = "200: OK" | "404: Not Found" | "500: Internal \"Server\" Error";
+
+/** Field demonstrating various Unicode characters in enum values */
+export type PropertyUnicodeEnumField = "🎯" | "✅" | "активный" | "已完成" | "ενεργός" | "café" | "!!!";
+
+
+// ===== Custom Types =====
+
+/** Whether user is active */
+export type CustomTypeActive = boolean;
+
+/** List of addresses */
+export type CustomTypeAddressList = CustomTypeAddressDetails[];
+
+/** User's age in years */
+export type CustomTypeAge = number;
+
+/** Custom type for Colors */
+export type CustomTypeColor = string;
+
+/** Custom type for email validation */
+export type CustomTypeEmail = string;
+
+/** List of email addresses */
+export type CustomTypeEmailList = CustomTypeEmail[];
+
+/** Empty object that does not allow additional properties */
+export type CustomTypeEmptyObjectNoAdditionalProps = Record<string, never>;
+
+/** Empty object that allows additional properties */
+export type CustomTypeEmptyObjectWithAdditionalProps = Record<string, unknown>;
+
+/** Custom type representing a null value */
+export type CustomTypeNullType = null;
+
+/** Custom type for phone numbers */
+export type CustomTypePhoneNumber = string;
+
+/** List of user profiles */
+export type CustomTypeProfileList = CustomTypeUserProfile[];
+
+/** User status enum */
+export type CustomTypeStatus = "pending" | "active" | "suspended" | "deleted";
+
+/** Custom type with Cyrillic name */
+export type CustomTypeТипыДанных = "активный" | "неактивный" | "pending";
+
+
+/** Address details object */
+export interface CustomTypeAddressDetails {
+    /** City name */
+    city: string;
+    /** Postal code */
+    postalCode?: string;
+    /** Street address */
+    street: string;
+}
+
+
+/** Feature configuration with variants based on multi-type flag */
+export interface CustomTypeFeatureConfig {
+    /** Feature flag that can be boolean or string */
+    featureFlag: boolean | string;
+}
+
+
+/** Page context with variants based on page type */
+export interface CustomTypePageContext {
+    /** Type of page */
+    pageType: string;
+}
+
+
+/** User access with variants based on active status */
+export interface CustomTypeUserAccess {
+    /** User active status */
+    active: CustomTypeActive;
+}
+
+
+/** User profile information */
+export interface CustomTypeUserProfile {
+    /** User's email address */
+    email: CustomTypeEmail;
+    /** User's first name */
+    firstName: string;
+    /** User's last name */
+    lastName?: string;
+}
+
+
+// ===== Nested Object Types =====
+
+/** demonstrates multiple levels of nesting */
+export interface UserSignedUpContextNestedContext {
+    /** Array of favorite colors using custom type */
+    favoriteColors?: CustomTypeColor[];
+    /** User profile data */
+    profile?: CustomTypeUserProfile;
+}
+
+
+/** example of object property */
+export interface UserSignedUpContext {
+    /** IP address of the user */
+    ipAddress: string;
+    /** demonstrates multiple levels of nesting */
+    nestedContext: UserSignedUpContextNestedContext;
+}
+
+
+// ===== Event Types =====
 
 /** User identification event */
 export interface IdentifyTraits {
     /** User active status */
-    active?: boolean;
+    active?: CustomTypeActive;
     /** User's email address */
-    email: string;
+    email: CustomTypeEmail;
 }
+
+
+/** Event with dollar signs to test string interpolation escaping */
+export interface VariableString {
+    /** Field with $ for testing string interpolation: $variable and ${expression} */
+    dollarField: PropertyDollarField;
+}
+
+
+/** Event with special characters that collide after sanitization */
+export interface EventWithNameCamelCase {
+    /** User's email address */
+    email?: CustomTypeEmail;
+}
+
+
+/** Triggered when user clicks on a "premium" product /\* important *\/ */
+export interface ProductPremiumClicked {
+    /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
+    specialField: string;
+    /** HTTP status with special characters */
+    statusCode?: PropertyStatusCode;
+}
+
+
+/** Triggered when a user signs up */
+export interface UserSignedUp {
+    /** User active status */
+    active: CustomTypeActive;
+    /** User's addresses */
+    addresses?: CustomTypeAddressList;
+    /** User's age */
+    age?: CustomTypeAge;
+    /** An array that can contain any type of items */
+    arrayOfAny?: unknown[];
+    /** Array with items that can be string or null */
+    arrayWithNullItems?: Array<string | null>;
+    /** Array of user contacts */
+    contacts?: CustomTypeEmail[];
+    /** example of object property */
+    context?: UserSignedUpContext;
+    /** Property using custom null type */
+    customNullField?: CustomTypeNullType;
+    /** Type of device */
+    deviceType?: PropertyDeviceType;
+    /** User's email addresses */
+    emailList?: CustomTypeEmailList;
+    /** Property with empty object not allowing additional properties */
+    emptyObjectNoAdditionalProps?: CustomTypeEmptyObjectNoAdditionalProps;
+    /** Property with empty object allowing additional properties */
+    emptyObjectWithAdditionalProps?: CustomTypeEmptyObjectWithAdditionalProps;
+    /** Feature enabled flag */
+    enabled?: PropertyEnabled;
+    /** Feature configuration information */
+    featureConfig?: CustomTypeFeatureConfig;
+    /** Property with mixed unicode: café, naïve, 日本語 */
+    mixedUnicode?: string;
+    /** Mixed type enum */
+    mixedValue?: PropertyMixedValue;
+    /** An array with items that can be string or integer */
+    multiTypeArray?: Array<string | number>;
+    /** A field that can be string, integer, or boolean */
+    multiTypeField?: string | number | boolean;
+    /** Property that can be string, integer, or null */
+    multiTypeWithNull?: string | number | null;
+    /** Nested property with empty object allowing additional properties */
+    nestedEmptyObject?: Record<string, unknown>;
+    /** Nested property with empty object not allowing additional properties */
+    nestedEmptyObjectNoAdditionalProps?: Record<string, never>;
+    /** Property that is always null */
+    nullField?: null;
+    /** Property that can be number or null */
+    numberOrNull?: number | null;
+    /** An object field with no defined structure */
+    objectProperty?: Record<string, unknown>;
+    /** Array of phone numbers using custom type */
+    phoneNumbers?: CustomTypePhoneNumber[];
+    /** Priority level */
+    priority?: PropertyPriority;
+    /** User profile data */
+    profile: CustomTypeUserProfile;
+    /** List of related user profiles */
+    profileList?: CustomTypeProfileList;
+    /** A field that can contain any type of value */
+    propertyOfAny?: unknown;
+    /** Rating value */
+    rating?: PropertyRating;
+    /** User account status */
+    status?: CustomTypeStatus;
+    /** Property that can be string or null */
+    stringOrNull?: string | null;
+    /** User tags as array of strings */
+    tags?: string[];
+    /** Property using custom type with Unicode */
+    unicodeCustomType?: CustomTypeТипыДанных;
+    /** Field demonstrating various Unicode characters in enum values */
+    unicodeEnumField?: PropertyUnicodeEnumField;
+    /** An array with no explicit item type (treated as any) */
+    untypedArray?: unknown[];
+    /** A field with no explicit type (treated as any) */
+    untypedField?: unknown;
+    /** User access information */
+    userAccess?: CustomTypeUserAccess;
+    /** Username in Chinese characters */
+    "用户名"?: string;
+}
+
+
+/** Event with camel case name */
+export interface EventWithNameCamelCase1 {
+    /** User active status */
+    active?: CustomTypeActive;
+}
+
 
 // ===== RudderTyper =====
 
@@ -56,7 +307,124 @@ export class RudderTyper {
     ): void {
         this.analytics.identify(
             userId,
-            traits as any,
+            traits as unknown as SDKIdentifyTraits,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Event with dollar signs to test string interpolation escaping
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackVariableString(
+        props: VariableString,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "$Variable$String",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Event with special characters that collide after sanitization
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackEventWithNameCamelCase(
+        props: EventWithNameCamelCase,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "$eventWithNameCamelCase$!",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Empty event schema with additionalProperties false
+     *
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackEmptyEventNoAdditionalProps(
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "Empty Event No Additional Props",
+            undefined,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Empty event schema with additionalProperties true
+     *
+     * @param props - Additional properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackEmptyEventWithAdditionalProps(
+        props?: Record<string, unknown>,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "Empty Event With Additional Props",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Triggered when user clicks on a "premium" product /\* important *\/
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackProductPremiumClicked(
+        props: ProductPremiumClicked,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "Product \"Premium\" Clicked",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Triggered when a user signs up
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackUserSignedUp(
+        props: UserSignedUp,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "User Signed Up",
+            props as unknown as SDKApiObject,
+            this.withRudderTyperContext(options),
+        );
+    }
+
+    /**
+     * Event with camel case name
+     *
+     * @param props - The properties to include with this event
+     * @param options - Optional ApiOptions for additional event configuration
+     */
+    public trackEventWithNameCamelCase1(
+        props: EventWithNameCamelCase1,
+        options?: ApiOptions,
+    ): void {
+        this.analytics.track(
+            "eventWithNameCamelCase",
+            props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
         );
     }

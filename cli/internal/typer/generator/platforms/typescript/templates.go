@@ -17,6 +17,9 @@ var disclaimerTemplate string
 //go:embed templates/interface.tmpl
 var interfaceTemplate string
 
+//go:embed templates/typealias.tmpl
+var typealiasTemplate string
+
 //go:embed templates/ruddertyper.tmpl
 var ruddertyperTemplate string
 
@@ -35,6 +38,7 @@ func GenerateFile(path string, ctx *TSContext) (*core.File, error) {
 	for name, src := range map[string]string{
 		"disclaimer.tmpl":  disclaimerTemplate,
 		"interface.tmpl":   interfaceTemplate,
+		"typealias.tmpl":   typealiasTemplate,
 		"ruddertyper.tmpl": ruddertyperTemplate,
 	} {
 		if _, err = tmpl.New(name).Parse(src); err != nil {

@@ -3,10 +3,15 @@ package typescript
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func newTestRegistry() *core.NameRegistry {
+	return core.NewNameRegistry(typescriptCollisionHandler)
+}
 
 func TestResolvePropertyType_Primitives(t *testing.T) {
 	tests := []struct {
@@ -25,7 +30,7 @@ func TestResolvePropertyType_Primitives(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(&plan.Property{Types: tt.types})
+			got, err := resolvePropertyType(&plan.Property{Types: tt.types}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -60,7 +65,7 @@ func TestResolvePropertyType_Arrays(t *testing.T) {
 			got, err := resolvePropertyType(&plan.Property{
 				Types:     []plan.PropertyType{plan.PrimitiveTypeArray},
 				ItemTypes: tt.itemTypes,
-			})
+			}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -99,7 +104,7 @@ func TestResolvePropertyType_MultiType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(&plan.Property{Types: tt.types})
+			got, err := resolvePropertyType(&plan.Property{Types: tt.types}, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -107,6 +112,9 @@ func TestResolvePropertyType_MultiType(t *testing.T) {
 }
 
 func TestResolvePropertyType_CustomType(t *testing.T) {
+	// Custom types resolve to a registered name, not the underlying primitive.
+	// resolvePropertyType registers the name on demand if it hasn't been
+	// processed already, so callers don't have to pre-walk the plan.
 	emailCT := plan.CustomType{
 		Name: "email",
 		Type: plan.PrimitiveTypeString,
@@ -128,29 +136,57 @@ func TestResolvePropertyType_CustomType(t *testing.T) {
 		expected string
 	}{
 		{
-			"custom string-backed type → string",
+			"primitive custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{emailCT}},
-			"string",
+			"CustomTypeEmail",
 		},
 		{
-			"custom object type → open record (named aliases deferred)",
+			"object custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{openObjectCT}},
-			"Record<string, unknown>",
+			"CustomTypePageData",
 		},
 		{
-			"custom array type with primitive item",
+			"array custom type → registered alias",
 			&plan.Property{Types: []plan.PropertyType{stringArrayCT}},
-			"string[]",
+			"CustomTypeTags",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePropertyType(tt.prop)
+			got, err := resolvePropertyType(tt.prop, "", "", newTestRegistry())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+func TestResolvePropertyType_EnumOverride(t *testing.T) {
+	// When the surrounding interface builder has already resolved an enum alias
+	// for the property, that alias takes precedence over inline type
+	// resolution. The plan-level types are irrelevant in this case.
+	got, err := resolvePropertyType(
+		&plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}},
+		"PropertyDeviceType",
+		"",
+		newTestRegistry(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "PropertyDeviceType", got)
+}
+
+func TestResolvePropertyType_NestedOverride(t *testing.T) {
+	// When the property has an inline nested-object schema, the caller hoists
+	// it into a top-level interface and passes the registered name. That name
+	// short-circuits the underlying `object` primitive resolution.
+	got, err := resolvePropertyType(
+		&plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+		"",
+		"TrackUserSignedUpContext",
+		newTestRegistry(),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "TrackUserSignedUpContext", got)
 }
 
 func TestIsValidTSIdentifier(t *testing.T) {
