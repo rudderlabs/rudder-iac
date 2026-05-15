@@ -223,21 +223,14 @@ describe("RudderTyper.track — variant discriminated unions", () => {
       userAccess: { active: false, status: "suspended" },
     });
 
-    typer.trackUserSignedUp({
-      active: true,
-      profile: {
-        email: "default.user@example.com",
-        firstName: "Default",
-        lastName: "Case",
-      },
-      userAccess: { active: true },
-    });
+    // CustomTypeUserAccess has a boolean discriminator with both a true and a
+    // false case, so its Default variant is unreachable (the discriminator
+    // narrows to never) and cannot be constructed — only the two named cases
+    // are exercised here.
+    const events = await interceptor.waitForEvents(2);
 
-    const events = await interceptor.waitForEvents(3);
-
-    expect(events.map((e) => e.type)).toEqual(["track", "track", "track"]);
+    expect(events.map((e) => e.type)).toEqual(["track", "track"]);
     expect(events.map((e) => e.event)).toEqual([
-      "User Signed Up",
       "User Signed Up",
       "User Signed Up",
     ]);
@@ -259,15 +252,6 @@ describe("RudderTyper.track — variant discriminated unions", () => {
           lastName: "User",
         },
         userAccess: { active: false, status: "suspended" },
-      },
-      {
-        active: true,
-        profile: {
-          email: "default.user@example.com",
-          firstName: "Default",
-          lastName: "Case",
-        },
-        userAccess: { active: true },
       },
     ]);
   });

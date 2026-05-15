@@ -62,7 +62,7 @@ func TestBuildVariantGroup_StringDiscriminator(t *testing.T) {
 				Comment: "Default case",
 				Properties: []TSInterfaceProperty{
 					{Name: "fallback", Type: "boolean", Optional: true},
-					{Name: "kind", Type: "string"},
+					{Name: "kind", Type: `Exclude<string, "alpha" | "beta">`},
 				},
 			},
 		},
@@ -131,9 +131,9 @@ func TestBuildVariantGroup_BooleanDiscriminator(t *testing.T) {
 		Name:    "UserAccessDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "active", Type: "boolean"},
+			{Name: "active", Type: "Exclude<boolean, true | false>"},
 		},
-	}, ifaceByName["UserAccessDefault"])
+	}, ifaceByName["UserAccessDefault"], "default discriminator excludes covered values — both cases cover boolean exhaustively, so this resolves to never")
 
 	assert.Equal(t, TSTypeAlias{
 		Alias:   "UserAccess",
@@ -213,7 +213,7 @@ func TestBuildVariantGroup_NoDefaultSchema(t *testing.T) {
 		Name:    "FooDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "kind", Type: "string"},
+			{Name: "kind", Type: `Exclude<string, "a">`},
 		},
 	}, ifaceByName["FooDefault"])
 }
@@ -289,9 +289,9 @@ func TestBuildVariantGroup_EnumDiscriminatorInDefault(t *testing.T) {
 		Name:    "EventDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "deviceType", Type: "PropertyDeviceType"},
+			{Name: "deviceType", Type: `Exclude<PropertyDeviceType, "mobile">`},
 		},
-	}, ifaceByName["EventDefault"], "default uses enum alias")
+	}, ifaceByName["EventDefault"], "default narrows the enum alias to values no named case covers")
 
 	assert.Equal(t, TSInterface{
 		Name: "EventCaseMobile",
