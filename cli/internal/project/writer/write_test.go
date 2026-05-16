@@ -166,6 +166,104 @@ func TestWrite(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, formatterFail)
 	})
+
+	t.Run("creates empty directory when IsDirectory is true", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			tmpDir = t.TempDir()
+			ctx    = context.Background()
+		)
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("ok")})
+
+		entities := []FormattableEntity{
+			{
+				RelativePath: "empty-dir",
+				IsDirectory:  true,
+			},
+		}
+
+		err := Write(ctx, tmpDir, formatters, entities)
+		require.NoError(t, err)
+
+		dirPath := filepath.Join(tmpDir, "empty-dir")
+		info, statErr := os.Stat(dirPath)
+		require.NoError(t, statErr)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("creates nested empty directories", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			tmpDir = t.TempDir()
+			ctx    = context.Background()
+		)
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("ok")})
+
+		entities := []FormattableEntity{
+			{
+				RelativePath: filepath.Join("parent", "child", "nested"),
+				IsDirectory:  true,
+			},
+		}
+
+		err := Write(ctx, tmpDir, formatters, entities)
+		require.NoError(t, err)
+
+		dirPath := filepath.Join(tmpDir, "parent", "child", "nested")
+		info, statErr := os.Stat(dirPath)
+		require.NoError(t, statErr)
+		assert.True(t, info.IsDir())
+	})
+
+	t.Run("creates mixed files and directories", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			tmpDir = t.TempDir()
+			ctx    = context.Background()
+		)
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("test-content")})
+
+		entities := []FormattableEntity{
+			{
+				RelativePath: "input",
+				IsDirectory:  true,
+			},
+			{
+				Content:      map[string]any{"key": "value"},
+				RelativePath: "config.yaml",
+			},
+			{
+				RelativePath: "output",
+				IsDirectory:  true,
+			},
+		}
+
+		err := Write(ctx, tmpDir, formatters, entities)
+		require.NoError(t, err)
+
+		// Verify directories exist
+		inputPath := filepath.Join(tmpDir, "input")
+		inputInfo, inputErr := os.Stat(inputPath)
+		require.NoError(t, inputErr)
+		assert.True(t, inputInfo.IsDir())
+
+		outputPath := filepath.Join(tmpDir, "output")
+		outputInfo, outputErr := os.Stat(outputPath)
+		require.NoError(t, outputErr)
+		assert.True(t, outputInfo.IsDir())
+
+		// Verify file exists and has correct content
+		filePath := filepath.Join(tmpDir, "config.yaml")
+		fileContent, fileErr := os.ReadFile(filePath)
+		require.NoError(t, fileErr)
+		assert.Equal(t, []byte("test-content"), fileContent)
+	})
 }
 
 func TestOverwriteFile(t *testing.T) {
