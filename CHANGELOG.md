@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.15.0](https://github.com/rudderlabs/rudder-iac/compare/v0.14.0...v0.15.0) (2026-05-18)
+
+
+### Features
+
+* **api:** add GeoEnrichmentEnabled and Transient to Source struct (INT-6264) ([#543](https://github.com/rudderlabs/rudder-iac/issues/543)) ([0dbe7a7](https://github.com/rudderlabs/rudder-iac/commit/0dbe7a7b3989d6f6d4d494a6d28207e2d509177c))
+* **retl:** add Go API client for RETL connections (PRO-5604) ([#531](https://github.com/rudderlabs/rudder-iac/issues/531)) ([1215210](https://github.com/rudderlabs/rudder-iac/commit/1215210d0c6b73b4e43b915aba9af5a30151e5b4))
+* **retl:** enhance retl api to support sourceType table ([#520](https://github.com/rudderlabs/rudder-iac/issues/520)) ([0a1ff9a](https://github.com/rudderlabs/rudder-iac/commit/0a1ff9a32c997c088b6b7e1e27d959a0bf09a178))
+* **typer-kotlin:** support custom annotation or compose stability via composeStable option ([#461](https://github.com/rudderlabs/rudder-iac/issues/461)) ([4c39af5](https://github.com/rudderlabs/rudder-iac/commit/4c39af59053ddbd8ee4a0d1bbd42ca6dbb0163e9))
+* **typer/swift:** add Swift validator skeleton + identify smoke test ([#516](https://github.com/rudderlabs/rudder-iac/issues/516)) ([8631889](https://github.com/rudderlabs/rudder-iac/commit/8631889733b73df08ea1378b67ba89de058ccfdc))
+* **typer/typescript:** add generator skeleton with identify event ([#545](https://github.com/rudderlabs/rudder-iac/issues/545)) ([371297d](https://github.com/rudderlabs/rudder-iac/commit/371297d890f0f8bcae68496337996d16e9bd8a66))
+* **typer/typescript:** add group and page event generation (DEX-334) ([#560](https://github.com/rudderlabs/rudder-iac/issues/560)) ([3758553](https://github.com/rudderlabs/rudder-iac/commit/3758553a8eae94f4704ff7d82c3d7286372e0d1c))
+* **typer/typescript:** add Node.js validator project with identify smoke test (DEX-339) ([#551](https://github.com/rudderlabs/rudder-iac/issues/551)) ([1f2efea](https://github.com/rudderlabs/rudder-iac/commit/1f2efeacce5957ddead92ea1bc7a674be2b8b93c))
+* **typer/typescript:** add support for variants (DEX-335) ([#562](https://github.com/rudderlabs/rudder-iac/issues/562)) ([17b208c](https://github.com/rudderlabs/rudder-iac/commit/17b208c62a6d396c33469e13a52d0ab61ab57449))
+* **typer/typescript:** add track event generation with custom types, enums, and nested objects (DEX-332) ([#557](https://github.com/rudderlabs/rudder-iac/issues/557)) ([5b583e8](https://github.com/rudderlabs/rudder-iac/commit/5b583e8c010babed598162188a1def6a0bcd4493))
+
+
+### Bug Fixes
+
+* **api:** include details in APIError.Error() for per-field validation messages ([#565](https://github.com/rudderlabs/rudder-iac/issues/565)) ([9453e9b](https://github.com/rudderlabs/rudder-iac/commit/9453e9bdd4b83b6ba3a125b4f3311ef54ec97df1))
+* **typer/swift:** wrap multi-type union defaults in case constructors ([#514](https://github.com/rudderlabs/rudder-iac/issues/514)) ([475a159](https://github.com/rudderlabs/rudder-iac/commit/475a159e74afb95fc6504f28af2992519208da52))
+* **typer:** redirect testutils warnings to stderr ([#515](https://github.com/rudderlabs/rudder-iac/issues/515)) ([3350f71](https://github.com/rudderlabs/rudder-iac/commit/3350f719042e80b8aeb1e3375fc5a8860db076cf))
+
+
+### Miscellaneous
+
+* add cron schedule support to RETL connection API ([#549](https://github.com/rudderlabs/rudder-iac/issues/549)) ([9db95c2](https://github.com/rudderlabs/rudder-iac/commit/9db95c2410606220f6bb99b4144db67b2361b2b8))
+* add swift and kotlin to allowed source definition types ([#525](https://github.com/rudderlabs/rudder-iac/issues/525)) ([b4d3bae](https://github.com/rudderlabs/rudder-iac/commit/b4d3bae79d926a75cbdb37bd806db23c8862e380))
+* **ci:** workflow cleanup (SEC-284) ([#558](https://github.com/rudderlabs/rudder-iac/issues/558)) ([8642404](https://github.com/rudderlabs/rudder-iac/commit/86424045e9c4ac827bcaeaecdbe8bf843231df45))
+* **typer/swift:** add core track validator coverage ([#518](https://github.com/rudderlabs/rudder-iac/issues/518)) ([9be7484](https://github.com/rudderlabs/rudder-iac/commit/9be748437127155f271e748d57cf4581df084bfb))
+* **typer/swift:** add group and screen validator coverage ([#517](https://github.com/rudderlabs/rudder-iac/issues/517)) ([6ad6867](https://github.com/rudderlabs/rudder-iac/commit/6ad6867a15cad08c1e860d199d4956613c35b9f0))
+* **typer/swift:** add track edge-case validator coverage ([#519](https://github.com/rudderlabs/rudder-iac/issues/519)) ([12969ec](https://github.com/rudderlabs/rudder-iac/commit/12969ec96ed86fc61ea4d6244a575bd71edfcded))
+* **typer/swift:** run swift typer e2e tests on swift typer changes ([#521](https://github.com/rudderlabs/rudder-iac/issues/521)) ([5a82038](https://github.com/rudderlabs/rudder-iac/commit/5a82038e4ffbdb93616888d5c68537cff57e5045))
+* **typer/typescript:** add core track validator coverage (DEX-340) ([#559](https://github.com/rudderlabs/rudder-iac/issues/559)) ([7682be8](https://github.com/rudderlabs/rudder-iac/commit/7682be82b382907fdc01efd56b90ef37d8fdc5f7))
+* **typer/typescript:** add variant discriminated union validator coverage (DEX-343) ([#563](https://github.com/rudderlabs/rudder-iac/issues/563)) ([845e3cd](https://github.com/rudderlabs/rudder-iac/commit/845e3cd0a4df9b92ca9252cce4be47e0777763d0))
+* **typer/typescript:** run typescript typer e2e tests on typer changes (DEX-344) ([#564](https://github.com/rudderlabs/rudder-iac/issues/564)) ([18a7222](https://github.com/rudderlabs/rudder-iac/commit/18a722286c5383ee74741153855ad804338ada64))
+* **vuln:** pin and bump action refs (SEC-171) ([#507](https://github.com/rudderlabs/rudder-iac/issues/507)) ([873bc05](https://github.com/rudderlabs/rudder-iac/commit/873bc059564e72076a8ee98d299240ac5ef974b8))
+* **vuln:** remediate template-injection findings (SEC-251) ([#534](https://github.com/rudderlabs/rudder-iac/issues/534)) ([61eb6f3](https://github.com/rudderlabs/rudder-iac/commit/61eb6f36bcc83dd8b187ae4b3e2e15d2f3b23c5f))
+* **vuln:** scope workflow permissions to least privilege (SEC-167) ([#532](https://github.com/rudderlabs/rudder-iac/issues/532)) ([86650b2](https://github.com/rudderlabs/rudder-iac/commit/86650b231d6eef1412bb8722b9c48fa1105af0bc))
+* **vuln:** zizmor --fix=all findings (SEC-199) ([#527](https://github.com/rudderlabs/rudder-iac/issues/527)) ([c5d7004](https://github.com/rudderlabs/rudder-iac/commit/c5d7004e112f761e984d31cbbc6ba2aea563c464))
+
 ## [0.14.0](https://github.com/rudderlabs/rudder-iac/compare/v0.13.1...v0.14.0) (2026-04-14)
 
 
