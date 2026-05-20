@@ -176,6 +176,11 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 		switch v := value.(type) {
 		case string:
 			if strings.HasPrefix(v, "#/") {
+				// Tracking-plan include refs (#/tp/<group>/event_rule/<id-or-*>) must stay in legacy form;
+				// ExpandRefs resolves them. Do not rewrite them to URN (convertPathToURN would corrupt them).
+				if IncludeRegex.MatchString(v) {
+					continue
+				}
 				urnRef, err := convertPathToURN(v)
 				if err != nil {
 					return err
@@ -192,6 +197,9 @@ func (dc *DataCatalog) transformReferencesInSpec(spec map[string]any) error {
 				switch itemVal := item.(type) {
 				case string:
 					if strings.HasPrefix(itemVal, "#/") {
+						if IncludeRegex.MatchString(itemVal) {
+							continue
+						}
 						urnRef, err := convertPathToURN(itemVal)
 						if err != nil {
 							return err

@@ -333,6 +333,33 @@ func TestTrackingPlanReferences(t *testing.T) {
 	})
 }
 
+func TestTrackingPlanIncludeReferences(t *testing.T) {
+	t.Parallel()
+
+	regex := regexp.MustCompile(TPIncludeLegacyReferenceRegex)
+
+	tests := []struct {
+		name      string
+		reference string
+		wantMatch bool
+	}{
+		{name: "wildcard", reference: "#/tp/common-rules-plan/event_rule/*", wantMatch: true},
+		{name: "specific rule id", reference: "#/tp/common-rules-plan/event_rule/identify-rule", wantMatch: true},
+		{name: "underscores in group", reference: "#/tp/my_tp/event_rule/rule_1", wantMatch: true},
+		{name: "not include path", reference: "#/tp/group/plan-id", wantMatch: false},
+		{name: "missing event_rule segment", reference: "#/tp/group/plan/wrong", wantMatch: false},
+		{name: "empty", reference: "", wantMatch: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := regex.MatchString(tt.reference)
+			assert.Equal(t, tt.wantMatch, got, "reference: %s", tt.reference)
+		})
+	}
+}
+
 func TestConstantValues(t *testing.T) {
 	t.Run("tag constants", func(t *testing.T) {
 		tests := []struct {
@@ -350,6 +377,7 @@ func TestConstantValues(t *testing.T) {
 			{"categoryReferenceTag", categoryReferenceTag, "category_ref"},
 			{"trackingPlanLegacyReferenceTag", trackingPlanLegacyReferenceTag, "legacy_tracking_plan_ref"},
 			{"trackingPlanReferenceTag", trackingPlanReferenceTag, "tracking_plan_ref"},
+			{"tpIncludeLegacyReferenceTag", tpIncludeLegacyReferenceTag, "tp_include_legacy"},
 		}
 
 		for _, tt := range tests {
@@ -375,6 +403,7 @@ func TestConstantValues(t *testing.T) {
 			{"categoryReferenceMessage", categoryReferenceMessage, "must be of pattern #category:<id>"},
 			{"trackingPlanLegacyReferenceMessage", trackingPlanLegacyReferenceMessage, "must be of pattern #/tp/<group>/<id>"},
 			{"trackingPlanReferenceMessage", trackingPlanReferenceMessage, "must be of pattern #tracking-plan:<id>"},
+			{"tpIncludeLegacyReferenceMessage", tpIncludeLegacyReferenceMessage, "must be of pattern #/tp/<group>/event_rule/<id-or-*>"},
 		}
 
 		for _, tt := range tests {

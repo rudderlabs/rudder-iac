@@ -2040,3 +2040,34 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		assert.Equal(t, "#property:page_url", variant.Default.Properties[0].Property)
 	})
 }
+
+func TestTransformReferencesInSpecPreservesIncludeRefs(t *testing.T) {
+	t.Parallel()
+
+	dc := New()
+	spec := map[string]any{
+		"rules": []any{
+			map[string]any{
+				"includes": map[string]any{
+					"$ref": "#/tp/common-rules-plan/event_rule/*",
+				},
+				"event": map[string]any{
+					"$ref": "#/events/user-events/signup",
+				},
+			},
+		},
+		"tpref": "#/tp/group/api_tracking",
+	}
+
+	err := dc.transformReferencesInSpec(spec)
+	require.NoError(t, err)
+
+	rules := spec["rules"].([]any)
+	r0 := rules[0].(map[string]any)
+	inc := r0["includes"].(map[string]any)
+	assert.Equal(t, "#/tp/common-rules-plan/event_rule/*", inc["$ref"])
+
+	ev := r0["event"].(map[string]any)
+	assert.Equal(t, "#event:signup", ev["$ref"])
+	assert.Equal(t, "#tracking-plan:api_tracking", spec["tpref"])
+}

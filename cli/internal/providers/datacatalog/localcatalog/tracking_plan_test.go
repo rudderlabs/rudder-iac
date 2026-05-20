@@ -182,4 +182,54 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid as failed regex match")
 	})
+
+	t.Run("expands includes wildcard merging events from shared tracking plan", func(t *testing.T) {
+		shared := &TrackingPlanV1{
+			LocalID: "common_tp",
+			Name:    "Common",
+			Rules: []*TPRuleV1{
+				{Type: "event_rule", LocalID: "r_ident", Event: "#event:identify", IdentitySection: "context.traits", Properties: []*TPRulePropertyV1{}},
+				{Type: "event_rule", LocalID: "r_page", Event: "#event:page", IdentitySection: "properties", Properties: []*TPRulePropertyV1{}},
+			},
+		}
+		host := &TrackingPlanV1{
+			LocalID: "crm_tp",
+			Name:    "CRM",
+			Rules: []*TPRuleV1{
+				{Type: "event_rule", LocalID: "include_all", Includes: &TPRuleIncludes{Ref: "#/tp/common_tp/event_rule/*"}},
+				{Type: "event_rule", LocalID: "opp", Event: "#event:opportunity", IdentitySection: "properties", Properties: []*TPRulePropertyV1{}},
+			},
+		}
+		dc := &DataCatalog{
+			Events: []EventV1{
+				{LocalID: "identify", Name: "Identify", Type: "identify"},
+				{LocalID: "page", Name: "Page", Type: "page"},
+				{LocalID: "opportunity", Name: "Opp", Type: "track"},
+			},
+			Properties:     []PropertyV1{},
+			TrackingPlans:  []*TrackingPlanV1{shared, host},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
+			ReferenceMap:   make(map[string]string),
+			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
+		}
+
+		err := host.ExpandRefs(dc)
+		require.NoError(t, err)
+		require.Len(t, host.EventProps, 3)
+
+		ids := []string{host.EventProps[0].LocalID, host.EventProps[1].LocalID, host.EventProps[2].LocalID}
+		assert.ElementsMatch(t, []string{"identify", "page", "opportunity"}, ids)
+
+		for _, ev := range host.EventProps {
+			switch ev.LocalID {
+			case "identify":
+				assert.Equal(t, "r_ident", ev.RuleLocalID)
+			case "page":
+				assert.Equal(t, "r_page", ev.RuleLocalID)
+			case "opportunity":
+				assert.Equal(t, "opp", ev.RuleLocalID)
+			}
+		}
+	})
 }

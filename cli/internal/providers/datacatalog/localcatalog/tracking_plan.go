@@ -39,9 +39,12 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name            string
-	LocalID         string
-	Ref             string
+	Name    string
+	LocalID string
+	Ref     string
+	// RuleLocalID is the tracking-plan event_rule id
+	// this TPEvent was expanded from (empty for direct rules).
+	RuleLocalID     string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -75,9 +78,9 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event" validate:"required"`
+	Event      *TPRuleEvent      `json:"event,omitempty" validate:"required_without=Includes,excluded_with=Includes"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
-	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
+	Includes   *TPRuleIncludes   `json:"includes,omitempty" validate:"required_without=Event,excluded_with=Event"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
 }
 
@@ -95,7 +98,7 @@ type TPRuleProperty struct {
 }
 
 type TPRuleIncludes struct {
-	Ref string `json:"$ref"`
+	Ref string `json:"$ref" validate:"required,pattern=tp_include_legacy"`
 }
 
 // ExpandRefs simply expands the references being held
@@ -150,7 +153,8 @@ func expandIncludeRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) ([]*TPEve
 		return nil, fmt.Errorf("includes ref: %s invalid as failed regex match", rule.Includes.Ref)
 	}
 
-	// ASK: how are we using include?
+	// NOTE: we are maintaining this fix for propte customer
+	// and ideally should support via different mechanism in future
 	// conventionally matches[1] would include the tpGroup and not the ID
 	// we need to sort this out
 	tpID, ruleID := matches[1], matches[2]
@@ -184,8 +188,12 @@ func expandIncludeRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) ([]*TPEve
 	return toReturn, nil
 }
 
-// expandEventRefs expands the direct event references in the tracking plan rule definition
-func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, error) {
+// expandEventRefs expands the direct event references in the tracking plan rule
+// definition
+func expandEventRefs(
+	rule *TPRuleV1,
+	fetcher CatalogResourceFetcher,
+) (*TPEvent, error) {
 	log.Debug("expanding event refs within the rule", "ruleID", rule.LocalID)
 
 	if rule.Event == "" {
@@ -216,6 +224,7 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 		Name:            event.Name,
 		LocalID:         event.LocalID,
 		Ref:             rule.Event,
+		RuleLocalID:     rule.LocalID,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
 		Type:            event.Type,

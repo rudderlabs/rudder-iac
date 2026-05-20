@@ -7,6 +7,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -1133,7 +1134,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec)
+		results := validateDuplicateEventsV0(spec, resources.NewGraph())
 		assert.Empty(t, results)
 	})
 
@@ -1150,7 +1151,7 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec)
+		results := validateDuplicateEventsV0(spec, resources.NewGraph())
 		assert.Equal(t, []rules.ValidationResult{
 			{Reference: "/rules/0/event/$ref", Message: "duplicate event reference in tracking plan rules"},
 			{Reference: "/rules/2/event/$ref", Message: "duplicate event reference in tracking plan rules"},
@@ -1169,7 +1170,70 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			},
 		}
 
-		results := validateDuplicateEventsV0(spec)
+		results := validateDuplicateEventsV0(spec, resources.NewGraph())
+		assert.Empty(t, results)
+	})
+
+	t.Run("duplicate across direct rule and includes wildcard", func(t *testing.T) {
+		t.Parallel()
+
+		g := resources.NewGraph()
+		g.AddResource(resources.NewResource("shared_tp", types.TrackingPlanResourceType, resources.ResourceData{
+			"name":    "Shared",
+			"localId": "shared_tp",
+			"events": []any{
+				map[string]any{
+					"localId":      "signup",
+					"sourceRuleId": "sr1",
+				},
+			},
+		}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "consumer",
+			Name:    "Consumer TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "inc",
+					Includes: &localcatalog.TPRuleIncludes{
+						Ref: "#/tp/shared_tp/event_rule/*",
+					},
+				},
+				{LocalID: "direct", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, g)
+		require.Len(t, results, 2)
+	})
+
+	t.Run("includes wildcard disjoint from direct events — no duplicate", func(t *testing.T) {
+		t.Parallel()
+
+		g := resources.NewGraph()
+		g.AddResource(resources.NewResource("shared_tp", types.TrackingPlanResourceType, resources.ResourceData{
+			"name":    "Shared",
+			"localId": "shared_tp",
+			"events": []any{
+				map[string]any{"localId": "page", "sourceRuleId": "sr_page"},
+			},
+		}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "consumer",
+			Name:    "Consumer TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "inc",
+					Includes: &localcatalog.TPRuleIncludes{
+						Ref: "#/tp/shared_tp/event_rule/*",
+					},
+				},
+				{LocalID: "direct", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, g)
 		assert.Empty(t, results)
 	})
 }

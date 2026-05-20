@@ -20,34 +20,134 @@ var validateTrackingPlanSemantic = func(_ string, _ string, _ map[string]any, sp
 	results = append(results, validateTrackingPlanVariants(spec, graph)...)
 	results = append(results, validatePropertyNestingV0(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV0(spec, graph)...)
-	results = append(results, validateDuplicateEventsV0(spec)...)
+	results = append(results, validateDuplicateEventsV0(spec, graph)...)
 	results = append(results, validateDuplicatePropertiesV0(spec)...)
 
 	return results
 }
 
-func validateDuplicateEventsV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
-	counts := make(map[string]int)
-	for _, rule := range spec.Rules {
-		if rule.Event == nil {
+func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.Graph) []rules.ValidationResult {
+	type dupOrigin struct {
+		ref string
+		msg string
+	}
+
+	add := func(m map[string][]dupOrigin, key string, o dupOrigin) {
+		if key == "" {
+			return
+		}
+		m[key] = append(m[key], o)
+	}
+
+	seen := make(map[string][]dupOrigin)
+
+	for i, rule := range spec.Rules {
+		if rule.Event != nil && rule.Event.Ref != "" {
+			key := canonicalEventRef(rule.Event.Ref)
+			add(seen, key, dupOrigin{
+				ref: fmt.Sprintf("/rules/%d/event/$ref", i),
+				msg: "duplicate event reference in tracking plan rules",
+			})
+		}
+
+		if rule.Includes == nil || rule.Includes.Ref == "" {
 			continue
 		}
-		counts[rule.Event.Ref]++
+
+		matches := localcatalog.IncludeRegex.FindStringSubmatch(rule.Includes.Ref)
+		if len(matches) != 3 {
+			continue
+		}
+
+		tpID, includeRuleID := matches[1], matches[2]
+		included, ok := graph.GetResource(resources.URN(tpID, types.TrackingPlanResourceType))
+		if !ok || included == nil {
+			continue
+		}
+
+		for _, evRef := range eventRefsFromTPData(included.Data(), includeRuleID) {
+			key := canonicalEventRef(evRef)
+			add(seen, key, dupOrigin{
+				ref: fmt.Sprintf("/rules/%d/includes/$ref", i),
+				msg: fmt.Sprintf(
+					"event '%s' from included tracking plan '%s' duplicates another event binding on this tracking plan",
+					strings.TrimPrefix(key, "#event:"),
+					tpID,
+				),
+			})
+		}
 	}
 
 	var results []rules.ValidationResult
-	for i, rule := range spec.Rules {
-		if rule.Event == nil {
+	for _, origins := range seen {
+		if len(origins) <= 1 {
 			continue
 		}
-		if counts[rule.Event.Ref] > 1 {
+		for _, o := range origins {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/rules/%d/event/$ref", i),
-				Message:   "duplicate event reference in tracking plan rules",
+				Reference: o.ref,
+				Message:   o.msg,
 			})
 		}
 	}
 	return results
+}
+
+func canonicalEventRef(ref string) string {
+	if ref == "" {
+		return ""
+	}
+	rt, id, err := funcs.ParseURNRef(ref)
+	if err != nil || rt == "" || id == "" {
+		return ref
+	}
+	return fmt.Sprintf("#%s:%s", rt, id)
+}
+
+func eventRefsFromTPData(data resources.ResourceData, filterRuleID string) []string {
+	if data == nil {
+		return nil
+	}
+	raw, ok := data["events"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	var xs []any
+	switch v := raw.(type) {
+	case []any:
+		xs = v
+	case []map[string]any:
+		xs = make([]any, len(v))
+		for i := range v {
+			xs[i] = v[i]
+		}
+	default:
+		return nil
+	}
+
+	var out []string
+	for _, e := range xs {
+		m, ok := mapStringAnyFromAny(e)
+		if !ok {
+			continue
+		}
+		localID, _ := m["localId"].(string)
+		if localID == "" {
+			continue
+		}
+		srcRule, _ := m["sourceRuleId"].(string)
+		if filterRuleID != "*" && srcRule != filterRuleID {
+			continue
+		}
+		out = append(out, fmt.Sprintf("#event:%s", localID))
+	}
+	return out
+}
+
+func mapStringAnyFromAny(e any) (map[string]any, bool) {
+	m, ok := e.(map[string]any)
+	return m, ok
 }
 
 func validateDuplicatePropertiesV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {

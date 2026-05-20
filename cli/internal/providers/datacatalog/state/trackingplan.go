@@ -231,6 +231,8 @@ func diffEventArgs(local []*TrackingPlanEventArgs, upstream []*catalog.TrackingP
 type TrackingPlanEventArgs struct {
 	ID              any
 	LocalID         string
+	// SourceRuleID is the event_rule id on the tracking plan this event was expanded from (empty for legacy data).
+	SourceRuleID    string
 	AllowUnplanned  bool
 	IdentitySection string
 	Properties      []*TrackingPlanPropertyArgs
@@ -617,6 +619,7 @@ func (args *TrackingPlanArgs) FromCatalogTrackingPlan(from *localcatalog.Trackin
 				Property: "id",
 			},
 			LocalID:         event.LocalID,
+			SourceRuleID:    event.RuleLocalID,
 			AllowUnplanned:  event.AllowUnplanned,
 			IdentitySection: identitySection,
 			Properties:      properties,
@@ -676,6 +679,7 @@ func (args *TrackingPlanArgs) FromResourceData(from resources.ResourceData) {
 		eventProps[idx] = &TrackingPlanEventArgs{
 			ID:              MustString(event, "id"),
 			LocalID:         MustString(event, "localId"),
+			SourceRuleID:    String(event, "sourceRuleId", ""),
 			AllowUnplanned:  MustBool(event, "allowUnplanned"),
 			IdentitySection: String(event, "identitySection", ""),
 			Properties:      make([]*TrackingPlanPropertyArgs, 0),
@@ -718,14 +722,18 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			properties = append(properties, property.ToResourceData())
 		}
 
-		events = append(events, map[string]interface{}{
+		ev := map[string]interface{}{
 			"id":              event.ID,
 			"localId":         event.LocalID,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
 			"variants":        event.Variants.ToResourceData(),
-		})
+		}
+		if event.SourceRuleID != "" {
+			ev["sourceRuleId"] = event.SourceRuleID
+		}
+		events = append(events, ev)
 	}
 
 	return resources.ResourceData{

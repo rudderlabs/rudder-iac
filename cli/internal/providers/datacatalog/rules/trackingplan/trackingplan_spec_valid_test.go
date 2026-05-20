@@ -202,6 +202,22 @@ func TestTrackingPlanSpecSyntaxValidRule_ValidEventAndPropertyRefs(t *testing.T)
 			},
 		},
 		{
+			name: "rule with includes ref only",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "include-rule",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/shared_tp/event_rule/*",
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "multiple rules with event and property refs",
 			spec: localcatalog.TrackingPlan{
 				LocalID: "test_tp",
@@ -298,8 +314,53 @@ func TestTrackingPlanSpecSyntaxValidRule_InvalidEventAndPropertyRefs(t *testing.
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/event"},
-			expectedMsgs: []string{"'event' is required"},
+			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
+			expectedMsgs: []string{
+				"'event' is required when 'Includes' is not specified",
+				"'includes' is required when 'Event' is not specified",
+			},
+		},
+		{
+			name: "rule with both event and includes",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Event: &localcatalog.TPRuleEvent{
+							Ref: "#/events/user-events/signup",
+						},
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/shared_tp/event_rule/*",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
+			expectedMsgs: []string{
+				"'event' and 'Includes' cannot be specified together",
+				"'includes' and 'Event' cannot be specified together",
+			},
+		},
+		{
+			name: "includes ref invalid format",
+			spec: localcatalog.TrackingPlan{
+				LocalID: "test_tp",
+				Name:    "Test TP",
+				Rules: []*localcatalog.TPRule{
+					{
+						Type:    "event_rule",
+						LocalID: "rule1",
+						Includes: &localcatalog.TPRuleIncludes{
+							Ref: "#/tp/bad/only",
+						},
+					},
+				},
+			},
+			expectedRefs: []string{"/rules/0/includes/$ref"},
+			expectedMsgs: []string{"'$ref' is not valid: must be of pattern #/tp/<group>/event_rule/<id-or-*>"},
 		},
 		{
 			name: "event ref missing",
