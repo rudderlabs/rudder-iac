@@ -20,6 +20,7 @@ import (
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
@@ -233,6 +234,15 @@ func (p *Provider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
+}
+
+func (p *Provider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for _, h := range p.handlers {
+		if err := h.LoadImportMetadata(manifest); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {

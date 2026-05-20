@@ -111,7 +111,6 @@ type sourceResource struct {
 	SourceDefinition string
 	Enabled          bool
 	Governance       *governanceResource
-	ImportMetadata   map[string]*WorkspaceRemoteIDMapping
 }
 
 type WorkspaceRemoteIDMapping struct {

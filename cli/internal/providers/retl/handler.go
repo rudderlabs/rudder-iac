@@ -24,6 +24,10 @@ type resourceHandler interface {
 	// the parsed spec data. Returns an error if the spec is invalid or cannot be loaded.
 	LoadSpec(path string, s *specs.Spec) error
 
+	// LoadImportMetadata receives import manifest data and populates the handler's
+	// import metadata map for classifying resources as importable during apply.
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
+
 	// GetResources returns all resources managed by this handler.
 	// The returned resources will be added to the resource graph for
 	// dependency resolution and state management.

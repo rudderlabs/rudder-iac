@@ -394,5 +394,19 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
+// LoadImportManifest broadcasts manifest data to child providers that implement ImportManifestLoader.
+func (p *CompositeProvider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for name, prov := range p.Providers {
+		loader, ok := prov.(ImportManifestLoader)
+		if !ok {
+			continue
+		}
+		if err := loader.LoadImportManifest(manifest); err != nil {
+			return fmt.Errorf("loading import manifest into provider %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 // Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
 var _ RuleProvider = (*CompositeProvider)(nil)

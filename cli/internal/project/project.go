@@ -140,8 +140,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("initialising validation engine: %w", err)
 	}
 
-	// At this point, rawspecs are successfully parsed as well and information
-	// parsed gets augmented to the base struct
+	// All specs (resource + manifest) go through syntax validation together
 	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
 	if err != nil {
 		return fmt.Errorf("syntactic validation: %w", err)
@@ -159,13 +158,26 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("syntax validation failed")
 	}
 
-	for path, rawSpec := range parsedRawSpecs {
+	// Separate manifests from resource specs after syntax validation passes.
+	// Only resource specs are loaded into providers; manifests are parsed separately.
+	resourceSpecs, manifestSpecs := separateManifests(parsedRawSpecs)
+
+	for path, rawSpec := range resourceSpecs {
 		if err := p.loadSpec(
 			path,
 			rawSpec.Parsed(),
 		); err != nil {
 			return fmt.Errorf("loading spec %s: %w", path, err)
 		}
+	}
+
+	manifest, err := parseManifests(manifestSpecs)
+	if err != nil {
+		return fmt.Errorf("parsing import manifests: %w", err)
+	}
+
+	if err := broadcastImportManifest(p.provider, manifest); err != nil {
+		return fmt.Errorf("broadcasting import manifest: %w", err)
 	}
 
 	// Graph is built once here - single source of truth for all resource relationships.
@@ -180,7 +192,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("cycle detected in resource graph: %w", err)
 	}
 
-	// Specs which were parsed will now be validated against semantic rules.
+	// All specs (resource + manifest) go through semantic validation together
 	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
@@ -239,20 +251,31 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	// Active patterns become the source of truth for the
-	// validation pipeline to determine which unique kinds and versions
-	// are supported in the system.
-	activePatterns := p.provider.SupportedMatchPatterns()
-	baseRegistry := rules.NewRegistry(activePatterns)
+	providerPatterns := p.provider.SupportedMatchPatterns()
+
+	// import-manifest is a project-level kind, not owned by any provider.
+	// The registry always needs it so import-manifest rules can be registered.
+	// Gatekeeper rules use the combined set only when providers declare patterns,
+	// preserving the unrestricted fallback when they don't.
+	importManifestPattern := rules.MatchKindVersion(specs.KindImportManifest, specs.SpecVersionV1)
+	registryPatterns := make([]rules.MatchPattern, 0, len(providerPatterns)+1)
+	registryPatterns = append(registryPatterns, providerPatterns...)
+	registryPatterns = append(registryPatterns, importManifestPattern)
+	gatekeeperPatterns := appendImportManifestPattern(providerPatterns)
+
+	baseRegistry := rules.NewRegistry(registryPatterns)
+
+	dispatcher := p.newParseSpecDispatcher()
 
 	syntactic := []rules.Rule{
-		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. They use activePatterns as source of truth for the supported kinds and versions.
-		prules.NewSpecSyntaxValidRule(activePatterns),
-		prules.NewResourceKindVersionValidRule(activePatterns),
-
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
-		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
+		prules.NewSpecSyntaxValidRule(gatekeeperPatterns),
+		prules.NewResourceKindVersionValidRule(gatekeeperPatterns),
+		// Metadata and URN rules only apply to provider-owned kinds;
+		// import-manifest has its own dedicated rules for structure validation.
+		prules.NewMetadataSyntaxValidRule(dispatcher, providerPatterns),
+		prules.NewDuplicateURNRule(dispatcher, providerPatterns),
+		prules.NewImportManifestSyntaxRule(),
+		prules.NewImportManifestProjectRule(),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 
@@ -262,7 +285,12 @@ func (p *project) registry() (rules.Registry, error) {
 		}
 	}
 
-	for _, rule := range p.provider.SemanticRules() {
+	semantic := []rules.Rule{
+		prules.NewImportManifestSemanticRule(),
+	}
+	semantic = append(semantic, p.provider.SemanticRules()...)
+
+	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}
@@ -273,4 +301,13 @@ func (p *project) registry() (rules.Registry, error) {
 
 func (p *project) ResourceGraph() (*resources.Graph, error) {
 	return p.provider.ResourceGraph()
+}
+
+func (p *project) newParseSpecDispatcher() prules.ParseSpecFunc {
+	return func(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+		if s.IsImportManifest() {
+			return parseManifestSpec()
+		}
+		return p.provider.ParseSpec(path, s)
+	}
 }

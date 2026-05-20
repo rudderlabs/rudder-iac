@@ -17,6 +17,7 @@ type Handler interface {
 	ResourceType() string
 	SpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	Resources() ([]*resources.Resource, error)
 	Create(ctx context.Context, data any) (any, error)
@@ -231,6 +232,16 @@ func (p *BaseProvider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
+}
+
+// LoadImportManifest broadcasts import manifest data to all handlers.
+func (p *BaseProvider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(manifest); err != nil {
+			return fmt.Errorf("loading import metadata for handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 // GetHandler returns the handler for a given resource type
