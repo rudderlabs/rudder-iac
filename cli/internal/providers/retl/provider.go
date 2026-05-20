@@ -123,6 +123,17 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
+func (p *Provider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for _, h := range p.handlers {
+		if loader, ok := h.(provider.ImportMetadataLoader); ok {
+			if err := loader.LoadImportMetadata(manifest); err != nil {
+				return fmt.Errorf("loading import metadata: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 func (p *Provider) SyntacticRules() []rules.Rule {
 	return []rules.Rule{
 		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),

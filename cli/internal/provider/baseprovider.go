@@ -233,6 +233,20 @@ func (p *BaseProvider) FormatForExport(
 	return result, nil
 }
 
+// LoadImportManifest broadcasts import manifest data to handlers that implement ImportMetadataLoader.
+func (p *BaseProvider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for resourceType, h := range p.handlers {
+		loader, ok := h.(ImportMetadataLoader)
+		if !ok {
+			continue
+		}
+		if err := loader.LoadImportMetadata(manifest); err != nil {
+			return fmt.Errorf("loading import metadata for handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
+}
+
 // GetHandler returns the handler for a given resource type
 func (p *BaseProvider) GetHandler(resourceType string) (Handler, bool) {
 	handler, ok := p.handlers[resourceType]

@@ -235,6 +235,17 @@ func (p *Provider) FormatForExport(
 	return result, nil
 }
 
+func (p *Provider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	for _, h := range p.handlers {
+		if loader, ok := h.(provider.ImportMetadataLoader); ok {
+			if err := loader.LoadImportMetadata(manifest); err != nil {
+				return fmt.Errorf("loading import metadata: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
 func (p *Provider) SyntacticRules() []rules.Rule {
 	return []rules.Rule{
 		sourceRules.NewSourceSpecSyntaxValidRule(),

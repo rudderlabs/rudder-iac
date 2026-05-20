@@ -202,6 +202,18 @@ type RuleProvider interface {
 	SemanticRules() []rules.Rule
 }
 
+// ImportManifestLoader is an optional interface that providers can implement
+// to receive import manifest data for broadcast to their handlers.
+type ImportManifestLoader interface {
+	LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error
+}
+
+// ImportMetadataLoader is an optional interface that handlers can implement
+// to receive import metadata from manifests.
+type ImportMetadataLoader interface {
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
