@@ -10,6 +10,7 @@ import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
@@ -105,6 +106,14 @@ func NewDeps() (Deps, error) {
 
 	if cfg.ExperimentalFlags.DataGraph {
 		providerMap["datagraph"] = p.DataGraph
+	}
+
+	for name, sub := range providerMap {
+		for _, kind := range sub.SupportedKinds() {
+			if kind == specs.KindImportManifest {
+				return nil, fmt.Errorf("resource provider %q claims reserved kind %q", name, kind)
+			}
+		}
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)

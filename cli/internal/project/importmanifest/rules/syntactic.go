@@ -148,7 +148,7 @@ func (r *urnUniqueRule) ValidateProject(
 		if ctx.Kind != specs.KindImportManifest {
 			continue
 		}
-		for wsIdx, urn := range collectManifestURNs(ctx.Spec) {
+		for _, urn := range collectManifestURNs(ctx.Spec) {
 			occurrences[urn.value] = append(occurrences[urn.value], urnLocation{
 				filePath: filePath,
 				ref: fmt.Sprintf(
@@ -156,7 +156,6 @@ func (r *urnUniqueRule) ValidateProject(
 					urn.workspaceIdx, urn.resourceIdx,
 				),
 			})
-			_ = wsIdx
 		}
 	}
 
