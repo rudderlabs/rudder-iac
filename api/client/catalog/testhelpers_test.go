@@ -1,7 +1,6 @@
 package catalog_test
 
 import (
-	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,11 +12,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const catalogAPIBase = "https://api.rudderstack.com/"
+
 type callAsserter interface {
 	AssertNumberOfCalls()
 }
 
-func newDataCatalog(t *testing.T, opts []catalog.Opts, calls ...testutils.Call) (catalog.DataCatalog, callAsserter) {
+func catalogURL(path string) string {
+	return catalogAPIBase + strings.TrimPrefix(path, "/")
+}
+
+// assertCall validates method, URL, and JSON body. testutils.ValidateRequest
+// currently ignores its url argument, so we assert the URL here explicitly.
+func assertCall(t *testing.T, req *http.Request, method, url, body string) bool {
+	t.Helper()
+	return assert.Equal(t, url, req.URL.String()) &&
+		testutils.ValidateRequest(t, req, method, url, body)
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func newDataCatalog(t *testing.T, calls ...testutils.Call) (catalog.DataCatalog, callAsserter) {
+	return newDataCatalogWithOptions(t, nil, calls...)
+}
+
+func newDataCatalogWithOptions(t *testing.T, opts []catalog.Opts, calls ...testutils.Call) (catalog.DataCatalog, callAsserter) {
 	t.Helper()
 
 	httpClient := testutils.NewMockHTTPClient(t, calls...)
@@ -29,29 +50,4 @@ func newDataCatalog(t *testing.T, opts []catalog.Opts, calls ...testutils.Call) 
 	require.NoError(t, err)
 
 	return dataCatalog, httpClient
-}
-
-func validateRequest(t *testing.T, req *http.Request, method, endpoint, body string) bool {
-	t.Helper()
-
-	if !assert.Equal(t, method, req.Method) {
-		return false
-	}
-
-	expectedURL := "https://api.rudderstack.com/" + strings.TrimPrefix(endpoint, "/")
-	if !assert.Equal(t, expectedURL, req.URL.String()) {
-		return false
-	}
-
-	if body == "" {
-		return true
-	}
-
-	bodyBytes, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-	if !assert.JSONEq(t, body, string(bodyBytes)) {
-		return false
-	}
-
-	return true
 }
