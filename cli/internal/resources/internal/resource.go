@@ -11,6 +11,7 @@ type Resource struct {
 
 	ImportMetadata *ResourceImportMetadata
 	FileMetadata   *ResourceFileMetadata
+	Annotations    map[string]any
 }
 
 type ResourceFileMetadata struct {

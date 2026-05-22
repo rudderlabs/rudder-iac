@@ -65,7 +65,7 @@ func validateDuplicateEventsV0(spec localcatalog.TrackingPlan, graph *resources.
 			continue
 		}
 
-		for _, evRef := range eventRefsFromTPData(included.Data(), includeRuleID) {
+		for _, evRef := range eventRefsFromTPData(included.Data(), included.Annotations(), includeRuleID) {
 			key := canonicalEventRef(evRef)
 			add(seen, key, dupOrigin{
 				ref: fmt.Sprintf("/rules/%d/includes/$ref", i),
@@ -104,7 +104,7 @@ func canonicalEventRef(ref string) string {
 	return fmt.Sprintf("#%s:%s", rt, id)
 }
 
-func eventRefsFromTPData(data resources.ResourceData, filterRuleID string) []string {
+func eventRefsFromTPData(data resources.ResourceData, annotations map[string]any, filterRuleID string) []string {
 	if data == nil {
 		return nil
 	}
@@ -126,6 +126,11 @@ func eventRefsFromTPData(data resources.ResourceData, filterRuleID string) []str
 		return nil
 	}
 
+	var ruleMapping map[string]string
+	if annotations != nil {
+		ruleMapping, _ = annotations["eventRuleMapping"].(map[string]string)
+	}
+
 	var out []string
 	for _, e := range xs {
 		m, ok := mapStringAnyFromAny(e)
@@ -136,9 +141,11 @@ func eventRefsFromTPData(data resources.ResourceData, filterRuleID string) []str
 		if localID == "" {
 			continue
 		}
-		srcRule, _ := m["sourceRuleId"].(string)
-		if filterRuleID != "*" && srcRule != filterRuleID {
-			continue
+		if filterRuleID != "*" {
+			srcRule := ruleMapping[localID]
+			if srcRule != filterRuleID {
+				continue
+			}
 		}
 		out = append(out, fmt.Sprintf("#event:%s", localID))
 	}

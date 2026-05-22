@@ -41,6 +41,12 @@ func WithRawData(rawData any) ResourceOpts {
 	}
 }
 
+func WithAnnotations(annotations map[string]any) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.Annotations = annotations
+	}
+}
+
 func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ResourceOpts) *Resource {
 	r := &internal.Resource{
 		URN:          URN(id, resourceType),
@@ -88,4 +94,8 @@ func (r *Resource) ImportMetadata() *internal.ResourceImportMetadata {
 
 func (r *Resource) FileMetadata() *internal.ResourceFileMetadata {
 	return r.r.FileMetadata
+}
+
+func (r *Resource) Annotations() map[string]any {
+	return r.r.Annotations
 }

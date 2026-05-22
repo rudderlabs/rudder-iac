@@ -1183,11 +1183,12 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			"localId": "shared_tp",
 			"events": []any{
 				map[string]any{
-					"localId":      "signup",
-					"sourceRuleId": "sr1",
+					"localId": "signup",
 				},
 			},
-		}, nil))
+		}, nil, resources.WithAnnotations(map[string]any{
+			"eventRuleMapping": map[string]string{"signup": "sr1"},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "consumer",
@@ -1215,9 +1216,11 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			"name":    "Shared",
 			"localId": "shared_tp",
 			"events": []any{
-				map[string]any{"localId": "page", "sourceRuleId": "sr_page"},
+				map[string]any{"localId": "page"},
 			},
-		}, nil))
+		}, nil, resources.WithAnnotations(map[string]any{
+			"eventRuleMapping": map[string]string{"page": "sr_page"},
+		})))
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "consumer",
@@ -1235,6 +1238,42 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 
 		results := validateDuplicateEventsV0(spec, g)
 		assert.Empty(t, results)
+	})
+
+	t.Run("includes specific rule filters by annotation", func(t *testing.T) {
+		t.Parallel()
+
+		g := resources.NewGraph()
+		g.AddResource(resources.NewResource("shared_tp", types.TrackingPlanResourceType, resources.ResourceData{
+			"name":    "Shared",
+			"localId": "shared_tp",
+			"events": []any{
+				map[string]any{"localId": "signup"},
+				map[string]any{"localId": "page"},
+			},
+		}, nil, resources.WithAnnotations(map[string]any{
+			"eventRuleMapping": map[string]string{
+				"signup": "signup-rule",
+				"page":   "page-rule",
+			},
+		})))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "consumer",
+			Name:    "Consumer TP",
+			Rules: []*localcatalog.TPRule{
+				{
+					LocalID: "inc",
+					Includes: &localcatalog.TPRuleIncludes{
+						Ref: "#/tp/shared_tp/event_rule/signup-rule",
+					},
+				},
+				{LocalID: "direct", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+
+		results := validateDuplicateEventsV0(spec, g)
+		require.Len(t, results, 2)
 	})
 }
 

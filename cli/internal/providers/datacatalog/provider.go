@@ -295,6 +295,13 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			return nil, fmt.Errorf("creating tracking plan args: %w", err)
 		}
 
+		eventRuleMapping := make(map[string]string, len(tp.EventProps))
+		for _, event := range tp.EventProps {
+			if event.RuleLocalID != "" {
+				eventRuleMapping[event.LocalID] = event.RuleLocalID
+			}
+		}
+
 		resource := resources.NewResource(
 			tp.LocalID,
 			types.TrackingPlanResourceType,
@@ -305,6 +312,9 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				localcatalog.KindTrackingPlans,
 				tp.LocalID,
 			)),
+			resources.WithAnnotations(map[string]any{
+				"eventRuleMapping": eventRuleMapping,
+			}),
 		)
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
