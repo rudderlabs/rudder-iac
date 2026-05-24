@@ -281,14 +281,24 @@ func (p *project) registry() (rules.Registry, error) {
 	}
 	baseRegistry := rules.NewRegistry(activePatterns)
 
+	// Route ParseSpec calls by kind so gatekeeper rules that depend on parsed
+	// URNs (MetadataSyntaxValid, DuplicateURN) reach the correct provider
+	// instead of silently failing on import-manifest specs.
+	parseSpecFn := func(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
+		if s.IsImportManifest() {
+			return p.importManifestProvider.ParseSpec(path, s)
+		}
+		return p.provider.ParseSpec(path, s)
+	}
+
 	syntactic := []rules.Rule{
 		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
 		// independently. They use activePatterns as source of truth for the supported kinds and versions.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
-		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
+		prules.NewMetadataSyntaxValidRule(parseSpecFn, activePatterns),
+		prules.NewDuplicateURNRule(parseSpecFn, activePatterns),
 	}
 	syntactic = append(syntactic, p.provider.SyntacticRules()...)
 	if len(resourcePatterns) > 0 {
