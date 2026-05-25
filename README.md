@@ -84,3 +84,21 @@ To build the Docker image locally:
 ```sh
 make docker-build
 ```
+
+## Data graph column metadata (experimental)
+
+Manage column display name aliases on data graph models via the public API (`/v2/data-graphs/.../column-metadata`). Requires `experimentalFlags.dataGraph: true` in `~/.rudder/config.json`.
+
+```sh
+rudder-cli data-graphs column-metadata list --data-graph-id <dg-id> --model-id <model-id>
+rudder-cli data-graphs column-metadata list --data-graph-id <dg-id> --model-id <model-id> --json
+
+rudder-cli data-graphs column-metadata set <columnName> \
+  --data-graph-id <dg-id> --model-id <model-id> \
+  --display-name "Lifetime Value"
+
+rudder-cli data-graphs column-metadata clear <columnName> \
+  --data-graph-id <dg-id> --model-id <model-id>
+```
+
+Deployment dependency: rudder-api v2 proxy for column-metadata must be deployed (config-backend apigateway routes alone are not sufficient for the CLI).

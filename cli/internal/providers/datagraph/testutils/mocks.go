@@ -203,6 +203,18 @@ func (m *MockDataGraphClient) ValidateRelationship(ctx context.Context, req *dgC
 	return &dgClient.ValidationReport{}, nil
 }
 
+func (m *MockDataGraphClient) ListColumnMetadata(ctx context.Context, dataGraphID, modelID string) (*dgClient.ColumnMetadataListResponse, error) {
+	return &dgClient.ColumnMetadataListResponse{}, nil
+}
+
+func (m *MockDataGraphClient) UpsertColumnMetadata(ctx context.Context, dataGraphID, modelID, columnName, displayName string) (*dgClient.ColumnMetadata, error) {
+	return &dgClient.ColumnMetadata{}, nil
+}
+
+func (m *MockDataGraphClient) DeleteColumnMetadata(ctx context.Context, dataGraphID, modelID, columnName string) error {
+	return nil
+}
+
 // MockURNResolver implements handler.URNResolver for testing
 type MockURNResolver struct {
 	urnByID map[string]map[string]string // map[resourceType]map[remoteID]urn
