@@ -20,3 +20,8 @@
 - Dependency injection uses functional options to swap infrastructure (HTTP client/base URL/user agent, sync reporter/concurrency) without changing constructors. Ref: `api/client/options.go:3` (`Option`), `api/client/options.go:15` (`WithHTTPClient`), `cli/internal/syncer/syncer.go:60` (`WithReporter`), `cli/internal/syncer/syncer.go:69` (`WithConcurrency`).
 - Polling-style async workflows use timeout + ticker loops with explicit pending/failed/completed states rather than sleep-based retries. Ref: `cli/internal/providers/retl/sqlmodel/preview.go:13` (`DefaultTimeout`), `cli/internal/providers/retl/sqlmodel/preview.go:25` (`Handler.Preview`), `cli/internal/providers/retl/sqlmodel/preview.go:55` (`time.NewTicker`).
 - Logging is package-scoped and structured (`slog` wrapper with fixed attrs), allowing runners/providers to stamp component identity into every record. Ref: `cli/internal/logger/log.go:49` (`logger.New`), `cli/internal/providers/datagraph/validator/runner.go:16` (`validationLog`), `cli/internal/providers/transformations/testorchestrator/runner.go:22` (`testLogger`).
+
+## DEX-358 — Test and Env-Resolution Idioms
+- Unit test style in `cli/internal` remains table-driven subtests with `testify` (`assert`/`require`) in co-located `*_test.go` files; follow this pattern for new package coverage.
+- Environment substitution resolution follows a snapshot-then-lookup idiom: matching variables are materialized at resolver construction and looked up from a map during resolution.
+- Empty-string environment values are treated as present values (`found=true`), so absence is represented by missing keys, not by empty value content.

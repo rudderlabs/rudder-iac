@@ -42,3 +42,6 @@
 - `go.mod` includes both `gopkg.in/yaml.v3` and `go.yaml.in/yaml/v3` module lines, indicating dependency overlap that commonly appears during partial migration and can become stale baggage.
 - `cli/internal/project/deprecation.go (LegacySpecDeprecationWarning)` warns that v0.1 will be removed “in a future release,” while many `LoadLegacySpec` paths remain active; this suggests prolonged deprecation without clear retirement point.
 - `cli/internal/provider/baseprovider.go:121` comment says legacy loading falls back to `LoadSpec` “for now,” which is explicit temporary behavior that can persist stale semantics.
+
+## DEX-358 — Resolver Naming Collision Risk
+- `cli/internal/resolver` already denotes import-reference resolution in the repository. Introducing a separate variable-substitution `Resolver` abstraction increases ambiguity in discussions, imports, and code search unless naming qualifiers stay explicit (`varsubst.Resolver` vs existing resolver package concepts).
