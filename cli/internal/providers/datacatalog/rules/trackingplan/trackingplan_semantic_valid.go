@@ -20,8 +20,34 @@ var validateTrackingPlanSemantic = func(_ string, _ string, _ map[string]any, sp
 	results = append(results, validateTrackingPlanVariants(spec, graph)...)
 	results = append(results, validatePropertyNestingV0(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV0(spec, graph)...)
+	results = append(results, validateDuplicateRuleIDsV0(spec)...)
 	results = append(results, validateDuplicateEventsV0(spec)...)
 	results = append(results, validateDuplicatePropertiesV0(spec)...)
+
+	return results
+}
+
+func validateDuplicateRuleIDsV0(spec localcatalog.TrackingPlan) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range spec.Rules {
+		if rule.LocalID == "" {
+			continue
+		}
+		counts[rule.LocalID]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range spec.Rules {
+		if rule.LocalID == "" {
+			continue
+		}
+		if counts[rule.LocalID] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/id", i),
+				Message:   "duplicate rule id in tracking plan rules",
+			})
+		}
+	}
 
 	return results
 }

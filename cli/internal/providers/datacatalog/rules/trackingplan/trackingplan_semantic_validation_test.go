@@ -725,6 +725,89 @@ func TestTrackingPlanSemanticValid_Uniqueness(t *testing.T) {
 	})
 }
 
+func TestTrackingPlanSemanticValid_DuplicateRuleIDsV0(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate rule ids are reported within tracking plan", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "Plan 1",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_1"}},
+				{Type: "event_rule", LocalID: "unique", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_2"}},
+				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_3"}},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/2/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("empty ids are skipped for duplicate check", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_4", "event", resources.ResourceData{}, nil))
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "Plan 1",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_1"}},
+				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_2"}},
+				{Type: "event_rule", LocalID: "", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_3"}},
+				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_4"}},
+			},
+		}
+
+		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/3/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("same rule id in different tracking plans does not cross-contaminate", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+
+		specA := localcatalog.TrackingPlan{
+			LocalID: "tp1",
+			Name:    "Plan 1",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "shared", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+		specB := localcatalog.TrackingPlan{
+			LocalID: "tp2",
+			Name:    "Plan 2",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "shared", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup"}},
+			},
+		}
+
+		resultsA := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, specA, graph)
+		resultsB := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, specB, graph)
+		assert.Empty(t, resultsA)
+		assert.Empty(t, resultsB)
+	})
+}
+
 func TestTrackingPlanSemanticValid_V1ReferenceResolution(t *testing.T) {
 	t.Parallel()
 
@@ -910,6 +993,89 @@ func TestTrackingPlanSemanticValid_V1Uniqueness(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, "/display_name", results[0].Reference)
 	assert.Contains(t, results[0].Message, "duplicate display_name 'Onboarding Plan' within kind 'tracking-plan'")
+}
+
+func TestTrackingPlanSemanticValid_DuplicateRuleIDsV1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("duplicate rule ids are reported within tracking plan", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Plan",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_1"},
+				{Type: "event_rule", LocalID: "unique", Event: "#event:signup_2"},
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_3"},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/2/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("empty ids are skipped for duplicate check", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
+		graph.AddResource(resources.NewResource("signup_4", "event", resources.ResourceData{}, nil))
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Plan",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "", Event: "#event:signup_1"},
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_2"},
+				{Type: "event_rule", LocalID: "", Event: "#event:signup_3"},
+				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_4"},
+			},
+		}
+
+		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
+		assert.ElementsMatch(t, []rules.ValidationResult{
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/3/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("same rule id in different tracking plans does not cross-contaminate", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("signup", "event", resources.ResourceData{}, nil))
+
+		specA := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1_a",
+			Name:    "Plan A",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "shared", Event: "#event:signup"},
+			},
+		}
+		specB := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1_b",
+			Name:    "Plan B",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "shared", Event: "#event:signup"},
+			},
+		}
+
+		resultsA := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, specA, graph)
+		resultsB := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, specB, graph)
+		assert.Empty(t, resultsA)
+		assert.Empty(t, resultsB)
+	})
 }
 
 func TestTrackingPlanSemanticValid_V1VariantDiscriminator(t *testing.T) {
