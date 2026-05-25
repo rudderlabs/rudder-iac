@@ -34,4 +34,27 @@ func TestMapValues(t *testing.T) {
 		assert.False(t, state.Bool(defaultmap, "invalid", false))
 	})
 
+	t.Run("numeric values are extracted from map successfully", func(t *testing.T) {
+		assert.Equal(t, 84, state.MustInt(defaultmap, "empCount"))
+		assert.Equal(t, 0, state.Int(defaultmap, "invalid", 0))
+
+		defaultmap["score"] = 9.5
+		assert.InDelta(t, 9.5, state.MustFloat64(defaultmap, "score"), 0)
+		assert.InDelta(t, 0.0, state.Float64(defaultmap, "invalid", 0), 0)
+	})
+
+	t.Run("nested map and slice values are extracted from map successfully", func(t *testing.T) {
+		nested := map[string]interface{}{"region": "us"}
+		nestedPtr := &nested
+		defaultmap["nested"] = nested
+		defaultmap["nestedPtr"] = nestedPtr
+
+		assert.Equal(t, nested, state.MustMapStringInterface(defaultmap, "nested"))
+		assert.Equal(t, nestedPtr, state.MustMapStringInterfacePtr(defaultmap, "nestedPtr"))
+		assert.Equal(t, map[string]interface{}{"fallback": true}, state.MapStringInterface(defaultmap, "missing", map[string]interface{}{"fallback": true}))
+
+		defaultmap["tags"] = []interface{}{"go", "cli"}
+		assert.Equal(t, []string{"go", "cli"}, state.MustStringSlice(defaultmap, "tags"))
+	})
+
 }

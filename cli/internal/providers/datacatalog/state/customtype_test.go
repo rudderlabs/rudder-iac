@@ -3,6 +3,7 @@ package state
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
@@ -718,4 +719,46 @@ func TestPropertyByID(t *testing.T) {
 	// Test non-existing property
 	prop = args.PropertyByID("nonexistent")
 	assert.Nil(t, prop)
+}
+
+func TestCustomTypeArgs_DiffUpstream(t *testing.T) {
+	args := &CustomTypeArgs{
+		Name:        "Email Type",
+		Description: "Email validation",
+		Type:        "string",
+		Config: map[string]interface{}{
+			"format": "email",
+		},
+		Properties: []*CustomTypeProperty{
+			{ID: "domain", Required: true},
+		},
+	}
+
+	t.Run("no diff", func(t *testing.T) {
+		t.Parallel()
+
+		upstream := &catalog.CustomType{
+			Name:        "Email Type",
+			Description: "Email validation",
+			Type:        "string",
+			Config: map[string]interface{}{
+				"format": "email",
+			},
+			Properties: []catalog.CustomTypeProperty{
+				{ID: "domain", Required: true},
+			},
+		}
+
+		assert.False(t, args.DiffUpstream(upstream))
+	})
+
+	t.Run("name changed", func(t *testing.T) {
+		t.Parallel()
+
+		upstream := &catalog.CustomType{
+			Name: "Updated Email Type",
+		}
+
+		assert.True(t, args.DiffUpstream(upstream))
+	})
 }

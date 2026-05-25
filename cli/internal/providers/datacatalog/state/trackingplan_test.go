@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/testutils/factory"
@@ -973,4 +974,65 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 			}
 		})
 	}
+}
+
+func TestTrackingPlanState_ResourceData(t *testing.T) {
+	t.Parallel()
+
+	trackingPlanArgs := factory.NewTrackingPlanArgsFactory().
+		WithName("Checkout TP").
+		WithDescription("Tracks checkout events").
+		Build()
+	trackingPlanState := state.TrackingPlanState{
+		TrackingPlanArgs: trackingPlanArgs,
+		ID:           "tp-id",
+		Name:         "Checkout TP",
+		Description:  "Tracks checkout events",
+		CreationType: "manual",
+		WorkspaceID:  "workspace-id",
+		CreatedAt:    "2021-09-01T00:00:00Z",
+		UpdatedAt:    "2021-09-01T00:00:00Z",
+	}
+
+	resourceData := trackingPlanState.ToResourceData()
+	loopback := state.TrackingPlanState{}
+	loopback.FromResourceData(resourceData)
+
+	if trackingPlanState.Events == nil {
+		trackingPlanState.Events = []*state.TrackingPlanEventArgs{}
+	}
+
+	assert.Equal(t, trackingPlanState, loopback)
+}
+
+func TestTrackingPlanArgs_DiffUpstream(t *testing.T) {
+	t.Parallel()
+
+	args := factory.NewTrackingPlanArgsFactory().
+		WithName("Local TP").
+		WithDescription("local description").
+		WithEvent(&state.TrackingPlanEventArgs{
+			ID:             "event-id",
+			LocalID:        "event-local-id",
+			AllowUnplanned: false,
+		}).Build()
+
+	remoteDescription := "remote description"
+	upstream := &catalog.TrackingPlanWithIdentifiers{
+		TrackingPlan: catalog.TrackingPlan{
+			Name:        "Remote TP",
+			Description: &remoteDescription,
+		},
+		Events: []*catalog.TrackingPlanEventPropertyIdentifiers{
+			{
+				ID:                   "other-event-id",
+				AdditionalProperties: true,
+			},
+		},
+	}
+
+	changed, diffed := args.DiffUpstream(upstream)
+
+	assert.True(t, changed)
+	assert.True(t, len(diffed.Added) > 0 || len(diffed.Updated) > 0 || len(diffed.Deleted) > 0)
 }

@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCategoryArgs_ResourceData(t *testing.T) {
@@ -68,6 +70,51 @@ func TestCategoryState_ResourceData(t *testing.T) {
 		loopback.FromResourceData(categoryState.ToResourceData())
 		assert.Equal(t, categoryState, loopback)
 	})
+}
+
+func TestCategoryArgs_FromCatalogCategory(t *testing.T) {
+	t.Parallel()
+
+	args := &state.CategoryArgs{}
+	args.FromCatalogCategory(&localcatalog.CategoryV1{
+		LocalID: "category-local-id",
+		Name:    "Marketing",
+	})
+
+	assert.Equal(t, "Marketing", args.Name)
+}
+
+func TestCategoryState_FromRemoteCategory(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	remoteCategory := &catalog.Category{
+		ID:          "category-123",
+		Name:        "Test Category",
+		WorkspaceID: "workspace-456",
+		ExternalID:  "category-123-local",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	getURNFromRemoteId := func(resourceType string, remoteId string) (string, error) {
+		return "", resources.ErrRemoteResourceNotFound
+	}
+
+	categoryState := &state.CategoryState{}
+	err := categoryState.FromRemoteCategory(remoteCategory, getURNFromRemoteId)
+
+	require.NoError(t, err)
+	assert.Equal(t, state.CategoryState{
+		CategoryArgs: state.CategoryArgs{
+			Name: "Test Category",
+		},
+		ID:          "category-123",
+		Name:        "Test Category",
+		WorkspaceID: "workspace-456",
+		CreatedAt:   now.String(),
+		UpdatedAt:   now.String(),
+	}, *categoryState)
 }
 
 func TestCategoryArgs_FromRemoteCategory(t *testing.T) {
