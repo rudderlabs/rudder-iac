@@ -37,18 +37,6 @@ func (m *manifestCapableProvider) LoadImportManifest(manifest *specs.WorkspacesI
 
 var _ provider.ImportManifestLoader = (*manifestCapableProvider)(nil)
 
-func TestParseManifestSpec(t *testing.T) {
-	t.Parallel()
-
-	result, err := parseManifestSpec()
-
-	require.NoError(t, err)
-	assert.Equal(t, &specs.ParsedSpec{
-		URNs:               nil,
-		LegacyResourceType: "",
-	}, result)
-}
-
 func TestSeparateManifests(t *testing.T) {
 	t.Parallel()
 
@@ -197,5 +185,54 @@ func TestBroadcastImportManifest(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, manifest, pp.manifest)
+	})
+}
+
+func TestCheckInlineManifestConflicts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no manifests returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		diags := checkInlineManifestConflicts(
+			map[string]*specs.RawSpec{},
+			map[string]*specs.RawSpec{},
+		)
+		assert.Nil(t, diags)
+	})
+
+	t.Run("no conflicts returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		manifestSpec := &specs.RawSpec{Data: []byte("version: rudder/v1\nkind: import-manifest\nmetadata:\n  name: m\nspec:\n  workspaces:\n    - workspace_id: ws-1\n      resources:\n        - urn: \"source:a\"\n          remote_id: r1\n")}
+		_, _ = manifestSpec.Parse()
+
+		resourceSpec := &specs.RawSpec{Data: []byte("version: rudder/v1\nkind: event-stream-source\nmetadata:\n  name: src\nspec:\n  id: my-source\n")}
+		_, _ = resourceSpec.Parse()
+
+		diags := checkInlineManifestConflicts(
+			map[string]*specs.RawSpec{"source.yaml": resourceSpec},
+			map[string]*specs.RawSpec{"manifest.yaml": manifestSpec},
+		)
+		assert.Empty(t, diags)
+	})
+
+	t.Run("conflict detected between manifest and inline metadata", func(t *testing.T) {
+		t.Parallel()
+
+		manifestSpec := &specs.RawSpec{Data: []byte("version: rudder/v1\nkind: import-manifest\nmetadata:\n  name: m\nspec:\n  workspaces:\n    - workspace_id: ws-1\n      resources:\n        - urn: \"source:shared\"\n          remote_id: r1\n")}
+		_, _ = manifestSpec.Parse()
+
+		resourceSpec := &specs.RawSpec{Data: []byte("version: rudder/v1\nkind: event-stream-source\nmetadata:\n  name: src\n  import:\n    workspaces:\n      - workspace_id: ws-1\n        resources:\n          - urn: \"source:shared\"\n            remote_id: r2\nspec:\n  id: my-source\n")}
+		_, _ = resourceSpec.Parse()
+
+		diags := checkInlineManifestConflicts(
+			map[string]*specs.RawSpec{"source.yaml": resourceSpec},
+			map[string]*specs.RawSpec{"manifest.yaml": manifestSpec},
+		)
+
+		require.Len(t, diags, 1)
+		assert.Contains(t, diags[0].Message, "source:shared")
+		assert.Equal(t, "project/import-manifest-inline-conflict", diags[0].RuleID)
 	})
 }

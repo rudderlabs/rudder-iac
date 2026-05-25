@@ -7,6 +7,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// importManifestProjectRule detects duplicate URNs across multiple manifest files.
+// Implements both Rule and ProjectRule — cross-file logic runs in ValidateProject.
 type importManifestProjectRule struct{}
 
 func NewImportManifestProjectRule() rules.Rule {
@@ -16,19 +18,18 @@ func NewImportManifestProjectRule() rules.Rule {
 func (r *importManifestProjectRule) ID() string               { return "project/import-manifest-cross-file" }
 func (r *importManifestProjectRule) Severity() rules.Severity { return rules.Error }
 func (r *importManifestProjectRule) Description() string {
-	return "import manifest URNs must be unique across files and not conflict with inline metadata"
+	return "import manifest URNs must be unique across files"
 }
 func (r *importManifestProjectRule) AppliesTo() []rules.MatchPattern {
-	return []rules.MatchPattern{rules.MatchAll()}
+	return []rules.MatchPattern{rules.MatchKind(specs.KindImportManifest)}
 }
 func (r *importManifestProjectRule) Examples() rules.Examples { return rules.Examples{} }
 
-// Validate returns nil -- cross-file logic is in ValidateProject
 func (r *importManifestProjectRule) Validate(_ *rules.ValidationContext) []rules.ValidationResult {
 	return nil
 }
 
-// ValidateProject implements ProjectRule for cross-file manifest checks
+// ValidateProject checks for duplicate URNs across manifest files.
 func (r *importManifestProjectRule) ValidateProject(
 	allSpecs map[string]*rules.ValidationContext,
 ) map[string][]rules.ValidationResult {
@@ -45,7 +46,7 @@ func (r *importManifestProjectRule) ValidateProject(
 			continue
 		}
 
-		for _, entry := range extractManifestURNs(ctx.Spec) {
+		for _, entry := range ExtractManifestURNs(ctx.Spec) {
 			if prev, exists := manifestURNs[entry.URN]; exists {
 				results[filePath] = append(results[filePath], rules.ValidationResult{
 					RuleID:    r.ID(),
@@ -61,41 +62,19 @@ func (r *importManifestProjectRule) ValidateProject(
 		}
 	}
 
-	if len(manifestURNs) == 0 {
-		return results
-	}
-
-	// Detect conflicts with inline metadata.import in resource specs
-	for filePath, ctx := range allSpecs {
-		if ctx.Kind == specs.KindImportManifest {
-			continue
-		}
-
-		inlineURNs := extractInlineImportURNs(ctx.Metadata)
-		for _, urn := range inlineURNs {
-			if manifestLoc, exists := manifestURNs[urn]; exists {
-				results[manifestLoc.FilePath] = append(results[manifestLoc.FilePath], rules.ValidationResult{
-					RuleID:    r.ID(),
-					Severity:  r.Severity(),
-					Message:   fmt.Sprintf("URN '%s' found in both manifest %s and inline metadata in %s", urn, manifestLoc.FilePath, filePath),
-					FilePath:  manifestLoc.FilePath,
-					FileName:  manifestLoc.FilePath,
-					Reference: manifestLoc.Reference,
-				})
-			}
-		}
-	}
-
 	return results
 }
 
-type manifestURNEntry struct {
+// ManifestURNEntry holds a URN and its JSON pointer reference within a manifest spec.
+type ManifestURNEntry struct {
 	URN       string
 	Reference string
 }
 
-func extractManifestURNs(specMap map[string]any) []manifestURNEntry {
-	var entries []manifestURNEntry
+// ExtractManifestURNs extracts all URNs from a manifest spec's workspaces.
+// The specMap is the inner spec map (ctx.Spec / rawSpec.Parsed().Spec).
+func ExtractManifestURNs(specMap map[string]any) []ManifestURNEntry {
+	var entries []ManifestURNEntry
 
 	workspacesRaw, ok := specMap["workspaces"]
 	if !ok {
@@ -127,7 +106,7 @@ func extractManifestURNs(specMap map[string]any) []manifestURNEntry {
 			}
 			urn, _ := res["urn"].(string)
 			if urn != "" {
-				entries = append(entries, manifestURNEntry{
+				entries = append(entries, ManifestURNEntry{
 					URN:       urn,
 					Reference: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", i, j),
 				})
@@ -138,7 +117,8 @@ func extractManifestURNs(specMap map[string]any) []manifestURNEntry {
 	return entries
 }
 
-func extractInlineImportURNs(metadata map[string]any) []string {
+// ExtractInlineImportURNs extracts URNs from a resource spec's metadata.import block.
+func ExtractInlineImportURNs(metadata map[string]any) []string {
 	var urns []string
 
 	importRaw, ok := metadata["import"]

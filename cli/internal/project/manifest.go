@@ -2,33 +2,109 @@ package project
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/project/rules"
 )
 
-// appendImportManifestPattern adds the import-manifest pattern to provider
-// patterns when providers have declared their own. When providers return nil
-// (meaning "no pattern-based restriction"), the result stays nil to preserve
-// that unrestricted behaviour for gatekeeper rules.
-func appendImportManifestPattern(providerPatterns []rules.MatchPattern) []rules.MatchPattern {
-	if len(providerPatterns) == 0 {
-		return nil
+// manifestRegistry builds the validation registry exclusively for import-manifest specs.
+// Manifest validation is separate from resource validation to avoid coupling
+// manifest rules with provider-specific concerns like ParseSpec dispatch.
+func manifestRegistry() (rules.Registry, error) {
+	manifestPatterns := []rules.MatchPattern{
+		rules.MatchKindVersion(specs.KindImportManifest, specs.SpecVersionV1),
 	}
-	result := make([]rules.MatchPattern, 0, len(providerPatterns)+1)
-	result = append(result, providerPatterns...)
-	result = append(result, rules.MatchKindVersion(specs.KindImportManifest, specs.SpecVersionV1))
-	return result
+	registry := rules.NewRegistry(manifestPatterns)
+
+	syntactic := []rules.Rule{
+		prules.NewSpecSyntaxValidRule(manifestPatterns),
+		prules.NewResourceKindVersionValidRule(manifestPatterns),
+		prules.NewImportManifestSyntaxRule(),
+		prules.NewImportManifestProjectRule(),
+	}
+	for _, rule := range syntactic {
+		if err := registry.RegisterSyntactic(rule); err != nil {
+			return nil, fmt.Errorf("registering manifest syntactic rule %s: %w", rule.ID(), err)
+		}
+	}
+
+	semantic := []rules.Rule{
+		prules.NewImportManifestSemanticRule(),
+	}
+	for _, rule := range semantic {
+		if err := registry.RegisterSemantic(rule); err != nil {
+			return nil, fmt.Errorf("registering manifest semantic rule %s: %w", rule.ID(), err)
+		}
+	}
+
+	return registry, nil
 }
 
-func parseManifestSpec() (*specs.ParsedSpec, error) {
-	return &specs.ParsedSpec{
-		URNs:               nil,
-		LegacyResourceType: "",
-	}, nil
+// checkInlineManifestConflicts detects URNs that appear in both manifest files
+// and inline metadata.import blocks in resource specs. This is a temporary
+// migration concern — once inline metadata is removed, this check becomes a no-op.
+func checkInlineManifestConflicts(
+	resourceSpecs map[string]*specs.RawSpec,
+	manifestSpecs map[string]*specs.RawSpec,
+) validation.Diagnostics {
+	if len(manifestSpecs) == 0 {
+		return nil
+	}
+
+	// Collect all URNs from manifests with their source file
+	type urnSource struct {
+		filePath  string
+		reference string
+	}
+	manifestURNs := make(map[string]urnSource)
+
+	for path, rawSpec := range manifestSpecs {
+		for _, entry := range prules.ExtractManifestURNs(rawSpec.Parsed().Spec) {
+			manifestURNs[entry.URN] = urnSource{filePath: path, reference: entry.Reference}
+		}
+	}
+
+	if len(manifestURNs) == 0 {
+		return nil
+	}
+
+	// Check resource specs' inline metadata.import for conflicts
+	var diags validation.Diagnostics
+	for resourcePath, rawSpec := range resourceSpecs {
+		inlineURNs := prules.ExtractInlineImportURNs(rawSpec.Parsed().Metadata)
+		for _, urn := range inlineURNs {
+			src, exists := manifestURNs[urn]
+			if !exists {
+				continue
+			}
+
+			pos := pathindex.StartingPosition
+			if pi, err := rawSpec.PathIndexer(); err == nil {
+				pos = *pi.NearestPosition("/metadata/import")
+			}
+
+			diags = append(diags, validation.Diagnostic{
+				RuleID:   "project/import-manifest-inline-conflict",
+				Severity: rules.Error,
+				Message: fmt.Sprintf(
+					"URN '%s' found in both manifest %s and inline metadata in %s",
+					urn, filepath.Base(src.filePath), filepath.Base(resourcePath),
+				),
+				File:     resourcePath,
+				Position: pos,
+			})
+		}
+	}
+
+	return diags
 }
 
 func separateManifests(

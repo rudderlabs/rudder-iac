@@ -30,8 +30,7 @@ func (r *importManifestSemanticRule) Validate(ctx *rules.ValidationContext) []ru
 
 	var results []rules.ValidationResult
 
-	// extractManifestURNs is defined in import_manifest_project_rule.go (same package)
-	for _, entry := range extractManifestURNs(ctx.Spec) {
+	for _, entry := range ExtractManifestURNs(ctx.Spec) {
 		if _, exists := ctx.Graph.GetResource(entry.URN); !exists {
 			results = append(results, rules.ValidationResult{
 				RuleID:    r.ID(),
