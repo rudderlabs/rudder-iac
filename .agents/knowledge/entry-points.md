@@ -14,3 +14,9 @@ Read these first (3-6 files):
 - `cli/internal/cmd/root.go`: top-level Cobra router; registers command groups (`auth`, `trackingplan`, `workspace`, `apply`, `validate`, `destroy`, `migrate`, `import`, `transformations`, `typer`, `datagraph`) and initialization hooks.
 - `Makefile`: canonical developer entrypoints for build/test/lint/docker and typer validation flows.
 - `api/client/client.go`: API client root used by CLI/provider layers to communicate with RudderStack services.
+
+## DAW-3474 — Documentation Authority Order
+<!-- ticket:DAW-3474 -->
+Read order for architecture/context tasks:
+- Start with `CLAUDE.md` and `.agents/knowledge/{entry-points,architecture}.md` for command/provider wiring and maintainer guidance.
+- Treat `README.md` primarily as install/usage onboarding (binary, Docker, source) rather than internal architecture documentation.
