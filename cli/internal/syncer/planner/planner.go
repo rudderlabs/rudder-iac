@@ -11,6 +11,16 @@ import (
 
 type Planner struct {
 	workspaceId string
+	options     PlanOptions
+}
+
+// PlanOptions configures the planning behavior
+type PlanOptions struct {
+	// SkipDeletes excludes delete operations from the plan
+	SkipDeletes bool
+	// ResourceTypes filters operations to only include these resource types.
+	// If empty, all resource types are included.
+	ResourceTypes []string
 }
 
 type OperationType int
@@ -51,9 +61,32 @@ type Plan struct {
 	Operations []*Operation
 }
 
-func New(workspaceId string) *Planner {
+type PlanOption func(*PlanOptions)
+
+// WithSkipDeletes configures the planner to exclude delete operations
+func WithSkipDeletes(skip bool) PlanOption {
+	return func(o *PlanOptions) {
+		o.SkipDeletes = skip
+	}
+}
+
+// WithResourceTypes configures the planner to only include operations
+// for the specified resource types
+func WithResourceTypes(types []string) PlanOption {
+	return func(o *PlanOptions) {
+		o.ResourceTypes = types
+	}
+}
+
+func New(workspaceId string, opts ...PlanOption) *Planner {
+	options := PlanOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	return &Planner{
 		workspaceId: workspaceId,
+		options:     options,
 	}
 }
 
@@ -67,14 +100,18 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	sortedImportable := sortByDependencies(diff.ImportableResources, target)
 	for _, urn := range sortedImportable {
 		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
+		if p.shouldIncludeResource(resource) {
+			plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
+		}
 	}
 
 	// Handle new resources (will be created)
 	sortedNew := sortByDependencies(diff.NewResources, target)
 	for _, urn := range sortedNew {
 		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
+		if p.shouldIncludeResource(resource) {
+			plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
+		}
 	}
 
 	// Handle updated resources
@@ -85,18 +122,39 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	sortedUpdated := sortByDependencies(updatedURNs, target)
 	for _, urn := range sortedUpdated {
 		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})
+		if p.shouldIncludeResource(resource) {
+			plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})
+		}
 	}
 
-	// Handle deleted resources
-	sortedDeleted := sortByDependencies(diff.RemovedResources, source)
-	slices.Reverse(sortedDeleted)
-	for _, urn := range sortedDeleted {
-		resource, _ := source.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Delete, Resource: resource})
+	// Handle deleted resources (skip if SkipDeletes is enabled)
+	if !p.options.SkipDeletes {
+		sortedDeleted := sortByDependencies(diff.RemovedResources, source)
+		slices.Reverse(sortedDeleted)
+		for _, urn := range sortedDeleted {
+			resource, _ := source.GetResource(urn)
+			if p.shouldIncludeResource(resource) {
+				plan.Operations = append(plan.Operations, &Operation{Type: Delete, Resource: resource})
+			}
+		}
 	}
 
 	return plan
+}
+
+// shouldIncludeResource checks if a resource should be included based on the
+// configured resource type filter
+func (p *Planner) shouldIncludeResource(resource *resources.Resource) bool {
+	if len(p.options.ResourceTypes) == 0 {
+		return true
+	}
+
+	for _, t := range p.options.ResourceTypes {
+		if resource.Type() == t {
+			return true
+		}
+	}
+	return false
 }
 
 // sortByDependencies returns resources ordered by their dependencies,

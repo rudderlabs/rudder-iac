@@ -337,6 +337,108 @@ func TestCompositeProvider_ResourceGraph(t *testing.T) {
 	}
 }
 
+func TestCompositeProvider_ProviderNames(t *testing.T) {
+	tests := []struct {
+		name      string
+		providers map[string]provider.Provider
+		expected  []string
+	}{
+		{
+			name: "single provider",
+			providers: map[string]provider.Provider{
+				"p1": testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+			},
+			expected: []string{"p1"},
+		},
+		{
+			name: "multiple providers",
+			providers: map[string]provider.Provider{
+				"retl":        testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+				"eventstream": testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"}),
+				"datacatalog": testutils.NewMockProvider([]string{"kindC"}, []string{"typeC"}),
+			},
+			expected: []string{"retl", "eventstream", "datacatalog"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cp, err := provider.NewCompositeProvider(tt.providers)
+			assert.NoError(t, err)
+			assert.NotNil(t, cp)
+
+			composite := cp.(*provider.CompositeProvider)
+			actual := composite.ProviderNames()
+			sort.Strings(actual)
+			sort.Strings(tt.expected)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestCompositeProvider_ResourceTypesForProviders(t *testing.T) {
+	p1 := testutils.NewMockProvider([]string{"kindA"}, []string{"typeA1", "typeA2"})
+	p2 := testutils.NewMockProvider([]string{"kindB"}, []string{"typeB1"})
+	p3 := testutils.NewMockProvider([]string{"kindC"}, []string{"typeC1", "typeC2", "typeC3"})
+
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"providerA": p1,
+		"providerB": p2,
+		"providerC": p3,
+	})
+	assert.NoError(t, err)
+	composite := cp.(*provider.CompositeProvider)
+
+	tests := []struct {
+		name        string
+		providers   []string
+		expected    []string
+		expectedErr string
+	}{
+		{
+			name:      "single provider",
+			providers: []string{"providerA"},
+			expected:  []string{"typeA1", "typeA2"},
+		},
+		{
+			name:      "multiple providers",
+			providers: []string{"providerA", "providerB"},
+			expected:  []string{"typeA1", "typeA2", "typeB1"},
+		},
+		{
+			name:      "all providers",
+			providers: []string{"providerA", "providerB", "providerC"},
+			expected:  []string{"typeA1", "typeA2", "typeB1", "typeC1", "typeC2", "typeC3"},
+		},
+		{
+			name:        "unknown provider returns error",
+			providers:   []string{"providerA", "unknownProvider"},
+			expectedErr: "unknown provider: unknownProvider",
+		},
+		{
+			name:     "empty provider list returns empty types",
+			providers: []string{},
+			expected:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := composite.ResourceTypesForProviders(tt.providers)
+
+			if tt.expectedErr != "" {
+				assert.EqualError(t, err, tt.expectedErr)
+				assert.Nil(t, actual)
+			} else {
+				assert.NoError(t, err)
+				sort.Strings(actual)
+				sort.Strings(tt.expected)
+				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
+}
+
 func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	ctx := context.Background()
 	resDataA := resources.ResourceData{"key": "valA"}
