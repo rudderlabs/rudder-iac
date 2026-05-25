@@ -3,7 +3,6 @@ package trackingplan
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
@@ -22,8 +21,6 @@ const (
 	includesReferenceRequiredMessage = "'$ref' is required"
 	includesReferencePatternMessage  = "'$ref' is not valid: must be of pattern #/tp/<group>/event_rule/<id-or-*>"
 )
-
-var tpIncludesReferenceRegexp = regexp.MustCompile(`^#/tp/[a-zA-Z0-9_-]+/event_rule/([a-zA-Z0-9_-]+|\*)$`)
 
 var examples = rules.Examples{
 	Valid: []string{
@@ -142,7 +139,7 @@ func validateTrackingPlanSpecV1WithEventRuleIncludes(
 	}
 
 	results := funcs.ParseValidationErrors(validationErrors, nil)
-	results = append(results, validateRulesV1(spec.Rules, eventRuleIncludesEnabled)...)
+	results = append(results, validateRulesV1(spec.Rules)...)
 
 	return results
 }
@@ -175,7 +172,7 @@ func validateRules(tpRules []*localcatalog.TPRule, eventRuleIncludesEnabled bool
 	return results
 }
 
-func validateRulesV1(tpRules []*localcatalog.TPRuleV1, eventRuleIncludesEnabled bool) []rules.ValidationResult {
+func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	results = append(
@@ -287,7 +284,7 @@ func validateIncludesRef(ref, reference string) []rules.ValidationResult {
 		}}
 	}
 
-	if !tpIncludesReferenceRegexp.MatchString(ref) {
+	if !localcatalog.IncludeRegex.MatchString(ref) {
 		return []rules.ValidationResult{{
 			Reference: reference,
 			Message:   includesReferencePatternMessage,

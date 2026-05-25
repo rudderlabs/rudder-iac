@@ -1297,16 +1297,14 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			"name": "Common Rules",
 			"events": []map[string]any{
 				{
-					"localId":     "signup",
-					"ruleLocalId": "signup_rule",
+					"localId": "signup",
 					"id": resources.PropertyRef{
 						URN:      "event:signup",
 						Property: "id",
 					},
 				},
 				{
-					"localId":     "checkout",
-					"ruleLocalId": "checkout_rule",
+					"localId": "checkout",
 					"id": resources.PropertyRef{
 						URN:      "event:checkout",
 						Property: "id",
@@ -1341,16 +1339,14 @@ func TestTrackingPlanSemanticValid_DuplicateEventsV0(t *testing.T) {
 			"name": "Common Rules",
 			"events": []map[string]any{
 				{
-					"localId":     "signup",
-					"ruleLocalId": "signup_rule",
+					"localId": "signup",
 					"id": resources.PropertyRef{
 						URN:      "event:signup",
 						Property: "id",
 					},
 				},
 				{
-					"localId":     "checkout",
-					"ruleLocalId": "checkout_rule",
+					"localId": "checkout",
 					"id": resources.PropertyRef{
 						URN:      "event:checkout",
 						Property: "id",

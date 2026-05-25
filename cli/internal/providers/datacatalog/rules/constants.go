@@ -98,7 +98,7 @@ var (
 		localcatalog.KindTrackingPlansV1,
 	)
 
-	TPIncludesReferenceRegex = `^#/tp/[a-zA-Z0-9_-]+/event_rule/([a-zA-Z0-9_-]+|\*)$`
+	TPIncludesReferenceRegex = `^#/tp/([a-zA-Z0-9_-]+)/event_rule/([a-zA-Z0-9_-]+|\*)$`
 
 	ValidPrimitiveTypes = []string{
 		"string", "number", "integer", "boolean", "null", "array", "object",

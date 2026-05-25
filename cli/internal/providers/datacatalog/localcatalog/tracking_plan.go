@@ -13,7 +13,7 @@ var (
 	// Non-capturing groups (?:...) ensure the we only capture the localId from the reference string
 	PropRegex         = regexp.MustCompile(`^#(?:/properties/[^/]+/|property:)(.+)$`)
 	EventRegex        = regexp.MustCompile(`^#(?:/events/[^/]+/|event:)(.+)$`)
-	IncludeRegex      = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	IncludeRegex      = regexp.MustCompile(`^#/tp/([a-zA-Z0-9_-]+)/event_rule/([a-zA-Z0-9_-]+|\*)$`)
 	CustomTypeRegex   = regexp.MustCompile(`^#(?:/custom-types/[^/]+/|custom-type:)(.+)$`)
 	CategoryRegex     = regexp.MustCompile(`^#(?:/categories/[^/]+/|category:)(.+)$`)
 	TrackingPlanRegex = regexp.MustCompile(`^#(?:/tp/[^/]+/|tracking-plan:)(.+)$`)
@@ -41,9 +41,7 @@ type TrackingPlan struct {
 type TPEvent struct {
 	Name    string
 	LocalID string
-	// RuleLocalID is the tracking-plan event_rule id this row was expanded from (direct rule or included rule).
-	RuleLocalID     string
-	Ref             string
+	Ref     string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -220,7 +218,6 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 	toReturn := TPEvent{
 		Name:            event.Name,
 		LocalID:         event.LocalID,
-		RuleLocalID:     rule.LocalID,
 		Ref:             rule.Event,
 		Description:     event.Description,
 		CategoryRef:     categoryRef,
