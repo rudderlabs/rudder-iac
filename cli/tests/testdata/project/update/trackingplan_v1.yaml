@@ -21,6 +21,8 @@ spec:
           required: true
         - property: "#property:user_email"
           required: false
+        - property: "#property:user_profiles"
+          required: false
 
     - type: event_rule
       id: checkout_rule

@@ -19,3 +19,5 @@ spec:
       properties:
         - property: "#property:email_address"
           required: true
+        - property: "#property:user_profiles"
+          required: false

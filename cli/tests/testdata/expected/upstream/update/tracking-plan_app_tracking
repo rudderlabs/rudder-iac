@@ -65,6 +65,12 @@
                     "name": "User Email",
                     "required": false,
                     "additionalProperties": false
+                },
+                {
+                    "id": "prop_IGNORED",
+                    "name": "User Profiles",
+                    "required": false,
+                    "additionalProperties": true
                 }
             ],
             "updatedAt": "2025-01-01T00:00:00.000Z",

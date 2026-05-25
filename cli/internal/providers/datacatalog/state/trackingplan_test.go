@@ -357,7 +357,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Description: "Test array property",
 				Type:        "array",
 				Required:    false,
-				Config: map[string]interface{}{},
+				Config:      map[string]interface{}{},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -383,10 +383,8 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemTypes:   []string{"string", "object"},
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"string", "object"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -405,17 +403,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			},
 		},
 		{
-			name: "Array property with custom type reference in itemTypes",
+			name: "Array property with custom type reference in itemType",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemType:    "#custom-type:type-id",
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"#custom-type:type-id"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -457,17 +453,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			},
 		},
 		{
-			name: "Invalid custom type reference in itemTypes",
+			name: "Invalid custom type reference in itemType",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemType:    "#custom-type:invalid-id",
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"#custom-type:invalid-id"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#property:test-array-id" {

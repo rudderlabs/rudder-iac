@@ -83,6 +83,71 @@ func TestTrackingPlanV1_ExpandRefs(t *testing.T) {
 		assert.Equal(t, "button_clicked", tp.EventProps[1].LocalID)
 	})
 
+	t.Run("preserves property item_type and item_types during expansion", func(t *testing.T) {
+		tp := &TrackingPlanV1{
+			LocalID: "property-types-tp",
+			Rules: []*TPRuleV1{
+				{
+					Type:    "event_rule",
+					LocalID: "signup-rule",
+					Event:   "#event:signup",
+					Properties: []*TPRulePropertyV1{
+						{Property: "#property:tags"},
+						{Property: "#property:profiles"},
+					},
+				},
+			},
+		}
+		dc := &DataCatalog{
+			Events: []EventV1{
+				{LocalID: "signup", Name: "User Sign Up", Type: "track"},
+			},
+			Properties: []PropertyV1{
+				{
+					LocalID:  "tags",
+					Name:     "Tags",
+					Type:     "array",
+					ItemType: "string",
+				},
+				{
+					LocalID:   "profiles",
+					Name:      "Profiles",
+					Type:      "array",
+					ItemTypes: []string{"string", "object"},
+				},
+			},
+			TrackingPlans:  []*TrackingPlanV1{},
+			CustomTypes:    []CustomTypeV1{},
+			Categories:     []CategoryV1{},
+			ReferenceMap:   make(map[string]string),
+			ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
+		}
+
+		err := tp.ExpandRefs(dc)
+		require.NoError(t, err)
+		require.Len(t, tp.EventProps, 1)
+		assert.Equal(t, []*TPEventProperty{
+			{
+				Name:       "Tags",
+				Ref:        "#property:tags",
+				LocalID:    "tags",
+				Type:       "array",
+				ItemType:   "string",
+				Config:     map[string]interface{}{},
+				Properties: []*TPEventProperty{},
+			},
+			{
+				Name:       "Profiles",
+				Ref:        "#property:profiles",
+				LocalID:    "profiles",
+				Type:       "array",
+				ItemTypes:  []string{"string", "object"},
+				Config:     map[string]interface{}{},
+				Properties: []*TPEventProperty{},
+			},
+		}, tp.EventProps[0].Properties)
+	})
+
 	t.Run("expands event ref in old format (#/events/group/id)", func(t *testing.T) {
 		tp := &TrackingPlanV1{
 			LocalID: "old-format-tp",
