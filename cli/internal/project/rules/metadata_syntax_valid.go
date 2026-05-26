@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
@@ -83,6 +84,101 @@ metadata:
 `),
 		},
 	}
+}
+
+// DocExamples implements docs.Documented. AppliesTo enumerates each version
+// the rule was constructed with so docs.validateAppliesToCoverage finds an
+// exact match for every enriched rule.AppliesTo pattern.
+func (r *MetadataSyntaxValidRule) DocExamples() []docs.MatchBehaviorEntry {
+	patterns := make([]docs.MatchPatternDoc, len(r.appliesTo))
+	for i, p := range r.appliesTo {
+		patterns[i] = docs.MatchPatternDoc{Kind: p.Kind, Version: p.Version}
+	}
+	return []docs.MatchBehaviorEntry{{
+		AppliesTo: patterns,
+		Valid: []docs.ValidExample{
+			{
+				ExampleID: "metadata-valid-basic",
+				Title:     "Basic metadata",
+				Files: map[string]string{
+					"main.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: my-project
+						spec: {}
+					`),
+				},
+			},
+			{
+				ExampleID: "metadata-valid-with-import",
+				Title:     "Metadata with import block",
+				Files: map[string]string{
+					"main.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: my-project
+						  import:
+						    workspaces:
+						      - workspace_id: ws-123
+						spec: {}
+					`),
+				},
+			},
+		},
+		Invalid: []docs.InvalidExample{
+			{
+				ExampleID: "metadata-missing-name",
+				Title:     "Missing required name field",
+				Files: map[string]string{
+					"main.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  import:
+						    workspaces:
+						      - workspace_id: ws-123
+						spec: {}
+					`),
+				},
+				ExpectedDiagnostics: []docs.ExpectedDiagnostic{
+					{
+						File:            "main.yaml",
+						Reference:       "project/metadata-syntax-valid",
+						Severity:        "error",
+						MessageContains: "name",
+					},
+				},
+			},
+			{
+				ExampleID: "metadata-missing-workspace-id",
+				Title:     "Missing required workspace_id in import",
+				Files: map[string]string{
+					"main.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: my-project
+						  import:
+						    workspaces:
+						      - resources:
+						          - local_id: src-local
+						            remote_id: src-remote
+						spec: {}
+					`),
+				},
+				ExpectedDiagnostics: []docs.ExpectedDiagnostic{
+					{
+						File:            "main.yaml",
+						Reference:       "project/metadata-syntax-valid",
+						Severity:        "error",
+						MessageContains: "workspace_id",
+					},
+				},
+			},
+		},
+	}}
 }
 
 func (r *MetadataSyntaxValidRule) Validate(ctx *rules.ValidationContext) []rules.ValidationResult {
