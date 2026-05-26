@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	// Trigger pattern registration (legacy_event_ref, legacy_property_ref, display_name, etc.) from parent rules package
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
@@ -1378,15 +1379,15 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 
 	event := &localcatalog.TPRuleEvent{Ref: "#/events/user-events/signup"}
 
-	t.Run("duplicate ids are not checked in syntax validation", func(t *testing.T) {
+	t.Run("no duplicates", func(t *testing.T) {
 		t.Parallel()
 
 		spec := localcatalog.TrackingPlan{
 			LocalID: "test_tp",
 			Name:    "Test TP",
 			Rules: []*localcatalog.TPRule{
-				{Type: "event_rule", LocalID: "dup_rule", Event: event},
-				{Type: "event_rule", LocalID: "dup_rule", Event: event},
+				{Type: "event_rule", LocalID: "rule1", Event: event},
+				{Type: "event_rule", LocalID: "rule2", Event: event},
 			},
 		}
 
@@ -1394,7 +1395,28 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
-	t.Run("three occurrences are not flagged in syntax validation", func(t *testing.T) {
+	t.Run("two rules share an id — both reported", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlan{
+			LocalID: "test_tp",
+			Name:    "Test TP",
+			Rules: []*localcatalog.TPRule{
+				{Type: "event_rule", LocalID: "dup_rule", Event: event},
+				{Type: "event_rule", LocalID: "unique_rule", Event: event},
+				{Type: "event_rule", LocalID: "dup_rule", Event: event},
+			},
+		}
+
+		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
+		require.Len(t, results, 2)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/2/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("three occurrences — all three reported with count 3", func(t *testing.T) {
 		t.Parallel()
 
 		spec := localcatalog.TrackingPlan{
@@ -1408,7 +1430,14 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		}
 
 		results := validateTrackingPlanSpec(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, map[string]any{}, spec)
-		assert.Empty(t, results)
+		require.Len(t, results, 3)
+		for _, r := range results {
+			assert.Equal(t, "duplicate rule id in tracking plan rules", r.Message)
+		}
+		assert.ElementsMatch(t,
+			[]string{"/rules/0/id", "/rules/1/id", "/rules/2/id"},
+			extractRefs(results),
+		)
 	})
 
 	t.Run("rule ids are case-sensitive", func(t *testing.T) {
@@ -1447,6 +1476,8 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 		assert.ElementsMatch(t, []rules.ValidationResult{
 			{Reference: "/rules/0/id", Message: "'id' is required"},
 			{Reference: "/rules/2/id", Message: "'id' is required"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/4/id", Message: "duplicate rule id in tracking plan rules"},
 		}, results)
 	})
 }
@@ -1454,15 +1485,15 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV0(t *testing.T) {
 func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 	t.Parallel()
 
-	t.Run("duplicate ids are not checked in syntax validation", func(t *testing.T) {
+	t.Run("no duplicates", func(t *testing.T) {
 		t.Parallel()
 
 		spec := localcatalog.TrackingPlanV1{
 			LocalID: "tp_v1",
 			Name:    "Test Plan",
 			Rules: []*localcatalog.TPRuleV1{
-				{Type: "event_rule", LocalID: "dup_rule", Event: "#event:signup"},
-				{Type: "event_rule", LocalID: "dup_rule", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "rule1", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "rule2", Event: "#event:signup"},
 			},
 		}
 
@@ -1470,7 +1501,27 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 		assert.Empty(t, results)
 	})
 
-	t.Run("three occurrences are not flagged in syntax validation", func(t *testing.T) {
+	t.Run("two rules share an id — both reported", func(t *testing.T) {
+		t.Parallel()
+
+		spec := localcatalog.TrackingPlanV1{
+			LocalID: "tp_v1",
+			Name:    "Test Plan",
+			Rules: []*localcatalog.TPRuleV1{
+				{Type: "event_rule", LocalID: "dup_rule", Event: "#event:signup"},
+				{Type: "event_rule", LocalID: "dup_rule", Event: "#event:signup"},
+			},
+		}
+
+		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
+		require.Len(t, results, 2)
+		assert.Equal(t, []rules.ValidationResult{
+			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+		}, results)
+	})
+
+	t.Run("three occurrences — all three reported with count 3", func(t *testing.T) {
 		t.Parallel()
 
 		spec := localcatalog.TrackingPlanV1{
@@ -1484,7 +1535,10 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 		}
 
 		results := validateTrackingPlanSpecV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, map[string]any{}, spec)
-		assert.Empty(t, results)
+		require.Len(t, results, 3)
+		for _, r := range results {
+			assert.Equal(t, "duplicate rule id in tracking plan rules", r.Message)
+		}
 	})
 
 	t.Run("rule ids are case-sensitive", func(t *testing.T) {
@@ -1523,6 +1577,8 @@ func TestTrackingPlanSpecSyntaxValidRule_DuplicateRuleIDsV1(t *testing.T) {
 		assert.ElementsMatch(t, []rules.ValidationResult{
 			{Reference: "/rules/0/id", Message: "'id' is required"},
 			{Reference: "/rules/2/id", Message: "'id' is required"},
+			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
+			{Reference: "/rules/4/id", Message: "duplicate rule id in tracking plan rules"},
 		}, results)
 	})
 }
