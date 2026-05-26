@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockRule is a simple Rule implementation for testing
@@ -231,6 +232,35 @@ func TestRegistry_MultipleKindsPerRule(t *testing.T) {
 	t.Run("rule does not appear for other kinds", func(t *testing.T) {
 		assert.NotContains(t, ruleIDs(registry.SyntacticRulesFor("custom-types", "rudder/v1")), "multi-kind-rule")
 	})
+}
+
+func TestRegistry_AllSyntacticRules_ReturnsDefensiveCopy(t *testing.T) {
+	registry := NewRegistry()
+	r1 := &mockRule{id: "a", appliesTo: []MatchPattern{MatchAll()}}
+	r2 := &mockRule{id: "b", appliesTo: []MatchPattern{MatchKind("source")}}
+	registry.RegisterSyntactic(r1)
+	registry.RegisterSyntactic(r2)
+
+	got := registry.AllSyntacticRules()
+	require.Len(t, got, 2)
+	assert.Equal(t, "a", got[0].ID())
+	assert.Equal(t, "b", got[1].ID())
+
+	got[0] = nil
+	assert.Equal(t, "a", registry.AllSyntacticRules()[0].ID())
+}
+
+func TestRegistry_AllSemanticRules_ReturnsDefensiveCopy(t *testing.T) {
+	registry := NewRegistry()
+	r := &mockRule{id: "sem", appliesTo: []MatchPattern{MatchAll()}}
+	registry.RegisterSemantic(r)
+
+	got := registry.AllSemanticRules()
+	require.Len(t, got, 1)
+	assert.Equal(t, "sem", got[0].ID())
+
+	got[0] = nil
+	assert.Equal(t, "sem", registry.AllSemanticRules()[0].ID())
 }
 
 // ruleIDs is a helper function to extract rule IDs from a slice of rules

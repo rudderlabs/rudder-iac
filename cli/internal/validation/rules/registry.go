@@ -17,6 +17,14 @@ type Registry interface {
 	// SemanticRulesFor returns semantic rules whose AppliesTo() patterns
 	// match the given (kind, version).
 	SemanticRulesFor(kind, version string) []Rule
+
+	// AllSyntacticRules returns a defensive copy of every syntactic rule,
+	// regardless of AppliesTo() — used by tooling that needs to enumerate
+	// the full set (e.g. docs generation).
+	AllSyntacticRules() []Rule
+
+	// AllSemanticRules returns a defensive copy of every semantic rule.
+	AllSemanticRules() []Rule
 }
 
 // defaultRegistry stores rules in flat slices per phase.
@@ -45,6 +53,18 @@ func (r *defaultRegistry) SyntacticRulesFor(kind, version string) []Rule {
 
 func (r *defaultRegistry) SemanticRulesFor(kind, version string) []Rule {
 	return matchRules(r.semantic, kind, version)
+}
+
+func (r *defaultRegistry) AllSyntacticRules() []Rule {
+	out := make([]Rule, len(r.syntactic))
+	copy(out, r.syntactic)
+	return out
+}
+
+func (r *defaultRegistry) AllSemanticRules() []Rule {
+	out := make([]Rule, len(r.semantic))
+	copy(out, r.semantic)
+	return out
 }
 
 // matchRules returns rules that have at least one AppliesTo() pattern
