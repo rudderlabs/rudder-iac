@@ -4,7 +4,7 @@
     "externalId": "user_metadata",
     "name": "User Metadata",
     "description": "Optional user metadata object or null",
-    "type": "object,null",
+    "type": "null,object",
     "workspaceId": "IGNORED",
     "createdBy": "IGNORED",
     "updatedBy": null,
