@@ -3,7 +3,9 @@ package rules
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -31,6 +33,80 @@ func (r *duplicateURNRule) Examples() rules.Examples {
 // Validate is a no-op — this rule operates as a ProjectRule via ValidateProject.
 func (r *duplicateURNRule) Validate(_ *rules.ValidationContext) []rules.ValidationResult {
 	return nil
+}
+
+func (r *duplicateURNRule) DocExamples() []docs.MatchBehaviorEntry {
+	return []docs.MatchBehaviorEntry{{
+		AppliesTo: []docs.MatchPatternDoc{{Kind: "*", Version: "*"}},
+		Valid: []docs.ValidExample{
+			{
+				ExampleID: "duplicate-urn-valid-distinct",
+				Title:     "Two files with distinct URNs",
+				Files: map[string]string{
+					"a.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: a
+						spec:
+						  properties:
+						    - id: prop-a
+						      name: A
+						      type: string
+					`),
+					"b.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: b
+						spec:
+						  properties:
+						    - id: prop-b
+						      name: B
+						      type: string
+					`),
+				},
+			},
+		},
+		Invalid: []docs.InvalidExample{
+			{
+				ExampleID: "duplicate-urn-invalid-same",
+				Title:     "Two files defining the same URN",
+				Files: map[string]string{
+					"a.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: a
+						spec:
+						  properties:
+						    - id: prop-dup
+						      name: A
+						      type: string
+					`),
+					"b.yaml": heredoc.Doc(`
+						kind: properties
+						version: rudder/v1
+						metadata:
+						  name: b
+						spec:
+						  properties:
+						    - id: prop-dup
+						      name: B
+						      type: string
+					`),
+				},
+				ExpectedDiagnostics: []docs.ExpectedDiagnostic{
+					{
+						File:            "b.yaml",
+						Reference:       "project/duplicate-urn",
+						Severity:        "error",
+						MessageContains: "duplicate URN",
+					},
+				},
+			},
+		},
+	}}
 }
 
 // ValidateProject checks for duplicate URNs across all specs.
