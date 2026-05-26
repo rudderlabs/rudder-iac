@@ -357,7 +357,7 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Description: "Test array property",
 				Type:        "array",
 				Required:    false,
-				Config: map[string]interface{}{},
+				Config:      map[string]interface{}{},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -383,10 +383,8 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemTypes:   []string{"string", "object"},
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"string", "object"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -405,17 +403,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			},
 		},
 		{
-			name: "Array property with custom type reference in itemTypes",
+			name: "Array property with custom type reference in itemType",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemType:    "#custom-type:type-id",
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"#custom-type:type-id"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#custom-type:type-id" {
@@ -457,17 +453,15 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			},
 		},
 		{
-			name: "Invalid custom type reference in itemTypes",
+			name: "Invalid custom type reference in itemType",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "test-array",
 				LocalID:     "test-array-id",
 				Ref:         "#property:test-array-id",
 				Description: "Test array property",
 				Type:        "array",
+				ItemType:    "#custom-type:invalid-id",
 				Required:    false,
-				Config: map[string]interface{}{
-					"item_types": []any{"#custom-type:invalid-id"},
-				},
 			},
 			urnFromRef: func(ref string) string {
 				if ref == "#property:test-array-id" {
@@ -726,6 +720,52 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			expectedErrMsg: "processing nested property invalid-nested-id: unable to resolve ref to the property urn: #property:invalid-nested-id",
 		},
 		{
+			name: "Multi-type property with object and array in Types",
+			prop: &localcatalog.TPEventProperty{
+				Name:        "flexible-value",
+				LocalID:     "flexible-value-id",
+				Ref:         "#property:flexible-value-id",
+				Description: "Value that can be object or array",
+				Types:       []string{"object", "array"},
+				Required:    false,
+			},
+			urnFromRef: func(ref string) string {
+				if ref == "#property:flexible-value-id" {
+					return "property:flexible-value-id"
+				}
+				return ""
+			},
+			expected: &state.TrackingPlanPropertyArgs{
+				LocalID:              "flexible-value-id",
+				ID:                   resources.PropertyRef{URN: "property:flexible-value-id", Property: "id"},
+				Required:             false,
+				AdditionalProperties: true,
+			},
+		},
+		{
+			name: "Multi-type property with object only in Types",
+			prop: &localcatalog.TPEventProperty{
+				Name:        "nullable-object",
+				LocalID:     "nullable-object-id",
+				Ref:         "#property:nullable-object-id",
+				Description: "Object or null",
+				Types:       []string{"object", "null"},
+				Required:    true,
+			},
+			urnFromRef: func(ref string) string {
+				if ref == "#property:nullable-object-id" {
+					return "property:nullable-object-id"
+				}
+				return ""
+			},
+			expected: &state.TrackingPlanPropertyArgs{
+				LocalID:              "nullable-object-id",
+				ID:                   resources.PropertyRef{URN: "property:nullable-object-id", Property: "id"},
+				Required:             true,
+				AdditionalProperties: true,
+			},
+		},
+		{
 			name: "Object type property without nested properties",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "user-profile",
@@ -971,6 +1011,84 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestGetAdditionalPropertiesDefaultVal(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		prop     *localcatalog.TPEventProperty
+		expected bool
+	}{
+		{
+			name:     "custom type is always false",
+			prop:     &localcatalog.TPEventProperty{Type: "#custom-type:my-type"},
+			expected: false,
+		},
+		{
+			name:     "single object type",
+			prop:     &localcatalog.TPEventProperty{Type: "object"},
+			expected: true,
+		},
+		{
+			name:     "single string type",
+			prop:     &localcatalog.TPEventProperty{Type: "string"},
+			expected: false,
+		},
+		{
+			name:     "multi-type with object and no array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"object", "string"}},
+			expected: true,
+		},
+		{
+			name:     "multi-type with object and array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"object", "array"}},
+			expected: true,
+		},
+		{
+			name:     "multi-type without object or array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"string", "number"}},
+			expected: false,
+		},
+		{
+			name:     "array with no item types",
+			prop:     &localcatalog.TPEventProperty{Type: "array"},
+			expected: false,
+		},
+		{
+			name:     "array with object item_type",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemType: "object"},
+			expected: true,
+		},
+		{
+			name:     "array with non-object item_type",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemType: "string"},
+			expected: false,
+		},
+		{
+			name:     "array with item_types containing object",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemTypes: []string{"string", "object"}},
+			expected: true,
+		},
+		{
+			name:     "array with item_types all non-object",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemTypes: []string{"string", "number"}},
+			expected: false,
+		},
+		{
+			name:     "multi-type array with object item_type",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"array", "string"}, ItemType: "object"},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, state.GetAdditionalPropertiesDefaultVal(tc.prop))
 		})
 	}
 }

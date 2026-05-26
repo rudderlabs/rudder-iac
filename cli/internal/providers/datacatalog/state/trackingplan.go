@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -388,19 +389,37 @@ func (args *TrackingPlanPropertyArgs) propertyByID(propertyID string) *TrackingP
 	return nil
 }
 
-// getAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
+func getArrayItemTypes(prop *localcatalog.TPEventProperty) []string {
+	switch {
+	case prop.ItemType != "":
+		return []string{prop.ItemType}
+	case len(prop.ItemTypes) > 0:
+		return prop.ItemTypes
+	}
+	return nil
+}
+
+func getPropertyTypes(prop *localcatalog.TPEventProperty) []string {
+	if len(prop.Types) > 0 {
+		return prop.Types
+	}
+	return []string{prop.Type}
+}
+
+// GetAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
 // the default value for additional properties is true for the following cases -
 // 1. Object type properties
 // 2. Multi-type properties with one of them "object" and no "array" type included
 // 3. Array properties where item type is object
 // 4. Array properties with multiple item types where at least one is object
-func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
+func GetAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
 	// if the property's type is a custom type, additional properties should be false
 	if strings.HasPrefix(prop.Type, "#custom-type:") {
 		return false
 	}
-	hasObject := strings.Contains(prop.Type, "object")
-	hasArray := strings.Contains(prop.Type, "array")
+	types := getPropertyTypes(prop)
+	hasObject := slices.Contains(types, "object")
+	hasArray := slices.Contains(types, "array")
 
 	// If both array and object types exist, additional properties must be true by default
 	if hasArray && hasObject {
@@ -414,24 +433,15 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 
 	// Cases 3, 4, 5: Array-specific cases
 	if hasArray {
-		itemTypes, ok := prop.Config["item_types"]
-		if !ok {
+		itemTypes := getArrayItemTypes(prop)
+		if len(itemTypes) == 0 {
 			// array properties with no item types defined -> false
 			return false
 		}
 
-		itemTypesSlice, ok := itemTypes.([]any)
-		if !ok {
-			return false
-		}
-		if len(itemTypesSlice) == 0 {
-			// empty itemTypes array -> false
-			return false
-		}
-
 		// Cases 4 & 5: Check if any itemType is "object"
-		for _, it := range itemTypesSlice {
-			if itStr, ok := it.(string); ok && itStr == "object" {
+		for _, itemType := range itemTypes {
+			if itemType == "object" {
 				return true
 			}
 		}
@@ -453,7 +463,7 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
-	additionalPropertiesDefaultVal := getAdditionalPropertiesDefaultVal(prop)
+	additionalPropertiesDefaultVal := GetAdditionalPropertiesDefaultVal(prop)
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {

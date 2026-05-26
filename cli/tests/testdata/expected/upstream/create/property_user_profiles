@@ -1,0 +1,19 @@
+{
+    "propConfig": {
+        "itemTypes": [
+            "object"
+        ]
+    },
+    "id": "prop_IGNORED",
+    "externalId": "user_profiles",
+    "name": "User Profiles",
+    "description": "List of user profile objects",
+    "type": "array",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}

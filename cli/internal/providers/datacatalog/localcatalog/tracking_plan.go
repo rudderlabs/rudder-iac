@@ -66,6 +66,9 @@ type TPEventProperty struct {
 	LocalID              string                 `json:"id"`
 	Description          string                 `json:"description"`
 	Type                 string                 `json:"type"`
+	Types                []string               `json:"types,omitempty"`
+	ItemType             string                 `json:"item_type,omitempty"`
+	ItemTypes            []string               `json:"item_types,omitempty"`
 	Config               map[string]interface{} `json:"config"`
 	Required             bool                   `json:"required"`
 	Properties           []*TPEventProperty     `json:"properties,omitempty"` // NEW: Nested properties
@@ -240,6 +243,9 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 			Properties:           property.Properties,
 			Description:          property.Description,
 			Type:                 property.Type,
+			Types:                append([]string(nil), property.Types...),
+			ItemType:             property.ItemType,
+			ItemTypes:            append([]string(nil), property.ItemTypes...),
 			Required:             prop.Required,
 			Config:               shallowCopy(property.Config),
 			AdditionalProperties: property.AdditionalProperties,
@@ -279,6 +285,9 @@ func expandPropertyRefs(prop *TPRulePropertyV1, fetcher CatalogResourceFetcher) 
 		LocalID:              property.LocalID,
 		Description:          property.Description,
 		Type:                 property.Type,
+		Types:                append([]string(nil), property.Types...),
+		ItemType:             property.ItemType,
+		ItemTypes:            append([]string(nil), property.ItemTypes...),
 		Required:             prop.Required,
 		Config:               shallowCopy(property.Config),
 		AdditionalProperties: prop.AdditionalProperties,
