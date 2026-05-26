@@ -1,12 +1,15 @@
 package docs
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/go-playground/validator/v10"
 )
 
-func (c *DocumentedRules) Validate(registeredRuleIDs []string) []error {
+func (c *RulesDoc) Validate(expectedRuleIDs []string) []error {
 	var errs []error
 	for i := range c.Rules {
 		structErrs := validateRuleStruct(&c.Rules[i])
@@ -21,11 +24,14 @@ func (c *DocumentedRules) Validate(registeredRuleIDs []string) []error {
 		errs = append(errs, validateAppliesToCoverage(&c.Rules[i])...)
 		errs = append(errs, validateUniqueExampleIDs(&c.Rules[i])...)
 	}
-	errs = append(errs, c.validateRegisteredCompleteness(registeredRuleIDs)...)
+	// TODO(spike DEX-371): re-enable after pilot phase. Disabled because
+	// only 3 of ~13 registered rules currently have docs — see spec §3 Layer 3.
+	// errs = append(errs, c.validateRegisteredCompleteness(expectedRuleIDs)...)
+	_ = expectedRuleIDs // suppress unused-parameter lint until restoration
 	return errs
 }
 
-func validateUniqueExampleIDs(rule *DocumentedRule) []error {
+func validateUniqueExampleIDs(rule *ResolvedRule) []error {
 	seen := make(map[string]struct{})
 	var errs []error
 	for _, mb := range rule.MatchBehavior {
@@ -45,7 +51,7 @@ func validateUniqueExampleIDs(rule *DocumentedRule) []error {
 	return errs
 }
 
-func validateAppliesToCoverage(rule *DocumentedRule) []error {
+func validateAppliesToCoverage(rule *ResolvedRule) []error {
 	covered := make(map[string]struct{})
 	for _, mb := range rule.MatchBehavior {
 		for _, p := range mb.AppliesTo {
@@ -63,9 +69,34 @@ func validateAppliesToCoverage(rule *DocumentedRule) []error {
 	return errs
 }
 
-func validateRuleStruct(rule *DocumentedRule) []error {
-	validationErrs, err := rules.ValidateStruct(rule, "")
-	if err != nil {
+// docsTagNameFunc reports field names using the YAML or JSON tag so validation
+// error messages reference user-facing keys instead of Go struct field names.
+var docsTagNameFunc = func(fld reflect.StructField) string {
+	if t, ok := fld.Tag.Lookup("yaml"); ok {
+		return strings.SplitN(t, ",", 2)[0]
+	}
+	if t, ok := fld.Tag.Lookup("json"); ok {
+		return strings.SplitN(t, ",", 2)[0]
+	}
+	return strings.ToLower(fld.Name)
+}
+
+func validateRuleStruct(rule *ResolvedRule) []error {
+	v := validator.New()
+	v.RegisterTagNameFunc(docsTagNameFunc)
+
+	err := v.Struct(rule)
+	if err == nil {
+		return nil
+	}
+
+	var invalid *validator.InvalidValidationError
+	if errors.As(err, &invalid) {
+		return []error{fmt.Errorf("rule %s: structural validation failed: %w", rule.RuleID, err)}
+	}
+
+	var validationErrs validator.ValidationErrors
+	if !errors.As(err, &validationErrs) {
 		return []error{fmt.Errorf("rule %s: structural validation failed: %w", rule.RuleID, err)}
 	}
 
@@ -76,25 +107,25 @@ func validateRuleStruct(rule *DocumentedRule) []error {
 	return errs
 }
 
-func (c *DocumentedRules) validateRegisteredCompleteness(registeredRuleIDs []string) []error {
+func (c *RulesDoc) validateRegisteredCompleteness(expectedRuleIDs []string) []error {
 	catalogSet := make(map[string]struct{}, len(c.Rules))
 	for _, r := range c.Rules {
 		catalogSet[r.RuleID] = struct{}{}
 	}
 
-	registeredSet := make(map[string]struct{}, len(registeredRuleIDs))
-	for _, id := range registeredRuleIDs {
-		registeredSet[id] = struct{}{}
+	expectedSet := make(map[string]struct{}, len(expectedRuleIDs))
+	for _, id := range expectedRuleIDs {
+		expectedSet[id] = struct{}{}
 	}
 
 	var errs []error
-	for id := range registeredSet {
+	for id := range expectedSet {
 		if _, ok := catalogSet[id]; !ok {
 			errs = append(errs, fmt.Errorf("rule %s is registered but has no doc entry", id))
 		}
 	}
 	for id := range catalogSet {
-		if _, ok := registeredSet[id]; !ok {
+		if _, ok := expectedSet[id]; !ok {
 			errs = append(errs, fmt.Errorf("rule %s has a doc entry but is not registered (orphan)", id))
 		}
 	}

@@ -241,3 +241,38 @@ func ruleIDs(rules []Rule) []string {
 	}
 	return ids
 }
+
+func TestRegistry_AllSyntacticRules_ReturnsRegisteredCopy(t *testing.T) {
+	r := NewRegistry()
+	r1 := &mockRule{id: "rule-1"}
+	r2 := &mockRule{id: "rule-2"}
+	r.RegisterSyntactic(r1)
+	r.RegisterSyntactic(r2)
+
+	got := r.AllSyntacticRules()
+
+	assert.Equal(t, []Rule{r1, r2}, got)
+}
+
+func TestRegistry_AllSemanticRules_ReturnsRegisteredCopy(t *testing.T) {
+	r := NewRegistry()
+	r1 := &mockRule{id: "rule-1"}
+	r2 := &mockRule{id: "rule-2"}
+	r.RegisterSemantic(r1)
+	r.RegisterSemantic(r2)
+
+	got := r.AllSemanticRules()
+
+	assert.Equal(t, []Rule{r1, r2}, got)
+}
+
+func TestRegistry_AllSyntacticRules_DefensiveCopy(t *testing.T) {
+	r := NewRegistry()
+	r.RegisterSyntactic(&mockRule{id: "rule-1"})
+
+	got := r.AllSyntacticRules()
+	got[0] = &mockRule{id: "mutated"}
+
+	// mutating the returned slice must not affect future calls
+	assert.Equal(t, "rule-1", r.AllSyntacticRules()[0].ID())
+}
