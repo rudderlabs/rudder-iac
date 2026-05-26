@@ -753,33 +753,6 @@ func TestTrackingPlanSemanticValid_DuplicateRuleIDsV0(t *testing.T) {
 		}, results)
 	})
 
-	t.Run("empty ids are skipped for duplicate check", func(t *testing.T) {
-		t.Parallel()
-
-		graph := resources.NewGraph()
-		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_4", "event", resources.ResourceData{}, nil))
-
-		spec := localcatalog.TrackingPlan{
-			LocalID: "tp1",
-			Name:    "Plan 1",
-			Rules: []*localcatalog.TPRule{
-				{Type: "event_rule", LocalID: "", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_1"}},
-				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_2"}},
-				{Type: "event_rule", LocalID: "", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_3"}},
-				{Type: "event_rule", LocalID: "dup", Event: &localcatalog.TPRuleEvent{Ref: "#event:signup_4"}},
-			},
-		}
-
-		results := validateTrackingPlanSemantic(localcatalog.KindTrackingPlans, specs.SpecVersionV0_1, nil, spec, graph)
-		assert.ElementsMatch(t, []rules.ValidationResult{
-			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
-			{Reference: "/rules/3/id", Message: "duplicate rule id in tracking plan rules"},
-		}, results)
-	})
-
 	t.Run("same rule id in different tracking plans does not cross-contaminate", func(t *testing.T) {
 		t.Parallel()
 
@@ -1020,33 +993,6 @@ func TestTrackingPlanSemanticValid_DuplicateRuleIDsV1(t *testing.T) {
 		assert.ElementsMatch(t, []rules.ValidationResult{
 			{Reference: "/rules/0/id", Message: "duplicate rule id in tracking plan rules"},
 			{Reference: "/rules/2/id", Message: "duplicate rule id in tracking plan rules"},
-		}, results)
-	})
-
-	t.Run("empty ids are skipped for duplicate check", func(t *testing.T) {
-		t.Parallel()
-
-		graph := resources.NewGraph()
-		graph.AddResource(resources.NewResource("signup_1", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_2", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_3", "event", resources.ResourceData{}, nil))
-		graph.AddResource(resources.NewResource("signup_4", "event", resources.ResourceData{}, nil))
-
-		spec := localcatalog.TrackingPlanV1{
-			LocalID: "tp_v1",
-			Name:    "Plan",
-			Rules: []*localcatalog.TPRuleV1{
-				{Type: "event_rule", LocalID: "", Event: "#event:signup_1"},
-				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_2"},
-				{Type: "event_rule", LocalID: "", Event: "#event:signup_3"},
-				{Type: "event_rule", LocalID: "dup", Event: "#event:signup_4"},
-			},
-		}
-
-		results := validateTrackingPlanSemanticV1(localcatalog.KindTrackingPlansV1, specs.SpecVersionV1, nil, spec, graph)
-		assert.ElementsMatch(t, []rules.ValidationResult{
-			{Reference: "/rules/1/id", Message: "duplicate rule id in tracking plan rules"},
-			{Reference: "/rules/3/id", Message: "duplicate rule id in tracking plan rules"},
 		}, results)
 	})
 

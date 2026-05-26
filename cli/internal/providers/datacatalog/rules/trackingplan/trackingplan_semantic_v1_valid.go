@@ -25,17 +25,11 @@ var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, 
 func validateDuplicateRuleIDsV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
 	counts := make(map[string]int)
 	for _, rule := range spec.Rules {
-		if rule.LocalID == "" {
-			continue
-		}
 		counts[rule.LocalID]++
 	}
 
 	var results []rules.ValidationResult
 	for i, rule := range spec.Rules {
-		if rule.LocalID == "" {
-			continue
-		}
 		if counts[rule.LocalID] > 1 {
 			results = append(results, rules.ValidationResult{
 				Reference: fmt.Sprintf("/rules/%d/id", i),
