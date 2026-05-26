@@ -13,7 +13,7 @@ var (
 	// Non-capturing groups (?:...) ensure the we only capture the localId from the reference string
 	PropRegex         = regexp.MustCompile(`^#(?:/properties/[^/]+/|property:)(.+)$`)
 	EventRegex        = regexp.MustCompile(`^#(?:/events/[^/]+/|event:)(.+)$`)
-	IncludeRegex      = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	IncludeRegex      = regexp.MustCompile(`^#/tp/([a-zA-Z0-9_-]+)/event_rule/([a-zA-Z0-9_-]+|\*)$`)
 	CustomTypeRegex   = regexp.MustCompile(`^#(?:/custom-types/[^/]+/|custom-type:)(.+)$`)
 	CategoryRegex     = regexp.MustCompile(`^#(?:/categories/[^/]+/|category:)(.+)$`)
 	TrackingPlanRegex = regexp.MustCompile(`^#(?:/tp/[^/]+/|tracking-plan:)(.+)$`)
@@ -39,9 +39,9 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name            string
-	LocalID         string
-	Ref             string
+	Name    string
+	LocalID string
+	Ref     string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -78,7 +78,7 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event" validate:"required"`
+	Event      *TPRuleEvent      `json:"event,omitempty"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`

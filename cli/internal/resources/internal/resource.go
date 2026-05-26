@@ -9,8 +9,9 @@ type Resource struct {
 	RawData      any
 	Dependencies []string
 
-	ImportMetadata *ResourceImportMetadata
-	FileMetadata   *ResourceFileMetadata
+	ImportMetadata     *ResourceImportMetadata
+	FileMetadata       *ResourceFileMetadata
+	AdditionalMetadata map[string]any
 }
 
 type ResourceFileMetadata struct {

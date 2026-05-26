@@ -728,14 +728,15 @@ func (args *TrackingPlanArgs) ToResourceData() resources.ResourceData {
 			properties = append(properties, property.ToResourceData())
 		}
 
-		events = append(events, map[string]interface{}{
+		evMap := map[string]interface{}{
 			"id":              event.ID,
 			"localId":         event.LocalID,
 			"allowUnplanned":  event.AllowUnplanned,
 			"identitySection": event.IdentitySection,
 			"properties":      properties,
 			"variants":        event.Variants.ToResourceData(),
-		})
+		}
+		events = append(events, evMap)
 	}
 
 	return resources.ResourceData{

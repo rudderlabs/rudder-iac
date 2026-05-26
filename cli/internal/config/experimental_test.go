@@ -31,6 +31,11 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			flagName: "transformations",
 			want:     "RUDDERSTACK_X_TRANSFORMATIONS",
 		},
+		{
+			name:     "eventRuleIncludes",
+			flagName: "eventRuleIncludes",
+			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
+		},
 	}
 
 	for _, tt := range tests {
@@ -66,6 +71,12 @@ func TestExperimentalConfigStructInvariants(t *testing.T) {
 				"experimental flag %s with tag %q must be recognized as valid", field.Name, tag)
 		})
 	}
+}
+
+func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
 }
 
 func TestGetAvailableExperimentalFlags(t *testing.T) {
