@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -96,6 +97,7 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(docs.NewCmdDocs())
 }
 
 func initConfig() {
