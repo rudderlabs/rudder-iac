@@ -11,11 +11,11 @@ type envResolver struct {
 	vars map[string]string
 }
 
-func NewEnvResolver() Resolver {
+func NewEnvResolver() (Resolver, error) {
 	return newEnvResolverFromEnviron(os.Environ())
 }
 
-func newEnvResolverFromEnviron(environ []string) Resolver {
+func newEnvResolverFromEnviron(environ []string) (Resolver, error) {
 	vars := make(map[string]string)
 	for _, env := range environ {
 		key, value, ok := strings.Cut(env, "=")
@@ -30,7 +30,7 @@ func newEnvResolverFromEnviron(environ []string) Resolver {
 		}
 	}
 
-	return &envResolver{vars: vars}
+	return &envResolver{vars: vars}, nil
 }
 
 func (r *envResolver) Resolve(name string) (string, bool) {

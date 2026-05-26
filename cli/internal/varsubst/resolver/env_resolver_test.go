@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewEnvResolverFromEnviron(t *testing.T) {
@@ -81,7 +82,8 @@ func TestNewEnvResolverFromEnviron(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := newEnvResolverFromEnviron(tt.environ)
+			r, err := newEnvResolverFromEnviron(tt.environ)
+			require.NoError(t, err)
 			value, found := r.Resolve(tt.lookup)
 			assert.Equal(t, tt.wantValue, value)
 			assert.Equal(t, tt.wantFound, found)
@@ -95,7 +97,8 @@ func TestNewEnvResolver(t *testing.T) {
 	t.Setenv("RUDDER_EMPTY", "")
 	t.Setenv("DB_HOST", "ignored")
 
-	r := NewEnvResolver()
+	r, err := NewEnvResolver()
+	require.NoError(t, err)
 
 	t.Run("strips prefix and loads value", func(t *testing.T) {
 		value, found := r.Resolve("DB_HOST")
