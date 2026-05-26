@@ -171,7 +171,9 @@ For each authored `InvalidExample` on a rule, the Verifier:
 3. Runs `ValidationEngine.ValidateSyntax` + `ValidateSemantic`.
 4. Subset-matches produced diagnostics against authored `ExpectedDiagnostic`s.
 
-**Subset match definition:** every authored `ExpectedDiagnostic` must match at least one produced diagnostic. Match means: same `severity`, same `reference`, same `file`, and produced `message` contains `MessageContains` substring. Extra produced diagnostics not in the authored list are **ignored** (no failure).
+**Subset match definition:** every authored `ExpectedDiagnostic` must match at least one produced diagnostic. Match means: same `severity`, same `file`, and produced `message` contains the `MessageContains` substring. Extra produced diagnostics not in the authored list are **ignored** (no failure).
+
+**Why `reference` is not in the match key:** the runtime `validation.Diagnostic` struct does not preserve the authored JSON-pointer reference — the engine resolves `ValidationResult.Reference` through the path indexer into a `Position` (line, column) before producing the diagnostic (see [engine.go:204-225](cli/internal/validation/engine.go)). The authored `ExpectedDiagnostic.Reference` field is retained in the artifact as **documentation-only metadata** (it tells human readers and LLMs *where* the rule fires), but the verifier doesn't match against it. A future enhancement could resolve the authored reference through the materialized example's path index to derive an expected `Position` and compare positions; out of scope for the spike.
 
 **Strict mode (designed-in, deferred):** the CLI command names a `--strict-verify` flag in its help text but the flag is unimplemented in the spike. When implemented later, it switches to exact match (produced set must equal authored set). This seam preserves the option without committing the spike to it.
 
