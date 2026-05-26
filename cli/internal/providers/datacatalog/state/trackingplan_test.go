@@ -1014,3 +1014,81 @@ func TestTrackingPlanPropertyArgs_ToResourceDataAndFromResourceData(t *testing.T
 		})
 	}
 }
+
+func TestGetAdditionalPropertiesDefaultVal(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		prop     *localcatalog.TPEventProperty
+		expected bool
+	}{
+		{
+			name:     "custom type is always false",
+			prop:     &localcatalog.TPEventProperty{Type: "#custom-type:my-type"},
+			expected: false,
+		},
+		{
+			name:     "single object type",
+			prop:     &localcatalog.TPEventProperty{Type: "object"},
+			expected: true,
+		},
+		{
+			name:     "single string type",
+			prop:     &localcatalog.TPEventProperty{Type: "string"},
+			expected: false,
+		},
+		{
+			name:     "multi-type with object and no array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"object", "string"}},
+			expected: true,
+		},
+		{
+			name:     "multi-type with object and array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"object", "array"}},
+			expected: true,
+		},
+		{
+			name:     "multi-type without object or array",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"string", "number"}},
+			expected: false,
+		},
+		{
+			name:     "array with no item types",
+			prop:     &localcatalog.TPEventProperty{Type: "array"},
+			expected: false,
+		},
+		{
+			name:     "array with object item_type",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemType: "object"},
+			expected: true,
+		},
+		{
+			name:     "array with non-object item_type",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemType: "string"},
+			expected: false,
+		},
+		{
+			name:     "array with item_types containing object",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemTypes: []string{"string", "object"}},
+			expected: true,
+		},
+		{
+			name:     "array with item_types all non-object",
+			prop:     &localcatalog.TPEventProperty{Type: "array", ItemTypes: []string{"string", "number"}},
+			expected: false,
+		},
+		{
+			name:     "multi-type array with object item_type",
+			prop:     &localcatalog.TPEventProperty{Types: []string{"array", "string"}, ItemType: "object"},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, state.GetAdditionalPropertiesDefaultVal(tc.prop))
+		})
+	}
+}

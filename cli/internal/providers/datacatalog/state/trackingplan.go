@@ -399,25 +399,25 @@ func getArrayItemTypes(prop *localcatalog.TPEventProperty) []string {
 	return nil
 }
 
-func tpEventPropertyTypes(prop *localcatalog.TPEventProperty) []string {
+func getPropertyTypes(prop *localcatalog.TPEventProperty) []string {
 	if len(prop.Types) > 0 {
 		return prop.Types
 	}
 	return []string{prop.Type}
 }
 
-// getAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
+// GetAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
 // the default value for additional properties is true for the following cases -
 // 1. Object type properties
 // 2. Multi-type properties with one of them "object" and no "array" type included
 // 3. Array properties where item type is object
 // 4. Array properties with multiple item types where at least one is object
-func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
+func GetAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool {
 	// if the property's type is a custom type, additional properties should be false
 	if strings.HasPrefix(prop.Type, "#custom-type:") {
 		return false
 	}
-	types := tpEventPropertyTypes(prop)
+	types := getPropertyTypes(prop)
 	hasObject := slices.Contains(types, "object")
 	hasArray := slices.Contains(types, "array")
 
@@ -463,7 +463,7 @@ func (args *TrackingPlanPropertyArgs) FromCatalogTrackingPlanEventProperty(prop 
 	}
 	args.LocalID = prop.LocalID
 	args.Required = prop.Required
-	additionalPropertiesDefaultVal := getAdditionalPropertiesDefaultVal(prop)
+	additionalPropertiesDefaultVal := GetAdditionalPropertiesDefaultVal(prop)
 
 	// Handle nested properties recursively
 	if len(prop.Properties) > 0 {
