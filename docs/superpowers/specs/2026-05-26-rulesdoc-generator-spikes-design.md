@@ -92,7 +92,7 @@ Both spikes implement this same interface. The generator depends only on the int
 
 **In PR #471 (+ #475 rename):** `RulesDoc`, `ResolvedRule`, `ToolMetadata` defined with `validate` tags in [types.go](cli/internal/validation/docs/types.go).
 
-**Status:** Both spikes reuse these. Path B trims two fields (see §6).
+**Status:** Both spikes reuse these but **both** trim the same two fields (`ResolvedRule.Provider`, `ToolMetadata.GeneratedAt`) and add `json` tags alongside existing `yaml` tags. This is part of the **shared first commit** — see §6.1 / §7.1 which describe identical content.
 
 ### Layer 2 — Shared inner types
 
@@ -189,7 +189,15 @@ Branch: `feat/docs-rule-gen-spike-path-a` off `feat/dex-269-add-docs-foundation`
 
 ### Commits
 
-**Commit 1 — Spike prep:** Comment out `validateRegisteredCompleteness` invocation in `RulesDoc.Validate` with restoration marker. Rename `registeredRuleIDs` parameter to `expectedRuleIDs`.
+**Commit 1 — Shared prep** (identical content to Path B's commit 1 — §7.1). Eight items:
+1. Rename `DocumentedRules` → `RulesDoc`, `DocumentedRule` → `ResolvedRule` (#475 rename direction).
+2. Drop `ResolvedRule.Provider` field. **Why:** forces every rule to be owned by a provider; project-level rules don't belong to one. Rule ID prefix already encodes provenance.
+3. Drop `ToolMetadata.GeneratedAt` field. **Why:** runtime timestamp makes the artifact non-reproducible — hostile to committed/PR-able output.
+4. Add `json` struct tags alongside existing `yaml` tags on all serializable types in `types.go`. **Why:** the spike emits both YAML (Hugo) and JSON (LLM); both need snake_case keys.
+5. Replace `rules.ValidateStruct(rule, "")` call in `docs/rules_doc.go` with direct `validator.New()` usage in the `docs` package. **Why:** the only `docs → rules` import in #471. Required for Path B (cycle), kept symmetric for Path A (removes unjustified cross-package coupling).
+6. Comment out `validateRegisteredCompleteness` invocation in `RulesDoc.Validate` with `// TODO(spike DEX-371): re-enable after pilot phase` marker.
+7. Rename parameter `registeredRuleIDs` → `expectedRuleIDs`.
+8. Add `AllSyntacticRules()` / `AllSemanticRules()` methods to `rules.Registry` interface + `defaultRegistry` (defensive-copy returns). **Why:** the spike enumerates the full rule set; the registry-extension carve-out PR (§4) hasn't landed, so both spikes include this directly.
 
 **Commit 2 — Resolver interface:** Add `Resolver` interface + `YAMLResolver` impl in `cli/internal/validation/docs/`. `YAMLResolver` wraps `LoadRuleDocEntries` (loads all fragments at construction) and indexes results by `RuleID`. Returns `*ResolvedRule` from `ResolveFor` — converting from `RuleDocEntry` by enriching with rule metadata.
 
@@ -215,15 +223,17 @@ Branch: `feat/docs-rule-gen-spike-path-a` off `feat/dex-269-add-docs-foundation`
 
 ### Estimated diff shape (Path A)
 
-| Area | Files added | Lines (rough) |
+| Area | Files added/modified | Lines (rough) |
 |---|---|---|
-| Spike-prep commit | 1 modified | ~5 |
+| Shared prep commit (8 items) | ~4 modified | ~40 |
 | Resolver + YAMLResolver | 2 added | ~80 |
 | Generator + Verifier + Serializer | 3 added | ~250 |
 | CLI command | 1-2 added | ~80 |
-| 3 YAML fragment files | 3 added | ~150 (data, not code) |
+| 3 YAML fragment files | 3 added | ~150 (authored data) |
 | Tests for new code | 4-5 added | ~400 |
-| **Total** | ~15 files | ~965 LoC |
+| **Total** | ~16 files | ~1000 LoC |
+
+Code (non-test, non-data) ≈ 450 LoC; under the 500 cap. Authored data ≈ 150 LoC; under the 200 cap.
 
 ---
 
@@ -233,48 +243,27 @@ Branch: `feat/docs-rule-gen-spike-path-a` off `feat/dex-269-add-docs-foundation`
 
 Branch: `feat/docs-rule-gen-spike-path-b` off `feat/dex-269-add-docs-foundation` (PR #471's branch) plus the registry-extension PR (§4 step 2).
 
-### Commit 1: Trim #471 down to Path B essentials, dissolve docs→rules dep, disable completeness
+### Commit 1: Shared prep (identical content to Path A's commit 1 — §6.1)
 
-Path B does not need the YAML authoring surface, and breaks one extra dependency that #471 incidentally introduced.
+Same 8-item list as Path A's commit 1; the full enumeration is in §6.1 and not repeated here. Key points specific to Path B:
 
-#### The load-bearing change in this commit
+- **The cycle-breaking item is load-bearing on Path B.** Replacing `rules.ValidateStruct(rule, "")` with `validator.New()` in `docs/rules_doc.go` dissolves the only `docs → rules` import. This is what allows the `Documented` interface (commit 3 below) to live in the `docs` package without creating a cycle when leaf rule packages import `docs.MatchBehaviorEntry`.
+- **What survives in the docs package after the shared prep:** `types.go` (resolved types minus `Provider` and `GeneratedAt`, plus `json` tags), `rules_doc.go` (`RulesDoc.Validate` with checks 1-3, completeness commented out, `validator.New()` instantiated locally), `rule_doc_entry.go` (still present — Path B removes it in commit 2 below), `rules_doc_test.go`, `rule_doc_entry_test.go` (also still present — also removed in commit 2).
+- The shared prep is conceptually identical content across both branches but each will have its own SHA due to different commit histories. Literal SHA identity would require a common ancestor commit — out of scope; not worth the coordination overhead.
 
-`docs/rules_doc.go::validateRuleStruct` currently calls `rules.ValidateStruct(rule, "")`. This single line is the *only* reason `cli/internal/validation/docs/` imports `cli/internal/validation/rules/`. Path B replaces it with a direct `validator.New()` instantiation in the `docs` package:
+### Commit 2: Path-B-only deletions
 
-```go
-// docs/rules_doc.go (after this commit)
-import "github.com/go-playground/validator/v10"
+Path B doesn't need #471's YAML authoring surface. Removed in a dedicated commit so the "removed surface area" criterion in §9 reads as a single, isolated diff (rather than mixing path-specific deletions into the shared prep).
 
-var docValidator = validator.New()
-
-func validateRuleStruct(rule *ResolvedRule) []error {
-    err := docValidator.Struct(rule)
-    // ... unchanged error mapping below ...
-}
-```
-
-This dissolves the `docs → rules` dep entirely. **This is what allows the `Documented` interface in commit 2 to live in the `docs` package without a cycle** (leaf rule packages can then freely import `docs` to author `[]docs.MatchBehaviorEntry`).
-
-#### Other removals in the same commit
-
-| Change | Justification |
+| Removal | Why |
 |---|---|
-| Remove `RuleDocEntry` type from `types.go` | Path B rules expose docs directly via the `Documented` interface (commit 2). No need for an external authored wrapper. |
+| Remove `RuleDocEntry` type from `types.go` | Path B rules expose docs directly via the `Documented` interface (commit 3). No external authored wrapper needed. |
 | Remove `LoadRuleDocEntries` function (entire `rule_doc_entry.go` file) | Path B has no on-disk YAML fragments to load. |
 | Remove `rule_doc_entry_test.go` | Tests for the removed loader. |
-| Remove `ResolvedRule.Provider` field from `types.go` | Forces every rule to be owned by a provider; project-level rules don't belong to one. Rule ID prefix already encodes provenance. |
-| Remove `ToolMetadata.GeneratedAt` field from `types.go` | Runtime timestamp makes the artifact non-reproducible — every regeneration produces a diff with no semantic change, hostile to a committed artifact. |
-| Comment out `validateRegisteredCompleteness` invocation in `RulesDoc.Validate` with restoration marker | Same as Path A's spike-prep commit; rolled into the trim. |
-| Rename parameter `registeredRuleIDs` → `expectedRuleIDs` | Semantic clarification (the caller decides the set to enforce). |
 
-What survives in the docs package after this commit:
-- `types.go` — resolved types (`RulesDoc`, `ResolvedRule` minus `Provider`, `ToolMetadata` minus `GeneratedAt`) + inner types (`MatchBehaviorEntry`, `MatchPatternDoc`, `ValidExample`, `InvalidExample`, `ExpectedDiagnostic`).
-- `rules_doc.go` — `RulesDoc.Validate` with checks 1-3 (completeness commented out) and `validator.New()` instantiated locally.
-- `rules_doc_test.go` — coverage of checks 1-3. Completeness tests can stay (asserting the check works in isolation) even though the wired-up call is commented out.
+After this commit: only Path-B-relevant surface remains in the `docs` package.
 
-After this commit: `docs/rules_doc.go` no longer references `rules.ValidateStruct`. Subsequent commits (notably commit 3's `Resolver` interface with signature `ResolveFor(r rules.Rule)`) will legitimately re-import `cli/internal/validation/rules` for the `rules.Rule` type. The cycle-breaking property that matters is removing the `rules.ValidateStruct` call; importing the `rules.Rule` *type* is fine because `rules.Rule` does not transitively depend on `docs/`.
-
-### Commit 2: `Documented` interface
+### Commit 3: `Documented` interface
 
 Define an opt-in sibling interface in the docs package, with **no change** to `rules.Rule`:
 
@@ -297,7 +286,7 @@ Critically, `rules` does **not** import `docs`. The `Documented` interface lives
 
 This is why dissolving the `docs → rules` dep in commit 1 was important: it allows the leaf rule packages to freely import `docs` without creating a cycle with `rules`.
 
-### Commit 3: `ExamplesResolver`
+### Commit 4: `ExamplesResolver`
 
 ```go
 // In cli/internal/validation/docs/
@@ -317,13 +306,13 @@ func (ExamplesResolver) ResolveFor(r rules.Rule) (*ResolvedRule, error) {
 }
 ```
 
-The Generator (commit 4) enriches the returned `*ResolvedRule` with `RuleID`, `Phase`, `Severity`, `Description`, `AppliesTo` from `rules.Rule` — same as Path A.
+The Generator (commit 5) enriches the returned `*ResolvedRule` with `RuleID`, `Phase`, `Severity`, `Description`, `AppliesTo` from `rules.Rule` — same as Path A.
 
-### Commits 4-6: Generator + Verifier + Serializer + CLI
+### Commits 5-7: Generator + Verifier + Serializer + CLI
 
 Same as Path A. Identical code (deliberate duplication — see §9). The CLI command is `rudder-cli docs rules` with `--output-dir` and `--strict-verify` flags only; no `--fragments-dir` flag (there is no fragments directory in Path B).
 
-### Commit 7: Three pilot rules implement `Documented`
+### Commit 8: Three pilot rules implement `Documented`
 
 The three pilot rules' Go files are edited to add a `DocExamples()` method:
 
@@ -344,16 +333,19 @@ YAML content within Go literals uses `heredoc.Doc` for readability — already a
 
 ### Estimated diff shape (Path B)
 
-| Area | Files added/edited | Lines (rough) |
+| Area | Files added/modified | Lines (rough) |
 |---|---|---|
-| Trim commit (deletes + edits) | 3 modified, 1 deleted | -130 LoC net |
+| Commit 1 — Shared prep (8 items) | ~4 modified | ~40 |
+| Commit 2 — Path-B-only deletions | 2 modified, 2 deleted | -170 net |
 | `Documented` interface | 1 modified | ~10 |
 | Resolver + ExamplesResolver | 2 added | ~50 |
 | Generator + Verifier + Serializer | 3 added | ~250 |
 | CLI command | 1-2 added | ~70 |
-| 3 pilot rules edited (additive method) | 3 modified | ~150 |
+| 3 pilot rules edited (additive method) | 3 modified | ~150 (authored data) |
 | Tests for new code | 4-5 added | ~400 |
-| **Total** | ~17 files | ~800 LoC net |
+| **Total** | ~19 files | ~800 LoC net |
+
+Code (non-test, non-data) ≈ 420 LoC; under the 500 cap (trim deletes count net). Authored data ≈ 150 LoC; under the 200 cap.
 
 ---
 
