@@ -82,8 +82,16 @@ func (v *Verifier) runEngineOnFiles(files map[string]string) (validation.Diagnos
 	// Loader keys specs by absolute path. Authors write File: "main.yaml"
 	// (relative). Rewrite the map keys before calling the engine so the
 	// File field on produced diagnostics matches the author's relative name.
+	// Also parse each RawSpec — the engine reads Parsed().Kind / .Version
+	// directly and would nil-deref on an unparsed spec.
 	relSpecs := make(map[string]*specs.RawSpec, len(rawSpecs))
 	for k, vRaw := range rawSpecs {
+		if _, err := vRaw.Parse(); err != nil {
+			// Authoring error in the example fixture itself; surface it
+			// up so the author sees the parse failure rather than a
+			// misleading diagnostic miss.
+			return nil, fmt.Errorf("parsing example spec %s: %w", k, err)
+		}
 		rel := strings.TrimPrefix(k, tmp+string(filepath.Separator))
 		relSpecs[rel] = vRaw
 	}
