@@ -12,7 +12,21 @@
 
 ## Spec Reference
 
-Source-of-truth spec: `/Users/shanmukh/workspace/rudder-iac/docs/superpowers/specs/2026-05-26-rulesdoc-generator-spikes-design.md` (lives on `main` in the main checkout — not in this worktree's branch). Read §§1, 2, 4, 5, 7, 9, 13 before executing tasks.
+Source-of-truth spec lives in this worktree's branch at `docs/superpowers/specs/2026-05-26-rulesdoc-generator-spikes-design.md`. Read §§1, 2, 4, 5, 7, 9, 13 before executing tasks.
+
+> **⚠ Spec amended after this plan was written (commit `764943da`).** §7 is restructured so **Commit 1 is "Shared prep"** (8 items, identical content to Path A's commit 1) and **Commit 2 is "Path-B-only deletions"** (`RuleDocEntry`, `LoadRuleDocEntries`, `rule_doc_entry_test.go`). Subsequent commits renumber: Documented interface = Commit 3, ExamplesResolver = Commit 4, Generator/Verifier/Serializer/CLI = 5-7, pilot rules = Commit 8.
+>
+> The 8-item shared prep (identical to Path A):
+> 1. Rename `DocumentedRules` → `RulesDoc`, `DocumentedRule` → `ResolvedRule`
+> 2. Drop `ResolvedRule.Provider` field
+> 3. Drop `ToolMetadata.GeneratedAt` field
+> 4. Add `json` struct tags alongside existing `yaml` tags
+> 5. Replace `rules.ValidateStruct` call in `docs/rules_doc.go` with `validator.New()`
+> 6. Comment out `validateRegisteredCompleteness` call with `// TODO(spike DEX-370)` marker
+> 7. Rename parameter `registeredRuleIDs` → `expectedRuleIDs`
+> 8. Add `AllSyntacticRules()` / `AllSemanticRules()` on `rules.Registry`
+>
+> **Executor: split this plan's previous "Trim" task into Commit 1 (the 8 items above, shared with Path A) and Commit 2 (the 3 Path-B-only deletions: `RuleDocEntry` type, `LoadRuleDocEntries` function, `rule_doc_entry_test.go`).** This isolates the "removed surface area" comparison metric in §9. The actual code work is unchanged; only commit boundaries shift.
 
 ## Working Directory
 
