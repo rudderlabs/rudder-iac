@@ -88,6 +88,7 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 		"--confirm=false",
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
+	assert.Contains(t, string(output), "Workspace:", "Expected workspace context in apply output, but got: %s", string(output))
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
 }
 

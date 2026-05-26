@@ -81,6 +81,8 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
+			fmt.Printf("Workspace: %s (ID: %s)\n", workspace.Name, workspace.ID)
+
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
 			if err != nil {

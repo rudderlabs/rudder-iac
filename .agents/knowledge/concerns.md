@@ -42,3 +42,7 @@
 - `go.mod` includes both `gopkg.in/yaml.v3` and `go.yaml.in/yaml/v3` module lines, indicating dependency overlap that commonly appears during partial migration and can become stale baggage.
 - `cli/internal/project/deprecation.go (LegacySpecDeprecationWarning)` warns that v0.1 will be removed “in a future release,” while many `LoadLegacySpec` paths remain active; this suggests prolonged deprecation without clear retirement point.
 - `cli/internal/provider/baseprovider.go:121` comment says legacy loading falls back to `LoadSpec` “for now,” which is explicit temporary behavior that can persist stale semantics.
+
+## RUD-11 — Apply E2E Assertion Blind Spot
+- Current `apply` E2E coverage (noted in `cli/tests/command_apply_test.go`) primarily asserts the substring `No changes to apply`; added output lines are therefore unlikely to fail tests as long as that text remains.
+- This creates a regression blind spot for apply output contracts: formatting, ordering, and additional identity lines can drift without test failures.
