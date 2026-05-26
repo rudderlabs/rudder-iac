@@ -56,6 +56,8 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
+		assert.Contains(t, string(output), "Workspace: ", "Expected workspace details in apply output")
+		assert.Contains(t, string(output), "(ID: ", "Expected workspace ID in apply output")
 		verifyState(t, "create")
 	})
 
@@ -64,6 +66,8 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
+		assert.Contains(t, string(output), "Workspace: ", "Expected workspace details in apply output")
+		assert.Contains(t, string(output), "(ID: ", "Expected workspace ID in apply output")
 		verifyState(t, "update")
 	})
 
@@ -88,6 +92,8 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 		"--confirm=false",
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
+	assert.Contains(t, string(output), "Workspace: ", "Expected workspace details in dry-run output")
+	assert.Contains(t, string(output), "(ID: ", "Expected workspace ID in dry-run output")
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
 }
 

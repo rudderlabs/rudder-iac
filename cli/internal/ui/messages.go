@@ -59,3 +59,11 @@ func Success(message string) string {
 func PrintSuccess(message string) {
 	fmt.Fprintln(uiWriter, Success(message))
 }
+
+func Workspace(name, ID string) string {
+	return fmt.Sprintf("Workspace: %s (ID: %s)", name, ID)
+}
+
+func PrintWorkspace(name, ID string) {
+	fmt.Fprintln(uiWriter, Workspace(name, ID))
+}
