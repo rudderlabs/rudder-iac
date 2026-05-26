@@ -181,7 +181,10 @@ func validateRulesV1(tpRules []*localcatalog.TPRuleV1) []rules.ValidationResult 
 	)
 
 	for i, rule := range tpRules {
-		results = append(results, validateEventRuleIncludesUnsupportedV1(rule, i)...)
+		results = append(
+			results,
+			validateEventRuleIncludesUnsupportedV1(rule, i)...,
+		)
 
 		for j, prop := range rule.Properties {
 			ref := fmt.Sprintf("/rules/%d/properties/%d", i, j)
@@ -205,6 +208,11 @@ func validateEventRuleShapeV0(rule *localcatalog.TPRule, index int, eventRuleInc
 
 func validateEventRuleIncludesUnsupportedV1(rule *localcatalog.TPRuleV1, index int) []rules.ValidationResult {
 	if rule.Includes == nil {
+		return nil
+	}
+
+	// When includes is present without event, only the struct-tag 'event' required error is reported.
+	if rule.Event == "" {
 		return nil
 	}
 

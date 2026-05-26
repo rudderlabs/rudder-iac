@@ -1411,8 +1411,8 @@ func TestTrackingPlanSpecSyntaxValidRule_EventRuleIncludesEnabledV1(t *testing.T
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
-			expectedMsgs: []string{"'event' is required", "includes is not supported for tracking-plan v1 event rules"},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{"'event' is required"},
 		},
 		{
 			name: "missing event and includes",
@@ -1463,8 +1463,8 @@ func TestTrackingPlanSpecSyntaxValidRule_EventRuleIncludesEnabledV1(t *testing.T
 					},
 				},
 			},
-			expectedRefs: []string{"/rules/0/event", "/rules/0/includes"},
-			expectedMsgs: []string{"'event' is required", "includes is not supported for tracking-plan v1 event rules"},
+			expectedRefs: []string{"/rules/0/event"},
+			expectedMsgs: []string{"'event' is required"},
 		},
 	}
 
