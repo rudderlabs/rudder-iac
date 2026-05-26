@@ -1,0 +1,68 @@
+rule_id: datacatalog/categories/spec-syntax-valid
+match_behavior:
+  - applies_to:
+      - { kind: categories, version: rudder/0.1 }
+      - { kind: categories, version: rudder/v0.1 }
+    valid:
+      - example_id: legacy-basic
+        title: Legacy categories with id and name
+        files:
+          main.yaml: |
+            version: rudder/v0.1
+            kind: categories
+            metadata:
+              name: legacy-categories
+            spec:
+              categories:
+                - id: user_actions
+                  name: User Actions
+    invalid:
+      - example_id: legacy-missing-name
+        title: Legacy category without name is rejected
+        files:
+          main.yaml: |
+            version: rudder/v0.1
+            kind: categories
+            metadata:
+              name: legacy-categories
+            spec:
+              categories:
+                - id: missing_name
+        expected_diagnostics:
+          - file: main.yaml
+            reference: /categories/0/name
+            severity: error
+            message_contains: "'name' is required"
+
+  - applies_to:
+      - { kind: categories, version: rudder/v1 }
+    valid:
+      - example_id: v1-basic
+        title: v1 categories with id and name
+        files:
+          main.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: my-project
+            spec:
+              categories:
+                - id: user_actions
+                  name: User Actions
+    invalid:
+      - example_id: v1-missing-name
+        title: v1 category without name is rejected
+        files:
+          main.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: my-project
+            spec:
+              categories:
+                - id: only_id
+        expected_diagnostics:
+          - file: main.yaml
+            reference: /categories/0/name
+            severity: error
+            message_contains: "'name' is required"

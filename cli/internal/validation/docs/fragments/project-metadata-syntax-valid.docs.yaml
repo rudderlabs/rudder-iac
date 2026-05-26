@@ -1,0 +1,55 @@
+rule_id: project/metadata-syntax-valid
+match_behavior:
+  - applies_to:
+      - { kind: "*", version: rudder/0.1 }
+      - { kind: "*", version: rudder/v0.1 }
+      - { kind: "*", version: rudder/v1 }
+    valid:
+      - example_id: basic-metadata
+        title: Simple metadata with name
+        files:
+          main.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: my-project
+            spec:
+              categories: []
+    invalid:
+      - example_id: missing-name
+        title: Metadata without name is rejected
+        files:
+          main.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              import:
+                workspaces:
+                  - workspace_id: ws-123
+            spec:
+              categories: []
+        expected_diagnostics:
+          - file: main.yaml
+            reference: /metadata/name
+            severity: error
+            message_contains: "'name' is required"
+      - example_id: missing-workspace-id
+        title: Import workspaces entry without workspace_id is rejected
+        files:
+          main.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: my-project
+              import:
+                workspaces:
+                  - resources:
+                      - urn: category:any
+                        remote_id: rem-1
+            spec:
+              categories: []
+        expected_diagnostics:
+          - file: main.yaml
+            reference: /metadata/import/workspaces/0/workspace_id
+            severity: error
+            message_contains: "'workspace_id' is required"

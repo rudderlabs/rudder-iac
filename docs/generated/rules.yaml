@@ -1,0 +1,216 @@
+schema_version: 1
+tool_metadata:
+    cli_version: "0.1"
+rules:
+    - rule_id: project/metadata-syntax-valid
+      phase: syntactic
+      severity: error
+      description: metadata syntax must be valid
+      applies_to:
+        - kind: '*'
+          version: rudder/0.1
+        - kind: '*'
+          version: rudder/v0.1
+        - kind: '*'
+          version: rudder/v1
+      match_behavior:
+        - applies_to:
+            - kind: '*'
+              version: rudder/0.1
+            - kind: '*'
+              version: rudder/v0.1
+            - kind: '*'
+              version: rudder/v1
+          valid:
+            - example_id: basic-metadata
+              title: Simple metadata with name
+              files:
+                main.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: my-project
+                    spec:
+                      categories: []
+          invalid:
+            - example_id: missing-name
+              title: Metadata without name is rejected
+              files:
+                main.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      import:
+                        workspaces:
+                          - workspace_id: ws-123
+                    spec:
+                      categories: []
+              expected_diagnostics:
+                - file: main.yaml
+                  reference: /metadata/name
+                  severity: error
+                  message_contains: '''name'' is required'
+            - example_id: missing-workspace-id
+              title: Import workspaces entry without workspace_id is rejected
+              files:
+                main.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: my-project
+                      import:
+                        workspaces:
+                          - resources:
+                              - urn: category:any
+                                remote_id: rem-1
+                    spec:
+                      categories: []
+              expected_diagnostics:
+                - file: main.yaml
+                  reference: /metadata/import/workspaces/0/workspace_id
+                  severity: error
+                  message_contains: '''workspace_id'' is required'
+    - rule_id: project/duplicate-urn
+      phase: syntactic
+      severity: error
+      description: URNs must be unique across the project
+      applies_to:
+        - kind: '*'
+          version: '*'
+      match_behavior:
+        - applies_to:
+            - kind: '*'
+              version: '*'
+          valid:
+            - example_id: distinct-urns
+              title: Two files with distinct URNs
+              files:
+                a.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: a
+                    spec:
+                      categories:
+                        - id: cat_a
+                          name: Category A
+                b.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: b
+                    spec:
+                      categories:
+                        - id: cat_b
+                          name: Category B
+          invalid:
+            - example_id: duplicate-urn-across-files
+              title: Two files defining the same category URN are both flagged
+              files:
+                a.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: a
+                    spec:
+                      categories:
+                        - id: shared_id
+                          name: Category A
+                b.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: b
+                    spec:
+                      categories:
+                        - id: shared_id
+                          name: Category B
+              expected_diagnostics:
+                - file: a.yaml
+                  reference: /spec/categories/0
+                  severity: error
+                  message_contains: duplicate URN
+                - file: b.yaml
+                  reference: /spec/categories/0
+                  severity: error
+                  message_contains: duplicate URN
+    - rule_id: datacatalog/categories/spec-syntax-valid
+      phase: syntactic
+      severity: error
+      description: category spec syntax must be valid
+      applies_to:
+        - kind: categories
+          version: rudder/0.1
+        - kind: categories
+          version: rudder/v0.1
+        - kind: categories
+          version: rudder/v1
+      match_behavior:
+        - applies_to:
+            - kind: categories
+              version: rudder/0.1
+            - kind: categories
+              version: rudder/v0.1
+          valid:
+            - example_id: legacy-basic
+              title: Legacy categories with id and name
+              files:
+                main.yaml: |
+                    version: rudder/v0.1
+                    kind: categories
+                    metadata:
+                      name: legacy-categories
+                    spec:
+                      categories:
+                        - id: user_actions
+                          name: User Actions
+          invalid:
+            - example_id: legacy-missing-name
+              title: Legacy category without name is rejected
+              files:
+                main.yaml: |
+                    version: rudder/v0.1
+                    kind: categories
+                    metadata:
+                      name: legacy-categories
+                    spec:
+                      categories:
+                        - id: missing_name
+              expected_diagnostics:
+                - file: main.yaml
+                  reference: /categories/0/name
+                  severity: error
+                  message_contains: '''name'' is required'
+        - applies_to:
+            - kind: categories
+              version: rudder/v1
+          valid:
+            - example_id: v1-basic
+              title: v1 categories with id and name
+              files:
+                main.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: my-project
+                    spec:
+                      categories:
+                        - id: user_actions
+                          name: User Actions
+          invalid:
+            - example_id: v1-missing-name
+              title: v1 category without name is rejected
+              files:
+                main.yaml: |
+                    version: rudder/v1
+                    kind: categories
+                    metadata:
+                      name: my-project
+                    spec:
+                      categories:
+                        - id: only_id
+              expected_diagnostics:
+                - file: main.yaml
+                  reference: /categories/0/name
+                  severity: error
+                  message_contains: '''name'' is required'

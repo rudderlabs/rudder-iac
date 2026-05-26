@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "tool_metadata": {
+    "cli_version": "0.1"
+  },
+  "rules": [
+    {
+      "rule_id": "project/metadata-syntax-valid",
+      "phase": "syntactic",
+      "severity": "error",
+      "description": "metadata syntax must be valid",
+      "applies_to": [
+        {
+          "kind": "*",
+          "version": "rudder/0.1"
+        },
+        {
+          "kind": "*",
+          "version": "rudder/v0.1"
+        },
+        {
+          "kind": "*",
+          "version": "rudder/v1"
+        }
+      ],
+      "match_behavior": [
+        {
+          "applies_to": [
+            {
+              "kind": "*",
+              "version": "rudder/0.1"
+            },
+            {
+              "kind": "*",
+              "version": "rudder/v0.1"
+            },
+            {
+              "kind": "*",
+              "version": "rudder/v1"
+            }
+          ],
+          "valid": [
+            {
+              "example_id": "basic-metadata",
+              "title": "Simple metadata with name",
+              "files": {
+                "main.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: my-project\nspec:\n  categories: []\n"
+              }
+            }
+          ],
+          "invalid": [
+            {
+              "example_id": "missing-name",
+              "title": "Metadata without name is rejected",
+              "files": {
+                "main.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  import:\n    workspaces:\n      - workspace_id: ws-123\nspec:\n  categories: []\n"
+              },
+              "expected_diagnostics": [
+                {
+                  "file": "main.yaml",
+                  "reference": "/metadata/name",
+                  "severity": "error",
+                  "message_contains": "'name' is required"
+                }
+              ]
+            },
+            {
+              "example_id": "missing-workspace-id",
+              "title": "Import workspaces entry without workspace_id is rejected",
+              "files": {
+                "main.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: my-project\n  import:\n    workspaces:\n      - resources:\n          - urn: category:any\n            remote_id: rem-1\nspec:\n  categories: []\n"
+              },
+              "expected_diagnostics": [
+                {
+                  "file": "main.yaml",
+                  "reference": "/metadata/import/workspaces/0/workspace_id",
+                  "severity": "error",
+                  "message_contains": "'workspace_id' is required"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rule_id": "project/duplicate-urn",
+      "phase": "syntactic",
+      "severity": "error",
+      "description": "URNs must be unique across the project",
+      "applies_to": [
+        {
+          "kind": "*",
+          "version": "*"
+        }
+      ],
+      "match_behavior": [
+        {
+          "applies_to": [
+            {
+              "kind": "*",
+              "version": "*"
+            }
+          ],
+          "valid": [
+            {
+              "example_id": "distinct-urns",
+              "title": "Two files with distinct URNs",
+              "files": {
+                "a.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: a\nspec:\n  categories:\n    - id: cat_a\n      name: Category A\n",
+                "b.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: b\nspec:\n  categories:\n    - id: cat_b\n      name: Category B\n"
+              }
+            }
+          ],
+          "invalid": [
+            {
+              "example_id": "duplicate-urn-across-files",
+              "title": "Two files defining the same category URN are both flagged",
+              "files": {
+                "a.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: a\nspec:\n  categories:\n    - id: shared_id\n      name: Category A\n",
+                "b.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: b\nspec:\n  categories:\n    - id: shared_id\n      name: Category B\n"
+              },
+              "expected_diagnostics": [
+                {
+                  "file": "a.yaml",
+                  "reference": "/spec/categories/0",
+                  "severity": "error",
+                  "message_contains": "duplicate URN"
+                },
+                {
+                  "file": "b.yaml",
+                  "reference": "/spec/categories/0",
+                  "severity": "error",
+                  "message_contains": "duplicate URN"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "rule_id": "datacatalog/categories/spec-syntax-valid",
+      "phase": "syntactic",
+      "severity": "error",
+      "description": "category spec syntax must be valid",
+      "applies_to": [
+        {
+          "kind": "categories",
+          "version": "rudder/0.1"
+        },
+        {
+          "kind": "categories",
+          "version": "rudder/v0.1"
+        },
+        {
+          "kind": "categories",
+          "version": "rudder/v1"
+        }
+      ],
+      "match_behavior": [
+        {
+          "applies_to": [
+            {
+              "kind": "categories",
+              "version": "rudder/0.1"
+            },
+            {
+              "kind": "categories",
+              "version": "rudder/v0.1"
+            }
+          ],
+          "valid": [
+            {
+              "example_id": "legacy-basic",
+              "title": "Legacy categories with id and name",
+              "files": {
+                "main.yaml": "version: rudder/v0.1\nkind: categories\nmetadata:\n  name: legacy-categories\nspec:\n  categories:\n    - id: user_actions\n      name: User Actions\n"
+              }
+            }
+          ],
+          "invalid": [
+            {
+              "example_id": "legacy-missing-name",
+              "title": "Legacy category without name is rejected",
+              "files": {
+                "main.yaml": "version: rudder/v0.1\nkind: categories\nmetadata:\n  name: legacy-categories\nspec:\n  categories:\n    - id: missing_name\n"
+              },
+              "expected_diagnostics": [
+                {
+                  "file": "main.yaml",
+                  "reference": "/categories/0/name",
+                  "severity": "error",
+                  "message_contains": "'name' is required"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "applies_to": [
+            {
+              "kind": "categories",
+              "version": "rudder/v1"
+            }
+          ],
+          "valid": [
+            {
+              "example_id": "v1-basic",
+              "title": "v1 categories with id and name",
+              "files": {
+                "main.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: my-project\nspec:\n  categories:\n    - id: user_actions\n      name: User Actions\n"
+              }
+            }
+          ],
+          "invalid": [
+            {
+              "example_id": "v1-missing-name",
+              "title": "v1 category without name is rejected",
+              "files": {
+                "main.yaml": "version: rudder/v1\nkind: categories\nmetadata:\n  name: my-project\nspec:\n  categories:\n    - id: only_id\n"
+              },
+              "expected_diagnostics": [
+                {
+                  "file": "main.yaml",
+                  "reference": "/categories/0/name",
+                  "severity": "error",
+                  "message_contains": "'name' is required"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

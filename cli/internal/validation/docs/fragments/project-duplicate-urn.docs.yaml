@@ -1,0 +1,57 @@
+rule_id: project/duplicate-urn
+match_behavior:
+  - applies_to:
+      - { kind: "*", version: "*" }
+    valid:
+      - example_id: distinct-urns
+        title: Two files with distinct URNs
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: a
+            spec:
+              categories:
+                - id: cat_a
+                  name: Category A
+          b.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: b
+            spec:
+              categories:
+                - id: cat_b
+                  name: Category B
+    invalid:
+      - example_id: duplicate-urn-across-files
+        title: Two files defining the same category URN are both flagged
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: a
+            spec:
+              categories:
+                - id: shared_id
+                  name: Category A
+          b.yaml: |
+            version: rudder/v1
+            kind: categories
+            metadata:
+              name: b
+            spec:
+              categories:
+                - id: shared_id
+                  name: Category B
+        expected_diagnostics:
+          - file: a.yaml
+            reference: /spec/categories/0
+            severity: error
+            message_contains: duplicate URN
+          - file: b.yaml
+            reference: /spec/categories/0
+            severity: error
+            message_contains: duplicate URN
