@@ -272,7 +272,7 @@ What survives in the docs package after this commit:
 - `rules_doc.go` — `RulesDoc.Validate` with checks 1-3 (completeness commented out) and `validator.New()` instantiated locally.
 - `rules_doc_test.go` — coverage of checks 1-3. Completeness tests can stay (asserting the check works in isolation) even though the wired-up call is commented out.
 
-After this commit: `docs` package has zero imports from `cli/internal/validation/rules`.
+After this commit: `docs/rules_doc.go` no longer references `rules.ValidateStruct`. Subsequent commits (notably commit 3's `Resolver` interface with signature `ResolveFor(r rules.Rule)`) will legitimately re-import `cli/internal/validation/rules` for the `rules.Rule` type. The cycle-breaking property that matters is removing the `rules.ValidateStruct` call; importing the `rules.Rule` *type* is fine because `rules.Rule` does not transitively depend on `docs/`.
 
 ### Commit 2: `Documented` interface
 
