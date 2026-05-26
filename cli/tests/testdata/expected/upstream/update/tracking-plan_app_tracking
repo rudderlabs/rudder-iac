@@ -68,6 +68,12 @@
                 },
                 {
                     "id": "prop_IGNORED",
+                    "name": "User Metadata",
+                    "required": false,
+                    "additionalProperties": true
+                },
+                {
+                    "id": "prop_IGNORED",
                     "name": "User Profiles",
                     "required": false,
                     "additionalProperties": true

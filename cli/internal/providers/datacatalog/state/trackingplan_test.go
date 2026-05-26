@@ -720,6 +720,52 @@ func TestTrackingPlanPropertyArgs_FromCatalogTrackingPlanEventProperty(t *testin
 			expectedErrMsg: "processing nested property invalid-nested-id: unable to resolve ref to the property urn: #property:invalid-nested-id",
 		},
 		{
+			name: "Multi-type property with object and array in Types",
+			prop: &localcatalog.TPEventProperty{
+				Name:        "flexible-value",
+				LocalID:     "flexible-value-id",
+				Ref:         "#property:flexible-value-id",
+				Description: "Value that can be object or array",
+				Types:       []string{"object", "array"},
+				Required:    false,
+			},
+			urnFromRef: func(ref string) string {
+				if ref == "#property:flexible-value-id" {
+					return "property:flexible-value-id"
+				}
+				return ""
+			},
+			expected: &state.TrackingPlanPropertyArgs{
+				LocalID:              "flexible-value-id",
+				ID:                   resources.PropertyRef{URN: "property:flexible-value-id", Property: "id"},
+				Required:             false,
+				AdditionalProperties: true,
+			},
+		},
+		{
+			name: "Multi-type property with object only in Types",
+			prop: &localcatalog.TPEventProperty{
+				Name:        "nullable-object",
+				LocalID:     "nullable-object-id",
+				Ref:         "#property:nullable-object-id",
+				Description: "Object or null",
+				Types:       []string{"object", "null"},
+				Required:    true,
+			},
+			urnFromRef: func(ref string) string {
+				if ref == "#property:nullable-object-id" {
+					return "property:nullable-object-id"
+				}
+				return ""
+			},
+			expected: &state.TrackingPlanPropertyArgs{
+				LocalID:              "nullable-object-id",
+				ID:                   resources.PropertyRef{URN: "property:nullable-object-id", Property: "id"},
+				Required:             true,
+				AdditionalProperties: true,
+			},
+		},
+		{
 			name: "Object type property without nested properties",
 			prop: &localcatalog.TPEventProperty{
 				Name:        "user-profile",

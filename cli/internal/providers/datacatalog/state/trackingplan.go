@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -398,6 +399,13 @@ func getArrayItemTypes(prop *localcatalog.TPEventProperty) []string {
 	return nil
 }
 
+func tpEventPropertyTypes(prop *localcatalog.TPEventProperty) []string {
+	if len(prop.Types) > 0 {
+		return prop.Types
+	}
+	return []string{prop.Type}
+}
+
 // getAdditionalPropertiesDefaultVal returns the default value for additional properties based on the property type
 // the default value for additional properties is true for the following cases -
 // 1. Object type properties
@@ -409,8 +417,9 @@ func getAdditionalPropertiesDefaultVal(prop *localcatalog.TPEventProperty) bool 
 	if strings.HasPrefix(prop.Type, "#custom-type:") {
 		return false
 	}
-	hasObject := strings.Contains(prop.Type, "object")
-	hasArray := strings.Contains(prop.Type, "array")
+	types := tpEventPropertyTypes(prop)
+	hasObject := slices.Contains(types, "object")
+	hasArray := slices.Contains(types, "array")
 
 	// If both array and object types exist, additional properties must be true by default
 	if hasArray && hasObject {
