@@ -109,7 +109,7 @@ Both spikes implement this same interface. The generator depends only on the int
 - Check 4 (`validateRegisteredCompleteness`) is **commented out** in both spike PRs with a clear marker (`// TODO(spike DEX-XXX): re-enable after pilot phase`). It would otherwise fail every spike run because only 3 of ~13 registered rules will have docs. Restoration is one line.
 - The parameter `registeredRuleIDs` is renamed to `expectedRuleIDs` to reflect that the call site decides what set to enforce — semantic clarification only, no behavioral change while the check is commented out.
 
-Both spike PRs include this trivial edit; for Path B it rolls into the trim commit, for Path A it's a single dedicated commit.
+Both spike PRs include this trivial edit; for Path B it rolls into the trim commit, while for Path A it's a single dedicated commit.
 
 ### Layer 4 — Authored wrapper `RuleDocEntry`
 
@@ -127,7 +127,7 @@ Both spike PRs include this trivial edit; for Path B it rolls into the trim comm
 
 **In PR #475:** Added to the `Registry` interface with defensive copies.
 
-**Status:** Both spikes need to enumerate rules. **Both spikes stack on top of #475's registry-extension portion.** The `RuleProvider.RuleDocEntries()` portion of #475 (Layer 7) is dropped — see §4.
+**Status:** Both spikes need to enumerate rules. **Both spikes stack on top of #475's registry-extension portion.** The `RuleProvider.RuleDocEntries()` portion of #475 (Layer 7) is dropped — §4 spells out the exact file-level split.
 
 ### Layer 7 — `RuleProvider.RuleDocEntries() []docs.RuleDocEntry`
 
@@ -209,7 +209,7 @@ Branch: `feat/docs-rule-gen-spike-path-a` off `feat/dex-269-add-docs-foundation`
 - No changes to any `rules.Rule` implementation.
 - No changes to the `RuleProvider` interface.
 - Existing rule tests untouched.
-- The existing `rules.Rule.Examples() Examples` method (used by the engine to attach to diagnostics — see [engine.go:218](cli/internal/validation/engine.go) and [text.go](cli/internal/validation/renderer/text.go)) remains in place, unaffected. The docs pipeline ignores it; the renderer continues to consume it.
+- The existing `rules.Rule.Examples() Examples` method (used by the engine to attach to diagnostics — see [engine.go:217-224](cli/internal/validation/engine.go) and [text.go](cli/internal/validation/renderer/text.go)) remains in place, unaffected. The docs pipeline ignores it; the renderer continues to consume it.
 
 ### Estimated diff shape (Path A)
 
@@ -233,18 +233,37 @@ Branch: `feat/docs-rule-gen-spike-path-b` off `feat/dex-269-add-docs-foundation`
 
 ### Commit 1: Trim #471 down to Path B essentials, dissolve docs→rules dep, disable completeness
 
-Path B does not need the YAML authoring surface, and breaks one extra dependency that #471 incidentally introduced. The first commit removes:
+Path B does not need the YAML authoring surface, and breaks one extra dependency that #471 incidentally introduced.
+
+#### The load-bearing change in this commit
+
+`docs/rules_doc.go::validateRuleStruct` currently calls `rules.ValidateStruct(rule, "")`. This single line is the *only* reason `cli/internal/validation/docs/` imports `cli/internal/validation/rules/`. Path B replaces it with a direct `validator.New()` instantiation in the `docs` package:
+
+```go
+// docs/rules_doc.go (after this commit)
+import "github.com/go-playground/validator/v10"
+
+var docValidator = validator.New()
+
+func validateRuleStruct(rule *ResolvedRule) []error {
+    err := docValidator.Struct(rule)
+    // ... unchanged error mapping below ...
+}
+```
+
+This dissolves the `docs → rules` dep entirely. **This is what allows the `Documented` interface in commit 2 to live in the `docs` package without a cycle** (leaf rule packages can then freely import `docs` to author `[]docs.MatchBehaviorEntry`).
+
+#### Other removals in the same commit
 
 | Change | Justification |
 |---|---|
-| **Remove** `RuleDocEntry` type from `types.go` | Path B rules expose docs directly via the `Documented` interface (§commit 2). No need for an external authored wrapper. |
-| **Remove** `LoadRuleDocEntries` function (entire `rule_doc_entry.go` file) | Path B has no on-disk YAML fragments to load. |
-| **Remove** `rule_doc_entry_test.go` | Tests for the removed loader. |
-| **Remove** `ResolvedRule.Provider` field from `types.go` | Forces every rule to be owned by a provider; project-level rules (`project/metadata-syntax-valid`, `project/duplicate-urn`) don't belong to a provider. Removing it eliminates a generator special-case and reduces noise. Rule ID prefix already encodes provenance. |
-| **Remove** `ToolMetadata.GeneratedAt` field from `types.go` | Runtime timestamp makes the artifact non-reproducible — every regeneration produces a diff with no semantic change, hostile to a committed/PR-able artifact. |
-| **Replace** `rules.ValidateStruct(rule, "")` call in `rules_doc.go::validateRuleStruct` with direct `validator.New()` usage in the `docs` package | The current `docs → rules` import exists only for this one helper call. Inlining a small `validator.New()` (package-level `docValidator = validator.New()`, ~5 lines) eliminates the dependency entirely. This is what allows `rules → docs` (commit 2) to compile without a cycle. |
-| **Comment out** `validateRegisteredCompleteness` invocation in `RulesDoc.Validate` with restoration marker | Same as Path A's commit 1; rolled into the trim. |
-| **Rename** parameter `registeredRuleIDs` → `expectedRuleIDs` | Semantic clarification (the caller decides the set to enforce). |
+| Remove `RuleDocEntry` type from `types.go` | Path B rules expose docs directly via the `Documented` interface (commit 2). No need for an external authored wrapper. |
+| Remove `LoadRuleDocEntries` function (entire `rule_doc_entry.go` file) | Path B has no on-disk YAML fragments to load. |
+| Remove `rule_doc_entry_test.go` | Tests for the removed loader. |
+| Remove `ResolvedRule.Provider` field from `types.go` | Forces every rule to be owned by a provider; project-level rules don't belong to one. Rule ID prefix already encodes provenance. |
+| Remove `ToolMetadata.GeneratedAt` field from `types.go` | Runtime timestamp makes the artifact non-reproducible — every regeneration produces a diff with no semantic change, hostile to a committed artifact. |
+| Comment out `validateRegisteredCompleteness` invocation in `RulesDoc.Validate` with restoration marker | Same as Path A's spike-prep commit; rolled into the trim. |
+| Rename parameter `registeredRuleIDs` → `expectedRuleIDs` | Semantic clarification (the caller decides the set to enforce). |
 
 What survives in the docs package after this commit:
 - `types.go` — resolved types (`RulesDoc`, `ResolvedRule` minus `Provider`, `ToolMetadata` minus `GeneratedAt`) + inner types (`MatchBehaviorEntry`, `MatchPatternDoc`, `ValidExample`, `InvalidExample`, `ExpectedDiagnostic`).
@@ -437,9 +456,10 @@ Both spike PRs must, at minimum:
 - [ ] The Verifier runs each authored invalid example through `ValidationEngine` and asserts every `ExpectedDiagnostic` matches at least one produced diagnostic (subset semantics, §5). Generation fails if any expectation is missing.
 - [ ] All three pilot rules are authored in the path's chosen format with matching coverage (same number of valid/invalid examples and same `ExpectedDiagnostic`s as the sibling PR's authoring).
 - [ ] `make test` and `make lint` are green.
-- [ ] Non-test diff is under 600 lines added (excluding `_test.go` files, excluding YAML data files for Path A).
+- [ ] **Code cap**: non-test, non-authored-data diff is under 500 lines added. Excludes `_test.go` files, YAML fragment files (Path A), and the Go literal `[]docs.MatchBehaviorEntry` bodies inside pilot rules' `DocExamples()` methods (Path B). Measures only the spike's *infrastructure code* — Resolver, Generator, Verifier, Serializer, CLI command, package edits.
+- [ ] **Authored-data cap**: per-spike authored data across all three pilot rules is under 200 lines. Symmetric across paths: counts YAML for Path A and Go literal data for Path B. This is what §9's "per-rule authoring cost" comparison measures, so it gets its own bound.
 
-The non-test cap is the objective version of "reviewable in a single sitting" — it bounds the comparison to a tight envelope and prevents either spike from inflating into a refactor.
+The two caps together are the objective version of "reviewable in a single sitting." Splitting code vs authored data prevents the comparison from being biased by whichever encoding is more verbose at the data level.
 
 ---
 
