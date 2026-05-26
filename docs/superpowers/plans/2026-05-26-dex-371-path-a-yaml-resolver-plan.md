@@ -10,6 +10,18 @@
 
 **Reference spec:** [`docs/superpowers/specs/2026-05-26-rulesdoc-generator-spikes-design.md`](../specs/2026-05-26-rulesdoc-generator-spikes-design.md) — §6 (Path A commits), §5 (Verifier semantics), §13 (acceptance criteria). Read it before starting.
 
+> **⚠ Spec amended after this plan was written (commit `b6fa7419`).** The spec's §6 now defines **Commit 1 as a "Shared prep" with 8 items** (identical content to Path B's commit 1). The 8 items:
+> 1. Rename `DocumentedRules` → `RulesDoc`, `DocumentedRule` → `ResolvedRule`
+> 2. Drop `ResolvedRule.Provider` field
+> 3. Drop `ToolMetadata.GeneratedAt` field
+> 4. Add `json` struct tags alongside existing `yaml` tags
+> 5. Replace `rules.ValidateStruct` call in `docs/rules_doc.go` with `validator.New()`
+> 6. Comment out `validateRegisteredCompleteness` call with `// TODO(spike DEX-371)` marker
+> 7. Rename parameter `registeredRuleIDs` → `expectedRuleIDs`
+> 8. Add `AllSyntacticRules()` / `AllSemanticRules()` on `rules.Registry`
+>
+> **Executor: align Task 1 with these 8 items before starting.** Items 2, 3, 4, 5 were previously Path-B-only; this plan now needs them too. Items 1, 6, 7, 8 were already in Task 1. The expansion keeps Path A's prep commit symmetric with Path B's, so the comparison in §9 isolates path-specific differences cleanly.
+
 ---
 
 ## Pre-flight context (read before starting)
