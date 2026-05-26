@@ -1,11 +1,6 @@
 package docs
 
-// Authored types — what providers write in YAML fragments.
-
-type RuleDocEntry struct {
-	RuleID        string               `yaml:"rule_id"        json:"rule_id"`
-	MatchBehavior []MatchBehaviorEntry `yaml:"match_behavior" json:"match_behavior"`
-}
+// Authored types — providers attach these via the Documented interface.
 
 type MatchBehaviorEntry struct {
 	AppliesTo []MatchPatternDoc `yaml:"applies_to"        json:"applies_to"        validate:"required,min=1,dive"`
