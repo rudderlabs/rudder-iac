@@ -12,7 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"golang.org/x/exp/maps"
@@ -359,25 +358,6 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, graph *resource
 		}
 	}
 	return nil
-}
-
-// PlanWarnings fans out to constituent providers that implement
-// planner.PlanWarner and concatenates their advisories. Providers without the
-// hook contribute nothing. Returns nil when no warnings were produced so the
-// syncer can treat absence uniformly.
-func (p *CompositeProvider) PlanWarnings(plan *planner.Plan) []string {
-	var all []string
-	for _, prov := range p.Providers {
-		warner, ok := prov.(planner.PlanWarner)
-		if !ok {
-			continue
-		}
-		all = append(all, warner.PlanWarnings(plan)...)
-	}
-	if len(all) == 0 {
-		return nil
-	}
-	return all
 }
 
 // SyntacticRules returns all syntactic rules from all providers implementing RuleProvider.

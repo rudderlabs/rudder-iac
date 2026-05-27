@@ -136,13 +136,6 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
-	// Optional plan-time warnings — populated before ReportPlan so the
-	// advisories surface on both dry-run and real apply, ahead of any
-	// resource mutation. Providers opt in by implementing planner.PlanWarner.
-	if pw, ok := s.provider.(planner.PlanWarner); ok {
-		plan.Warnings = pw.PlanWarnings(plan)
-	}
-
 	spinner.Stop()
 
 	s.reporter.ReportPlan(plan)

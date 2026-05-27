@@ -12,7 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -452,42 +451,3 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	}
 }
 
-// fixedPlanWarner wraps a MockProvider to satisfy the optional
-// planner.PlanWarner interface with a canned warning set.
-type fixedPlanWarner struct {
-	*testutils.MockProvider
-	warnings []string
-}
-
-func (f *fixedPlanWarner) PlanWarnings(_ *planner.Plan) []string { return f.warnings }
-
-func TestCompositeProvider_PlanWarnings(t *testing.T) {
-	t.Run("fans out and concatenates warnings from PlanWarner providers", func(t *testing.T) {
-		warner := &fixedPlanWarner{
-			MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
-			warnings:     []string{"metadata for x will remain in the workspace; v1 has no clear/delete path"},
-		}
-		plain := testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"})
-
-		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-			"warner": warner,
-			"plain":  plain,
-		})
-		assert.NoError(t, err)
-
-		pw, ok := cp.(planner.PlanWarner)
-		assert.True(t, ok, "CompositeProvider must implement planner.PlanWarner")
-
-		got := pw.PlanWarnings(&planner.Plan{})
-		assert.Equal(t, []string{"metadata for x will remain in the workspace; v1 has no clear/delete path"}, got)
-	})
-
-	t.Run("returns nil when no providers contribute warnings", func(t *testing.T) {
-		p := testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"})
-		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"p": p})
-		assert.NoError(t, err)
-
-		pw := cp.(planner.PlanWarner)
-		assert.Nil(t, pw.PlanWarnings(&planner.Plan{}))
-	})
-}

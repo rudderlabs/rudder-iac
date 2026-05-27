@@ -20,7 +20,6 @@ import (
 	dgRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 )
@@ -106,77 +105,6 @@ func (p *Provider) SemanticRules() []rules.Rule {
 		dgRules.NewRelationshipRefsValidRule(),
 		dgRules.NewRelationshipUniquePairRule(),
 		dgRules.NewUniqueNamesValidRule(),
-	}
-}
-
-// PlanWarnings surfaces non-fatal advisories about the planned diff before any
-// resource mutation runs. Currently the only signal is the v1 column-metadata
-// orphan: any column whose row exists remotely but whose name no longer
-// appears in yaml will persist after apply because the batch-upsert endpoint
-// has no clear/delete path. The warning is emitted once per orphaned column
-// name (across all model updates) using the LLD-pinned wording so users can
-// reconcile the leftover row out-of-band.
-//
-// Implements planner.PlanWarner; the syncer calls this between planner.Plan
-// and reporter.ReportPlan so warnings appear on both dry-run and real apply.
-func (p *Provider) PlanWarnings(plan *planner.Plan) []string {
-	if plan == nil || plan.Diff == nil || len(plan.Diff.UpdatedResources) == 0 {
-		return nil
-	}
-
-	modelURNPrefix := model.HandlerMetadata.ResourceType + ":"
-
-	// Sort URNs so the produced warnings have a stable order independent of
-	// the differ's map iteration.
-	urns := make([]string, 0, len(plan.Diff.UpdatedResources))
-	for urn := range plan.Diff.UpdatedResources {
-		urns = append(urns, urn)
-	}
-	slices.Sort(urns)
-
-	var warnings []string
-	for _, urn := range urns {
-		if !strings.HasPrefix(urn, modelURNPrefix) {
-			continue
-		}
-		columnsDiff, ok := plan.Diff.UpdatedResources[urn].Diffs["columns"]
-		if !ok {
-			continue
-		}
-		remote := asColumnEntries(columnsDiff.SourceValue)
-		local := asColumnEntries(columnsDiff.TargetValue)
-		for _, orphan := range model.FindOrphanedColumns(local, remote) {
-			warnings = append(warnings, model.FormatOrphanColumnWarning(orphan))
-		}
-	}
-
-	if len(warnings) == 0 {
-		return nil
-	}
-	return warnings
-}
-
-// asColumnEntries normalises a property diff value into the []map[string]any
-// shape FindOrphanedColumns understands. The mapstructure-driven differ can
-// hand the value back as either []map[string]any (the resource's declared
-// field type) or []any of map[string]any (after a generic decode), depending
-// on which side of the diff went through which code path; both shapes are
-// accepted. Anything else (nil, scalar, wrong element type) returns nil so
-// the caller treats it as "no columns" rather than panicking on a bad assert.
-func asColumnEntries(value any) []map[string]any {
-	switch typed := value.(type) {
-	case []map[string]any:
-		return typed
-	case []any:
-		out := make([]map[string]any, 0, len(typed))
-		for _, item := range typed {
-			if entry, ok := item.(map[string]any); ok {
-				out = append(out, entry)
-			}
-		}
-		return out
-	default:
-		return nil
 	}
 }
 
