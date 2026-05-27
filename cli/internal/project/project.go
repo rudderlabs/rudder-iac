@@ -59,6 +59,17 @@ func WithLoader(l Loader) ProjectOption {
 	}
 }
 
+// WithRenderer allows providing a custom validation Renderer.
+// Defaults to a stdout text renderer when unset; tests use this to
+// capture rendered diagnostics into a buffer for assertions.
+func WithRenderer(r renderer.Renderer) ProjectOption {
+	return func(p *project) {
+		if r != nil {
+			p.renderer = r
+		}
+	}
+}
+
 // New creates a new Project instance.
 // By default, it uses a loader.Loader.
 func New(provider provider.Provider, opts ...ProjectOption) Project {
