@@ -223,6 +223,10 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (
 		return nil, fmt.Errorf("creating %s model: %w", data.Type, err)
 	}
 
+	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, data.Columns); err != nil {
+		return nil, err
+	}
+
 	return &dgModel.ModelState{
 		ID: remote.ID,
 	}, nil
@@ -266,9 +270,43 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 		return nil, fmt.Errorf("updating %s model: %w", newData.Type, err)
 	}
 
+	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, newData.Columns); err != nil {
+		return nil, err
+	}
+
 	return &dgModel.ModelState{
 		ID: remote.ID,
 	}, nil
+}
+
+// applyColumnMetadata forwards the parsed yaml columns block to the column
+// metadata batch upsert endpoint after the model itself has been
+// created/updated. The server applies partial-merge semantics: only rows in
+// the payload are touched. The server-side model commit is not rolled back if
+// this call fails — the error surfaces to the apply user as a wrapped error so
+// the cause and the operation are both visible.
+func (h *HandlerImpl) applyColumnMetadata(ctx context.Context, dataGraphID, modelID string, columns []map[string]any) error {
+	if len(columns) == 0 {
+		return nil
+	}
+
+	entries := make([]dgClient.ColumnMetadataEntry, 0, len(columns))
+	for _, col := range columns {
+		name, _ := col["name"].(string)
+		displayName, _ := col["display_name"].(string)
+		entries = append(entries, dgClient.ColumnMetadataEntry{
+			Name:        name,
+			DisplayName: displayName,
+		})
+	}
+
+	if _, err := h.client.BatchUpsertColumnMetadata(ctx, dataGraphID, modelID, dgClient.BatchUpsertColumnMetadataRequest{
+		Columns: entries,
+	}); err != nil {
+		return fmt.Errorf("batch-upsert column metadata: %w", err)
+	}
+
+	return nil
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *dgModel.ModelResource, remoteID string) (*dgModel.ModelState, error) {

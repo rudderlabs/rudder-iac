@@ -227,9 +227,28 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 		PrimaryID:    spec.PrimaryID,
 		Root:         spec.Root,
 		Timestamp:    spec.Timestamp,
+		Columns:      columnsFromSpec(spec.Columns),
 	}
 
 	return resource, nil
+}
+
+// columnsFromSpec lowers the typed yaml column entries into the resource's
+// map-shaped slice so the syncer's mapstructure diff can compare slices via
+// reflect.DeepEqual. Returns nil for an empty input to preserve no-op semantics
+// in the diff (an empty resource map key is treated as missing).
+func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any {
+	if len(specColumns) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, len(specColumns))
+	for i, c := range specColumns {
+		out[i] = map[string]any{
+			"name":         c.Name,
+			"display_name": c.DisplayName,
+		}
+	}
+	return out
 }
 
 

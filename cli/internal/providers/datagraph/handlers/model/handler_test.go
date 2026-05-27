@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -659,6 +661,9 @@ func TestModelResourceMapstructureTags(t *testing.T) {
 		PrimaryID:    "id",
 		Root:         true,
 		Timestamp:    "",
+		Columns: []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+		},
 	}
 
 	var result map[string]interface{}
@@ -675,5 +680,255 @@ func TestModelResourceMapstructureTags(t *testing.T) {
 		"primary_id":   "id",
 		"root":         true,
 		"timestamp":    "",
+		"columns": []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+		},
 	}, result)
+}
+
+// ============================================================================
+// Column Metadata Tests
+// ============================================================================
+
+// buildModelResource is a tiny builder used by the column-metadata tests to
+// keep them focused on what's being asserted instead of repeating boilerplate
+// for the parent DataGraphRef wiring.
+func buildModelResource(t *testing.T, columns []map[string]any) *model.ModelResource {
+	t.Helper()
+
+	dataGraphURN := resources.URN("my-dg", datagraph.HandlerMetadata.ResourceType)
+	dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
+	dataGraphRef.IsResolved = true
+	dataGraphRef.Value = "dg-remote-123"
+
+	return &model.ModelResource{
+		ID:           "user",
+		DisplayName:  "User",
+		Type:         "entity",
+		Table:        "users",
+		DataGraphRef: dataGraphRef,
+		PrimaryID:    "id",
+		Root:         true,
+		Columns:      columns,
+	}
+}
+
+func TestCreate_BatchUpsertColumnMetadata(t *testing.T) {
+	t.Run("with columns: calls BatchUpsert exactly once with mapped entries", func(t *testing.T) {
+		var (
+			createCalls int
+			upsertCalls int
+			gotDgID     string
+			gotModelID  string
+			gotReq      dgClient.BatchUpsertColumnMetadataRequest
+		)
+
+		mockClient := &testutils.MockDataGraphClient{
+			CreateModelFunc: func(_ context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error) {
+				createCalls++
+				return &dgClient.Model{ID: "em-456", ExternalID: req.ExternalID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(_ context.Context, dgID, mID string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				upsertCalls++
+				gotDgID = dgID
+				gotModelID = mID
+				gotReq = req
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		data := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+			{"name": "email_address", "display_name": "Email"},
+		})
+
+		state, err := h.Create(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, &model.ModelState{ID: "em-456"}, state)
+
+		assert.Equal(t, 1, createCalls)
+		assert.Equal(t, 1, upsertCalls)
+		assert.Equal(t, "dg-remote-123", gotDgID)
+		assert.Equal(t, "em-456", gotModelID)
+		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+			Columns: []dgClient.ColumnMetadataEntry{
+				{Name: "id", DisplayName: "User ID"},
+				{Name: "email_address", DisplayName: "Email"},
+			},
+		}, gotReq)
+	})
+
+	t.Run("no columns: BatchUpsert is not called", func(t *testing.T) {
+		var upsertCalls int
+
+		mockClient := &testutils.MockDataGraphClient{
+			CreateModelFunc: func(_ context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: "em-456", ExternalID: req.ExternalID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(context.Context, string, string, dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				upsertCalls++
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		data := buildModelResource(t, nil)
+
+		state, err := h.Create(context.Background(), data)
+		require.NoError(t, err)
+		assert.Equal(t, &model.ModelState{ID: "em-456"}, state)
+		assert.Equal(t, 0, upsertCalls)
+	})
+
+	t.Run("batch upsert error is wrapped and propagated", func(t *testing.T) {
+		sentinel := errors.New("422 column metadata validation failed")
+
+		mockClient := &testutils.MockDataGraphClient{
+			CreateModelFunc: func(_ context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: "em-456", ExternalID: req.ExternalID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(context.Context, string, string, dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				return nil, sentinel
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		data := buildModelResource(t, []map[string]any{{"name": "id", "display_name": "User ID"}})
+
+		state, err := h.Create(context.Background(), data)
+		require.Error(t, err)
+		assert.Nil(t, state)
+		assert.ErrorIs(t, err, sentinel)
+		assert.Contains(t, err.Error(), "batch-upsert column metadata")
+	})
+}
+
+func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
+	t.Run("with columns: calls BatchUpsert exactly once after model update", func(t *testing.T) {
+		var (
+			updateCalls int
+			upsertCalls int
+			gotDgID     string
+			gotModelID  string
+			gotReq      dgClient.BatchUpsertColumnMetadataRequest
+		)
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				updateCalls++
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(_ context.Context, dgID, mID string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				upsertCalls++
+				gotDgID = dgID
+				gotModelID = mID
+				gotReq = req
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "Customer ID"},
+		})
+		oldData := buildModelResource(t, nil)
+		oldState := &model.ModelState{ID: "em-456"}
+
+		state, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.NoError(t, err)
+		assert.Equal(t, &model.ModelState{ID: "em-456"}, state)
+
+		assert.Equal(t, 1, updateCalls)
+		assert.Equal(t, 1, upsertCalls)
+		assert.Equal(t, "dg-remote-123", gotDgID)
+		assert.Equal(t, "em-456", gotModelID)
+		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+			Columns: []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: "Customer ID"}},
+		}, gotReq)
+	})
+
+	t.Run("no columns: BatchUpsert is not called", func(t *testing.T) {
+		var upsertCalls int
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(context.Context, string, string, dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				upsertCalls++
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, nil)
+		oldData := buildModelResource(t, nil)
+		oldState := &model.ModelState{ID: "em-456"}
+
+		state, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.NoError(t, err)
+		assert.Equal(t, &model.ModelState{ID: "em-456"}, state)
+		assert.Equal(t, 0, upsertCalls)
+	})
+
+	t.Run("batch upsert error is wrapped and propagated", func(t *testing.T) {
+		sentinel := errors.New("422 column metadata validation failed")
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(context.Context, string, string, dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				return nil, sentinel
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, []map[string]any{{"name": "id", "display_name": "Customer ID"}})
+		oldData := buildModelResource(t, nil)
+		oldState := &model.ModelState{ID: "em-456"}
+
+		state, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.Error(t, err)
+		assert.Nil(t, state)
+		assert.ErrorIs(t, err, sentinel)
+		assert.Contains(t, err.Error(), "batch-upsert column metadata")
+	})
+}
+
+// TestModelResource_ColumnsParticipateInDiff guards the re-apply idempotency
+// contract: identical Columns slices on two ModelResource instances must
+// produce no property diffs from the syncer's mapstructure-driven differ.
+// Without Columns participating, the syncer would never short-circuit on a
+// no-op apply and BatchUpsertColumnMetadata would be re-issued every time.
+func TestModelResource_ColumnsParticipateInDiff(t *testing.T) {
+	mkResource := func(cols []map[string]any) map[string]any {
+		var decoded map[string]any
+		require.NoError(t, mapstructure.Decode(buildModelResource(t, cols), &decoded))
+		return decoded
+	}
+
+	t.Run("identical columns produce no diff", func(t *testing.T) {
+		cols := []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+			{"name": "email_address", "display_name": "Email"},
+		}
+		diffs := differ.CompareData(mkResource(cols), mkResource(cols))
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("different columns surface as a diff", func(t *testing.T) {
+		a := []map[string]any{{"name": "id", "display_name": "User ID"}}
+		b := []map[string]any{{"name": "id", "display_name": "Customer ID"}}
+		diffs := differ.CompareData(mkResource(a), mkResource(b))
+		assert.Contains(t, diffs, "columns")
+	})
+
+	t.Run("columns added in target surface as a diff", func(t *testing.T) {
+		empty := mkResource(nil)
+		populated := mkResource([]map[string]any{{"name": "id", "display_name": "User ID"}})
+		diffs := differ.CompareData(empty, populated)
+		assert.Contains(t, diffs, "columns")
+	})
 }
