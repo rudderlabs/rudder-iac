@@ -12,15 +12,15 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
 
-var (
-	JsonExt        = ".json"
-	NoTestsDefined = "No test suites defined for transformation, using default events. Use `rudder-cli transformations test default-events--show` to view default events."
+const (
+	jsonExt        = ".json"
+	noTestsDefined = "No test suites defined for transformation, using default events. Use `rudder-cli transformations show-default-events` to view default events."
 )
 
 // ResolveTestDefinitions resolves test cases for a transformation.
 func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*transformations.TestDefinition, error) {
 	if len(transformation.Tests) == 0 {
-		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
+		testLogger.Warn(noTestsDefined, "transformationID", transformation.ID)
 		return defaultTestDefinitions()
 	}
 
@@ -35,7 +35,7 @@ func ResolveTestDefinitions(transformation *model.TransformationResource) ([]*tr
 	}
 
 	if len(allTestDefs) == 0 {
-		testLogger.Warn(NoTestsDefined, "transformationID", transformation.ID)
+		testLogger.Warn(noTestsDefined, "transformationID", transformation.ID)
 		return defaultTestDefinitions()
 	}
 
@@ -154,7 +154,7 @@ func listJSONFiles(dir string) (map[string]string, error) {
 		}
 
 		name := entry.Name()
-		if strings.HasSuffix(strings.ToLower(name), JsonExt) {
+		if strings.HasSuffix(strings.ToLower(name), jsonExt) {
 			files[name] = filepath.Join(dir, name)
 		}
 	}
