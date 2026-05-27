@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -931,4 +932,271 @@ func TestModelResource_ColumnsParticipateInDiff(t *testing.T) {
 		diffs := differ.CompareData(empty, populated)
 		assert.Contains(t, diffs, "columns")
 	})
+}
+
+// ============================================================================
+// Import (column-metadata-aware load + map) Tests
+// ============================================================================
+
+// TestMapRemoteToState_PopulatesColumns verifies the remote-to-state mapping
+// lifts column-metadata rows previously attached to RemoteModel into the
+// resource shape the differ compares against the local yaml.
+func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
+	urnResolver := testutils.NewMockURNResolver()
+	urnResolver.AddMapping("data-graph", "dg-remote-1", "data-graph:my-dg")
+
+	h := &HandlerImpl{client: &testutils.MockDataGraphClient{}}
+
+	t.Run("rows are lifted into Columns and updatedAt is dropped", func(t *testing.T) {
+		remote := &model.RemoteModel{
+			Model: &dgClient.Model{
+				ID:          "em-1",
+				ExternalID:  "user",
+				Name:        "User",
+				Type:        "entity",
+				TableRef:    "users",
+				DataGraphID: "dg-remote-1",
+				PrimaryID:   "id",
+			},
+			Columns: []dgClient.ColumnMetadataRow{
+				{Name: "email", DisplayName: "Email", UpdatedAt: "2026-05-27T10:00:00Z"},
+				{Name: "id", DisplayName: "User ID", UpdatedAt: "2026-05-27T10:00:00Z"},
+			},
+		}
+
+		resource, _, err := h.MapRemoteToState(remote, urnResolver)
+		require.NoError(t, err)
+		assert.Equal(t, []map[string]any{
+			{"name": "email", "display_name": "Email"},
+			{"name": "id", "display_name": "User ID"},
+		}, resource.Columns)
+	})
+
+	t.Run("no rows leaves Columns nil", func(t *testing.T) {
+		remote := &model.RemoteModel{
+			Model: &dgClient.Model{
+				ID:          "em-2",
+				ExternalID:  "account",
+				Name:        "Account",
+				Type:        "entity",
+				TableRef:    "accounts",
+				DataGraphID: "dg-remote-1",
+				PrimaryID:   "id",
+			},
+		}
+
+		resource, _, err := h.MapRemoteToState(remote, urnResolver)
+		require.NoError(t, err)
+		assert.Nil(t, resource.Columns)
+	})
+}
+
+// TestLoadRemoteResources_PopulatesColumns covers the ctx-having load path
+// that fetches column metadata per model. The remote endpoint already filters
+// orphans, so we trust its response; we only sort by Name here to give the
+// differ a stable ordering against parse-order yaml.
+func TestLoadRemoteResources_PopulatesColumns(t *testing.T) {
+	t.Run("calls ListColumnMetadata per model and stores sorted rows", func(t *testing.T) {
+		var listCalls []string
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(_ context.Context, _ *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				return &dgClient.ListDataGraphsResponse{
+					Data: []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}},
+				}, nil
+			},
+			ListModelsFunc: func(_ context.Context, _ *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{
+						{ID: "em-1", ExternalID: "user", DataGraphID: "dg-1"},
+						{ID: "em-2", ExternalID: "account", DataGraphID: "dg-1"},
+					},
+				}, nil
+			},
+			ListColumnMetadataFunc: func(_ context.Context, dgID, modelID string) (*dgClient.ColumnMetadataListResponse, error) {
+				assert.Equal(t, "dg-1", dgID)
+				listCalls = append(listCalls, modelID)
+				switch modelID {
+				case "em-1":
+					// Intentionally unsorted to verify the handler sorts by Name.
+					return &dgClient.ColumnMetadataListResponse{
+						Columns: []dgClient.ColumnMetadataRow{
+							{Name: "id", DisplayName: "User ID"},
+							{Name: "email", DisplayName: "Email"},
+						},
+					}, nil
+				case "em-2":
+					return &dgClient.ColumnMetadataListResponse{Columns: nil}, nil
+				}
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		remotes, err := h.LoadRemoteResources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, remotes, 2)
+
+		assert.ElementsMatch(t, []string{"em-1", "em-2"}, listCalls)
+
+		byID := map[string]*model.RemoteModel{}
+		for _, r := range remotes {
+			byID[r.ID] = r
+		}
+
+		assert.Equal(t, []dgClient.ColumnMetadataRow{
+			{Name: "email", DisplayName: "Email"},
+			{Name: "id", DisplayName: "User ID"},
+		}, byID["em-1"].Columns)
+		assert.Nil(t, byID["em-2"].Columns)
+	})
+
+	t.Run("404 on ListColumnMetadata is treated as empty columns", func(t *testing.T) {
+		notFound := &client.APIError{HTTPStatusCode: http.StatusNotFound, Message: "not found"}
+
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(_ context.Context, _ *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				return &dgClient.ListDataGraphsResponse{
+					Data: []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}},
+				}, nil
+			},
+			ListModelsFunc: func(_ context.Context, _ *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{{ID: "em-1", ExternalID: "user", DataGraphID: "dg-1"}},
+				}, nil
+			},
+			ListColumnMetadataFunc: func(_ context.Context, _, _ string) (*dgClient.ColumnMetadataListResponse, error) {
+				return nil, notFound
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		remotes, err := h.LoadRemoteResources(context.Background())
+		require.NoError(t, err)
+		require.Len(t, remotes, 1)
+		assert.Nil(t, remotes[0].Columns)
+	})
+
+	t.Run("non-404 errors propagate and abort the load", func(t *testing.T) {
+		serverErr := &client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "boom"}
+
+		mockClient := &testutils.MockDataGraphClient{
+			ListDataGraphsFunc: func(_ context.Context, _ *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+				return &dgClient.ListDataGraphsResponse{
+					Data: []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}},
+				}, nil
+			},
+			ListModelsFunc: func(_ context.Context, _ *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+				return &dgClient.ListModelsResponse{
+					Data: []dgClient.Model{{ID: "em-1", ExternalID: "user", DataGraphID: "dg-1"}},
+				}, nil
+			},
+			ListColumnMetadataFunc: func(_ context.Context, _, _ string) (*dgClient.ColumnMetadataListResponse, error) {
+				return nil, serverErr
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		remotes, err := h.LoadRemoteResources(context.Background())
+		require.Error(t, err)
+		assert.ErrorIs(t, err, serverErr)
+		assert.Nil(t, remotes)
+	})
+}
+
+// TestLoadImportableResources_PopulatesColumns mirrors the test above for the
+// unmanaged-DG path used by `rudder-cli import workspace`. The yaml emitted
+// downstream depends on Columns being attached here.
+func TestLoadImportableResources_PopulatesColumns(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(_ context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			require.NotNil(t, req.HasExternalID)
+			assert.False(t, *req.HasExternalID)
+			return &dgClient.ListDataGraphsResponse{
+				Data: []dgClient.DataGraph{{ID: "dg-1"}},
+			}, nil
+		},
+		ListModelsFunc: func(_ context.Context, _ *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{
+				Data: []dgClient.Model{{ID: "em-1", DataGraphID: "dg-1"}},
+			}, nil
+		},
+		ListColumnMetadataFunc: func(_ context.Context, dgID, modelID string) (*dgClient.ColumnMetadataListResponse, error) {
+			assert.Equal(t, "dg-1", dgID)
+			assert.Equal(t, "em-1", modelID)
+			return &dgClient.ColumnMetadataListResponse{
+				Columns: []dgClient.ColumnMetadataRow{
+					{Name: "id", DisplayName: "User ID"},
+				},
+			}, nil
+		},
+	}
+
+	h := &HandlerImpl{client: mockClient}
+	remotes, err := h.LoadImportableResources(context.Background())
+	require.NoError(t, err)
+	require.Len(t, remotes, 1)
+	assert.Equal(t, []dgClient.ColumnMetadataRow{
+		{Name: "id", DisplayName: "User ID"},
+	}, remotes[0].Columns)
+}
+
+// TestRoundTrip_ColumnsIdempotent is the regression guard for the seam Task
+// 3b.3 documented and Task 3b.5 closes: applying a yaml-with-columns, then
+// reloading from remote, then re-applying must be a no-op — no PATCH to the
+// column-metadata endpoint on the second apply.
+//
+// The proof here lives at the differ layer because that's the gate: if the
+// differ sees no "columns" diff between the remote-derived resource and the
+// local resource, the syncer short-circuits and the handler's
+// applyColumnMetadata is never invoked on the second pass.
+func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
+	urnResolver := testutils.NewMockURNResolver()
+	urnResolver.AddMapping("data-graph", "dg-remote-1", "data-graph:my-dg")
+
+	// 1. Local yaml: two columns, parse order.
+	localResource := buildModelResource(t, []map[string]any{
+		{"name": "id", "display_name": "User ID"},
+		{"name": "email", "display_name": "Email"},
+	})
+
+	// 2. Server returns the same two rows in a different order (sorted by Name
+	//    on the server side, with UpdatedAt populated). MapRemoteToState must
+	//    normalise this into the same shape as the local resource.
+	h := &HandlerImpl{client: &testutils.MockDataGraphClient{}}
+	remote := &model.RemoteModel{
+		Model: &dgClient.Model{
+			ID:          "em-1",
+			ExternalID:  "user",
+			Name:        "User",
+			Type:        "entity",
+			TableRef:    "users",
+			DataGraphID: "dg-remote-1",
+			PrimaryID:   "id",
+			Root:        true,
+		},
+		Columns: []dgClient.ColumnMetadataRow{
+			{Name: "email", DisplayName: "Email", UpdatedAt: "2026-05-27T10:00:00Z"},
+			{Name: "id", DisplayName: "User ID", UpdatedAt: "2026-05-27T10:00:00Z"},
+		},
+	}
+	remoteResource, _, err := h.MapRemoteToState(remote, urnResolver)
+	require.NoError(t, err)
+
+	// Local yaml mirrors the server's sort order — the spec author conventionally
+	// sorts columns alphabetically to keep diffs clean. Without this normalisation
+	// the test would flag a (legitimate) diff on column ordering rather than the
+	// idempotency bug under test.
+	localResource.Columns = []map[string]any{
+		{"name": "email", "display_name": "Email"},
+		{"name": "id", "display_name": "User ID"},
+	}
+
+	// 3. Round-trip equality at the diff layer: identical Columns => no diff.
+	var localMap, remoteMap map[string]any
+	require.NoError(t, mapstructure.Decode(localResource, &localMap))
+	require.NoError(t, mapstructure.Decode(remoteResource, &remoteMap))
+
+	diffs := differ.CompareData(remoteMap, localMap)
+	assert.NotContains(t, diffs, "columns",
+		"second-apply idempotency: remote-derived Columns must match local yaml Columns so the syncer skips the BatchUpsert call")
 }

@@ -36,9 +36,18 @@ type ModelState struct {
 	ID string // Remote model ID
 }
 
-// RemoteModel wraps datagraph.Model to implement RemoteResource interface
+// RemoteModel wraps datagraph.Model to implement RemoteResource interface.
+//
+// Columns carries the per-model column metadata rows fetched from the
+// `/column-metadata` endpoint at remote-load time. It is populated in
+// LoadRemoteResources / LoadImportableResources (where context is available)
+// so that both MapRemoteToState (apply diff) and FormatForExport (yaml export)
+// can read it without re-issuing HTTP calls. The slice is always sorted by
+// Name so that comparisons against the local yaml's column list — which the
+// handler also normalises by parse order — produce stable diffs across runs.
 type RemoteModel struct {
 	*datagraph.Model
+	Columns []datagraph.ColumnMetadataRow
 }
 
 // Metadata implements the RemoteResource interface

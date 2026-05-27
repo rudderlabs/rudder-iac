@@ -1,9 +1,14 @@
 package model
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"slices"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -92,6 +97,9 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 		if err != nil {
 			return nil, fmt.Errorf("loading models for data graph %s: %w", dg.ID, err)
 		}
+		if err := h.populateColumnMetadata(ctx, dg.ID, models); err != nil {
+			return nil, fmt.Errorf("loading column metadata for data graph %s: %w", dg.ID, err)
+		}
 		allModels = append(allModels, models...)
 	}
 
@@ -114,10 +122,68 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.R
 		if err != nil {
 			return nil, fmt.Errorf("loading importable models for data graph %s: %w", dg.ID, err)
 		}
+		if err := h.populateColumnMetadata(ctx, dg.ID, models); err != nil {
+			return nil, fmt.Errorf("loading column metadata for data graph %s: %w", dg.ID, err)
+		}
 		allModels = append(allModels, models...)
 	}
 
 	return allModels, nil
+}
+
+// populateColumnMetadata fetches the per-column metadata rows for each model
+// and attaches them (sorted by Name) to the corresponding RemoteModel.
+//
+// The remote list endpoint already filters orphans against the cached schema,
+// so the rows we attach here mirror what the user can author declaratively in
+// yaml. This is the seam that makes a subsequent re-apply of an unchanged
+// yaml-with-columns a no-op: MapRemoteToState lifts these rows into the
+// resource's Columns field, the differ compares against the local resource's
+// Columns, and the syncer short-circuits when they match.
+//
+// Error policy:
+//   - HTTP 404 from /column-metadata is treated as "no rows yet" (the
+//     endpoint exists for the model but holds no entries, or the model was
+//     just created in a transient race). The model is left with empty
+//     Columns.
+//   - Any other error — including 5xx and transport failures — fails the
+//     load so a real infrastructure issue isn't silently masked as a clean
+//     remote state and then mis-diagnosed as a stale-yaml diff.
+func (h *HandlerImpl) populateColumnMetadata(ctx context.Context, dataGraphID string, models []*dgModel.RemoteModel) error {
+	for _, m := range models {
+		resp, err := h.client.ListColumnMetadata(ctx, dataGraphID, m.ID)
+		if err != nil {
+			if isNotFound(err) {
+				m.Columns = nil
+				continue
+			}
+			return fmt.Errorf("listing column metadata for model %s: %w", m.ID, err)
+		}
+
+		if len(resp.Columns) == 0 {
+			m.Columns = nil
+			continue
+		}
+
+		rows := make([]dgClient.ColumnMetadataRow, len(resp.Columns))
+		copy(rows, resp.Columns)
+		slices.SortFunc(rows, func(a, b dgClient.ColumnMetadataRow) int {
+			return cmp.Compare(a.Name, b.Name)
+		})
+		m.Columns = rows
+	}
+	return nil
+}
+
+// isNotFound reports whether err wraps a 404 response from the API client.
+// Used to distinguish "no rows for this model" (treat as empty) from any
+// other failure (which must propagate).
+func isNotFound(err error) bool {
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.HTTPStatusCode == http.StatusNotFound
 }
 
 // listAllDataGraphs fetches all data graphs with pagination
@@ -176,6 +242,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver 
 		PrimaryID:    remote.PrimaryID,
 		Root:         remote.Root,
 		Timestamp:    remote.Timestamp,
+		Columns:      columnsFromRemote(remote.Columns),
 	}
 
 	state := &dgModel.ModelState{
@@ -183,6 +250,25 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver 
 	}
 
 	return resource, state, nil
+}
+
+// columnsFromRemote lifts the server's column-metadata rows into the
+// resource's diff-friendly map slice. The server's UpdatedAt is intentionally
+// omitted: it's an authoring-visible artifact that would surface as a spurious
+// diff against the local yaml on every apply. Returns nil for empty input so
+// the resulting resource matches the "no columns:" yaml shape exactly.
+func columnsFromRemote(rows []dgClient.ColumnMetadataRow) []map[string]any {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		out[i] = map[string]any{
+			"name":         row.Name,
+			"display_name": row.DisplayName,
+		}
+	}
+	return out
 }
 
 func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (*dgModel.ModelState, error) {

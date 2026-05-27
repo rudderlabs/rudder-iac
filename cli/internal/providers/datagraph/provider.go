@@ -520,10 +520,30 @@ func (p *Provider) buildInlineModelSpecs(
 			PrimaryID:     remoteModel.PrimaryID,
 			Root:          remoteModel.Root,
 			Timestamp:     remoteModel.Timestamp,
+			Columns:       columnsForExport(remoteModel.Columns),
 		})
 	}
 
 	return modelSpecs, importResources
+}
+
+// columnsForExport translates the remote column-metadata rows into the
+// yaml-bound ColumnMetadataYAML shape consumed by the formatter. Empty input
+// yields nil so the `columns:` key is omitted from the produced yaml — we only
+// emit the block for models that actually carry server-side metadata, matching
+// the sparse authoring contract.
+func columnsForExport(rows []dgClient.ColumnMetadataRow) []dgModel.ColumnMetadataYAML {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]dgModel.ColumnMetadataYAML, len(rows))
+	for i, row := range rows {
+		out[i] = dgModel.ColumnMetadataYAML{
+			Name:        row.Name,
+			DisplayName: row.DisplayName,
+		}
+	}
+	return out
 }
 
 // parseModelReference parses a model reference like '#data-graph-model:user' and returns the URN
