@@ -23,6 +23,11 @@ type ModelSpec struct {
 	Description   string             `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
 	Relationships []RelationshipSpec `json:"relationships,omitempty" yaml:"relationships,omitempty" mapstructure:"relationships" validate:"omitempty,dive"`
 
+	// Optional per-column metadata overrides. Sparse: only columns the user
+	// wants to override appear. Cross-field constraints (trimmed, no control
+	// characters, in-model uniqueness) are enforced by the spec validator.
+	Columns []ColumnMetadataYAML `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns" validate:"omitempty,dive"`
+
 	// Entity model fields (only used when Type == "entity")
 	// Conditional required: handled in rule function
 	PrimaryID string `json:"primary_id,omitempty" yaml:"primary_id,omitempty" mapstructure:"primary_id"`
@@ -31,6 +36,14 @@ type ModelSpec struct {
 	// Event model fields (only used when Type == "event")
 	// Conditional required: handled in rule function
 	Timestamp string `json:"timestamp,omitempty" yaml:"timestamp,omitempty" mapstructure:"timestamp"`
+}
+
+// ColumnMetadataYAML is one entry in a model's `columns:` block. Constraints
+// match the rudder-api column-metadata contract: required, length-bounded,
+// trimmed, no control characters, and case-insensitively unique within a model.
+type ColumnMetadataYAML struct {
+	Name        string `json:"name" yaml:"name" mapstructure:"name" validate:"required,max=255"`
+	DisplayName string `json:"display_name" yaml:"display_name" mapstructure:"display_name" validate:"required,max=255"`
 }
 
 // RelationshipSpec represents configuration for relationships from YAML

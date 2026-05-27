@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"sort"
+	"strings"
+	"unicode"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
@@ -87,9 +90,165 @@ var validateDataGraphSpec = func(_ string, _ string, _ map[string]any, spec dgMo
 				})
 			}
 		}
+
+		results = append(results, validateModelColumns(i, model.Columns)...)
 	}
 
 	return results
+}
+
+// validateModelColumns enforces the per-column constraints that can't be
+// expressed via struct tags: trimmed values, no control characters in
+// display_name, and in-model uniqueness of `name` and case-insensitive
+// uniqueness of `display_name`. Required/max=255 are handled upstream by
+// struct-tag validation.
+func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []rules.ValidationResult {
+	if len(columns) == 0 {
+		return nil
+	}
+
+	var (
+		results       []rules.ValidationResult
+		nameToIdx     = map[string][]int{}
+		dispNameToIdx = map[string][]int{} // lowercased display name -> indexes
+		// preserve original display name spelling per lowercase key for messages
+		dispNameOriginals = map[string][]string{}
+	)
+
+	for j, col := range columns {
+		base := fmt.Sprintf("/models/%d/columns/%d", modelIdx, j)
+
+		if col.Name != "" && hasLeadingOrTrailingWhitespace(col.Name) {
+			results = append(results, rules.ValidationResult{
+				Reference: base + "/name",
+				Message:   "'name' must not have leading or trailing whitespace",
+			})
+		}
+
+		if col.DisplayName != "" {
+			if hasLeadingOrTrailingWhitespace(col.DisplayName) {
+				results = append(results, rules.ValidationResult{
+					Reference: base + "/display_name",
+					Message:   "'display_name' must not have leading or trailing whitespace",
+				})
+			}
+			if hasControlCharacters(col.DisplayName) {
+				results = append(results, rules.ValidationResult{
+					Reference: base + "/display_name",
+					Message:   "'display_name' must not contain control characters (tab, newline, carriage return)",
+				})
+			}
+		}
+
+		if col.Name != "" {
+			nameToIdx[col.Name] = append(nameToIdx[col.Name], j)
+		}
+		if col.DisplayName != "" {
+			key := strings.ToLower(col.DisplayName)
+			dispNameToIdx[key] = append(dispNameToIdx[key], j)
+			dispNameOriginals[key] = append(dispNameOriginals[key], col.DisplayName)
+		}
+	}
+
+	results = append(results, collectDuplicateColumnNames(modelIdx, columns, nameToIdx)...)
+	results = append(results, collectDuplicateColumnDisplayNames(modelIdx, columns, dispNameToIdx)...)
+
+	return results
+}
+
+func collectDuplicateColumnNames(
+	modelIdx int,
+	columns []dgModel.ColumnMetadataYAML,
+	nameToIdx map[string][]int,
+) []rules.ValidationResult {
+	keys := sortedStringKeys(nameToIdx)
+
+	var results []rules.ValidationResult
+	for _, name := range keys {
+		idxs := nameToIdx[name]
+		if len(idxs) < 2 {
+			continue
+		}
+		for _, j := range idxs {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/models/%d/columns/%d/name", modelIdx, j),
+				Message:   fmt.Sprintf("duplicate column name %q within model (also at indexes %s)", name, formatPeerIndexes(idxs, j)),
+			})
+		}
+	}
+	_ = columns
+	return results
+}
+
+func collectDuplicateColumnDisplayNames(
+	modelIdx int,
+	columns []dgModel.ColumnMetadataYAML,
+	dispNameToIdx map[string][]int,
+) []rules.ValidationResult {
+	keys := sortedStringKeys(dispNameToIdx)
+
+	var results []rules.ValidationResult
+	for _, key := range keys {
+		idxs := dispNameToIdx[key]
+		if len(idxs) < 2 {
+			continue
+		}
+		// Build a name list to make the error actionable: surface every column
+		// name that collides on this display name (case-insensitive).
+		conflictingNames := make([]string, 0, len(idxs))
+		for _, j := range idxs {
+			conflictingNames = append(conflictingNames, fmt.Sprintf("%q", columns[j].Name))
+		}
+		joined := strings.Join(conflictingNames, ", ")
+		for _, j := range idxs {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/models/%d/columns/%d/display_name", modelIdx, j),
+				Message: fmt.Sprintf(
+					"duplicate column display name %q (case-insensitive) across columns: %s",
+					columns[j].DisplayName, joined,
+				),
+			})
+		}
+	}
+	return results
+}
+
+func formatPeerIndexes(all []int, self int) string {
+	peers := make([]string, 0, len(all)-1)
+	for _, i := range all {
+		if i == self {
+			continue
+		}
+		peers = append(peers, fmt.Sprintf("%d", i))
+	}
+	return strings.Join(peers, ", ")
+}
+
+func sortedStringKeys(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func hasLeadingOrTrailingWhitespace(s string) bool {
+	return strings.TrimSpace(s) != s
+}
+
+func hasControlCharacters(s string) bool {
+	for _, r := range s {
+		if r == '\t' || r == '\n' || r == '\r' {
+			return true
+		}
+		// Reject other ASCII control characters too for parity with the
+		// server's "no control characters" rule.
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func NewDataGraphSpecSyntaxValidRule() rules.Rule {
