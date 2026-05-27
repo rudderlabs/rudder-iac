@@ -309,12 +309,23 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 // map-shaped slice so the syncer's mapstructure diff can compare slices via
 // reflect.DeepEqual. Returns nil for an empty input to preserve no-op semantics
 // in the diff (an empty resource map key is treated as missing).
+//
+// Entries are sorted by name so the local side has the same canonical order
+// as the server's response (which sorts by name in handler.populateColumnMetadata).
+// Without this normalisation, authoring `columns:` in any order other than
+// alphabetical would surface as a spurious diff against the server's sorted
+// shape, re-issuing BatchUpsertColumnMetadata on every apply.
 func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any {
 	if len(specColumns) == 0 {
 		return nil
 	}
-	out := make([]map[string]any, len(specColumns))
-	for i, c := range specColumns {
+	sorted := make([]dgModel.ColumnMetadataYAML, len(specColumns))
+	copy(sorted, specColumns)
+	slices.SortFunc(sorted, func(a, b dgModel.ColumnMetadataYAML) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	out := make([]map[string]any, len(sorted))
+	for i, c := range sorted {
 		out[i] = map[string]any{
 			"name":         c.Name,
 			"display_name": c.DisplayName,
