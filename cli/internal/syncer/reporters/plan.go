@@ -32,6 +32,9 @@ func (r *planReporter) getWriter() io.Writer {
 
 func (r *planReporter) ReportPlan(plan *planner.Plan) {
 	fmt.Fprint(r.getWriter(), renderDiff(plan.Diff))
+	for _, warning := range plan.Warnings {
+		fmt.Fprintln(r.getWriter(), ui.Warning(warning))
+	}
 }
 
 func renderDiff(diff *differ.Diff) string {

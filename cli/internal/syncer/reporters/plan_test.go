@@ -263,6 +263,47 @@ func TestPrintablePropertyRef(t *testing.T) {
 	})
 }
 
+// TestPlanReporter_RendersWarnings guards the warning render path: plan-time
+// advisories carried on Plan.Warnings are appended after the diff render and
+// styled via ui.Warning so they share the existing yellow "Warning:" prefix.
+func TestPlanReporter_RendersWarnings(t *testing.T) {
+	var buf bytes.Buffer
+	r := &planReporter{}
+	r.SetWriter(&buf)
+
+	plan := &planner.Plan{
+		Diff: &differ.Diff{},
+		Warnings: []string{
+			"metadata for created_at will remain in the workspace; v1 has no clear/delete path",
+			"metadata for email will remain in the workspace; v1 has no clear/delete path",
+		},
+	}
+
+	r.ReportPlan(plan)
+
+	out := buf.String()
+	// Each warning is rendered on its own line, prefixed with "Warning:" so the
+	// existing ui.Warning style is reused without coupling the reporter to a
+	// specific colour code (lipgloss may emit ANSI escapes depending on the
+	// terminal).
+	assert.Contains(t, out, "Warning:")
+	assert.Contains(t, out, "metadata for created_at will remain in the workspace; v1 has no clear/delete path")
+	assert.Contains(t, out, "metadata for email will remain in the workspace; v1 has no clear/delete path")
+}
+
+// TestPlanReporter_NoWarningsLeavesOutputUnchanged keeps the existing no-warning
+// output stable: plans without advisories must not introduce stray newlines or
+// "Warning:" prefixes.
+func TestPlanReporter_NoWarningsLeavesOutputUnchanged(t *testing.T) {
+	var buf bytes.Buffer
+	r := &planReporter{}
+	r.SetWriter(&buf)
+
+	r.ReportPlan(&planner.Plan{Diff: &differ.Diff{}})
+
+	assert.NotContains(t, buf.String(), "Warning:")
+}
+
 func enableNestedDiffs(t *testing.T) {
 	t.Helper()
 

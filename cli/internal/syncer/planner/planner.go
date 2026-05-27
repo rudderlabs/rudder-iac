@@ -13,6 +13,15 @@ type Planner struct {
 	workspaceId string
 }
 
+// PlanWarner is an optional interface providers can implement to surface
+// non-fatal advisories computed from the planned diff. The syncer calls
+// PlanWarnings once between planner.Plan and reporter.ReportPlan so the
+// warnings show up on dry-run and real apply alike, before any resource
+// mutation runs. Returning nil signals "no warnings".
+type PlanWarner interface {
+	PlanWarnings(plan *Plan) []string
+}
+
 type OperationType int
 
 const (
@@ -49,6 +58,13 @@ func (t *OperationType) String() string {
 type Plan struct {
 	Diff       *differ.Diff
 	Operations []*Operation
+	// Warnings carries plan-time non-fatal advisories surfaced before any
+	// resource mutation runs. Populated by providers via the
+	// provider.PlanWarner optional interface (currently used by data-graph to
+	// flag column-metadata orphans that the v1 partial-merge endpoint cannot
+	// delete) and rendered by the plan reporter for both dry-run and real
+	// apply.
+	Warnings []string
 }
 
 func New(workspaceId string) *Planner {
