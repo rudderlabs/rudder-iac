@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
 var log = logger.New("project")
@@ -45,6 +46,7 @@ type project struct {
 	specs            map[string]*specs.Spec
 	validationEngine validation.ValidationEngine
 	renderer         renderer.Renderer
+	substitutor      varsubst.Substitutor
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -56,6 +58,14 @@ func WithLoader(l Loader) ProjectOption {
 		if l != nil {
 			p.loader = l
 		}
+	}
+}
+
+// WithSubstitutor sets an optional variable substitutor that runs on raw spec
+// bytes before parsing. When nil (the default), no substitution happens.
+func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
+	return func(p *project) {
+		p.substitutor = s
 	}
 }
 
@@ -211,6 +221,15 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 	// Ideally this should be done by validation engine but the engine
 	// only works on the data provided.
 	for path, rawSpec := range raw {
+
+		if p.substitutor != nil {
+			substituted, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
+			if len(subErrs) > 0 {
+				diags = append(diags, varsubst.ToDiagnostics(path, subErrs)...)
+				continue
+			}
+			rawSpec = &specs.RawSpec{Data: substituted}
+		}
 
 		parsed, err := rawSpec.Parse()
 		if err != nil {
