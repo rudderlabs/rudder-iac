@@ -12,7 +12,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
+
+// mapResolver is a tiny in-memory varsubst.Resolver used to drive substitution
+// from test cases without depending on env vars or files.
+type mapResolver map[string]string
+
+func (m mapResolver) Resolve(name string) (string, bool) {
+	v, ok := m[name]
+	return v, ok
+}
 
 // MockLoader is a mock implementation of the project.Loader interface for testing.
 type MockLoader struct {
@@ -225,6 +235,123 @@ func TestProject_LoadSpec_VersionRouting(t *testing.T) {
 				tc.expectLoadLegacySpecCalled,
 				loadLegacySpecCalled,
 				"LoadLegacySpec called mismatch: expected %v, got %v", tc.expectLoadLegacySpecCalled, loadLegacySpecCalled)
+		})
+	}
+}
+
+func TestProject_Load_WithSubstitutor(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		substitutor varsubst.Substitutor
+		rawSpecs    map[string][]byte
+		wantErr     string // empty when Load should succeed
+		wantSpecs   map[string]*specs.Spec
+	}{
+		{
+			name:        "resolves variables in metadata",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "resolved_name"},
+					Spec:     map[string]any{"k": "v"},
+				},
+			},
+		},
+		{
+			// Bare 5432 (no surrounding quotes in the spec) parses as int after substitution.
+			name:        "preserves non-string scalar type",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"PORT": "5432"}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: db\nspec:\n  port: {{ .PORT }}"),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "db"},
+					Spec:     map[string]any{"port": 5432},
+				},
+			},
+		},
+		{
+			name:        "undefined variable excludes spec and fails load",
+			substitutor: varsubst.NewSubstitutor(mapResolver{}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
+			},
+			wantErr:   "syntax validation failed",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+		{
+			name:        "nil substitutor leaves spec untouched",
+			substitutor: nil,
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: literal\nspec:\n  k: \"{{ .v }}\""),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "literal"},
+					Spec:     map[string]any{"k": "{{ .v }}"},
+				},
+			},
+		},
+		{
+			// Mixed batch: clean spec must still parse and reach Specs(), errored one is skipped.
+			name:        "mixed clean and errored specs",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"NAME": "clean_name"}),
+			rawSpecs: map[string][]byte{
+				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
+				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
+			},
+			wantErr: "syntax validation failed",
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/clean.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "clean_name"},
+					Spec:     map[string]any{"k": "v"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
+				for path, data := range tc.rawSpecs {
+					raw[path] = &specs.RawSpec{Data: data}
+				}
+				return raw, nil
+			}}
+
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithSubstitutor(tc.substitutor),
+			)
+
+			err := proj.Load("test_dir")
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.wantSpecs, proj.Specs())
 		})
 	}
 }
