@@ -309,7 +309,9 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (
 		return nil, fmt.Errorf("creating %s model: %w", data.Type, err)
 	}
 
-	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, data.Columns); err != nil {
+	// Create has no remote state, so no removals to compute — nil remoteColumns
+	// short-circuits the diff and only upserts the local entries.
+	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, data.Columns, nil); err != nil {
 		return nil, err
 	}
 
@@ -356,7 +358,11 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 		return nil, fmt.Errorf("updating %s model: %w", newData.Type, err)
 	}
 
-	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, newData.Columns); err != nil {
+	// Update threads oldData.Columns through as the pre-apply remote state so
+	// the handler can compute removals (names present remotely but no longer
+	// in yaml) and send them in the same PATCH as the upserts. MapRemoteToState
+	// is the seam that populates oldData.Columns from the server's rows.
+	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, newData.Columns, oldData.Columns); err != nil {
 		return nil, err
 	}
 
@@ -365,29 +371,56 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 	}, nil
 }
 
-// applyColumnMetadata forwards the parsed yaml columns block to the column
-// metadata batch upsert endpoint after the model itself has been
-// created/updated. The server applies partial-merge semantics: only rows in
-// the payload are touched. The server-side model commit is not rolled back if
-// this call fails — the error surfaces to the apply user as a wrapped error so
-// the cause and the operation are both visible.
-func (h *HandlerImpl) applyColumnMetadata(ctx context.Context, dataGraphID, modelID string, columns []map[string]any) error {
-	if len(columns) == 0 {
-		return nil
-	}
-
-	entries := make([]dgClient.ColumnMetadataEntry, 0, len(columns))
-	for _, col := range columns {
+// applyColumnMetadata reconciles the local yaml columns block against the
+// pre-apply remote state and sends one PATCH per model carrying both upserts
+// and removals. The yaml is declarative: any column name present remotely but
+// missing from local yaml goes into deleteColumns; the remaining entries go
+// into columns as (name, displayName) pairs. The server applies the diff
+// atomically — sets and clears land in the same transaction. The model commit
+// is not rolled back if this call fails; the wrapped error surfaces to the
+// apply user with the original cause intact.
+func (h *HandlerImpl) applyColumnMetadata(
+	ctx context.Context,
+	dataGraphID, modelID string,
+	localColumns []map[string]any,
+	remoteColumns []map[string]any,
+) error {
+	entries := make([]dgClient.ColumnMetadataEntry, 0, len(localColumns))
+	localNames := make(map[string]struct{}, len(localColumns))
+	for _, col := range localColumns {
 		name, _ := col["name"].(string)
 		displayName, _ := col["display_name"].(string)
 		entries = append(entries, dgClient.ColumnMetadataEntry{
 			Name:        name,
 			DisplayName: displayName,
 		})
+		if name != "" {
+			localNames[name] = struct{}{}
+		}
+	}
+
+	var deleteColumns []string
+	for _, col := range remoteColumns {
+		name, ok := col["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+		if _, kept := localNames[name]; kept {
+			continue
+		}
+		deleteColumns = append(deleteColumns, name)
+	}
+	// Sort for deterministic ordering — important for both wire-payload
+	// equivalence in tests and idempotency of repeated applies.
+	slices.Sort(deleteColumns)
+
+	if len(entries) == 0 && len(deleteColumns) == 0 {
+		return nil
 	}
 
 	if _, err := h.client.BatchUpsertColumnMetadata(ctx, dataGraphID, modelID, dgClient.BatchUpsertColumnMetadataRequest{
-		Columns: entries,
+		Columns:       entries,
+		DeleteColumns: deleteColumns,
 	}); err != nil {
 		return fmt.Errorf("batch-upsert column metadata: %w", err)
 	}

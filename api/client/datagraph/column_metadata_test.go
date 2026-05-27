@@ -145,6 +145,81 @@ func TestBatchUpsertColumnMetadata(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestBatchUpsertColumnMetadata_BothColumnsAndDeleteColumns(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			if req.Header.Get("Authorization") != "Bearer test-token" {
+				return false
+			}
+			expected := `{
+				"columns": [{"name":"user_id","displayName":"User ID"}],
+				"deleteColumns": ["email","legacy_field"]
+			}`
+			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"columns": [
+				{"name": "user_id", "displayName": "User ID", "updatedAt": "2024-01-15T12:00:00Z"}
+			]
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.BatchUpsertColumnMetadata(
+		context.Background(),
+		"dg-123",
+		"em-456",
+		datagraph.BatchUpsertColumnMetadataRequest{
+			Columns:       []datagraph.ColumnMetadataEntry{{Name: "user_id", DisplayName: "User ID"}},
+			DeleteColumns: []string{"email", "legacy_field"},
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
+		Columns: []datagraph.ColumnMetadataRow{
+			{Name: "user_id", DisplayName: "User ID", UpdatedAt: "2024-01-15T12:00:00Z"},
+		},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+// TestBatchUpsertColumnMetadata_OnlyDeleteColumns covers the all-removals
+// shape: yaml drops every previously-managed column, so the call carries only
+// deleteColumns. Verifies omitempty on Columns drops the key from the wire
+// payload entirely, matching the server's "at least one non-empty" contract.
+func TestBatchUpsertColumnMetadata_OnlyDeleteColumns(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			if req.Header.Get("Authorization") != "Bearer test-token" {
+				return false
+			}
+			expected := `{"deleteColumns": ["email", "user_id"]}`
+			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"columns": []}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.BatchUpsertColumnMetadata(
+		context.Background(),
+		"dg-123",
+		"em-456",
+		datagraph.BatchUpsertColumnMetadataRequest{
+			DeleteColumns: []string{"email", "user_id"},
+		},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, &datagraph.ColumnMetadataListResponse{Columns: []datagraph.ColumnMetadataRow{}}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestBatchUpsertColumnMetadata_EmptyDataGraphID(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t)
 	store := newTestStore(t, httpClient)

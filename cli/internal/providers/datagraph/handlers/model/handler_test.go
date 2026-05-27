@@ -896,6 +896,117 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 		assert.ErrorIs(t, err, sentinel)
 		assert.Contains(t, err.Error(), "batch-upsert column metadata")
 	})
+
+	// yaml drops a column that was previously present remotely → the dropped
+	// column's name lands in DeleteColumns and the remaining entries land in
+	// Columns. One PATCH per model, both fields populated.
+	t.Run("yaml drops a column: sends deleteColumns with the dropped name", func(t *testing.T) {
+		var gotReq dgClient.BatchUpsertColumnMetadataRequest
+		var upsertCalls int
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(_ context.Context, _, _ string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				upsertCalls++
+				gotReq = req
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+		})
+		oldData := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+			{"name": "email", "display_name": "Email"},
+		})
+		oldState := &model.ModelState{ID: "em-456"}
+
+		state, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.NoError(t, err)
+		assert.Equal(t, &model.ModelState{ID: "em-456"}, state)
+
+		assert.Equal(t, 1, upsertCalls)
+		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+			Columns:       []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: "User ID"}},
+			DeleteColumns: []string{"email"},
+		}, gotReq)
+	})
+
+	// yaml simultaneously adds a new column and drops an existing one → both
+	// arrays carry their respective entries in a single PATCH.
+	t.Run("yaml adds and drops simultaneously: both arrays populated", func(t *testing.T) {
+		var gotReq dgClient.BatchUpsertColumnMetadataRequest
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(_ context.Context, _, _ string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				gotReq = req
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+			{"name": "phone", "display_name": "Phone"},
+		})
+		oldData := buildModelResource(t, []map[string]any{
+			{"name": "id", "display_name": "User ID"},
+			{"name": "email", "display_name": "Email"},
+			{"name": "legacy_field", "display_name": "Legacy"},
+		})
+		oldState := &model.ModelState{ID: "em-456"}
+
+		_, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.NoError(t, err)
+
+		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+			Columns: []dgClient.ColumnMetadataEntry{
+				{Name: "id", DisplayName: "User ID"},
+				{Name: "phone", DisplayName: "Phone"},
+			},
+			// Sorted alphabetically for deterministic wire payload.
+			DeleteColumns: []string{"email", "legacy_field"},
+		}, gotReq)
+	})
+
+	// yaml empties the columns block while remote has rows → PATCH with no
+	// Columns and all remote names in DeleteColumns.
+	t.Run("yaml empty + remote populated: only deleteColumns is sent", func(t *testing.T) {
+		var gotReq dgClient.BatchUpsertColumnMetadataRequest
+
+		mockClient := &testutils.MockDataGraphClient{
+			UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+				return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+			},
+			BatchUpsertColumnMetadataFunc: func(_ context.Context, _, _ string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+				gotReq = req
+				return &dgClient.ColumnMetadataListResponse{}, nil
+			},
+		}
+
+		h := &HandlerImpl{client: mockClient}
+		newData := buildModelResource(t, nil)
+		oldData := buildModelResource(t, []map[string]any{
+			{"name": "email", "display_name": "Email"},
+			{"name": "user_id", "display_name": "User ID"},
+		})
+		oldState := &model.ModelState{ID: "em-456"}
+
+		_, err := h.Update(context.Background(), newData, oldData, oldState)
+		require.NoError(t, err)
+
+		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+			Columns:       []dgClient.ColumnMetadataEntry{},
+			DeleteColumns: []string{"email", "user_id"},
+		}, gotReq)
+	})
 }
 
 // TestModelResource_ColumnsParticipateInDiff guards the re-apply idempotency

@@ -35,9 +35,15 @@ type ColumnMetadataListResponse struct {
 	Columns []ColumnMetadataRow `json:"columns"`
 }
 
-// BatchUpsertColumnMetadataRequest is the request body for a batch upsert.
+// BatchUpsertColumnMetadataRequest is the request body for a combined batch
+// upsert + remove. Columns carries (name, displayName) pairs to set or update,
+// DeleteColumns carries names whose rows should be removed in the same call.
+// Both fields use omitempty so empty slices are not serialized; the server
+// requires at least one of them to be non-empty. The caller is responsible
+// for ensuring no name appears in both arrays.
 type BatchUpsertColumnMetadataRequest struct {
-	Columns []ColumnMetadataEntry `json:"columns"`
+	Columns       []ColumnMetadataEntry `json:"columns,omitempty"`
+	DeleteColumns []string              `json:"deleteColumns,omitempty"`
 }
 
 // ColumnMetadataValidationErrorEntry describes a single per-column validation
