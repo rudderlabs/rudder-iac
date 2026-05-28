@@ -25,6 +25,10 @@
 - `cli/internal/cmd/telemetry/utils.go (TrackCommand)` blindly copies arbitrary `extras` into telemetry properties, with no allowlist/redaction boundary for future sensitive fields.
 - `cli/internal/cmd/root.go (recovery)` prints full panic stack traces in debug mode; stack traces may contain sensitive config/path/token-adjacent context depending on upstream errors.
 
+## DAW-3454 -- Release-Sensitive Onboarding
+- `README.md` contains the repo’s main onboarding instructions, but its install commands are tightly coupled to release artifacts and image tags.
+- When editing that document, preserve the exact command targets and URLs rather than shortening them in a way that risks drift from the current release layout.
+
 ## Architectural Smells
 <!-- ticket:RUD-2739 -->
 - `cli/internal/app/dependencies.go (setupProviders, NewDeps)` centralizes provider wiring, feature-flag branching, and client setup in one bootstrap unit; this increases coupling and makes provider extension fragile.

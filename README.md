@@ -1,41 +1,28 @@
-# rudder-cli
+# rudder-iac
 
-## Table of Contents
+`rudder-iac` ships `rudder-cli`, the CLI for managing RudderStack infrastructure as code.
 
-- [⚠️ Work in Progress](#️-work-in-progress)
-- [Installation](#installation)
-  - [MacOS](#macos)
-    - [Apple Silicon](#apple-silicon)
-    - [Intel-based](#intel-based)
-  - [Linux](#linux)
-  - [Docker](#docker)
-  - [Build from Source](#build-from-source)
+> The CLI is actively developed, so command behavior and release artifacts may change.
 
-## ⚠️ Work in Progress
+## Install
 
-> **Warning**
->
-> Please note that this tool is currently a work in progress. We are actively developing and improving it, and as such, there may be frequent changes and updates. We do not guarantee backwards compatibility at this stage.
+### Prebuilt binary
 
-## Installation
-
-### MacOS
-
-#### Apple Silicon
+#### macOS, Apple Silicon
 
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
-#### Intel-based
+#### macOS, Intel
 
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
-### Linux
+#### Linux
 
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
@@ -44,33 +31,31 @@ sudo mv rudder-cli /usr/local/bin/
 
 ### Docker
 
-You can run the CLI directly using Docker:
+Run the image directly:
 
 ```sh
 docker run rudderlabs/rudder-cli
 ```
 
-If you need to persist your configuration, or provide an external configuration file, you can mount your local config directory into the container. Assuming your config directory is located at `~/.rudder`, you can run the following command:
+Persist your config by mounting `~/.rudder`:
 
 ```sh
 docker run -v ~/.rudder:/.rudder rudderlabs/rudder-cli
 ```
 
-To run commands with local catalog files, mount your files directory and use the `-l` flag. For example:
+Run commands against local project files:
 
 ```sh
-docker run -v ~/.rudder:/.rudder -v ~/my-catalog:/catalog rudderlabs/rudder-cli tp apply --dry-run -l /catalog
+docker run -v ~/.rudder:/.rudder -v ~/my-catalog:/catalog rudderlabs/rudder-cli apply --dry-run -l /catalog
 ```
 
-This will use the access token from your local configuration file, and the catalog files from the `/catalog` directory. Alternatively, you can use the `RUDDERSTACK_ACCESS_TOKEN` environment variable to provide the access token:
+Use an access token instead of local config:
 
 ```sh
-docker run -v ~/my-catalog:/catalog -e RUDDERSTACK_ACCESS_TOKEN=your-access-token rudderlabs/rudder-cli tp apply --dry-run -l /catalog
+docker run -v ~/my-catalog:/catalog -e RUDDERSTACK_ACCESS_TOKEN=your-access-token rudderlabs/rudder-cli apply --dry-run -l /catalog
 ```
 
-### Build from Source
-
-To build the `rudder-cli` from source, you need to have Go installed. Then, run the following commands:
+### Build from source
 
 ```sh
 git clone https://github.com/rudderlabs/rudder-iac.git
@@ -84,3 +69,18 @@ To build the Docker image locally:
 ```sh
 make docker-build
 ```
+
+## Quick start
+
+1. Authenticate with `rudder-cli auth login`, or set `RUDDERSTACK_ACCESS_TOKEN`.
+2. Validate a project with `rudder-cli validate -l ./path/to/project`.
+3. Apply changes with `rudder-cli apply -l ./path/to/project`.
+4. Use `rudder-cli <command> --help` for command-specific flags.
+
+## Common commands
+
+- `rudder-cli validate` checks project configuration.
+- `rudder-cli apply` plans and applies changes.
+- `rudder-cli destroy` removes managed resources.
+- `rudder-cli migrate` upgrades legacy specs.
+- `rudder-cli import workspace` imports an existing RudderStack workspace.

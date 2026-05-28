@@ -14,3 +14,7 @@ Read these first (3-6 files):
 - `cli/internal/cmd/root.go`: top-level Cobra router; registers command groups (`auth`, `trackingplan`, `workspace`, `apply`, `validate`, `destroy`, `migrate`, `import`, `transformations`, `typer`, `datagraph`) and initialization hooks.
 - `Makefile`: canonical developer entrypoints for build/test/lint/docker and typer validation flows.
 - `api/client/client.go`: API client root used by CLI/provider layers to communicate with RudderStack services.
+
+## DAW-3454 -- README First, Keep Commands Accurate
+- `README.md` is the primary top-level onboarding entry point, so it should be read before other docs when orienting in the repo.
+- The install instructions in `README.md` are release-sensitive and include concrete artifact URLs and image references; edits should preserve command correctness while trimming unnecessary prose.
