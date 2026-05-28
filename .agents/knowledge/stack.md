@@ -20,3 +20,7 @@ Build/runtime tooling:
 - `Makefile`: build target compiles `./cli/cmd/rudder-cli`; linter runner pinned as `GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0`; test targets include `test`, `test-e2e`, `test-it`, `test-all`; image target `docker-build` uses `cli/Dockerfile`.
 - `cli/Dockerfile`: builder `FROM golang:1.24.9-alpine@sha256:8f8959f38530d159bf71d0b3eb0c547dc61e7959d8225d1599cf762477384923`; runtime `FROM alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412`; entrypoint `"/usr/local/bin/rudder-cli"`.
 - CI workflows (`.github/workflows/*.yml` names): `Docker Build and Push`, `lint`, `Release Please`, `goreleaser`, `Semantic pull requests`, `test with code coverage`, `typer swift validate`, `typer typescript validate`.
+
+## DOCS-2434 — Release packaging is GoReleaser-driven
+<!-- ticket:DOCS-2434 -->
+- Binary distribution should be treated as a release-pipeline concern: `cli/.goreleaser.yaml` defines the artifact matrix, and `.github/workflows/release.yml` is the publishing path that docs need to stay aligned with.
