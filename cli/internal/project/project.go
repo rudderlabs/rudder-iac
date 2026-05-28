@@ -136,9 +136,19 @@ func (p *project) Load(location string) error {
 func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	ctx := context.Background()
 
-	// Start with parsing the specs and validating it's syntax.
-	// This is because we get raw specs from the loader and we need to parse them.
-	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
+	// Run variable substitution first. If any spec fails to resolve its
+	// variables, render the substitution diagnostics and stop — see
+	// substituteSpecs for why this is all-or-nothing.
+	substituted, subDiags := p.substituteSpecs(rawSpecs)
+	if subDiags.HasErrors() {
+		if err := p.renderer.Render(subDiags); err != nil {
+			return fmt.Errorf("rendering diagnostics: %w", err)
+		}
+		return fmt.Errorf("syntax validation failed")
+	}
+
+	// Parse the substituted specs into structured form before syntactic validation.
+	parsedRawSpecs, specDiags := p.parseSpecs(substituted)
 
 	registry, err := p.registry()
 	if err != nil {
@@ -207,41 +217,51 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	return nil
 }
 
+// substituteSpecs runs variable substitution over each raw spec, returning a
+// map of fully-substituted specs ready for parsing.
+//
+// All-or-nothing: if any spec fails substitution, the returned map is empty
+// and the diagnostics carry the substitution errors. This stops downstream
+// parsing and validation from surfacing cascading false errors (e.g. missing
+// references) for resources whose definitions failed substitution.
+//
+// When no substitutor is configured, raw is returned unchanged.
+func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
+	if p.substitutor == nil {
+		return raw, nil
+	}
+
+	var (
+		diags       = make(validation.Diagnostics, 0)
+		substituted = make(map[string]*specs.RawSpec, len(raw))
+	)
+	for path, rawSpec := range raw {
+		data, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
+		if len(subErrs) > 0 {
+			diags = append(diags, substitutionDiagnostics(path, subErrs)...)
+			continue
+		}
+		substituted[path] = &specs.RawSpec{Data: data}
+	}
+	if diags.HasErrors() {
+		diags.Sort()
+		return nil, diags
+	}
+	return substituted, nil
+}
+
+// parseSpecs converts raw spec bytes into parsed specs, collecting any
+// per-spec parse errors as diagnostics. Specs that fail to parse are dropped
+// from the returned map so downstream validation only sees usable specs.
+//
+// Ideally this would live in the validation engine, but the engine only
+// operates on already-parsed specs.
 func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
 	var (
 		diags          = make(validation.Diagnostics, 0)
 		parsedRawSpecs = make(map[string]*specs.RawSpec)
 	)
 
-	// Substitution runs as an all-or-nothing first phase: if any spec fails to
-	// resolve its variables, we stop before parsing so that syntactic and
-	// semantic validation never see partially-substituted specs. Without this,
-	// downstream validation would surface cascading false errors (e.g. missing
-	// references) for resources whose definitions failed substitution.
-	if p.substitutor != nil {
-		substituted := make(map[string]*specs.RawSpec, len(raw))
-		for path, rawSpec := range raw {
-			data, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
-			if len(subErrs) > 0 {
-				diags = append(diags, substitutionDiagnostics(path, subErrs)...)
-				continue
-			}
-			substituted[path] = &specs.RawSpec{Data: data}
-		}
-		if diags.HasErrors() {
-			diags.Sort()
-			return parsedRawSpecs, diags
-		}
-		raw = substituted
-	}
-
-	// Validation Engine is responsible for validating
-	// on the parsed specs along with the raw specs for indexer.
-	// To reach that, we need to parse the specs from loader
-	// and return diagnostics for the parsing errors.
-
-	// Ideally this should be done by validation engine but the engine
-	// only works on the data provided.
 	for path, rawSpec := range raw {
 		parsed, err := rawSpec.Parse()
 		if err != nil {
