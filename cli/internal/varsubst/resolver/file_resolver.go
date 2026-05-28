@@ -14,10 +14,10 @@ type fileResolver struct {
 // NewFileResolver loads variables from a flat YAML file whose top-level keys
 // map to scalar values (string, int, float, bool).
 //
-// Nil values are rejected. A YAML key with no value (`KEY:`) or an explicit
-// null (`KEY: null`) returns ErrVarFileParseFailed because the intent is
-// ambiguous. To represent an empty string, use explicit quotes: `KEY: ""` or
-// `KEY: ''`.
+// Null/empty values are rejected. A YAML key with no value (`KEY:`) or an
+// explicit null (`KEY: null`) returns ErrVarFileParseFailed — setting null
+// values is not supported. To represent an empty value, use empty quotes:
+// `KEY: ""`.
 func NewFileResolver(path string) (Resolver, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -44,7 +44,7 @@ func NewFileResolver(path string) (Resolver, error) {
 		case bool:
 			vars[key] = fmt.Sprint(v)
 		case nil:
-			return nil, fmt.Errorf("%w: key %q has nil value in %s (use \"\" or '' for empty strings)", ErrVarFileParseFailed, key, path)
+			return nil, fmt.Errorf("%w: key %q has a null or empty value in %s. Setting null values is not supported; to set an empty value use empty quotes \"\"", ErrVarFileParseFailed, key, path)
 		default:
 			return nil, fmt.Errorf("%w: key %q has non-scalar value in %s", ErrVarFileParseFailed, key, path)
 		}
