@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,24 +24,34 @@ func TestNewFileResolver(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "missing file returns ErrVarFileNotFound",
+			name:    "missing file returns ErrNotFound",
 			noFile:  true,
-			wantErr: varsubst.ErrVarFileNotFound,
+			wantErr: ErrNotFound,
 		},
 		{
-			name:    "invalid YAML returns ErrVarFileParseFailed",
+			name:    "invalid YAML returns ErrIllegalArgument",
 			content: "{{not valid yaml",
-			wantErr: varsubst.ErrVarFileParseFailed,
+			wantErr: ErrIllegalArgument,
 		},
 		{
 			name:    "nested map rejected",
 			content: "DB:\n  HOST: localhost\n  PORT: 5432",
-			wantErr: varsubst.ErrVarFileParseFailed,
+			wantErr: ErrIllegalArgument,
 		},
 		{
 			name:    "nested array rejected",
 			content: "HOSTS:\n  - a\n  - b",
-			wantErr: varsubst.ErrVarFileParseFailed,
+			wantErr: ErrIllegalArgument,
+		},
+		{
+			name:    "nil value (bare key) rejected",
+			content: "EMPTY_KEY:",
+			wantErr: ErrIllegalArgument,
+		},
+		{
+			name:    "explicit null value rejected",
+			content: "EMPTY_KEY: null",
+			wantErr: ErrIllegalArgument,
 		},
 		{
 			name:    "valid flat file succeeds",
@@ -51,6 +60,10 @@ func TestNewFileResolver(t *testing.T) {
 		{
 			name:    "empty file succeeds",
 			content: "",
+		},
+		{
+			name:    "explicit empty string succeeds",
+			content: `EMPTY: ""`,
 		},
 	}
 
@@ -110,8 +123,8 @@ func TestFileResolver_Resolve(t *testing.T) {
 			wantFound: true,
 		},
 		{
-			name:      "null value converted to empty string",
-			content:   "EMPTY_KEY:",
+			name:      "explicit empty string value preserved",
+			content:   `EMPTY_KEY: ""`,
 			lookup:    "EMPTY_KEY",
 			wantValue: "",
 			wantFound: true,

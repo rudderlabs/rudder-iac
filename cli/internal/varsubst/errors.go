@@ -6,10 +6,8 @@ import (
 )
 
 var (
-	ErrUndefinedVariable  = errors.New("undefined variable")
-	ErrInvalidVarSyntax   = errors.New("invalid variable syntax")
-	ErrVarFileNotFound    = errors.New("variable file not found")
-	ErrVarFileParseFailed = errors.New("variable file parse failed")
+	ErrUndefinedVariable = errors.New("undefined variable")
+	ErrInvalidVarSyntax  = errors.New("invalid variable syntax")
 )
 
 type SubstitutionError struct {
