@@ -281,7 +281,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			},
 		},
 		{
-			name:        "undefined variable excludes spec and fails load",
+			name:        "undefined variable aborts load before parsing",
 			substitutor: varsubst.NewSubstitutor(mapResolver{}),
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
@@ -305,22 +305,16 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			},
 		},
 		{
-			// Mixed batch: clean spec must still parse and reach Specs(), errored one is skipped.
-			name:        "mixed clean and errored specs",
+			// Substitution is all-or-nothing: a single failed spec aborts the
+			// pass before any spec is parsed, so no specs reach Specs().
+			name:        "mixed clean and errored specs short-circuits before parsing",
 			substitutor: varsubst.NewSubstitutor(mapResolver{"NAME": "clean_name"}),
 			rawSpecs: map[string][]byte{
 				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
 				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
-			wantErr: "syntax validation failed",
-			wantSpecs: map[string]*specs.Spec{
-				"path/to/clean.yaml": {
-					Kind:     "Source",
-					Version:  "rudder/0.1",
-					Metadata: map[string]any{"name": "clean_name"},
-					Spec:     map[string]any{"k": "v"},
-				},
-			},
+			wantErr:   "syntax validation failed",
+			wantSpecs: map[string]*specs.Spec{},
 		},
 	}
 

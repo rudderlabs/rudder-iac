@@ -213,6 +213,28 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		parsedRawSpecs = make(map[string]*specs.RawSpec)
 	)
 
+	// Substitution runs as an all-or-nothing first phase: if any spec fails to
+	// resolve its variables, we stop before parsing so that syntactic and
+	// semantic validation never see partially-substituted specs. Without this,
+	// downstream validation would surface cascading false errors (e.g. missing
+	// references) for resources whose definitions failed substitution.
+	if p.substitutor != nil {
+		substituted := make(map[string]*specs.RawSpec, len(raw))
+		for path, rawSpec := range raw {
+			data, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
+			if len(subErrs) > 0 {
+				diags = append(diags, substitutionDiagnostics(path, subErrs)...)
+				continue
+			}
+			substituted[path] = &specs.RawSpec{Data: data}
+		}
+		if diags.HasErrors() {
+			diags.Sort()
+			return parsedRawSpecs, diags
+		}
+		raw = substituted
+	}
+
 	// Validation Engine is responsible for validating
 	// on the parsed specs along with the raw specs for indexer.
 	// To reach that, we need to parse the specs from loader
@@ -221,16 +243,6 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 	// Ideally this should be done by validation engine but the engine
 	// only works on the data provided.
 	for path, rawSpec := range raw {
-
-		if p.substitutor != nil {
-			substituted, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
-			if len(subErrs) > 0 {
-				diags = append(diags, substitutionDiagnostics(path, subErrs)...)
-				continue
-			}
-			rawSpec = &specs.RawSpec{Data: substituted}
-		}
-
 		parsed, err := rawSpec.Parse()
 		if err != nil {
 			diags = append(diags, validation.Diagnostic{
@@ -250,7 +262,6 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		// we need to add to the specs map on the project required by migrate command.
 		p.specs[path] = parsed
 		parsedRawSpecs[path] = rawSpec
-
 	}
 
 	diags.Sort()
