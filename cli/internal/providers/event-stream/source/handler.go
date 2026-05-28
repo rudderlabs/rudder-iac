@@ -22,18 +22,20 @@ import (
 )
 
 type Handler struct {
-	resources map[string]*sourceResource
-	seenIDs   []string
-	client    esClient.EventStreamStore
-	importDir string
+	resources      map[string]*sourceResource
+	seenIDs        []string
+	client         esClient.EventStreamStore
+	importDir      string
+	importMetadata map[string]*WorkspaceRemoteIDMapping
 }
 
 func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 	return &Handler{
-		resources: make(map[string]*sourceResource),
-		seenIDs:   make([]string, 0),
-		client:    client,
-		importDir: filepath.Join(importDir, ImportPath),
+		resources:      make(map[string]*sourceResource),
+		seenIDs:        make([]string, 0),
+		client:         client,
+		importDir:      filepath.Join(importDir, ImportPath),
+		importMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 	}
 }
 
@@ -77,12 +79,11 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		SourceDefinition: spec.SourceDefinition,
 		Enabled:          enabled,
 		Governance:       &governanceResource{},
-		ImportMetadata:   make(map[string]*WorkspaceRemoteIDMapping),
 	}
 	if err := h.loadTrackingPlanSpec(spec, sourceResource); err != nil {
 		return err
 	}
-	if err := sourceResource.addImportMetadata(s); err != nil {
+	if err := h.addImportMetadata(s); err != nil {
 		return fmt.Errorf("loading import metadata: %w", err)
 	}
 	// When we are at this point, we expect the spec
@@ -211,9 +212,9 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			resources.WithResourceFileMetadata(ref),
 		}
 		urn := resources.URN(s.LocalID, ResourceType)
-		if importMetadata, ok := s.ImportMetadata[urn]; ok {
+		if meta, ok := h.importMetadata[urn]; ok {
 			opts = []resources.ResourceOpts{
-				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+				resources.WithResourceImportMetadata(meta.RemoteId, meta.WorkspaceId),
 			}
 		}
 		r := resources.NewResource(
@@ -667,7 +668,7 @@ func (p *Handler) toImportSpec(
 	}, nil
 }
 
-func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
+func (h *Handler) addImportMetadata(s *specs.Spec) error {
 	metadata, err := s.CommonMetadata()
 	if err != nil {
 		return err
@@ -683,12 +684,30 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 				} else {
 					urn = resources.URN(resource.LocalID, ResourceType)
 				}
-				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				h.importMetadata[urn] = &WorkspaceRemoteIDMapping{
 					WorkspaceId: workspace.WorkspaceID,
 					RemoteId:    resource.RemoteID,
 				}
 			})
 		})
+	}
+	return nil
+}
+
+// LoadImportMetadata receives import manifest data and populates the handler's
+// central import metadata map. This enables the manifest broadcast to reach
+// event-stream handlers without going through inline metadata.import in specs.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	for _, workspace := range m.Workspaces {
+		for _, resource := range workspace.Resources {
+			if resource.URN == "" {
+				continue
+			}
+			h.importMetadata[resource.URN] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
+		}
 	}
 	return nil
 }

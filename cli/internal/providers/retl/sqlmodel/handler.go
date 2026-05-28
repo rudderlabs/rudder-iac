@@ -23,17 +23,19 @@ const modelSourceTypeFilter = string(retlClient.ModelSourceType)
 
 // Handler implements the resourceHandler interface for SQL Model resources
 type Handler struct {
-	client    retlClient.RETLStore
-	resources map[string]*SQLModelResource
-	importDir string
+	client         retlClient.RETLStore
+	resources      map[string]*SQLModelResource
+	importDir      string
+	importMetadata map[string]*ImportResourceInfo
 }
 
 // NewHandler creates a new SQL Model resource handler
 func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 	return &Handler{
-		client:    client,
-		resources: make(map[string]*SQLModelResource),
-		importDir: filepath.Join(importDir, ImportPath),
+		client:         client,
+		resources:      make(map[string]*SQLModelResource),
+		importDir:      filepath.Join(importDir, ImportPath),
+		importMetadata: make(map[string]*ImportResourceInfo),
 	}
 }
 
@@ -138,7 +140,7 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 				} else {
 					urn = resources.URN(resourceMetadata.LocalID, ResourceType)
 				}
-				importMetadata[urn] = &ImportResourceInfo{
+				h.importMetadata[urn] = &ImportResourceInfo{
 					WorkspaceId: workspaceId,
 					RemoteId:    resourceMetadata.RemoteID,
 				}
@@ -146,6 +148,24 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 		}
 	}
 
+	return nil
+}
+
+// LoadImportMetadata receives import manifest data and populates the handler's
+// central import metadata map. This enables the manifest broadcast to reach
+// retl handlers without going through inline metadata.import in specs.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	for _, workspace := range m.Workspaces {
+		for _, resource := range workspace.Resources {
+			if resource.URN == "" {
+				continue
+			}
+			h.importMetadata[resource.URN] = &ImportResourceInfo{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
+		}
+	}
 	return nil
 }
 
@@ -168,7 +188,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 
 		var opts []resources.ResourceOpts
 		urn := resources.URN(spec.ID, ResourceType)
-		if importMeta, ok := importMetadata[urn]; ok {
+		if importMeta, ok := h.importMetadata[urn]; ok {
 			opts = []resources.ResourceOpts{
 				resources.WithResourceImportMetadata(importMeta.RemoteId, importMeta.WorkspaceId),
 			}

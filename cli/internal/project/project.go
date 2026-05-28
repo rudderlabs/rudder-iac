@@ -126,46 +126,67 @@ func (p *project) Load(location string) error {
 func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	ctx := context.Background()
 
-	// Start with parsing the specs and validating it's syntax.
-	// This is because we get raw specs from the loader and we need to parse them.
 	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
 
-	registry, err := p.registry()
+	// Separate manifests from resource specs — each gets its own engine
+	resourceSpecs, manifestSpecs := separateManifests(parsedRawSpecs)
+
+	resourceRegistry, err := p.resourceRegistry()
 	if err != nil {
-		return fmt.Errorf("setting up registry: %w", err)
+		return fmt.Errorf("setting up resource registry: %w", err)
+	}
+	resourceEngine, err := validation.NewValidationEngine(resourceRegistry, log)
+	if err != nil {
+		return fmt.Errorf("initialising resource validation engine: %w", err)
 	}
 
-	engine, err := validation.NewValidationEngine(registry, log)
+	manifestRegistry, err := manifestRegistry()
 	if err != nil {
-		return fmt.Errorf("initialising validation engine: %w", err)
+		return fmt.Errorf("setting up manifest registry: %w", err)
+	}
+	manifestEngine, err := validation.NewValidationEngine(manifestRegistry, log)
+	if err != nil {
+		return fmt.Errorf("initialising manifest validation engine: %w", err)
 	}
 
-	// At this point, rawspecs are successfully parsed as well and information
-	// parsed gets augmented to the base struct
-	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
+	resourceSyntaxDiags, err := resourceEngine.ValidateSyntax(ctx, resourceSpecs)
 	if err != nil {
-		return fmt.Errorf("syntactic validation: %w", err)
+		return fmt.Errorf("resource syntactic validation: %w", err)
 	}
 
-	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
-	// Both of them are part of the syntax validation although done at different places.
-	if specDiags.HasErrors() || syntaxDiags.HasErrors() {
-		if err := p.renderer.Render(append(
-			specDiags,
-			syntaxDiags...,
-		)); err != nil {
+	manifestSyntaxDiags, err := manifestEngine.ValidateSyntax(ctx, manifestSpecs)
+	if err != nil {
+		return fmt.Errorf("manifest syntactic validation: %w", err)
+	}
+
+	// Inline-vs-manifest conflict is a cross-concern check that spans both spec types
+	conflictDiags := checkInlineManifestConflicts(resourceSpecs, manifestSpecs)
+
+	allSyntaxDiags := append(specDiags, resourceSyntaxDiags...)
+	allSyntaxDiags = append(allSyntaxDiags, manifestSyntaxDiags...)
+	allSyntaxDiags = append(allSyntaxDiags, conflictDiags...)
+
+	if allSyntaxDiags.HasErrors() {
+		allSyntaxDiags.Sort()
+		if err := p.renderer.Render(allSyntaxDiags); err != nil {
 			return fmt.Errorf("rendering diagnostics: %w", err)
 		}
 		return fmt.Errorf("syntax validation failed")
 	}
 
-	for path, rawSpec := range parsedRawSpecs {
-		if err := p.loadSpec(
-			path,
-			rawSpec.Parsed(),
-		); err != nil {
+	for path, rawSpec := range resourceSpecs {
+		if err := p.loadSpec(path, rawSpec.Parsed()); err != nil {
 			return fmt.Errorf("loading spec %s: %w", path, err)
 		}
+	}
+
+	manifest, err := parseManifests(manifestSpecs)
+	if err != nil {
+		return fmt.Errorf("parsing import manifests: %w", err)
+	}
+
+	if err := broadcastImportManifest(p.provider, manifest); err != nil {
+		return fmt.Errorf("broadcasting import manifest: %w", err)
 	}
 
 	// Graph is built once here - single source of truth for all resource relationships.
@@ -174,23 +195,26 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("building resource graph: %w", err)
 	}
 
-	// Cycles make the graph unusable,
-	// so detect them before semantic validation
 	if _, err := graph.DetectCycles(); err != nil {
 		return fmt.Errorf("cycle detected in resource graph: %w", err)
 	}
 
-	// Specs which were parsed will now be validated against semantic rules.
-	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
+	resourceSemanticDiags, err := resourceEngine.ValidateSemantic(ctx, resourceSpecs, graph)
 	if err != nil {
-		return fmt.Errorf("semantic validation: %w", err)
+		return fmt.Errorf("resource semantic validation: %w", err)
 	}
 
-	if err := p.renderer.Render(semanticDiags); err != nil {
+	manifestSemanticDiags, err := manifestEngine.ValidateSemantic(ctx, manifestSpecs, graph)
+	if err != nil {
+		return fmt.Errorf("manifest semantic validation: %w", err)
+	}
+
+	allSemanticDiags := append(resourceSemanticDiags, manifestSemanticDiags...)
+	if err := p.renderer.Render(allSemanticDiags); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
 	}
 
-	if semanticDiags.HasErrors() {
+	if allSemanticDiags.HasErrors() {
 		return fmt.Errorf("semantic validation failed")
 	}
 
@@ -238,19 +262,15 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 	return parsedRawSpecs, diags
 }
 
-func (p *project) registry() (rules.Registry, error) {
-	// Active patterns become the source of truth for the
-	// validation pipeline to determine which unique kinds and versions
-	// are supported in the system.
+// resourceRegistry builds the validation registry for resource specs only.
+// Manifest specs have their own engine — see newManifestEngine in manifest.go.
+func (p *project) resourceRegistry() (rules.Registry, error) {
 	activePatterns := p.provider.SupportedMatchPatterns()
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
-		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. They use activePatterns as source of truth for the supported kinds and versions.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
-
 		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
 		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
 	}
