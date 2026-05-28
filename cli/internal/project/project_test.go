@@ -286,7 +286,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
-			wantErr:   "syntax validation failed",
+			wantErr:   "variable substitution failed",
 			wantSpecs: map[string]*specs.Spec{},
 		},
 		{
@@ -313,7 +313,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
 				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
-			wantErr:   "syntax validation failed",
+			wantErr:   "variable substitution failed",
 			wantSpecs: map[string]*specs.Spec{},
 		},
 	}

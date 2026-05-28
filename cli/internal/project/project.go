@@ -114,16 +114,27 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
-// Load loads the project specifications from the given location using the configured SpecLoader
-// and runs them through the validation engine (syntax, then semantic rules from RuleProvider).
+// Load loads the project specifications from the given location using the
+// configured SpecLoader, runs variable substitution if a substitutor is
+// configured, then runs the specs through the validation engine (syntax,
+// then semantic rules from RuleProvider).
 func (p *project) Load(location string) error {
-	var err error
-
 	p.location = location
 
-	rawSpecs, err := p.loader.Load(p.location) // Use the specLoader
+	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
+	}
+
+	if p.substitutor != nil {
+		substituted, subDiags := p.substituteSpecs(rawSpecs)
+		if subDiags.HasErrors() {
+			if err := p.renderer.Render(subDiags); err != nil {
+				return fmt.Errorf("rendering diagnostics: %w", err)
+			}
+			return fmt.Errorf("variable substitution failed")
+		}
+		rawSpecs = substituted
 	}
 
 	return p.handleValidation(rawSpecs)
@@ -136,19 +147,8 @@ func (p *project) Load(location string) error {
 func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	ctx := context.Background()
 
-	// Run variable substitution first. If any spec fails to resolve its
-	// variables, render the substitution diagnostics and stop — see
-	// substituteSpecs for why this is all-or-nothing.
-	substituted, subDiags := p.substituteSpecs(rawSpecs)
-	if subDiags.HasErrors() {
-		if err := p.renderer.Render(subDiags); err != nil {
-			return fmt.Errorf("rendering diagnostics: %w", err)
-		}
-		return fmt.Errorf("syntax validation failed")
-	}
-
-	// Parse the substituted specs into structured form before syntactic validation.
-	parsedRawSpecs, specDiags := p.parseSpecs(substituted)
+	// Parse the raw specs into structured form before syntactic validation.
+	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
 
 	registry, err := p.registry()
 	if err != nil {
@@ -218,19 +218,14 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 }
 
 // substituteSpecs runs variable substitution over each raw spec, returning a
-// map of fully-substituted specs ready for parsing.
+// map of fully-substituted specs ready for parsing. Callers must ensure a
+// substitutor is configured before calling.
 //
-// All-or-nothing: if any spec fails substitution, the returned map is empty
-// and the diagnostics carry the substitution errors. This stops downstream
+// All-or-nothing: if any spec fails substitution, the returned map is nil and
+// the diagnostics carry the substitution errors. This stops downstream
 // parsing and validation from surfacing cascading false errors (e.g. missing
 // references) for resources whose definitions failed substitution.
-//
-// When no substitutor is configured, raw is returned unchanged.
 func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
-	if p.substitutor == nil {
-		return raw, nil
-	}
-
 	var (
 		diags       = make(validation.Diagnostics, 0)
 		substituted = make(map[string]*specs.RawSpec, len(raw))
