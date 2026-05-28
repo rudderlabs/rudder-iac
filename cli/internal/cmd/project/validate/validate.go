@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -25,6 +26,7 @@ func NewCmdValidate() *cobra.Command {
 		p        project.Project
 		err      error
 		location string
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -44,7 +46,12 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = deps.NewProject()
+			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			if err != nil {
+				return err
+			}
+
+			p = deps.NewProject(projectOpts...)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -72,5 +79,6 @@ func NewCmdValidate() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; earlier files take priority)")
 	return cmd
 }
