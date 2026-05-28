@@ -89,13 +89,39 @@ func TestNewEnvResolverFromEnviron(t *testing.T) {
 	}
 }
 
-func TestNewEnvResolver_LoadsRudderPrefixedVariables(t *testing.T) {
-	t.Setenv("RUDDER_ABC", "hello")
-	t.Setenv("ABC", "ignored")
+func TestNewEnvResolver(t *testing.T) {
+	t.Setenv("RUDDER_DB_HOST", "db.example.com")
+	t.Setenv("RUDDER_DB_PORT", "5432")
+	t.Setenv("RUDDER_EMPTY", "")
+	t.Setenv("DB_HOST", "ignored")
 
 	r := NewEnvResolver()
-	value, found := r.Resolve("ABC")
 
-	assert.Equal(t, "hello", value)
-	assert.True(t, found)
+	t.Run("strips prefix and loads value", func(t *testing.T) {
+		value, found := r.Resolve("DB_HOST")
+		assert.Equal(t, "db.example.com", value)
+		assert.True(t, found)
+	})
+
+	t.Run("loads multiple prefixed vars", func(t *testing.T) {
+		value, found := r.Resolve("DB_PORT")
+		assert.Equal(t, "5432", value)
+		assert.True(t, found)
+	})
+
+	t.Run("ignores unprefixed vars", func(t *testing.T) {
+		_, found := r.Resolve("ignored")
+		assert.False(t, found)
+	})
+
+	t.Run("missing key returns not found", func(t *testing.T) {
+		_, found := r.Resolve("MISSING")
+		assert.False(t, found)
+	})
+
+	t.Run("empty value is preserved", func(t *testing.T) {
+		value, found := r.Resolve("EMPTY")
+		assert.Equal(t, "", value)
+		assert.True(t, found)
+	})
 }

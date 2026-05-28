@@ -23,6 +23,9 @@ func newEnvResolverFromEnviron(environ []string) Resolver {
 			continue
 		}
 		if strings.HasPrefix(key, defaultEnvPrefix) {
+			// Last-write-wins: if the same RUDDER_-prefixed key appears more than
+			// once in environ, the later occurrence silently overrides the earlier
+			// one. This mirrors the OS behaviour on lookup.
 			vars[strings.TrimPrefix(key, defaultEnvPrefix)] = value
 		}
 	}
