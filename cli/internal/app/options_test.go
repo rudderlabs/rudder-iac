@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst/resolver"
 )
 
 func setExperimental(t *testing.T, enabled bool) {
@@ -65,7 +65,7 @@ func TestNewProjectOptions(t *testing.T) {
 		opts, err := NewProjectOptions(config.GetConfig(), []string{path})
 		require.Error(t, err)
 		assert.Nil(t, opts)
-		assert.ErrorIs(t, err, varsubst.ErrVarFileNotFound)
+		assert.ErrorIs(t, err, resolver.ErrVarFileNotFound)
 	})
 
 	t.Run("invalid var file surfaces ErrVarFileParseFailed", func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestNewProjectOptions(t *testing.T) {
 		opts, err := NewProjectOptions(config.GetConfig(), []string{path})
 		require.Error(t, err)
 		assert.Nil(t, opts)
-		assert.ErrorIs(t, err, varsubst.ErrVarFileParseFailed)
+		assert.ErrorIs(t, err, resolver.ErrVarFileParseFailed)
 	})
 }
 
