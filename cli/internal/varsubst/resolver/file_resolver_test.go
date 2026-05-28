@@ -24,34 +24,34 @@ func TestNewFileResolver(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name:    "missing file returns ErrNotFound",
+			name:    "missing file returns ErrVarFileNotFound",
 			noFile:  true,
-			wantErr: ErrNotFound,
+			wantErr: ErrVarFileNotFound,
 		},
 		{
-			name:    "invalid YAML returns ErrIllegalArgument",
+			name:    "invalid YAML returns ErrVarFileParseFailed",
 			content: "{{not valid yaml",
-			wantErr: ErrIllegalArgument,
+			wantErr: ErrVarFileParseFailed,
 		},
 		{
 			name:    "nested map rejected",
 			content: "DB:\n  HOST: localhost\n  PORT: 5432",
-			wantErr: ErrIllegalArgument,
+			wantErr: ErrVarFileParseFailed,
 		},
 		{
 			name:    "nested array rejected",
 			content: "HOSTS:\n  - a\n  - b",
-			wantErr: ErrIllegalArgument,
+			wantErr: ErrVarFileParseFailed,
 		},
 		{
 			name:    "nil value (bare key) rejected",
 			content: "EMPTY_KEY:",
-			wantErr: ErrIllegalArgument,
+			wantErr: ErrVarFileParseFailed,
 		},
 		{
 			name:    "explicit null value rejected",
 			content: "EMPTY_KEY: null",
-			wantErr: ErrIllegalArgument,
+			wantErr: ErrVarFileParseFailed,
 		},
 		{
 			name:    "valid flat file succeeds",

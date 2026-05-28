@@ -3,12 +3,11 @@ package resolver
 import "errors"
 
 var (
-	// ErrNotFound is returned when a backing source for a resolver is missing
-	// (e.g. the variable file does not exist on disk).
-	ErrNotFound = errors.New("not found")
+	// ErrVarFileNotFound is returned when the variable file does not exist on disk.
+	ErrVarFileNotFound = errors.New("variable file not found")
 
-	// ErrIllegalArgument is returned when a resolver receives input it cannot
-	// process — for example, a variable file that fails to parse or whose
-	// contents do not match the expected scalar shape.
-	ErrIllegalArgument = errors.New("illegal argument")
+	// ErrVarFileParseFailed is returned when the variable file cannot be parsed
+	// as a flat YAML map of scalar values (e.g. invalid YAML, nested map/array,
+	// or a nil value).
+	ErrVarFileParseFailed = errors.New("variable file parse failed")
 )
