@@ -1,14 +1,9 @@
 package varsubst
 
 import (
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type Resolver interface {
@@ -268,20 +263,3 @@ func computePositions(original []byte, rawErrors []rawError) []SubstitutionError
 	return result
 }
 
-func ToDiagnostics(filePath string, errs []SubstitutionError) validation.Diagnostics {
-	diagnostics := make(validation.Diagnostics, 0, len(errs))
-	for _, e := range errs {
-		diagnostics = append(diagnostics, validation.Diagnostic{
-			RuleID:   "project/var-substitution",
-			Severity: rules.Error,
-			Message:  fmt.Sprintf("%s %q", e.Err, e.Name),
-			File:     filePath,
-			Position: pathindex.Position{
-				Line:     e.Line,
-				Column:   e.Column,
-				LineText: e.LineText,
-			},
-		})
-	}
-	return diagnostics
-}

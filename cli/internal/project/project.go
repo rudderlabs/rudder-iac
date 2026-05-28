@@ -225,7 +225,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		if p.substitutor != nil {
 			substituted, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
 			if len(subErrs) > 0 {
-				diags = append(diags, varsubst.ToDiagnostics(path, subErrs)...)
+				diags = append(diags, substitutionDiagnostics(path, subErrs)...)
 				continue
 			}
 			rawSpec = &specs.RawSpec{Data: substituted}
