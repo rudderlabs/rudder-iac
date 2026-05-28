@@ -86,6 +86,24 @@ func TestSubstituteBytes(t *testing.T) {
 			wantData:  `host: ""`,
 		},
 		{
+			name:      "empty resolved value not auto-quoted inside double quotes",
+			resolvers: []Resolver{mapResolver{"HOST": ""}},
+			input:     `host: "{{ .HOST }}"`,
+			wantData:  `host: ""`,
+		},
+		{
+			name:      "empty resolved value not auto-quoted inside single quotes",
+			resolvers: []Resolver{mapResolver{"HOST": ""}},
+			input:     `host: '{{ .HOST }}'`,
+			wantData:  `host: ''`,
+		},
+		{
+			name:      "default value containing closing brace",
+			resolvers: []Resolver{mapResolver{}},
+			input:     "pattern: {{ .RE | [a-z]{3} }}",
+			wantData:  "pattern: [a-z]{3}",
+		},
+		{
 			name:      "whitespace variants",
 			resolvers: []Resolver{mapResolver{"VAR": "value"}},
 			input:     "a: {{.VAR}}\nb: {{ .VAR }}\nc: {{  .VAR  }}",
@@ -199,6 +217,12 @@ func TestIsInComment(t *testing.T) {
 			line:       "'#hash-in-single-quotes' {{ .VAR }}",
 			matchStart: 25,
 			want:       false,
+		},
+		{
+			name:       "escaped quote inside double quotes does not reopen string",
+			line:       `key: "val\"ue" # {{ .VAR }}`,
+			matchStart: 17,
+			want:       true,
 		},
 	}
 

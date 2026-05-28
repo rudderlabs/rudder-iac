@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
@@ -16,13 +17,27 @@ type Resolver interface {
 
 // Matches any {{ content }} token. Group 1 captures the token (anything that
 // isn't whitespace, pipe, or closing brace). Group 2 (optional) captures the
-// default value after pipe — cannot contain "}" and surrounding whitespace is
-// stripped by the enclosing \s* groups. Validation of the token (dot prefix,
-// variable name pattern) happens in code after matching.
-var varRegex = regexp.MustCompile(`\{\{\s*([^}\s|]+)(?:\s*\|\s*([^}]*?))?\s*\}\}`)
+// default value after pipe — a single `}` is allowed (so defaults can contain
+// regex like `[a-z]{3}`), but `}}` always terminates the token. Surrounding
+// whitespace is stripped by the enclosing \s* groups. Validation of the token
+// (dot prefix, variable name pattern) happens in code after matching.
+var varRegex = regexp.MustCompile(`\{\{\s*([^}\s|]+)(?:\s*\|\s*((?:[^}]|}[^}])*?))?\s*\}\}`)
 
 var validVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// Substitutor performs `{{ .VAR }}` substitution against a chain of resolvers.
+//
+// Known limitations:
+//
+//   - Substitution always runs inside YAML quoted strings. There is currently
+//     no escape mechanism to write a literal `{{ }}` token (e.g. in
+//     description text), so any `{{ .X }}`-shaped substring in a quoted value
+//     is treated as a variable reference.
+//   - Resolved values are injected verbatim. Values containing newlines, YAML
+//     special characters, or content that parses as a different YAML type
+//     (`true`, `123`, `null`, sequences) can change the document's semantics.
+//     Callers that need to force a string should quote at the call site:
+//     `flag: "{{ .FLAG }}"`.
 type Substitutor interface {
 	SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 }
@@ -80,7 +95,10 @@ func (s *substitutor) SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 			hasDefault = match[4] != -1
 		)
 		if hasDefault {
-			defaultVal = string(data[match[4]:match[5]])
+			// Trim trailing whitespace: when the default contains a single `}`
+			// (e.g. `[a-z]{3}`), regex backtracking can absorb the trailing
+			// space before `}}` into the capture group.
+			defaultVal = strings.TrimRight(string(data[match[4]:match[5]]), " \t")
 		}
 
 		var (
@@ -103,7 +121,7 @@ func (s *substitutor) SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 			}
 		}
 
-		if resolved == "" {
+		if resolved == "" && !isAdjacentToQuote(data, matchStart, matchEnd) {
 			resolved = `""`
 		}
 
@@ -138,6 +156,8 @@ func replaceRange(data []byte, start, end int, replacement []byte) []byte {
 // isInComment finds the start of the line containing matchStart, then scans
 // forward tracking single/double quote state. Returns true if an unquoted #
 // appears before matchStart, indicating the token is inside a YAML comment.
+// Inside a double-quoted string, a backslash escapes the next character so
+// that `\"` is treated as part of the string rather than closing it.
 func isInComment(data []byte, matchStart int) bool {
 	lineStart := matchStart
 	// go backward to find the start of the line
@@ -152,6 +172,12 @@ func isInComment(data []byte, matchStart int) bool {
 
 	for i := lineStart; i < matchStart; i++ {
 		switch data[i] {
+		case '\\':
+			// In YAML double-quoted strings, `\X` is an escape sequence; skip
+			// the next character so an escaped quote is not treated as a close.
+			if inDoubleQuote && i+1 < matchStart {
+				i++
+			}
 		case '\'':
 			if !inDoubleQuote {
 				inSingleQuote = !inSingleQuote
@@ -167,6 +193,24 @@ func isInComment(data []byte, matchStart int) bool {
 		}
 	}
 
+	return false
+}
+
+// isAdjacentToQuote reports whether the byte immediately before matchStart or
+// immediately after matchEnd is a YAML quote character. Used to suppress the
+// auto-quoting of empty resolved values when the token is already wrapped in
+// quotes (e.g. `"{{ .VAR }}"`), which would otherwise produce invalid YAML.
+func isAdjacentToQuote(data []byte, matchStart, matchEnd int) bool {
+	if matchStart > 0 {
+		if c := data[matchStart-1]; c == '"' || c == '\'' {
+			return true
+		}
+	}
+	if matchEnd < len(data) {
+		if c := data[matchEnd]; c == '"' || c == '\'' {
+			return true
+		}
+	}
 	return false
 }
 
