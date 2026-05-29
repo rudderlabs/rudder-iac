@@ -150,7 +150,7 @@ func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []
 		}
 	}
 
-	results = append(results, collectDuplicateColumnNames(modelIdx, columns, nameToIdx)...)
+	results = append(results, collectDuplicateColumnNames(modelIdx, nameToIdx)...)
 	results = append(results, collectDuplicateColumnDisplayNames(modelIdx, columns, dispNameToIdx)...)
 
 	return results
@@ -158,7 +158,6 @@ func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []
 
 func collectDuplicateColumnNames(
 	modelIdx int,
-	columns []dgModel.ColumnMetadataYAML,
 	nameToIdx map[string][]int,
 ) []rules.ValidationResult {
 	keys := sortedStringKeys(nameToIdx)
@@ -176,7 +175,6 @@ func collectDuplicateColumnNames(
 			})
 		}
 	}
-	_ = columns
 	return results
 }
 

@@ -400,8 +400,8 @@ func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
 						PrimaryID:   "user_id",
 					},
 					Columns: []dgClient.ColumnMetadataRow{
-						{Name: "email", DisplayName: "Email", UpdatedAt: "2026-05-27T10:00:00Z"},
-						{Name: "user_id", DisplayName: "User ID", UpdatedAt: "2026-05-27T10:00:00Z"},
+						{Name: "email", DisplayName: "Email"},
+						{Name: "user_id", DisplayName: "User ID"},
 					},
 				},
 			},
@@ -438,8 +438,7 @@ func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
 		byID[m.ID] = m
 	}
 
-	// User has column metadata — the block is emitted in remote order and the
-	// server's UpdatedAt does not leak into yaml.
+	// User has column metadata — the block is emitted in remote order.
 	assert.Equal(t, []dgModel.ColumnMetadataYAML{
 		{Name: "email", DisplayName: "Email"},
 		{Name: "user_id", DisplayName: "User ID"},

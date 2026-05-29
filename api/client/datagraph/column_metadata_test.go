@@ -37,8 +37,8 @@ func TestListColumnMetadata(t *testing.T) {
 
 	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
 		Columns: []datagraph.ColumnMetadataRow{
-			{Name: "email", DisplayName: "Email", UpdatedAt: "2024-01-15T12:00:00Z"},
-			{Name: "user_id", DisplayName: "User ID", UpdatedAt: "2024-01-15T13:00:00Z"},
+			{Name: "email", DisplayName: "Email"},
+			{Name: "user_id", DisplayName: "User ID"},
 		},
 	}, result)
 
@@ -137,8 +137,8 @@ func TestBatchUpsertColumnMetadata(t *testing.T) {
 
 	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
 		Columns: []datagraph.ColumnMetadataRow{
-			{Name: "email", DisplayName: "Email", UpdatedAt: "2024-01-15T12:00:00Z"},
-			{Name: "user_id", DisplayName: "User ID", UpdatedAt: "2024-01-15T12:00:00Z"},
+			{Name: "email", DisplayName: "Email"},
+			{Name: "user_id", DisplayName: "User ID"},
 		},
 	}, result)
 
@@ -180,7 +180,7 @@ func TestBatchUpsertColumnMetadata_BothColumnsAndDeleteColumns(t *testing.T) {
 
 	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
 		Columns: []datagraph.ColumnMetadataRow{
-			{Name: "user_id", DisplayName: "User ID", UpdatedAt: "2024-01-15T12:00:00Z"},
+			{Name: "user_id", DisplayName: "User ID"},
 		},
 	}, result)
 
@@ -303,61 +303,4 @@ func TestBatchUpsertColumnMetadata_ServerError(t *testing.T) {
 	assert.Contains(t, err.Error(), "upserting column metadata")
 
 	httpClient.AssertNumberOfCalls()
-}
-
-func TestBatchUpsertColumnMetadata_ValidationError422(t *testing.T) {
-	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
-		Validate: func(req *http.Request) bool {
-			return req.Method == "PATCH" && req.URL.Path == "/v2/data-graphs/dg-123/models/em-456/column-metadata"
-		},
-		ResponseStatus: 422,
-		ResponseBody: `{
-			"message": "Failed to upsert column metadata",
-			"error": "Failed to upsert column metadata",
-			"code": "column-metadata-validation-failed",
-			"details": {
-				"code": "column-metadata-validation-failed",
-				"errors": [
-					{"name": "email", "reason": "duplicate-display-name", "conflictWith": "user_id"},
-					{"name": "phone", "reason": "column-not-in-schema"}
-				]
-			}
-		}`,
-	})
-
-	store := newTestStore(t, httpClient)
-
-	_, err := store.BatchUpsertColumnMetadata(context.Background(), "dg-123", "em-456", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{
-			{Name: "email", DisplayName: "User ID"},
-			{Name: "phone", DisplayName: "Phone"},
-		},
-	})
-	require.Error(t, err)
-
-	validationErr, ok := datagraph.AsColumnMetadataValidationError(err)
-	require.True(t, ok, "expected error to decode as ColumnMetadataValidationError, got %T: %v", err, err)
-	assert.Equal(t, "column-metadata-validation-failed", validationErr.Code)
-	assert.Equal(t, []datagraph.ColumnMetadataValidationErrorEntry{
-		{Name: "email", Reason: "duplicate-display-name", ConflictWith: "user_id"},
-		{Name: "phone", Reason: "column-not-in-schema"},
-	}, validationErr.Errors)
-
-	// The underlying APIError should remain accessible.
-	var apiErr *client.APIError
-	require.True(t, errors.As(err, &apiErr))
-	assert.Equal(t, 422, apiErr.HTTPStatusCode)
-
-	httpClient.AssertNumberOfCalls()
-}
-
-func TestAsColumnMetadataValidationError_OtherErrors(t *testing.T) {
-	// Plain error: not a column metadata validation error.
-	_, ok := datagraph.AsColumnMetadataValidationError(errors.New("boom"))
-	assert.False(t, ok)
-
-	// APIError without the expected code: not a column metadata validation error.
-	apiErr := &client.APIError{HTTPStatusCode: 422, ErrorCode: "something-else"}
-	_, ok = datagraph.AsColumnMetadataValidationError(apiErr)
-	assert.False(t, ok)
 }

@@ -450,4 +450,3 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		})
 	}
 }
-

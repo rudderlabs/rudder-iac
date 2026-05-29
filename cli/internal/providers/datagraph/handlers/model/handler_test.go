@@ -1070,8 +1070,8 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 				PrimaryID:   "id",
 			},
 			Columns: []dgClient.ColumnMetadataRow{
-				{Name: "email", DisplayName: "Email", UpdatedAt: "2026-05-27T10:00:00Z"},
-				{Name: "id", DisplayName: "User ID", UpdatedAt: "2026-05-27T10:00:00Z"},
+				{Name: "email", DisplayName: "Email"},
+				{Name: "id", DisplayName: "User ID"},
 			},
 		}
 
@@ -1271,8 +1271,8 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	})
 
 	// 2. Server returns the same two rows in a different order (sorted by Name
-	//    on the server side, with UpdatedAt populated). MapRemoteToState must
-	//    normalise this into the same shape as the local resource.
+	//    on the server side). MapRemoteToState must normalise this into the
+	//    same shape as the local resource.
 	h := &HandlerImpl{client: &testutils.MockDataGraphClient{}}
 	remote := &model.RemoteModel{
 		Model: &dgClient.Model{
@@ -1286,8 +1286,8 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 			Root:        true,
 		},
 		Columns: []dgClient.ColumnMetadataRow{
-			{Name: "email", DisplayName: "Email", UpdatedAt: "2026-05-27T10:00:00Z"},
-			{Name: "id", DisplayName: "User ID", UpdatedAt: "2026-05-27T10:00:00Z"},
+			{Name: "email", DisplayName: "Email"},
+			{Name: "id", DisplayName: "User ID"},
 		},
 	}
 	remoteResource, _, err := h.MapRemoteToState(remote, urnResolver)
