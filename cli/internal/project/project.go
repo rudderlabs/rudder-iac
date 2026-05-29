@@ -69,6 +69,9 @@ func WithRenderer(r renderer.Renderer) ProjectOption {
 		if r != nil {
 			p.renderer = r
 		}
+	}
+}
+
 // WithSubstitutor sets an optional variable substitutor that runs on raw spec
 // bytes before parsing. When nil (the default), no substitution happens.
 func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
