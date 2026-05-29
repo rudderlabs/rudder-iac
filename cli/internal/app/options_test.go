@@ -103,7 +103,7 @@ func TestBuildSubstitutor_ResolverChain(t *testing.T) {
 		assert.Equal(t, "env-value", string(got))
 	})
 
-	t.Run("earlier var file wins over later var file", func(t *testing.T) {
+	t.Run("later var file wins over earlier var file", func(t *testing.T) {
 		dir := t.TempDir()
 		path1 := filepath.Join(dir, "first.yaml")
 		path2 := filepath.Join(dir, "second.yaml")
@@ -115,7 +115,7 @@ func TestBuildSubstitutor_ResolverChain(t *testing.T) {
 
 		got, errs := sub.SubstituteBytes([]byte(`{{ .X }}`))
 		require.Empty(t, errs)
-		assert.Equal(t, "first", string(got))
+		assert.Equal(t, "second", string(got))
 	})
 
 	t.Run("file resolver supplies values not in env", func(t *testing.T) {
