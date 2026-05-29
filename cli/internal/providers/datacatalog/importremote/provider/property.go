@@ -42,7 +42,7 @@ func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewRemoteResources()
 
@@ -67,7 +67,7 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer nam
 		resourceMap,
 	)
 
-	if err := p.idResources(collection, idNamer); err != nil {
+	if err := p.idResources(collection, idNamer, localGraph); err != nil {
 		return nil, fmt.Errorf("assigning identifiers to properties: %w", err)
 	}
 
@@ -77,6 +77,7 @@ func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer nam
 func (p *PropertyImportProvider) idResources(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
+	localGraph *resources.Graph,
 ) error {
 	p.log.Debug("assigning identifiers to properties")
 	properties := collection.GetAll(types.PropertyResourceType)
@@ -85,6 +86,18 @@ func (p *PropertyImportProvider) idResources(
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog property")
+		}
+
+		// Auto-link: check if a local resource matches by name+type+itemTypes
+		// Skip custom type properties (DefinitionId set) — out of spike scope
+		if localGraph != nil && data.DefinitionId == "" {
+			if localID, found := findLocalPropertyMatch(localGraph, data.Name, data.Type, data.Config); found {
+				property.ExternalID = localID
+				property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, localID)
+				property.AutoLinked = true
+				p.log.Debug("auto-linked property", "remoteName", data.Name, "localID", localID)
+				continue
+			}
 		}
 
 		externalID, err := idNamer.Name(namer.ScopeName{
@@ -131,12 +144,21 @@ func (p *PropertyImportProvider) FormatForExport(
 			RemoteID:    property.ID,
 		})
 
+		// Auto-linked resources only need manifest entries, not spec files
+		if property.AutoLinked {
+			continue
+		}
+
 		importableProp := &model.ImportablePropertyV1{}
 		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
 			return nil, nil, fmt.Errorf("formatting property: %w", err)
 		}
 		formattedProps = append(formattedProps, formatted)
+	}
+
+	if len(formattedProps) == 0 {
+		return nil, entries, nil
 	}
 
 	spec, err := toImportSpec(

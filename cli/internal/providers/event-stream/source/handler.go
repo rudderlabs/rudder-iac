@@ -542,7 +542,7 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	return result, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, _ *resources.Graph) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {

@@ -89,7 +89,7 @@ type UnmanagedRemoteResourceLoader interface {
 	// the project's configuration.
 	// The idNamer is used to generate unique IDs for the importable resources,
 	// avoiding conflicts with existing resources.
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error)
 }
 
 // RemoteResourceLoader combines the ability to load both managed and unmanaged resources

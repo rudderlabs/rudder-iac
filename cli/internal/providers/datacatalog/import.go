@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	var (
 		collection = resources.NewRemoteResources()
 		err        error
@@ -34,7 +34,7 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 			return fmt.Errorf("expected entityProviderTask, got %T", task)
 		}
 
-		importable, err := t.provider.LoadImportable(ctx, idNamer)
+		importable, err := t.provider.LoadImportable(ctx, idNamer, localGraph)
 		if err != nil {
 			return fmt.Errorf("loading importable resources collection for provider of resource type %s: %w", t.resourceType, err)
 		}

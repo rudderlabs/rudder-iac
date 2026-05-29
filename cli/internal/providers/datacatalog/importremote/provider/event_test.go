@@ -44,7 +44,7 @@ func TestEventLoadImportable(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		events := collection.GetAll(types.EventResourceType)
@@ -74,7 +74,7 @@ func TestEventLoadImportable(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		events := collection.GetAll(types.EventResourceType)
@@ -112,7 +112,7 @@ func TestEventFormatForExport(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		result, _, err := provider.FormatForExport(
@@ -169,7 +169,7 @@ func TestEventFormatForExport(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.NoError(t, err)
 
 		result, _, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)

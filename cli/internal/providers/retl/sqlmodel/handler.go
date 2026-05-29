@@ -435,7 +435,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 	return s, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, _ *resources.Graph) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	hasExternalID := false
 	sources, err := h.client.ListRetlSources(ctx, &hasExternalID)

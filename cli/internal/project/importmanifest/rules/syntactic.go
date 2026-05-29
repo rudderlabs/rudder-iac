@@ -115,8 +115,11 @@ func (r *specShapeRule) Validate(ctx *rules.ValidationContext) []rules.Validatio
 
 // --- urn-unique (cross-file) ---
 
-// urnUniqueRule ensures URNs are unique across every import-manifest file in
-// the project. It is a ProjectRule, so it runs once with all specs in scope.
+// urnUniqueRule ensures URNs are unique per workspace across every
+// import-manifest file in the project. The same URN may appear under
+// different workspace IDs (multi-workspace import), but must not be
+// duplicated within the same workspace. It is a ProjectRule, so it runs
+// once with all specs in scope.
 type urnUniqueRule struct{}
 
 func newURNUniqueRule() rules.Rule { return &urnUniqueRule{} }
@@ -124,7 +127,7 @@ func newURNUniqueRule() rules.Rule { return &urnUniqueRule{} }
 func (r *urnUniqueRule) ID() string               { return "import-manifest/urn-unique" }
 func (r *urnUniqueRule) Severity() rules.Severity { return rules.Error }
 func (r *urnUniqueRule) Description() string {
-	return "a URN must appear in at most one import-manifest entry across the project"
+	return "a URN must appear at most once per workspace across all import-manifest files"
 }
 func (r *urnUniqueRule) AppliesTo() []rules.MatchPattern {
 	return []rules.MatchPattern{
@@ -142,14 +145,18 @@ type urnLocation struct {
 func (r *urnUniqueRule) ValidateProject(
 	allSpecs map[string]*rules.ValidationContext,
 ) map[string][]rules.ValidationResult {
-	occurrences := make(map[string][]urnLocation)
+	// Key by "workspaceID\x00URN" so the same URN under different workspaces
+	// is allowed, but duplicates within the same workspace are flagged.
+	type wsURN struct{ workspaceID, urn string }
+	occurrences := make(map[wsURN][]urnLocation)
 
 	for filePath, ctx := range allSpecs {
 		if ctx.Kind != specs.KindImportManifest {
 			continue
 		}
 		for _, urn := range collectManifestURNs(ctx.Spec) {
-			occurrences[urn.value] = append(occurrences[urn.value], urnLocation{
+			key := wsURN{workspaceID: urn.workspaceID, urn: urn.value}
+			occurrences[key] = append(occurrences[key], urnLocation{
 				filePath: filePath,
 				ref: fmt.Sprintf(
 					"/spec/workspaces/%d/resources/%d/urn",
@@ -160,14 +167,17 @@ func (r *urnUniqueRule) ValidateProject(
 	}
 
 	results := make(map[string][]rules.ValidationResult)
-	for urn, locs := range occurrences {
+	for key, locs := range occurrences {
 		if len(locs) <= 1 {
 			continue
 		}
 		for _, loc := range locs {
 			results[loc.filePath] = append(results[loc.filePath], rules.ValidationResult{
 				Reference: loc.ref,
-				Message:   fmt.Sprintf("URN %q appears in multiple import-manifest entries", urn),
+				Message: fmt.Sprintf(
+					"URN %q appears multiple times in workspace %q",
+					key.urn, key.workspaceID,
+				),
 			})
 		}
 	}
@@ -242,6 +252,7 @@ func (r *inlineClashRule) ValidateProject(
 
 type indexedURN struct {
 	value        string
+	workspaceID  string
 	workspaceIdx int
 	resourceIdx  int
 }
@@ -257,6 +268,7 @@ func collectManifestURNs(spec map[string]any) []indexedURN {
 		if !ok {
 			continue
 		}
+		wsID, _ := ws["workspace_id"].(string)
 		resources, _ := ws["resources"].([]any)
 		for j, resRaw := range resources {
 			res, ok := resRaw.(map[string]any)
@@ -267,7 +279,7 @@ func collectManifestURNs(spec map[string]any) []indexedURN {
 			if urn == "" {
 				continue
 			}
-			out = append(out, indexedURN{value: urn, workspaceIdx: i, resourceIdx: j})
+			out = append(out, indexedURN{value: urn, workspaceID: wsID, workspaceIdx: i, resourceIdx: j})
 		}
 	}
 	return out

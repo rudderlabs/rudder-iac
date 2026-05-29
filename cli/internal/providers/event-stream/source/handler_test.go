@@ -1466,7 +1466,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		})
 		handler := source.NewHandler(mockClient, importDir)
 
-		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
+		collection, err := handler.LoadImportable(context.Background(), &mockNamer{}, nil)
 
 		assert.NoError(t, err)
 		assert.True(t, mockClient.GetSourcesCalled())
@@ -1643,7 +1643,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			})
 			handler := source.NewHandler(mockClient, importDir)
 
-			collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
+			collection, err := handler.LoadImportable(context.Background(), &mockNamer{}, nil)
 			require.NoError(t, err)
 			esResources := collection.GetAll(source.ResourceType)
 			require.Len(t, esResources, 1)

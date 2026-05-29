@@ -31,7 +31,7 @@ type handler interface {
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error)
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
@@ -217,10 +217,10 @@ func (p *Provider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
 	return nil
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
-		resources, err := handler.LoadImportable(ctx, idNamer)
+		resources, err := handler.LoadImportable(ctx, idNamer, localGraph)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from handler %w", err)
 		}

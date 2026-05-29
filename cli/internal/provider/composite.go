@@ -193,7 +193,7 @@ var _ tasker.Task = &compositeProviderTask{}
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	var (
 		collection = resources.NewRemoteResources()
 		err        error
@@ -213,7 +213,7 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)
 		}
-		importable, err := t.provider.LoadImportable(ctx, idNamer)
+		importable, err := t.provider.LoadImportable(ctx, idNamer, localGraph)
 		if err != nil {
 			return fmt.Errorf("loading importable resources for composite provider %s: %w", t.name, err)
 		}

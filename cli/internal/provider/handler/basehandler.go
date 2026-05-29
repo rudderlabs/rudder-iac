@@ -70,7 +70,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) AddResource(id string, resource 
 	return nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 
 	remoteResources, err := h.Impl.LoadImportableResources(ctx)

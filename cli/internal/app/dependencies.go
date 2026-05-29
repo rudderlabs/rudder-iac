@@ -101,7 +101,7 @@ func NewDeps() (Deps, error) {
 		"datacatalog":     p.DataCatalog,
 		"retl":            p.RETL,
 		"eventstream":     p.EventStream,
-		"transformations": p.Transformations,
+		// "transformations": p.Transformations,
 	}
 
 	if cfg.ExperimentalFlags.DataGraph {

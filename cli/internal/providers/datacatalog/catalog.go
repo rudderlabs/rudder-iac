@@ -20,7 +20,7 @@ type entityProvider interface {
 }
 
 type resourceImportProvider interface {
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error)
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,

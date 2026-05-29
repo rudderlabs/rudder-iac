@@ -39,7 +39,8 @@ type Project interface {
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
-	p ImportProvider) error {
+	p ImportProvider,
+	merge bool) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -58,8 +59,13 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	if diff.HasDiff() {
-		return fmt.Errorf("%w", ErrProjectNotSynced)
+	if !merge {
+		if diff.HasDiff() {
+			return fmt.Errorf("%w", ErrProjectNotSynced)
+		}
+	} else if len(diff.RemovedResources) > 0 {
+		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
+			ErrProjectNotSynced, diff.RemovedResources)
 	}
 
 	idNamer, err := initNamer(targetGraph)
@@ -67,7 +73,13 @@ func WorkspaceImport(
 		return fmt.Errorf("initializing namer: %w", err)
 	}
 
-	importable, err := p.LoadImportable(ctx, idNamer)
+	// Pass localGraph when in merge mode, nil otherwise
+	var localGraph *resources.Graph
+	if merge {
+		localGraph = targetGraph
+	}
+
+	importable, err := p.LoadImportable(ctx, idNamer, localGraph)
 	if err != nil {
 		return fmt.Errorf("loading importable resources: %w", err)
 	}
@@ -75,6 +87,14 @@ func WorkspaceImport(
 	if importable.Len() == 0 {
 		fmt.Println("No resources to import")
 		return nil
+	}
+
+	// Print auto-link summary when in merge mode
+	if merge {
+		autoLinked := collectAutoLinkEntries(importable, targetGraph)
+		if summary := formatAutoLinkSummary(autoLinked); summary != "" {
+			fmt.Print(summary)
+		}
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
@@ -109,6 +129,43 @@ func WorkspaceImport(
 	}
 
 	return nil
+}
+
+// collectAutoLinkEntries identifies imported resources whose ExternalID matches
+// an existing resource in the local graph — these are the auto-linked ones.
+// It also captures the WorkspaceID from the local graph's import metadata so
+// manifest entries can be grouped correctly.
+func collectAutoLinkEntries(importable *resources.RemoteResources, localGraph *resources.Graph) []autoLinkEntry {
+	var entries []autoLinkEntry
+	for _, r := range localGraph.Resources() {
+		urn := r.URN()
+		for _, remote := range importable.GetAll(r.Type()) {
+			remoteURN := resources.URN(remote.ExternalID, r.Type())
+			if remoteURN == urn {
+				entries = append(entries, autoLinkEntry{
+					URN:      urn,
+					RemoteID: remote.ID,
+				})
+			}
+		}
+	}
+	return entries
+}
+
+type autoLinkEntry struct {
+	URN      string
+	RemoteID string
+}
+
+func formatAutoLinkSummary(entries []autoLinkEntry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	summary := fmt.Sprintf("Auto-linked %d resources to existing local project:\n", len(entries))
+	for _, e := range entries {
+		summary += fmt.Sprintf("  %s → %s\n", e.URN, e.RemoteID)
+	}
+	return summary
 }
 
 func initNamer(graph *resources.Graph) (namer.Namer, error) {

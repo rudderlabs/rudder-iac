@@ -1624,7 +1624,7 @@ func TestSQLModelHandler(t *testing.T) {
 			s2 := mkSource("rid-2", "Users Model", "mysql", "acc-2", false, "users", "user_id", "SELECT * FROM users")
 			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources(s1, s2)}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection, err := h.LoadImportable(context.Background(), idNamer)
+			collection, err := h.LoadImportable(context.Background(), idNamer, nil)
 			require.NoError(t, err)
 			require.NotNil(t, collection)
 
@@ -1650,7 +1650,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{listRetlSourcesFunc: mockListRetlSources()}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection, err := h.LoadImportable(context.Background(), idNamer)
+			collection, err := h.LoadImportable(context.Background(), idNamer, nil)
 			require.NoError(t, err)
 			require.NotNil(t, collection)
 			assert.Len(t, collection.GetAll(sqlmodel.ResourceType), 0)
@@ -1660,7 +1660,7 @@ func TestSQLModelHandler(t *testing.T) {
 			t.Parallel()
 			mockClient := &mockRETLClient{listRetlSourcesFunc: func(ctx context.Context) (*retlClient.RETLSources, error) { return nil, fmt.Errorf("api") }}
 			h := sqlmodel.NewHandler(mockClient, "retl")
-			collection, err := h.LoadImportable(context.Background(), idNamer)
+			collection, err := h.LoadImportable(context.Background(), idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, collection)
 			assert.Contains(t, err.Error(), "listing RETL sources")

@@ -42,7 +42,7 @@ func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable categories from remote catalog")
 	collection := resources.NewRemoteResources()
 
@@ -72,7 +72,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 		resourceMap,
 	)
 
-	if err := p.idResources(collection, idNamer); err != nil {
+	if err := p.idResources(collection, idNamer, localGraph); err != nil {
 		return nil, fmt.Errorf("assigning identifiers to categories: %w", err)
 	}
 
@@ -82,6 +82,7 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 func (p *CategoryImportProvider) idResources(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
+	localGraph *resources.Graph,
 ) error {
 	p.log.Debug("assigning identifiers to categories")
 	categories := collection.GetAll(types.CategoryResourceType)
@@ -90,6 +91,17 @@ func (p *CategoryImportProvider) idResources(
 		data, ok := category.Data.(*catalog.Category)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog category")
+		}
+
+		// Auto-link: check if a local resource matches by name
+		if localGraph != nil {
+			if localID, found := findLocalCategoryMatch(localGraph, data.Name); found {
+				category.ExternalID = localID
+				category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, localID)
+				category.AutoLinked = true
+				p.log.Debug("auto-linked category", "remoteName", data.Name, "localID", localID)
+				continue
+			}
 		}
 
 		externalID, err := idNamer.Name(namer.ScopeName{
@@ -136,12 +148,22 @@ func (p *CategoryImportProvider) FormatForExport(
 			RemoteID:    category.ID,
 		})
 
+		// Auto-linked resources only need manifest entries, not spec files
+		if category.AutoLinked {
+			continue
+		}
+
 		importableCategory := &model.ImportableCategoryV1{}
 		formatted, err := importableCategory.ForExport(category.ExternalID, data, resolver)
 		if err != nil {
 			return nil, nil, fmt.Errorf("formatting category: %w", err)
 		}
 		formattedCategories = append(formattedCategories, formatted)
+	}
+
+	// If all categories were auto-linked, return only entries (no spec file)
+	if len(formattedCategories) == 0 {
+		return nil, entries, nil
 	}
 
 	spec, err := toImportSpec(

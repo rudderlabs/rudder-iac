@@ -43,7 +43,7 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 	}
 }
 
-func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable tracking plans from remote catalog")
 	collection := resources.NewRemoteResources()
 
@@ -68,7 +68,7 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 		resourceMap,
 	)
 
-	if err := p.idResources(collection, idNamer); err != nil {
+	if err := p.idResources(collection, idNamer, localGraph); err != nil {
 		return nil, fmt.Errorf("assigning identifiers to tracking plans: %w", err)
 	}
 
@@ -78,6 +78,7 @@ func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer
 func (p *TrackingPlanImportProvider) idResources(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
+	localGraph *resources.Graph,
 ) error {
 	p.log.Debug("assigning identifiers to tracking plans")
 	trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
@@ -86,6 +87,17 @@ func (p *TrackingPlanImportProvider) idResources(
 		data, ok := tp.Data.(*catalog.TrackingPlanWithIdentifiers)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog tracking plan")
+		}
+
+		// Auto-link: check if a local tracking plan matches by name
+		if localGraph != nil {
+			if localID, found := findLocalTrackingPlanMatch(localGraph, data.Name); found {
+				tp.ExternalID = localID
+				tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, localID)
+				tp.AutoLinked = true
+				p.log.Debug("auto-linked tracking plan", "remoteName", data.Name, "localID", localID)
+				continue
+			}
 		}
 
 		externalID, err := idNamer.Name(namer.ScopeName{
@@ -129,6 +141,11 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			URN:         resources.URN(trackingPlan.ExternalID, types.TrackingPlanResourceType),
 			RemoteID:    trackingPlan.ID,
 		})
+
+		// Auto-linked resources only need manifest entries, not spec files
+		if trackingPlan.AutoLinked {
+			continue
+		}
 
 		importableTrackingPlan := &model.ImportableTrackingPlanV1{}
 		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)

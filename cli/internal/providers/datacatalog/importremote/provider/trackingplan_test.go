@@ -45,7 +45,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
@@ -75,7 +75,7 @@ func TestTrackingPlanLoadImportable(t *testing.T) {
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
@@ -137,7 +137,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		)
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		result, _, err := provider.FormatForExport(
@@ -226,7 +226,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		)
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		result, _, err := provider.FormatForExport(
@@ -282,7 +282,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		)
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
+		collection, err := provider.LoadImportable(context.Background(), externalIdNamer, nil)
 		require.Nil(t, err)
 
 		result, _, err := provider.FormatForExport(

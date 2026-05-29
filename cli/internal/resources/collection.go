@@ -13,6 +13,7 @@ type RemoteResource struct {
 	ExternalID string
 	Reference  string
 	Data       interface{}
+	AutoLinked bool // Set during import --merge when this resource matches a local project resource
 }
 
 // RemoteResources provides a generic container for mixed resource types

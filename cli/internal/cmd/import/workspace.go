@@ -21,6 +21,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 		p        project.Project
 		err      error
 		location string
+		merge    bool
 	)
 
 	cmd := &cobra.Command{
@@ -29,6 +30,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 		Long:  "Import upstream workspace resources using available providers into configuration files",
 		Example: heredoc.Doc(`
 			$ rudder-cli import workspace --location </path/to/project_dir>
+			$ rudder-cli import workspace --location </path/to/project_dir> --merge
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -65,7 +67,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			spinner := ui.NewSpinner("Importing ...")
 			spinner.Start()
 
-			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider())
+			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), merge)
 
 			spinner.Stop()
 			if err == nil {
@@ -77,5 +79,6 @@ func NewCmdWorkspaceImport() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files")
+	cmd.Flags().BoolVar(&merge, "merge", false, "Allow import on projects with existing resources, auto-linking matching resources")
 	return cmd
 }

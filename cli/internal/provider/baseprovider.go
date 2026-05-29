@@ -27,7 +27,7 @@ type Handler interface {
 	Import(ctx context.Context, data any, remoteId string) (any, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error)
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
@@ -215,10 +215,10 @@ func (p *BaseProvider) ImportRaw(ctx context.Context, resource *resources.Resour
 	return handler.Import(ctx, resource.RawData(), remoteId)
 }
 
-func (p *BaseProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *BaseProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
-		resources, err := handler.LoadImportable(ctx, idNamer)
+		resources, err := handler.LoadImportable(ctx, idNamer, localGraph)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from handler %w", err)
 		}

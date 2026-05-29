@@ -41,7 +41,7 @@ func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, 
 	}
 }
 
-func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, _ *resources.Graph) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable custom types from remote catalog")
 	collection := resources.NewRemoteResources()
 

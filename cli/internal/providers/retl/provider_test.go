@@ -852,7 +852,7 @@ func TestProviderLoadImportable(t *testing.T) {
 
 		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		collection, err := provider.LoadImportable(ctx, idNamer)
+		collection, err := provider.LoadImportable(ctx, idNamer, nil)
 		require.NoError(t, err)
 		require.NotNil(t, collection)
 
@@ -882,7 +882,7 @@ func TestProviderLoadImportable(t *testing.T) {
 
 		ctx := context.Background()
 		idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-		collection, err := provider.LoadImportable(ctx, idNamer)
+		collection, err := provider.LoadImportable(ctx, idNamer, nil)
 		require.Error(t, err)
 		assert.Nil(t, collection)
 		assert.Contains(t, err.Error(), "loading importable resources from handler")

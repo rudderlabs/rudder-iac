@@ -42,7 +42,7 @@ func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, impor
 	}
 }
 
-func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, localGraph *resources.Graph) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable events from remote catalog")
 	collection := resources.NewRemoteResources()
 
@@ -67,7 +67,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 		resourceMap,
 	)
 
-	if err := p.idResources(collection, idNamer); err != nil {
+	if err := p.idResources(collection, idNamer, localGraph); err != nil {
 		return nil, fmt.Errorf("assigning identifiers to events: %w", err)
 	}
 
@@ -77,6 +77,7 @@ func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.
 func (p *EventImportProvider) idResources(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
+	localGraph *resources.Graph,
 ) error {
 	p.log.Debug("assigning identifiers to events")
 	events := collection.GetAll(types.EventResourceType)
@@ -85,6 +86,17 @@ func (p *EventImportProvider) idResources(
 		data, ok := event.Data.(*catalog.Event)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog event")
+		}
+
+		// Auto-link: check if a local resource matches by name+eventType
+		if localGraph != nil {
+			if localID, found := findLocalEventMatch(localGraph, data.Name, data.EventType); found {
+				event.ExternalID = localID
+				event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, localID)
+				event.AutoLinked = true
+				p.log.Debug("auto-linked event", "remoteName", data.Name, "localID", localID)
+				continue
+			}
 		}
 
 		name := data.Name
@@ -138,12 +150,21 @@ func (p *EventImportProvider) FormatForExport(
 			RemoteID:    event.ID,
 		})
 
+		// Auto-linked resources only need manifest entries, not spec files
+		if event.AutoLinked {
+			continue
+		}
+
 		importableEvent := &model.ImportableEventV1{}
 		formatted, err := importableEvent.ForExport(event.ExternalID, data, resolver)
 		if err != nil {
 			return nil, nil, fmt.Errorf("formatting event: %w", err)
 		}
 		formattedEvents = append(formattedEvents, formatted)
+	}
+
+	if len(formattedEvents) == 0 {
+		return nil, entries, nil
 	}
 
 	spec, err := toImportSpec(

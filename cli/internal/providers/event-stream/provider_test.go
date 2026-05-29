@@ -349,7 +349,7 @@ func TestProvider(t *testing.T) {
 
 		idNamer := &mockNamer{}
 
-		collection, err := provider.LoadImportable(ctx, idNamer)
+		collection, err := provider.LoadImportable(ctx, idNamer, nil)
 		require.NoError(t, err)
 
 		esResources := collection.GetAll(source.ResourceType)
