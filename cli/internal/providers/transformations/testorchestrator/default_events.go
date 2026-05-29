@@ -16,7 +16,9 @@ var defaultEventsJSON []byte
 // Each call returns a new map to prevent mutation of shared data.
 func GetDefaultEvents() map[string]any {
 	var events map[string]any
-	json.Unmarshal(defaultEventsJSON, &events)
+	if err := json.Unmarshal(defaultEventsJSON, &events); err != nil {
+		panic(fmt.Sprintf("unmarshaling embedded default events: %v", err))
+	}
 	return events
 }
 

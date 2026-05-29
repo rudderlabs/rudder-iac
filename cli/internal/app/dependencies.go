@@ -59,7 +59,7 @@ type Deps interface {
 	CompositeProvider() provider.Provider
 
 	// NewProject creates a new project instance with the composite provider.
-	NewProject() project.Project
+	NewProject(opts ...project.ProjectOption) project.Project
 
 	// NewDataCatalogProject creates a new project instance with only the DataCatalog provider.
 	// Used by trackingplan commands.
@@ -183,8 +183,8 @@ func (d *deps) CompositeProvider() provider.Provider {
 }
 
 // NewProject creates a project with composite provider.
-func (d *deps) NewProject() project.Project {
-	return project.New(d.CompositeProvider())
+func (d *deps) NewProject(opts ...project.ProjectOption) project.Project {
+	return project.New(d.CompositeProvider(), opts...)
 }
 
 // NewDataCatalogProject creates a project with only the DataCatalog provider.
