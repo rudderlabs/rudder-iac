@@ -3,6 +3,7 @@ package datagraph_test
 import (
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
@@ -12,6 +13,7 @@ import (
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -368,4 +370,76 @@ func TestProvider_SupportedMatchPatterns(t *testing.T) {
 	p := datagraph.NewProvider(&testutils.MockDataGraphClient{}, nil)
 	want := prules.V1VersionPatterns("data-graph")
 	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+}
+
+// TestLoadSpec_ColumnsOrderIdempotent guards Phase 3b Task 3b.8: the local
+// yaml's `columns:` block is authored in arbitrary order, but the server
+// always returns rows sorted by Name. If the provider preserved yaml-order
+// in the resource's Columns slice, the differ's reflect.DeepEqual would
+// flag a spurious diff on every re-apply, re-issuing BatchUpsertColumnMetadata
+// and bumping updatedAt + emitting per-row audit events for no real change.
+//
+// This test mirrors the round-trip pattern from
+// TestRoundTrip_ColumnsIdempotent (handlers/model) but exercises the local
+// side (provider.columnsFromSpec via LoadSpec) with reverse-alphabetical
+// yaml. It must see no "columns" diff against a sorted "remote-shape"
+// resource that matches what columnsFromRemote produces.
+func TestLoadSpec_ColumnsOrderIdempotent(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{}
+	provider := datagraph.NewProvider(mockClient, nil)
+
+	// Local yaml: reverse-alphabetical columns order.
+	spec := &specs.Spec{
+		Version: "rudder/v1",
+		Kind:    "data-graph",
+		Spec: map[string]any{
+			"id":         "my-dg",
+			"account_id": "wh-123",
+			"models": []map[string]any{
+				{
+					"id":           "user",
+					"display_name": "User",
+					"type":         "entity",
+					"table":        "db.schema.users",
+					"primary_id":   "id",
+					"columns": []map[string]any{
+						{"name": "user_id", "display_name": "User ID"},
+						{"name": "email", "display_name": "Email"},
+					},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, provider.LoadSpec("test.yaml", spec))
+
+	graph, err := provider.ResourceGraph()
+	require.NoError(t, err)
+
+	userResource, exists := graph.GetResource(resources.URN("user", modelHandler.HandlerMetadata.ResourceType))
+	require.True(t, exists)
+	localModel, ok := userResource.RawData().(*dgModel.ModelResource)
+	require.True(t, ok)
+
+	// Remote-shape resource: mirrors what handlers/model.columnsFromRemote
+	// produces from a server response whose rows are sorted by Name (the
+	// handler's populateColumnMetadata also enforces this sort). Building
+	// the shape directly here keeps the test self-contained and decoupled
+	// from the unexported handler client field.
+	remoteShapeColumns := []map[string]any{
+		{"name": "email", "display_name": "Email"},
+		{"name": "user_id", "display_name": "User ID"},
+	}
+	remoteShape := *localModel
+	remoteShape.Columns = remoteShapeColumns
+
+	// Diff layer is the gate the syncer uses: identical Columns => no
+	// "columns" diff => no BatchUpsert on re-apply.
+	var localMap, remoteMap map[string]any
+	require.NoError(t, mapstructure.Decode(localModel, &localMap))
+	require.NoError(t, mapstructure.Decode(&remoteShape, &remoteMap))
+
+	diffs := differ.CompareData(remoteMap, localMap)
+	assert.NotContains(t, diffs, "columns",
+		"yaml-order-reversed columns must sort to the same canonical order as the server's sorted response so the differ short-circuits")
 }
