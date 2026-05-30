@@ -43,6 +43,7 @@ type project struct {
 	location         string
 	provider         ProjectProvider
 	loader           Loader
+	workspaceID      string
 	specs            map[string]*specs.Spec
 	validationEngine validation.ValidationEngine
 	renderer         renderer.Renderer
@@ -77,6 +78,16 @@ func WithRenderer(r renderer.Renderer) ProjectOption {
 func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
 	return func(p *project) {
 		p.substitutor = s
+	}
+}
+
+// WithWorkspaceID sets the resolved workspace ID for the project. This scopes
+// workspace-aware operations (e.g. import-manifest broadcast) to only the
+// entries belonging to the active workspace.
+// When empty, workspace-aware operations fall back to unscoped behavior.
+func WithWorkspaceID(id string) ProjectOption {
+	return func(p *project) {
+		p.workspaceID = id
 	}
 }
 
