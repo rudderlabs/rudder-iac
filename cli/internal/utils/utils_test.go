@@ -6,6 +6,122 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type sortableItem struct {
+	localID string
+}
+
+func (s sortableItem) GetLocalID() string {
+	return s.localID
+}
+
+func TestSortByLocalID(t *testing.T) {
+	t.Parallel()
+
+	items := []sortableItem{
+		{localID: "z-last"},
+		{localID: "a-first"},
+		{localID: "m-middle"},
+	}
+
+	SortByLocalID(items)
+
+	assert.Equal(t, []sortableItem{
+		{localID: "a-first"},
+		{localID: "m-middle"},
+		{localID: "z-last"},
+	}, items)
+}
+
+func TestSortLexicographically(t *testing.T) {
+	t.Parallel()
+
+	items := []any{"zebra", "apple", "mango"}
+	SortLexicographically(items)
+
+	assert.Equal(t, []any{"apple", "mango", "zebra"}, items)
+}
+
+func TestSplitMultiTypeString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single type",
+			input:    "string",
+			expected: []string{"string"},
+		},
+		{
+			name:     "comma separated types",
+			input:    "string,number,boolean",
+			expected: []string{"string", "number", "boolean"},
+		},
+		{
+			name:     "trims whitespace around types",
+			input:    " string , number , boolean ",
+			expected: []string{"string", "number", "boolean"},
+		},
+		{
+			name:     "empty string yields single empty element",
+			input:    "",
+			expected: []string{""},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, SplitMultiTypeString(tt.input))
+		})
+	}
+}
+
+func TestToCamelCase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "snake_case",
+			input:    "min_length",
+			expected: "minLength",
+		},
+		{
+			name:     "multiple segments",
+			input:    "exclusive_maximum",
+			expected: "exclusiveMaximum",
+		},
+		{
+			name:     "already lowercase",
+			input:    "enum",
+			expected: "enum",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "leading underscore skipped",
+			input:    "_private_field",
+			expected: "PrivateField",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, ToCamelCase(tt.input))
+		})
+	}
+}
+
 func TestToSnakeCase(t *testing.T) {
 	t.Parallel()
 
