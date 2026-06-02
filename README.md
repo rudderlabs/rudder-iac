@@ -4,10 +4,17 @@
 
 - [⚠️ Work in Progress](#️-work-in-progress)
 - [Installation](#installation)
-  - [MacOS](#macos)
-    - [Apple Silicon](#apple-silicon)
-    - [Intel-based](#intel-based)
+  - [macOS](#macos)
+    - [Apple Silicon (arm64)](#apple-silicon-arm64)
+    - [Intel (x86_64)](#intel-x86_64)
   - [Linux](#linux)
+    - [arm64](#linux-arm64)
+    - [x86_64](#linux-x86_64)
+    - [i386](#linux-i386)
+  - [Windows](#windows)
+    - [arm64](#windows-arm64)
+    - [x86_64](#windows-x86_64)
+    - [i386](#windows-i386)
   - [Docker](#docker)
   - [Build from Source](#build-from-source)
 
@@ -19,16 +26,18 @@
 
 ## Installation
 
-### MacOS
+Release binaries are published for macOS, Linux, and Windows. macOS and Linux archives use `.tar.gz`; Windows archives use `.zip`.
 
-#### Apple Silicon
+### macOS
+
+#### Apple Silicon (arm64)
 
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
 ```
 
-#### Intel-based
+#### Intel (x86_64)
 
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
@@ -37,9 +46,53 @@ sudo mv rudder-cli /usr/local/bin/
 
 ### Linux
 
+#### Linux arm64
+
+```sh
+curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_arm64.tar.gz | tar -xz rudder-cli
+sudo mv rudder-cli /usr/local/bin/
+```
+
+#### Linux x86_64
+
 ```sh
 curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
 sudo mv rudder-cli /usr/local/bin/
+```
+
+#### Linux i386
+
+```sh
+curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_i386.tar.gz | tar -xz rudder-cli
+sudo mv rudder-cli /usr/local/bin/
+```
+
+### Windows
+
+Each Windows ZIP archive contains `rudder-cli.exe`. Extract the archive and place the binary on your `PATH`.
+
+#### Windows arm64
+
+```powershell
+$archive = "rudder-cli_Windows_arm64.zip"
+Invoke-WebRequest -Uri "https://github.com/rudderlabs/rudder-iac/releases/latest/download/$archive" -OutFile $archive
+Expand-Archive -Path $archive -DestinationPath .
+```
+
+#### Windows x86_64
+
+```powershell
+$archive = "rudder-cli_Windows_x86_64.zip"
+Invoke-WebRequest -Uri "https://github.com/rudderlabs/rudder-iac/releases/latest/download/$archive" -OutFile $archive
+Expand-Archive -Path $archive -DestinationPath .
+```
+
+#### Windows i386
+
+```powershell
+$archive = "rudder-cli_Windows_i386.zip"
+Invoke-WebRequest -Uri "https://github.com/rudderlabs/rudder-iac/releases/latest/download/$archive" -OutFile $archive
+Expand-Archive -Path $archive -DestinationPath .
 ```
 
 ### Docker

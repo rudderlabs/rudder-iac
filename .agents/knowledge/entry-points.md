@@ -14,3 +14,7 @@ Read these first (3-6 files):
 - `cli/internal/cmd/root.go`: top-level Cobra router; registers command groups (`auth`, `trackingplan`, `workspace`, `apply`, `validate`, `destroy`, `migrate`, `import`, `transformations`, `typer`, `datagraph`) and initialization hooks.
 - `Makefile`: canonical developer entrypoints for build/test/lint/docker and typer validation flows.
 - `api/client/client.go`: API client root used by CLI/provider layers to communicate with RudderStack services.
+
+## DOCS-2434 — README is the install surface
+<!-- ticket:DOCS-2434 -->
+- `README.md` remains the authoritative installation entry point: it covers macOS, Linux, Docker, and build-from-source setup, and there are no nested installation docs under `docs/` to consult instead.
