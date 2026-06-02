@@ -14,3 +14,8 @@ Read these first (3-6 files):
 - `cli/internal/cmd/root.go`: top-level Cobra router; registers command groups (`auth`, `trackingplan`, `workspace`, `apply`, `validate`, `destroy`, `migrate`, `import`, `transformations`, `typer`, `datagraph`) and initialization hooks.
 - `Makefile`: canonical developer entrypoints for build/test/lint/docker and typer validation flows.
 - `api/client/client.go`: API client root used by CLI/provider layers to communicate with RudderStack services.
+
+## RUD-17 — README As Install Entry Surface
+<!-- ticket:RUD-17 -->
+- `README.md` is the top-level user onboarding entrypoint and is expected to contain all primary install paths in one place: macOS release tarballs (Apple Silicon and Intel), Linux release tarball, Docker image usage, and local source builds.
+- Documentation rewrites should preserve concrete install path fidelity (artifact names/commands) or explicitly replace it with equivalent pointers, because users rely on copy-paste-safe setup instructions from this page.
