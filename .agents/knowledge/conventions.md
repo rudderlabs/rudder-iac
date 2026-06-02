@@ -16,3 +16,9 @@
 - Test placement uses co-located unit tests (`*_test.go`) for package behavior plus dedicated cross-package E2E under `cli/tests`, where `TestMain` builds the binary once and scenarios are snapshot-driven. Ref: `cli/tests/main_test.go` (`TestMain`), `cli/tests/README.md` (scenario and snapshot layout), `cli/tests/helpers/file_manager.go` (`StateFileManager`).
 - Snapshot file naming in E2E follows URN-derived filenames and splits expected artifacts by concern (`expected/state` vs `expected/upstream`), enabling deterministic diffing of local-state and API-state regressions separately. Ref: `cli/tests/README.md` ("URN-based filename convention", snapshot sections).
 - Error-display convention at process boundary distinguishes normal errors from machine-output flows via `SilentError`, so JSON-producing commands can fail with non-zero exits without extra stderr noise. Ref: `cli/internal/cmd/root.go` (`Execute`), `cli/internal/cmd/cmderrors/errors.go` (`SilentError`).
+
+## RUD-17 — Product Naming In User Docs
+<!-- ticket:RUD-17 -->
+- Repository/module naming and product/runtime naming intentionally differ: repo/module uses `rudder-iac`, while user-facing binary/image/command/release artifacts use `rudder-cli`.
+- For documentation-only edits, preserve `rudder-cli` in install and command examples unless the task explicitly requires a naming migration.
+- When slimming README content, keep exact install-critical literals intact: release artifact filenames (`rudder-cli_Darwin_arm64.tar.gz`, `rudder-cli_Darwin_x86_64.tar.gz`, `rudder-cli_Linux_x86_64.tar.gz`), Docker image (`rudderlabs/rudder-cli`), token env var (`RUDDERSTACK_ACCESS_TOKEN`), and source build commands (`make build`, `make docker-build`).
