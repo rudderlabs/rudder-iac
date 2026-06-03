@@ -2,6 +2,7 @@ package source_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -1192,6 +1193,62 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				assert.Equal(t, tc.expectedUnlinkTPCalled, mockClient.UnlinkTPCalled())
 			})
 		}
+	})
+
+	t.Run("List", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("success", func(t *testing.T) {
+			mockClient := source.NewMockSourceClient()
+			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+				return []sourceClient.EventStreamSource{
+					{
+						ID:         "remote123",
+						ExternalID: "external-123",
+						Name:       "Test Source 1",
+						Type:       "javascript",
+						Enabled:    true,
+					},
+					{
+						ID:      "remote456",
+						Name:    "Test Source 2",
+						Type:    "python",
+						Enabled: false,
+					},
+				}, nil
+			})
+			handler := source.NewHandler(mockClient, importDir)
+
+			listed, err := handler.List(context.Background(), nil)
+			require.NoError(t, err)
+			assert.Equal(t, []resources.ResourceData{
+				{
+					"id":         "remote123",
+					"name":       "Test Source 1",
+					"type":       "javascript",
+					"enabled":    true,
+					"externalId": "external-123",
+				},
+				{
+					"id":      "remote456",
+					"name":    "Test Source 2",
+					"type":    "python",
+					"enabled": false,
+				},
+			}, listed)
+		})
+
+		t.Run("propagates api errors", func(t *testing.T) {
+			mockClient := source.NewMockSourceClient()
+			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+				return nil, errors.New("request failed")
+			})
+			handler := source.NewHandler(mockClient, importDir)
+
+			_, err := handler.List(context.Background(), nil)
+			require.Error(t, err)
+			assert.EqualError(t, err, "getting event stream sources: request failed")
+		})
 	})
 
 	t.Run("LoadResourcesFromRemote", func(t *testing.T) {

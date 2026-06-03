@@ -2,6 +2,7 @@ package eventstream_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -201,6 +203,72 @@ func TestProvider(t *testing.T) {
 		assert.True(t, mockClient.GetSourcesCalled())
 		assert.True(t, mockClient.UpdateCalled())
 		assert.True(t, mockClient.SetExternalIDCalled())
+	})
+
+	t.Run("List", func(t *testing.T) {
+		t.Run("success", func(t *testing.T) {
+			mockClient := source.NewMockSourceClient()
+			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+				return []sourceClient.EventStreamSource{
+					{
+						ID:         "remote-123",
+						ExternalID: "external-123",
+						Name:       "Existing Source",
+						Type:       "javascript",
+						Enabled:    true,
+					},
+					{
+						ID:      "remote-456",
+						Name:    "Source Without External ID",
+						Type:    "python",
+						Enabled: false,
+					},
+				}, nil
+			})
+
+			provider := eventstream.New(mockClient)
+			ctx := context.Background()
+
+			listed, err := provider.List(ctx, source.ResourceType, nil)
+			require.NoError(t, err)
+			assert.Equal(t, []resources.ResourceData{
+				{
+					"id":         "remote-123",
+					"name":       "Existing Source",
+					"type":       "javascript",
+					"enabled":    true,
+					"externalId": "external-123",
+				},
+				{
+					"id":      "remote-456",
+					"name":    "Source Without External ID",
+					"type":    "python",
+					"enabled": false,
+				},
+			}, listed)
+		})
+
+		t.Run("unsupported resource type", func(t *testing.T) {
+			provider := eventstream.New(source.NewMockSourceClient())
+			ctx := context.Background()
+
+			_, err := provider.List(ctx, "unsupported-resource-type", lister.Filters{})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "no handler for resource type: unsupported-resource-type")
+		})
+
+		t.Run("propagates list errors", func(t *testing.T) {
+			mockClient := source.NewMockSourceClient()
+			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+				return nil, errors.New("api error")
+			})
+			provider := eventstream.New(mockClient)
+			ctx := context.Background()
+
+			_, err := provider.List(ctx, source.ResourceType, nil)
+			require.Error(t, err)
+			assert.EqualError(t, err, "listing event-stream-source: getting event stream sources: api error")
+		})
 	})
 
 	t.Run("LoadResourcesFromRemote", func(t *testing.T) {

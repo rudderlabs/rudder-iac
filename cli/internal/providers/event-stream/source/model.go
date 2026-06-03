@@ -9,6 +9,7 @@ const (
 	NameKey             = "name"
 	EnabledKey          = "enabled"
 	SourceDefinitionKey = "type"
+	ExternalIDKey       = "externalId"
 
 	TrackKey              = "track"
 	IdentifyKey           = "identify"
@@ -100,7 +101,7 @@ type EventConfigSpec struct {
 }
 
 type TrackConfigSpec struct {
-	EventConfigSpec         `mapstructure:",squash"`
+	EventConfigSpec     `mapstructure:",squash"`
 	DropUnplannedEvents *bool `json:"drop_unplanned_events" mapstructure:"drop_unplanned_events"`
 }
 
