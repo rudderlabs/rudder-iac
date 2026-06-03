@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:         []EventV1{},
@@ -861,9 +860,9 @@ func TestDataCatalog_ParseSpec(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name         string
-		spec         *specs.Spec
-		expectedIDs  []string
+		name          string
+		spec          *specs.Spec
+		expectedIDs   []string
 		expectedError bool
 		errorContains string
 	}{
@@ -1161,9 +1160,9 @@ func TestDataCatalog_ParseSpec_LegacyResourceType(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name                     string
-		spec                     *specs.Spec
-		expectedResourceType     string
+		name                 string
+		spec                 *specs.Spec
+		expectedResourceType string
 	}{
 		{
 			name: "tracking plan sets LegacyResourceType to tracking-plan",
@@ -2039,4 +2038,42 @@ func TestDataCatalog_LoadLegacySpec(t *testing.T) {
 		assert.Equal(t, "#property:product_id", variant.Cases[1].Properties[0].Property)
 		assert.Equal(t, "#property:page_url", variant.Default.Properties[0].Property)
 	})
+}
+
+func TestDataCatalog_transformReferencesInSpec(t *testing.T) {
+	t.Parallel()
+
+	spec := map[string]any{
+		"ref_event": "#/events/group_a/event_a",
+		"ref_tp":    "#/tp/group_b/tp_b",
+		"include_wildcard": map[string]any{
+			"$ref": "#/tp/common_rules/event_rule/*",
+		},
+		"include_specific": map[string]any{
+			"$ref": "#/tp/common_rules/event_rule/rule_login",
+		},
+		"items": []any{
+			"#/events/group_c/event_c",
+			"#/tp/group_d/tp_d",
+			"#/tp/common_rules/event_rule/rule_checkout",
+		},
+	}
+
+	dc := New()
+	err := dc.transformReferencesInSpec(spec)
+	require.NoError(t, err)
+
+	assert.Equal(t, "#event:event_a", spec["ref_event"])
+	assert.Equal(t, "#tracking-plan:tp_b", spec["ref_tp"])
+
+	includeWildcard := spec["include_wildcard"].(map[string]any)
+	assert.Equal(t, "#/tp/common_rules/event_rule/*", includeWildcard["$ref"])
+
+	includeSpecific := spec["include_specific"].(map[string]any)
+	assert.Equal(t, "#/tp/common_rules/event_rule/rule_login", includeSpecific["$ref"])
+
+	items := spec["items"].([]any)
+	assert.Equal(t, "#event:event_c", items[0])
+	assert.Equal(t, "#tracking-plan:tp_d", items[1])
+	assert.Equal(t, "#/tp/common_rules/event_rule/rule_checkout", items[2])
 }

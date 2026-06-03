@@ -363,3 +363,88 @@ func TestFormatForExport_SkipsUnmanagedModelsUnderManagedDataGraphs(t *testing.T
 	assert.False(t, urnSet[resources.URN("orphan-model", modelHandler.HandlerMetadata.ResourceType)])
 	assert.False(t, urnSet[fmt.Sprintf("%s:%s", modelHandler.HandlerMetadata.ResourceType, "orphan-model")])
 }
+
+// TestFormatForExport_IncludesColumnsBlock asserts that the yaml produced by
+// `rudder-cli import workspace` carries the `columns:` block for models that
+// have column metadata, and omits it entirely for models that don't — matching
+// the sparse authoring contract.
+func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{}
+	provider := datagraph.NewProvider(mockClient, nil)
+
+	collection := buildRemoteResources(
+		map[string]*resources.RemoteResource{
+			"dg-remote-1": {
+				ID:         "dg-remote-1",
+				ExternalID: "my-data-graph",
+				Data: &dgModel.RemoteDataGraph{
+					DataGraph: &dgClient.DataGraph{
+						ID:          "dg-remote-1",
+						WorkspaceID: "ws-123",
+						AccountID:   "account-1",
+					},
+				},
+			},
+		},
+		map[string]*resources.RemoteResource{
+			"model-remote-1": {
+				ID:         "model-remote-1",
+				ExternalID: "user",
+				Data: &dgModel.RemoteModel{
+					Model: &dgClient.Model{
+						ID:          "model-remote-1",
+						Name:        "User",
+						Type:        "entity",
+						TableRef:    "db.schema.users",
+						DataGraphID: "dg-remote-1",
+						PrimaryID:   "user_id",
+					},
+					Columns: []dgClient.ColumnMetadataRow{
+						{Name: "email", DisplayName: "Email"},
+						{Name: "user_id", DisplayName: "User ID"},
+					},
+				},
+			},
+			"model-remote-2": {
+				ID:         "model-remote-2",
+				ExternalID: "purchase",
+				Data: &dgModel.RemoteModel{
+					Model: &dgClient.Model{
+						ID:          "model-remote-2",
+						Name:        "Purchase",
+						Type:        "event",
+						TableRef:    "db.schema.purchases",
+						DataGraphID: "dg-remote-1",
+						Timestamp:   "purchased_at",
+					},
+					// No column metadata on this model.
+				},
+			},
+		},
+		nil,
+	)
+
+	result, err := provider.FormatForExport(collection, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+
+	spec := result[0].Content.(*specs.Spec)
+	models, ok := spec.Spec["models"].([]dgModel.ModelSpec)
+	require.True(t, ok)
+	require.Len(t, models, 2)
+
+	byID := map[string]dgModel.ModelSpec{}
+	for _, m := range models {
+		byID[m.ID] = m
+	}
+
+	// User has column metadata — the block is emitted in remote order.
+	assert.Equal(t, []dgModel.ColumnMetadataYAML{
+		{Name: "email", DisplayName: "Email"},
+		{Name: "user_id", DisplayName: "User ID"},
+	}, byID["user"].Columns)
+
+	// Purchase has no metadata rows — the block must be omitted (nil), not
+	// emitted as an empty list, so the produced yaml has no `columns:` key.
+	assert.Nil(t, byID["purchase"].Columns)
+}

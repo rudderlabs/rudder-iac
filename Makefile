@@ -39,7 +39,7 @@ test: ## Run all unit tests (excluding e2e)
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
-	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out ./cli/tests/...  -v
+	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out -timeout 20m ./cli/tests/...  -v
 
 .PHONY: test-it
 test-it: ## Run all test, including integration tests

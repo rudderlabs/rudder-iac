@@ -39,6 +39,10 @@ type MockDataGraphClient struct {
 	// Validation methods
 	ValidateModelFunc        func(ctx context.Context, req *dgClient.ValidateModelRequest) (*dgClient.ValidationReport, error)
 	ValidateRelationshipFunc func(ctx context.Context, req *dgClient.ValidateRelationshipRequest) (*dgClient.ValidationReport, error)
+
+	// Column metadata methods
+	ListColumnMetadataFunc        func(ctx context.Context, dataGraphID, modelID string) (*dgClient.ColumnMetadataListResponse, error)
+	BatchUpsertColumnMetadataFunc func(ctx context.Context, dataGraphID, modelID string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error)
 }
 
 // DataGraph methods
@@ -201,6 +205,22 @@ func (m *MockDataGraphClient) ValidateRelationship(ctx context.Context, req *dgC
 		return m.ValidateRelationshipFunc(ctx, req)
 	}
 	return &dgClient.ValidationReport{}, nil
+}
+
+// Column metadata methods
+
+func (m *MockDataGraphClient) ListColumnMetadata(ctx context.Context, dataGraphID, modelID string) (*dgClient.ColumnMetadataListResponse, error) {
+	if m.ListColumnMetadataFunc != nil {
+		return m.ListColumnMetadataFunc(ctx, dataGraphID, modelID)
+	}
+	return &dgClient.ColumnMetadataListResponse{}, nil
+}
+
+func (m *MockDataGraphClient) BatchUpsertColumnMetadata(ctx context.Context, dataGraphID, modelID string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+	if m.BatchUpsertColumnMetadataFunc != nil {
+		return m.BatchUpsertColumnMetadataFunc(ctx, dataGraphID, modelID, req)
+	}
+	return &dgClient.ColumnMetadataListResponse{}, nil
 }
 
 // MockURNResolver implements handler.URNResolver for testing

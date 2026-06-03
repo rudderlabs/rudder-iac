@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.16.0](https://github.com/rudderlabs/rudder-iac/compare/v0.15.0...v0.16.0) (2026-05-26)
+
+
+### Features
+
+* **api:** parallelize GetTrackingPlansWithIdentifiers using tasker framework ([#513](https://github.com/rudderlabs/rudder-iac/issues/513)) ([7497dc8](https://github.com/rudderlabs/rudder-iac/commit/7497dc82c2aaf9a35c23049a19e31e5bdda27457))
+
+
+### Bug Fixes
+
+* add permissions content write to the triggered release please ([#570](https://github.com/rudderlabs/rudder-iac/issues/570)) ([aa42e4d](https://github.com/rudderlabs/rudder-iac/commit/aa42e4de4e86f5a8114eca70f9cb3bb602400fc2))
+* enforce tracking plan rule id uniqueness in semantic validation ([#580](https://github.com/rudderlabs/rudder-iac/issues/580)) ([ad99fda](https://github.com/rudderlabs/rudder-iac/commit/ad99fda067fa83913656fe91e4cd23b318ee8b0c))
+* restore v0.1 tracking plan includes support ([#548](https://github.com/rudderlabs/rudder-iac/issues/548)) ([ee2cd80](https://github.com/rudderlabs/rudder-iac/commit/ee2cd804d728ae883168e167928435f4b0c78fff))
+* **revert:** enforce tracking plan rule id uniqueness in semantic validation ([#590](https://github.com/rudderlabs/rudder-iac/issues/590)) ([a8bd0de](https://github.com/rudderlabs/rudder-iac/commit/a8bd0de550c54f7235701b9691ffe5aa750da6dd))
+* use v1 item_type/item_types for tracking plan additionalProperties default ([#583](https://github.com/rudderlabs/rudder-iac/issues/583)) ([6e4807e](https://github.com/rudderlabs/rudder-iac/commit/6e4807eca58398b4155cbe3129ab8624e8825069))
+
 ## [0.15.0](https://github.com/rudderlabs/rudder-iac/compare/v0.14.0...v0.15.0) (2026-05-18)
 
 

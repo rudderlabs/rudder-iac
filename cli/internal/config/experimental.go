@@ -20,6 +20,10 @@ type ExperimentalConfig struct {
 	Transformations bool `mapstructure:"transformations"`
 	// DataGraph enables data graph operations (sync, validate, import)
 	DataGraph bool `mapstructure:"dataGraph"`
+	// EventRuleIncludes enables including event rules from other tracking plans
+	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
+	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
+	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

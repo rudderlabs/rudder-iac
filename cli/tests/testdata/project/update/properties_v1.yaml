@@ -34,6 +34,20 @@ spec:
         - integer
         - number
 
+    - id: user_profiles
+      name: User Profiles
+      description: "List of user profile objects"
+      type: array
+      item_types:
+        - object
+
+    - id: user_metadata
+      name: User Metadata
+      description: "Optional user metadata object or null"
+      types:
+        - object
+        - "null"
+
     - id: user_email
       name: User Email
       description: "User email validated against the email_string custom type"

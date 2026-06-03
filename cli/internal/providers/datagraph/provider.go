@@ -227,9 +227,39 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 		PrimaryID:    spec.PrimaryID,
 		Root:         spec.Root,
 		Timestamp:    spec.Timestamp,
+		Columns:      columnsFromSpec(spec.Columns),
 	}
 
 	return resource, nil
+}
+
+// columnsFromSpec lowers the typed yaml column entries into the resource's
+// map-shaped slice so the syncer's mapstructure diff can compare slices via
+// reflect.DeepEqual. Returns nil for an empty input to preserve no-op semantics
+// in the diff (an empty resource map key is treated as missing).
+//
+// Entries are sorted by name so the local side has the same canonical order
+// as the server's response (which sorts by name in handler.populateColumnMetadata).
+// Without this normalisation, authoring `columns:` in any order other than
+// alphabetical would surface as a spurious diff against the server's sorted
+// shape, re-issuing BatchUpsertColumnMetadata on every apply.
+func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any {
+	if len(specColumns) == 0 {
+		return nil
+	}
+	sorted := make([]dgModel.ColumnMetadataYAML, len(specColumns))
+	copy(sorted, specColumns)
+	slices.SortFunc(sorted, func(a, b dgModel.ColumnMetadataYAML) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	out := make([]map[string]any, len(sorted))
+	for i, c := range sorted {
+		out[i] = map[string]any{
+			"name":         c.Name,
+			"display_name": c.DisplayName,
+		}
+	}
+	return out
 }
 
 
@@ -501,10 +531,30 @@ func (p *Provider) buildInlineModelSpecs(
 			PrimaryID:     remoteModel.PrimaryID,
 			Root:          remoteModel.Root,
 			Timestamp:     remoteModel.Timestamp,
+			Columns:       columnsForExport(remoteModel.Columns),
 		})
 	}
 
 	return modelSpecs, importResources
+}
+
+// columnsForExport translates the remote column-metadata rows into the
+// yaml-bound ColumnMetadataYAML shape consumed by the formatter. Empty input
+// yields nil so the `columns:` key is omitted from the produced yaml — we only
+// emit the block for models that actually carry server-side metadata, matching
+// the sparse authoring contract.
+func columnsForExport(rows []dgClient.ColumnMetadataRow) []dgModel.ColumnMetadataYAML {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]dgModel.ColumnMetadataYAML, len(rows))
+	for i, row := range rows {
+		out[i] = dgModel.ColumnMetadataYAML{
+			Name:        row.Name,
+			DisplayName: row.DisplayName,
+		}
+	}
+	return out
 }
 
 // parseModelReference parses a model reference like '#data-graph-model:user' and returns the URN

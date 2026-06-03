@@ -30,6 +30,7 @@ func NewCmdApply() *cobra.Command {
 		location string
 		dryRun   bool
 		confirm  bool
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -51,7 +52,12 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = deps.NewProject()
+			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			if err != nil {
+				return err
+			}
+
+			p = deps.NewProject(projectOpts...)
 
 			// Load and validate the project configuration
 			if err := p.Load(location); err != nil {
@@ -122,6 +128,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; earlier files take priority)")
 
 	return cmd
 }

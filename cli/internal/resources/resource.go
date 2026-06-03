@@ -41,7 +41,18 @@ func WithRawData(rawData any) ResourceOpts {
 	}
 }
 
-func NewResource(id string, resourceType string, data ResourceData, dependencies []string, opts ...ResourceOpts) *Resource {
+func WithAdditionalMetadata(metadata map[string]any) ResourceOpts {
+	return func(r *internal.Resource) {
+		r.AdditionalMetadata = metadata
+	}
+}
+
+func NewResource(
+	id string,
+	resourceType string,
+	data ResourceData,
+	dependencies []string,
+	opts ...ResourceOpts) *Resource {
 	r := &internal.Resource{
 		URN:          URN(id, resourceType),
 		ID:           id,
@@ -88,4 +99,8 @@ func (r *Resource) ImportMetadata() *internal.ResourceImportMetadata {
 
 func (r *Resource) FileMetadata() *internal.ResourceFileMetadata {
 	return r.r.FileMetadata
+}
+
+func (r *Resource) AdditionalMetadata() map[string]any {
+	return r.r.AdditionalMetadata
 }
