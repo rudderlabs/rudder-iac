@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var (
@@ -57,6 +58,10 @@ type Deps interface {
 	// CompositeProvider returns a composite provider aggregating all individual providers
 	// used by components that operate across multiple providers.
 	CompositeProvider() provider.Provider
+
+	// Registry builds a validation rule registry from the composite provider so
+	// the docs generator observes the same rule set as project validation.
+	Registry() (rules.Registry, error)
 
 	// NewProject creates a new project instance with the composite provider.
 	NewProject(opts ...project.ProjectOption) project.Project
@@ -180,6 +185,13 @@ func (d *deps) Providers() *Providers {
 
 func (d *deps) CompositeProvider() provider.Provider {
 	return d.compositeProvider
+}
+
+// Registry builds a validation rule registry from the composite provider,
+// sharing the same construction as project validation so the docs generator
+// observes an identical rule set.
+func (d *deps) Registry() (rules.Registry, error) {
+	return project.BuildRegistry(d.CompositeProvider())
 }
 
 // NewProject creates a project with composite provider.
