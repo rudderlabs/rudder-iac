@@ -1,7 +1,6 @@
 package docs
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,8 +81,8 @@ func TestSerializeYAMLStableIgnoringGeneratedAt(t *testing.T) {
 		dir2 = t.TempDir()
 	)
 
-	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir1, FormatBoth))
-	require.NoError(t, Serialize(fixtureDocumentedRules("2026-12-31T23:59:59Z"), dir2, FormatBoth))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir1))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-12-31T23:59:59Z"), dir2))
 
 	yaml1, err := os.ReadFile(filepath.Join(dir1, "rules.yaml"))
 	require.NoError(t, err)
@@ -94,66 +93,34 @@ func TestSerializeYAMLStableIgnoringGeneratedAt(t *testing.T) {
 	assert.Equal(t, stripGeneratedAt(string(yaml1)), stripGeneratedAt(string(yaml2)))
 }
 
-func TestSerializeJSONSnakeCase(t *testing.T) {
+func TestSerializeYAMLSnakeCase(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir, FormatBoth))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir))
 
-	data, err := os.ReadFile(filepath.Join(dir, "rules.json"))
+	data, err := os.ReadFile(filepath.Join(dir, "rules.yaml"))
 	require.NoError(t, err)
 
-	var generic interface{}
-	require.NoError(t, json.Unmarshal(data, &generic), "rules.json must be valid JSON")
-
 	content := string(data)
-	assert.Contains(t, content, `"rule_id"`)
-	assert.Contains(t, content, `"schema_version"`)
-	assert.NotContains(t, content, `"RuleID"`)
-	assert.NotContains(t, content, `"SchemaVersion"`)
+	assert.Contains(t, content, "rule_id:")
+	assert.Contains(t, content, "schema_version:")
+	assert.NotContains(t, content, "RuleID:")
+	assert.NotContains(t, content, "SchemaVersion:")
 }
 
-func TestSerializeWritesAndOverwritesBothFiles(t *testing.T) {
+func TestSerializeWritesAndOverwritesYAML(t *testing.T) {
 	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "rules.yaml")
 
-	var (
-		yamlPath = filepath.Join(dir, "rules.yaml")
-		jsonPath = filepath.Join(dir, "rules.json")
-	)
-
-	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir, FormatBoth))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir))
 	assert.FileExists(t, yamlPath)
-	assert.FileExists(t, jsonPath)
+	// JSON output was dropped — only rules.yaml is written.
+	assert.NoFileExists(t, filepath.Join(dir, "rules.json"))
 
 	// Second run with different content must overwrite cleanly.
-	require.NoError(t, Serialize(fixtureDocumentedRules("2026-06-01T00:00:00Z"), dir, FormatBoth))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-06-01T00:00:00Z"), dir))
 
 	yamlData, err := os.ReadFile(yamlPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(yamlData), "2026-06-01T00:00:00Z")
 	assert.NotContains(t, string(yamlData), "2026-01-01T00:00:00Z")
-}
-
-func TestSerializeFormatGatesFiles(t *testing.T) {
-	tests := []struct {
-		name         string
-		format       string
-		wantYAMLFile bool
-		wantJSONFile bool
-	}{
-		{name: "yaml only", format: FormatYAML, wantYAMLFile: true, wantJSONFile: false},
-		{name: "json only", format: FormatJSON, wantYAMLFile: false, wantJSONFile: true},
-		{name: "both", format: FormatBoth, wantYAMLFile: true, wantJSONFile: true},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir, tc.format))
-
-			_, yamlErr := os.Stat(filepath.Join(dir, "rules.yaml"))
-			_, jsonErr := os.Stat(filepath.Join(dir, "rules.json"))
-
-			assert.Equal(t, tc.wantYAMLFile, yamlErr == nil, "rules.yaml presence")
-			assert.Equal(t, tc.wantJSONFile, jsonErr == nil, "rules.json presence")
-		})
-	}
 }

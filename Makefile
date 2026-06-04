@@ -37,7 +37,7 @@ RULE_DOCS_OUTPUT_DIR ?= docs/generated
 
 .PHONY: gen-rule-docs
 gen-rule-docs: ## Generate the validation rule documentation artifact
-	$(GO) run ./cli/cmd/rudder-cli docs rules --output-dir $(RULE_DOCS_OUTPUT_DIR)
+	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
 
 .PHONY: test
 test: ## Run all unit tests (excluding e2e)

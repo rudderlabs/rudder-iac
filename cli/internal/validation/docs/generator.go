@@ -7,6 +7,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// schemaVersion is the version of the generated catalog schema. Bump it when
+// the resolved DocumentedRules shape changes in a way consumers must notice.
+const schemaVersion = 1
+
 // Generate joins the live validation rule registry (passed as flat syntactic
 // and semantic rule slices) with authored YAML doc entries and produces a
 // validated DocumentedRules.
@@ -38,7 +42,7 @@ func Generate(syntactic, semantic []rules.Rule, entries []RuleDocEntry, cliVersi
 	})
 
 	doc := DocumentedRules{
-		SchemaVersion: 1,
+		SchemaVersion: schemaVersion,
 		ToolMetadata: ToolMetadata{
 			CLIVersion:  cliVersion,
 			GeneratedAt: generatedAt,

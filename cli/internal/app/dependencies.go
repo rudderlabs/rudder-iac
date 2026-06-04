@@ -94,9 +94,44 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
 
+	cp, p, err := composeProviders(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return &deps{
+		client:            c,
+		providers:         p,
+		compositeProvider: cp,
+	}, nil
+}
+
+// NewCompositeProvider builds the composite provider without requiring an access
+// token. Rule-doc generation enumerates rules and reads authored fragments but
+// makes no network calls, so it deliberately skips the auth check NewDeps
+// enforces. It shares composeProviders with NewDeps so the documented rule set
+// stays identical to the one project validation observes — they can't drift.
+func NewCompositeProvider() (provider.Provider, error) {
+	c, err := setupClient(v)
+	if err != nil {
+		return nil, fmt.Errorf("setup client: %w", err)
+	}
+
+	cp, _, err := composeProviders(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return cp, nil
+}
+
+// composeProviders builds the provider set and aggregates it into a composite
+// provider. Shared by NewDeps and NewCompositeProvider so every consumer
+// observes the same providers (and therefore the same registered rules).
+func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	p, err := setupProviders(c)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize providers: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
 	cfg := config.GetConfig()
@@ -114,14 +149,10 @@ func NewDeps() (Deps, error) {
 
 	cp, err := provider.NewCompositeProvider(providerMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
 
-	return &deps{
-		client:            c,
-		providers:         p,
-		compositeProvider: cp,
-	}, nil
+	return cp, p, nil
 }
 
 func setupClient(version string) (*client.Client, error) {
