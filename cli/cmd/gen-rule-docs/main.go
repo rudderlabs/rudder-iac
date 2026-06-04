@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	projectdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
 
@@ -52,10 +53,21 @@ func run() error {
 		return fmt.Errorf("building rule registry: %w", err)
 	}
 
+	entries := cp.RuleDocEntries()
+
+	// Project-level (gatekeeper) rules are registered outside any provider, so
+	// their authored fragments are embedded here and appended to the
+	// provider-contributed entries.
+	projectEntries, err := docs.LoadRuleDocEntries(projectdocs.FragmentsFS, ".")
+	if err != nil {
+		return fmt.Errorf("loading project rule docs: %w", err)
+	}
+	entries = append(entries, projectEntries...)
+
 	doc, verrs := docs.Generate(
 		reg.AllSyntacticRules(),
 		reg.AllSemanticRules(),
-		cp.RuleDocEntries(),
+		entries,
 		app.GetVersion(),
 		time.Now().UTC().Format(time.RFC3339),
 	)

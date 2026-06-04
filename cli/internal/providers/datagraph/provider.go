@@ -13,6 +13,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	dgdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/relationship"
@@ -20,8 +22,8 @@ import (
 	dgRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 )
 
 // Provider wraps the base provider to provide a concrete type for dependency injection
@@ -106,6 +108,13 @@ func (p *Provider) SemanticRules() []rules.Rule {
 		dgRules.NewRelationshipUniquePairRule(),
 		dgRules.NewUniqueNamesValidRule(),
 	}
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the datagraph provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
+	entries, _ := docs.LoadRuleDocEntries(dgdocs.FragmentsFS, ".")
+	return entries
 }
 
 func (p *Provider) parseDataGraphWithInlineModels(s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -208,7 +217,6 @@ func (p *Provider) processInlineModel(dataGraphID string, modelSpec dgModel.Mode
 	return nil
 }
 
-
 // extractModelResource creates a ModelResource from an inline model spec
 func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelSpec) (*dgModel.ModelResource, error) {
 	// Create URN for the parent data graph
@@ -262,7 +270,6 @@ func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any 
 	return out
 }
 
-
 // extractDataGraphResource creates a DataGraphResource from a spec
 func (p *Provider) extractDataGraphResource(spec *dgModel.DataGraphSpec) (*dgModel.DataGraphResource, error) {
 	resource := &dgModel.DataGraphResource{
@@ -286,7 +293,6 @@ func (p *Provider) processInlineRelationship(dataGraphID, sourceModelID string, 
 
 	return nil
 }
-
 
 func (p *Provider) extractRelationshipResource(dataGraphID, sourceModelID string, spec *dgModel.RelationshipSpec) (*dgModel.RelationshipResource, error) {
 	// Create URN for data graph (parent)

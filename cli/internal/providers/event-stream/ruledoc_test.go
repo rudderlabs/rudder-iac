@@ -1,0 +1,25 @@
+package eventstream_test
+
+import (
+	"testing"
+
+	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestProviderRuleDocs runs the provider's authored fragments through the real
+// docs generator together with its live rules, asserting every rule resolves
+// and passes the DocumentedRules validation invariants.
+func TestProviderRuleDocs(t *testing.T) {
+	p := eventstream.New(source.NewMockSourceClient())
+
+	syntactic := p.SyntacticRules()
+	semantic := p.SemanticRules()
+
+	doc, verrs := docs.Generate(syntactic, semantic, p.RuleDocEntries(), "test", "2026-06-03T00:00:00Z")
+	assert.Empty(t, verrs, "expected no validation errors, got: %v", verrs)
+	require.Len(t, doc.Rules, len(syntactic)+len(semantic))
+}
