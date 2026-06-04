@@ -310,12 +310,15 @@ func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 
 	syntactic := []rules.Rule{
 		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. They use activePatterns as source of truth for the supported kinds and versions.
+		// independently. spec-syntax-valid and resource-kind-version-valid use
+		// activePatterns as source of truth for the supported kinds and versions.
+		// metadata-syntax-valid and duplicate-urn match all specs and do not
+		// consume activePatterns.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, activePatterns),
-		prules.NewDuplicateURNRule(provider.ParseSpec, activePatterns),
+		prules.NewMetadataSyntaxValidRule(provider.ParseSpec),
+		prules.NewDuplicateURNRule(provider.ParseSpec),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 
