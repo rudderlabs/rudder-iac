@@ -19,14 +19,16 @@ type MatchPatternDoc struct {
 }
 
 type ValidExample struct {
-	ExampleID string            `yaml:"example_id" validate:"required"`
-	Title     string            `yaml:"title"      validate:"required"`
-	Files     map[string]string `yaml:"files"      validate:"required,min=1"`
+	ExampleID   string            `yaml:"example_id"            validate:"required"`
+	Title       string            `yaml:"title"                 validate:"required"`
+	Description string            `yaml:"description,omitempty"`
+	Files       map[string]string `yaml:"files"                 validate:"required,min=1"`
 }
 
 type InvalidExample struct {
 	ExampleID           string               `yaml:"example_id"           validate:"required"`
 	Title               string               `yaml:"title"                validate:"required"`
+	Description         string               `yaml:"description,omitempty"`
 	Files               map[string]string    `yaml:"files"                validate:"required,min=1"`
 	ExpectedDiagnostics []ExpectedDiagnostic `yaml:"expected_diagnostics" validate:"required,min=1,dive"`
 }
