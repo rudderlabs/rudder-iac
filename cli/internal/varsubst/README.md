@@ -107,9 +107,12 @@ host: "{{ .DB_HOST }}"
 - The token is `{{ .NAME }}` — the **leading dot is required** (`{{ DB_HOST }}` is invalid).
 - Whitespace inside the braces is flexible: `{{.DB_HOST}}`, `{{ .DB_HOST }}`, and
   `{{  .DB_HOST  }}` are all equivalent.
-- Variable names must match `[A-Za-z_][A-Za-z0-9_]*` — start with a letter or underscore,
-  followed by letters, digits, or underscores. (So `{{ .123 }}` or `{{ .my-var }}` are
-  invalid syntax.)
+- Variable names may contain only **letters, digits, and underscores**, and must **start
+  with a letter or underscore** — the same rule as environment variable names (formally,
+  `[A-Za-z_][A-Za-z0-9_]*`). A few examples:
+  - `{{ .DB_HOST }}`, `{{ .db_host }}`, `{{ .host2 }}` — valid
+  - `{{ .my-var }}` — invalid: hyphens aren't allowed (use `{{ .my_var }}` instead)
+  - `{{ .123 }}` — invalid: can't start with a digit
 - You can put multiple tokens on one line:
 
   ```yaml
