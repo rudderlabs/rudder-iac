@@ -71,7 +71,6 @@ func TestGenerate_EnrichmentAndJoin(t *testing.T) {
 	require.Len(t, doc.Rules, 2)
 	assert.Equal(t, DocumentedRule{
 		RuleID:        "datacatalog/categories/spec-syntax-valid",
-		Provider:      "datacatalog",
 		Phase:         "syntactic",
 		Severity:      "error",
 		Description:   "categories spec must be syntactically valid",
@@ -80,7 +79,6 @@ func TestGenerate_EnrichmentAndJoin(t *testing.T) {
 	}, doc.Rules[0])
 	assert.Equal(t, DocumentedRule{
 		RuleID:        "project/duplicate-urn",
-		Provider:      "project",
 		Phase:         "semantic",
 		Severity:      "warning",
 		Description:   "URNs must be unique across the project",
@@ -141,7 +139,6 @@ func TestGenerate_MissingAuthoredEntryYieldsErrorsButReturnsDoc(t *testing.T) {
 	require.Len(t, doc.Rules, 1)
 	resolved := doc.Rules[0]
 	assert.Equal(t, "datacatalog/undocumented", resolved.RuleID)
-	assert.Equal(t, "datacatalog", resolved.Provider)
 	assert.Equal(t, "syntactic", resolved.Phase)
 	assert.Nil(t, resolved.MatchBehavior)
 }

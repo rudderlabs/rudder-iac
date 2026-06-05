@@ -55,7 +55,6 @@ type ToolMetadata struct {
 
 type DocumentedRule struct {
 	RuleID        string               `yaml:"rule_id"        validate:"required"`
-	Provider      string               `yaml:"provider"       validate:"required"`
 	Phase         string               `yaml:"phase"          validate:"required,oneof=syntactic semantic"`
 	Severity      string               `yaml:"severity"       validate:"required,oneof=error warning info"`
 	Description   string               `yaml:"description"    validate:"required"`

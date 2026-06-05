@@ -20,7 +20,6 @@ func fixtureDocumentedRules(generatedAt string) DocumentedRules {
 		Rules: []DocumentedRule{
 			{
 				RuleID:      "datacatalog/categories/spec-syntax-valid",
-				Provider:    "datacatalog",
 				Phase:       "syntactic",
 				Severity:    "error",
 				Description: "Spec syntax must be valid.",

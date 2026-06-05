@@ -10,7 +10,6 @@ import (
 func minimalRule(ruleID string) DocumentedRule {
 	return DocumentedRule{
 		RuleID:      ruleID,
-		Provider:    "test-provider",
 		Phase:       "syntactic",
 		Severity:    "error",
 		Description: "test description",

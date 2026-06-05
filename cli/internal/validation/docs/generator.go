@@ -2,7 +2,6 @@ package docs
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -70,21 +69,10 @@ func resolveRule(r rules.Rule, phase string, entryByID map[string]RuleDocEntry) 
 
 	return DocumentedRule{
 		RuleID:        ruleID,
-		Provider:      providerFromRuleID(ruleID),
 		Phase:         phase,
 		Severity:      r.Severity().String(),
 		Description:   r.Description(),
 		AppliesTo:     appliesTo,
 		MatchBehavior: matchBehavior,
 	}
-}
-
-// providerFromRuleID extracts the first "/"-separated segment of a rule ID,
-// which by convention names the owning provider (e.g.
-// "datacatalog/categories/spec-syntax-valid" -> "datacatalog").
-func providerFromRuleID(ruleID string) string {
-	if idx := strings.Index(ruleID, "/"); idx >= 0 {
-		return ruleID[:idx]
-	}
-	return ruleID
 }
