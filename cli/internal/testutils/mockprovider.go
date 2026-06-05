@@ -10,17 +10,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
 type MockProvider struct {
 	provider.EmptyProvider
-	supportedKinds             []string
-	supportedTypes             []string
+	supportedKinds []string
+	supportedTypes []string
 	// MatchPatterns when non-nil is returned by SupportedMatchPatterns; when nil, defers to EmptyProvider (nil).
-	MatchPatterns []rules.MatchPattern
+	MatchPatterns              []rules.MatchPattern
 	LoadSpecErr                error
 	LoadLegacySpecErr          error
 	GetResourceGraphVal        *resources.Graph
@@ -42,8 +42,8 @@ type MockProvider struct {
 	// It lets a test return URNs derived from the spec content — needed by
 	// gatekeeper rules (duplicate-urn, metadata import cross-check) whose
 	// behaviour depends on the actual URNs a provider would extract.
-	ParseSpecFn func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
-	RuleDocEntriesVal          []docs.RuleDocEntry
+	ParseSpecFn       func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
+	RuleDocEntriesVal []docs.RuleDocEntry
 
 	// Tracking calls
 	LoadSpecCalledWithArgs             []LoadSpecArgs
