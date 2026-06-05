@@ -45,22 +45,66 @@ func validateUniqueExampleIDs(rule *DocumentedRule) []error {
 	return errs
 }
 
+// validateAppliesToCoverage enforces a bidirectional, wildcard-aware
+// equivalence between the rule's real AppliesTo() (the "code" side, serialized
+// by the generator) and the union of authored match_behavior.applies_to (the
+// "docs" side). Both directions guard against docs↔code drift (DEX-406):
+//
+//   - code ⊆ docs: every (kind, version) the rule actually matches must be
+//     documented by some authored match_behavior — otherwise a rule that grows
+//     a new kind/version goes undocumented.
+//   - docs ⊆ code: every authored (kind, version) must be matched by the rule —
+//     otherwise a stale/over-declared fragment (referencing a kind/version the
+//     rule no longer matches) passes silently.
+//
+// Coverage uses pattern-subset semantics rather than string equality so "*"
+// wildcards (e.g. MatchAll gatekeeper rules) are handled consistently in both
+// directions.
 func validateAppliesToCoverage(rule *DocumentedRule) []error {
-	covered := make(map[string]struct{})
+	var authored []MatchPatternDoc
 	for _, mb := range rule.MatchBehavior {
-		for _, p := range mb.AppliesTo {
-			covered[p.Kind+":"+p.Version] = struct{}{}
-		}
+		authored = append(authored, mb.AppliesTo...)
 	}
 
 	var errs []error
-	for _, p := range rule.AppliesTo {
-		key := p.Kind + ":" + p.Version
-		if _, ok := covered[key]; !ok {
-			errs = append(errs, fmt.Errorf("rule %s: applies_to entry {kind: %s, version: %s} has no matching match_behavior coverage", rule.RuleID, p.Kind, p.Version))
+
+	// code ⊆ docs: each rule pattern must be contained in some authored pattern.
+	for _, c := range rule.AppliesTo {
+		if !coveredBy(c, authored) {
+			errs = append(errs, fmt.Errorf("rule %s: applies_to entry {kind: %s, version: %s} has no matching match_behavior coverage", rule.RuleID, c.Kind, c.Version))
 		}
 	}
+
+	// docs ⊆ code: each authored pattern must be contained in some rule pattern.
+	for _, a := range authored {
+		if !coveredBy(a, rule.AppliesTo) {
+			errs = append(errs, fmt.Errorf("rule %s: match_behavior applies_to entry {kind: %s, version: %s} is not covered by the rule's AppliesTo() (stale or over-declared)", rule.RuleID, a.Kind, a.Version))
+		}
+	}
+
 	return errs
+}
+
+// coveredBy reports whether pattern p is a subset of at least one pattern in
+// set — i.e. every concrete (kind, version) that p would match is also matched
+// by some pattern in set.
+func coveredBy(p MatchPatternDoc, set []MatchPatternDoc) bool {
+	for _, q := range set {
+		if patternSubset(p, q) {
+			return true
+		}
+	}
+	return false
+}
+
+// patternSubset reports whether every concrete (kind, version) matched by a is
+// also matched by b. A "*" on b widens b's coverage; a "*" on a widens what a
+// must have covered, so a wildcard in a is only a subset of a correspondingly
+// wildcarded b.
+func patternSubset(a, b MatchPatternDoc) bool {
+	kindOK := b.Kind == "*" || (a.Kind != "*" && a.Kind == b.Kind)
+	versionOK := b.Version == "*" || (a.Version != "*" && a.Version == b.Version)
+	return kindOK && versionOK
 }
 
 func validateRuleStruct(rule *DocumentedRule) []error {

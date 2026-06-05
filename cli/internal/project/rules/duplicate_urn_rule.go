@@ -12,11 +12,10 @@ type ParseSpecFunc func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 
 type duplicateURNRule struct {
 	parseSpec ParseSpecFunc
-	appliesTo []rules.MatchPattern
 }
 
-func NewDuplicateURNRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
-	return &duplicateURNRule{parseSpec: parseSpec, appliesTo: patterns}
+func NewDuplicateURNRule(parseSpec ParseSpecFunc) rules.Rule {
+	return &duplicateURNRule{parseSpec: parseSpec}
 }
 
 func (r *duplicateURNRule) ID() string               { return "project/duplicate-urn" }
@@ -24,7 +23,9 @@ func (r *duplicateURNRule) Severity() rules.Severity { return rules.Error }
 func (r *duplicateURNRule) Description() string {
 	return "URNs must be unique across the project"
 }
-func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern { return r.appliesTo }
+func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern {
+	return []rules.MatchPattern{rules.MatchAll()}
+}
 func (r *duplicateURNRule) Examples() rules.Examples {
 	return rules.Examples{}
 }

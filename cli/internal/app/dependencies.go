@@ -17,9 +17,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -106,13 +108,43 @@ func NewDeps() (Deps, error) {
 	}, nil
 }
 
-// NewCompositeProvider builds the composite provider without requiring an access
-// token. Rule-doc generation enumerates rules and reads authored fragments but
-// makes no network calls, so it deliberately skips the auth check NewDeps
-// enforces. It shares composeProviders with NewDeps so the documented rule set
-// stays identical to the one project validation observes — they can't drift.
-func NewCompositeProvider() (provider.Provider, error) {
-	c, err := setupClient(v)
+// GenerateRuleCatalog composes the same providers project validation uses and
+// hands them to ruledoc.Build, which joins the live rules with the authored
+// *.docs.yaml fragments and returns the validated catalog.
+//
+// Composition is the only part that needs the app's machinery, so it lives
+// here in the composition root; the provider-in, catalog-out assembly lives in
+// package ruledoc where it can be tested without credentials. Generation makes
+// no network calls, so it skips the access-token check NewDeps enforces.
+//
+// verrs carries catalog validation failures (e.g. a registered rule with no
+// authored fragment); a non-nil error means the catalog could not be assembled
+// at all. generatedAt is injected so callers own the timestamp.
+func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
+	cp, err := newCompositeProvider()
+	if err != nil {
+		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
+	}
+
+	return ruledoc.Build(cp, GetVersion(), generatedAt)
+}
+
+// newCompositeProvider builds the composite provider without requiring
+// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
+// enumerates rules and reads authored fragments but makes no network calls, so
+// it skips the auth check NewDeps enforces and feeds client.New a placeholder
+// token (an empty token is rejected outright, which would otherwise break
+// generation in CI where no credentials are configured). It shares
+// composeProviders with NewDeps so the documented rule set stays identical to
+// the one project validation observes — they can't drift.
+func newCompositeProvider() (provider.Provider, error) {
+	cfg := config.GetConfig()
+
+	c, err := client.New(
+		"rule-doc-generation", // unused: generation makes no API calls
+		client.WithBaseURL(cfg.APIURL),
+		client.WithUserAgent("rudder-cli/"+v),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
@@ -126,7 +158,7 @@ func NewCompositeProvider() (provider.Provider, error) {
 }
 
 // composeProviders builds the provider set and aggregates it into a composite
-// provider. Shared by NewDeps and NewCompositeProvider so every consumer
+// provider. Shared by NewDeps and newCompositeProvider so every consumer
 // observes the same providers (and therefore the same registered rules).
 func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	p, err := setupProviders(c)
