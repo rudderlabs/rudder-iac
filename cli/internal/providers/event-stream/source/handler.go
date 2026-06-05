@@ -10,6 +10,7 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -492,6 +493,29 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 		return fmt.Errorf("deleting event stream source: %w", err)
 	}
 	return nil
+}
+
+func (h *Handler) List(ctx context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+
+	result := make([]resources.ResourceData, 0, len(sources))
+	for _, source := range sources {
+		resourceData := resources.ResourceData{
+			IDKey:               source.ID,
+			NameKey:             source.Name,
+			SourceDefinitionKey: source.Type,
+			EnabledKey:          source.Enabled,
+		}
+		if source.ExternalID != "" {
+			resourceData[ExternalIDKey] = source.ExternalID
+		}
+		result = append(result, resourceData)
+	}
+
+	return result, nil
 }
 
 func (h *Handler) Import(ctx context.Context, id string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {

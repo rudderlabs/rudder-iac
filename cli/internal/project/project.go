@@ -61,6 +61,17 @@ func WithLoader(l Loader) ProjectOption {
 	}
 }
 
+// WithRenderer allows providing a custom validation Renderer.
+// Defaults to a stdout text renderer when unset; tests use this to
+// capture rendered diagnostics into a buffer for assertions.
+func WithRenderer(r renderer.Renderer) ProjectOption {
+	return func(p *project) {
+		if r != nil {
+			p.renderer = r
+		}
+	}
+}
+
 // WithSubstitutor sets an optional variable substitutor that runs on raw spec
 // bytes before parsing. When nil (the default), no substitution happens.
 func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
