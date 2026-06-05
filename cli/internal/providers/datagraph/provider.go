@@ -257,6 +257,7 @@ func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any 
 		out[i] = map[string]any{
 			"name":         c.Name,
 			"display_name": c.DisplayName,
+			"description":  c.Description,
 		}
 	}
 	return out
@@ -552,6 +553,7 @@ func columnsForExport(rows []dgClient.ColumnMetadataRow) []dgModel.ColumnMetadat
 		out[i] = dgModel.ColumnMetadataYAML{
 			Name:        row.Name,
 			DisplayName: row.DisplayName,
+			Description: row.Description,
 		}
 	}
 	return out
