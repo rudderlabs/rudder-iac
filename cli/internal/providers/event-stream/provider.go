@@ -10,11 +10,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -233,6 +235,13 @@ func (p *Provider) FormatForExport(
 		result = append(result, entities...)
 	}
 	return result, nil
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the event-stream provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
+	entries, _ := docs.LoadRuleDocEntries(esdocs.FragmentsFS, ".")
+	return entries
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {

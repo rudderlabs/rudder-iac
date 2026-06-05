@@ -33,6 +33,12 @@ build:
 clean:
 	rm -rf bin
 
+RULE_DOCS_OUTPUT_DIR ?= docs/generated
+
+.PHONY: gen-rule-docs
+gen-rule-docs: ## Generate the validation rule documentation artifact
+	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
+
 .PHONY: test
 test: ## Run all unit tests (excluding e2e)
 	@go test --race --covermode=atomic --coverprofile=coverage-unit.out $(shell go list ./... | grep -v /cli/tests)

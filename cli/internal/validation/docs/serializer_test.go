@@ -1,0 +1,125 @@
+package docs
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func fixtureDocumentedRules(generatedAt string) DocumentedRules {
+	return DocumentedRules{
+		SchemaVersion: 1,
+		ToolMetadata: ToolMetadata{
+			CLIVersion:  "1.2.3",
+			GeneratedAt: generatedAt,
+		},
+		Rules: []DocumentedRule{
+			{
+				RuleID:      "datacatalog/categories/spec-syntax-valid",
+				Phase:       "syntactic",
+				Severity:    "error",
+				Description: "Spec syntax must be valid.",
+				AppliesTo: []MatchPatternDoc{
+					{Kind: "categories", Version: "v1"},
+				},
+				MatchBehavior: []MatchBehaviorEntry{
+					{
+						AppliesTo: []MatchPatternDoc{
+							{Kind: "categories", Version: "v1"},
+						},
+						Valid: []ValidExample{
+							{
+								ExampleID: "ok-1",
+								Title:     "A valid spec",
+								Files:     map[string]string{"a.yaml": "kind: categories"},
+							},
+						},
+						Invalid: []InvalidExample{
+							{
+								ExampleID: "bad-1",
+								Title:     "A broken spec",
+								Files:     map[string]string{"b.yaml": "kind: ???"},
+								ExpectedDiagnostics: []ExpectedDiagnostic{
+									{
+										File:            "b.yaml",
+										Reference:       "$.kind",
+										Severity:        "error",
+										MessageContains: "invalid",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// stripGeneratedAt removes the generated_at line so two runs with different
+// timestamps can be compared for byte-stability of everything else.
+func stripGeneratedAt(s string) string {
+	lines := strings.Split(s, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.Contains(line, "generated_at") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+func TestSerializeYAMLStableIgnoringGeneratedAt(t *testing.T) {
+	var (
+		dir1 = t.TempDir()
+		dir2 = t.TempDir()
+	)
+
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir1))
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-12-31T23:59:59Z"), dir2))
+
+	yaml1, err := os.ReadFile(filepath.Join(dir1, "rules.yaml"))
+	require.NoError(t, err)
+	yaml2, err := os.ReadFile(filepath.Join(dir2, "rules.yaml"))
+	require.NoError(t, err)
+
+	assert.Contains(t, string(yaml1), "generated_at")
+	assert.Equal(t, stripGeneratedAt(string(yaml1)), stripGeneratedAt(string(yaml2)))
+}
+
+func TestSerializeYAMLSnakeCase(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir))
+
+	data, err := os.ReadFile(filepath.Join(dir, "rules.yaml"))
+	require.NoError(t, err)
+
+	content := string(data)
+	assert.Contains(t, content, "rule_id:")
+	assert.Contains(t, content, "schema_version:")
+	assert.NotContains(t, content, "RuleID:")
+	assert.NotContains(t, content, "SchemaVersion:")
+}
+
+func TestSerializeWritesAndOverwritesYAML(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "rules.yaml")
+
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-01-01T00:00:00Z"), dir))
+	assert.FileExists(t, yamlPath)
+	// JSON output was dropped — only rules.yaml is written.
+	assert.NoFileExists(t, filepath.Join(dir, "rules.json"))
+
+	// Second run with different content must overwrite cleanly.
+	require.NoError(t, Serialize(fixtureDocumentedRules("2026-06-01T00:00:00Z"), dir))
+
+	yamlData, err := os.ReadFile(yamlPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(yamlData), "2026-06-01T00:00:00Z")
+	assert.NotContains(t, string(yamlData), "2026-01-01T00:00:00Z")
+}

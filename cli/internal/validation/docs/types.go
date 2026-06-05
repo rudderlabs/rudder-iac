@@ -19,14 +19,16 @@ type MatchPatternDoc struct {
 }
 
 type ValidExample struct {
-	ExampleID string            `yaml:"example_id" validate:"required"`
-	Title     string            `yaml:"title"      validate:"required"`
-	Files     map[string]string `yaml:"files"      validate:"required,min=1"`
+	ExampleID   string            `yaml:"example_id"            validate:"required"`
+	Title       string            `yaml:"title"                 validate:"required"`
+	Description string            `yaml:"description,omitempty"`
+	Files       map[string]string `yaml:"files"                 validate:"required,min=1"`
 }
 
 type InvalidExample struct {
 	ExampleID           string               `yaml:"example_id"           validate:"required"`
 	Title               string               `yaml:"title"                validate:"required"`
+	Description         string               `yaml:"description,omitempty"`
 	Files               map[string]string    `yaml:"files"                validate:"required,min=1"`
 	ExpectedDiagnostics []ExpectedDiagnostic `yaml:"expected_diagnostics" validate:"required,min=1,dive"`
 }
@@ -53,7 +55,6 @@ type ToolMetadata struct {
 
 type DocumentedRule struct {
 	RuleID        string               `yaml:"rule_id"        validate:"required"`
-	Provider      string               `yaml:"provider"       validate:"required"`
 	Phase         string               `yaml:"phase"          validate:"required,oneof=syntactic semantic"`
 	Severity      string               `yaml:"severity"       validate:"required,oneof=error warning info"`
 	Description   string               `yaml:"description"    validate:"required"`

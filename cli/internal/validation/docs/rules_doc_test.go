@@ -10,7 +10,6 @@ import (
 func minimalRule(ruleID string) DocumentedRule {
 	return DocumentedRule{
 		RuleID:      ruleID,
-		Provider:    "test-provider",
 		Phase:       "syntactic",
 		Severity:    "error",
 		Description: "test description",
@@ -108,6 +107,9 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 			name: "duplicate example_id across valid and invalid in same entry is flagged",
 			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
+				// Keep applies_to coverage clean so this case isolates
+				// duplicate-example_id detection, not coverage drift.
+				r.AppliesTo = append(r.AppliesTo, MatchPatternDoc{Kind: "source", Version: "v2"})
 				r.MatchBehavior = append(r.MatchBehavior, MatchBehaviorEntry{
 					AppliesTo: []MatchPatternDoc{{Kind: "source", Version: "v2"}},
 					Valid: []ValidExample{
@@ -132,6 +134,12 @@ func TestCatalogValidate_UniqueExampleIDs(t *testing.T) {
 			name: "duplicate example_id across match_behavior entries is flagged",
 			rule: func() DocumentedRule {
 				r := minimalRule("rule-A")
+				// Keep applies_to coverage clean so this case isolates
+				// duplicate-example_id detection, not coverage drift.
+				r.AppliesTo = append(r.AppliesTo,
+					MatchPatternDoc{Kind: "source", Version: "v2"},
+					MatchPatternDoc{Kind: "source", Version: "v3"},
+				)
 				mbWithDup := func(kind, version string) MatchBehaviorEntry {
 					return MatchBehaviorEntry{
 						AppliesTo: []MatchPatternDoc{{Kind: kind, Version: version}},
@@ -190,6 +198,55 @@ func TestCatalogValidate_AppliesToCoverage(t *testing.T) {
 				return r
 			}(),
 			wantLen: 2,
+		},
+		{
+			// authored ⊆ code direction (DEX-406): an authored pair the rule
+			// no longer matches is stale/over-declared and must be flagged.
+			name: "authored pair absent from rule AppliesTo is flagged (over-declaration)",
+			rule: func() DocumentedRule {
+				r := minimalRule("rule-A")
+				r.MatchBehavior[0].AppliesTo = append(r.MatchBehavior[0].AppliesTo,
+					MatchPatternDoc{Kind: "destination", Version: "v1"})
+				return r
+			}(),
+			wantLen: 1,
+		},
+		{
+			// wildcard-aware (DEX-406): MatchAll gatekeeper shape — code {*,*}
+			// documented by authored {*,*} is exact coverage, no errors.
+			name: "wildcard code covered by wildcard authored produces no errors",
+			rule: func() DocumentedRule {
+				r := minimalRule("rule-A")
+				r.AppliesTo = []MatchPatternDoc{{Kind: "*", Version: "*"}}
+				r.MatchBehavior[0].AppliesTo = []MatchPatternDoc{{Kind: "*", Version: "*"}}
+				return r
+			}(),
+			wantLen: 0,
+		},
+		{
+			// wildcard-aware (DEX-406): concrete code {source,v1} is contained
+			// in authored {*,*} (so code⊆authored holds), but authored {*,*}
+			// claims more than the rule matches → authored⊄code → 1 error.
+			name: "concrete code under wildcard authored flags over-declaration only",
+			rule: func() DocumentedRule {
+				r := minimalRule("rule-A")
+				r.AppliesTo = []MatchPatternDoc{{Kind: "source", Version: "v1"}}
+				r.MatchBehavior[0].AppliesTo = []MatchPatternDoc{{Kind: "*", Version: "*"}}
+				return r
+			}(),
+			wantLen: 1,
+		},
+		{
+			// wildcard-aware (DEX-406): authored {*,v1} claims all kinds at v1
+			// but the rule only matches {source,v1} → over-declared.
+			name: "wildcard-kind authored not fully covered by concrete code is flagged",
+			rule: func() DocumentedRule {
+				r := minimalRule("rule-A")
+				r.AppliesTo = []MatchPatternDoc{{Kind: "source", Version: "v1"}}
+				r.MatchBehavior[0].AppliesTo = []MatchPatternDoc{{Kind: "*", Version: "v1"}}
+				return r
+			}(),
+			wantLen: 1,
 		},
 	}
 
