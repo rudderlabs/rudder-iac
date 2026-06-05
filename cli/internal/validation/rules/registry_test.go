@@ -259,6 +259,19 @@ func TestRegistry_AllSyntacticRules(t *testing.T) {
 		assert.Contains(t, ruleIDs(all), "kind-rule")
 		assert.Contains(t, ruleIDs(all), "exact-rule")
 	})
+
+	t.Run("returns all registered syntactic rules", func(t *testing.T) {
+		registry := NewRegistry(registryTestSupportedPatterns)
+
+		registry.RegisterSyntactic(&mockRule{id: "rule-a", appliesTo: []MatchPattern{MatchKind("properties")}})
+		registry.RegisterSyntactic(&mockRule{id: "rule-b", appliesTo: []MatchPattern{MatchAll()}})
+
+		all := registry.AllSyntacticRules()
+		assert.Len(t, all, 2)
+		assert.Contains(t, ruleIDs(all), "rule-a")
+		assert.Contains(t, ruleIDs(all), "rule-b")
+	})
+
 }
 
 func TestRegistry_RegisterAppliesToValidation(t *testing.T) {
@@ -333,6 +346,20 @@ func TestRegistry_RegisterAppliesToValidation(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRegistry_AllSemanticRules(t *testing.T) {
+	t.Run("returns all registered semantic rules", func(t *testing.T) {
+		registry := NewRegistry(registryTestSupportedPatterns)
+
+		registry.RegisterSemantic(&mockRule{id: "sem-a", appliesTo: []MatchPattern{MatchKind("events")}})
+		registry.RegisterSemantic(&mockRule{id: "sem-b", appliesTo: []MatchPattern{MatchAll()}})
+
+		all := registry.AllSemanticRules()
+		assert.Len(t, all, 2)
+		assert.Contains(t, ruleIDs(all), "sem-a")
+		assert.Contains(t, ruleIDs(all), "sem-b")
+	})
 }
 
 // ruleIDs is a helper function to extract rule IDs from a slice of rules

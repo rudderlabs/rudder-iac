@@ -295,22 +295,32 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
+	return BuildRegistry(p.provider)
+}
+
+// BuildRegistry constructs the validation rule registry for a provider. It is
+// shared by project loading and the docs generator so both observe an identical
+// rule set built from the provider's supported match patterns.
+func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 	// Active patterns become the source of truth for the
 	// validation pipeline to determine which unique kinds and versions
 	// are supported in the system.
-	activePatterns := p.provider.SupportedMatchPatterns()
+	activePatterns := provider.SupportedMatchPatterns()
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
 		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. They use activePatterns as source of truth for the supported kinds and versions.
+		// independently. spec-syntax-valid and resource-kind-version-valid use
+		// activePatterns as source of truth for the supported kinds and versions.
+		// metadata-syntax-valid and duplicate-urn match all specs and do not
+		// consume activePatterns.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(p.provider.ParseSpec, activePatterns),
-		prules.NewDuplicateURNRule(p.provider.ParseSpec, activePatterns),
+		prules.NewMetadataSyntaxValidRule(provider.ParseSpec),
+		prules.NewDuplicateURNRule(provider.ParseSpec),
 	}
-	syntactic = append(syntactic, p.provider.SyntacticRules()...)
+	syntactic = append(syntactic, provider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -318,7 +328,7 @@ func (p *project) registry() (rules.Registry, error) {
 		}
 	}
 
-	for _, rule := range p.provider.SemanticRules() {
+	for _, rule := range provider.SemanticRules() {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}

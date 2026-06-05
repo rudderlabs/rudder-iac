@@ -34,6 +34,10 @@ go.work.sum
 # Added by goreleaser init:
 dist/
 
+# Generated validation rule catalog (produced as a CI build artifact via
+# `make gen-rule-docs`, not committed)
+docs/generated/
+
 # Cline memory-bank
 memory-bank
 

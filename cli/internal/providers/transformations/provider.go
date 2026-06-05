@@ -22,8 +22,11 @@ import (
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
+
+	tfdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/docs"
 )
 
 var log = logger.New("transformationsprovider")
@@ -93,6 +96,13 @@ func (p *Provider) SemanticRules() []vrules.Rule {
 		trules.NewTransformationSemanticValidRule(),
 		lrules.NewLibrarySemanticValidRule(),
 	}
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the transformations provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []vdocs.RuleDocEntry {
+	entries, _ := vdocs.LoadRuleDocEntries(tfdocs.FragmentsFS, ".")
+	return entries
 }
 
 // MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations
