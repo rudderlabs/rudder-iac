@@ -22,7 +22,7 @@ func TestGenerateRuleCatalog_VerifiesCleanly(t *testing.T) {
 	Initialise("0.0.0-test")
 	config.InitConfig(config.DefaultConfigFile())
 
-	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")
+	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z", false)
 	require.NoError(t, err)
 	assert.Empty(t, verrs, "every authored example must verify cleanly through the real engine")
 	assert.NotEmpty(t, doc.Rules, "catalog should document at least one rule")

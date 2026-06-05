@@ -34,6 +34,7 @@ func main() {
 
 func run() error {
 	outputDir := flag.String("output-dir", "./docs/generated/", "Directory to write the generated rules.yaml artifact")
+	strict := flag.Bool("strict-verify", false, "Fail if the engine produces diagnostics beyond those documented (exact-match)")
 	flag.Parse()
 
 	app.Initialise(version)
@@ -42,7 +43,7 @@ func run() error {
 	// All composition lives in app.GenerateRuleCatalog so the documented rule
 	// set is built from the same providers and registry project validation
 	// uses; this command only chooses the timestamp and writes the result.
-	doc, verrs, err := app.GenerateRuleCatalog(time.Now().UTC().Format(time.RFC3339))
+	doc, verrs, err := app.GenerateRuleCatalog(time.Now().UTC().Format(time.RFC3339), *strict)
 	if err != nil {
 		return err
 	}

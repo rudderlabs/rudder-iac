@@ -63,3 +63,10 @@ func TestMatchValid_ProducesDiagnostic_Fails(t *testing.T) {
 	misses := MatchValid(ex, produced)
 	assert.NotEmpty(t, misses)
 }
+
+func TestMatchInvalid_StrictRejectsExtra(t *testing.T) {
+	ex := InvalidExample{ExampleID: "x", ExpectedDiagnostics: []ExpectedDiagnostic{{File: "a.yaml", Severity: "error", MessageContains: "boom"}}}
+	produced := []ProducedDiagnostic{{File: "a.yaml", Severity: "error", Message: "boom"}, {File: "a.yaml", Severity: "error", Message: "surprise extra"}}
+	assert.Empty(t, MatchInvalid(ex, produced, ModeSubset))   // subset passes
+	assert.Len(t, MatchInvalid(ex, produced, ModeStrict), 1)  // strict flags the extra
+}
