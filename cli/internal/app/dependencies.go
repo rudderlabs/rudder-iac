@@ -126,7 +126,7 @@ func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, err
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
 	}
 
-	return ruledoc.Build(cp, GetVersion(), generatedAt)
+	return ruledoc.Build(cp, GetVersion(), generatedAt, docs.ModeSubset)
 }
 
 // newCompositeProvider builds the composite provider without requiring

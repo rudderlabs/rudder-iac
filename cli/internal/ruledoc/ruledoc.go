@@ -29,8 +29,9 @@ import (
 // authored fragment) and is returned rather than raised so the caller can
 // surface every problem at once; a non-nil error means the catalog could not
 // be assembled at all. generatedAt is injected so callers own the timestamp —
-// the real clock in the command, a fixed value in tests.
-func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.DocumentedRules, []error, error) {
+// the real clock in the command, a fixed value in tests. mode controls how
+// strictly example expectations are matched during verification.
+func Build(cp provider.Provider, cliVersion, generatedAt string, mode docs.VerifyMode) (docs.DocumentedRules, []error, error) {
 	reg, err := project.BuildRegistry(cp)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
@@ -53,5 +54,13 @@ func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.Documente
 		cliVersion,
 		generatedAt,
 	)
+
+	// Run example verification only when structural validation is clean: an
+	// incomplete or invalid catalog (missing fragments, mismatched rule IDs)
+	// cannot be meaningfully executed — fix structure first, then verify behaviour.
+	if len(verrs) == 0 {
+		verrs = append(verrs, verify(reg, doc, mode)...)
+	}
+
 	return doc, verrs, nil
 }

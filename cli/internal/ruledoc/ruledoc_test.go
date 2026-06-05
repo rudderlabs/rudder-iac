@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,9 +17,12 @@ import (
 // catalog validates with zero errors. This is the assembly seam that package
 // app exercises end-to-end against the real composed providers.
 func TestBuild_GatekeeperOnly(t *testing.T) {
-	cp := &testutils.MockProvider{}
+	// NewMockProvider initialises ParseSpecVal to a non-nil ParsedSpec so that
+	// the duplicate-urn rule (wired via provider.ParseSpec) can safely iterate
+	// URNs when verify() runs examples through the engine.
+	cp := testutils.NewMockProvider(nil, nil)
 
-	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z")
+	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z", docs.ModeSubset)
 	require.NoError(t, err)
 	assert.Empty(t, verrs, "gatekeeper fragments must cover the gatekeeper rules exactly")
 
