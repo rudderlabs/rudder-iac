@@ -38,6 +38,11 @@ type MockProvider struct {
 	ImportErr                  error
 	ParseSpecVal               *specs.ParsedSpec
 	ParseSpecErr               error
+	// ParseSpecFn, when non-nil, takes precedence over ParseSpecVal/ParseSpecErr.
+	// It lets a test return URNs derived from the spec content — needed by
+	// gatekeeper rules (duplicate-urn, metadata import cross-check) whose
+	// behaviour depends on the actual URNs a provider would extract.
+	ParseSpecFn func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	RuleDocEntriesVal          []docs.RuleDocEntry
 
 	// Tracking calls
@@ -124,6 +129,9 @@ func (m *MockProvider) SupportedMatchPatterns() []rules.MatchPattern {
 
 func (m *MockProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	m.ParseSpecCalledWithArgs = append(m.ParseSpecCalledWithArgs, ParseSpecArgs{Path: path, Spec: s})
+	if m.ParseSpecFn != nil {
+		return m.ParseSpecFn(path, s)
+	}
 	return m.ParseSpecVal, m.ParseSpecErr
 }
 

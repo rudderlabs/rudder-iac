@@ -60,7 +60,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/properties/0/propConfig/format"
             severity: "error"
-            message_contains: "not_valid"
+            message_contains: "'format' must be one of"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "properties"
@@ -102,4 +102,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/properties/0/propConfig/format"
             severity: "error"
-            message_contains: "totally_wrong"
+            message_contains: "'format' must be one of"

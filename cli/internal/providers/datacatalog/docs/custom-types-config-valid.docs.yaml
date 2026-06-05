@@ -59,7 +59,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/types/0/config/format"
             severity: "error"
-            message_contains: "invalid_format"
+            message_contains: "'format' must be one of"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "custom-types"
@@ -100,4 +100,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/types/0/config/format"
             severity: "error"
-            message_contains: "not_a_valid_format"
+            message_contains: "'format' must be one of"

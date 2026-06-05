@@ -13,16 +13,15 @@ match_behavior:
             metadata:
               name: my-transformations
             spec:
-              transformations:
-                - id: my-transformation
-                  name: My Transformation
-                  description: Enriches events with additional metadata
-                  language: javascript
-                  code: |
-                    export function transformEvent(event, metadata) {
-                      event.properties.enriched = true;
-                      return event;
-                    }
+              id: my-transformation
+              name: My Transformation
+              description: Enriches events with additional metadata
+              language: javascript
+              code: |
+                export function transformEvent(event, metadata) {
+                  event.properties.enriched = true;
+                  return event;
+                }
     invalid:
       - example_id: "transformation-spec-syntax-valid-missing-id"
         title: "Transformation spec missing required id field"
@@ -33,13 +32,12 @@ match_behavior:
             metadata:
               name: my-transformations
             spec:
-              transformations:
-                - name: My Transformation
-                  language: javascript
-                  code: |
-                    export function transformEvent(event, metadata) {
-                      return event;
-                    }
+              name: My Transformation
+              language: javascript
+              code: |
+                export function transformEvent(event, metadata) {
+                  return event;
+                }
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/id"
@@ -54,13 +52,12 @@ match_behavior:
             metadata:
               name: my-transformations
             spec:
-              transformations:
-                - id: my-transformation
-                  name: My Transformation
-                  code: |
-                    export function transformEvent(event, metadata) {
-                      return event;
-                    }
+              id: my-transformation
+              name: My Transformation
+              code: |
+                export function transformEvent(event, metadata) {
+                  return event;
+                }
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/language"
@@ -75,14 +72,13 @@ match_behavior:
             metadata:
               name: my-transformations
             spec:
-              transformations:
-                - id: my-transformation
-                  name: My Transformation
-                  language: ruby
-                  code: |
-                    def transform_event(event, metadata)
-                      event
-                    end
+              id: my-transformation
+              name: My Transformation
+              language: ruby
+              code: |
+                def transform_event(event, metadata)
+                  event
+                end
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/language"
@@ -97,10 +93,9 @@ match_behavior:
             metadata:
               name: my-transformations
             spec:
-              transformations:
-                - id: my-transformation
-                  name: My Transformation
-                  language: javascript
+              id: my-transformation
+              name: My Transformation
+              language: javascript
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/code"
