@@ -23,11 +23,21 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # This job only reads the tree, builds, and uploads an artifact — it
+          # never pushes. Don't leave the git credential on disk where the
+          # artifact upload could capture it (zizmor artipacked).
+          persist-credentials: false
 
       - name: setup go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: 'go.mod'
+          # This workflow publishes a runtime artifact on push to main, so a
+          # poisoned build/module cache could be baked into it. Generation is
+          # fast and the cache buys little here (zizmor cache-poisoning).
+          # Matches release.yml / typer-typescript-validate.yml.
+          cache: false
 
       # Doubles as the drift/completeness gate: gen-rule-docs validates the
       # joined catalog and exits non-zero if any rule lacks an authored doc
