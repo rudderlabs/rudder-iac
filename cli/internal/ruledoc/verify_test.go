@@ -38,9 +38,9 @@ spec:
 						AppliesTo: []docs.MatchPatternDoc{{Kind: "*", Version: "*"}},
 						Invalid: []docs.InvalidExample{
 							{
-								ExampleID:   "missing-kind",
-								Title:       "spec missing kind field",
-								Files:       map[string]string{"spec.yaml": missingKindYAML},
+								ExampleID: "missing-kind",
+								Title:     "spec missing kind field",
+								Files:     map[string]string{"spec.yaml": missingKindYAML},
 								ExpectedDiagnostics: []docs.ExpectedDiagnostic{
 									{
 										File:            "spec.yaml",
@@ -81,9 +81,9 @@ func TestVerify_SemanticWithoutFactoryErrors(t *testing.T) {
 						AppliesTo: []docs.MatchPatternDoc{{Kind: "properties", Version: "rudder/v1"}},
 						Invalid: []docs.InvalidExample{
 							{
-								ExampleID:   "semantic-invalid",
-								Title:       "semantic invalid example",
-								Files:       map[string]string{"spec.yaml": "version: rudder/v1\nkind: properties\n"},
+								ExampleID: "semantic-invalid",
+								Title:     "semantic invalid example",
+								Files:     map[string]string{"spec.yaml": "version: rudder/v1\nkind: properties\n"},
 								ExpectedDiagnostics: []docs.ExpectedDiagnostic{
 									{File: "spec.yaml", Reference: "/spec/properties", Severity: "error", MessageContains: "some message"},
 								},
