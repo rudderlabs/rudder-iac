@@ -57,6 +57,10 @@ match_behavior:
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
+          - file: "spec2.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "retl-source-sql-model"
@@ -108,6 +112,10 @@ match_behavior:
               sql: SELECT user_id FROM churn_signals
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"
+          - file: "spec2.yaml"
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"

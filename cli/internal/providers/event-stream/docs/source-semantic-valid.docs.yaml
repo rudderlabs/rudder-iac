@@ -94,6 +94,10 @@ match_behavior:
             reference: "/name"
             severity: "error"
             message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
+          - file: "source-b.yaml"
+            reference: "/name"
+            severity: "error"
+            message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
   # Current spec version (rudder/v1) applies the same semantic checks with the modern ref format.
   - applies_to:
       - kind: "event-stream-source"
@@ -182,6 +186,10 @@ match_behavior:
               type: node
         expected_diagnostics:
           - file: "source-a.yaml"
+            reference: "/name"
+            severity: "error"
+            message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
+          - file: "source-b.yaml"
             reference: "/name"
             severity: "error"
             message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"

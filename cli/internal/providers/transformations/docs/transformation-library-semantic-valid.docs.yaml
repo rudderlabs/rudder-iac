@@ -60,3 +60,7 @@ match_behavior:
             reference: "/import_name"
             severity: "error"
             message_contains: "import_name 'mathUtils' is duplicate"
+          - file: "spec2.yaml"
+            reference: "/import_name"
+            severity: "error"
+            message_contains: "import_name 'mathUtils' is duplicate"

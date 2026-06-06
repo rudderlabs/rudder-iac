@@ -84,6 +84,10 @@ match_behavior:
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'My Tracking Plan' within kind 'tp'"
+          - file: "spec2.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'My Tracking Plan' within kind 'tp'"
   # Current spec version (rudder/v1) uses kind "tracking-plan".
   - applies_to:
       - kind: "tracking-plan"
@@ -159,6 +163,10 @@ match_behavior:
                   event: "#event:page_view"
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'My Tracking Plan' within kind 'tracking-plan'"
+          - file: "spec2.yaml"
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'My Tracking Plan' within kind 'tracking-plan'"
