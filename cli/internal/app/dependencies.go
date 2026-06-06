@@ -131,7 +131,15 @@ func GenerateRuleCatalog(generatedAt string, strict bool) (docs.DocumentedRules,
 		mode = docs.ModeStrict
 	}
 
-	return ruledoc.Build(cp, GetVersion(), generatedAt, mode)
+	// Semantic verification loads each example into an isolated provider and
+	// reads back its resource graph; a fresh provider per example prevents
+	// state from one example bleeding into the next. newCompositeProvider is
+	// credential-free, matching the catalog provider above.
+	newProvider := func() (provider.Provider, error) {
+		return newCompositeProvider()
+	}
+
+	return ruledoc.Build(cp, GetVersion(), generatedAt, mode, newProvider)
 }
 
 // newCompositeProvider builds the composite provider without requiring
