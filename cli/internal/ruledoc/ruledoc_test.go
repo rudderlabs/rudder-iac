@@ -47,7 +47,9 @@ func TestBuild_GatekeeperOnly(t *testing.T) {
 		ParseSpecFn: extractEventURNs,
 	}
 
-	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z", docs.ModeSubset)
+	// Gatekeeper rules are syntactic, so no provider factory is exercised here;
+	// nil is intentional and asserts no semantic example sneaks into this path.
+	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z", docs.ModeSubset, nil)
 	require.NoError(t, err)
 	assert.Empty(t, verrs, "gatekeeper fragments must cover the gatekeeper rules exactly")
 

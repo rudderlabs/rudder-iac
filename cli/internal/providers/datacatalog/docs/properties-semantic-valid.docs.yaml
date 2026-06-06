@@ -26,7 +26,7 @@ match_behavior:
     invalid:
       - example_id: "prop-sem-legacy-duplicate"
         title: "Duplicate (name, type, itemTypes) property combination across files (legacy)"
-        description: "Two properties with the same name, type, and itemTypes in the resource graph trigger this error."
+        description: "Two properties in separate files sharing the same name, type, and itemTypes collide in the resource graph and trigger this error on each file."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -35,11 +35,25 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - id: user_id_2
+                - id: user_id
+                  name: User ID
+                  type: string
+          spec2.yaml: |
+            version: rudder/0.1
+            kind: properties
+            metadata:
+              name: my-properties-2
+            spec:
+              properties:
+                - id: user_id_copy
                   name: User ID
                   type: string
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/properties/0"
+            severity: "error"
+            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
+          - file: "spec2.yaml"
             reference: "/properties/0"
             severity: "error"
             message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
@@ -67,7 +81,7 @@ match_behavior:
     invalid:
       - example_id: "prop-sem-v1-duplicate"
         title: "Duplicate (name, type, itemTypes) property combination across files (v1)"
-        description: "Two properties with the same name, type, and itemTypes in the resource graph trigger this error."
+        description: "Two properties in separate files sharing the same name, type, and itemTypes collide in the resource graph and trigger this error on each file."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -76,11 +90,25 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - id: user_id_2
+                - id: user_id
+                  name: User ID
+                  type: string
+          spec2.yaml: |
+            version: rudder/v1
+            kind: properties
+            metadata:
+              name: my-properties-2
+            spec:
+              properties:
+                - id: user_id_copy
                   name: User ID
                   type: string
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/properties/0"
+            severity: "error"
+            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
+          - file: "spec2.yaml"
             reference: "/properties/0"
             severity: "error"
             message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"

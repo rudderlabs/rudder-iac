@@ -26,8 +26,21 @@ match_behavior:
     invalid:
       - example_id: "sqlmodel-semantic-legacy-duplicate-display-name"
         title: "Legacy SQL model with a display_name that duplicates another model in the workspace"
+        description: "Two SQL models sharing the same display_name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
+            version: rudder/0.1
+            kind: retl-source-sql-model
+            metadata:
+              name: revenue-model
+            spec:
+              id: revenue-model
+              display_name: Revenue Model
+              account_id: acc-123
+              primary_key: id
+              source_definition: postgres
+              sql: SELECT id, amount FROM revenue
+          spec2.yaml: |
             version: rudder/0.1
             kind: retl-source-sql-model
             metadata:
@@ -41,6 +54,10 @@ match_behavior:
               sql: SELECT id, amount FROM revenue
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
+          - file: "spec2.yaml"
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
@@ -67,8 +84,21 @@ match_behavior:
     invalid:
       - example_id: "sqlmodel-semantic-v1-duplicate-display-name"
         title: "v1 SQL model with a display_name that duplicates another model in the workspace"
+        description: "Two SQL models sharing the same display_name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model
+            spec:
+              id: churn-model
+              display_name: Churn Risk Model
+              account_id: acc-456
+              primary_key: user_id
+              source_definition: bigquery
+              sql: SELECT user_id FROM churn_signals
+          spec2.yaml: |
             version: rudder/v1
             kind: retl-source-sql-model
             metadata:
@@ -82,6 +112,10 @@ match_behavior:
               sql: SELECT user_id FROM churn_signals
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"
+          - file: "spec2.yaml"
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"

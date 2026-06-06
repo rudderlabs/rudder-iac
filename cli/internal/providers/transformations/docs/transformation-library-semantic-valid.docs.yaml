@@ -6,6 +6,7 @@ match_behavior:
     valid:
       - example_id: "transformation-library-semantic-valid-unique-import-name"
         title: "Transformation library with a unique import_name across all libraries"
+        description: "A single library whose import_name no other library claims validates cleanly."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -13,44 +14,53 @@ match_behavior:
             metadata:
               name: my-libraries
             spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  import_name: mathUtils
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
+              id: math-utils
+              name: Math Utils
+              import_name: mathUtils
+              language: javascript
+              code: |
+                export function round(value) {
+                  return Math.round(value);
+                }
     invalid:
       - example_id: "transformation-library-semantic-valid-duplicate-import-name"
         title: "Two transformation libraries sharing the same import_name"
+        description: "Two libraries declaring the same import_name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/v1
             kind: transformation-library
             metadata:
-              name: my-libraries
+              name: math-utils
             spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  import_name: mathUtils
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
-                - id: math-helpers
-                  name: Math Helpers
-                  import_name: mathUtils
-                  language: javascript
-                  code: |
-                    export function ceil(value) {
-                      return Math.ceil(value);
-                    }
+              id: math-utils
+              name: Math Utils
+              import_name: mathUtils
+              language: javascript
+              code: |
+                export function round(value) {
+                  return Math.round(value);
+                }
+          spec2.yaml: |
+            version: rudder/v1
+            kind: transformation-library
+            metadata:
+              name: math-helpers
+            spec:
+              id: math-helpers
+              name: Math Utils
+              import_name: mathUtils
+              language: javascript
+              code: |
+                export function ceil(value) {
+                  return Math.ceil(value);
+                }
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/import_name"
+            severity: "error"
+            message_contains: "import_name 'mathUtils' is duplicate"
+          - file: "spec2.yaml"
             reference: "/import_name"
             severity: "error"
             message_contains: "import_name 'mathUtils' is duplicate"

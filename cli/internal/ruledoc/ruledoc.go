@@ -31,7 +31,15 @@ import (
 // be assembled at all. generatedAt is injected so callers own the timestamp —
 // the real clock in the command, a fixed value in tests. mode controls how
 // strictly example expectations are matched during verification.
-func Build(cp provider.Provider, cliVersion, generatedAt string, mode docs.VerifyMode) (docs.DocumentedRules, []error, error) {
+//
+// newProvider yields a fresh, isolated provider per semantic example. Semantic
+// verification loads each example's specs into a provider and reads back its
+// resource graph, so every example needs its own provider to avoid state
+// bleeding between examples. It originates in the composition root (package
+// app) and is passed as a plain func so ruledoc need not import app. Callers
+// with no semantic examples to exercise may pass nil; a semantic example
+// encountered with a nil factory surfaces a clear error rather than panicking.
+func Build(cp provider.Provider, cliVersion, generatedAt string, mode docs.VerifyMode, newProvider func() (provider.Provider, error)) (docs.DocumentedRules, []error, error) {
 	reg, err := project.BuildRegistry(cp)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
@@ -59,7 +67,7 @@ func Build(cp provider.Provider, cliVersion, generatedAt string, mode docs.Verif
 	// incomplete or invalid catalog (missing fragments, mismatched rule IDs)
 	// cannot be meaningfully executed — fix structure first, then verify behaviour.
 	if len(verrs) == 0 {
-		verrs = append(verrs, verify(reg, doc, mode)...)
+		verrs = append(verrs, verify(reg, doc, mode, newProvider)...)
 	}
 
 	return doc, verrs, nil

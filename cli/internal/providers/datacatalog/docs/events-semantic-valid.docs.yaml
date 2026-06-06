@@ -26,7 +26,7 @@ match_behavior:
     invalid:
       - example_id: "ev-sem-legacy-duplicate"
         title: "Duplicate (name, type) event combination across files (legacy)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        description: "Two track events in separate files sharing the same name and event_type collide in the resource graph and trigger this error on each file."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -35,11 +35,25 @@ match_behavior:
               name: my-events
             spec:
               events:
-                - id: page_viewed_2
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
+          spec2.yaml: |
+            version: rudder/0.1
+            kind: events
+            metadata:
+              name: my-events-2
+            spec:
+              events:
+                - id: page_viewed_copy
                   event_type: track
                   name: Page Viewed
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/events/0"
+            severity: "error"
+            message_contains: "duplicate name 'Page Viewed' within kind 'events'"
+          - file: "spec2.yaml"
             reference: "/events/0"
             severity: "error"
             message_contains: "duplicate name 'Page Viewed' within kind 'events'"
@@ -67,7 +81,7 @@ match_behavior:
     invalid:
       - example_id: "ev-sem-v1-duplicate"
         title: "Duplicate (name, type) event combination across files (v1)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        description: "Two track events in separate files sharing the same name and event_type collide in the resource graph and trigger this error on each file."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -76,11 +90,25 @@ match_behavior:
               name: my-events
             spec:
               events:
-                - id: page_viewed_2
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
+          spec2.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: my-events-2
+            spec:
+              events:
+                - id: page_viewed_copy
                   event_type: track
                   name: Page Viewed
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/events/0"
+            severity: "error"
+            message_contains: "duplicate name 'Page Viewed' within kind 'events'"
+          - file: "spec2.yaml"
             reference: "/events/0"
             severity: "error"
             message_contains: "duplicate name 'Page Viewed' within kind 'events'"
