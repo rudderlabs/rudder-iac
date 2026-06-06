@@ -101,3 +101,7 @@ match_behavior:
             reference: "/code"
             severity: "error"
             message_contains: "'code' is required when 'file' is not specified"
+          - file: "spec.yaml"
+            reference: "/file"
+            severity: "error"
+            message_contains: "'file' is required when 'code' is not specified"
