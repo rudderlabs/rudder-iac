@@ -9,8 +9,19 @@ match_behavior:
         version: "rudder/v0.1"
     valid:
       - example_id: "tp-sem-legacy-valid"
-        title: "Tracking plan with unique display_name and no duplicate events (legacy)"
+        title: "Tracking plan with unique display_name and resolvable event refs (legacy)"
+        description: "The referenced event exists in the catalog, so the tracking plan validates cleanly."
         files:
+          events.yaml: |
+            version: rudder/0.1
+            kind: events
+            metadata:
+              name: my-events
+            spec:
+              events:
+                - id: signup
+                  event_type: track
+                  name: Signup
           spec.yaml: |
             version: rudder/0.1
             kind: tp
@@ -27,9 +38,35 @@ match_behavior:
     invalid:
       - example_id: "tp-sem-legacy-duplicate-display-name"
         title: "Duplicate tracking plan display_name across files (legacy)"
-        description: "Two tracking plans with the same display_name in the resource graph trigger this error."
+        description: "Two tracking plans sharing the same display_name collide in the resource graph and trigger this error."
         files:
+          events.yaml: |
+            version: rudder/0.1
+            kind: events
+            metadata:
+              name: my-events
+            spec:
+              events:
+                - id: signup
+                  event_type: track
+                  name: Signup
+                - id: page_view
+                  event_type: track
+                  name: Page View
           spec.yaml: |
+            version: rudder/0.1
+            kind: tp
+            metadata:
+              name: my-tracking-plan
+            spec:
+              id: my_tp
+              display_name: My Tracking Plan
+              rules:
+                - id: signup_rule
+                  type: event_rule
+                  event:
+                    $ref: "#/events/user-events/signup"
+          spec2.yaml: |
             version: rudder/0.1
             kind: tp
             metadata:
@@ -53,8 +90,19 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "tp-sem-v1-valid"
-        title: "Tracking plan with unique display_name and no duplicate events (v1)"
+        title: "Tracking plan with unique display_name and resolvable event refs (v1)"
+        description: "The referenced event exists in the catalog, so the tracking plan validates cleanly."
         files:
+          events.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: my-events
+            spec:
+              events:
+                - id: signup
+                  event_type: track
+                  name: Signup
           spec.yaml: |
             version: rudder/v1
             kind: tracking-plan
@@ -70,9 +118,34 @@ match_behavior:
     invalid:
       - example_id: "tp-sem-v1-duplicate-display-name"
         title: "Duplicate tracking plan display_name across files (v1)"
-        description: "Two tracking plans with the same display_name in the resource graph trigger this error."
+        description: "Two tracking plans sharing the same display_name collide in the resource graph and trigger this error."
         files:
+          events.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: my-events
+            spec:
+              events:
+                - id: signup
+                  event_type: track
+                  name: Signup
+                - id: page_view
+                  event_type: track
+                  name: Page View
           spec.yaml: |
+            version: rudder/v1
+            kind: tracking-plan
+            metadata:
+              name: my-tracking-plan
+            spec:
+              id: my_tp
+              display_name: My Tracking Plan
+              rules:
+                - id: signup_rule
+                  type: event_rule
+                  event: "#event:signup"
+          spec2.yaml: |
             version: rudder/v1
             kind: tracking-plan
             metadata:

@@ -55,13 +55,16 @@ spec:
 		},
 	}
 
-	errs := verify(reg, doc, docs.ModeSubset)
+	// Gatekeeper rules are syntactic, so no provider factory is needed.
+	errs := verify(reg, doc, docs.ModeSubset, nil)
 	assert.Empty(t, errs, "expected no verification misses for a matching invalid example")
 }
 
-// TestVerify_SkipsSemanticPhase ensures that semantic-phase rules are silently
-// skipped (counted and logged) without triggering any errors or panics.
-func TestVerify_SkipsSemanticPhase(t *testing.T) {
+// TestVerify_SemanticWithoutFactoryErrors proves the nil-factory guard: a
+// semantic-phase example encountered with no provider factory yields a clear
+// error rather than a panic. This is the contract syntactic-only callers rely
+// on when they pass nil.
+func TestVerify_SemanticWithoutFactoryErrors(t *testing.T) {
 	cp := &testutils.MockProvider{}
 	reg, err := project.BuildRegistry(cp)
 	require.NoError(t, err)
@@ -90,6 +93,7 @@ func TestVerify_SkipsSemanticPhase(t *testing.T) {
 		},
 	}
 
-	errs := verify(reg, doc, docs.ModeSubset)
-	assert.Empty(t, errs, "semantic-phase examples must be skipped without error")
+	errs := verify(reg, doc, docs.ModeSubset, nil)
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Error(), "provider factory")
 }

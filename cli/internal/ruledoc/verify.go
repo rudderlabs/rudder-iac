@@ -148,28 +148,34 @@ func runSemantic(
 	parsed := map[string]*specs.RawSpec{}
 	for name, content := range files {
 		rs := &specs.RawSpec{Data: []byte(content)}
-		spec, err := rs.Parse()
-		if err != nil {
+		if _, err := rs.Parse(); err != nil {
 			return nil, fmt.Errorf("parsing fixture file %s: %w", name, err)
 		}
 		parsed[name] = rs
-
-		if err := loadSpec(p, name, spec); err != nil {
-			return nil, fmt.Errorf("loading fixture file %s: %w", name, err)
-		}
 	}
 
 	ctx := context.Background()
 
-	// A semantic fixture must be syntactically valid; otherwise the example
-	// isn't exercising the semantic rule it claims to, so flag it as a bad
-	// fixture instead of leaking syntax diagnostics into the semantic match.
+	// Mirror project.handleValidation ordering exactly: validate syntax over the
+	// parsed specs *before* loading them into the provider. LoadLegacySpec/LoadSpec
+	// mutate the spec while ingesting it (e.g. rewriting legacy refs), so loading
+	// first would corrupt what ValidateSyntax inspects.
+	//
+	// A semantic fixture must be syntactically valid; otherwise the example isn't
+	// exercising the semantic rule it claims to, so flag it as a bad fixture
+	// instead of leaking syntax diagnostics into the semantic match.
 	syntaxDiags, err := engine.ValidateSyntax(ctx, parsed)
 	if err != nil {
 		return nil, fmt.Errorf("validate syntax: %w", err)
 	}
 	if syntaxDiags.HasErrors() {
 		return nil, fmt.Errorf("semantic fixture is not syntactically valid: %s", diagSummary(syntaxDiags.Errors()))
+	}
+
+	for name, rs := range parsed {
+		if err := loadSpec(p, name, rs.Parsed()); err != nil {
+			return nil, fmt.Errorf("loading fixture file %s: %w", name, err)
+		}
 	}
 
 	graph, err := p.ResourceGraph()
