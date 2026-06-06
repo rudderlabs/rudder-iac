@@ -25,8 +25,8 @@ match_behavior:
                   name: Product Clicked
     invalid:
       - example_id: "ev-sem-legacy-duplicate"
-        title: "Duplicate (name, type) event combination across files (legacy)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        title: "Duplicate (name, type) event combination (legacy)"
+        description: "Two track events sharing the same name and event_type collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -35,6 +35,9 @@ match_behavior:
               name: my-events
             spec:
               events:
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
                 - id: page_viewed_2
                   event_type: track
                   name: Page Viewed
@@ -66,8 +69,8 @@ match_behavior:
                   name: Product Clicked
     invalid:
       - example_id: "ev-sem-v1-duplicate"
-        title: "Duplicate (name, type) event combination across files (v1)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        title: "Duplicate (name, type) event combination (v1)"
+        description: "Two track events sharing the same name and event_type collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -76,6 +79,9 @@ match_behavior:
               name: my-events
             spec:
               events:
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
                 - id: page_viewed_2
                   event_type: track
                   name: Page Viewed

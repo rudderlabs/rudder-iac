@@ -25,8 +25,8 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-sem-legacy-duplicate-name"
-        title: "Duplicate custom type name across files (legacy)"
-        description: "Two custom types with the same name in the resource graph trigger this error."
+        title: "Duplicate custom type name (legacy)"
+        description: "Two custom types sharing the same name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -35,6 +35,9 @@ match_behavior:
               name: my-custom-types
             spec:
               types:
+                - id: address
+                  name: Address
+                  type: object
                 - id: address_v2
                   name: Address
                   type: object
@@ -66,8 +69,8 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-sem-v1-duplicate-name"
-        title: "Duplicate custom type name across files (v1)"
-        description: "Two custom types with the same name in the resource graph trigger this error."
+        title: "Duplicate custom type name (v1)"
+        description: "Two custom types sharing the same name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -76,6 +79,9 @@ match_behavior:
               name: my-custom-types
             spec:
               types:
+                - id: address
+                  name: Address
+                  type: object
                 - id: address_v2
                   name: Address
                   type: object

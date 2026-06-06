@@ -24,8 +24,8 @@ match_behavior:
                   name: System Events
     invalid:
       - example_id: "cat-sem-legacy-duplicate"
-        title: "Duplicate category name across files (legacy)"
-        description: "Two categories with the same name in the resource graph trigger this error."
+        title: "Duplicate category name (legacy)"
+        description: "Two categories sharing the same name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -34,6 +34,8 @@ match_behavior:
               name: my-categories
             spec:
               categories:
+                - id: user_actions
+                  name: User Actions
                 - id: user_actions_2
                   name: User Actions
         expected_diagnostics:
@@ -62,8 +64,8 @@ match_behavior:
                   name: System Events
     invalid:
       - example_id: "cat-sem-v1-duplicate"
-        title: "Duplicate category name across files (v1)"
-        description: "Two categories with the same name in the resource graph trigger this error."
+        title: "Duplicate category name (v1)"
+        description: "Two categories sharing the same name collide in the resource graph and trigger this error."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -72,6 +74,8 @@ match_behavior:
               name: my-categories
             spec:
               categories:
+                - id: user_actions
+                  name: User Actions
                 - id: user_actions_2
                   name: User Actions
         expected_diagnostics:
