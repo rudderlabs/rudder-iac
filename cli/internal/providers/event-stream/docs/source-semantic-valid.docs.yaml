@@ -38,12 +38,12 @@ match_behavior:
                   config: {}
           tracking_plan.yaml: |
             version: rudder/0.1
-            kind: tracking-plan
+            kind: tp
             metadata:
               name: tp-main
             spec:
               id: tp-main
-              name: Main Tracking Plan
+              display_name: Main Tracking Plan
               description: Default plan
               rules: []
     invalid:
@@ -134,7 +134,7 @@ match_behavior:
               name: tp-main
             spec:
               id: tp-main
-              name: Main Tracking Plan
+              display_name: Main Tracking Plan
               description: Default plan
               rules: []
     invalid:
