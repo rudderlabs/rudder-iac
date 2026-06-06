@@ -26,31 +26,37 @@ const (
 	ModeStrict
 )
 
+// anyMatch returns true if at least one produced diagnostic satisfies exp.
+func anyMatch(exp ExpectedDiagnostic, produced []ProducedDiagnostic) bool {
+	for _, p := range produced {
+		if matchesExpected(exp, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesExpected reports whether produced satisfies the expectation.
+func matchesExpected(exp ExpectedDiagnostic, p ProducedDiagnostic) bool {
+	if p.File != exp.File || p.Severity != exp.Severity {
+		return false
+	}
+	if exp.MessageContains != "" && !strings.Contains(p.Message, exp.MessageContains) {
+		return false
+	}
+	return true
+}
+
 // MatchInvalid checks that each expected diagnostic in ex is satisfied by at least one
 // entry in produced (subset semantics). In ModeStrict, any produced diagnostic that no
-// expectation covers is also reported as a miss. Returns human-readable miss strings; an
-// empty slice means the example verified cleanly.
+// expectation covers is also reported as a miss via greedy one-to-one assignment. Returns
+// human-readable miss strings; an empty slice means the example verified cleanly.
 func MatchInvalid(ex InvalidExample, produced []ProducedDiagnostic, mode VerifyMode) []string {
-	// matchedProduced tracks which produced indices were claimed by an expectation;
-	// only relevant in ModeStrict.
-	matchedProduced := make([]bool, len(produced))
-
 	var misses []string
 
+	// Subset: each expected must match at least one produced (semantics unchanged).
 	for _, exp := range ex.ExpectedDiagnostics {
-		matched := false
-		for i, p := range produced {
-			if p.File != exp.File || p.Severity != exp.Severity {
-				continue
-			}
-			if exp.MessageContains != "" && !strings.Contains(p.Message, exp.MessageContains) {
-				continue
-			}
-			matchedProduced[i] = true
-			matched = true
-			break
-		}
-		if !matched {
+		if !anyMatch(exp, produced) {
 			misses = append(misses, fmt.Sprintf(
 				"%s: expected diagnostic not found (file=%q severity=%q contains=%q)",
 				ex.ExampleID, exp.File, exp.Severity, exp.MessageContains,
@@ -59,14 +65,25 @@ func MatchInvalid(ex InvalidExample, produced []ProducedDiagnostic, mode VerifyM
 	}
 
 	if mode == ModeStrict {
-		for i, p := range produced {
-			if matchedProduced[i] {
-				continue
+		// Greedy one-to-one assignment: each produced may only be claimed by one
+		// expectation so that N identical expected entries consume N distinct produced
+		// entries rather than all collapsing onto produced[0].
+		matched := make([]bool, len(produced))
+		for _, exp := range ex.ExpectedDiagnostics {
+			for i, p := range produced {
+				if !matched[i] && matchesExpected(exp, p) {
+					matched[i] = true
+					break
+				}
 			}
-			misses = append(misses, fmt.Sprintf(
-				"%s: unexpected diagnostic (file=%q severity=%q message=%q)",
-				ex.ExampleID, p.File, p.Severity, p.Message,
-			))
+		}
+		for i, p := range produced {
+			if !matched[i] {
+				misses = append(misses, fmt.Sprintf(
+					"%s: unexpected diagnostic (file=%q severity=%q message=%q)",
+					ex.ExampleID, p.File, p.Severity, p.Message,
+				))
+			}
 		}
 	}
 
