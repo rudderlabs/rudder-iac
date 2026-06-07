@@ -101,9 +101,9 @@ func TestReader_List_NameExtractedFromData(t *testing.T) {
 	assert.Equal(t, "My Source", rows[0].Name)
 }
 
-func TestReader_List_NoImportableSupport_Degraded(t *testing.T) {
-	// MockProvider.LoadImportable always returns nil, nil — it implements
-	// UnmanagedRemoteResourceLoader but returns nil collection; treat as empty.
+func TestReader_List_LoadImportableReturnsNil(t *testing.T) {
+	// MockProvider implements UnmanagedRemoteResourceLoader but its LoadImportable
+	// returns nil, nil — the interface is present but the collection is empty.
 	mp := testutils.NewMockProvider(nil, []string{"event-stream-source"})
 	rc := resources.NewRemoteResources()
 	rc.Set("event-stream-source", map[string]*resources.RemoteResource{
@@ -135,6 +135,36 @@ func TestReader_SupportsUnmanaged(t *testing.T) {
 	// bareProvider does NOT satisfy UnmanagedRemoteResourceLoader because EmptyProvider
 	// does not implement LoadImportable. Verify via the helper.
 	assert.False(t, resourceops.SupportsUnmanaged(&bareProvider{}))
+}
+
+// managedOnlyProvider satisfies provider.ManagedRemoteResourceLoader but does NOT
+// implement provider.UnmanagedRemoteResourceLoader (no LoadImportable method).
+// This exercises the `if !ok { return result, nil }` branch in mergedRemote.
+type managedOnlyProvider struct {
+	remote *resources.RemoteResources
+}
+
+func (p *managedOnlyProvider) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
+	return p.remote, nil
+}
+
+func TestReader_List_ProviderWithoutUnmanagedInterface(t *testing.T) {
+	rc := resources.NewRemoteResources()
+	rc.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src_1": {ID: "src_1", ExternalID: "ext-a"},
+	})
+	prov := &managedOnlyProvider{remote: rc}
+
+	// SupportsUnmanaged must report false — the interface is genuinely absent.
+	assert.False(t, resourceops.SupportsUnmanaged(prov))
+
+	rows, err := resourceops.ListRows(context.Background(), prov, "event-stream-source", resourceops.ScopeAll)
+	require.NoError(t, err)
+
+	// Only the managed row is returned; no panic because the unmanaged branch is skipped.
+	assert.ElementsMatch(t, []resourceops.Row{
+		{ExternalID: "ext-a", RemoteID: "src_1", Managed: true},
+	}, rows)
 }
 
 func TestReader_List_EmptyCollections(t *testing.T) {

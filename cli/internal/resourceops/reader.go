@@ -31,7 +31,9 @@ type Row struct {
 
 // SupportsUnmanaged reports whether prov implements UnmanagedRemoteResourceLoader,
 // meaning it can enumerate unmanaged remote resources.
-// Commands use this to surface a note when unmanaged resources cannot be listed.
+// It is the companion probe for the two-call degraded protocol: callers that need
+// to warn the user should call this before (or after) ListRows and print a one-line
+// note when it returns false and the requested scope includes unmanaged resources.
 func SupportsUnmanaged(prov any) bool {
 	_, ok := prov.(provider.UnmanagedRemoteResourceLoader)
 	return ok
@@ -41,8 +43,11 @@ func SupportsUnmanaged(prov any) bool {
 // resourceType, merges them — managed entries win on duplicate remote ID —
 // and returns them filtered by scope.
 //
-// If the provider does not implement UnmanagedRemoteResourceLoader, only managed
-// rows are returned (no error). Callers can detect this case with SupportsUnmanaged.
+// Two-call degraded protocol: when prov does not implement
+// UnmanagedRemoteResourceLoader, unmanaged rows cannot be listed and ListRows
+// silently returns only managed rows (no error). Callers that need to warn the
+// user should probe with SupportsUnmanaged(prov) and print a one-line note when
+// it returns false and the requested scope includes unmanaged resources.
 func ListRows(ctx context.Context, prov provider.ManagedRemoteResourceLoader, resourceType string, scope Scope) ([]Row, error) {
 	merged, err := mergedRemote(ctx, prov, resourceType)
 	if err != nil {
@@ -66,6 +71,10 @@ func ListRows(ctx context.Context, prov provider.ManagedRemoteResourceLoader, re
 			if row.Managed {
 				continue
 			}
+		case ScopeAll:
+			// include everything
+		default:
+			// unreachable; new scopes must update this switch
 		}
 		rows = append(rows, row)
 	}
@@ -98,6 +107,9 @@ func mergedRemote(ctx context.Context, prov provider.ManagedRemoteResourceLoader
 		return result, nil
 	}
 
+	// Kebab-case matches the importer's namer (project/importer/importer.go) for
+	// consistency; a fresh namer per call is fine because it only generates
+	// suggested external IDs for importable resources during this read.
 	importableCollection, err := unmanagedLoader.LoadImportable(ctx, namer.NewExternalIdNamer(namer.NewKebabCase()))
 	if err != nil {
 		return nil, err
