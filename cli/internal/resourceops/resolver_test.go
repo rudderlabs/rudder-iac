@@ -129,3 +129,36 @@ func TestResolver_ProviderFor(t *testing.T) {
 	_, err = r.ProviderFor("unknown-type")
 	require.Error(t, err)
 }
+
+// ---------------------------------------------------------------------------
+// ValidateType tests
+// ---------------------------------------------------------------------------
+
+func TestValidateType_KnownType_ReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	types := []string{"event-stream-source", "event-stream-destination"}
+	require.NoError(t, resourceops.ValidateType(types, "event-stream-source"))
+	require.NoError(t, resourceops.ValidateType(types, "event-stream-destination"))
+}
+
+func TestValidateType_UnknownType_ListsValidTypes(t *testing.T) {
+	t.Parallel()
+
+	types := []string{"event-stream-source", "event-stream-destination"}
+	err := resourceops.ValidateType(types, "bogus-type")
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "bogus-type", "error must name the offending type")
+	assert.Contains(t, msg, "event-stream-source", "error must list valid types")
+	assert.Contains(t, msg, "event-stream-destination", "error must list valid types")
+}
+
+func TestValidateType_EmptyList_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	err := resourceops.ValidateType([]string{}, "anything")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "anything")
+}

@@ -12,6 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// setExternalIDRouter is the minimal seam the set-external-id command needs from
+// the composite provider: per-type routing plus the full list of registered types
+// for validation.
+type setExternalIDRouter interface {
+	provider.TypeRouter
+	SupportedTypes() []string
+}
+
 // NewCmdSetExternalID returns the top-level `set-external-id` cobra command.
 func NewCmdSetExternalID() *cobra.Command {
 	cmd := &cobra.Command{
@@ -37,9 +45,13 @@ Examples:
 				return err
 			}
 
-			router, ok := d.CompositeProvider().(provider.TypeRouter)
+			router, ok := d.CompositeProvider().(setExternalIDRouter)
 			if !ok {
 				return fmt.Errorf("internal error: composite provider does not support per-type routing")
+			}
+
+			if err = resourceops.ValidateType(router.SupportedTypes(), args[0]); err != nil {
+				return err
 			}
 
 			err = RunSetExternalID(cmd.Context(), cmd.OutOrStdout(), router, args[0], args[1], args[2])

@@ -14,6 +14,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// describeRouter is the minimal seam the describe command needs from the composite
+// provider: per-type routing plus the full list of registered types for validation.
+type describeRouter interface {
+	provider.TypeRouter
+	SupportedTypes() []string
+}
+
 // NewCmdDescribe returns the top-level `describe` cobra command.
 func NewCmdDescribe() *cobra.Command {
 	cmd := &cobra.Command{
@@ -41,9 +48,13 @@ Examples:
 				return err
 			}
 
-			router, ok := d.CompositeProvider().(provider.TypeRouter)
+			router, ok := d.CompositeProvider().(describeRouter)
 			if !ok {
 				return fmt.Errorf("internal error: composite provider does not support per-type routing")
+			}
+
+			if err = resourceops.ValidateType(router.SupportedTypes(), args[0]); err != nil {
+				return err
 			}
 
 			err = RunDescribe(cmd.Context(), cmd.OutOrStdout(), router, args[0], args[1])

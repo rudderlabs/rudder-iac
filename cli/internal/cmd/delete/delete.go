@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -19,18 +18,6 @@ import (
 type deleteRouter interface {
 	provider.TypeRouter
 	SupportedTypes() []string
-}
-
-// validateType returns a descriptive error when resourceType is not in the
-// router's registered set, listing the valid types so the user can self-correct.
-func validateType(r deleteRouter, resourceType string) error {
-	for _, t := range r.SupportedTypes() {
-		if t == resourceType {
-			return nil
-		}
-	}
-	return fmt.Errorf("unknown resource type %q; valid types: %s",
-		resourceType, strings.Join(r.SupportedTypes(), ", "))
 }
 
 // NewCmdDelete returns the top-level `delete` cobra command.
@@ -73,7 +60,7 @@ Examples:
 				return fmt.Errorf("internal error: composite provider does not support per-type routing")
 			}
 
-			if err = validateType(router, args[0]); err != nil {
+			if err = resourceops.ValidateType(router.SupportedTypes(), args[0]); err != nil {
 				return err
 			}
 

@@ -1,4 +1,4 @@
-package delete
+package delete_test
 
 import (
 	"strings"
@@ -7,33 +7,28 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resourceops"
 )
 
-// stubRouter is a minimal deleteRouter for validateType tests.
-type stubRouter struct {
-	types []string
-}
-
-func (s *stubRouter) SupportedTypes() []string { return s.types }
-
-func (s *stubRouter) ProviderForType(_ string) (provider.Provider, error) { return nil, nil }
+// These tests exercise resourceops.ValidateType as used by the delete command.
+// The delete command delegates type validation to the shared helper rather than
+// maintaining its own copy — these tests confirm the shared contract holds.
 
 func TestValidateType_KnownType_ReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	r := &stubRouter{types: []string{"event-stream-source", "event-stream-destination"}}
+	types := []string{"event-stream-source", "event-stream-destination"}
 
-	require.NoError(t, validateType(r, "event-stream-source"))
-	require.NoError(t, validateType(r, "event-stream-destination"))
+	require.NoError(t, resourceops.ValidateType(types, "event-stream-source"))
+	require.NoError(t, resourceops.ValidateType(types, "event-stream-destination"))
 }
 
 func TestValidateType_UnknownType_ListsValidTypes(t *testing.T) {
 	t.Parallel()
 
-	r := &stubRouter{types: []string{"event-stream-source", "event-stream-destination"}}
+	types := []string{"event-stream-source", "event-stream-destination"}
 
-	err := validateType(r, "bogus-type")
+	err := resourceops.ValidateType(types, "bogus-type")
 	require.Error(t, err)
 
 	msg := err.Error()
