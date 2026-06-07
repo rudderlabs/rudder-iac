@@ -22,7 +22,7 @@
 |------|-------|--------|-----------|
 | 1 | Public ProviderForType on composite | ✅ done | `1f10cf8e`, `c81df306` |
 | 2 | ExternalIDSetter capability + beachhead | ✅ done | `d6052ca8`, `adb4474c` |
-| 3 | syncer.WithScopeToTarget() seam | pending | — |
+| 3 | syncer.WithScopeToTarget() seam | ✅ done | `81a099ef`, `84d3a070` |
 | 4 | resourceops Resolver | pending | — |
 | 5 | Reader — managed+unmanaged merge | pending | — |
 | 6 | Single-resource spec materialization | pending | — |
@@ -96,3 +96,31 @@
   convention (interface method `SetExternalId` left locked to the API client).
   Noted pre-existing `remoteId`/`sourceId` naming in lower layers as out-of-scope.
 - **Fix (sonnet):** Both applied. Commit `adb4474c`. `make test` + `make lint` green.
+
+### 2026-06-07 — Task 3: `syncer.WithScopeToTarget()` seam ✅
+
+- **Implementer (sonnet):** Added `scopeToTarget` field + `WithScopeToTarget()`
+  option + private `scopeGraphToTarget(source, target)` helper. Guard inserted in
+  `apply` immediately after `source := StateToGraph(state)` and before
+  `planner.Plan` — filters source to URNs present in target. Left
+  `executePlanConcurrently`'s `StateToGraph` untouched (used only for dependency
+  ordering; ops come from the already-fixed plan). Two tests:
+  `TestSyncer_ScopeToTarget_SuppressesDeletes` (dry-run, asserts no Delete op,
+  Update for A present, B absent) and `..._Execution` (non-dry-run, asserts no
+  Delete executed against B via `DataCatalogProvider.OperationLog`). Commit `81a099ef`.
+- **Discovery:** Existing `DataCatalogProvider` exposes `OperationLog` entries with
+  the resource ID at `Args[0]` (from `logOperation`), enabling the execution-path
+  assertion without new fakes.
+- **Spec review (sonnet):** ✅ Compliant; guard placement correct; helper doesn't
+  mutate inputs; concurrent path unchanged; execution test is not a tautology.
+- **Code-quality review (sonnet):** Approve with 2 Important test improvements —
+  the execution test lacked a positive "Update for A actually ran" assertion, and
+  the `Args[0]` index needed a clarifying comment. Minor suggestions (single-loop
+  test, `WithScopeToTarget(bool)` signature) declined: the parameterless signature
+  is mandated by the plan + Task 11.
+- **Fix (sonnet):** Added positive Update assertion + `Args[0]` comment + improved
+  helper "why" doc-comment. Commit `84d3a070`.
+- **⚠️ Discovery (flaky test, pre-existing):** `make test` intermittently fails
+  `TestRunTasks_ErrorWithDependentTask` in `cli/pkg/tasker`. Confirmed unrelated to
+  these changes — passes consistently when run in isolation (3×). Tracked as a
+  known flaky to watch across later tasks; not caused by this work.
