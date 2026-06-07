@@ -28,7 +28,7 @@
 | 6 | Single-resource spec materialization | ✅ done | `50c0bb5d`, `865ab9c4` |
 | 7 | get command | ✅ done | `b067ccc0`, `5ea2dfdb`, `f245c9a5` |
 | 8 | describe command | ✅ done | `058312d9`, `5a10f332` |
-| 9 | set-external-id command | pending | — |
+| 9 | set-external-id command | ✅ done | `62f4d44d`, `31712c0a` |
 | 10 | delete command | pending | — |
 | 11 | apply -f scoped mode | pending | — |
 | 12 | Deprecate per-noun list commands | pending | — |
@@ -255,3 +255,22 @@
   have failed at `SpecYAML` for an unmanaged resource too, so the single-load
   refactor narrows nothing in practice; describe renders managed resources, which is
   the v1 contract.
+
+### 2026-06-07 — Task 9: `set-external-id` command ✅ (Phase 3)
+
+- **Implementer (sonnet):** Added `cli/internal/cmd/setexternalid/` —
+  `NewCmdSetExternalID()` (`ExactArgs(3)`) + testable
+  `RunSetExternalID(ctx, out, router, type, remoteID, externalID)` that resolves the
+  optional setter via `Resolver.ExternalIDSetterFor` and calls
+  `SetExternalID(ctx, type, remoteID, externalID)`, printing a confirmation.
+  Registered in root.go. 4 tests (success, unsupported-capability→ErrVerbNotSupported,
+  unknown-type→ErrUnsupportedType, arity). Commit `62f4d44d`.
+- **Spec review (sonnet):** ✅ Compliant; arg→param order verified correct (no
+  remoteID/externalID swap).
+- **Code-quality review (sonnet):** Approve with minors — import path-ordering in
+  root.go; success test only checked the external id; no error-path test; the mock
+  discarded its args (an arg transposition would be invisible).
+- **Fix (sonnet):** Path-sorted imports; enhanced `MockSourceClient.SetExternalID` to
+  capture args + a `SetExternalIDErr` injector; strengthened the success test to
+  assert all three fields AND the correct forwarded arg order; added a client-error
+  propagation test. Commit `31712c0a`.
