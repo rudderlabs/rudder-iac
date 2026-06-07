@@ -24,8 +24,3 @@ type ErrUnsupportedResourceType struct {
 func (e *ErrUnsupportedResourceType) Error() string {
 	return fmt.Sprintf("unsupported resource type '%s'", e.ResourceType)
 }
-
-// Unwrap allows errors.Is(err, ErrUnsupportedType) to work on ErrUnsupportedResourceType values.
-func (e *ErrUnsupportedResourceType) Unwrap() error {
-	return ErrUnsupportedType
-}

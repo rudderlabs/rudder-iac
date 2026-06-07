@@ -413,7 +413,11 @@ type TypeRouter interface {
 // ProviderForType returns the provider registered for the given resource type.
 // Returns ErrUnsupportedType (wrapped) when no provider handles the type.
 func (p *CompositeProvider) ProviderForType(resourceType string) (Provider, error) {
-	return p.providerForType(resourceType)
+	prov, err := p.providerForType(resourceType)
+	if err != nil {
+		return nil, fmt.Errorf("%q: %w", resourceType, ErrUnsupportedType)
+	}
+	return prov, nil
 }
 
 // Compile-time verification that CompositeProvider implements RuleProvider (including RuleDocEntries)
