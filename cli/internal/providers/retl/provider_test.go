@@ -35,7 +35,7 @@ type mockRETLStore struct {
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
 	// SetExternalId tracking
-	setExternalIdCalled bool
+	setExternalIDCalled bool
 }
 
 // Mock RETL source operations
@@ -91,12 +91,12 @@ func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID str
 }
 
 func (m *mockRETLStore) SetExternalId(ctx context.Context, id string, externalId string) error {
-	m.setExternalIdCalled = true
+	m.setExternalIDCalled = true
 	return nil
 }
 
-func (m *mockRETLStore) SetExternalIdCalled() bool {
-	return m.setExternalIdCalled
+func (m *mockRETLStore) SetExternalIDCalled() bool {
+	return m.setExternalIDCalled
 }
 
 // newDefaultMockClient creates a new mock client with default behavior
@@ -1165,7 +1165,7 @@ func TestProvider_SetExternalID(t *testing.T) {
 
 		err := p.SetExternalID(context.Background(), sqlmodel.ResourceType, "remote-id-123", "my-sql-model")
 		require.NoError(t, err)
-		assert.True(t, mockClient.SetExternalIdCalled())
+		assert.True(t, mockClient.SetExternalIDCalled())
 	})
 
 	t.Run("UnknownType", func(t *testing.T) {
