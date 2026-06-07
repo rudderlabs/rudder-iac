@@ -29,7 +29,7 @@
 | 7 | get command | ✅ done | `b067ccc0`, `5ea2dfdb`, `f245c9a5` |
 | 8 | describe command | ✅ done | `058312d9`, `5a10f332` |
 | 9 | set-external-id command | ✅ done | `62f4d44d`, `31712c0a` |
-| 10 | delete command | pending | — |
+| 10 | delete command | ✅ done | `14b710fb`, `56806eb5` |
 | 11 | apply -f scoped mode | pending | — |
 | 12 | Deprecate per-noun list commands | pending | — |
 | 13 | E2E round-trip + scoped no-delete | pending | — |
@@ -274,3 +274,26 @@
   capture args + a `SetExternalIDErr` injector; strengthened the success test to
   assert all three fields AND the correct forwarded arg order; added a client-error
   propagation test. Commit `31712c0a`.
+
+### 2026-06-07 — Task 10: `delete` command ✅
+
+- **Implementer (sonnet):** Added `resourceops.Delete(ctx, prov, type, id)` (reuses
+  `mergedRemote`+`findInMap`; rejects unmanaged via new `ErrUnmanaged`; builds
+  state via `MapRemoteToState`, calls `prov.Delete(ctx, externalID, type,
+  sr.Data())` — same path as `syncer.deleteOperation`) and a
+  `cli/internal/cmd/delete/` command (`ExactArgs(2)`, `--confirm` default false =
+  prompt, true = skip) with a testable `RunDelete(ctx, out, prov, type, id,
+  skipConfirm, confirmFn)` doing preview→confirm→delete. Commit `14b710fb`.
+- **Discovery:** `mergedRemote` returns `(map, error)` (degraded flag dropped in
+  Task 5 for `SupportsUnmanaged`) — implementer adapted.
+- **Spec review (sonnet):** ✅ Compliant; critically verified `prov.Delete` receives
+  the resolved EXTERNAL id (not the remote id) even when looked up by remote-id —
+  no transposition bug. Unmanaged/abort paths confirmed to NOT call Delete.
+- **Code-quality review (sonnet):** Changes needed — import path-order in root.go;
+  unknown type didn't list valid types (inconsistent with `get`); no test for
+  `prov.Delete` returning an error. (Reviewer questioned `--confirm` semantics vs
+  apply; kept as-is — the plan mandates `--confirm`=skip for delete.)
+- **Fix (sonnet):** Path-sorted imports; clarified `--confirm` help; added
+  `validateType` listing valid types (+ tests); added delete-error wrap test.
+  Commit `56806eb5`. Deferred minors: show resource name in preview, shared test
+  fixtures, pre-existing `ImportArgs.RemoteId` naming.
