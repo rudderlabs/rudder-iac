@@ -91,7 +91,7 @@ func TestK8sVerbs_GetApplyRoundTrip_ScopedNoDelete(t *testing.T) {
 		cliBinPath, "apply", "-f", aYAMLPath, "--dry-run", "--confirm=false",
 	)
 	require.NoError(t, err, "round-trip dry-run failed: %s", string(roundTripOut))
-	assert.Contains(t, string(roundTripOut), "No changes to apply",
+	require.Contains(t, string(roundTripOut), "No changes to apply",
 		"round-trip dry-run must report no changes; got:\n%s", string(roundTripOut))
 
 	// ─── Step 4: Scoped update of A, assert B is untouched ───────────────────
