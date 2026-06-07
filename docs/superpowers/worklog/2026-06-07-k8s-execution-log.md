@@ -20,7 +20,7 @@
 
 | Task | Title | Status | Commit(s) |
 |------|-------|--------|-----------|
-| 1 | Public ProviderForType on composite | pending | — |
+| 1 | Public ProviderForType on composite | ✅ done | `1f10cf8e`, `c81df306` |
 | 2 | ExternalIDSetter capability + beachhead | pending | — |
 | 3 | syncer.WithScopeToTarget() seam | pending | — |
 | 4 | resourceops Resolver | pending | — |
@@ -48,3 +48,27 @@
 - Created the 13-task tracker and this immutable log.
 - Will push `claude/sweet-mccarthy-8c3eca` → remote `feat/k8s-style-imperative-commands`
   to establish the remote branch, then keep pushing after each task.
+
+### 2026-06-07 — Task 1: Public `ProviderForType` on composite ✅
+
+- **Implementer (sonnet):** Added `TypeRouter` interface + public `ProviderForType`
+  on `*CompositeProvider` delegating to the existing private `providerForType`
+  (no map-lookup duplication); added a compile-time guard
+  `var _ TypeRouter = (*CompositeProvider)(nil)`. Test
+  `TestCompositeProvider_ProviderForType` uses the existing
+  `testutils.NewMockProvider`. Commit `1f10cf8e`.
+- **Discovery:** Plan assumed `NewCompositeProvider` returns `*CompositeProvider`;
+  it actually returns `(Provider, error)`, so the test's interface assertion
+  `cp.(provider.TypeRouter)` is the right shape. Private `providerForType`
+  confirmed at `composite.go:273` as the plan predicted.
+- **Spec review (sonnet):** ✅ All 6 requirements met; error chain traced; no
+  missing/extra work.
+- **Code-quality review (sonnet):** ⚠️ Important issue — the implementer's first
+  cut added a global `Unwrap()` to the existing `ErrUnsupportedResourceType` so
+  `errors.Is(.., ErrUnsupportedType)` would match. That couples six unrelated
+  lifecycle error sites in `baseprovider.go` to the routing sentinel and would
+  wrongly match in Task 4's resolver.
+- **Fix (sonnet):** Removed the broad `Unwrap()`; `ProviderForType` now wraps the
+  not-found case itself with `fmt.Errorf("%q: %w", resourceType, ErrUnsupportedType)`,
+  delegating to `providerForType` for the lookup. `ErrUnsupportedType` is now
+  scoped strictly to routing. Commit `c81df306`. `make test` + `make lint` green.
