@@ -27,7 +27,7 @@
 | 5 | Reader — managed+unmanaged merge | ✅ done | `cdaad663`, `4a5991ed` |
 | 6 | Single-resource spec materialization | ✅ done | `50c0bb5d`, `865ab9c4` |
 | 7 | get command | ✅ done | `b067ccc0`, `5ea2dfdb`, `f245c9a5` |
-| 8 | describe command | pending | — |
+| 8 | describe command | ✅ done | `058312d9`, `5a10f332` |
 | 9 | set-external-id command | pending | — |
 | 10 | delete command | pending | — |
 | 11 | apply -f scoped mode | pending | — |
@@ -231,3 +231,27 @@
   added not-found + malformed-selector + list-yaml + single-no-note tests (21 tests
   total). Commit `f245c9a5`. Deferred minors: adopt `MarkFlagsMutuallyExclusive`,
   `validateType`/`ProviderForType` dedup, `GetProvider` naming.
+
+### 2026-06-07 — Task 8: `describe` command ✅
+
+- **Implementer (sonnet):** Added `cli/internal/cmd/describe/` with `NewCmdDescribe()`
+  (`ExactArgs(2)`) and testable `RunDescribe(ctx, out, router, type, id)` —
+  resolves provider, `SpecYAML` → decode YAML → `ui.FormattedMap` + a
+  `Managed: yes/no` line, all to `out`. Registered in root.go. 5 tests using a
+  real event-stream provider. Commit `058312d9`.
+- **Spec review (sonnet):** ✅ Compliant; renders to `out`, reuses `SpecYAML`,
+  sentinels propagate.
+- **Code-quality review (sonnet):** Changes needed — (Important) describe did a
+  redundant double remote load (`FindRemote` + `SpecYAML`); (Important) `RunE`
+  used a non-idiomatic named return `(err error)`. Minors: a duplicate test and a
+  weak `Args` assertion.
+- **Fix (sonnet):** Added `resourceops.SpecYAMLWithManaged` (returns yaml + managed
+  in one find; `SpecYAML`/`SpecJSON` signatures unchanged, delegate to the shared
+  internal path); describe now calls it once (one load instead of two). Switched to
+  `var err error`. Strengthened the arity test; removed the duplicate. Commit
+  `5a10f332`.
+- **Controller verification (no regression):** Confirmed `specContent` (hence all
+  `Spec*` funcs) is MANAGED-only — already true since Task 6. The old describe would
+  have failed at `SpecYAML` for an unmanaged resource too, so the single-load
+  refactor narrows nothing in practice; describe renders managed resources, which is
+  the v1 contract.
