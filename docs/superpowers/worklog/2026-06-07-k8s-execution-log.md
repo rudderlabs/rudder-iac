@@ -25,7 +25,7 @@
 | 3 | syncer.WithScopeToTarget() seam | ✅ done | `81a099ef`, `84d3a070` |
 | 4 | resourceops Resolver | ✅ done | `8abfbf7f` |
 | 5 | Reader — managed+unmanaged merge | ✅ done | `cdaad663`, `4a5991ed` |
-| 6 | Single-resource spec materialization | pending | — |
+| 6 | Single-resource spec materialization | ✅ done | `50c0bb5d`, `865ab9c4` |
 | 7 | get command | pending | — |
 | 8 | describe command | pending | — |
 | 9 | set-external-id command | pending | — |
@@ -169,3 +169,34 @@
 - **Fix (sonnet):** All applied. New `TestReader_List_ProviderWithoutUnmanagedInterface`
   uses a `managedOnlyProvider` (no `LoadImportable`), exercising the
   `if !ok { return result, nil }` branch. Commit `4a5991ed`.
+
+### 2026-06-07 — Task 6: Single-resource spec materialization (-o yaml/json) ✅
+
+- **Implementer (sonnet):** Added `SpecYAML`/`SpecJSON` to `reader.go` (find single
+  resource → single-entry collection → `Exporter.FormatForExport` → encode) and
+  `printer.go` (`EncodeYAML` via project formatter; `EncodeJSON` via
+  YAML→map→JSON so keys are lowercase & a top-level `"kind"` exists). Real
+  round-trip test using `eventstream.New(mockClient)` + `SetGetSourcesFunc`.
+  Commit `50c0bb5d`.
+- **🐞 Discovery (real pre-existing bug, FIXED):** event-stream
+  `source/handler.go` `LoadResourcesFromRemote` stored `Data` as a VALUE
+  `EventStreamSource`, but `FormatForExport` and `MapRemoteToState` type-assert a
+  POINTER `*EventStreamSource`. This would fail at runtime for `get -o yaml` and
+  import. Fixed to store `&s` and updated `MapRemoteToState` + handler/provider
+  tests. Spec review confirmed the loopvar `&s` is SAFE (go.mod = go 1.24,
+  per-iteration scoping) — explicit `s := source` copy added belt-and-suspenders.
+- **⚠️ Known limitation (documented follow-up):** single-resource materialization
+  loads only the target provider's remote, so CROSS-PROVIDER references (e.g. a
+  source pointing at a tracking plan owned by another provider) can't be resolved.
+  Mitigated: resolver `Remote` is now populated with the provider's full managed
+  collection (same-provider refs resolve), and `FormatForExport` errors are
+  wrapped with a clear message naming the limitation. Full fix (composite-level
+  remote) deferred — aligns with the design's beachhead scope.
+- **Spec review (sonnet):** ✅ Compliant; bug fix confirmed real + safe.
+- **Code-quality review (sonnet):** Changes needed — populate the export resolver
+  (correctness), share the external-id-first find rule between `FindRemote` and
+  the materializer (dedup), rename a misleading test, fix a stale loopvar comment,
+  add `printer_test.go`, add a nil guard.
+- **Fix (sonnet):** All applied — extracted shared `findInMap` helper (used by both
+  `FindRemote` and `specContent`); populated resolver Remote + wrapped error;
+  removed the redundant test; added `printer_test.go` (4 tests). Commit `865ab9c4`.
