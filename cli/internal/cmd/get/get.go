@@ -87,21 +87,25 @@ Examples:
   rudder-cli get event-stream-source my-source -o yaml`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			sel, err := parseSelector(selector)
+			if err != nil {
+				return err
+			}
+
 			opts := GetOptions{
 				Output:    output,
 				Managed:   managed,
 				Unmanaged: unmanaged,
-				Selector:  parseSelector(selector),
+				Selector:  sel,
 			}
 
-			var err error
 			defer func() {
-				telemetry.TrackCommand("get", err,
-					telemetry.KV{K: "type", V: firstArg(args)},
-					telemetry.KV{K: "output", V: output},
-					telemetry.KV{K: "managed", V: managed},
-					telemetry.KV{K: "unmanaged", V: unmanaged},
-				)
+				telemetry.TrackCommand("get", err, []telemetry.KV{
+					{K: "type", V: firstArg(args)},
+					{K: "output", V: output},
+					{K: "managed", V: managed},
+					{K: "unmanaged", V: unmanaged},
+				}...)
 			}()
 
 			d, err := app.NewDeps()
@@ -127,11 +131,19 @@ Examples:
 	return cmd
 }
 
+// validOutputFormats lists all accepted --output values.
+var validOutputFormats = []string{"table", "yaml", "json"}
+
 // RunGet is the testable core. It validates inputs, dispatches to list or single-
 // resource paths, and writes all output to out.
 func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opts GetOptions) error {
 	if opts.Managed && opts.Unmanaged {
 		return fmt.Errorf("--managed and --unmanaged are mutually exclusive")
+	}
+
+	if !isValidOutputFormat(opts.Output) {
+		return fmt.Errorf("invalid output format %q; valid formats: %s",
+			opts.Output, strings.Join(validOutputFormats, ", "))
 	}
 
 	resourceType := args[0]
@@ -147,13 +159,6 @@ func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opt
 
 	scope := toScope(opts)
 
-	// Warn when unmanaged is requested but the provider can't enumerate them.
-	if scope == resourceops.ScopeUnmanaged || scope == resourceops.ScopeAll {
-		if !resourceops.SupportsUnmanaged(prov) {
-			_, _ = fmt.Fprintf(out, "note: provider for %q does not support listing unmanaged resources; only managed resources will be shown\n", resourceType)
-		}
-	}
-
 	if len(args) == 2 {
 		return runSingle(ctx, out, prov, resourceType, args[1], opts)
 	}
@@ -161,8 +166,32 @@ func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opt
 	return runList(ctx, out, prov, resourceType, scope, opts)
 }
 
+// isValidOutputFormat reports whether f is one of the accepted output formats.
+func isValidOutputFormat(f string) bool {
+	for _, v := range validOutputFormats {
+		if f == v {
+			return true
+		}
+	}
+	return false
+}
+
 // runList fetches all rows, applies any selector filter, and renders them.
 func runList(ctx context.Context, out io.Writer, prov GetProvider, resourceType string, scope resourceops.Scope, opts GetOptions) error {
+	// yaml output is only meaningful for a single resource; reject it here to
+	// avoid silently falling through to a table render.
+	if opts.Output == "yaml" {
+		return fmt.Errorf("yaml output is only supported for a single resource: get %s <id> -o yaml", resourceType)
+	}
+
+	// Warn only in the list path — the single-resource path always knows exactly
+	// which resource it fetched so the note would be misleading there.
+	if scope == resourceops.ScopeUnmanaged || scope == resourceops.ScopeAll {
+		if !resourceops.SupportsUnmanaged(prov) {
+			_, _ = fmt.Fprintf(out, "note: provider for %q does not support listing unmanaged resources; only managed resources will be shown\n", resourceType)
+		}
+	}
+
 	rows, err := resourceops.ListRows(ctx, prov, resourceType, scope)
 	if err != nil {
 		return fmt.Errorf("listing %s: %w", resourceType, err)
@@ -365,19 +394,26 @@ func toScope(opts GetOptions) resourceops.Scope {
 	}
 }
 
-func parseSelector(pairs []string) map[string]string {
+// ParseSelector parses the raw -l/--selector flag values into a key→value map.
+// Each pair must be of the form "key=value" with a non-empty key; any other
+// form is rejected so that malformed selectors surface an explicit error rather
+// than being silently dropped.
+func ParseSelector(pairs []string) (map[string]string, error) {
 	if len(pairs) == 0 {
-		return nil
+		return nil, nil
 	}
 	m := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
 		kv := strings.SplitN(pair, "=", 2)
-		if len(kv) == 2 {
-			m[kv[0]] = kv[1]
+		if len(kv) != 2 || kv[0] == "" {
+			return nil, fmt.Errorf("invalid selector %q: must be key=value", pair)
 		}
+		m[kv[0]] = kv[1]
 	}
-	return m
+	return m, nil
 }
+
+func parseSelector(pairs []string) (map[string]string, error) { return ParseSelector(pairs) }
 
 func firstArg(args []string) string {
 	if len(args) > 0 {
