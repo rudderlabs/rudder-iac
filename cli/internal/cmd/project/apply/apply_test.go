@@ -3,8 +3,11 @@ package apply
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/testutils"
+	internalTestutils "github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,14 +86,19 @@ func TestBuildSyncOptions(t *testing.T) {
 	})
 
 	t.Run("options are valid and apply without error", func(t *testing.T) {
-		// Verify that all returned options are callable without error by applying them
-		// to a syncer. This validates the option constructors complete successfully.
-		opts := buildSyncOptions(true, true, true, reporter, 2, true)
-		for _, opt := range opts {
-			require.IsType(t, syncer.Option(nil), opt,
-				"each element should be a syncer.Option")
+		// Construct a real syncer from the assembled options to prove they apply
+		// without error — catches e.g. a nil-reporter panic or invalid concurrency value.
+		opts := buildSyncOptions(true, true, false, reporter, 2, true)
+		mockProvider := &internalTestutils.DataCatalogProvider{
+			InitialState:       state.EmptyState(),
+			ReconstructedState: state.EmptyState(),
 		}
-		// The len-delta proof above plus syncer_test.go (Task 3) provide behavioral
-		// coverage of WithScopeToTarget suppressing deletes.
+		workspace := &client.Workspace{
+			ID:   "test-workspace-id",
+			Name: "Test Workspace",
+		}
+		s, err := syncer.New(mockProvider, workspace, opts...)
+		require.NoError(t, err)
+		require.NotNil(t, s)
 	})
 }

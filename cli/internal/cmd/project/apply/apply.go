@@ -77,7 +77,10 @@ func NewCmdApply() *cobra.Command {
 			--file / -f: Scoped, delete-free mode. Applies ONLY the resources in the given
 			files or directories. Resources outside those paths are NEVER deleted — this mode
 			only creates and updates. Use this when you want to apply a subset of your project
-			without risking unintended deletions of other resources.
+			without risking unintended deletions of other resources. Note: each -f path is
+			loaded and validated independently; cross-file consistency checks (e.g. duplicate
+			URNs spanning two separate -f paths) are NOT performed across distinct -f paths —
+			pass non-overlapping sets to avoid ambiguous results.
 
 			--file and --location are mutually exclusive.
 		`),
@@ -112,6 +115,10 @@ func NewCmdApply() *cobra.Command {
 			if len(files) > 0 {
 				// Load each path individually; handlers accumulate resources across
 				// calls so multi-file -f correctly builds a combined resource graph.
+				// Note: p.Load overwrites p.location on each call, so after this loop
+				// p.Location() reflects only the last path. This is harmless for apply
+				// (Location() is not used here), but callers that rely on Location()
+				// should be aware.
 				for _, f := range files {
 					if err := p.Load(f); err != nil {
 						return fmt.Errorf("loading and validating project from %s: %w", f, err)
@@ -191,7 +198,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; earlier files take priority)")
-	cmd.Flags().StringArrayVarP(&files, "file", "f", nil, "Apply ONLY the resources in these files/dirs (scoped: creates/updates only, never deletes). Mutually exclusive with --location.")
+	cmd.Flags().StringArrayVarP(&files, "file", "f", nil, "Apply ONLY the resources in these files or directories (scoped: creates/updates only, never deletes). Mutually exclusive with --location.")
 
 	return cmd
 }
