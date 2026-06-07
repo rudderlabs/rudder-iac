@@ -404,5 +404,20 @@ func (p *CompositeProvider) RuleDocEntries() []docs.RuleDocEntry {
 	return entries
 }
 
+// TypeRouter resolves the provider responsible for a given resource type.
+// CompositeProvider satisfies this interface; individual providers need not.
+type TypeRouter interface {
+	ProviderForType(resourceType string) (Provider, error)
+}
+
+// ProviderForType returns the provider registered for the given resource type.
+// Returns ErrUnsupportedType (wrapped) when no provider handles the type.
+func (p *CompositeProvider) ProviderForType(resourceType string) (Provider, error) {
+	return p.providerForType(resourceType)
+}
+
 // Compile-time verification that CompositeProvider implements RuleProvider (including RuleDocEntries)
 var _ RuleProvider = (*CompositeProvider)(nil)
+
+// Compile-time verification that CompositeProvider implements TypeRouter.
+var _ TypeRouter = (*CompositeProvider)(nil)
