@@ -21,7 +21,7 @@
 | Task | Title | Status | Commit(s) |
 |------|-------|--------|-----------|
 | 1 | Public ProviderForType on composite | ✅ done | `1f10cf8e`, `c81df306` |
-| 2 | ExternalIDSetter capability + beachhead | pending | — |
+| 2 | ExternalIDSetter capability + beachhead | ✅ done | `d6052ca8`, `adb4474c` |
 | 3 | syncer.WithScopeToTarget() seam | pending | — |
 | 4 | resourceops Resolver | pending | — |
 | 5 | Reader — managed+unmanaged merge | pending | — |
@@ -72,3 +72,27 @@
   not-found case itself with `fmt.Errorf("%q: %w", resourceType, ErrUnsupportedType)`,
   delegating to `providerForType` for the lookup. `ErrUnsupportedType` is now
   scoped strictly to routing. Commit `c81df306`. `make test` + `make lint` green.
+
+### 2026-06-07 — Task 2: `ExternalIDSetter` capability + beachhead ✅
+
+- **Implementer (sonnet):** Added optional `ExternalIDSetter` interface to
+  `provider.go`. event-stream + retl `Provider.SetExternalID` route by
+  resourceType through their `handlers` map, wrapping `provider.ErrUnsupportedType`
+  on unknown type. Extracted thin `Handler.SetExternalID` on both source +
+  sqlmodel handlers (event-stream wraps `client.SetExternalID`, retl wraps
+  `client.SetExternalId` — lowercase d preserved); each `Import` now calls the
+  thin method at the same position (no behavior/ordering change). Added
+  `TestProvider_SetExternalID` to both providers. Commit `d6052ca8`.
+- **Discovery:** event-stream `MockSourceClient` already had `SetExternalIDCalled()`.
+  retl's in-file `mockRETLStore` lacked a setter — added `SetExternalId` + a
+  *Called accessor (test-only). retl mock's `ListRetlSources` uses a variadic
+  `...ListRetlSourcesOption` signature.
+- **Spec review (sonnet):** ✅ Compliant; Import ordering preserved on both sides
+  (retl sets external-id BEFORE diffing state; event-stream AFTER update — both
+  unchanged). One minor: event-stream unknown-type test weaker than retl's.
+- **Code-quality review (sonnet):** Approve with 2 test-layer fixes — strengthen
+  the event-stream unknown-type assertion to `ErrorIs(ErrUnsupportedType)`, and
+  rename retl mock's `setExternalIdCalled`/`SetExternalIdCalled()` to the `ID`
+  convention (interface method `SetExternalId` left locked to the API client).
+  Noted pre-existing `remoteId`/`sourceId` naming in lower layers as out-of-scope.
+- **Fix (sonnet):** Both applied. Commit `adb4474c`. `make test` + `make lint` green.
