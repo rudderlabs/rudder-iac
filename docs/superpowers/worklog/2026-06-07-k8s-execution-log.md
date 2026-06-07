@@ -24,7 +24,7 @@
 | 2 | ExternalIDSetter capability + beachhead | ✅ done | `d6052ca8`, `adb4474c` |
 | 3 | syncer.WithScopeToTarget() seam | ✅ done | `81a099ef`, `84d3a070` |
 | 4 | resourceops Resolver | ✅ done | `8abfbf7f` |
-| 5 | Reader — managed+unmanaged merge | pending | — |
+| 5 | Reader — managed+unmanaged merge | ✅ done | `cdaad663`, `4a5991ed` |
 | 6 | Single-resource spec materialization | pending | — |
 | 7 | get command | pending | — |
 | 8 | describe command | pending | — |
@@ -143,3 +143,29 @@
 - **Code-quality review (sonnet):** ✅ Approve, no blocking issues. Minor: `loadAll`
   doc says "managed" (will be updated in Task 5 when merge lands); `New` lacks a
   doc comment. `loadAll` seam confirmed well-shaped for Task 5 (body-only change).
+
+### 2026-06-07 — Task 5: Reader — managed+unmanaged merge ✅
+
+- **Implementer (sonnet):** Added `reader.go` — `Scope` (All/Managed/Unmanaged),
+  `Row{ExternalID,RemoteID,Name,Managed}`, `ListRows(ctx, prov, type, scope)`,
+  `SupportsUnmanaged(prov)`, private `mergedRemote` (managed+unmanaged, managed
+  wins on RemoteID dup), `extractName`. Extended resolver `loadAll` to delegate to
+  the shared `mergedRemote` so `FindRemote` resolves unmanaged-by-remote-id.
+  Commit `cdaad663`.
+- **Design decisions / discovery:**
+  - `ListRows` takes the narrower `provider.ManagedRemoteResourceLoader` (not full
+    `Provider`) and asserts `UnmanagedRemoteResourceLoader` at runtime.
+  - **Degraded surfacing:** plan wanted a `Degraded` flag, but the binding test
+    pins `ListRows(...) ([]Row, error)`. Resolved by keeping the signature and
+    providing a companion `SupportsUnmanaged(prov) bool` probe (two-call protocol).
+    Task 7's `get` must call `SupportsUnmanaged` and print a one-line note when it
+    is false and scope includes unmanaged.
+- **Spec review (sonnet):** ✅ Compliant; merge/de-dup/scope correct; `loadAll`
+  uses the shared primitive; nil-safe. Minor: no test for a provider lacking the
+  unmanaged interface entirely.
+- **Code-quality review (sonnet):** Approve with minor rework — document the
+  two-call protocol + namer choice, exhaustive scope switch, rename a misleading
+  test, add the missing no-interface-branch test.
+- **Fix (sonnet):** All applied. New `TestReader_List_ProviderWithoutUnmanagedInterface`
+  uses a `managedOnlyProvider` (no `LoadImportable`), exercising the
+  `if !ok { return result, nil }` branch. Commit `4a5991ed`.
