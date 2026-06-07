@@ -251,3 +251,24 @@ func TestReader_SpecJSON_RoundTrips(t *testing.T) {
 	assert.Equal(t, esSource.ResourceKind, kind)
 }
 
+func TestReader_SpecYAMLWithManaged_ManagedSource(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	// "my-source" has ExternalID set → managed == true.
+	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "my-source")
+	require.NoError(t, err)
+	require.NotEmpty(t, out)
+	assert.True(t, managed, "source with ExternalID must be reported as managed")
+
+	spec, err := specs.New([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, esSource.ResourceKind, spec.Kind)
+}
+
+func TestReader_SpecYAMLWithManaged_NotFound(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	_, _, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "does-not-exist")
+	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
+}
+

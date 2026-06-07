@@ -28,7 +28,8 @@ Examples:
   # Describe a managed event-stream source
   rudder-cli describe event-stream-source my-source-id`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
 			defer func() {
 				telemetry.TrackCommand("describe", err, []telemetry.KV{
 					{K: "type", V: args[0]},
@@ -62,16 +63,9 @@ func RunDescribe(ctx context.Context, out io.Writer, router provider.TypeRouter,
 		return err
 	}
 
-	// Determine managed status before materializing the spec so that a missing
-	// resource surfaces ErrResourceNotFound from FindRemote rather than from
-	// the (less informative) SpecYAML path.
-	found, err := res.FindRemote(ctx, resourceType, id)
-	if err != nil {
-		return err
-	}
-	managed := found.ExternalID != ""
-
-	yamlStr, err := resourceops.SpecYAML(ctx, prov, resourceType, id)
+	// Single remote load: SpecYAMLWithManaged returns both the YAML and managed
+	// flag without an extra FindRemote round-trip.
+	yamlStr, managed, err := resourceops.SpecYAMLWithManaged(ctx, prov, resourceType, id)
 	if err != nil {
 		return err
 	}
