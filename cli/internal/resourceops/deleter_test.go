@@ -2,6 +2,7 @@ package resourceops_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,4 +113,19 @@ func TestDelete_NotFound_RejectsWithErrResourceNotFound(t *testing.T) {
 
 	// Delete must not have been called on the provider.
 	assert.Equal(t, testutils.DeleteArgs{}, mp.DeleteCalledWithArg)
+}
+
+func TestDelete_ProviderDeleteErr_WrapsError(t *testing.T) {
+	t.Parallel()
+
+	sentinel := errors.New("api failure")
+
+	mp := testutils.NewMockProvider(nil, []string{"event-stream-source"})
+	mp.LoadResourcesFromRemoteVal = buildManagedRemoteResources("src_1", "my-source")
+	mp.MapRemoteToStateVal = buildStateForSource("my-source")
+	mp.DeleteErr = sentinel
+
+	err := resourceops.Delete(context.Background(), mp, "event-stream-source", "my-source")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel)
 }
