@@ -109,8 +109,8 @@ func WithScopeToTarget() Option {
 	}
 }
 
-// scopeGraphToTarget returns a copy of source containing only resources whose
-// URN is also in target.
+// scopeGraphToTarget restricts source to its intersection with target so the
+// planner has no basis for emitting Delete operations for out-of-scope resources.
 func scopeGraphToTarget(source, target *resources.Graph) *resources.Graph {
 	scoped := resources.NewGraph()
 	for urn, r := range source.Resources() {
