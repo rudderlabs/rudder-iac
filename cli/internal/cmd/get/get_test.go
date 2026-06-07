@@ -16,6 +16,7 @@ import (
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resourceops"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -410,4 +411,89 @@ func TestRunGet_DegradedNote_ManagedOnlyProvider(t *testing.T) {
 	assert.Contains(t, out, "unmanaged", "note must mention unmanaged resources")
 	// The managed row must still be present.
 	assert.Contains(t, out, "managed-src")
+}
+
+// ---------------------------------------------------------------------------
+// Fix 5: new tests for the review follow-up behaviours
+// ---------------------------------------------------------------------------
+
+func TestRunGet_Single_NotFound_ErrorIs(t *testing.T) {
+	t.Parallel()
+
+	cp := newFakeComposite(testSources())
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp,
+		[]string{"event-stream-source", "nonexistent-id"},
+		get.GetOptions{Output: "table"},
+	)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, resourceops.ErrResourceNotFound)
+}
+
+func TestParseSelector_MalformedPair_Error(t *testing.T) {
+	t.Parallel()
+
+	// A value without "=" must be rejected; silently dropping it would let the
+	// user think they had filtered correctly when they had not.
+	_, err := get.ParseSelector([]string{"name-only"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "key=value", "error must mention key=value format")
+}
+
+func TestParseSelector_ValidPairs(t *testing.T) {
+	t.Parallel()
+
+	m, err := get.ParseSelector([]string{"name=foo", "managed=true"})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"name": "foo", "managed": "true"}, m)
+}
+
+func TestParseSelector_EmptyKey_Error(t *testing.T) {
+	t.Parallel()
+
+	_, err := get.ParseSelector([]string{"=value"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "key=value")
+}
+
+func TestRunGet_List_YAMLOutput_Error(t *testing.T) {
+	t.Parallel()
+
+	cp := newFakeComposite(testSources())
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp,
+		[]string{"event-stream-source"},
+		get.GetOptions{Output: "yaml"},
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "single resource", "error must mention single resource requirement")
+}
+
+func TestRunGet_Single_DegradedNote_Absent(t *testing.T) {
+	t.Parallel()
+
+	// A managed-only provider (no UnmanagedRemoteResourceLoader) + single-resource
+	// path must NOT print the degraded note.
+	rc := resources.NewRemoteResources()
+	rc.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src-1": {ID: "src-1", ExternalID: "managed-src", Data: map[string]any{"name": "Managed Source"}},
+	})
+
+	cp := &managedOnlyComposite{
+		prov:           &managedOnlyProv{rc: rc},
+		supportedTypes: []string{"event-stream-source"},
+	}
+
+	var buf bytes.Buffer
+	// Use the single-resource path (two args) — note must NOT appear.
+	err := get.RunGet(context.Background(), &buf, cp,
+		[]string{"event-stream-source", "managed-src"},
+		get.GetOptions{Output: "table"},
+	)
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.NotContains(t, out, "note:", "degraded note must NOT appear for the single-resource path")
 }
