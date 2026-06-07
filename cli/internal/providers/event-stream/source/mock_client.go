@@ -8,15 +8,18 @@ import (
 )
 
 type MockSourceClient struct {
-	createCalled     bool
-	updateCalled     bool
-	deleteCalled     bool
-	linkTPCalled     bool
-	unlinkTPCalled   bool
+	createCalled             bool
+	updateCalled             bool
+	deleteCalled             bool
+	linkTPCalled             bool
+	unlinkTPCalled           bool
 	updateTPConnectionCalled bool
-	getSourcesCalled bool
-	setExternalIDCalled bool
-	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
+	getSourcesCalled         bool
+	setExternalIDCalled      bool
+	setExternalIDSourceID    string
+	setExternalIDExternalID  string
+	SetExternalIDErr         error
+	getSourcesFunc           func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
 
 func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
@@ -70,7 +73,9 @@ func (m *MockSourceClient) UpdateTPConnection(ctx context.Context, trackingPlanI
 
 func (m *MockSourceClient) SetExternalID(ctx context.Context, sourceID string, externalID string) error {
 	m.setExternalIDCalled = true
-	return nil
+	m.setExternalIDSourceID = sourceID
+	m.setExternalIDExternalID = externalID
+	return m.SetExternalIDErr
 }
 
 func NewMockSourceClient() *MockSourceClient {
@@ -111,4 +116,12 @@ func (m *MockSourceClient) UpdateTPConnectionCalled() bool {
 
 func (m *MockSourceClient) SetExternalIDCalled() bool {
 	return m.setExternalIDCalled
+}
+
+func (m *MockSourceClient) SetExternalIDSourceID() string {
+	return m.setExternalIDSourceID
+}
+
+func (m *MockSourceClient) SetExternalIDExternalID() string {
+	return m.setExternalIDExternalID
 }

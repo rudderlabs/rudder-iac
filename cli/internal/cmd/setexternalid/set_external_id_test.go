@@ -3,6 +3,7 @@ package setexternalid_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,36 @@ func TestRunSetExternalID_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, mockClient.SetExternalIDCalled(), "SetExternalID must be called on the client")
-	assert.Contains(t, buf.String(), "my-source", "output must mention the external id")
+
+	out := buf.String()
+	assert.Contains(t, out, "my-source", "output must mention the external id")
+	assert.Contains(t, out, "src_remote_1", "output must mention the remote id")
+	assert.Contains(t, out, "event-stream-source", "output must mention the resource type")
+
+	// Guard against arg transposition: client must receive (sourceID, externalID) in the correct order.
+	assert.Equal(t, "src_remote_1", mockClient.SetExternalIDSourceID(), "sourceID arg must be forwarded correctly")
+	assert.Equal(t, "my-source", mockClient.SetExternalIDExternalID(), "externalID arg must be forwarded correctly")
+}
+
+func TestRunSetExternalID_ClientError(t *testing.T) {
+	t.Parallel()
+
+	sentinel := errors.New("server unavailable")
+
+	mockClient := esSource.NewMockSourceClient()
+	mockClient.SetExternalIDErr = sentinel
+
+	prov := eventstream.New(mockClient)
+	router := &fakeRouter{
+		prov:           prov,
+		supportedTypes: prov.SupportedTypes(),
+	}
+
+	var buf bytes.Buffer
+	err := setexternalid.RunSetExternalID(context.Background(), &buf, router, "event-stream-source", "src_remote_1", "my-source")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel)
 }
 
 func TestRunSetExternalID_UnsupportedCapability(t *testing.T) {
