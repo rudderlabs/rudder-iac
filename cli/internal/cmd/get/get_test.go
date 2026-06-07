@@ -16,6 +16,7 @@ import (
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // fakeComposite implements get.Composite (the seam interface) with a single
@@ -25,7 +26,7 @@ type fakeComposite struct {
 	supportedTypes []string
 }
 
-func (f *fakeComposite) ProviderForType(resourceType string) (provider.Provider, error) {
+func (f *fakeComposite) ProviderForType(resourceType string) (get.GetProvider, error) {
 	for _, t := range f.supportedTypes {
 		if t == resourceType {
 			return f.prov, nil
@@ -243,4 +244,170 @@ func TestNewCmdGet_Registered(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("managed"))
 	assert.NotNil(t, cmd.Flags().Lookup("unmanaged"))
 	assert.NotNil(t, cmd.Flags().Lookup("selector"))
+}
+
+// ---------------------------------------------------------------------------
+// Selector filter tests
+// ---------------------------------------------------------------------------
+
+func TestRunGet_Selector_ExternalID_Table(t *testing.T) {
+	t.Parallel()
+
+	cp := newFakeComposite(testSources())
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output:   "table",
+		Selector: map[string]string{"external-id": "my-managed-source"},
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "my-managed-source", "selector must keep the matching row")
+	// The unmanaged source has no external-id so it must be absent.
+	assert.NotContains(t, out, "src-remote-2", "selector must exclude non-matching rows")
+}
+
+func TestRunGet_Selector_ExternalID_JSON(t *testing.T) {
+	t.Parallel()
+
+	cp := newFakeComposite(testSources())
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output:   "json",
+		Selector: map[string]string{"external-id": "my-managed-source"},
+	})
+	require.NoError(t, err)
+
+	var rows []map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &rows))
+	require.Len(t, rows, 1, "exactly one row must survive the selector filter")
+	assert.Equal(t, "my-managed-source", rows[0]["external_id"])
+}
+
+// newMixedComposite creates a composite backed by a managedOnlyProv with both
+// a managed and an unmanaged row so selector tests for managed=true/false work
+// with predictable Managed fields (unaffected by the event-stream LoadImportable
+// namer which would assign ExternalIDs to unmanaged rows).
+func newMixedComposite() *managedOnlyComposite {
+	rc := resources.NewRemoteResources()
+	rc.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src-m": {ID: "src-m", ExternalID: "ext-managed", Data: map[string]any{"name": "Managed Source"}},
+		"src-u": {ID: "src-u", ExternalID: "", Data: map[string]any{"name": "Unmanaged Source"}},
+	})
+	return &managedOnlyComposite{
+		prov:           &managedOnlyProv{rc: rc},
+		supportedTypes: []string{"event-stream-source"},
+	}
+}
+
+func TestRunGet_Selector_Managed_True(t *testing.T) {
+	t.Parallel()
+
+	cp := newMixedComposite()
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output:   "table",
+		Selector: map[string]string{"managed": "true"},
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "ext-managed", "managed=true must keep the managed row")
+	assert.NotContains(t, out, "src-u", "managed=true must exclude the unmanaged row")
+}
+
+func TestRunGet_Selector_Managed_False(t *testing.T) {
+	t.Parallel()
+
+	cp := newMixedComposite()
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output:   "table",
+		Selector: map[string]string{"managed": "false"},
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.NotContains(t, out, "ext-managed", "managed=false must exclude the managed row")
+	assert.Contains(t, out, "src-u", "managed=false must keep the unmanaged row")
+}
+
+func TestRunGet_Selector_UnknownKey_Error(t *testing.T) {
+	t.Parallel()
+
+	cp := newFakeComposite(testSources())
+	var buf bytes.Buffer
+
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output:   "table",
+		Selector: map[string]string{"bogus": "x"},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bogus", "error must name the offending key")
+	assert.Contains(t, err.Error(), "external-id", "error must list supported keys")
+}
+
+// ---------------------------------------------------------------------------
+// Degraded-note test
+// ---------------------------------------------------------------------------
+
+// managedOnlyProv implements only provider.ManagedRemoteResourceLoader (= get.GetProvider).
+// It does NOT implement provider.UnmanagedRemoteResourceLoader, so
+// resourceops.SupportsUnmanaged returns false and RunGet prints the degraded note.
+type managedOnlyProv struct {
+	rc *resources.RemoteResources
+}
+
+func (p *managedOnlyProv) LoadResourcesFromRemote(_ context.Context) (*resources.RemoteResources, error) {
+	return p.rc, nil
+}
+
+// managedOnlyComposite is a fakeComposite variant that returns a managedOnlyProv
+// so that the degraded-mode note path in RunGet can be exercised.
+type managedOnlyComposite struct {
+	prov           *managedOnlyProv
+	supportedTypes []string
+}
+
+func (c *managedOnlyComposite) ProviderForType(resourceType string) (get.GetProvider, error) {
+	for _, t := range c.supportedTypes {
+		if t == resourceType {
+			return c.prov, nil
+		}
+	}
+	return nil, provider.ErrUnsupportedType
+}
+
+func (c *managedOnlyComposite) SupportedTypes() []string { return c.supportedTypes }
+
+func TestRunGet_DegradedNote_ManagedOnlyProvider(t *testing.T) {
+	t.Parallel()
+
+	// Build a RemoteResources with one managed source so there is something to list.
+	rc := resources.NewRemoteResources()
+	rc.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src-1": {ID: "src-1", ExternalID: "managed-src", Data: map[string]any{"name": "Managed Source"}},
+	})
+
+	cp := &managedOnlyComposite{
+		prov:           &managedOnlyProv{rc: rc},
+		supportedTypes: []string{"event-stream-source"},
+	}
+
+	var buf bytes.Buffer
+	// Default scope (ScopeAll) triggers the unmanaged check.
+	err := get.RunGet(context.Background(), &buf, cp, []string{"event-stream-source"}, get.GetOptions{
+		Output: "table",
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "note:", "degraded note must appear when provider cannot enumerate unmanaged resources")
+	assert.Contains(t, out, "unmanaged", "note must mention unmanaged resources")
+	// The managed row must still be present.
+	assert.Contains(t, out, "managed-src")
 }
