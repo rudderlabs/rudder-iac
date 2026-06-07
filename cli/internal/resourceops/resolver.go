@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -13,6 +15,23 @@ var (
 	ErrResourceNotFound = errors.New("resource not found")
 	ErrVerbNotSupported = errors.New("operation not supported for resource type")
 )
+
+// ValidateType returns a helpful error listing supported types when resourceType
+// is not among them. supportedTypes is the full set of registered types returned
+// by the composite provider — all four verb commands (get, delete, describe,
+// set-external-id) route through this so users always get the same actionable message.
+func ValidateType(supportedTypes []string, resourceType string) error {
+	for _, t := range supportedTypes {
+		if t == resourceType {
+			return nil
+		}
+	}
+	sorted := make([]string, len(supportedTypes))
+	copy(sorted, supportedTypes)
+	sort.Strings(sorted)
+	return fmt.Errorf("unknown resource type %q; valid types: %s",
+		resourceType, strings.Join(sorted, ", "))
+}
 
 // Resolver routes resource operations to the appropriate provider and provides
 // common lookup and capability-assertion helpers used by verb commands.

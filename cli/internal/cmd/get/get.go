@@ -148,7 +148,7 @@ func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opt
 
 	resourceType := args[0]
 
-	if err := validateType(cp, resourceType); err != nil {
+	if err := resourceops.ValidateType(cp.SupportedTypes(), resourceType); err != nil {
 		return err
 	}
 
@@ -365,21 +365,6 @@ func renderRowsJSON(out io.Writer, rows []resourceops.Row) error {
 	}
 	_, err = out.Write(b)
 	return err
-}
-
-// validateType returns an error listing valid types when resourceType is not
-// registered with cp.
-func validateType(cp Composite, resourceType string) error {
-	if cp == nil {
-		return fmt.Errorf("no provider configured")
-	}
-	for _, t := range cp.SupportedTypes() {
-		if t == resourceType {
-			return nil
-		}
-	}
-	return fmt.Errorf("unknown resource type %q; valid types: %s",
-		resourceType, strings.Join(cp.SupportedTypes(), ", "))
 }
 
 // toScope converts the managed/unmanaged flag pair into a resourceops.Scope.

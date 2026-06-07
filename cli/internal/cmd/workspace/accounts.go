@@ -67,7 +67,6 @@ func newCmdListAccounts() *cobra.Command {
 	cmd.Flags().String("category", "", "Filter by account category")
 	cmd.Flags().String("type", "", "Filter by account type")
 	cmd.Flags().Bool("json", false, "Output as JSON")
-	cmd.Deprecated = "use 'rudder-cli get account' instead"
 
 	return cmd
 }
