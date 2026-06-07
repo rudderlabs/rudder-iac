@@ -32,7 +32,7 @@
 | 10 | delete command | ✅ done | `14b710fb`, `56806eb5` |
 | 11 | apply -f scoped mode | ✅ done | `f7722bff`, `6db806d2` |
 | 12 | Deprecate per-noun list commands | ✅ done | `074195a2` |
-| 13 | E2E round-trip + scoped no-delete | pending | — |
+| 13 | E2E round-trip + scoped no-delete | ✅ done | `1c75a7c4`, `78cf08b5` |
 
 ---
 
@@ -336,3 +336,35 @@
   verified against each list's `l.List(ctx, <type>, ...)` call; behavior unchanged.
   Note: `tracking-plans list` (a 4th list) was intentionally NOT deprecated — the
   plan named only 3; `get tracking-plan` isn't part of the beachhead.
+
+### 2026-06-07 — Task 13: E2E round-trip + scoped no-delete ✅
+
+- **User decision:** The E2E harness drives the binary against the LIVE workspace
+  in `~/.rudder/config.json` (prod read-write) and mutates real resources. Asked
+  the user (AskUserQuestion) → they chose "Write and run it now" → executed live
+  with explicit authorization.
+- **Implementer (sonnet):** Added `cli/tests/command_k8s_verbs_test.go` —
+  `TestK8sVerbs_GetApplyRoundTrip_ScopedNoDelete`: creates two event-stream
+  sources A+B (unique `UnixNano` suffix) via `apply -l`; captures
+  `get event-stream-source <A> -o yaml` STDOUT-ONLY (separate buffers, since the
+  harness `Execute` returns combined output); asserts `apply -f a.yaml --dry-run`
+  → "No changes to apply" (round-trip no-op); modifies A's name, `apply -f` →
+  "Updated resources" + verifies the remote name changed; verifies B is still
+  present/unchanged (scoped never deletes); cleans up A+B via the `delete` verb in
+  `t.Cleanup`. Commit `1c75a7c4`.
+- **Live result:** PASS in 56.2s. Workspace verified clean afterward (no `k8se2e`
+  sources remained). `make lint` clean.
+- **Discovery (no gap):** Round-trip is a clean no-op because `get -o yaml` embeds
+  the workspace import metadata (remote ID + workspace ID); `LoadSpec` →
+  `addImportMetadata` makes apply update-by-remote-id rather than create, and the
+  `enabled` default matches the remote, so the plan has zero operations.
+- **Spec review (sonnet):** ✅ Rigorous — stdout-only capture confirmed; scoped
+  no-delete genuinely proven (B independently re-fetched + asserted unchanged after
+  the A-only `-f` apply); update double-proven (message + remote name change);
+  cleanup registered before failure-prone steps; no global `destroy`. One defect:
+  the no-op check used non-fatal `assert.Contains` (a dirty round-trip could be
+  masked by the later update step).
+- **Fix (controller):** Changed the no-op assertion to `require.Contains` (fatal).
+  One-line change to an already-passing assertion — verified via `go vet` + `make
+  lint`; did NOT re-run the live test to avoid an unnecessary extra prod mutation
+  (logic unchanged, already validated green). Commit `78cf08b5`.
