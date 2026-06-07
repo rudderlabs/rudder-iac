@@ -558,11 +558,15 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 		return nil, fmt.Errorf("updating event stream source during import: %w", err)
 	}
 
-	err = h.client.SetExternalID(ctx, remoteId, id)
+	err = h.SetExternalID(ctx, remoteId, id)
 	if err != nil {
 		return nil, fmt.Errorf("setting external ID for event stream source during import: %w", err)
 	}
 	return result, nil
+}
+
+func (h *Handler) SetExternalID(ctx context.Context, remoteID, externalID string) error {
+	return h.client.SetExternalID(ctx, remoteID, externalID)
 }
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
