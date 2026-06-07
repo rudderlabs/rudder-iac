@@ -306,7 +306,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -317,7 +317,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
@@ -338,7 +338,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -349,7 +349,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
