@@ -143,32 +143,49 @@ func extractName(data any) string {
 // It finds the resource matching id (external-ID first, then remote-ID), runs it through
 // the provider's FormatForExport, and encodes the first entity as YAML.
 func SpecYAML(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
-	content, err := specContent(ctx, prov, resourceType, id)
+	content, _, err := specContent(ctx, prov, resourceType, id)
 	if err != nil {
 		return "", err
 	}
 	return EncodeYAML(content)
 }
 
+// SpecYAMLWithManaged materializes the re-appliable YAML spec for a single resource
+// and reports whether it is managed (has an external ID), reusing the same single-resource
+// lookup as SpecYAML with no extra remote round-trip beyond it.
+func SpecYAMLWithManaged(ctx context.Context, prov provider.Provider, resourceType, id string) (string, bool, error) {
+	content, managed, err := specContent(ctx, prov, resourceType, id)
+	if err != nil {
+		return "", false, err
+	}
+	yamlStr, err := EncodeYAML(content)
+	if err != nil {
+		return "", false, err
+	}
+	return yamlStr, managed, nil
+}
+
 // SpecJSON materializes a single managed remote resource into a re-appliable JSON string.
 // It finds the resource matching id (external-ID first, then remote-ID), runs it through
 // the provider's FormatForExport, and encodes the first entity as JSON.
 func SpecJSON(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
-	content, err := specContent(ctx, prov, resourceType, id)
+	content, _, err := specContent(ctx, prov, resourceType, id)
 	if err != nil {
 		return "", err
 	}
 	return EncodeJSON(content)
 }
 
-// specContent is the shared find-and-export path used by SpecYAML and SpecJSON.
-// It loads managed remote resources, finds the one matching id (external-ID-first
-// then remote-ID, mirroring Resolver.FindRemote), builds a single-entry collection,
-// and delegates to FormatForExport to get the formattable entity content.
-func specContent(ctx context.Context, prov provider.Provider, resourceType, id string) (any, error) {
+// specContent is the shared find-and-export path used by SpecYAML, SpecYAMLWithManaged,
+// and SpecJSON. It loads managed remote resources, finds the one matching id
+// (external-ID-first then remote-ID, mirroring Resolver.FindRemote), builds a
+// single-entry collection, and delegates to FormatForExport to get the formattable
+// entity content. The returned bool reports whether the resource is managed
+// (has a non-empty ExternalID).
+func specContent(ctx context.Context, prov provider.Provider, resourceType, id string) (any, bool, error) {
 	managed, err := prov.LoadResourcesFromRemote(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("loading remote resources: %w", err)
+		return nil, false, fmt.Errorf("loading remote resources: %w", err)
 	}
 	if managed == nil {
 		managed = resources.NewRemoteResources()
@@ -178,8 +195,10 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 
 	found := findInMap(all, id)
 	if found == nil {
-		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
+		return nil, false, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
+
+	isManaged := found.ExternalID != ""
 
 	coll := resources.NewRemoteResources()
 	coll.Set(resourceType, map[string]*resources.RemoteResource{found.ID: found})
@@ -199,11 +218,11 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 
 	entities, err := prov.FormatForExport(coll, idNamer, refResolver)
 	if err != nil {
-		return nil, fmt.Errorf("materializing spec for %s %q (cross-resource references such as tracking plans may not resolve in single-resource export): %w", resourceType, id, err)
+		return nil, false, fmt.Errorf("materializing spec for %s %q (cross-resource references such as tracking plans may not resolve in single-resource export): %w", resourceType, id, err)
 	}
 	if len(entities) == 0 {
-		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
+		return nil, false, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
 
-	return entities[0].Content, nil
+	return entities[0].Content, isManaged, nil
 }

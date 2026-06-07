@@ -77,19 +77,6 @@ func TestRunDescribe_ManagedSource_OutputContainsKeyFields(t *testing.T) {
 	assert.Contains(t, out, "yes", "managed source must show 'yes'")
 }
 
-func TestRunDescribe_ManagedSource_OutputContainsManagedYes(t *testing.T) {
-	t.Parallel()
-
-	router := newFakeRouter([]sourceClient.EventStreamSource{managedSource()})
-	var buf bytes.Buffer
-
-	err := describe.RunDescribe(context.Background(), &buf, router, "event-stream-source", "my-managed-source")
-	require.NoError(t, err)
-
-	out := buf.String()
-	assert.Contains(t, out, "Managed:")
-	assert.Contains(t, out, "yes")
-}
 
 func TestRunDescribe_UnknownType_WrapsErrUnsupportedType(t *testing.T) {
 	t.Parallel()
@@ -119,6 +106,9 @@ func TestNewCmdDescribe_Registered(t *testing.T) {
 	cmd := describe.NewCmdDescribe()
 	require.NotNil(t, cmd)
 	assert.Equal(t, "describe", cmd.Name())
-	// Exactly 2 args required.
-	assert.NotNil(t, cmd.Args)
+	// Exactly 2 args required — verify all arity boundary cases.
+	assert.Error(t, cmd.Args(cmd, []string{}), "zero args must be rejected")
+	assert.Error(t, cmd.Args(cmd, []string{"a"}), "one arg must be rejected")
+	assert.NoError(t, cmd.Args(cmd, []string{"a", "b"}), "two args must be accepted")
+	assert.Error(t, cmd.Args(cmd, []string{"a", "b", "c"}), "three args must be rejected")
 }
