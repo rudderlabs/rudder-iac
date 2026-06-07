@@ -15,12 +15,44 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// GetProvider is the narrowest interface the get command needs from a single
+// provider. It deliberately excludes provider.UnmanagedRemoteResourceLoader so
+// that resourceops.SupportsUnmanaged can distinguish managed-only providers at
+// runtime and print a degraded-mode note.
+//
+// Production providers (implementing the full provider.Provider interface) satisfy
+// this interface automatically. The single-resource path additionally requires
+// provider.Exporter; runSingle type-asserts to it and returns an informative error
+// if the provider does not export (which cannot happen with real providers).
+type GetProvider interface {
+	provider.ManagedRemoteResourceLoader
+}
+
 // Composite is the minimal seam the get command needs from the composite
-// provider. *provider.CompositeProvider satisfies both methods.
+// provider. See NewCompositeShim to adapt a *provider.CompositeProvider.
 type Composite interface {
-	ProviderForType(resourceType string) (provider.Provider, error)
+	ProviderForType(resourceType string) (GetProvider, error)
 	SupportedTypes() []string
 }
+
+// typeRouter is satisfied by *provider.CompositeProvider, which exposes
+// ProviderForType returning the full provider.Provider.
+type typeRouter interface {
+	ProviderForType(string) (provider.Provider, error)
+	SupportedTypes() []string
+}
+
+// compositeShim adapts a typeRouter (e.g. *provider.CompositeProvider) to the
+// Composite seam by narrowing the ProviderForType return type to GetProvider.
+// Since provider.Provider embeds ManagedRemoteResourceLoader, the value itself
+// satisfies GetProvider — only the declared return type differs.
+type compositeShim struct{ r typeRouter }
+
+func (s *compositeShim) ProviderForType(t string) (GetProvider, error) {
+	return s.r.ProviderForType(t)
+}
+
+func (s *compositeShim) SupportedTypes() []string { return s.r.SupportedTypes() }
 
 // GetOptions holds the parsed flag values for the get command.
 type GetOptions struct {
@@ -77,12 +109,12 @@ Examples:
 				return err
 			}
 
-			cp, ok := d.CompositeProvider().(Composite)
+			router, ok := d.CompositeProvider().(typeRouter)
 			if !ok {
-				return fmt.Errorf("internal error: composite provider does not implement the required interface")
+				return fmt.Errorf("internal error: composite provider does not support per-type routing")
 			}
 
-			err = RunGet(cmd.Context(), cmd.OutOrStdout(), cp, args, opts)
+			err = RunGet(cmd.Context(), cmd.OutOrStdout(), &compositeShim{r: router}, args, opts)
 			return err
 		},
 	}
@@ -129,11 +161,16 @@ func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opt
 	return runList(ctx, out, prov, resourceType, scope, opts)
 }
 
-// runList fetches all rows and renders them.
-func runList(ctx context.Context, out io.Writer, prov provider.Provider, resourceType string, scope resourceops.Scope, opts GetOptions) error {
+// runList fetches all rows, applies any selector filter, and renders them.
+func runList(ctx context.Context, out io.Writer, prov GetProvider, resourceType string, scope resourceops.Scope, opts GetOptions) error {
 	rows, err := resourceops.ListRows(ctx, prov, resourceType, scope)
 	if err != nil {
 		return fmt.Errorf("listing %s: %w", resourceType, err)
+	}
+
+	rows, err = filterRows(rows, opts.Selector)
+	if err != nil {
+		return err
 	}
 
 	switch opts.Output {
@@ -144,19 +181,95 @@ func runList(ctx context.Context, out io.Writer, prov provider.Provider, resourc
 	}
 }
 
-// runSingle fetches and renders a single resource by its id.
-func runSingle(ctx context.Context, out io.Writer, prov provider.Provider, resourceType, id string, opts GetOptions) error {
-	switch opts.Output {
-	case "yaml":
-		s, err := resourceops.SpecYAML(ctx, prov, resourceType, id)
-		if err != nil {
-			return err
-		}
-		_, err = fmt.Fprint(out, s)
-		return err
+// supportedSelectorKeys lists the row columns that -l/--selector can filter on.
+// These map directly to the fields of resourceops.Row.
+var supportedSelectorKeys = []string{"external-id", "remote-id", "name", "managed"}
 
-	case "json":
-		s, err := resourceops.SpecJSON(ctx, prov, resourceType, id)
+// filterRows returns only those rows matching ALL entries in selector (AND semantics).
+// String comparisons are case-insensitive. "managed" accepts "true" or "false".
+//
+// This is a v1 selector that operates over the four listed columns (external-id,
+// remote-id, name, managed). Filtering on arbitrary resource fields (full
+// lister.Filters) is a documented follow-up.
+//
+// An unknown key causes an error that lists the supported keys so the caller
+// can fix the command rather than silently getting an unfiltered result.
+func filterRows(rows []resourceops.Row, selector map[string]string) ([]resourceops.Row, error) {
+	if len(selector) == 0 {
+		return rows, nil
+	}
+
+	// Validate all keys up-front so we never silently ignore unknown keys.
+	for k := range selector {
+		if !isSupportedSelectorKey(k) {
+			return nil, fmt.Errorf("unknown selector key %q; supported keys: %s",
+				k, strings.Join(supportedSelectorKeys, ", "))
+		}
+	}
+
+	out := rows[:0:0] // reuse backing array but start empty
+	for _, row := range rows {
+		if rowMatchesSelector(row, selector) {
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
+// isSupportedSelectorKey reports whether key is in supportedSelectorKeys.
+func isSupportedSelectorKey(key string) bool {
+	for _, k := range supportedSelectorKeys {
+		if strings.EqualFold(k, key) {
+			return true
+		}
+	}
+	return false
+}
+
+// rowMatchesSelector reports whether row satisfies every entry in selector.
+func rowMatchesSelector(row resourceops.Row, selector map[string]string) bool {
+	for k, v := range selector {
+		switch strings.ToLower(k) {
+		case "external-id":
+			if !strings.EqualFold(row.ExternalID, v) {
+				return false
+			}
+		case "remote-id":
+			if !strings.EqualFold(row.RemoteID, v) {
+				return false
+			}
+		case "name":
+			if !strings.EqualFold(row.Name, v) {
+				return false
+			}
+		case "managed":
+			want := strings.EqualFold(v, "true")
+			if row.Managed != want {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// runSingle fetches and renders a single resource by its id.
+// yaml/json output formats require the provider to also implement provider.Provider
+// (Exporter + full spec materialization); table output only needs ManagedRemoteResourceLoader.
+func runSingle(ctx context.Context, out io.Writer, prov GetProvider, resourceType, id string, opts GetOptions) error {
+	switch opts.Output {
+	case "yaml", "json":
+		// Full spec materialization requires the provider to export.
+		fullProv, ok := prov.(provider.Provider)
+		if !ok {
+			return fmt.Errorf("provider for %q does not support yaml/json single-resource output", resourceType)
+		}
+		var s string
+		var err error
+		if opts.Output == "yaml" {
+			s, err = resourceops.SpecYAML(ctx, fullProv, resourceType, id)
+		} else {
+			s, err = resourceops.SpecJSON(ctx, fullProv, resourceType, id)
+		}
 		if err != nil {
 			return err
 		}
