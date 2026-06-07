@@ -30,7 +30,7 @@
 | 8 | describe command | ✅ done | `058312d9`, `5a10f332` |
 | 9 | set-external-id command | ✅ done | `62f4d44d`, `31712c0a` |
 | 10 | delete command | ✅ done | `14b710fb`, `56806eb5` |
-| 11 | apply -f scoped mode | pending | — |
+| 11 | apply -f scoped mode | ✅ done | `f7722bff`, `6db806d2` |
 | 12 | Deprecate per-noun list commands | pending | — |
 | 13 | E2E round-trip + scoped no-delete | pending | — |
 
@@ -297,3 +297,29 @@
   `validateType` listing valid types (+ tests); added delete-error wrap test.
   Commit `56806eb5`. Deferred minors: show resource name in preview, shared test
   fixtures, pre-existing `ImportArgs.RemoteId` naming.
+
+### 2026-06-07 — Task 11: `apply -f` scoped mode ✅
+
+- **Implementer (sonnet):** Added `-f`/`--file` to the existing apply command with
+  two pure testable seams: `validateApplyFlags(files, locationChanged)` (mutual
+  exclusion, called in PreRunE before deps so it fires without auth) and
+  `buildSyncOptions(scoped, dryRun, confirm, reporter, concurrency, useConcurrency)`
+  (appends `syncer.WithScopeToTarget()` iff scoped). `-f` loads each path on a
+  fresh project; `--location` path unchanged. Long/Example document the
+  blast-radius difference. Commit `f7722bff`.
+- **Discovery:** Verified `project.Load` ACCUMULATES across calls (appends to
+  `p.specs` + handler maps), so multi-`-f` builds a combined graph. BUT each
+  `Load` also overwrites `p.location` and validates only that file's batch — so
+  cross-file consistency checks (e.g. duplicate URNs spanning two distinct `-f`
+  paths) are NOT performed (documented in the help text as a v1 caveat).
+- **Spec review (sonnet):** ✅ Compliant; `--location` behavior preserved
+  byte-for-byte; scope option only appended when scoped.
+- **Code-quality review (sonnet):** Approve with one must-fix — a vacuous
+  `IsType` assertion in `TestBuildSyncOptions` that couldn't fail. Pre-existing
+  architectural notes: per-file validation scope (#2) and `p.location` clobber
+  (#1). `MarkFlagsMutuallyExclusive` vs the custom seam judged a fair trade-off
+  (kept the testable seam).
+- **Fix (sonnet):** Replaced the hollow assertion with a real
+  `syncer.New(stubProvider, workspace, opts...)` applicability check; documented
+  the per-file validation caveat in Long; commented the `p.location` clobber;
+  reworded the flag usage. Commit `6db806d2`.
