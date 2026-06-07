@@ -31,7 +31,7 @@
 | 9 | set-external-id command | ✅ done | `62f4d44d`, `31712c0a` |
 | 10 | delete command | ✅ done | `14b710fb`, `56806eb5` |
 | 11 | apply -f scoped mode | ✅ done | `f7722bff`, `6db806d2` |
-| 12 | Deprecate per-noun list commands | pending | — |
+| 12 | Deprecate per-noun list commands | ✅ done | `074195a2` |
 | 13 | E2E round-trip + scoped no-delete | pending | — |
 
 ---
@@ -323,3 +323,16 @@
   `syncer.New(stubProvider, workspace, opts...)` applicability check; documented
   the per-file validation caveat in Long; commented the `p.location` clobber;
   reworded the flag usage. Commit `6db806d2`.
+
+### 2026-06-07 — Task 12: deprecate per-noun `list` commands ✅ (Phase 4)
+
+- **Implementer (sonnet):** Set `cmd.Deprecated` on the three workspace `list`
+  subcommands → "use 'rudder-cli get <type>' instead", with the real registry type
+  strings: `event-stream-source` (`source.ResourceType`), `account`
+  (`workspace.AccountResourceType`), `retl-source-sql-model`
+  (`sqlmodel.ResourceType`). Behavior otherwise unchanged. Added
+  `deprecation_test.go` (3 tests). TDD red→green. Commit `074195a2`.
+- **Review (sonnet, combined, proportionate):** ✅ Compliant + clean. Type strings
+  verified against each list's `l.List(ctx, <type>, ...)` call; behavior unchanged.
+  Note: `tracking-plans list` (a 4th list) was intentionally NOT deprecated — the
+  plan named only 3; `get tracking-plan` isn't part of the beachhead.
