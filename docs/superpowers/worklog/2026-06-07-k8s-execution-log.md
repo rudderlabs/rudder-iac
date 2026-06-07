@@ -23,7 +23,7 @@
 | 1 | Public ProviderForType on composite | ✅ done | `1f10cf8e`, `c81df306` |
 | 2 | ExternalIDSetter capability + beachhead | ✅ done | `d6052ca8`, `adb4474c` |
 | 3 | syncer.WithScopeToTarget() seam | ✅ done | `81a099ef`, `84d3a070` |
-| 4 | resourceops Resolver | pending | — |
+| 4 | resourceops Resolver | ✅ done | `8abfbf7f` |
 | 5 | Reader — managed+unmanaged merge | pending | — |
 | 6 | Single-resource spec materialization | pending | — |
 | 7 | get command | pending | — |
@@ -124,3 +124,22 @@
   `TestRunTasks_ErrorWithDependentTask` in `cli/pkg/tasker`. Confirmed unrelated to
   these changes — passes consistently when run in isolation (3×). Tracked as a
   known flaky to watch across later tasks; not caused by this work.
+
+### 2026-06-07 — Task 4: resourceops Resolver ✅
+
+- **Implementer (sonnet):** New package `cli/internal/resourceops` with `Resolver`
+  (`New`, `ProviderFor`, `FindRemote` external-id-first/remote-id-fallback,
+  `ExternalIDSetterFor` capability gate, private `loadAll` single managed-load
+  path) + sentinels `ErrResourceNotFound`/`ErrVerbNotSupported`. 7 black-box
+  tests (96% coverage) including capability gate BOTH directions (a local
+  `mockExternalIDSetter` embeds `testutils.MockProvider` + adds `SetExternalID`).
+  Commit `8abfbf7f`.
+- **Discovery:** Reused `testutils.MockProvider` (field `LoadResourcesFromRemoteVal`)
+  instead of a hand-rolled `fakeProvider` — reviewer called this a justified
+  positive deviation. Noted pre-existing `RemoteId` (lowercase d) field in
+  `testutils.MockProvider` as a convention follow-up (out of scope).
+- **Spec review (sonnet):** ✅ Compliant; external-id-first ordering verified;
+  `loadAll` is the single load path; no premature Task 5 unmanaged merge.
+- **Code-quality review (sonnet):** ✅ Approve, no blocking issues. Minor: `loadAll`
+  doc says "managed" (will be updated in Task 5 when merge lands); `New` lacks a
+  doc comment. `loadAll` seam confirmed well-shaped for Task 5 (body-only change).
