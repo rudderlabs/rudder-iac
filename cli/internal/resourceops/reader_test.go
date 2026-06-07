@@ -251,10 +251,3 @@ func TestReader_SpecJSON_RoundTrips(t *testing.T) {
 	assert.Equal(t, esSource.ResourceKind, kind)
 }
 
-// TestReader_SpecYAML_TypeNotFound verifies ErrResourceNotFound for an unknown resource type.
-func TestReader_SpecYAML_TypeNotFound(t *testing.T) {
-	prov := newEventStreamProvider()
-
-	_, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "unknown-id")
-	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
-}

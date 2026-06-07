@@ -33,17 +33,11 @@ func (r *Resolver) FindRemote(ctx context.Context, resourceType, id string) (*re
 		return nil, err
 	}
 
-	for _, res := range all {
-		if res.ExternalID == id {
-			return res, nil
-		}
+	res := findInMap(all, id)
+	if res == nil {
+		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
-
-	if res, ok := all[id]; ok {
-		return res, nil
-	}
-
-	return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
+	return res, nil
 }
 
 // ExternalIDSetterFor asserts the optional ExternalIDSetter capability on the provider
@@ -77,4 +71,17 @@ func (r *Resolver) loadAll(ctx context.Context, resourceType string) (map[string
 	}
 
 	return merged, nil
+}
+
+// findInMap returns the resource matching id (external-id first, then remote-id), or nil.
+func findInMap(all map[string]*resources.RemoteResource, id string) *resources.RemoteResource {
+	for _, res := range all {
+		if res.ExternalID == id {
+			return res
+		}
+	}
+	if res, ok := all[id]; ok {
+		return res
+	}
+	return nil
 }

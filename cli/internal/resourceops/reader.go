@@ -170,10 +170,13 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources: %w", err)
 	}
+	if managed == nil {
+		managed = resources.NewRemoteResources()
+	}
 
 	all := managed.GetAll(resourceType)
 
-	found := findByID(all, id)
+	found := findInMap(all, id)
 	if found == nil {
 		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
@@ -182,33 +185,25 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 	coll.Set(resourceType, map[string]*resources.RemoteResource{found.ID: found})
 
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+	// Remote is populated with this provider's full managed collection so that
+	// same-provider cross-resource references (e.g. a tracking plan owned by this
+	// provider) can be resolved via ImportRefResolver.ResolveToReference.
+	// Known limitation: cross-PROVIDER references (e.g. a tracking plan owned by a
+	// different provider) cannot be resolved here because only this provider's remote
+	// is loaded; treated as a follow-up.
 	refResolver := &resolver.ImportRefResolver{
-		Remote:     resources.NewRemoteResources(),
+		Remote:     managed,
 		Graph:      resources.NewGraph(),
 		Importable: coll,
 	}
 
 	entities, err := prov.FormatForExport(coll, idNamer, refResolver)
 	if err != nil {
-		return nil, fmt.Errorf("formatting for export: %w", err)
+		return nil, fmt.Errorf("materializing spec for %s %q (cross-resource references such as tracking plans may not resolve in single-resource export): %w", resourceType, id, err)
 	}
 	if len(entities) == 0 {
 		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
 
 	return entities[0].Content, nil
-}
-
-// findByID returns the resource matching id by external-ID first, then by remote-ID.
-// Returns nil when no match is found.
-func findByID(all map[string]*resources.RemoteResource, id string) *resources.RemoteResource {
-	for _, res := range all {
-		if res.ExternalID == id {
-			return res
-		}
-	}
-	if res, ok := all[id]; ok {
-		return res
-	}
-	return nil
 }

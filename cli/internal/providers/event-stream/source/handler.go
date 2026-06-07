@@ -431,7 +431,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 			// as they are not anyway part of the state
 			continue
 		}
-		s := source // capture loop variable before taking address
+		s := source // copy to take a stable address
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: source.ExternalID,
