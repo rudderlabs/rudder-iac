@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/testutils"
 	internalTestutils "github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -230,5 +231,151 @@ func TestSyncerDelete(t *testing.T) {
 			Description: "Delete " + urn,
 			Err:         nil,
 		}, "TaskCompleted should contain deletion task for "+urn)
+	}
+}
+
+// TestSyncer_ScopeToTarget_SuppressesDeletes verifies that WithScopeToTarget prevents
+// the planner from emitting Delete operations for resources outside the target graph.
+// Without scoping, applying a single-resource target against a two-resource remote state
+// would cause the second resource to be deleted; with scoping, no delete occurs.
+func TestSyncer_ScopeToTarget_SuppressesDeletes(t *testing.T) {
+	// resourceA is in both remote state and the target (it will be updated)
+	resourceA := internalTestutils.NewMockEvent("eventA", resources.ResourceData{
+		"name":        "Event A",
+		"description": "original description",
+	})
+
+	// resourceB is only in remote state — should NOT be deleted when scoping is on
+	resourceB := internalTestutils.NewMockEvent("eventB", resources.ResourceData{
+		"name":        "Event B",
+		"description": "event B description",
+	})
+
+	// Both resources exist in remote state
+	remoteState := state.EmptyState()
+	remoteState.AddResource(&state.ResourceState{
+		ID:    resourceA.ID(),
+		Type:  resourceA.Type(),
+		Input: resourceA.Data(),
+		Output: resources.ResourceData{
+			"id": "remote-event-eventA",
+		},
+	})
+	remoteState.AddResource(&state.ResourceState{
+		ID:    resourceB.ID(),
+		Type:  resourceB.Type(),
+		Input: resourceB.Data(),
+		Output: resources.ResourceData{
+			"id": "remote-event-eventB",
+		},
+	})
+
+	provider := &internalTestutils.DataCatalogProvider{
+		InitialState:       remoteState,
+		ReconstructedState: remoteState,
+	}
+
+	// Target contains only resourceA, with a modified description to trigger an Update
+	updatedA := internalTestutils.NewMockEvent("eventA", resources.ResourceData{
+		"name":        "Event A",
+		"description": "updated description",
+	})
+	targetGraph := resources.NewGraph()
+	targetGraph.AddResource(updatedA)
+
+	mockReporter := testutils.NewMockReporter()
+	s, err := syncer.New(provider, mockWorkspace(),
+		syncer.WithReporter(mockReporter),
+		syncer.WithScopeToTarget(),
+		syncer.WithDryRun(true),
+	)
+	require.NoError(t, err)
+
+	err = s.Sync(context.Background(), targetGraph)
+	require.NoError(t, err)
+
+	require.Len(t, mockReporter.ReportPlanCalls, 1, "ReportPlan should be called once")
+	capturedPlan := mockReporter.ReportPlanCalls[0]
+
+	// No Delete operations should exist — resourceB is out of scope
+	for _, op := range capturedPlan.Operations {
+		assert.NotEqual(t, planner.Delete, op.Type,
+			"WithScopeToTarget must suppress deletes; got unexpected Delete for %s", op.Resource.URN())
+	}
+
+	// resourceA should be updated (not created or deleted)
+	var hasUpdateForA bool
+	for _, op := range capturedPlan.Operations {
+		if op.Resource.URN() == updatedA.URN() && op.Type == planner.Update {
+			hasUpdateForA = true
+		}
+	}
+	assert.True(t, hasUpdateForA, "expected an Update operation for resourceA")
+
+	// resourceB must not appear in the plan at all
+	for _, op := range capturedPlan.Operations {
+		assert.NotEqual(t, resourceB.URN(), op.Resource.URN(),
+			"resourceB must not appear in the scoped plan")
+	}
+}
+
+// TestSyncer_ScopeToTarget_SuppressesDeletes_Execution verifies the no-delete invariant
+// holds in a non-dry-run execution: the provider's Delete must never be called for
+// resources outside the target graph.
+func TestSyncer_ScopeToTarget_SuppressesDeletes_Execution(t *testing.T) {
+	resourceA := internalTestutils.NewMockEvent("eventA", resources.ResourceData{
+		"name":        "Event A",
+		"description": "original",
+	})
+	resourceB := internalTestutils.NewMockEvent("eventB", resources.ResourceData{
+		"name":        "Event B",
+		"description": "should not be deleted",
+	})
+
+	remoteState := state.EmptyState()
+	remoteState.AddResource(&state.ResourceState{
+		ID:    resourceA.ID(),
+		Type:  resourceA.Type(),
+		Input: resourceA.Data(),
+		Output: resources.ResourceData{
+			"id": "remote-event-eventA",
+		},
+	})
+	remoteState.AddResource(&state.ResourceState{
+		ID:    resourceB.ID(),
+		Type:  resourceB.Type(),
+		Input: resourceB.Data(),
+		Output: resources.ResourceData{
+			"id": "remote-event-eventB",
+		},
+	})
+
+	provider := &internalTestutils.DataCatalogProvider{
+		InitialState:       remoteState,
+		ReconstructedState: remoteState,
+	}
+
+	updatedA := internalTestutils.NewMockEvent("eventA", resources.ResourceData{
+		"name":        "Event A",
+		"description": "updated",
+	})
+	targetGraph := resources.NewGraph()
+	targetGraph.AddResource(updatedA)
+
+	s, err := syncer.New(provider, mockWorkspace(),
+		syncer.WithScopeToTarget(),
+	)
+	require.NoError(t, err)
+
+	err = s.Sync(context.Background(), targetGraph)
+	require.NoError(t, err)
+
+	// provider.OperationLog must not contain any Delete for resourceB
+	for _, entry := range provider.OperationLog {
+		if entry.Operation == "Delete" {
+			// The first arg is the resource ID
+			assert.NotEqual(t, resourceB.ID(), entry.Args[0],
+				"Delete must not be called for out-of-scope resourceB")
+		}
 	}
 }

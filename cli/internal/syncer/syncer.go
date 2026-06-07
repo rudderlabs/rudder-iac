@@ -23,6 +23,7 @@ type ProjectSyncer struct {
 	concurrency     int
 	dryRun          bool
 	askConfirmation bool
+	scopeToTarget   bool
 }
 
 type SyncProvider interface {
@@ -97,6 +98,29 @@ func WithAskConfirmation(askConfirmation bool) Option {
 	}
 }
 
+// WithScopeToTarget filters the source graph (from remote state) to only URNs
+// present in the target before planning, so the planner emits creates/updates
+// for exactly the applied resources and never deletes anything outside that set.
+// Used by `apply -f`.
+func WithScopeToTarget() Option {
+	return func(s *ProjectSyncer) error {
+		s.scopeToTarget = true
+		return nil
+	}
+}
+
+// scopeGraphToTarget returns a copy of source containing only resources whose
+// URN is also in target.
+func scopeGraphToTarget(source, target *resources.Graph) *resources.Graph {
+	scoped := resources.NewGraph()
+	for urn, r := range source.Resources() {
+		if _, ok := target.GetResource(urn); ok {
+			scoped.AddResource(r)
+		}
+	}
+	return scoped
+}
+
 type SyncReporter interface {
 	ReportPlan(plan *planner.Plan)
 	AskConfirmation() (bool, error)
@@ -132,6 +156,9 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		return []error{err}
 	}
 	source := StateToGraph(state)
+	if s.scopeToTarget {
+		source = scopeGraphToTarget(source, target)
+	}
 
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
