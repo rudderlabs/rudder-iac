@@ -368,3 +368,48 @@
   One-line change to an already-passing assertion — verified via `go vet` + `make
   lint`; did NOT re-run the live test to avoid an unnecessary extra prod mutation
   (logic unchanged, already validated green). Commit `78cf08b5`.
+
+### 2026-06-07 — Final holistic review (whole feature) ✅
+
+- **Final reviewer (opus, cross-cutting):** Reviewed `0dae6cad..HEAD` for integration
+  seams the per-task reviews could miss. Verdict: architecture clean, scoped-apply
+  invariant holds, capability gating type-safe, strong unit+live-E2E coverage —
+  but ONE blocker.
+- **🛑 Blocker found (CRITICAL):** Task 12 deprecated `workspace accounts list` →
+  "use 'rudder-cli get account'", but `get account` does NOT work: the workspace
+  provider implements only List/SupportedKinds/SupportedTypes (not full
+  `provider.Provider`) and is NOT in the composite's providerMap
+  (`dependencies.go composeProviders`). So `get account` fails "unknown resource
+  type". The per-task review of Task 12 only checked the message string, missing the
+  end-to-end gap. Confirmed by the controller before fixing.
+- **Other findings:** (Important) inconsistent type-validation — `get`/`delete`
+  listed valid types, `describe`/`set-external-id` didn't; duplicated `validateType`.
+  (Minor) two unsupported-type sentinels needed a clarifying comment;
+  `Resolver.FindRemote` now unused (kept as a public seam); `get <id> -o yaml`
+  managed-only asymmetry; cross-provider ref limitation (already documented).
+- **Fix (sonnet):** (1) Removed the `accounts list` deprecation (kept it working) +
+  flipped its test to assert NOT-deprecated, locking the decision — account stays
+  undeprecated until the workspace provider is gettable via the composite (deferred
+  follow-up). (2) Lifted a shared `resourceops.ValidateType` (+tests) and routed ALL
+  FOUR verbs through it, so every unknown-type error now lists valid types.
+  (3) Documented the two sentinels' intentional split. Commit `89d117dc`. Full
+  `make test` + `make lint` + `make build` all green.
+
+## Outcome
+
+All 13 plan tasks complete; each landed via implementer → spec review → code-quality
+review → fix loop, then a final cross-cutting review + fix. No PR raised (per
+instruction). Branch `feat/k8s-style-imperative-commands` pushed to remote.
+
+### Deferred follow-ups (out of scope, captured for later)
+- Make `account` gettable: implement full `provider.Provider` for the workspace
+  provider + register it in the composite, then re-add the `accounts list`
+  deprecation pointing at `get account`.
+- Widen beachhead beyond event-stream-source / retl-source-sql-model (datagraph,
+  transformations, datacatalog) — verify `ExternalIDSetter` per type.
+- Single-resource `-o yaml/json` is managed-only; surface a clearer error for
+  unmanaged ids, and resolve cross-PROVIDER references (composite-level remote).
+- Evolve `apply` to safe-by-default `+ --prune` (Decision 12); short type aliases;
+  rich context-aware `describe`; adoption facade `import <type> <id>` (TABLED doc).
+- Pre-existing flaky `TestRunTasks_ErrorWithDependentTask` (cli/pkg/tasker) — not
+  caused by this work; passes in isolation; worth a separate stabilization fix.
