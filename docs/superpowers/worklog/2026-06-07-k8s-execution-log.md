@@ -26,7 +26,7 @@
 | 4 | resourceops Resolver | ✅ done | `8abfbf7f` |
 | 5 | Reader — managed+unmanaged merge | ✅ done | `cdaad663`, `4a5991ed` |
 | 6 | Single-resource spec materialization | ✅ done | `50c0bb5d`, `865ab9c4` |
-| 7 | get command | pending | — |
+| 7 | get command | ✅ done | `b067ccc0`, `5ea2dfdb`, `f245c9a5` |
 | 8 | describe command | pending | — |
 | 9 | set-external-id command | pending | — |
 | 10 | delete command | pending | — |
@@ -200,3 +200,34 @@
 - **Fix (sonnet):** All applied — extracted shared `findInMap` helper (used by both
   `FindRemote` and `specContent`); populated resolver Remote + wrapped error;
   removed the redundant test; added `printer_test.go` (4 tests). Commit `865ab9c4`.
+
+### 2026-06-07 — Task 7: top-level `get` command ✅ (Phase 2)
+
+- **Implementer (sonnet):** Added `cli/internal/cmd/get/` with `NewCmdGet()` and a
+  testable `RunGet(ctx, out, cp, args, opts)` core behind a package `Composite`
+  seam (`ProviderForType` + `SupportedTypes`). Flags `-o/--output`,
+  `--managed`/`--unmanaged` (mutually exclusive), `-l/--selector`. Dispatch:
+  1 arg→`ListRows` (table via `text/tabwriter` for testability, or json);
+  2 args+yaml/json→`SpecYAML`/`SpecJSON`; 2 args+table→single row. Registered in
+  root.go. Commit `b067ccc0`.
+- **Spec review (sonnet):** Found `-l/--selector` parsed but SILENTLY DROPPED — a
+  no-op. Everything else compliant.
+- **Fix 1 (sonnet):** Made `--selector` functional via `filterRows` over the Row
+  columns (`external-id`/`remote-id`/`name`/`managed`, AND semantics, unknown key
+  → error). To make the degraded-note path testable, narrowed the seam so
+  `Composite.ProviderForType` returns `GetProvider` (=`ManagedRemoteResourceLoader`)
+  with a `compositeShim` wrapping the real composite; `runSingle` re-asserts
+  `provider.Provider` for yaml/json. Added selector + degraded-note tests.
+  Commit `5ea2dfdb`.
+- **Code-quality review (sonnet):** Seam inversion judged JUSTIFIED (a full
+  `provider.Provider` always satisfies `SupportsUnmanaged`, so the degraded path is
+  untestable without a narrower return). Found 3 Important UX-correctness bugs:
+  (1) `parseSelector` silently drops malformed `-l` entries; (2) degraded note
+  fired on the single-resource path too; (3) `-o yaml` on the list path silently
+  rendered a table.
+- **Fix 2 (sonnet):** (1) `parseSelector` now errors on non-`key=value`; (2) note
+  moved into `runList` only; (3) `--output` validated up front, list+yaml returns a
+  clear "single resource only" error; aligned telemetry to the `[]KV` slice form;
+  added not-found + malformed-selector + list-yaml + single-no-note tests (21 tests
+  total). Commit `f245c9a5`. Deferred minors: adopt `MarkFlagsMutuallyExclusive`,
+  `validateType`/`ProviderForType` dedup, `GetProvider` naming.
