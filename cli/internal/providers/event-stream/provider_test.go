@@ -536,3 +536,24 @@ type mockResolver struct{}
 func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
 	return remoteID, nil
 }
+
+func TestProvider_SetExternalID(t *testing.T) {
+	t.Run("KnownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := source.NewMockSourceClient()
+		p := eventstream.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), source.ResourceType, "src_remote_123", "my-source")
+		require.NoError(t, err)
+		assert.True(t, mockClient.SetExternalIDCalled())
+	})
+
+	t.Run("UnknownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := source.NewMockSourceClient()
+		p := eventstream.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), "not-a-type", "x", "y")
+		assert.Error(t, err)
+	})
+}

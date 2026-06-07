@@ -31,6 +31,7 @@ type handler interface {
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
 	List(ctx context.Context, filters lister.Filters) ([]resources.ResourceData, error)
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
+	SetExternalID(ctx context.Context, remoteID, externalID string) error
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
@@ -214,6 +215,14 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
 	}
 	return handler.Import(ctx, ID, data, remoteId)
+}
+
+func (p *Provider) SetExternalID(ctx context.Context, resourceType, remoteID, externalID string) error {
+	h, ok := p.handlers[resourceType]
+	if !ok {
+		return fmt.Errorf("%q: %w", resourceType, provider.ErrUnsupportedType)
+	}
+	return h.SetExternalID(ctx, remoteID, externalID)
 }
 
 func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
