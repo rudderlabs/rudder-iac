@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	describecmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/describe"
 	getcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/get"
+	setexternalid "github.com/rudderlabs/rudder-iac/cli/internal/cmd/setexternalid"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
@@ -91,6 +92,7 @@ func init() {
 
 	rootCmd.AddCommand(getcmd.NewCmdGet())
 	rootCmd.AddCommand(describecmd.NewCmdDescribe())
+	rootCmd.AddCommand(setexternalid.NewCmdSetExternalID())
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
