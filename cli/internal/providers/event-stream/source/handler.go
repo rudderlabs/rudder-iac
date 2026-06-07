@@ -431,10 +431,11 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 			// as they are not anyway part of the state
 			continue
 		}
+		s := source // capture loop variable before taking address
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: source.ExternalID,
-			Data:       source,
+			Data:       &s,
 		}
 	}
 	collection.Set(ResourceType, resourceMap)
@@ -445,7 +446,7 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 	s := state.EmptyState()
 	esResources := collection.GetAll(ResourceType)
 	for _, esResource := range esResources {
-		source, ok := esResource.Data.(sourceClient.EventStreamSource)
+		source, ok := esResource.Data.(*sourceClient.EventStreamSource)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream source")
 		}
@@ -462,7 +463,7 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 				trackingPlanURN = &tpURN
 			}
 		}
-		resourceState, skip := mapRemoteToState(&source, trackingPlanURN)
+		resourceState, skip := mapRemoteToState(source, trackingPlanURN)
 		if skip {
 			continue
 		}

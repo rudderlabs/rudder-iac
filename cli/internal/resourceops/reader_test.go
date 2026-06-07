@@ -2,13 +2,18 @@ package resourceops_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
+	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resourceops"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
@@ -175,4 +180,81 @@ func TestReader_List_EmptyCollections(t *testing.T) {
 	rows, err := resourceops.ListRows(context.Background(), prov, "event-stream-source", resourceops.ScopeAll)
 	require.NoError(t, err)
 	assert.Empty(t, rows)
+}
+
+// newEventStreamProvider builds a real event-stream provider backed by a mock client
+// that returns one managed source (ExternalID = "my-source").
+func newEventStreamProvider() *eventstream.Provider {
+	mockClient := esSource.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{
+			{
+				ID:          "src-remote-id",
+				ExternalID:  "my-source",
+				Name:        "My Source",
+				Type:        "javascript",
+				Enabled:     true,
+				WorkspaceID: "ws-123",
+				TrackingPlan: nil,
+			},
+		}, nil
+	})
+	return eventstream.New(mockClient)
+}
+
+func TestReader_SpecYAML_RoundTrips(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "my-source")
+	require.NoError(t, err)
+	require.NotEmpty(t, out)
+
+	spec, err := specs.New([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, esSource.ResourceKind, spec.Kind)
+}
+
+func TestReader_SpecYAML_MatchByRemoteID(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	// "src-remote-id" is the remote (non-external) ID; external-ID lookup fails first,
+	// then remote-ID lookup should find it.
+	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "src-remote-id")
+	require.NoError(t, err)
+
+	spec, err := specs.New([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, esSource.ResourceKind, spec.Kind)
+}
+
+func TestReader_SpecYAML_NotFound(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	_, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "does-not-exist")
+	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
+}
+
+func TestReader_SpecJSON_RoundTrips(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	out, err := resourceops.SpecJSON(context.Background(), prov, esSource.ResourceType, "my-source")
+	require.NoError(t, err)
+	require.NotEmpty(t, out)
+
+	// Must be valid JSON.
+	var m map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &m))
+
+	// Top-level "kind" key must equal the source resource kind.
+	kind, ok := m["kind"].(string)
+	require.True(t, ok, "expected 'kind' key in JSON output")
+	assert.Equal(t, esSource.ResourceKind, kind)
+}
+
+// TestReader_SpecYAML_TypeNotFound verifies ErrResourceNotFound for an unknown resource type.
+func TestReader_SpecYAML_TypeNotFound(t *testing.T) {
+	prov := newEventStreamProvider()
+
+	_, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "unknown-id")
+	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
 }

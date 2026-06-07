@@ -2,9 +2,11 @@ package resourceops
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -135,4 +137,78 @@ func extractName(data any) string {
 	}
 	name, _ := m["name"].(string)
 	return name
+}
+
+// SpecYAML materializes a single managed remote resource into a re-appliable YAML spec string.
+// It finds the resource matching id (external-ID first, then remote-ID), runs it through
+// the provider's FormatForExport, and encodes the first entity as YAML.
+func SpecYAML(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
+	content, err := specContent(ctx, prov, resourceType, id)
+	if err != nil {
+		return "", err
+	}
+	return EncodeYAML(content)
+}
+
+// SpecJSON materializes a single managed remote resource into a re-appliable JSON string.
+// It finds the resource matching id (external-ID first, then remote-ID), runs it through
+// the provider's FormatForExport, and encodes the first entity as JSON.
+func SpecJSON(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
+	content, err := specContent(ctx, prov, resourceType, id)
+	if err != nil {
+		return "", err
+	}
+	return EncodeJSON(content)
+}
+
+// specContent is the shared find-and-export path used by SpecYAML and SpecJSON.
+// It loads managed remote resources, finds the one matching id (external-ID-first
+// then remote-ID, mirroring Resolver.FindRemote), builds a single-entry collection,
+// and delegates to FormatForExport to get the formattable entity content.
+func specContent(ctx context.Context, prov provider.Provider, resourceType, id string) (any, error) {
+	managed, err := prov.LoadResourcesFromRemote(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("loading remote resources: %w", err)
+	}
+
+	all := managed.GetAll(resourceType)
+
+	found := findByID(all, id)
+	if found == nil {
+		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
+	}
+
+	coll := resources.NewRemoteResources()
+	coll.Set(resourceType, map[string]*resources.RemoteResource{found.ID: found})
+
+	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+	refResolver := &resolver.ImportRefResolver{
+		Remote:     resources.NewRemoteResources(),
+		Graph:      resources.NewGraph(),
+		Importable: coll,
+	}
+
+	entities, err := prov.FormatForExport(coll, idNamer, refResolver)
+	if err != nil {
+		return nil, fmt.Errorf("formatting for export: %w", err)
+	}
+	if len(entities) == 0 {
+		return nil, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
+	}
+
+	return entities[0].Content, nil
+}
+
+// findByID returns the resource matching id by external-ID first, then by remote-ID.
+// Returns nil when no match is found.
+func findByID(all map[string]*resources.RemoteResource, id string) *resources.RemoteResource {
+	for _, res := range all {
+		if res.ExternalID == id {
+			return res
+		}
+	}
+	if res, ok := all[id]; ok {
+		return res
+	}
+	return nil
 }
