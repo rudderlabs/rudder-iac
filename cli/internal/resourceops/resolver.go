@@ -63,18 +63,18 @@ func (r *Resolver) ExternalIDSetterFor(resourceType string) (provider.ExternalID
 }
 
 // loadAll is the single load path for remote resources: resolves the provider,
-// fetches managed resources, and returns the type-keyed map (keyed by remote ID).
-// Task 5 will extend this with the unmanaged merge.
+// fetches managed and (when supported) unmanaged resources, and returns the
+// merged map keyed by remote ID (managed entries win on collision).
 func (r *Resolver) loadAll(ctx context.Context, resourceType string) (map[string]*resources.RemoteResource, error) {
 	prov, err := r.ProviderFor(resourceType)
 	if err != nil {
 		return nil, err
 	}
 
-	collection, err := prov.LoadResourcesFromRemote(ctx)
+	merged, err := mergedRemote(ctx, prov, resourceType)
 	if err != nil {
 		return nil, fmt.Errorf("loading remote resources for %q: %w", resourceType, err)
 	}
 
-	return collection.GetAll(resourceType), nil
+	return merged, nil
 }
