@@ -370,12 +370,21 @@ func TestSyncer_ScopeToTarget_SuppressesDeletes_Execution(t *testing.T) {
 	err = s.Sync(context.Background(), targetGraph)
 	require.NoError(t, err)
 
-	// provider.OperationLog must not contain any Delete for resourceB
+	// Args[0] is the resource ID, as logged by DataCatalogProvider.logOperation("Delete", ID, ...)
+	// which appends each argument positionally into the untyped []any slice.
 	for _, entry := range provider.OperationLog {
 		if entry.Operation == "Delete" {
-			// The first arg is the resource ID
 			assert.NotEqual(t, resourceB.ID(), entry.Args[0],
 				"Delete must not be called for out-of-scope resourceB")
 		}
 	}
+
+	// Positive case: the Update for resourceA must have actually executed.
+	var sawUpdateForA bool
+	for _, entry := range provider.OperationLog {
+		if entry.Operation == "Update" && entry.Args[0] == updatedA.ID() {
+			sawUpdateForA = true
+		}
+	}
+	assert.True(t, sawUpdateForA, "Update must be executed for resourceA when scoped")
 }
