@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -554,6 +555,7 @@ func TestProvider_SetExternalID(t *testing.T) {
 		p := eventstream.New(mockClient)
 
 		err := p.SetExternalID(context.Background(), "not-a-type", "x", "y")
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, provider.ErrUnsupportedType)
 	})
 }
