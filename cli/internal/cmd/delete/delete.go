@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -12,6 +13,25 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
+
+// deleteRouter is the minimal seam the delete command needs from the composite
+// provider: per-type routing plus the full list of registered types for validation.
+type deleteRouter interface {
+	provider.TypeRouter
+	SupportedTypes() []string
+}
+
+// validateType returns a descriptive error when resourceType is not in the
+// router's registered set, listing the valid types so the user can self-correct.
+func validateType(r deleteRouter, resourceType string) error {
+	for _, t := range r.SupportedTypes() {
+		if t == resourceType {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown resource type %q; valid types: %s",
+		resourceType, strings.Join(r.SupportedTypes(), ", "))
+}
 
 // NewCmdDelete returns the top-level `delete` cobra command.
 func NewCmdDelete() *cobra.Command {
@@ -48,9 +68,13 @@ Examples:
 				return err
 			}
 
-			router, ok := d.CompositeProvider().(provider.TypeRouter)
+			router, ok := d.CompositeProvider().(deleteRouter)
 			if !ok {
 				return fmt.Errorf("internal error: composite provider does not support per-type routing")
+			}
+
+			if err = validateType(router, args[0]); err != nil {
+				return err
 			}
 
 			res := resourceops.New(router)
@@ -64,7 +88,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip the interactive confirmation prompt and proceed with deletion")
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Proceed without the interactive confirmation prompt")
 
 	return cmd
 }
