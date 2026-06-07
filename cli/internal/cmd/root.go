@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
+	describecmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/describe"
 	getcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/get"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -89,6 +90,7 @@ func init() {
 	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
 
 	rootCmd.AddCommand(getcmd.NewCmdGet())
+	rootCmd.AddCommand(describecmd.NewCmdDescribe())
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
