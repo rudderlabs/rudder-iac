@@ -124,13 +124,12 @@ func getOrRegisterEventInterfaceName(rule *plan.EventRule, nr *core.NameRegistry
 		name := FormatTypeName("Group", "Traits")
 		return nr.RegisterName(key, globalTypeScope, name)
 	case plan.EventTypeTrack:
-		// Track interfaces follow the spec convention: PascalCase event name
-		// only, no prefix or suffix. Per-event distinct names come from the
-		// event name itself.
-		name := FormatTypeName("", rule.Event.Name)
-		if name == "" {
+		// Mirror the mobile (Kotlin/Swift) convention: Track{EventName}Properties.
+		// Per-event distinct names come from the event name itself.
+		if rule.Event.Name == "" {
 			return "", fmt.Errorf("track event has empty name")
 		}
+		name := FormatTypeName("Track", rule.Event.Name+" Properties")
 		return nr.RegisterName(key, globalTypeScope, name)
 	case plan.EventTypePage:
 		// Page is a singleton in analytics-js: the SDK exposes one `page()`
