@@ -25,6 +25,7 @@ This file captures repository-specific rules used during implementation and revi
 - Wrap errors with action context and `%w`.
   - Example: `fmt.Errorf("loading workspace: %w", err)`
 - Sentinel errors use `Err` prefix (for branching semantics).
+- Reuse sentinel errors when formatting messages — derive from `err.Error()` rather than hardcoding the same string (e.g. `fmt.Sprintf("%s %q", e.Err, e.Name)`).
 - Avoid logging the same error at multiple layers; log near user/command boundary.
 
 ## Logging
@@ -39,6 +40,7 @@ This file captures repository-specific rules used during implementation and revi
 - Prefer guard clauses (early return/continue) over nested `else`.
 - Use `var` blocks for tightly related multi-variable declarations.
 - Comments should explain intent/tradeoff (`why`) rather than restating code (`what`).
+- Add algorithm comments on non-trivial functions (single-pass scans, reverse iteration, offset computation) explaining the strategy and invariants.
 
 ## Provider/Apply-Cycle Awareness
 

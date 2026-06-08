@@ -47,6 +47,22 @@ Failure messages should quickly show function, input, and got/want mismatch.
 Prefer table-driven tests for multiple scenarios.
 Use `t.Fatal` only when continuing invalidates remaining assertions.
 
+## Prefer Standard Library Over Hand-Rolled
+
+Use `slices.Reverse`, `slices.Sort`, `maps.Keys`, etc. instead of writing manual loops.
+Standard library functions are self-documenting and well-tested.
+
+## Avoid Redundant Work in Loops
+
+When processing an ordered collection against shared data, prefer a single scan with index
+tracking over per-item re-scans from the beginning. Algorithmic structure matters, not just
+correctness.
+
+## Extract Small Validation Helpers
+
+When inline validation exceeds 2-3 checks, extract to a named function like `parseX()` or
+`validateX()` returning `(result, error)`. Keeps the calling function focused on orchestration.
+
 ## Practical Tie-Breakers
 
 When multiple choices are valid:

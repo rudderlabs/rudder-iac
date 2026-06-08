@@ -9,7 +9,7 @@ Use this reference when deciding interface shape, location, and constructor/API 
 
 - Define interfaces at the consumer boundary, not in provider packages by default.
 - Keep interfaces small and behavior-focused.
-- Accept interfaces where polymorphism is needed; return concrete types from constructors.
+- Return interfaces from constructors for public APIs; keep the struct unexported.
 - Do not use pointers to interfaces.
 - Avoid creating an interface when only one concrete implementation exists and no test seam is needed.
 
@@ -41,13 +41,19 @@ type Engine struct {
 ```
 
 ```go
-// Provider package returns concrete implementation.
-func NewStateLoader(client *Client) *StateLoader {
-    return &StateLoader{client: client}
+// Provider package returns interface, keeps struct unexported.
+type Substitutor interface {
+    SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
+}
+
+type substitutor struct { ... }
+
+func NewSubstitutor(resolvers ...Resolver) Substitutor {
+    return &substitutor{resolvers: resolvers}
 }
 ```
 
-Why: the consumer controls the minimal contract; provider stays concrete and discoverable.
+Why: callers depend on behavior, not implementation. The struct stays unexported; swapping or testing is straightforward.
 
 ### 2) Avoid Premature Provider-Side Interfaces
 
