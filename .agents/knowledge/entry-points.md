@@ -14,3 +14,10 @@ Read these first (3-6 files):
 - `cli/internal/cmd/root.go`: top-level Cobra router; registers command groups (`auth`, `trackingplan`, `workspace`, `apply`, `validate`, `destroy`, `migrate`, `import`, `transformations`, `typer`, `datagraph`) and initialization hooks.
 - `Makefile`: canonical developer entrypoints for build/test/lint/docker and typer validation flows.
 - `api/client/client.go`: API client root used by CLI/provider layers to communicate with RudderStack services.
+
+## RUD-2752 — Workspace Event Stream Sources CLI Entry
+<!-- ticket:RUD-2752 -->
+Read these when working on event stream source listing:
+- `cli/internal/cmd/workspace/event-stream-sources.go`: workspace command entry for `workspace event-stream-sources list`.
+- `cli/internal/providers/event-stream/provider.go`: provider dispatch point for list requests.
+- `cli/internal/providers/event-stream/source/handler.go`: source-level list mapping and row shaping.

@@ -1,0 +1,117 @@
+rule_id: "datagraph/data-graph/unique-names-valid"
+match_behavior:
+  - applies_to:
+      - kind: "data-graph"
+        version: "rudder/v1"
+    valid:
+      - example_id: "dg-unique-names-all-unique"
+        title: "All model and relationship display names are unique within the data graph"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                  relationships:
+                    - id: user-order
+                      display_name: User Order
+                      cardinality: one-to-many
+                      target: "#data-graph-model:order"
+                      source_join_key: user_id
+                      target_join_key: user_id
+                - id: order
+                  display_name: Order
+                  type: entity
+                  table: db.schema.orders
+                  primary_id: order_id
+    invalid:
+      - example_id: "dg-unique-names-duplicate-model-display-name"
+        title: "Two models share the same display name within a data graph"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                - id: user-v2
+                  display_name: User
+                  type: entity
+                  table: db.schema.users_v2
+                  primary_id: user_id
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/display_name"
+            severity: "error"
+            message_contains: "duplicate model display name"
+          - file: "spec.yaml"
+            reference: "/models/1/display_name"
+            severity: "error"
+            message_contains: "duplicate model display name"
+      - example_id: "dg-unique-names-duplicate-relationship-display-name"
+        title: "Two relationships share the same display name within a data graph"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                  relationships:
+                    - id: user-order
+                      display_name: Links To
+                      cardinality: one-to-many
+                      target: "#data-graph-model:order"
+                      source_join_key: user_id
+                      target_join_key: user_id
+                - id: order
+                  display_name: Order
+                  type: entity
+                  table: db.schema.orders
+                  primary_id: order_id
+                  relationships:
+                    - id: order-product
+                      display_name: Links To
+                      cardinality: one-to-many
+                      target: "#data-graph-model:product"
+                      source_join_key: order_id
+                      target_join_key: order_id
+                - id: product
+                  display_name: Product
+                  type: entity
+                  table: db.schema.products
+                  primary_id: product_id
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/relationships/0/display_name"
+            severity: "error"
+            message_contains: "duplicate relationship display name"
+          - file: "spec.yaml"
+            reference: "/models/1/relationships/0/display_name"
+            severity: "error"
+            message_contains: "duplicate relationship display name"

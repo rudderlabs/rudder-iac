@@ -427,8 +427,8 @@ func TestLoadSpec_ColumnsOrderIdempotent(t *testing.T) {
 	// the shape directly here keeps the test self-contained and decoupled
 	// from the unexported handler client field.
 	remoteShapeColumns := []map[string]any{
-		{"name": "email", "display_name": "Email"},
-		{"name": "user_id", "display_name": "User ID"},
+		{"name": "email", "display_name": "Email", "description": ""},
+		{"name": "user_id", "display_name": "User ID", "description": ""},
 	}
 	remoteShape := *localModel
 	remoteShape.Columns = remoteShapeColumns

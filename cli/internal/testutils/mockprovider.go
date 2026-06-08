@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
@@ -37,6 +38,7 @@ type MockProvider struct {
 	ImportErr                  error
 	ParseSpecVal               *specs.ParsedSpec
 	ParseSpecErr               error
+	RuleDocEntriesVal          []docs.RuleDocEntry
 
 	// Tracking calls
 	LoadSpecCalledWithArgs             []LoadSpecArgs
@@ -183,6 +185,10 @@ func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, id
 
 func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
+}
+
+func (m *MockProvider) RuleDocEntries() []docs.RuleDocEntry {
+	return m.RuleDocEntriesVal
 }
 
 // ResetCallCounters resets all call counters and argument trackers.
