@@ -10,6 +10,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -46,28 +47,7 @@ func renderDiff(diff *differ.Diff) string {
 	}
 
 	if len(diff.UpdatedResources) > 0 {
-		urns := []string{}
-		for _, r := range diff.UpdatedResources {
-			urns = append(urns, r.URN)
-		}
-		sort.Strings(urns)
-		listResources(b, "Updated resources", urns, func(urn string) string {
-			r := diff.UpdatedResources[urn]
-			details := ""
-			diffKeys := []string{}
-			for k := range r.Diffs {
-				diffKeys = append(diffKeys, k)
-			}
-			sort.Strings(diffKeys)
-			for _, k := range diffKeys {
-				d := r.Diffs[k]
-				diffLines := renderPropertyDiff(d)
-				for _, line := range diffLines {
-					details += line
-				}
-			}
-			return details
-		})
+		renderUpdatedResources(b, diff)
 	}
 
 	if len(diff.RemovedResources) > 0 {
@@ -75,6 +55,46 @@ func renderDiff(diff *differ.Diff) string {
 	}
 
 	return b.String()
+}
+
+// renderUpdatedResources lists updated resources, splitting off the secret-only
+// ones — which re-apply every run because their remote value can't be read — into
+// their own section so they don't read as user-made drift. This is the only place
+// the section layout is secret-aware; the per-line rendering stays generic.
+func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
+	var updated, secretOnly []string
+	for _, r := range diff.UpdatedResources {
+		if r.IsSecretOnly() {
+			secretOnly = append(secretOnly, r.URN)
+		} else {
+			updated = append(updated, r.URN)
+		}
+	}
+
+	detail := func(urn string) string {
+		r := diff.UpdatedResources[urn]
+		details := ""
+		diffKeys := make([]string, 0, len(r.Diffs))
+		for k := range r.Diffs {
+			diffKeys = append(diffKeys, k)
+		}
+		sort.Strings(diffKeys)
+		for _, k := range diffKeys {
+			for _, line := range renderPropertyDiff(r.Diffs[k]) {
+				details += line
+			}
+		}
+		return details
+	}
+
+	if len(updated) > 0 {
+		sort.Strings(updated)
+		listResources(b, "Updated resources", updated, detail)
+	}
+	if len(secretOnly) > 0 {
+		sort.Strings(secretOnly)
+		listResources(b, "Always re-applied (secret values can't be read back)", secretOnly, detail)
+	}
 }
 
 func listResources(b *strings.Builder, label string, resources []string, detailFn func(string) string) {
@@ -95,9 +115,25 @@ func renderPropertyRef(ref *resources.PropertyRef) string {
 	return ui.Color(ref.URN, ui.ColorGreen)
 }
 
+// renderSecret masks a secret value wherever it surfaces in a diff (e.g. nested in
+// a map that also has real changes). It is the secret analogue of renderPropertyRef:
+// the type-specific rendering lives here, dispatched from printable.
+func renderSecret(s *secret.String) string {
+	if s == nil {
+		return ui.Color("<nil>", ui.ColorBlue)
+	}
+	return ui.Color(s.String(), ui.ColorWhite)
+}
+
 func printable(val any) string {
 	if val == nil {
 		return ui.Color("<nil>", ui.ColorBlue)
+	}
+	if s, ok := val.(secret.String); ok {
+		return renderSecret(&s)
+	}
+	if s, ok := val.(*secret.String); ok {
+		return renderSecret(s)
 	}
 	if ref, ok := val.(*resources.PropertyRef); ok {
 		return renderPropertyRef(ref)
@@ -119,6 +155,13 @@ func printable(val any) string {
 
 // renderPropertyDiff renders a single property diff, either as a flat diff or expanded nested diff
 func renderPropertyDiff(diff differ.PropertyDiff) []string {
+	// A secret-only diff has no meaningful old => new — the remote value is unknown
+	// — so it is rendered by the dedicated secret helper and never enters the
+	// generic value/nested-diff path below.
+	if diff.SecretOnly {
+		return []string{renderSecretDiff(diff.Property)}
+	}
+
 	// If nested diff printing is disabled, use old behavior
 	useNestedDiffPrinting := config.GetConfig().ExperimentalFlags.NestedDiffs
 	if !useNestedDiffPrinting {
@@ -174,5 +217,17 @@ func formattedLine(property string, pair ValuePair) string {
 		printable(pair.Source),
 		ui.Color("=>", ui.ColorYellow),
 		printable(pair.Target),
+	)
+}
+
+// renderSecretDiff renders a property whose only change is a secret. The remote
+// value is unknown, so there is no old => new to show — it will be re-applied every
+// run. Mirrors renderPropertyRef: secret-specific rendering lives here, not in the
+// generic line formatter.
+func renderSecretDiff(property string) string {
+	return fmt.Sprintf(
+		"    - %s: %s\n",
+		ui.Color(property, ui.ColorWhite),
+		ui.Color("(secret, always re-applied)", ui.ColorYellow),
 	)
 }

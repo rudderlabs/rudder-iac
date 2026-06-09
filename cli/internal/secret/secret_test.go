@@ -27,7 +27,7 @@ func TestString_Masking(t *testing.T) {
 		{"exactly eight shows last four", New("abcd1234"), "****1234"},
 		{"short value is fully masked", New("hunter2"), "***"},
 		{"empty value is masked", New(""), "***"},
-		{"remote redacted", NewRedacted(), "(remote-redacted)"},
+		{"unknown secret", NewUnknown(), "(unknown)"},
 		// Masking counts characters, not bytes: the hint is the last four whole
 		// runes and the threshold counts runes, so multi-byte values are not split.
 		{"multibyte value shows last four runes", New("1234café"), "****café"},
@@ -75,7 +75,7 @@ func TestString_RedactingSurfaces(t *testing.T) {
 		wantMasked string
 	}{
 		{"real value", New(realSecret), realSecret, maskedSecret},
-		{"remote redacted", NewRedacted(), "", "(remote-redacted)"},
+		{"unknown secret", NewUnknown(), "", "(unknown)"},
 	}
 
 	for _, in := range inputs {
@@ -98,14 +98,14 @@ func TestReveal(t *testing.T) {
 	_ = fmt.Sprintf("%v %s %q %#v", s, s, s, s)
 	assert.Equal(t, realSecret, s.Reveal())
 
-	assert.Equal(t, "", NewRedacted().Reveal())
+	assert.Equal(t, "", NewUnknown().Reveal())
 }
 
 func TestUnmarshalYAML(t *testing.T) {
 	var s String
 	require.NoError(t, yaml.Unmarshal([]byte("sk_live_abcd1234\n"), &s))
 	assert.Equal(t, New("sk_live_abcd1234"), s)
-	assert.False(t, s.IsRedacted())
+	assert.False(t, s.IsUnknown())
 }
 
 func TestUnmarshalYAML_InStruct(t *testing.T) {
@@ -122,7 +122,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	var s String
 	require.NoError(t, json.Unmarshal([]byte(`"sk_live_abcd1234"`), &s))
 	assert.Equal(t, New("sk_live_abcd1234"), s)
-	assert.False(t, s.IsRedacted())
+	assert.False(t, s.IsUnknown())
 }
 
 // TestMarshalJSON_InStruct_Redacts mirrors the export path, which json.Marshals a
@@ -150,19 +150,40 @@ func TestLogValue_Integration(t *testing.T) {
 func TestEquality(t *testing.T) {
 	assert.True(t, New("a") == New("a"))
 	assert.False(t, New("a") == New("b"))
-	assert.False(t, New("a") == NewRedacted())
-	assert.True(t, NewRedacted() == NewRedacted())
+	assert.False(t, New("a") == NewUnknown())
+	assert.True(t, NewUnknown() == NewUnknown())
 }
 
 func TestIsZero(t *testing.T) {
 	assert.True(t, String{}.IsZero())
 	assert.True(t, New("").IsZero())
 	assert.False(t, New("x").IsZero())
-	assert.False(t, NewRedacted().IsZero())
+	assert.False(t, NewUnknown().IsZero())
 }
 
-func TestIsRedacted(t *testing.T) {
-	assert.False(t, New("x").IsRedacted())
-	assert.False(t, New("").IsRedacted())
-	assert.True(t, NewRedacted().IsRedacted())
+func TestIsUnknown(t *testing.T) {
+	assert.False(t, New("x").IsUnknown())
+	assert.False(t, New("").IsUnknown())
+	assert.True(t, NewUnknown().IsUnknown())
+}
+
+func TestDiff(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b String
+		want bool
+	}{
+		{"equal values do not diff", New("hunter2"), New("hunter2"), false},
+		{"different values diff", New("hunter2"), New("hunter3"), true},
+		{"local value vs unknown remote always diffs", New("hunter2"), NewUnknown(), true},
+		{"unknown remote vs local value always diffs", NewUnknown(), New("hunter2"), true},
+		{"both unknown always diff", NewUnknown(), NewUnknown(), true},
+		{"empty equals empty", New(""), New(""), false},
+		{"empty vs set diffs", New(""), New("hunter2"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.a.Diff(tt.b))
+		})
+	}
 }

@@ -439,7 +439,7 @@ func TestLoadSpec_ColumnsOrderIdempotent(t *testing.T) {
 	require.NoError(t, mapstructure.Decode(localModel, &localMap))
 	require.NoError(t, mapstructure.Decode(&remoteShape, &remoteMap))
 
-	diffs := differ.CompareData(remoteMap, localMap)
+	diffs, _ := differ.CompareData(remoteMap, localMap)
 	assert.NotContains(t, diffs, "columns",
 		"yaml-order-reversed columns must sort to the same canonical order as the server's sorted response so the differ short-circuits")
 }
