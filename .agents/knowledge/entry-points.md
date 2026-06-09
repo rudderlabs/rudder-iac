@@ -21,3 +21,7 @@ Read these when working on event stream source listing:
 - `cli/internal/cmd/workspace/event-stream-sources.go`: workspace command entry for `workspace event-stream-sources list`.
 - `cli/internal/providers/event-stream/provider.go`: provider dispatch point for list requests.
 - `cli/internal/providers/event-stream/source/handler.go`: source-level list mapping and row shaping.
+
+## RUD-19 — README Onboarding Anchor
+- `README.md` is the primary onboarding entry point and must remain accurate for first-run paths (binary and Docker).
+- Keep README install instructions aligned with shipped release assets named `rudder-cli_<OS>_<arch>.tar.gz` and the runtime binary `rudder-cli`.

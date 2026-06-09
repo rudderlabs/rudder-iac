@@ -47,3 +47,7 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## RUD-19 — Onboarding Doc Drift Risk
+- `README.md` simplification can silently break onboarding if it drifts from shipped CLI artifact naming and invocation paths.
+- Treat these as invariant checks during doc edits: release assets remain `rudder-cli_<OS>_<arch>.tar.gz`, local build/run remains `make build` then `bin/rudder-cli`, and first-run Docker examples retain config mount, token injection, and local catalog mount patterns.
