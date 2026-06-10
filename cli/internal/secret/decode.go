@@ -6,12 +6,16 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 )
 
-var stringType = reflect.TypeOf(String{})
+var (
+	stringType     = reflect.TypeOf(String{})
+	importableType = reflect.TypeOf(ImportableSecret{})
+)
 
-// StringDecodeHook converts a plain string into a String (or *String) during a
-// mapstructure decode. Spec maps carry secrets as bare strings (after YAML load
-// and variable substitution); without this hook mapstructure cannot populate a
-// String field, since the struct has no exported fields to map onto.
+// StringDecodeHook converts a plain string into a String or ImportableSecret
+// (or pointers to them) during a mapstructure decode. Spec maps carry secrets
+// as bare strings (after YAML load and variable substitution); without this
+// hook mapstructure cannot populate a secret field, since the struct has no
+// exported value field to map onto.
 func StringDecodeHook() mapstructure.DecodeHookFunc {
 	return func(from reflect.Type, to reflect.Type, data any) (any, error) {
 		if from.Kind() != reflect.String {
@@ -19,11 +23,18 @@ func StringDecodeHook() mapstructure.DecodeHookFunc {
 		}
 
 		// reflect, not a type assertion, so named string types convert too.
+		raw := reflect.ValueOf(data).String()
+
 		switch to {
 		case stringType:
-			return New(reflect.ValueOf(data).String()), nil
+			return New(raw), nil
 		case reflect.PointerTo(stringType):
-			s := New(reflect.ValueOf(data).String())
+			s := New(raw)
+			return &s, nil
+		case importableType:
+			return ImportableSecret{String: New(raw)}, nil
+		case reflect.PointerTo(importableType):
+			s := ImportableSecret{String: New(raw)}
 			return &s, nil
 		}
 		return data, nil

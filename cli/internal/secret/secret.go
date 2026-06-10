@@ -35,10 +35,6 @@ type String struct {
 	// "no secret" from "a secret we cannot see", and it drives the always-re-apply
 	// diff rule below.
 	unknown bool
-	// ref marks a non-sensitive stand-in (e.g. a "{{ .VAR }}" variable reference
-	// emitted during import scaffolding) that must serialize verbatim instead of
-	// masked, so the redacting marshal does not turn it into a useless literal.
-	ref bool
 }
 
 // New wraps a real, known value. The spec loader and provider spec-to-args
@@ -50,15 +46,6 @@ func New(v string) String { return String{v: v} }
 // return secret values. An unknown secret always diffs (see Diff), so its
 // resource is re-applied on every run.
 func NewUnknown() String { return String{unknown: true} }
-
-// NewRef wraps a non-sensitive reference that stands in for a secret, such as a
-// "{{ .VAR }}" variable token emitted during import scaffolding. A ref holds no
-// real value, so every surface — including the otherwise-redacting marshals —
-// emits it verbatim, letting the token reach the exported YAML intact.
-func NewRef(ref string) String { return String{v: ref, ref: true} }
-
-// IsRef reports whether the value is a non-sensitive reference stand-in.
-func (s String) IsRef() bool { return s.ref }
 
 // Reveal returns the real value. This is the only escape hatch and every call
 // site is greppable, so revelations can be audited.
@@ -91,10 +78,6 @@ func (a String) Diff(b String) bool {
 
 // masked is the single masked representation used by every formatting surface.
 func (s String) masked() string {
-	// A ref carries no secret, so there is nothing to redact.
-	if s.ref {
-		return s.v
-	}
 	if s.unknown {
 		return unknownPlaceholder
 	}

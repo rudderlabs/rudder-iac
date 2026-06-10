@@ -55,7 +55,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec
 			ID:        bookItem.ID,
 			Name:      bookItem.Name,
 			Author:    examplewriter.CreateWriterReference(authorURN),
-			AccessKey: &bookItem.AccessKey,
+			AccessKey: &bookItem.AccessKey.String,
 		}
 		res[bookItem.ID] = resource
 	}
@@ -175,8 +175,10 @@ func (h *HandlerImpl) MapRemoteToSpec(data map[string]*model.RemoteBook, inputRe
 			ID:     externalID,
 			Name:   res.Name,
 			Author: authorRef,
-			// Unknown on purpose: export can never recover the real value.
-			AccessKey: secret.NewUnknown(),
+			// Unknown on purpose: export can never recover the real value. The
+			// variable name is derived from the resource's identity so it stays
+			// stable across re-imports.
+			AccessKey: secret.NewImportable(secret.NewUnknown(), fmt.Sprintf("BOOK_%s_ACCESS_KEY", externalID)),
 		})
 	}
 

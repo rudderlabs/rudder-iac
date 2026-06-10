@@ -50,8 +50,10 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	require.NoError(t, proj.Load(testDir))
 	require.NoError(t, importer.WorkspaceImport(context.Background(), proj, importProvider))
 
-	// The generated spec carries a quoted variable reference, not a mask.
-	const wantVar = "BOOKS_BOOKS_BOOKS_THE_HOBBIT_ACCESS_KEY"
+	// The generated spec carries a quoted variable reference, not a mask. The
+	// handler names the variable from the resource's identity (BOOK_<id>_...),
+	// normalized to the substitution grammar.
+	const wantVar = "BOOK_THE_HOBBIT_ACCESS_KEY"
 	specBytes, err := os.ReadFile(filepath.Join(testDir, "imported", "books", "books.yaml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(specBytes), `accessKey: "{{ .`+wantVar+` }}"`)
