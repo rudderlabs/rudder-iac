@@ -45,7 +45,9 @@ func TestCollectVariableNames(t *testing.T) {
 				map[string]any{"id": "c", "plain": "no token", "count": 3},
 			},
 		}),
-		{Content: "select * from {{ .A_TOKEN }}", RelativePath: "raw.txt"},
+		// Substitution only runs over spec files, so references inside other
+		// generated files (extracted SQL, code) must not produce placeholders.
+		{Content: "select * from {{ .NOT_A_SPEC_FILE }}", RelativePath: "raw.txt"},
 	}
 
 	assert.Equal(t,
@@ -66,7 +68,14 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(dir, SecretsVarFileName), path)
 
-	assert.Equal(t, map[string]any{"BOOKS_ACCESS_KEY": ""}, readVarFile(t, path))
+	// nil placeholder: the var-file resolver rejects null values, so an
+	// unfilled placeholder fails apply loudly instead of sending "".
+	assert.Equal(t, map[string]any{"BOOKS_ACCESS_KEY": nil}, readVarFile(t, path))
+
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "# Variables referenced by the imported specs")
+	assert.Contains(t, string(raw), "BOOKS_ACCESS_KEY:\n")
 }
 
 // Re-imports must keep values the user already filled in and only add
@@ -90,7 +99,7 @@ func TestScaffoldSecretsVarFile_MergesExisting(t *testing.T) {
 
 	assert.Equal(t, map[string]any{
 		"BOOKS_ACCESS_KEY": "filled-in",
-		"BOOKS_WRITE_KEY":  "",
+		"BOOKS_WRITE_KEY":  nil,
 		"UNRELATED":        "kept",
 	}, readVarFile(t, path))
 }

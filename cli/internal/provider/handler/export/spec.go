@@ -2,6 +2,7 @@ package export
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 )
@@ -16,7 +17,9 @@ func (s *SpecExportData[Spec]) ToMap() (map[string]any, error) {
 	// "{{ .VAR }}" references instead of masked literals, so the generated spec
 	// stays applyable; the importer scaffolds a var file for the references.
 	if config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
-		scaffoldSecretRefs(s.Data, varPathPrefix(s.RelativePath))
+		if err := scaffoldSecretRefs(s.Data, varPathPrefix(s.RelativePath)); err != nil {
+			return nil, fmt.Errorf("scaffolding secret references: %w", err)
+		}
 	}
 
 	bytes, err := json.Marshal(s.Data)

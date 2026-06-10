@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // End-to-end shape of DEX-410: importing a resource with a secret yields a
@@ -56,11 +57,19 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	assert.Contains(t, string(specBytes), `accessKey: "{{ .`+wantVar+` }}"`)
 	assert.NotContains(t, string(specBytes), "(unknown)")
 
-	// The var file scaffolds a placeholder for exactly that variable.
+	// The var file scaffolds an unfilled (null) placeholder for exactly that
+	// variable — null so that applying without filling it fails loudly.
 	varFilePath := filepath.Join(testDir, "imported", importer.SecretsVarFileName)
 	varFileBytes, err := os.ReadFile(varFilePath)
 	require.NoError(t, err)
-	assert.Equal(t, wantVar+`: ""`+"\n", string(varFileBytes))
+	varFileVars := map[string]any{}
+	require.NoError(t, yaml.Unmarshal(varFileBytes, &varFileVars))
+	assert.Equal(t, map[string]any{wantVar: nil}, varFileVars)
+
+	// Applying with the unfilled placeholder is rejected by the var-file
+	// resolver, so a forgotten secret can never silently apply as "".
+	_, err = resolver.NewFileResolver(varFilePath)
+	require.ErrorContains(t, err, wantVar)
 
 	// The user fills in the real secret.
 	require.NoError(t, os.WriteFile(varFilePath, []byte(wantVar+`: "filled-in-access-key"`+"\n"), 0600))

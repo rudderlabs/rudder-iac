@@ -24,21 +24,47 @@ var secretStringType = reflect.TypeOf(secret.String{})
 // field's JSON path, so they are deterministic and stable across re-imports.
 // Slice elements are identified by their "id" field when they have one, since
 // positional indices are not stable identities for exported resources.
-func scaffoldSecretRefs(data any, pathPrefix []string) {
+//
+// Sanitizing path components into variable names can alias distinct fields
+// (e.g. ids "a-b" and "a_b") onto the same name; that would silently feed one
+// value to two different secrets, so it is reported as an error instead.
+func scaffoldSecretRefs(data any, pathPrefix []string) error {
 	v := reflect.ValueOf(data)
 	if !v.IsValid() {
-		return
+		return nil
 	}
-	replaceSecrets(v, pathPrefix)
+
+	s := &secretScaffolder{claimed: make(map[string]string)}
+	s.replaceSecrets(v, pathPrefix)
+	return s.err
 }
 
-func replaceSecrets(v reflect.Value, path []string) {
+// secretScaffolder tracks which field path claimed each variable name so
+// sanitization collisions surface as errors instead of aliased variables.
+type secretScaffolder struct {
+	claimed map[string]string
+	err     error
+}
+
+func (s *secretScaffolder) tokenFor(path []string) string {
+	var (
+		name      = varName(path)
+		fieldPath = strings.Join(path, ".")
+	)
+	if existing, ok := s.claimed[name]; ok && s.err == nil {
+		s.err = fmt.Errorf("variable name %s for secret at %q collides with the one for %q; rename one of the resources", name, fieldPath, existing)
+	}
+	s.claimed[name] = fieldPath
+	return fmt.Sprintf("{{ .%s }}", name)
+}
+
+func (s *secretScaffolder) replaceSecrets(v reflect.Value, path []string) {
 	switch v.Kind() {
 	case reflect.Pointer:
 		if v.IsNil() {
 			return
 		}
-		replaceSecrets(v.Elem(), path)
+		s.replaceSecrets(v.Elem(), path)
 
 	case reflect.Interface:
 		if v.IsNil() || !v.CanSet() {
@@ -48,13 +74,13 @@ func replaceSecrets(v reflect.Value, path []string) {
 		// addressable copy and store it back.
 		elem := reflect.New(v.Elem().Type()).Elem()
 		elem.Set(v.Elem())
-		replaceSecrets(elem, path)
+		s.replaceSecrets(elem, path)
 		v.Set(elem)
 
 	case reflect.Struct:
 		if v.Type() == secretStringType {
 			if v.CanSet() {
-				v.Set(reflect.ValueOf(secret.NewRef(varToken(path))))
+				v.Set(reflect.ValueOf(secret.NewRef(s.tokenFor(path))))
 			}
 			return
 		}
@@ -68,15 +94,15 @@ func replaceSecrets(v reflect.Value, path []string) {
 				continue
 			}
 			if inline {
-				replaceSecrets(v.Field(i), path)
+				s.replaceSecrets(v.Field(i), path)
 				continue
 			}
-			replaceSecrets(v.Field(i), append(path, name))
+			s.replaceSecrets(v.Field(i), append(path, name))
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			replaceSecrets(v.Index(i), append(path, elementName(v.Index(i), i)))
+			s.replaceSecrets(v.Index(i), append(path, elementName(v.Index(i), i)))
 		}
 
 	case reflect.Map:
@@ -85,7 +111,7 @@ func replaceSecrets(v reflect.Value, path []string) {
 			// store it back.
 			elem := reflect.New(v.Type().Elem()).Elem()
 			elem.Set(v.MapIndex(key))
-			replaceSecrets(elem, append(path, fmt.Sprintf("%v", key.Interface())))
+			s.replaceSecrets(elem, append(path, fmt.Sprintf("%v", key.Interface())))
 			v.SetMapIndex(key, elem)
 		}
 	}
@@ -149,10 +175,6 @@ func elementName(elem reflect.Value, index int) string {
 func varPathPrefix(relativePath string) []string {
 	trimmed := strings.TrimSuffix(filepath.ToSlash(relativePath), filepath.Ext(relativePath))
 	return strings.Split(trimmed, "/")
-}
-
-func varToken(path []string) string {
-	return fmt.Sprintf("{{ .%s }}", varName(path))
 }
 
 var (

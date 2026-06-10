@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
@@ -19,11 +21,19 @@ import (
 // loading. Users fill in the real values and pass it to apply via --var-file.
 const SecretsVarFileName = "secrets.vars.yaml" //nolint:gosec // a file name, not a credential
 
+const varFileHeader = `# Variables referenced by the imported specs. Fill in every value before
+# applying, and keep this file out of version control.
+#
+# An unfilled (null) entry makes apply fail rather than silently sending an
+# empty secret; to deliberately send an empty value, use KEY: "".
+`
+
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
 // variable referenced by the generated entities. Only active under the
 // enableVarSubstitution experimental gate — without substitution the
-// references could never be resolved on apply. Re-imports merge: values the
-// user already filled in are kept, only missing variables gain a placeholder.
+// references could never be resolved on apply. If a var file already exists
+// (e.g. kept from an earlier import), values the user filled in are kept and
+// only missing variables gain a placeholder.
 func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity) (string, error) {
 	if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
 		return "", nil
@@ -42,13 +52,15 @@ func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity)
 
 	for _, name := range names {
 		if _, ok := vars[name]; !ok {
-			vars[name] = ""
+			// nil scaffolds a "KEY:" line; the var-file resolver rejects null
+			// values, so an unfilled placeholder fails apply loudly.
+			vars[name] = nil
 		}
 	}
 
-	data, err := yaml.Marshal(vars)
+	data, err := renderVarFile(vars)
 	if err != nil {
-		return "", fmt.Errorf("marshaling var file content: %w", err)
+		return "", err
 	}
 
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
@@ -80,14 +92,46 @@ func loadExistingVars(path string) (map[string]any, error) {
 	return vars, nil
 }
 
+// renderVarFile renders the flat var file by hand — one sorted "KEY: value"
+// entry per line under an explanatory header — because yaml.Marshal can emit
+// neither comments nor the bare "KEY:" form used for placeholders.
+func renderVarFile(vars map[string]any) ([]byte, error) {
+	names := make([]string, 0, len(vars))
+	for name := range vars {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var b strings.Builder
+	b.WriteString(varFileHeader)
+	for _, name := range names {
+		if vars[name] == nil {
+			fmt.Fprintf(&b, "%s:\n", name)
+			continue
+		}
+		entry, err := yaml.Marshal(map[string]any{name: vars[name]})
+		if err != nil {
+			return nil, fmt.Errorf("marshaling var file entry %q: %w", name, err)
+		}
+		b.Write(entry)
+	}
+	return []byte(b.String()), nil
+}
+
 // collectVariableNames extracts the names of all "{{ .VAR }}" references in the
 // entities' content, sorted and de-duplicated. Scanning the generated content —
 // rather than threading names through every export strategy — keeps the var
 // file in sync with what the specs actually reference, regardless of which
-// provider or strategy produced them.
+// provider or strategy produced them. Only YAML entities count: variable
+// substitution runs exclusively over spec files, so references in other
+// generated files (e.g. extracted SQL or code) could never be resolved.
 func collectVariableNames(entities []writer.FormattableEntity) []string {
 	found := make(map[string]struct{})
 	for _, entity := range entities {
+		ext := filepath.Ext(entity.RelativePath)
+		if ext != loader.ExtensionYAML && ext != loader.ExtensionYML {
+			continue
+		}
 		extractVariableNames(entity.Content, found)
 	}
 

@@ -52,7 +52,7 @@ func TestScaffoldSecretRefs(t *testing.T) {
 		Freeform: map[string]any{"apiKey": secret.NewUnknown(), "plain": "untouched"},
 	}
 
-	scaffoldSecretRefs(spec, varPathPrefix("retl/sources.yaml"))
+	require.NoError(t, scaffoldSecretRefs(spec, varPathPrefix("retl/sources.yaml")))
 
 	assert.Equal(t, &exportSpec{
 		Sources: []sourceItem{
@@ -70,8 +70,23 @@ func TestScaffoldSecretRefs_KnownValuesAlsoTokenized(t *testing.T) {
 	// Even a known value must never be serialized on export — it would be
 	// masked into a useless literal anyway. Every secret becomes a reference.
 	spec := &exportSpec{Config: nestedConfig{Password: secret.New("real")}}
-	scaffoldSecretRefs(spec, varPathPrefix("spec.yaml"))
+	require.NoError(t, scaffoldSecretRefs(spec, varPathPrefix("spec.yaml")))
 	assert.Equal(t, secret.NewRef("{{ .SPEC_CONFIG_PASSWORD }}"), spec.Config.Password)
+}
+
+// Sanitization can alias distinct ids onto one variable name; feeding a single
+// value to two different secrets must fail loudly rather than happen silently.
+func TestScaffoldSecretRefs_NameCollision(t *testing.T) {
+	spec := &exportSpec{
+		Sources: []sourceItem{
+			{ID: "src-a", AccessToken: secret.NewUnknown()},
+			{ID: "src_a", AccessToken: secret.NewUnknown()},
+		},
+	}
+
+	err := scaffoldSecretRefs(spec, varPathPrefix("sources.yaml"))
+	require.ErrorContains(t, err, "SOURCES_SOURCES_SRC_A_ACCESS_TOKEN")
+	require.ErrorContains(t, err, "collides")
 }
 
 func TestVarName(t *testing.T) {
