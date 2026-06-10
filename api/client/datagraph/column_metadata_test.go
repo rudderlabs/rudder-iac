@@ -108,7 +108,7 @@ func TestBatchUpsertColumnMetadata(t *testing.T) {
 			if req.Header.Get("Authorization") != "Bearer test-token" {
 				return false
 			}
-			expected := `{"columns":[{"name":"email","displayName":"Email"},{"name":"user_id","displayName":"User ID"}]}`
+			expected := `{"columns":[{"name":"email","displayName":"Email","description":null},{"name":"user_id","displayName":"User ID","description":null}]}`
 			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
 		},
 		ResponseStatus: 200,
@@ -128,8 +128,8 @@ func TestBatchUpsertColumnMetadata(t *testing.T) {
 		"em-456",
 		datagraph.BatchUpsertColumnMetadataRequest{
 			Columns: []datagraph.ColumnMetadataEntry{
-				{Name: "email", DisplayName: "Email"},
-				{Name: "user_id", DisplayName: "User ID"},
+				{Name: "email", DisplayName: stringPtr("Email")},
+				{Name: "user_id", DisplayName: stringPtr("User ID")},
 			},
 		},
 	)
@@ -145,6 +145,52 @@ func TestBatchUpsertColumnMetadata(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+// TestBatchUpsertColumnMetadata_Description covers the description field on the
+// wire: a description-only entry sends displayName:null, a both-fields entry
+// sends both, and the response decodes description on the returned rows.
+func TestBatchUpsertColumnMetadata_Description(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"columns":[` +
+				`{"name":"notes","displayName":null,"description":"Free-form notes"},` +
+				`{"name":"user_id","displayName":"User ID","description":"Primary identifier"}` +
+				`]}`
+			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"columns": [
+				{"name": "notes", "description": "Free-form notes", "updatedAt": "2024-01-15T12:00:00Z"},
+				{"name": "user_id", "displayName": "User ID", "description": "Primary identifier", "updatedAt": "2024-01-15T12:00:00Z"}
+			]
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.BatchUpsertColumnMetadata(
+		context.Background(),
+		"dg-123",
+		"em-456",
+		datagraph.BatchUpsertColumnMetadataRequest{
+			Columns: []datagraph.ColumnMetadataEntry{
+				{Name: "notes", DisplayName: nil, Description: stringPtr("Free-form notes")},
+				{Name: "user_id", DisplayName: stringPtr("User ID"), Description: stringPtr("Primary identifier")},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
+		Columns: []datagraph.ColumnMetadataRow{
+			{Name: "notes", Description: "Free-form notes"},
+			{Name: "user_id", DisplayName: "User ID", Description: "Primary identifier"},
+		},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestBatchUpsertColumnMetadata_BothColumnsAndDeleteColumns(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -152,7 +198,7 @@ func TestBatchUpsertColumnMetadata_BothColumnsAndDeleteColumns(t *testing.T) {
 				return false
 			}
 			expected := `{
-				"columns": [{"name":"user_id","displayName":"User ID"}],
+				"columns": [{"name":"user_id","displayName":"User ID","description":null}],
 				"deleteColumns": ["email","legacy_field"]
 			}`
 			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
@@ -172,7 +218,7 @@ func TestBatchUpsertColumnMetadata_BothColumnsAndDeleteColumns(t *testing.T) {
 		"dg-123",
 		"em-456",
 		datagraph.BatchUpsertColumnMetadataRequest{
-			Columns:       []datagraph.ColumnMetadataEntry{{Name: "user_id", DisplayName: "User ID"}},
+			Columns:       []datagraph.ColumnMetadataEntry{{Name: "user_id", DisplayName: stringPtr("User ID")}},
 			DeleteColumns: []string{"email", "legacy_field"},
 		},
 	)
@@ -225,7 +271,7 @@ func TestBatchUpsertColumnMetadata_EmptyDataGraphID(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.BatchUpsertColumnMetadata(context.Background(), "", "em-456", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: "Email"}},
+		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: stringPtr("Email")}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "data graph ID cannot be empty")
@@ -236,7 +282,7 @@ func TestBatchUpsertColumnMetadata_EmptyModelID(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.BatchUpsertColumnMetadata(context.Background(), "dg-123", "", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: "Email"}},
+		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: stringPtr("Email")}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "model ID cannot be empty")
@@ -254,7 +300,7 @@ func TestBatchUpsertColumnMetadata_BadRequest(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.BatchUpsertColumnMetadata(context.Background(), "dg-123", "em-456", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: ""}},
+		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: stringPtr("")}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "upserting column metadata")
@@ -274,7 +320,7 @@ func TestBatchUpsertColumnMetadata_NotFound(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.BatchUpsertColumnMetadata(context.Background(), "dg-123", "em-456", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: "Email"}},
+		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: stringPtr("Email")}},
 	})
 	require.Error(t, err)
 
@@ -297,7 +343,7 @@ func TestBatchUpsertColumnMetadata_ServerError(t *testing.T) {
 	store := newTestStore(t, httpClient)
 
 	_, err := store.BatchUpsertColumnMetadata(context.Background(), "dg-123", "em-456", datagraph.BatchUpsertColumnMetadataRequest{
-		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: "Email"}},
+		Columns: []datagraph.ColumnMetadataEntry{{Name: "email", DisplayName: stringPtr("Email")}},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "upserting column metadata")

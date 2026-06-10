@@ -80,6 +80,64 @@ func TestDataGraphSpecSyntaxValid_ColumnsValid(t *testing.T) {
 			},
 		},
 		{
+			name: "column with description only (no display_name)",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "notes", Description: "Free-form notes"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "column with both display_name and description",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "id", DisplayName: "User ID", Description: "Primary identifier"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "two description-only columns do not collide (no description uniqueness)",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "notes", Description: "Same note"},
+							{Name: "memo", Description: "Same note"},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "model without columns is valid",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
@@ -197,7 +255,7 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 			expectedMsgSubstrings: []string{"'name' is required"},
 		},
 		{
-			name: "column missing display_name",
+			name: "column with neither display_name nor description",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
 				AccountID: "wh-123",
@@ -205,26 +263,20 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 					baseModel(dgModel.ColumnMetadataYAML{Name: "id"}),
 				},
 			},
-			expectedRefs:          []string{"/models/0/columns/0/display_name"},
-			expectedMsgSubstrings: []string{"'display_name' is required"},
+			expectedRefs:          []string{"/models/0/columns/0"},
+			expectedMsgSubstrings: []string{"at least one of 'display_name' or 'description'"},
 		},
 		{
-			name: "column missing both name and display_name",
+			name: "column missing name (with description set)",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
 				AccountID: "wh-123",
 				Models: []dgModel.ModelSpec{
-					baseModel(dgModel.ColumnMetadataYAML{}),
+					baseModel(dgModel.ColumnMetadataYAML{Description: "some note"}),
 				},
 			},
-			expectedRefs: []string{
-				"/models/0/columns/0/name",
-				"/models/0/columns/0/display_name",
-			},
-			expectedMsgSubstrings: []string{
-				"'name' is required",
-				"'display_name' is required",
-			},
+			expectedRefs:          []string{"/models/0/columns/0/name"},
+			expectedMsgSubstrings: []string{"'name' is required"},
 		},
 		{
 			name: "column name leading whitespace",
@@ -293,6 +345,36 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 				},
 			},
 			expectedRefs:          []string{"/models/0/columns/0/display_name"},
+			expectedMsgSubstrings: []string{"control characters"},
+		},
+		{
+			name: "column description with leading whitespace is rejected",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					baseModel(dgModel.ColumnMetadataYAML{
+						Name:        "id",
+						Description: " padded note",
+					}),
+				},
+			},
+			expectedRefs:          []string{"/models/0/columns/0/description"},
+			expectedMsgSubstrings: []string{"leading or trailing whitespace"},
+		},
+		{
+			name: "column description with newline is rejected",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					baseModel(dgModel.ColumnMetadataYAML{
+						Name:        "id",
+						Description: "line\nbreak",
+					}),
+				},
+			},
+			expectedRefs:          []string{"/models/0/columns/0/description"},
 			expectedMsgSubstrings: []string{"control characters"},
 		},
 		{

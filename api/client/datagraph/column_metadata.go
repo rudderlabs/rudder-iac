@@ -7,16 +7,24 @@ import (
 	"fmt"
 )
 
-// ColumnMetadataEntry is a single (name, displayName) pair sent in a batch upsert.
+// ColumnMetadataEntry is a single column-metadata write sent in a batch upsert.
+// DisplayName / Description are pointers so a nil value serializes as JSON `null`
+// (an explicit clear, per the declarative apply contract) rather than being
+// omitted — hence no `omitempty`. A non-nil value sets the field. At least one
+// of the two is non-nil; an empty string is invalid (use null to clear).
 type ColumnMetadataEntry struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
+	Name        string  `json:"name"`
+	DisplayName *string `json:"displayName"`
+	Description *string `json:"description"`
 }
 
-// ColumnMetadataRow is a single (name, displayName) row returned by the API.
+// ColumnMetadataRow is a single column-metadata row returned by the API.
+// displayName / description are omitted by the server when unset, so they
+// unmarshal to the empty string.
 type ColumnMetadataRow struct {
 	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // ColumnMetadataListResponse is the response from both List and BatchUpsert.

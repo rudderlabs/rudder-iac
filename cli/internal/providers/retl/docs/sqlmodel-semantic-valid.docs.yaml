@@ -1,0 +1,87 @@
+rule_id: "retl/sqlmodel/semantic-valid"
+match_behavior:
+  # Legacy spec versions (rudder/0.1 and rudder/v0.1) share the same
+  # semantic constraints, so they are documented together.
+  - applies_to:
+      - kind: "retl-source-sql-model"
+        version: "rudder/0.1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/v0.1"
+    valid:
+      - example_id: "sqlmodel-semantic-legacy-valid"
+        title: "Valid legacy SQL model — display_name is unique across all models"
+        files:
+          spec.yaml: |
+            version: rudder/0.1
+            kind: retl-source-sql-model
+            metadata:
+              name: revenue-model
+            spec:
+              id: revenue-model
+              display_name: Revenue Model
+              account_id: acc-123
+              primary_key: id
+              source_definition: postgres
+              sql: SELECT id, amount FROM revenue
+    invalid:
+      - example_id: "sqlmodel-semantic-legacy-duplicate-display-name"
+        title: "Legacy SQL model with a display_name that duplicates another model in the workspace"
+        files:
+          spec.yaml: |
+            version: rudder/0.1
+            kind: retl-source-sql-model
+            metadata:
+              name: revenue-model-copy
+            spec:
+              id: revenue-model-copy
+              display_name: Revenue Model
+              account_id: acc-123
+              primary_key: id
+              source_definition: postgres
+              sql: SELECT id, amount FROM revenue
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
+  # Current spec version (rudder/v1).
+  - applies_to:
+      - kind: "retl-source-sql-model"
+        version: "rudder/v1"
+    valid:
+      - example_id: "sqlmodel-semantic-v1-valid"
+        title: "Valid v1 SQL model — display_name is unique across all models"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model
+            spec:
+              id: churn-model
+              display_name: Churn Risk Model
+              account_id: acc-456
+              primary_key: user_id
+              source_definition: bigquery
+              sql: SELECT user_id FROM churn_signals
+    invalid:
+      - example_id: "sqlmodel-semantic-v1-duplicate-display-name"
+        title: "v1 SQL model with a display_name that duplicates another model in the workspace"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model-duplicate
+            spec:
+              id: churn-model-duplicate
+              display_name: Churn Risk Model
+              account_id: acc-456
+              primary_key: user_id
+              source_definition: bigquery
+              sql: SELECT user_id FROM churn_signals
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"

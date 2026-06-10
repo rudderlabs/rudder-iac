@@ -99,9 +99,10 @@ var validateDataGraphSpec = func(_ string, _ string, _ map[string]any, spec dgMo
 
 // validateModelColumns enforces the per-column constraints that can't be
 // expressed via struct tags: trimmed values, no control characters in
-// display_name, and in-model uniqueness of `name` and case-insensitive
-// uniqueness of `display_name`. Required/max=255 are handled upstream by
-// struct-tag validation.
+// display_name / description, the "at least one of display_name or description"
+// rule, in-model uniqueness of `name`, and case-insensitive uniqueness of
+// `display_name` (description has no uniqueness rule). max=255 is handled
+// upstream by struct-tag validation.
 func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []rules.ValidationResult {
 	if len(columns) == 0 {
 		return nil
@@ -125,6 +126,13 @@ func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []
 			})
 		}
 
+		if col.DisplayName == "" && col.Description == "" {
+			results = append(results, rules.ValidationResult{
+				Reference: base,
+				Message:   "each column must set at least one of 'display_name' or 'description'",
+			})
+		}
+
 		if col.DisplayName != "" {
 			if hasLeadingOrTrailingWhitespace(col.DisplayName) {
 				results = append(results, rules.ValidationResult{
@@ -136,6 +144,21 @@ func validateModelColumns(modelIdx int, columns []dgModel.ColumnMetadataYAML) []
 				results = append(results, rules.ValidationResult{
 					Reference: base + "/display_name",
 					Message:   "'display_name' must not contain control characters (tab, newline, carriage return)",
+				})
+			}
+		}
+
+		if col.Description != "" {
+			if hasLeadingOrTrailingWhitespace(col.Description) {
+				results = append(results, rules.ValidationResult{
+					Reference: base + "/description",
+					Message:   "'description' must not have leading or trailing whitespace",
+				})
+			}
+			if hasControlCharacters(col.Description) {
+				results = append(results, rules.ValidationResult{
+					Reference: base + "/description",
+					Message:   "'description' must not contain control characters (tab, newline, carriage return)",
 				})
 			}
 		}
