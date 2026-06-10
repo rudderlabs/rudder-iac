@@ -12,9 +12,9 @@ type BookItem struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Author string `json:"author"` // URN reference to a writer
-	// ImportableSecret so that export emits a "{{ .VAR }}" reference (the
-	// handler names the variable) instead of a useless masked literal.
-	AccessKey secret.ImportableSecret `json:"accessKey"`
+	// On export the handler attaches a variable name (WithVariableName) so the
+	// spec carries a "{{ .VAR }}" reference instead of a useless masked literal.
+	AccessKey secret.String `json:"accessKey"`
 }
 
 // BookSpec represents the configuration for books (can contain multiple)

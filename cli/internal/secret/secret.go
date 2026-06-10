@@ -36,17 +36,32 @@ type String struct {
 	// "no secret" from "a secret we cannot see", and it drives the always-re-apply
 	// diff rule below.
 	unknown bool
+	// varName, when set via WithVariableName, names the substitution variable
+	// that stands in for this secret during import scaffolding: the marshals
+	// emit a "{{ .varName }}" reference instead of a masked literal, which the
+	// user later resolves through a var file on apply.
+	varName string
 }
+
+// Option configures a String at construction time.
+type Option func(*String)
 
 // New wraps a real, known value. The spec loader and provider spec-to-args
 // conversion use it.
-func New(v string) String { return String{v: v} }
+func New(v string, opts ...Option) String { return apply(String{v: v}, opts) }
 
 // NewUnknown marks a secret whose real value we never hold. This is what
 // MapRemoteToState constructs for a secret field, since backend APIs do not
 // return secret values. An unknown secret always diffs (see Diff), so its
 // resource is re-applied on every run.
-func NewUnknown() String { return String{unknown: true} }
+func NewUnknown(opts ...Option) String { return apply(String{unknown: true}, opts) }
+
+func apply(s String, opts []Option) String {
+	for _, opt := range opts {
+		opt(&s)
+	}
+	return s
+}
 
 // Reveal returns the real value. This is the only escape hatch and every call
 // site is greppable, so revelations can be audited.
@@ -105,13 +120,29 @@ func (s String) GoString() string { return s.masked() }
 // LogValue implements slog.LogValuer so structured logs mask automatically.
 func (s String) LogValue() slog.Value { return slog.StringValue(s.masked()) }
 
-// MarshalJSON redacts. This is load-bearing for export, which json.Marshals a
-// spec before turning it into YAML. Outgoing API request bodies use plain string
-// fields populated via Reveal(), so the real value still reaches the wire.
-func (s String) MarshalJSON() ([]byte, error) { return json.Marshal(s.masked()) }
+// MarshalJSON redacts — unless a substitution variable is attached, in which
+// case it emits the "{{ .VAR }}" reference: a remote never returns a secret's
+// real value, so a masked literal in an exported spec would be useless, while
+// a reference gives the user a var-file slot to supply it. This is
+// load-bearing for export, which json.Marshals a spec before turning it into
+// YAML. Outgoing API request bodies use plain string fields populated via
+// Reveal(), so the real value still reaches the wire.
+func (s String) MarshalJSON() ([]byte, error) {
+	if s.varName != "" {
+		return json.Marshal(s.token())
+	}
+	return json.Marshal(s.masked())
+}
 
-// MarshalYAML redacts any direct YAML serialization of a String.
-func (s String) MarshalYAML() (any, error) { return s.masked(), nil }
+// MarshalYAML mirrors MarshalJSON for any direct YAML serialization of a String.
+func (s String) MarshalYAML() (any, error) {
+	if s.varName != "" {
+		return s.token(), nil
+	}
+	return s.masked(), nil
+}
+
+func (s String) token() string { return fmt.Sprintf("{{ .%s }}", s.varName) }
 
 // UnmarshalYAML reads a bare string from a spec, producing a known value.
 func (s *String) UnmarshalYAML(node *yaml.Node) error {
