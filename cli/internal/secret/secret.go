@@ -18,9 +18,10 @@ import (
 const (
 	unknownPlaceholder = "(unknown)"
 	shortMask          = "***"
-	// hintThreshold is the minimum number of characters before masked() reveals
-	// the last four as a spot-check hint; below it the value is fully masked so the
-	// hint never exposes a meaningful fraction of a short secret.
+	// hintThreshold is the minimum length, in runes, at which masked() reveals the
+	// last four runes as a spot-check hint; shorter values are masked whole ("***").
+	// At exactly this length the tail is half the value, so 8 is the shortest secret
+	// for which leaking a 4-rune tail is treated as acceptable.
 	hintThreshold = 8
 )
 
@@ -48,6 +49,9 @@ func NewUnknown() String { return String{unknown: true} }
 
 // Reveal returns the real value. This is the only escape hatch and every call
 // site is greppable, so revelations can be audited.
+//
+// On an unknown secret there is no real value to reveal, so this returns "".
+// we may later harden Reveal to error rather than silently return "" for an unknown secret.
 func (s String) Reveal() string { return s.v }
 
 // IsZero reports whether there is no secret to send: an empty value that is not an
