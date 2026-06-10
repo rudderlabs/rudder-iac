@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -31,9 +32,7 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
 // variable referenced by the generated entities. Only active under the
 // enableVarSubstitution experimental gate — without substitution the
-// references could never be resolved on apply. If a var file already exists
-// (e.g. kept from an earlier import), values the user filled in are kept and
-// only missing variables gain a placeholder.
+// references could never be resolved on apply.
 func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity) (string, error) {
 	if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
 		return "", nil
@@ -45,11 +44,14 @@ func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity)
 	}
 
 	path := filepath.Join(baseDir, SecretsVarFileName)
+
+	// If a var file already exists (e.g. kept from an earlier import), merge
+	// into it: variables discovered by this import gain a placeholder only when
+	// missing, so values the user already filled in are never overwritten.
 	vars, err := loadExistingVars(path)
 	if err != nil {
 		return "", err
 	}
-
 	for _, name := range names {
 		if _, ok := vars[name]; !ok {
 			// nil scaffolds a "KEY:" line; the var-file resolver rejects null
@@ -58,23 +60,20 @@ func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity)
 		}
 	}
 
-	data, err := renderVarFile(vars)
-	if err != nil {
-		return "", err
+	entity := writer.FormattableEntity{
+		Content:      vars,
+		RelativePath: path,
 	}
-
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return "", fmt.Errorf("creating directory %s: %w", baseDir, err)
-	}
-
-	// 0600: the user is expected to put real secrets in this file.
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		return "", fmt.Errorf("writing var file %s: %w", path, err)
+	if err := writer.OverwriteFile(formatter.Setup(varFileFormatter{}), entity); err != nil {
+		return "", fmt.Errorf("writing var file: %w", err)
 	}
 
 	return path, nil
 }
 
+// loadExistingVars reads the var file at path into a name→value map so a new
+// scaffold can merge with it. A missing file is not an error — it simply means
+// there is nothing to merge and every variable starts as a placeholder.
 func loadExistingVars(path string) (map[string]any, error) {
 	vars := make(map[string]any)
 
@@ -92,10 +91,23 @@ func loadExistingVars(path string) (map[string]any, error) {
 	return vars, nil
 }
 
-// renderVarFile renders the flat var file by hand — one sorted "KEY: value"
-// entry per line under an explanatory header — because yaml.Marshal can emit
-// neither comments nor the bare "KEY:" form used for placeholders.
-func renderVarFile(vars map[string]any) ([]byte, error) {
+// varFileFormatter renders the flat name→value var-file map — one sorted
+// "KEY: value" entry per line under an explanatory header. It exists because
+// yaml.Marshal can emit neither comments nor the bare "KEY:" placeholder form,
+// and implementing formatter.Formatter lets the var file flow through the same
+// writer machinery as every other generated file.
+type varFileFormatter struct{}
+
+func (varFileFormatter) Extension() []string {
+	return []string{loader.ExtensionYAML, loader.ExtensionYML}
+}
+
+func (varFileFormatter) Format(data any) ([]byte, error) {
+	vars, ok := data.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("expected map[string]any, got %T", data)
+	}
+
 	names := make([]string, 0, len(vars))
 	for name := range vars {
 		names = append(names, name)
@@ -143,6 +155,9 @@ func collectVariableNames(entities []writer.FormattableEntity) []string {
 	return names
 }
 
+// extractVariableNames recursively walks an entity's content — spec wrappers,
+// maps, and slices — and records the name of every "{{ .VAR }}" reference found
+// in the string values it reaches.
 func extractVariableNames(content any, found map[string]struct{}) {
 	switch v := content.(type) {
 	case *specs.Spec:

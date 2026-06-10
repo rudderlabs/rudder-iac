@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 const (
@@ -99,8 +100,8 @@ func WorkspaceImport(
 		return fmt.Errorf("scaffolding secrets var file: %w", err)
 	}
 	if varFile != "" {
-		fmt.Printf("Imported specs reference variables for secret values.\n"+
-			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.\n", varFile)
+		ui.PrintWarning(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
+			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
 	return nil
