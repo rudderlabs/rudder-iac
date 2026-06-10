@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"reflect"
 
 	"gopkg.in/yaml.v3"
 )
@@ -129,5 +130,25 @@ func (s *String) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("decoding secret: %w", err)
 	}
 	*s = New(raw)
+	return nil
+}
+
+// UnmarshalMapstructure implements mapstructure's Unmarshaler so every
+// mapstructure decoder in the codebase accepts a secret field without
+// per-decoder hook wiring. Spec maps carry secrets as bare strings (after YAML
+// load and variable substitution); without this, mapstructure could not
+// populate a String, since the struct has no exported field to map onto.
+func (s *String) UnmarshalMapstructure(input any) error {
+	if existing, ok := input.(String); ok {
+		*s = existing
+		return nil
+	}
+
+	// reflect, not a type assertion, so named string types convert too.
+	v := reflect.ValueOf(input)
+	if v.Kind() != reflect.String {
+		return fmt.Errorf("decoding secret: expected a string, got %T", input)
+	}
+	*s = New(v.String())
 	return nil
 }
