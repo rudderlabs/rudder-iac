@@ -113,8 +113,9 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.WriterResource,
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.WriterResource, remoteId string) (*model.WriterState, error) {
-	// Set external ID on the remote resource
-	if err := h.backend.SetWriterExternalID(remoteId, ""); err != nil {
+	// Set external ID on the remote resource, marking it managed so the next
+	// apply diffs it instead of importing it again
+	if err := h.backend.SetWriterExternalID(remoteId, data.ID); err != nil {
 		return nil, fmt.Errorf("setting external ID on writer: %w", err)
 	}
 

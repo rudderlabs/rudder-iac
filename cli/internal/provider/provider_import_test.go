@@ -37,9 +37,9 @@ func TestExampleImport(t *testing.T) {
 	wB, err := b.CreateWriter("Writer B", "")
 	require.NoError(t, err)
 
-	_, err = b.CreateBook("Book A", wA.ID, "")
+	_, err = b.CreateBook("Book A", wA.ID, "", "")
 	require.NoError(t, err)
-	_, err = b.CreateBook("Book B", wB.ID, "")
+	_, err = b.CreateBook("Book B", wB.ID, "", "")
 	require.NoError(t, err)
 
 	err = importer.WorkspaceImport(context.Background(), proj, provider)

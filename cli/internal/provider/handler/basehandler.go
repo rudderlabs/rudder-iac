@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 // BaseHandler provides a generic, reusable foundation for implementing resource handlers
@@ -166,8 +167,16 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.Spec) error {
 	spec := h.Impl.NewSpec()
 
-	// Convert spec map to struct using mapstructure
-	if err := mapstructure.Decode(s.Spec, spec); err != nil {
+	// Convert spec map to struct using mapstructure. The hook lets bare strings
+	// (real values injected by variable substitution) load into secret.String fields.
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: secret.StringDecodeHook(),
+		Result:     spec,
+	})
+	if err != nil {
+		return fmt.Errorf("creating spec decoder: %w", err)
+	}
+	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("converting spec: %w", err)
 	}
 

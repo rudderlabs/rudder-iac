@@ -4,13 +4,15 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 // BookItem represents a single book in the spec
 type BookItem struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Author string `json:"author"` // URN reference to a writer
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Author    string        `json:"author"` // URN reference to a writer
+	AccessKey secret.String `json:"accessKey"`
 }
 
 // BookSpec represents the configuration for books (can contain multiple)
@@ -23,6 +25,9 @@ type BookResource struct {
 	ID     string                 `json:"id"`
 	Name   string                 `json:"name"`
 	Author *resources.PropertyRef `json:"author"` // Reference to a writer
+	// Pointer on purpose: RawData structs carry secrets as *secret.String so the
+	// value survives the differ's struct→map decode (see differ's secret case).
+	AccessKey *secret.String `json:"accessKey"`
 }
 
 // BookState represents the output state of a book from the remote system
@@ -39,8 +44,9 @@ type RemoteBook struct {
 // Metadata implements the RemoteResource interface
 func (r RemoteBook) Metadata() handler.RemoteResourceMetadata {
 	return handler.RemoteResourceMetadata{
-		ID:         r.ID,
-		ExternalID: r.ExternalID,
-		Name:       r.Name,
+		ID:          r.ID,
+		ExternalID:  r.ExternalID,
+		WorkspaceID: backend.WorkspaceID,
+		Name:        r.Name,
 	}
 }

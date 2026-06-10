@@ -89,8 +89,18 @@ func WorkspaceImport(
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
-	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
+	importDir := filepath.Join(location, ImportedDir)
+	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
+	}
+
+	varFile, err := scaffoldSecretsVarFile(importDir, entities)
+	if err != nil {
+		return fmt.Errorf("scaffolding secrets var file: %w", err)
+	}
+	if varFile != "" {
+		fmt.Printf("Imported specs reference variables for secret values.\n"+
+			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.\n", varFile)
 	}
 
 	return nil

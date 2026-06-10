@@ -11,6 +11,7 @@ import (
 	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 type BookHandler = handler.BaseHandler[model.BookSpec, model.BookResource, model.BookState, model.RemoteBook]
@@ -51,9 +52,10 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.BookSpec
 		}
 
 		resource := &model.BookResource{
-			ID:     bookItem.ID,
-			Name:   bookItem.Name,
-			Author: examplewriter.CreateWriterReference(authorURN),
+			ID:        bookItem.ID,
+			Name:      bookItem.Name,
+			Author:    examplewriter.CreateWriterReference(authorURN),
+			AccessKey: &bookItem.AccessKey,
 		}
 		res[bookItem.ID] = resource
 	}
@@ -91,10 +93,13 @@ func (h *HandlerImpl) MapRemoteToState(remote *model.RemoteBook, urnResolver han
 		return nil, nil, fmt.Errorf("resolving author URN for book %s: %w", remote.ID, err)
 	}
 
+	unknownKey := secret.NewUnknown()
 	resource := &model.BookResource{
 		ID:     remote.ExternalID,
 		Name:   remote.Name,
 		Author: examplewriter.CreateWriterReference(authorURN),
+		// The backend, like a real API, never returns the secret's value.
+		AccessKey: &unknownKey,
 	}
 
 	state := &model.BookState{
@@ -108,7 +113,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *model.BookResource) (*mo
 	// In a real implementation, we would need to resolve the author URN to a remote ID
 	// For this example, we'll store the URN directly
 	// A more complete implementation would use a PropertyRef resolver
-	remoteBook, err := h.backend.CreateBook(data.Name, data.Author.Value, data.ID)
+	remoteBook, err := h.backend.CreateBook(data.Name, data.Author.Value, data.ID, revealAccessKey(data))
 	if err != nil {
 		return nil, fmt.Errorf("creating book in backend: %w", err)
 	}
@@ -128,7 +133,7 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.BookResource, o
 		return nil, fmt.Errorf("cannot update book: old author reference not dereferenced (PropertyRef.Value is empty)")
 	}
 
-	remoteBook, err := h.backend.UpdateBook(oldState.ID, newData.Name, newData.Author.Value)
+	remoteBook, err := h.backend.UpdateBook(oldState.ID, newData.Name, newData.Author.Value, revealAccessKey(newData))
 	if err != nil {
 		return nil, fmt.Errorf("updating book in backend: %w", err)
 	}
@@ -139,8 +144,9 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *model.BookResource, o
 }
 
 func (h *HandlerImpl) Import(ctx context.Context, data *model.BookResource, remoteId string) (*model.BookState, error) {
-	// Set external ID on the remote resource
-	if err := h.backend.SetBookExternalID(remoteId, ""); err != nil {
+	// Set external ID on the remote resource, marking it managed so the next
+	// apply diffs it instead of importing it again
+	if err := h.backend.SetBookExternalID(remoteId, data.ID); err != nil {
 		return nil, fmt.Errorf("setting external ID on book: %w", err)
 	}
 
@@ -169,6 +175,8 @@ func (h *HandlerImpl) MapRemoteToSpec(data map[string]*model.RemoteBook, inputRe
 			ID:     externalID,
 			Name:   res.Name,
 			Author: authorRef,
+			// Unknown on purpose: export can never recover the real value.
+			AccessKey: secret.NewUnknown(),
 		})
 	}
 
@@ -184,6 +192,15 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Book
 		return fmt.Errorf("cannot delete book: author reference not dereferenced (PropertyRef.Value is empty)")
 	}
 	return h.backend.DeleteBook(oldState.ID)
+}
+
+// revealAccessKey is the single point where the real secret escapes toward the
+// backend API; a spec without an access key sends the empty string.
+func revealAccessKey(data *model.BookResource) string {
+	if data.AccessKey == nil {
+		return ""
+	}
+	return data.AccessKey.Reveal()
 }
 
 func ParseBookReference(ref string) (string, error) {
