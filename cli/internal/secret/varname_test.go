@@ -80,23 +80,13 @@ func TestWithVariableName_UnmarshalResetsName(t *testing.T) {
 	assert.Equal(t, New("real-value"), s)
 }
 
-func TestWithVariableName_Normalizes(t *testing.T) {
+// The name is used verbatim — choosing one that satisfies the substitutor's
+// variable grammar is the provider's responsibility.
+func TestWithVariableName_UsedVerbatim(t *testing.T) {
 	enableVarSubstitution(t)
 
-	tests := []struct {
-		name string
-		in   string
-		want String
-	}{
-		{"kebab external id", "BOOK_the-hobbit_ACCESS_KEY", String{varName: "BOOK_THE_HOBBIT_ACCESS_KEY"}},
-		{"already valid", "ACCESS_KEY", String{varName: "ACCESS_KEY"}},
-		{"special chars fold", "retl/src.main password", String{varName: "RETL_SRC_MAIN_PASSWORD"}},
-		{"leading digit prefixed", "1984-access-key", String{varName: "_1984_ACCESS_KEY"}},
-		{"trims stray separators", "-access-key-", String{varName: "ACCESS_KEY"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, New("", WithVariableName(tt.in)))
-		})
-	}
+	assert.Equal(t,
+		String{varName: "Book_Access_Key_2"},
+		New("", WithVariableName("Book_Access_Key_2")),
+	)
 }

@@ -3,6 +3,7 @@ package book
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
@@ -177,8 +178,9 @@ func (h *HandlerImpl) MapRemoteToSpec(data map[string]*model.RemoteBook, inputRe
 			Author: authorRef,
 			// Unknown on purpose: export can never recover the real value. The
 			// variable name is derived from the resource's identity so it stays
-			// stable across re-imports.
-			AccessKey: secret.NewUnknown(secret.WithVariableName(fmt.Sprintf("BOOK_%s_ACCESS_KEY", externalID))),
+			// stable across re-imports; kebab-case IDs are folded to the
+			// substitutor's variable grammar.
+			AccessKey: secret.NewUnknown(secret.WithVariableName(accessKeyVarName(externalID))),
 		})
 	}
 
@@ -194,6 +196,10 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, oldData *model.Book
 		return fmt.Errorf("cannot delete book: author reference not dereferenced (PropertyRef.Value is empty)")
 	}
 	return h.backend.DeleteBook(oldState.ID)
+}
+
+func accessKeyVarName(externalID string) string {
+	return fmt.Sprintf("BOOK_%s_ACCESS_KEY", strings.ToUpper(strings.ReplaceAll(externalID, "-", "_")))
 }
 
 // revealAccessKey is the single point where the real secret escapes toward the

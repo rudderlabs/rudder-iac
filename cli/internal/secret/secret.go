@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"reflect"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,6 +46,27 @@ type String struct {
 
 // Option configures a String at construction time.
 type Option func(*String)
+
+// WithVariableName attaches the substitution variable that stands in for the
+// secret during import scaffolding, making the marshals emit a quoted
+// "{{ .name }}" reference instead of a masked literal. The provider building
+// the export spec chooses the name from what it knows about the resource
+// (e.g. resource type, external ID, field) — it is used verbatim, so it must
+// satisfy the substitutor's variable grammar (^[A-Za-z_][A-Za-z0-9_]*$) —
+// which is what keeps names deterministic and stable across re-imports.
+//
+// Scaffolding only works under the enableVarSubstitution experimental gate —
+// without substitution the reference could never be resolved on apply — so
+// with the gate off this option is a no-op and the secret exports as a masked
+// literal, the pre-scaffolding behaviour.
+func WithVariableName(name string) Option {
+	return func(s *String) {
+		if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
+			return
+		}
+		s.varName = name
+	}
+}
 
 // New wraps a real, known value. The spec loader and provider spec-to-args
 // conversion use it.
