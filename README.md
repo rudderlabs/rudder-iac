@@ -9,7 +9,7 @@ It ships the `rudder-cli` binary used to manage RudderStack resources from YAML 
 
 ## Install `rudder-cli`
 
-Download a release binary for your platform:
+Download the latest release binary for your platform:
 
 - **macOS (Apple Silicon)**
   ```sh
