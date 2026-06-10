@@ -220,6 +220,11 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: true})
 			}
 
+		// TODO: a secret.String nested inside a slice (same for []any below) is
+		// compared whole via reflect.DeepEqual, so it bypasses the secret case
+		// above — it still re-applies every run but isn't flagged SecretOnly, so it
+		// renders as a normal masked update rather than under "always re-applied".
+		// No value leaks (Format masks). Extend secret-awareness to slices.
 		case []map[string]any:
 			v2Typed := v2.([]map[string]any)
 			if !reflect.DeepEqual(v1Typed, v2Typed) {

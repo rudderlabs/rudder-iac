@@ -1,6 +1,7 @@
 package differ_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -125,16 +126,39 @@ func TestCompareData_Secret(t *testing.T) {
 		assert.False(t, secretOnly)
 	})
 
-	t.Run("secret inside a slice diffs via DeepEqual but is not classified secret-only", func(t *testing.T) {
-		// Slices fall back to reflect.DeepEqual, so an unknown remote still produces
-		// a diff (it re-applies) but the diff is not tagged Secret.
-		diffs, secretOnly := differ.CompareData(
-			resources.ResourceData{"creds": []map[string]any{{"token": secret.New("hunter2")}}},
-			resources.ResourceData{"creds": []map[string]any{{"token": secret.NewUnknown()}}},
-		)
-		require.Contains(t, diffs, "creds")
-		assert.False(t, diffs["creds"].SecretOnly)
-		assert.False(t, secretOnly)
+	t.Run("secret inside a slice re-applies every run, not classified secret-only, never leaks", func(t *testing.T) {
+		// Slices fall back to reflect.DeepEqual, so a secret nested inside one
+		// bypasses the secret case: an unknown remote never equals local, so it
+		// diffs (re-applies) on every run, but the diff is not flagged Secret.
+		// Format still masks, so the real value never leaks through the render path.
+		slices := map[string]struct{ local, remote any }{
+			"[]map[string]any": {
+				local:  []map[string]any{{"token": secret.New("hunter2")}},
+				remote: []map[string]any{{"token": secret.NewUnknown()}},
+			},
+			"[]any": {
+				local:  []any{map[string]any{"token": secret.New("hunter2")}},
+				remote: []any{map[string]any{"token": secret.NewUnknown()}},
+			},
+		}
+		for name, tc := range slices {
+			t.Run(name, func(t *testing.T) {
+				// Two independent compares against the always-unknown remote both
+				// diff: the resource re-applies on every run.
+				for run := 1; run <= 2; run++ {
+					diffs, secretOnly := differ.CompareData(
+						resources.ResourceData{"creds": tc.remote},
+						resources.ResourceData{"creds": tc.local},
+					)
+					require.Contains(t, diffs, "creds", "unknown remote must diff on run %d (re-applied every run)", run)
+					assert.False(t, diffs["creds"].SecretOnly, "slice-nested secret is not classified secret-only")
+					assert.False(t, secretOnly)
+
+					rendered := fmt.Sprintf("%v -> %v", diffs["creds"].SourceValue, diffs["creds"].TargetValue)
+					assert.NotContains(t, rendered, "hunter2", "real secret value leaked through render path: %s", rendered)
+				}
+			})
+		}
 	})
 
 	t.Run("pointer flavor mirrors value flavor", func(t *testing.T) {
