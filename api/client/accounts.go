@@ -11,12 +11,27 @@ type Account struct {
 	WorkspaceID string `json:"workspaceId"`
 	Name        string `json:"name"`
 	Definition  struct {
+		Name     string `json:"name"`
 		Type     string `json:"type"`
 		Category string `json:"category"`
 	} `json:"definition"`
 	Options   json.RawMessage `json:"options"`
 	CreatedAt *time.Time      `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time      `json:"updatedAt,omitempty"`
+}
+
+type CreateAccountRequest struct {
+	AccountDefinitionName string          `json:"accountDefinitionName"`
+	Name                  string          `json:"name"`
+	Options               json.RawMessage `json:"options"`
+	Secret                json.RawMessage `json:"secret"`
+}
+
+// args: name, options and secret are all required; account definition name is immutable;
+type UpdateAccountRequest struct {
+	Name    string          `json:"name"`
+	Options json.RawMessage `json:"options"`
+	Secret  json.RawMessage `json:"secret"`
 }
 
 type accounts struct {
@@ -83,4 +98,26 @@ func (s *accounts) Get(ctx context.Context, id string) (*Account, error) {
 	}
 
 	return response, nil
+}
+
+func (s *accounts) Create(ctx context.Context, account *CreateAccountRequest) (*Account, error) {
+	response := &Account{}
+	if err := s.create(ctx, account, response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (s *accounts) Update(ctx context.Context, id string, account *UpdateAccountRequest) (*Account, error) {
+	response := &Account{}
+	if err := s.update(ctx, id, account, response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (s *accounts) Delete(ctx context.Context, id string) error {
+	return s.service.delete(ctx, id)
 }
