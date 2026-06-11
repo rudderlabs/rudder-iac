@@ -267,6 +267,7 @@ func columnsFromRemote(rows []dgClient.ColumnMetadataRow) []map[string]any {
 			"name":         row.Name,
 			"display_name": row.DisplayName,
 			"description":  row.Description,
+			"pii_mask":     row.PiiMask,
 		}
 	}
 	return out
@@ -392,9 +393,10 @@ func (h *HandlerImpl) applyColumnMetadata(
 		name, _ := col["name"].(string)
 		displayName, _ := col["display_name"].(string)
 		description, _ := col["description"].(string)
+		piiMask, _ := col["pii_mask"].(bool)
 		// Declarative mapping: a field present in yaml is set; a field absent
-		// (empty here) is cleared by sending JSON null (nil pointer). The local
-		// validator guarantees at least one is non-empty.
+		// (empty here) is cleared by sending JSON null (nil pointer). pii_mask
+		// defaults to false when omitted from yaml.
 		entry := dgClient.ColumnMetadataEntry{Name: name}
 		if displayName != "" {
 			dn := displayName
@@ -404,6 +406,7 @@ func (h *HandlerImpl) applyColumnMetadata(
 			desc := description
 			entry.Description = &desc
 		}
+		entry.PiiMask = &piiMask
 		entries = append(entries, entry)
 		if name != "" {
 			localNames[name] = struct{}{}

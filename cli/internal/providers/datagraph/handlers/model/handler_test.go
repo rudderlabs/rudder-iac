@@ -20,6 +20,8 @@ import (
 
 func strptr(s string) *string { return &s }
 
+func boolptr(b bool) *bool { return &b }
+
 func TestMapRemoteToState(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	h := &HandlerImpl{client: mockClient}
@@ -756,8 +758,8 @@ func TestCreate_BatchUpsertColumnMetadata(t *testing.T) {
 		assert.Equal(t, "em-456", gotModelID)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
 			Columns: []dgClient.ColumnMetadataEntry{
-				{Name: "id", DisplayName: strptr("User ID")},
-				{Name: "email_address", DisplayName: strptr("Email")},
+				{Name: "id", DisplayName: strptr("User ID"), PiiMask: boolptr(false)},
+				{Name: "email_address", DisplayName: strptr("Email"), PiiMask: boolptr(false)},
 			},
 		}, gotReq)
 	})
@@ -847,7 +849,7 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 		assert.Equal(t, "dg-remote-123", gotDgID)
 		assert.Equal(t, "em-456", gotModelID)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
-			Columns: []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("Customer ID")}},
+			Columns: []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("Customer ID"), PiiMask: boolptr(false)}},
 		}, gotReq)
 	})
 
@@ -933,7 +935,7 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 
 		assert.Equal(t, 1, upsertCalls)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
-			Columns:       []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("User ID")}},
+			Columns:       []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("User ID"), PiiMask: boolptr(false)}},
 			DeleteColumns: []string{"email"},
 		}, gotReq)
 	})
@@ -970,8 +972,8 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
 			Columns: []dgClient.ColumnMetadataEntry{
-				{Name: "id", DisplayName: strptr("User ID")},
-				{Name: "phone", DisplayName: strptr("Phone")},
+				{Name: "id", DisplayName: strptr("User ID"), PiiMask: boolptr(false)},
+				{Name: "phone", DisplayName: strptr("Phone"), PiiMask: boolptr(false)},
 			},
 			// Sorted alphabetically for deterministic wire payload.
 			DeleteColumns: []string{"email", "legacy_field"},
@@ -1080,8 +1082,8 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 		resource, _, err := h.MapRemoteToState(remote, urnResolver)
 		require.NoError(t, err)
 		assert.Equal(t, []map[string]any{
-			{"name": "email", "display_name": "Email", "description": ""},
-			{"name": "id", "display_name": "User ID", "description": ""},
+			{"name": "email", "display_name": "Email", "description": "", "pii_mask": false},
+			{"name": "id", "display_name": "User ID", "description": "", "pii_mask": false},
 		}, resource.Columns)
 	})
 
@@ -1300,8 +1302,8 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	// the test would flag a (legitimate) diff on column ordering rather than the
 	// idempotency bug under test.
 	localResource.Columns = []map[string]any{
-		{"name": "email", "display_name": "Email", "description": ""},
-		{"name": "id", "display_name": "User ID", "description": ""},
+		{"name": "email", "display_name": "Email", "description": "", "pii_mask": false},
+		{"name": "id", "display_name": "User ID", "description": "", "pii_mask": false},
 	}
 
 	// 3. Round-trip equality at the diff layer: identical Columns => no diff.
@@ -1312,4 +1314,34 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	diffs := differ.CompareData(remoteMap, localMap)
 	assert.NotContains(t, diffs, "columns",
 		"second-apply idempotency: remote-derived Columns must match local yaml Columns so the syncer skips the BatchUpsert call")
+}
+
+func TestCreate_BatchUpsertColumnMetadata_PiiMask(t *testing.T) {
+	var gotReq dgClient.BatchUpsertColumnMetadataRequest
+
+	mockClient := &testutils.MockDataGraphClient{
+		CreateModelFunc: func(_ context.Context, req *dgClient.CreateModelRequest) (*dgClient.Model, error) {
+			return &dgClient.Model{ID: "em-456", ExternalID: req.ExternalID, Type: req.Type}, nil
+		},
+		BatchUpsertColumnMetadataFunc: func(_ context.Context, _, _ string, req dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+			gotReq = req
+			return &dgClient.ColumnMetadataListResponse{}, nil
+		},
+	}
+
+	h := &HandlerImpl{client: mockClient}
+	data := buildModelResource(t, []map[string]any{
+		{"name": "email_address", "display_name": "Email", "pii_mask": true},
+		{"name": "ssn", "pii_mask": true},
+	})
+
+	_, err := h.Create(context.Background(), data)
+	require.NoError(t, err)
+
+	assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
+		Columns: []dgClient.ColumnMetadataEntry{
+			{Name: "email_address", DisplayName: strptr("Email"), PiiMask: boolptr(true)},
+			{Name: "ssn", PiiMask: boolptr(true)},
+		},
+	}, gotReq)
 }
