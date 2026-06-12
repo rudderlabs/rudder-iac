@@ -55,7 +55,9 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	if diff.HasDiff() {
+	// HasNonSecretDiff (not HasDiff) so resources that only re-apply an unknown
+	// secret — which is expected on every run — do not permanently block imports.
+	if diff.HasNonSecretDiff() {
 		return fmt.Errorf("%w", ErrProjectNotSynced)
 	}
 

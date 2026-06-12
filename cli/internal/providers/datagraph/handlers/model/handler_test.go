@@ -1028,21 +1028,21 @@ func TestModelResource_ColumnsParticipateInDiff(t *testing.T) {
 			{"name": "id", "display_name": "User ID"},
 			{"name": "email_address", "display_name": "Email"},
 		}
-		diffs := differ.CompareData(mkResource(cols), mkResource(cols))
+		diffs, _ := differ.CompareData(mkResource(cols), mkResource(cols))
 		assert.Empty(t, diffs)
 	})
 
 	t.Run("different columns surface as a diff", func(t *testing.T) {
 		a := []map[string]any{{"name": "id", "display_name": "User ID"}}
 		b := []map[string]any{{"name": "id", "display_name": "Customer ID"}}
-		diffs := differ.CompareData(mkResource(a), mkResource(b))
+		diffs, _ := differ.CompareData(mkResource(a), mkResource(b))
 		assert.Contains(t, diffs, "columns")
 	})
 
 	t.Run("columns added in target surface as a diff", func(t *testing.T) {
 		empty := mkResource(nil)
 		populated := mkResource([]map[string]any{{"name": "id", "display_name": "User ID"}})
-		diffs := differ.CompareData(empty, populated)
+		diffs, _ := differ.CompareData(empty, populated)
 		assert.Contains(t, diffs, "columns")
 	})
 }
@@ -1309,7 +1309,7 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	require.NoError(t, mapstructure.Decode(localResource, &localMap))
 	require.NoError(t, mapstructure.Decode(remoteResource, &remoteMap))
 
-	diffs := differ.CompareData(remoteMap, localMap)
+	diffs, _ := differ.CompareData(remoteMap, localMap)
 	assert.NotContains(t, diffs, "columns",
 		"second-apply idempotency: remote-derived Columns must match local yaml Columns so the syncer skips the BatchUpsert call")
 }
