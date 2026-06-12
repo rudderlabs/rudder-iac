@@ -174,7 +174,7 @@ spec:
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "syntax validation failed")
 
-	assert.Contains(t, out, "at least one of 'display_name' or 'description'")
+	assert.Contains(t, out, "at least one of 'display_name', 'description', or 'pii_mask'")
 	assert.Contains(t, out, "Found 1 error(s)")
 }
 

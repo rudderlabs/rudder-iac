@@ -118,6 +118,44 @@ func TestDataGraphSpecSyntaxValid_ColumnsValid(t *testing.T) {
 			},
 		},
 		{
+			name: "column with pii_mask only (no display_name)",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "ssn", PiiMask: boolPtr(true)},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "column with display_name and pii_mask",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "email_address", DisplayName: "Email", PiiMask: boolPtr(true)},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "two description-only columns do not collide (no description uniqueness)",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
@@ -255,7 +293,7 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 			expectedMsgSubstrings: []string{"'name' is required"},
 		},
 		{
-			name: "column with neither display_name nor description",
+			name: "column with neither display_name, description, nor pii_mask",
 			spec: dgModel.DataGraphSpec{
 				ID:        "my-dg",
 				AccountID: "wh-123",
@@ -264,7 +302,7 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 				},
 			},
 			expectedRefs:          []string{"/models/0/columns/0"},
-			expectedMsgSubstrings: []string{"at least one of 'display_name' or 'description'"},
+			expectedMsgSubstrings: []string{"at least one of 'display_name', 'description', or 'pii_mask'"},
 		},
 		{
 			name: "column missing name (with description set)",
@@ -633,4 +671,40 @@ func TestModelSpec_ColumnsMapstructure(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, decoded)
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func TestModelSpec_ColumnsYAMLRoundTrip_PiiMask(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`id: user
+display_name: User
+type: entity
+table: db.schema.users
+primary_id: id
+columns:
+  - name: email_address
+    display_name: Email
+    pii_mask: true
+  - name: ssn
+    pii_mask: true
+`)
+
+	var parsed dgModel.ModelSpec
+	require.NoError(t, yaml.Unmarshal(input, &parsed))
+
+	piiTrue := true
+	expected := dgModel.ModelSpec{
+		ID:          "user",
+		DisplayName: "User",
+		Type:        "entity",
+		Table:       "db.schema.users",
+		PrimaryID:   "id",
+		Columns: []dgModel.ColumnMetadataYAML{
+			{Name: "email_address", DisplayName: "Email", PiiMask: &piiTrue},
+			{Name: "ssn", PiiMask: &piiTrue},
+		},
+	}
+	assert.Equal(t, expected, parsed)
 }
