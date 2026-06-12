@@ -184,6 +184,11 @@ Rules for variable files:
   rejected (`DB: { HOST: x }` or `HOSTS: [a, b]` cause an error).
 - **No null/empty values.** `KEY:` or `KEY: null` is rejected. To set an empty value, use
   explicit empty quotes: `KEY: ""`.
+- **Inside the project directory, the file must be named `<name>.vars.yaml`** (or
+  `<name>.vars.yml`). The project loader treats every other YAML file in the project
+  directory as a resource spec — a stray `staging.yaml` var file would fail loading with a
+  spec parse error. The `.vars.yaml` suffix tells the loader to skip the file. Var files
+  kept *outside* the project directory can be named anything.
 - Comments (`#`) and blank lines are fine.
 - Paths are resolved relative to your current working directory.
 

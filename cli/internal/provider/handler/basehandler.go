@@ -166,7 +166,8 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.Spec) error {
 	spec := h.Impl.NewSpec()
 
-	// Convert spec map to struct using mapstructure
+	// Convert spec map to struct using mapstructure. Secret fields decode from
+	// bare strings via secret.String's UnmarshalMapstructure.
 	if err := mapstructure.Decode(s.Spec, spec); err != nil {
 		return fmt.Errorf("converting spec: %w", err)
 	}

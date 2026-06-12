@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,7 +37,9 @@ func (f YAMLFormatter) Format(data any) ([]byte, error) {
 		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	// Byte-level rewrite: the yaml encoder cannot emit a '{'-leading scalar
+	// unquoted, so quoted substitution tokens are unquoted after encoding.
+	return varsubst.UnquoteTokens(buf.Bytes()), nil
 }
 
 // Extension returns "yaml" as the file extension.

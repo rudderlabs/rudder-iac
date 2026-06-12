@@ -40,6 +40,19 @@ func PrintDeprecationWarning(message string) {
 	fmt.Fprintln(uiWriter, "")
 }
 
+func Info(message string) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorBlue)).
+		Bold(true).
+		Render
+
+	return fmt.Sprintf("%s %s", style("Info:"), message)
+}
+
+func PrintInfo(message string) {
+	fmt.Fprintln(uiWriter, Info(message))
+}
+
 // Failure returns a failure message string in a styled format, including a red "x" symbol.
 func Failure(message string) string {
 	return fmt.Sprintf("%s %s", Color("x", ColorRed), message)
