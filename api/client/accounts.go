@@ -27,7 +27,9 @@ type CreateAccountRequest struct {
 	Secret                json.RawMessage `json:"secret"`
 }
 
-// args: name, options and secret are all required; account definition name is immutable;
+// All fields are required — PUT is a full-state replace, so a missing field means
+// "set to empty", not "leave unchanged". accountDefinitionName is immutable after
+// creation and intentionally absent.
 type UpdateAccountRequest struct {
 	Name    string          `json:"name"`
 	Options json.RawMessage `json:"options"`

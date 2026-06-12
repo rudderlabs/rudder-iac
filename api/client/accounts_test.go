@@ -230,7 +230,7 @@ func TestClientAccountsCreate(t *testing.T) {
 		{
 			Validate: func(req *http.Request) bool {
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/accounts", `{
-					"accountDefinitionName": "BigQuery",
+					"accountDefinitionName": "SOURCE_BIGQUERY",
 					"name": "some-name",
 					"options": { "key1": "val1" },
 					"secret": { "token": "shh" }
@@ -241,7 +241,7 @@ func TestClientAccountsCreate(t *testing.T) {
 				"id": "some-id",
 				"name": "some-name",
 				"definition": {
-					"name": "BigQuery",
+					"name": "SOURCE_BIGQUERY",
 					"type": "some-type",
 					"category": "some-category"
 				},
@@ -258,7 +258,7 @@ func TestClientAccountsCreate(t *testing.T) {
 	require.NoError(t, err)
 
 	account, err := c.Accounts.Create(ctx, &client.CreateAccountRequest{
-		AccountDefinitionName: "BigQuery",
+		AccountDefinitionName: "SOURCE_BIGQUERY",
 		Name:                  "some-name",
 		Options:               json.RawMessage([]byte(`{ "key1": "val1" }`)),
 		Secret:                json.RawMessage([]byte(`{ "token": "shh" }`)),
@@ -267,7 +267,7 @@ func TestClientAccountsCreate(t *testing.T) {
 	assert.NotNil(t, account)
 	assert.Equal(t, "some-id", account.ID)
 	assert.Equal(t, "some-name", account.Name)
-	assert.Equal(t, "BigQuery", account.Definition.Name)
+	assert.Equal(t, "SOURCE_BIGQUERY", account.Definition.Name)
 	assert.Equal(t, "some-type", account.Definition.Type)
 	assert.Equal(t, "some-category", account.Definition.Category)
 	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *account.CreatedAt)
@@ -293,7 +293,7 @@ func TestClientAccountsUpdate(t *testing.T) {
 				"id": "some-id",
 				"name": "new-name",
 				"definition": {
-					"name": "BigQuery",
+					"name": "SOURCE_BIGQUERY",
 					"type": "some-type",
 					"category": "some-category"
 				},
@@ -318,7 +318,7 @@ func TestClientAccountsUpdate(t *testing.T) {
 	assert.NotNil(t, account)
 	assert.Equal(t, "some-id", account.ID)
 	assert.Equal(t, "new-name", account.Name)
-	assert.Equal(t, "BigQuery", account.Definition.Name)
+	assert.Equal(t, "SOURCE_BIGQUERY", account.Definition.Name)
 	assert.Equal(t, "some-type", account.Definition.Type)
 	assert.Equal(t, "some-category", account.Definition.Category)
 	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *account.CreatedAt)
