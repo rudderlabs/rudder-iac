@@ -1,8 +1,8 @@
 package importer
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -33,7 +33,7 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 // variable referenced by the generated entities. Only active under the
 // enableVarSubstitution experimental gate — without substitution the
 // references could never be resolved on apply.
-func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity) (string, error) {
+func scaffoldSecretsVarFile(ctx context.Context, baseDir string, entities []writer.FormattableEntity) (string, error) {
 	if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
 		return "", nil
 	}
@@ -43,52 +43,24 @@ func scaffoldSecretsVarFile(baseDir string, entities []writer.FormattableEntity)
 		return "", nil
 	}
 
-	path := filepath.Join(baseDir, SecretsVarFileName)
-
-	// If a var file already exists (e.g. kept from an earlier import), merge
-	// into it: variables discovered by this import gain a placeholder only when
-	// missing, so values the user already filled in are never overwritten.
-	vars, err := loadExistingVars(path)
-	if err != nil {
-		return "", err
-	}
+	vars := make(map[string]any, len(names))
 	for _, name := range names {
-		if _, ok := vars[name]; !ok {
-			// nil scaffolds a "KEY:" line; the var-file resolver rejects null
-			// values, so an unfilled placeholder fails apply loudly.
-			vars[name] = nil
-		}
+		// nil scaffolds a "KEY:" line; the var-file resolver rejects null
+		// values, so an unfilled placeholder fails apply loudly.
+		vars[name] = nil
 	}
 
 	entity := writer.FormattableEntity{
 		Content:      vars,
-		RelativePath: path,
+		RelativePath: SecretsVarFileName,
 	}
-	if err := writer.OverwriteFile(formatter.Setup(varFileFormatter{}), entity); err != nil {
+	// writer.Write fails if the file already exists: a var file may hold real
+	// secret values the user filled in, so it is never overwritten or merged.
+	if err := writer.Write(ctx, baseDir, formatter.Setup(varFileFormatter{}), []writer.FormattableEntity{entity}); err != nil {
 		return "", fmt.Errorf("writing var file: %w", err)
 	}
 
-	return path, nil
-}
-
-// loadExistingVars reads the var file at path into a name→value map so a new
-// scaffold can merge with it. A missing file is not an error — it simply means
-// there is nothing to merge and every variable starts as a placeholder.
-func loadExistingVars(path string) (map[string]any, error) {
-	vars := make(map[string]any)
-
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return vars, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("reading existing var file %s: %w", path, err)
-	}
-
-	if err := yaml.Unmarshal(data, &vars); err != nil {
-		return nil, fmt.Errorf("parsing existing var file %s: %w", path, err)
-	}
-	return vars, nil
+	return filepath.Join(baseDir, SecretsVarFileName), nil
 }
 
 // varFileFormatter renders the flat name→value var-file map — one sorted
@@ -134,16 +106,10 @@ func (varFileFormatter) Format(data any) ([]byte, error) {
 // entities' content, sorted and de-duplicated. Scanning the generated content —
 // rather than threading names through every export strategy — keeps the var
 // file in sync with what the specs actually reference, regardless of which
-// provider or strategy produced them. Only YAML entities count: variable
-// substitution runs exclusively over spec files, so references in other
-// generated files (e.g. extracted SQL or code) could never be resolved.
+// provider or strategy produced them.
 func collectVariableNames(entities []writer.FormattableEntity) []string {
 	found := make(map[string]struct{})
 	for _, entity := range entities {
-		ext := filepath.Ext(entity.RelativePath)
-		if ext != loader.ExtensionYAML && ext != loader.ExtensionYML {
-			continue
-		}
 		extractVariableNames(entity.Content, found)
 	}
 

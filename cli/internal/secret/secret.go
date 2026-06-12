@@ -48,7 +48,7 @@ type String struct {
 type Option func(*String)
 
 // WithVariableName attaches the substitution variable that stands in for the
-// secret during import scaffolding, making the marshals emit a quoted
+// secret during import scaffolding, making the marshals emit a
 // "{{ .name }}" reference instead of a masked literal. The provider building
 // the export spec chooses the name from what it knows about the resource
 // (e.g. resource type, external ID, field) — it is used verbatim, so it must
@@ -190,7 +190,7 @@ func (s *String) UnmarshalJSON(b []byte) error {
 // mapstructure decoder in the codebase accepts a secret field without
 // per-decoder hook wiring. Spec maps carry secrets as bare strings (after YAML
 // load and variable substitution); without this, mapstructure could not
-// populate a String, since the struct has no exported field to map onto.
+// populate a secret.String, since the struct has no exported field to map onto.
 func (s *String) UnmarshalMapstructure(input any) error {
 	if existing, ok := input.(String); ok {
 		*s = existing

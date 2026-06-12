@@ -94,7 +94,7 @@ func printFileContentsRecursively(t *testing.T, dir string) {
 }
 
 // End-to-end shape of DEX-410: importing a resource with a secret yields a
-// spec with a quoted variable reference (never a masked literal) plus a var
+// spec with a variable reference (never a masked literal) plus a var
 // file with a placeholder; filling the var file and applying round-trips the
 // real value to the backend through the secret type.
 //
@@ -123,13 +123,13 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	require.NoError(t, proj.Load(testDir))
 	require.NoError(t, importer.WorkspaceImport(context.Background(), proj, importProvider))
 
-	// The generated spec carries a quoted variable reference, not a mask. The
-	// handler names the variable from the resource's identity (BOOK_<id>_...),
-	// normalized to the substitution grammar.
+	// The generated spec carries an unquoted variable reference, not a mask.
+	// The handler names the variable from the resource's identity
+	// (BOOK_<id>_...), normalized to the substitution grammar.
 	const wantVar = "BOOK_THE_HOBBIT_ACCESS_KEY"
 	specBytes, err := os.ReadFile(filepath.Join(testDir, "imported", "books", "books.yaml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(specBytes), `accessKey: "{{ .`+wantVar+` }}"`)
+	assert.Contains(t, string(specBytes), "accessKey: {{ ."+wantVar+" }}\n")
 	assert.NotContains(t, string(specBytes), "(unknown)")
 
 	// The var file scaffolds an unfilled (null) placeholder for exactly that

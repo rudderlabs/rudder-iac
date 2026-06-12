@@ -45,13 +45,12 @@ func TestCollectVariableNames(t *testing.T) {
 				map[string]any{"id": "c", "plain": "no token", "count": 3},
 			},
 		}),
-		// Substitution only runs over spec files, so references inside other
-		// generated files (extracted SQL, code) must not produce placeholders.
-		{Content: "select * from {{ .NOT_A_SPEC_FILE }}", RelativePath: "raw.txt"},
+		// Every generated entity is scanned, spec file or not.
+		{Content: "select * from {{ .RAW_TABLE }}", RelativePath: "raw.txt"},
 	}
 
 	assert.Equal(t,
-		[]string{"A_TOKEN", "B_ACCESS_KEY"},
+		[]string{"A_TOKEN", "B_ACCESS_KEY", "RAW_TABLE"},
 		collectVariableNames(entities),
 	)
 }
@@ -64,7 +63,7 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
-	path, err := scaffoldSecretsVarFile(dir, entities)
+	path, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(dir, SecretsVarFileName), path)
 
@@ -78,37 +77,29 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	assert.Contains(t, string(raw), "BOOKS_ACCESS_KEY:\n")
 }
 
-// Re-imports must keep values the user already filled in and only add
-// placeholders for new variables.
-func TestScaffoldSecretsVarFile_MergesExisting(t *testing.T) {
+// An existing var file may hold real secret values the user filled in, so
+// scaffolding never overwrites or merges into it — it errors out instead.
+func TestScaffoldSecretsVarFile_ExistingFileErrors(t *testing.T) {
 	enableVarSubstitution(t)
 	dir := t.TempDir()
 
 	existing := filepath.Join(dir, SecretsVarFileName)
-	require.NoError(t, os.WriteFile(existing, []byte("BOOKS_ACCESS_KEY: \"filled-in\"\nUNRELATED: \"kept\"\n"), 0600))
+	require.NoError(t, os.WriteFile(existing, []byte("BOOKS_ACCESS_KEY: \"filled-in\"\n"), 0600))
 
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{
-			"accessKey": "{{ .BOOKS_ACCESS_KEY }}",
-			"writeKey":  "{{ .BOOKS_WRITE_KEY }}",
-		}),
+		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
-	path, err := scaffoldSecretsVarFile(dir, entities)
-	require.NoError(t, err)
-
-	assert.Equal(t, map[string]any{
-		"BOOKS_ACCESS_KEY": "filled-in",
-		"BOOKS_WRITE_KEY":  nil,
-		"UNRELATED":        "kept",
-	}, readVarFile(t, path))
+	_, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
+	require.ErrorIs(t, err, os.ErrExist)
+	assert.Equal(t, map[string]any{"BOOKS_ACCESS_KEY": "filled-in"}, readVarFile(t, existing))
 }
 
 func TestScaffoldSecretsVarFile_NoVariables(t *testing.T) {
 	enableVarSubstitution(t)
 	dir := t.TempDir()
 
-	path, err := scaffoldSecretsVarFile(dir, []writer.FormattableEntity{
+	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
 		specEntity(map[string]any{"plain": "value"}),
 	})
 	require.NoError(t, err)
@@ -119,7 +110,7 @@ func TestScaffoldSecretsVarFile_NoVariables(t *testing.T) {
 func TestScaffoldSecretsVarFile_GateOff(t *testing.T) {
 	dir := t.TempDir()
 
-	path, err := scaffoldSecretsVarFile(dir, []writer.FormattableEntity{
+	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
 		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	})
 	require.NoError(t, err)

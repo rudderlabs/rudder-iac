@@ -95,12 +95,12 @@ func WorkspaceImport(
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
-	varFile, err := scaffoldSecretsVarFile(importDir, entities)
+	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
 	if err != nil {
 		return fmt.Errorf("scaffolding secrets var file: %w", err)
 	}
 	if varFile != "" {
-		ui.PrintWarning(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
+		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
