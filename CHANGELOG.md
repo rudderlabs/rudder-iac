@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.0](https://github.com/rudderlabs/rudder-iac/compare/v0.17.0...v0.18.0) (2026-06-12)
+
+
+### Features
+
+* **import:** scaffold secrets as variable references with a companion var file (DEX-410) ([#616](https://github.com/rudderlabs/rudder-iac/issues/616)) ([0ed8e50](https://github.com/rudderlabs/rudder-iac/commit/0ed8e508eef9dfae81618fe2d386397d5521ddbb))
+* **secret:** add self-redacting secret.String value type (DEX-407) ([#608](https://github.com/rudderlabs/rudder-iac/issues/608)) ([3c86797](https://github.com/rudderlabs/rudder-iac/commit/3c86797c0cfd98db1ac39b0aaaee314b63990130))
+* **syncer:** make the apply-cycle diff secret-aware (DEX-408) ([#614](https://github.com/rudderlabs/rudder-iac/issues/614)) ([63d55b3](https://github.com/rudderlabs/rudder-iac/commit/63d55b366b737d708074db79f5585840b8fb145b))
+
 ## [0.17.0](https://github.com/rudderlabs/rudder-iac/compare/v0.16.0...v0.17.0) (2026-06-05)
 
 
