@@ -104,12 +104,17 @@ func (m *Migrator) MigrateSpecs(loadedSpecs map[string]*specs.Spec) (map[string]
 	return migratedSpecs, nil
 }
 
-// WriteSpecs writes the migrated specs back to files
+// WriteSpecs writes the migrated specs back to files.
+// Uses YAMLOrderedFormatter seeded with each spec's original yaml.Node so
+// output preserves the original key order — diffs reflect only the
+// semantic migrations, not alphabetization by the encoder.
 func (m *Migrator) WriteSpecs(migratedSpecs map[string]*specs.Spec) error {
 	ui.Println("Writing migrated specs to files...")
-	formatters := formatter.Setup(&formatter.YAMLFormatter{})
 	for path, migratedSpec := range migratedSpecs {
 		migratorLog.Info("writing migrated file", "path", path)
+		formatters := formatter.Setup(&formatter.YAMLOrderedFormatter{
+			Original: migratedSpec.OriginalNode(),
+		})
 		entity := writer.FormattableEntity{
 			Content:      migratedSpec,
 			RelativePath: path,
