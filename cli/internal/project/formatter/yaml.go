@@ -3,19 +3,14 @@ package formatter
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"gopkg.in/yaml.v3"
 )
 
 var (
 	defaultIndent = 2
 )
-
-// quotedVarToken matches a quoted variable substitution token ("{{ .VAR }}").
-// The quotes must directly enclose the token, so a token embedded inside a
-// larger string keeps its quotes.
-var quotedVarToken = regexp.MustCompile(`"(\{\{[ \t]*\.[A-Za-z_][A-Za-z0-9_]*[ \t]*\}\})"`)
 
 // YAMLFormatter formats data into YAML with custom string quoting behavior.
 // String values are always double-quoted while keys remain unquoted.
@@ -42,17 +37,9 @@ func (f YAMLFormatter) Format(data any) ([]byte, error) {
 		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
 
-	return unquoteVarTokens(buf.Bytes()), nil
-}
-
-// unquoteVarTokens replaces every quoted "{{ .VAR }}" instance with its
-// unquoted form, so the generated spec reads as a template reference, not a
-// string literal. Substitution replaces the token in the raw bytes before YAML
-// parsing, so the unquoted form never reaches the parser. This has to be a
-// byte-level rewrite: a scalar starting with '{' cannot be represented plain,
-// so the yaml encoder always falls back to quoting it.
-func unquoteVarTokens(content []byte) []byte {
-	return quotedVarToken.ReplaceAll(content, []byte("$1"))
+	// Byte-level rewrite: the yaml encoder cannot emit a '{'-leading scalar
+	// unquoted, so quoted substitution tokens are unquoted after encoding.
+	return varsubst.UnquoteTokens(buf.Bytes()), nil
 }
 
 // Extension returns "yaml" as the file extension.

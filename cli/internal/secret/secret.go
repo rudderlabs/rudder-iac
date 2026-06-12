@@ -14,6 +14,7 @@ import (
 	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"gopkg.in/yaml.v3"
 )
 
@@ -51,9 +52,11 @@ type Option func(*String)
 // secret during import scaffolding, making the marshals emit a
 // "{{ .name }}" reference instead of a masked literal. The provider building
 // the export spec chooses the name from what it knows about the resource
-// (e.g. resource type, external ID, field) — it is used verbatim, so it must
-// satisfy the substitutor's variable grammar (^[A-Za-z_][A-Za-z0-9_]*$) —
-// which is what keeps names deterministic and stable across re-imports.
+// (e.g. resource type, external ID, field) — which is what keeps names
+// deterministic and stable across re-imports. A name outside the substitutor's
+// variable grammar (^[A-Za-z_][A-Za-z0-9_]*$) makes the marshals fail, so a
+// bad name errors when the spec is generated rather than when apply later
+// rejects the malformed token.
 //
 // Scaffolding only works under the enableVarSubstitution experimental gate —
 // without substitution the reference could never be resolved on apply — so
@@ -151,6 +154,12 @@ func (s String) LogValue() slog.Value { return slog.StringValue(s.masked()) }
 // Reveal(), so the real value still reaches the wire.
 func (s String) MarshalJSON() ([]byte, error) {
 	if s.varName != "" {
+		// Names derive from external IDs — user-controlled resource names — so
+		// failing here surfaces a bad name when the spec is generated, not two
+		// steps later when apply rejects the malformed token.
+		if !varsubst.IsValidVariableName(s.varName) {
+			return nil, fmt.Errorf("substitution variable name %q does not satisfy the variable grammar", s.varName)
+		}
 		return json.Marshal(s.token())
 	}
 	return json.Marshal(s.masked())
@@ -159,6 +168,9 @@ func (s String) MarshalJSON() ([]byte, error) {
 // MarshalYAML mirrors MarshalJSON for any direct YAML serialization of a String.
 func (s String) MarshalYAML() (any, error) {
 	if s.varName != "" {
+		if !varsubst.IsValidVariableName(s.varName) {
+			return nil, fmt.Errorf("substitution variable name %q does not satisfy the variable grammar", s.varName)
+		}
 		return s.token(), nil
 	}
 	return s.masked(), nil

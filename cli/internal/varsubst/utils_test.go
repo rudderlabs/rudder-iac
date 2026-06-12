@@ -49,3 +49,44 @@ func TestExtractVariableNames(t *testing.T) {
 		})
 	}
 }
+
+func TestUnquoteTokens(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "quoted token unquoted",
+			in:   `accessKey: "{{ .ACCESS_KEY }}"`,
+			want: `accessKey: {{ .ACCESS_KEY }}`,
+		},
+		{
+			name: "token with default unquoted",
+			in:   `region: "{{ .REGION | us-east-1 }}"`,
+			want: `region: {{ .REGION | us-east-1 }}`,
+		},
+		{
+			// Validity is not checked: substitution rejects a malformed token
+			// loudly whether quoted or not.
+			name: "malformed token also unquoted",
+			in:   `a: "{{ NO_DOT }}"`,
+			want: `a: {{ NO_DOT }}`,
+		},
+		{
+			name: "token embedded in longer string keeps quotes",
+			in:   `a: "prefix {{ .KEY }} suffix"`,
+			want: `a: "prefix {{ .KEY }} suffix"`,
+		},
+		{
+			name: "unquoted token untouched",
+			in:   `accessKey: {{ .ACCESS_KEY }}`,
+			want: `accessKey: {{ .ACCESS_KEY }}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, string(UnquoteTokens([]byte(tt.in))))
+		})
+	}
+}

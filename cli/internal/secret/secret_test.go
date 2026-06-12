@@ -258,8 +258,7 @@ func TestWithVariableName_UnmarshalResetsName(t *testing.T) {
 	assert.Equal(t, New("real-value"), s)
 }
 
-// The name is used verbatim — choosing one that satisfies the substitutor's
-// variable grammar is the provider's responsibility.
+// The name is stored verbatim — validation happens at marshal time.
 func TestWithVariableName_UsedVerbatim(t *testing.T) {
 	enableVarSubstitution(t)
 
@@ -267,4 +266,19 @@ func TestWithVariableName_UsedVerbatim(t *testing.T) {
 		String{varName: "Book_Access_Key_2"},
 		New("", WithVariableName("Book_Access_Key_2")),
 	)
+}
+
+// A name outside the substitutor's variable grammar fails the marshals, so a
+// bad name (derived from user-controlled external IDs) errors when the export
+// spec is generated — not two steps later when apply rejects the token.
+func TestWithVariableName_InvalidNameFailsMarshal(t *testing.T) {
+	enableVarSubstitution(t)
+
+	s := NewUnknown(WithVariableName("9-starts-with-digit"))
+
+	_, err := json.Marshal(s)
+	require.ErrorContains(t, err, "9-starts-with-digit")
+
+	_, err = s.MarshalYAML()
+	require.ErrorContains(t, err, "9-starts-with-digit")
 }
