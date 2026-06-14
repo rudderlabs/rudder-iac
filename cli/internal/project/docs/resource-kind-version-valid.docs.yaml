@@ -24,23 +24,29 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
     invalid:
       - example_id: "kind-version-unsupported-version"
         title: "Known kind declared with an unsupported version"
         description: >
-          The events kind is recognised, but it is not registered for version
-          rudder/v0.1. The rule reports the unsupported kind/version pairing.
+          The transformation kind is recognised, but it is only registered for
+          version rudder/v1, not rudder/0.1. The rule reports the unsupported
+          kind/version pairing.
         files:
           spec.yaml: |
-            version: rudder/v0.1
-            kind: events
+            version: rudder/0.1
+            kind: transformation
             metadata:
-              name: my-events
+              name: my-transformations
             spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
+              id: my-transformation
+              name: My Transformation
+              language: javascript
+              code: |
+                export function transformEvent(event, metadata) {
+                  return event;
+                }
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/kind"
