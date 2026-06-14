@@ -35,11 +35,6 @@ func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
-	appliesToPatterns := []rules.MatchPattern{
-		rules.MatchKindVersion("*", specs.SpecVersionV0_1),
-		rules.MatchKindVersion("*", specs.SpecVersionV0_1Variant),
-	}
-
 	tests := []struct {
 		name           string
 		parseSpec      ParseSpecFunc
@@ -288,7 +283,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewMetadataSyntaxValidRule(tt.parseSpec, appliesToPatterns)
+			rule := NewMetadataSyntaxValidRule(tt.parseSpec)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -311,16 +306,12 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 func TestMetadataSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	patterns := []rules.MatchPattern{
-		rules.MatchKindVersion("properties", specs.SpecVersionV0_1),
-		rules.MatchKindVersion("events", specs.SpecVersionV0_1),
-	}
-	rule := NewMetadataSyntaxValidRule(noopParseSpec, patterns)
+	rule := NewMetadataSyntaxValidRule(noopParseSpec)
 
 	assert.Equal(t, "project/metadata-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "metadata syntax must be valid", rule.Description())
-	assert.Equal(t, patterns, rule.AppliesTo())
+	assert.Equal(t, []rules.MatchPattern{rules.MatchAll()}, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)

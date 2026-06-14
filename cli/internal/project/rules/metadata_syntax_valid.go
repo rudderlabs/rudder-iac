@@ -15,13 +15,11 @@ import (
 
 type MetadataSyntaxValidRule struct {
 	parseSpec ParseSpecFunc
-	appliesTo []rules.MatchPattern
 }
 
-func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
+func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc) rules.Rule {
 	return &MetadataSyntaxValidRule{
 		parseSpec: parseSpec,
-		appliesTo: patterns,
 	}
 }
 
@@ -38,7 +36,7 @@ func (r *MetadataSyntaxValidRule) Description() string {
 }
 
 func (r *MetadataSyntaxValidRule) AppliesTo() []rules.MatchPattern {
-	return r.appliesTo
+	return []rules.MatchPattern{rules.MatchAll()}
 }
 
 func (r *MetadataSyntaxValidRule) Examples() rules.Examples {

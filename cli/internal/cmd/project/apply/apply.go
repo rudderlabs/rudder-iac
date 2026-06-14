@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -24,13 +25,14 @@ var (
 
 func NewCmdApply() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		dryRun   bool
-		confirm  bool
-		varFiles []string
+		deps      app.Deps
+		p         project.Project
+		workspace *client.Workspace
+		err       error
+		location  string
+		dryRun    bool
+		confirm   bool
+		varFiles  []string
 	)
 
 	cmd := &cobra.Command{
@@ -52,10 +54,16 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
+			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
 			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
 			if err != nil {
 				return err
 			}
+			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 
 			p = deps.NewProject(projectOpts...)
 
@@ -81,11 +89,6 @@ func NewCmdApply() *cobra.Command {
 					{K: "confirm", V: confirm},
 				}...)
 			}()
-
-			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
-			}
 
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
@@ -128,7 +131,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
-	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; earlier files take priority)")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; later files take priority)")
 
 	return cmd
 }

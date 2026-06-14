@@ -14,6 +14,7 @@ func NewCmdWorkspace() *cobra.Command {
 	cmd.AddCommand(NewCmdAccounts())
 	cmd.AddCommand(NewCmdRetlSource())
 	cmd.AddCommand(NewCmdTrackingPlans())
+	cmd.AddCommand(NewCmdEventStreamSources())
 
 	return cmd
 }

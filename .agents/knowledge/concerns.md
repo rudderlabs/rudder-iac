@@ -42,3 +42,8 @@
 - `go.mod` includes both `gopkg.in/yaml.v3` and `go.yaml.in/yaml/v3` module lines, indicating dependency overlap that commonly appears during partial migration and can become stale baggage.
 - `cli/internal/project/deprecation.go (LegacySpecDeprecationWarning)` warns that v0.1 will be removed “in a future release,” while many `LoadLegacySpec` paths remain active; this suggests prolonged deprecation without clear retirement point.
 - `cli/internal/provider/baseprovider.go:121` comment says legacy loading falls back to `LoadSpec` “for now,” which is explicit temporary behavior that can persist stale semantics.
+
+## RUD-2752 — Baseline Test Failures Affecting Validation Signal
+<!-- ticket:RUD-2752 -->
+- Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
+- Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.

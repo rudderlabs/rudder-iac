@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"golang.org/x/exp/maps"
@@ -394,5 +395,14 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
-// Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
+// RuleDocEntries aggregates authored doc fragments from all child providers.
+func (p *CompositeProvider) RuleDocEntries() []docs.RuleDocEntry {
+	var entries []docs.RuleDocEntry
+	for _, provider := range p.Providers {
+		entries = append(entries, provider.RuleDocEntries()...)
+	}
+	return entries
+}
+
+// Compile-time verification that CompositeProvider implements RuleProvider (including RuleDocEntries)
 var _ RuleProvider = (*CompositeProvider)(nil)

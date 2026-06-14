@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 const (
@@ -55,7 +56,9 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	if diff.HasDiff() {
+	// HasNonSecretDiff (not HasDiff) so resources that only re-apply an unknown
+	// secret — which is expected on every run — do not permanently block imports.
+	if diff.HasNonSecretDiff() {
 		return fmt.Errorf("%w", ErrProjectNotSynced)
 	}
 
@@ -87,8 +90,18 @@ func WorkspaceImport(
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
-	if err := writer.Write(ctx, filepath.Join(location, ImportedDir), formatters, entities); err != nil {
+	importDir := filepath.Join(location, ImportedDir)
+	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
+	}
+
+	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
+	if err != nil {
+		return fmt.Errorf("scaffolding secrets var file: %w", err)
+	}
+	if varFile != "" {
+		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
+			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
 	return nil

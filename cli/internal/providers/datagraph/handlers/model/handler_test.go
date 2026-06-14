@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func strptr(s string) *string { return &s }
+
 func TestMapRemoteToState(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	h := &HandlerImpl{client: mockClient}
@@ -754,8 +756,8 @@ func TestCreate_BatchUpsertColumnMetadata(t *testing.T) {
 		assert.Equal(t, "em-456", gotModelID)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
 			Columns: []dgClient.ColumnMetadataEntry{
-				{Name: "id", DisplayName: "User ID"},
-				{Name: "email_address", DisplayName: "Email"},
+				{Name: "id", DisplayName: strptr("User ID")},
+				{Name: "email_address", DisplayName: strptr("Email")},
 			},
 		}, gotReq)
 	})
@@ -845,7 +847,7 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 		assert.Equal(t, "dg-remote-123", gotDgID)
 		assert.Equal(t, "em-456", gotModelID)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
-			Columns: []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: "Customer ID"}},
+			Columns: []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("Customer ID")}},
 		}, gotReq)
 	})
 
@@ -931,7 +933,7 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 
 		assert.Equal(t, 1, upsertCalls)
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
-			Columns:       []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: "User ID"}},
+			Columns:       []dgClient.ColumnMetadataEntry{{Name: "id", DisplayName: strptr("User ID")}},
 			DeleteColumns: []string{"email"},
 		}, gotReq)
 	})
@@ -968,8 +970,8 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 
 		assert.Equal(t, dgClient.BatchUpsertColumnMetadataRequest{
 			Columns: []dgClient.ColumnMetadataEntry{
-				{Name: "id", DisplayName: "User ID"},
-				{Name: "phone", DisplayName: "Phone"},
+				{Name: "id", DisplayName: strptr("User ID")},
+				{Name: "phone", DisplayName: strptr("Phone")},
 			},
 			// Sorted alphabetically for deterministic wire payload.
 			DeleteColumns: []string{"email", "legacy_field"},
@@ -1026,21 +1028,21 @@ func TestModelResource_ColumnsParticipateInDiff(t *testing.T) {
 			{"name": "id", "display_name": "User ID"},
 			{"name": "email_address", "display_name": "Email"},
 		}
-		diffs := differ.CompareData(mkResource(cols), mkResource(cols))
+		diffs, _ := differ.CompareData(mkResource(cols), mkResource(cols))
 		assert.Empty(t, diffs)
 	})
 
 	t.Run("different columns surface as a diff", func(t *testing.T) {
 		a := []map[string]any{{"name": "id", "display_name": "User ID"}}
 		b := []map[string]any{{"name": "id", "display_name": "Customer ID"}}
-		diffs := differ.CompareData(mkResource(a), mkResource(b))
+		diffs, _ := differ.CompareData(mkResource(a), mkResource(b))
 		assert.Contains(t, diffs, "columns")
 	})
 
 	t.Run("columns added in target surface as a diff", func(t *testing.T) {
 		empty := mkResource(nil)
 		populated := mkResource([]map[string]any{{"name": "id", "display_name": "User ID"}})
-		diffs := differ.CompareData(empty, populated)
+		diffs, _ := differ.CompareData(empty, populated)
 		assert.Contains(t, diffs, "columns")
 	})
 }
@@ -1078,8 +1080,8 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 		resource, _, err := h.MapRemoteToState(remote, urnResolver)
 		require.NoError(t, err)
 		assert.Equal(t, []map[string]any{
-			{"name": "email", "display_name": "Email"},
-			{"name": "id", "display_name": "User ID"},
+			{"name": "email", "display_name": "Email", "description": ""},
+			{"name": "id", "display_name": "User ID", "description": ""},
 		}, resource.Columns)
 	})
 
@@ -1298,8 +1300,8 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	// the test would flag a (legitimate) diff on column ordering rather than the
 	// idempotency bug under test.
 	localResource.Columns = []map[string]any{
-		{"name": "email", "display_name": "Email"},
-		{"name": "id", "display_name": "User ID"},
+		{"name": "email", "display_name": "Email", "description": ""},
+		{"name": "id", "display_name": "User ID", "description": ""},
 	}
 
 	// 3. Round-trip equality at the diff layer: identical Columns => no diff.
@@ -1307,7 +1309,7 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	require.NoError(t, mapstructure.Decode(localResource, &localMap))
 	require.NoError(t, mapstructure.Decode(remoteResource, &remoteMap))
 
-	diffs := differ.CompareData(remoteMap, localMap)
+	diffs, _ := differ.CompareData(remoteMap, localMap)
 	assert.NotContains(t, diffs, "columns",
 		"second-apply idempotency: remote-derived Columns must match local yaml Columns so the syncer skips the BatchUpsert call")
 }
