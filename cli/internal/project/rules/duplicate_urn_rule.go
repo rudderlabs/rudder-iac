@@ -12,10 +12,14 @@ type ParseSpecFunc func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 
 type duplicateURNRule struct {
 	parseSpec ParseSpecFunc
+	patterns  []rules.MatchPattern
 }
 
-func NewDuplicateURNRule(parseSpec ParseSpecFunc) rules.Rule {
-	return &duplicateURNRule{parseSpec: parseSpec}
+// NewDuplicateURNRule scopes the rule to the given resource match patterns. The
+// engine delivers only specs matching these patterns (see MultipleResourceRule), so
+// non-resource kinds such as import-manifest are never handed to this rule.
+func NewDuplicateURNRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
+	return &duplicateURNRule{parseSpec: parseSpec, patterns: patterns}
 }
 
 func (r *duplicateURNRule) ID() string               { return "project/duplicate-urn" }
@@ -24,13 +28,19 @@ func (r *duplicateURNRule) Description() string {
 	return "URNs must be unique across the project"
 }
 func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern {
-	return []rules.MatchPattern{rules.MatchAll()}
+	// Fall back to MatchAll when no patterns are supplied (e.g. a provider that
+	// declares no SupportedMatchPatterns). This preserves the rule's original
+	// project-wide reach; only callers that pass explicit resource patterns narrow it.
+	if len(r.patterns) == 0 {
+		return []rules.MatchPattern{rules.MatchAll()}
+	}
+	return r.patterns
 }
 func (r *duplicateURNRule) Examples() rules.Examples {
 	return rules.Examples{}
 }
 
-// Validate is a no-op — this rule operates as a ProjectRule via ValidateProject.
+// Validate is a no-op — this rule operates as a MultipleResourceRule via ValidateProject.
 func (r *duplicateURNRule) Validate(_ *rules.ValidationContext) []rules.ValidationResult {
 	return nil
 }

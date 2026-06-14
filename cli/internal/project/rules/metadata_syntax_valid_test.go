@@ -10,6 +10,12 @@ import (
 
 const testResourceType = "test-resource"
 
+// metadataTestPatterns are the resource patterns the rule is scoped to in these tests.
+// AppliesTo() must return exactly these — the rule no longer matches all kinds.
+var metadataTestPatterns = []rules.MatchPattern{
+	rules.MatchKindVersion(testResourceType, "rudder/v1"),
+}
+
 // parseSpecWithIDs returns a ParseSpecFunc that returns URNEntry items for the given IDs.
 // LegacyResourceType is set so that local_id-based import metadata can be resolved.
 func parseSpecWithIDs(ids ...string) ParseSpecFunc {
@@ -283,7 +289,7 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewMetadataSyntaxValidRule(tt.parseSpec)
+			rule := NewMetadataSyntaxValidRule(tt.parseSpec, metadataTestPatterns)
 			results := rule.Validate(tt.ctx)
 
 			assert.Len(t, results, tt.expectedErrors, "unexpected number of validation errors")
@@ -306,12 +312,12 @@ func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 func TestMetadataSyntaxValidRule_Metadata(t *testing.T) {
 	t.Parallel()
 
-	rule := NewMetadataSyntaxValidRule(noopParseSpec)
+	rule := NewMetadataSyntaxValidRule(noopParseSpec, metadataTestPatterns)
 
 	assert.Equal(t, "project/metadata-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
 	assert.Equal(t, "metadata syntax must be valid", rule.Description())
-	assert.Equal(t, []rules.MatchPattern{rules.MatchAll()}, rule.AppliesTo())
+	assert.Equal(t, metadataTestPatterns, rule.AppliesTo())
 
 	examples := rule.Examples()
 	assert.NotEmpty(t, examples.Valid)
