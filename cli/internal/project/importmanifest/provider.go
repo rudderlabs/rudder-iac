@@ -9,6 +9,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -66,6 +67,13 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
+	return nil
+}
+
+// RuleDocEntries returns nil — the manifest provider contributes no doc fragments
+// until its validation rules land. Present so the provider satisfies RuleProvider
+// (and therefore ProjectProvider).
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 	return nil
 }
 
