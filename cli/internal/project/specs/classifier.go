@@ -15,16 +15,10 @@ const (
 	ProjectSpec
 )
 
-// SpecClassifier categorises a spec as resource-level or project-level. The
-// classification is internal — it is not visible in the YAML schema.
-type SpecClassifier struct{}
-
-func NewSpecClassifier() *SpecClassifier {
-	return &SpecClassifier{}
-}
-
-// Classify reports whether a spec is resource-level or project-level.
-func (c *SpecClassifier) Classify(s *Spec) SpecLevel {
+// Classify reports whether a spec is resource-level or project-level. The
+// classification is internal — it is not visible in the YAML schema. It is a
+// stateless function: classification depends only on the spec's kind.
+func Classify(s *Spec) SpecLevel {
 	if s.Kind == KindImportManifest {
 		return ProjectSpec
 	}

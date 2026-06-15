@@ -6,10 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSpecClassifier_Classify(t *testing.T) {
+func TestClassify(t *testing.T) {
 	t.Parallel()
-
-	c := NewSpecClassifier()
 
 	tests := []struct {
 		name     string
@@ -41,7 +39,7 @@ func TestSpecClassifier_Classify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.expected, c.Classify(tt.spec))
+			assert.Equal(t, tt.expected, Classify(tt.spec))
 		})
 	}
 }

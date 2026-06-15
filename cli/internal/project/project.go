@@ -44,7 +44,6 @@ type project struct {
 	location               string
 	provider               ProjectProvider
 	importManifestProvider *importmanifest.Provider
-	classifier             *specs.SpecClassifier
 	loader                 Loader
 	workspaceID            string
 	specs                  map[string]*specs.Spec
@@ -100,7 +99,6 @@ func New(provider provider.Provider, opts ...ProjectOption) Project {
 	p := &project{
 		provider:               provider,
 		importManifestProvider: importmanifest.New(),
-		classifier:             specs.NewSpecClassifier(),
 		specs:                  make(map[string]*specs.Spec),
 	}
 
@@ -134,7 +132,7 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	// Project-level specs (e.g. import-manifest) are handled outside the resource
 	// provider tree by their dedicated provider; resource-level specs flow through
 	// the version-based dispatch below.
-	if p.classifier.Classify(spec) == specs.ProjectSpec {
+	if specs.Classify(spec) == specs.ProjectSpec {
 		return p.importManifestProvider.LoadSpec(path, spec)
 	}
 
