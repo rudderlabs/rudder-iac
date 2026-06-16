@@ -262,10 +262,15 @@ func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any 
 	})
 	out := make([]map[string]any, len(sorted))
 	for i, c := range sorted {
+		piiMask := false
+		if c.PiiMask != nil {
+			piiMask = *c.PiiMask
+		}
 		out[i] = map[string]any{
 			"name":         c.Name,
 			"display_name": c.DisplayName,
 			"description":  c.Description,
+			"pii_mask":     piiMask,
 		}
 	}
 	return out
@@ -560,6 +565,10 @@ func columnsForExport(rows []dgClient.ColumnMetadataRow) []dgModel.ColumnMetadat
 			Name:        row.Name,
 			DisplayName: row.DisplayName,
 			Description: row.Description,
+		}
+		if row.PiiMask {
+			piiMask := true
+			out[i].PiiMask = &piiMask
 		}
 	}
 	return out
