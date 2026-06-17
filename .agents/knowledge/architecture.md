@@ -73,3 +73,9 @@
 - Workspace event-stream source listing is intentionally implemented at CLI/provider layers, not by changing control-plane or low-level API client behavior.
 - The command entry delegates through provider `List` dispatch into source handler list logic, preserving existing list-command architecture and keeping blast radius limited.
 - This layering relies on pre-existing paginated source retrieval in the event stream API client, so feature additions can be composed above client transport when read-path primitives already exist.
+
+## INT-6489 — Destination API Versioning DTO Surface
+<!-- ticket:INT-6489 -->
+- The shared API client owns destination DTO shape and CRUD transport in `api/client/destinations.go`, so public API destination contract fields should be modeled there first.
+- Destination versioning is represented on the public client DTO as `Destination.Version` and `Destination.VersionInfo`, allowing Create, Update, and Get paths to share one contract type.
+- Optional destination version metadata flows through the existing shared service helper and response unmarshal path without separate service-method changes.
