@@ -5,9 +5,12 @@ metadata:
 spec:
   events:
   - id: "api_tracking"
-    name: "API Tracking"
+    # name is set in BOTH the var file and RUDDER_API_TRACKING_NAME; the env var
+    # wins, so it resolves to "API Tracking" (the var file value is ignored).
+    name: "{{ .API_TRACKING_NAME }}"
     event_type: "track"
-    description: "This event is triggered every time a user views a product." 
+    # description resolves from the var file only (no matching env var is set).
+    description: "{{ .API_TRACKING_DESCRIPTION }}"
     category: "#/categories/app_categories/user_actions"
 
   - id: "login"

@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -19,6 +20,7 @@ func NewCmdMigrate() *cobra.Command {
 		location string
 		confirm  bool
 		proj     project.Project
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -43,8 +45,17 @@ func NewCmdMigrate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
+			// Wire variable substitution so specs containing {{ .VAR }} placeholders
+			// resolve before they are validated and migrated; otherwise migration of a
+			// project that uses substitution would fail on the literal tokens. Gated by
+			// the same experimental flag as apply/validate, so it is a no-op when off.
+			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			if err != nil {
+				return err
+			}
+
 			// Validate project before migration
-			proj = deps.NewProject()
+			proj = deps.NewProject(projectOpts...)
 			if err := proj.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
@@ -64,6 +75,7 @@ func NewCmdMigrate() *cobra.Command {
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; later files take priority)")
 
 	return cmd
 }
