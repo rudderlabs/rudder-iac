@@ -1,76 +1,53 @@
-# rudder-cli
+# rudder-iac
 
-## Table of Contents
+`rudder-iac` is the repository for RudderStack Infrastructure as Code tooling.
+It ships the `rudder-cli` binary used to manage RudderStack resources from YAML specs.
 
-- [⚠️ Work in Progress](#️-work-in-progress)
-- [Installation](#installation)
-  - [MacOS](#macos)
-    - [Apple Silicon](#apple-silicon)
-    - [Intel-based](#intel-based)
-  - [Linux](#linux)
-  - [Docker](#docker)
-  - [Build from Source](#build-from-source)
+## Status
 
-## ⚠️ Work in Progress
+> **Work in progress:** this project is under active development and backward compatibility is not guaranteed yet.
 
-> **Warning**
->
-> Please note that this tool is currently a work in progress. We are actively developing and improving it, and as such, there may be frequent changes and updates. We do not guarantee backwards compatibility at this stage.
+## Install `rudder-cli`
 
-## Installation
+Download the latest release binary for your platform:
 
-### MacOS
+- **macOS (Apple Silicon)**
+  ```sh
+  curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
+  sudo mv rudder-cli /usr/local/bin/
+  ```
+- **macOS (Intel)**
+  ```sh
+  curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
+  sudo mv rudder-cli /usr/local/bin/
+  ```
+- **Linux (x86_64)**
+  ```sh
+  curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
+  sudo mv rudder-cli /usr/local/bin/
+  ```
 
-#### Apple Silicon
+## Use with Docker
 
-```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_arm64.tar.gz | tar -xz rudder-cli
-sudo mv rudder-cli /usr/local/bin/
-```
-
-#### Intel-based
-
-```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Darwin_x86_64.tar.gz | tar -xz rudder-cli
-sudo mv rudder-cli /usr/local/bin/
-```
-
-### Linux
-
-```sh
-curl -L https://github.com/rudderlabs/rudder-iac/releases/latest/download/rudder-cli_Linux_x86_64.tar.gz | tar -xz rudder-cli
-sudo mv rudder-cli /usr/local/bin/
-```
-
-### Docker
-
-You can run the CLI directly using Docker:
+Run the published image directly:
 
 ```sh
 docker run rudderlabs/rudder-cli
 ```
 
-If you need to persist your configuration, or provide an external configuration file, you can mount your local config directory into the container. Assuming your config directory is located at `~/.rudder`, you can run the following command:
-
-```sh
-docker run -v ~/.rudder:/.rudder rudderlabs/rudder-cli
-```
-
-To run commands with local catalog files, mount your files directory and use the `-l` flag. For example:
+Typical mounted usage (local config + catalog files):
 
 ```sh
 docker run -v ~/.rudder:/.rudder -v ~/my-catalog:/catalog rudderlabs/rudder-cli tp apply --dry-run -l /catalog
 ```
 
-This will use the access token from your local configuration file, and the catalog files from the `/catalog` directory. Alternatively, you can use the `RUDDERSTACK_ACCESS_TOKEN` environment variable to provide the access token:
+Or provide an access token via environment variable:
 
 ```sh
 docker run -v ~/my-catalog:/catalog -e RUDDERSTACK_ACCESS_TOKEN=your-access-token rudderlabs/rudder-cli tp apply --dry-run -l /catalog
 ```
 
-### Build from Source
-
-To build the `rudder-cli` from source, you need to have Go installed. Then, run the following commands:
+## Build from source
 
 ```sh
 git clone https://github.com/rudderlabs/rudder-iac.git
@@ -79,7 +56,7 @@ make build
 sudo mv bin/rudder-cli /usr/local/bin/
 ```
 
-To build the Docker image locally:
+Build the Docker image locally:
 
 ```sh
 make docker-build
