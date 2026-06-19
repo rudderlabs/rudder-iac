@@ -24,6 +24,7 @@ func TestAccountNameResolver_GetAccountName(t *testing.T) {
 			account: &client.Account{
 				Name:       "My Warehouse",
 				Definition: struct {
+					Name     string `json:"name"`
 					Type     string `json:"type"`
 					Category string `json:"category"`
 				}{Type: "SNOWFLAKE"},
@@ -39,6 +40,7 @@ func TestAccountNameResolver_GetAccountName(t *testing.T) {
 		resolver := NewAccountNameResolver(&mockAccountGetter{
 			account: &client.Account{
 				Definition: struct {
+					Name     string `json:"name"`
 					Type     string `json:"type"`
 					Category string `json:"category"`
 				}{Type: "SNOWFLAKE"},

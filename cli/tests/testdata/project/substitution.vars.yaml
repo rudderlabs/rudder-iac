@@ -1,0 +1,10 @@
+# Values for the {{ .VAR }} placeholders in the create/ and update/ specs, passed
+# via `--var-file`. This file sits outside the spec directories and uses the
+# .vars.yaml suffix, so the project loader never treats it as a resource spec.
+#
+# API_TRACKING_DESCRIPTION - resolved from this file only (no RUDDER_ env var set).
+# API_TRACKING_NAME        - also exported as RUDDER_API_TRACKING_NAME by the test;
+#                            environment variables outrank var files, so the value
+#                            below is intentionally wrong and must lose to the env var.
+API_TRACKING_DESCRIPTION: "This event is triggered every time a user views a product."
+API_TRACKING_NAME: "Name from var file that must lose to the env var"

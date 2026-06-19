@@ -350,3 +350,48 @@ func TestBatchUpsertColumnMetadata_ServerError(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+// TestBatchUpsertColumnMetadata_PiiMask covers PII-only and mixed entries on
+// the wire, plus response decoding when displayName is omitted on alias-less rows.
+func TestBatchUpsertColumnMetadata_PiiMask(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{"columns":[` +
+				`{"name":"email_address","displayName":"Email","description":null,"piiMask":true},` +
+				`{"name":"ssn","displayName":null,"description":null,"piiMask":true}` +
+				`]}`
+			return testutils.ValidateRequest(t, req, "PATCH", "https://api.rudderstack.com/v2/data-graphs/dg-123/models/em-456/column-metadata", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"columns": [
+				{"name": "email_address", "displayName": "Email", "piiMask": true, "updatedAt": "2024-01-15T12:00:00Z"},
+				{"name": "ssn", "piiMask": true, "updatedAt": "2024-01-15T13:00:00Z"}
+			]
+		}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.BatchUpsertColumnMetadata(
+		context.Background(),
+		"dg-123",
+		"em-456",
+		datagraph.BatchUpsertColumnMetadataRequest{
+			Columns: []datagraph.ColumnMetadataEntry{
+				{Name: "email_address", DisplayName: stringPtr("Email"), PiiMask: boolPtr(true)},
+				{Name: "ssn", DisplayName: nil, PiiMask: boolPtr(true)},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, &datagraph.ColumnMetadataListResponse{
+		Columns: []datagraph.ColumnMetadataRow{
+			{Name: "email_address", DisplayName: "Email", PiiMask: true},
+			{Name: "ssn", PiiMask: true},
+		},
+	}, result)
+
+	httpClient.AssertNumberOfCalls()
+}
