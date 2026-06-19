@@ -9,13 +9,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/internal/testutils"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func ptr[T any](v T) *T {
-	return &v
-}
 
 func TestClientDestinationsList(t *testing.T) {
 	ctx := context.Background()
@@ -94,8 +91,6 @@ func TestClientDestinationsList(t *testing.T) {
 
 func TestClientDestinationsGet(t *testing.T) {
 	ctx := context.Background()
-	retirementDate := "2026-12-31"
-	migrationDocsURL := "https://docs.example.com/destinations/migration"
 
 	calls := []testutils.Call{
 		{
@@ -139,12 +134,12 @@ func TestClientDestinationsGet(t *testing.T) {
 		VersionInfo: &client.VersionInfo{
 			Status:           "deprecated",
 			Action:           "upgrade",
-			RetirementDate:   &retirementDate,
-			MigrationDocsURL: &migrationDocsURL,
+			RetirementDate:   lo.ToPtr("2026-12-31"),
+			MigrationDocsURL: lo.ToPtr("https://docs.example.com/destinations/migration"),
 		},
 		Config:    []byte(`{"key1": "val1"}`),
-		CreatedAt: ptr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
-		UpdatedAt: ptr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
+		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
+		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
 	}, destination)
 
 	httpClient.AssertNumberOfCalls()
