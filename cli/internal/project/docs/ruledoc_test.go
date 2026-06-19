@@ -5,6 +5,11 @@ import (
 
 	projectdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/docs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/project/rules"
+	providerrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -15,40 +20,38 @@ import (
 // the metadata-syntax-valid and duplicate-urn fragments. The rules are constructed
 // with these so their AppliesTo() matches the authored fragments exactly (the
 // generator enforces bidirectional coverage). Production scopes them to the live
-// provider patterns via BuildRegistry; this fragment-plumbing test supplies the same
-// set the fragments document.
-var gatekeeperScopedPatterns = []rules.MatchPattern{
-	{Kind: "categories", Version: "rudder/0.1"},
-	{Kind: "categories", Version: "rudder/v0.1"},
-	{Kind: "categories", Version: "rudder/v1"},
-	{Kind: "custom-types", Version: "rudder/0.1"},
-	{Kind: "custom-types", Version: "rudder/v0.1"},
-	{Kind: "custom-types", Version: "rudder/v1"},
-	{Kind: "event-stream-source", Version: "rudder/0.1"},
-	{Kind: "event-stream-source", Version: "rudder/v0.1"},
-	{Kind: "event-stream-source", Version: "rudder/v1"},
-	{Kind: "events", Version: "rudder/0.1"},
-	{Kind: "events", Version: "rudder/v0.1"},
-	{Kind: "events", Version: "rudder/v1"},
-	{Kind: "properties", Version: "rudder/0.1"},
-	{Kind: "properties", Version: "rudder/v0.1"},
-	{Kind: "properties", Version: "rudder/v1"},
-	{Kind: "retl-source-sql-model", Version: "rudder/0.1"},
-	{Kind: "retl-source-sql-model", Version: "rudder/v0.1"},
-	{Kind: "retl-source-sql-model", Version: "rudder/v1"},
-	{Kind: "tp", Version: "rudder/0.1"},
-	{Kind: "tp", Version: "rudder/v0.1"},
-	{Kind: "tracking-plan", Version: "rudder/v1"},
-	{Kind: "transformation", Version: "rudder/v1"},
-	{Kind: "transformation-library", Version: "rudder/v1"},
+// provider patterns via BuildRegistry; this fragment-plumbing test reproduces the
+// same set the fragments document using the shared pattern helpers (the idiom every
+// provider's SupportedMatchPatterns uses) rather than hand-written literals.
+func gatekeeperScopedPatterns() []rules.MatchPattern {
+	var p []rules.MatchPattern
+	// Kinds carrying both legacy and v1 specs.
+	for _, kind := range []string{
+		localcatalog.KindCategories,
+		localcatalog.KindCustomTypes,
+		essource.ResourceKind,
+		localcatalog.KindEvents,
+		localcatalog.KindProperties,
+		sqlmodel.ResourceKind,
+	} {
+		p = append(p, providerrules.LegacyVersionPatterns(kind)...)
+		p = append(p, providerrules.V1VersionPatterns(kind)...)
+	}
+	// Tracking plans: legacy kind "tp", v1 kind "tracking-plan".
+	p = append(p, providerrules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
+	p = append(p, providerrules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
+	// v1-only kinds.
+	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
+	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)
+	return p
 }
 
 // projectGatekeeperRules returns the project-level rules whose doc fragments
 // live in this package, paired with the phase the docs generator records.
 func projectGatekeeperRules() []rules.Rule {
 	return []rules.Rule{
-		prules.NewMetadataSyntaxValidRule(nil, gatekeeperScopedPatterns),
-		prules.NewDuplicateURNRule(nil, gatekeeperScopedPatterns),
+		prules.NewMetadataSyntaxValidRule(nil, gatekeeperScopedPatterns()),
+		prules.NewDuplicateURNRule(nil, gatekeeperScopedPatterns()),
 		prules.NewSpecSyntaxValidRule(nil),
 		prules.NewResourceKindVersionValidRule(nil),
 	}

@@ -328,7 +328,7 @@ func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 
 		// metadata-syntax-valid and duplicate-urn are scoped to the resource patterns
 		// (activePatterns) so the engine only hands them resource specs — non-resource
-		// project-level kinds are excluded. See MultipleResourceRule filtering.
+		// project-level kinds are excluded. See MultiSpecRule filtering.
 		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, activePatterns),
 		prules.NewDuplicateURNRule(provider.ParseSpec, activePatterns),
 	}

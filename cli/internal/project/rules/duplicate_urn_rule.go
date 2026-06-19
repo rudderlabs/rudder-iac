@@ -16,7 +16,7 @@ type duplicateURNRule struct {
 }
 
 // NewDuplicateURNRule scopes the rule to the given resource match patterns. The
-// engine delivers only specs matching these patterns (see MultipleResourceRule), so
+// engine delivers only specs matching these patterns (see MultiSpecRule), so
 // non-resource kinds such as import-manifest are never handed to this rule.
 func NewDuplicateURNRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
 	return &duplicateURNRule{parseSpec: parseSpec, patterns: patterns}
@@ -28,28 +28,22 @@ func (r *duplicateURNRule) Description() string {
 	return "URNs must be unique across the project"
 }
 func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern {
-	// Fall back to MatchAll when no patterns are supplied (e.g. a provider that
-	// declares no SupportedMatchPatterns). This preserves the rule's original
-	// project-wide reach; only callers that pass explicit resource patterns narrow it.
-	if len(r.patterns) == 0 {
-		return []rules.MatchPattern{rules.MatchAll()}
-	}
 	return r.patterns
 }
 func (r *duplicateURNRule) Examples() rules.Examples {
 	return rules.Examples{}
 }
 
-// Validate is a no-op — this rule operates as a MultipleResourceRule via ValidateProject.
+// Validate is a no-op — this rule operates as a MultiSpecRule via ValidateSpecs.
 func (r *duplicateURNRule) Validate(_ *rules.ValidationContext) []rules.ValidationResult {
 	return nil
 }
 
-// ValidateProject checks for duplicate URNs across all specs.
+// ValidateSpecs checks for duplicate URNs across all specs.
 // URNs encode the resource type, so duplicates are only flagged when both
 // the type and local ID match. This correctly allows the same local ID
 // across different resource types.
-func (r *duplicateURNRule) ValidateProject(allSpecs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+func (r *duplicateURNRule) ValidateSpecs(allSpecs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 	type occurrence struct {
 		filePath string
 		jsonPath string

@@ -47,12 +47,12 @@ func NewValidationEngine(
 
 // ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
 // It operates in two phases:
-//  1. Per-spec rules: validates each spec individually (MultipleResourceRules return nil here)
+//  1. Per-spec rules: validates each spec individually (MultiSpecRules return nil here)
 //  2. Multiple-resource rules: if Phase 1 passes, runs each with the specs matching its patterns
 func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
 	toReturn := make(Diagnostics, 0)
 
-	// Phase 1: per-spec validation (MultipleResourceRules harmlessly return nil from Validate)
+	// Phase 1: per-spec validation (MultiSpecRules harmlessly return nil from Validate)
 	for path, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
 			path,
@@ -83,21 +83,21 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	return toReturn, nil
 }
 
-// runProjectValidationRules discovers rules implementing MultipleResourceRule from all
+// runProjectValidationRules discovers rules implementing MultiSpecRule from all
 // registered syntactic rules and executes each with the specs matching its AppliesTo()
 // patterns. Unlike per-spec rules, these need more than one spec at once (e.g. cross-file
 // uniqueness), but they still only see the specs they apply to — not the whole project.
 func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
-	// MultipleResourceRules may have any AppliesTo() pattern (not just MatchAll), so we
-	// scan all registered syntactic rules and filter by the MultipleResourceRule interface.
-	var multiResourceRules []rules.MultipleResourceRule
+	// MultiSpecRules may have any AppliesTo() pattern (not just MatchAll), so we
+	// scan all registered syntactic rules and filter by the MultiSpecRule interface.
+	var multiSpecRules []rules.MultiSpecRule
 	for _, rule := range e.registry.AllSyntacticRules() {
-		if mr, ok := rule.(rules.MultipleResourceRule); ok {
-			multiResourceRules = append(multiResourceRules, mr)
+		if mr, ok := rule.(rules.MultiSpecRule); ok {
+			multiSpecRules = append(multiSpecRules, mr)
 		}
 	}
 
-	if len(multiResourceRules) == 0 {
+	if len(multiSpecRules) == 0 {
 		return nil, nil
 	}
 
@@ -115,9 +115,9 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 
 	diagnostics := make(Diagnostics, 0)
 
-	for _, mr := range multiResourceRules {
+	for _, mr := range multiSpecRules {
 		rule := mr.(rules.Rule)
-		resultsMap := mr.ValidateProject(filterContextsByPatterns(contexts, rule.AppliesTo()))
+		resultsMap := mr.ValidateSpecs(filterContextsByPatterns(contexts, rule.AppliesTo()))
 
 		for filePath, results := range resultsMap {
 			rawSpec, ok := rawSpecs[filePath]
@@ -155,7 +155,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 }
 
 // filterContextsByPatterns returns the subset of contexts whose (kind, version)
-// matches at least one of the given patterns. A MultipleResourceRule receives only
+// matches at least one of the given patterns. A MultiSpecRule receives only
 // the specs it applies to, so resource-only rules never see manifest specs (and vice
 // versa) even though they all run in the same project-wide validation pass.
 func filterContextsByPatterns(

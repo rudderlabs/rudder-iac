@@ -29,7 +29,7 @@ func TestDuplicateURNRule_Metadata(t *testing.T) {
 	assert.Nil(t, rule.Validate(nil))
 }
 
-func TestDuplicateURNRule_ValidateProject(t *testing.T) {
+func TestDuplicateURNRule_ValidateSpecs(t *testing.T) {
 	t.Parallel()
 
 	parseSpec := func(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -76,9 +76,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"props1.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{
 					map[string]any{"id": "email"},
@@ -99,9 +99,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"props1.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{
 					map[string]any{"id": "email"},
@@ -125,9 +125,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"props.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{
 					map[string]any{"id": "email"},
@@ -146,9 +146,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"props.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{
 					map[string]any{"id": "user_id"},
@@ -169,9 +169,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"a.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{map[string]any{"id": "dup"}},
 			}},
@@ -193,9 +193,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"a.yaml": {Kind: "properties", Spec: map[string]any{
 				"properties": []any{map[string]any{"id": "dup"}},
 			}},
@@ -219,9 +219,9 @@ func TestDuplicateURNRule_ValidateProject(t *testing.T) {
 		t.Parallel()
 
 		rule := NewDuplicateURNRule(parseSpec, dupURNTestPatterns)
-		pr := rule.(rules.MultipleResourceRule)
+		pr := rule.(rules.MultiSpecRule)
 
-		results := pr.ValidateProject(map[string]*rules.ValidationContext{
+		results := pr.ValidateSpecs(map[string]*rules.ValidationContext{
 			"tp1.yaml": {Kind: "tp", Spec: map[string]any{"id": "my_tp"}},
 			"tp2.yaml": {Kind: "tp", Spec: map[string]any{"id": "my_tp"}},
 		})

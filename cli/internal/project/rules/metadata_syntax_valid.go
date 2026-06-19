@@ -42,12 +42,6 @@ func (r *MetadataSyntaxValidRule) Description() string {
 }
 
 func (r *MetadataSyntaxValidRule) AppliesTo() []rules.MatchPattern {
-	// Fall back to MatchAll when no patterns are supplied (e.g. a provider that
-	// declares no SupportedMatchPatterns). This preserves the rule's original
-	// project-wide reach; only callers that pass explicit resource patterns narrow it.
-	if len(r.patterns) == 0 {
-		return []rules.MatchPattern{rules.MatchAll()}
-	}
 	return r.patterns
 }
 

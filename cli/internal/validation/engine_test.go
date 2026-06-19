@@ -529,13 +529,13 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 	})
 }
 
-// mockMultipleResourceRule implements both Rule and ProjectRule
-type mockMultipleResourceRule struct {
+// mockMultiSpecRule implements both Rule and ProjectRule
+type mockMultiSpecRule struct {
 	mockRule
 	validateProjectFn func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult
 }
 
-func (m *mockMultipleResourceRule) ValidateProject(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+func (m *mockMultiSpecRule) ValidateSpecs(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 	if m.validateProjectFn != nil {
 		return m.validateProjectFn(specs)
 	}
@@ -552,7 +552,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
 		}
 
-		pr := &mockMultipleResourceRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
@@ -602,7 +602,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		pr := &mockMultipleResourceRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
@@ -640,7 +640,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
 		}
 
-		pr := &mockMultipleResourceRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:       "exact-pattern-project-rule",
 				severity: rules.Error,
@@ -679,7 +679,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 
 		var receivedPaths []string
 
-		pr := &mockMultipleResourceRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "capture-rule",
 				severity:  rules.Error,
@@ -718,7 +718,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		var receivedPaths []string
 
 		// Scoped to "properties" only — must NOT receive the events spec.
-		pr := &mockMultipleResourceRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "properties-only-rule",
 				severity:  rules.Error,
