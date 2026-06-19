@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.18.0](https://github.com/rudderlabs/rudder-iac/compare/v0.17.0...v0.18.0) (2026-06-19)
+
+
+### Features
+
+* add accounts CUD to API client ([#617](https://github.com/rudderlabs/rudder-iac/issues/617)) ([1a80346](https://github.com/rudderlabs/rudder-iac/commit/1a803468fa33c96fd11ad582754552bbe3d7e44b))
+* **datagraph:** add pii_mask to column-metadata CLI and client ([#618](https://github.com/rudderlabs/rudder-iac/issues/618)) ([396922c](https://github.com/rudderlabs/rudder-iac/commit/396922c502801da646b9427440f61c0c5597b450))
+* import manifest provider and classifier ([#603](https://github.com/rudderlabs/rudder-iac/issues/603)) ([9d3608d](https://github.com/rudderlabs/rudder-iac/commit/9d3608d9e443113b056899131261a08b87a771ad))
+* **import:** scaffold secrets as variable references with a companion var file (DEX-410) ([#616](https://github.com/rudderlabs/rudder-iac/issues/616)) ([0ed8e50](https://github.com/rudderlabs/rudder-iac/commit/0ed8e508eef9dfae81618fe2d386397d5521ddbb))
+* **secret:** add self-redacting secret.String value type (DEX-407) ([#608](https://github.com/rudderlabs/rudder-iac/issues/608)) ([3c86797](https://github.com/rudderlabs/rudder-iac/commit/3c86797c0cfd98db1ac39b0aaaee314b63990130))
+* **syncer:** make the apply-cycle diff secret-aware (DEX-408) ([#614](https://github.com/rudderlabs/rudder-iac/issues/614)) ([63d55b3](https://github.com/rudderlabs/rudder-iac/commit/63d55b366b737d708074db79f5585840b8fb145b))
+* **varsubst:** require .vars.yaml or .vars.yml suffix for all var files ([#624](https://github.com/rudderlabs/rudder-iac/issues/624)) ([15e3236](https://github.com/rudderlabs/rudder-iac/commit/15e323668214b6b403a747df60cf6bfcd397326b))
+
+
+### Miscellaneous
+
+* add WithWorkspaceID project option and resolve workspace before project load ([#602](https://github.com/rudderlabs/rudder-iac/issues/602)) ([6c03ce2](https://github.com/rudderlabs/rudder-iac/commit/6c03ce24cd349a98ee0813a53c78268add64f158))
+
 ## [0.17.0](https://github.com/rudderlabs/rudder-iac/compare/v0.16.0...v0.17.0) (2026-06-05)
 
 
