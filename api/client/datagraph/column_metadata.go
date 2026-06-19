@@ -11,20 +11,22 @@ import (
 // DisplayName / Description are pointers so a nil value serializes as JSON `null`
 // (an explicit clear, per the declarative apply contract) rather than being
 // omitted — hence no `omitempty`. A non-nil value sets the field. At least one
-// of the two is non-nil; an empty string is invalid (use null to clear).
+// of displayName, description, or piiMask must be set on the wire.
 type ColumnMetadataEntry struct {
 	Name        string  `json:"name"`
 	DisplayName *string `json:"displayName"`
 	Description *string `json:"description"`
+	PiiMask     *bool   `json:"piiMask,omitempty"`
 }
 
 // ColumnMetadataRow is a single column-metadata row returned by the API.
 // displayName / description are omitted by the server when unset, so they
-// unmarshal to the empty string.
+// unmarshal to the empty string. piiMask is always present.
 type ColumnMetadataRow struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
+	PiiMask     bool   `json:"piiMask"`
 }
 
 // ColumnMetadataListResponse is the response from both List and BatchUpsert.

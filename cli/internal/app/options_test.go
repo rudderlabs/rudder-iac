@@ -27,7 +27,7 @@ func setExperimental(t *testing.T, enabled bool) {
 
 func writeVarFile(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "vars.yaml")
+	path := filepath.Join(t.TempDir(), "config.vars.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 	return path
 }
@@ -60,12 +60,23 @@ func TestNewProjectOptions(t *testing.T) {
 
 	t.Run("missing var file surfaces ErrVarFileNotFound", func(t *testing.T) {
 		setExperimental(t, true)
-		path := filepath.Join(t.TempDir(), "missing.yaml")
+		path := filepath.Join(t.TempDir(), "missing.vars.yaml")
 
 		opts, err := NewProjectOptions(config.GetConfig(), []string{path})
 		require.Error(t, err)
 		assert.Nil(t, opts)
 		assert.ErrorIs(t, err, resolver.ErrVarFileNotFound)
+	})
+
+	t.Run("var file without .vars.yaml suffix surfaces ErrVarFileInvalidName", func(t *testing.T) {
+		setExperimental(t, true)
+		path := filepath.Join(t.TempDir(), "plain.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("FOO: bar"), 0644))
+
+		opts, err := NewProjectOptions(config.GetConfig(), []string{path})
+		require.Error(t, err)
+		assert.Nil(t, opts)
+		assert.ErrorIs(t, err, resolver.ErrVarFileInvalidName)
 	})
 
 	t.Run("invalid var file surfaces ErrVarFileParseFailed", func(t *testing.T) {
@@ -105,8 +116,8 @@ func TestBuildSubstitutor_ResolverChain(t *testing.T) {
 
 	t.Run("later var file wins over earlier var file", func(t *testing.T) {
 		dir := t.TempDir()
-		path1 := filepath.Join(dir, "first.yaml")
-		path2 := filepath.Join(dir, "second.yaml")
+		path1 := filepath.Join(dir, "first.vars.yaml")
+		path2 := filepath.Join(dir, "second.vars.yaml")
 		require.NoError(t, os.WriteFile(path1, []byte("X: first"), 0644))
 		require.NoError(t, os.WriteFile(path2, []byte("X: second"), 0644))
 

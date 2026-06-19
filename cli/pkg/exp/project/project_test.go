@@ -12,6 +12,14 @@ import (
 func TestProjectLoad(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
 
+	// The shared create fixtures keep two api_tracking fields as {{ .VAR }}
+	// placeholders. Enable substitution and supply their values via env so the
+	// loader resolves them before validation, mirroring how apply/validate run.
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
+	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
+	t.Setenv("RUDDER_API_TRACKING_DESCRIPTION", "This event is triggered every time a user views a product.")
+
 	t.Run("Load project and verify resource graph", func(t *testing.T) {
 		graph, err := project.Load(context.Background(), "../../../tests/testdata/project/create")
 		require.NoError(t, err)
