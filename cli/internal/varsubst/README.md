@@ -184,11 +184,12 @@ Rules for variable files:
   rejected (`DB: { HOST: x }` or `HOSTS: [a, b]` cause an error).
 - **No null/empty values.** `KEY:` or `KEY: null` is rejected. To set an empty value, use
   explicit empty quotes: `KEY: ""`.
-- **Inside the project directory, the file must be named `<name>.vars.yaml`** (or
-  `<name>.vars.yml`). The project loader treats every other YAML file in the project
-  directory as a resource spec — a stray `staging.yaml` var file would fail loading with a
-  spec parse error. The `.vars.yaml` suffix tells the loader to skip the file. Var files
-  kept *outside* the project directory can be named anything.
+- **The file must be named `<name>.vars.yaml`** (or `<name>.vars.yml`) — always, whether it
+  lives inside or outside the project directory. `--var-file` rejects any other path with a
+  `variable file must use the .vars.yaml or .vars.yml suffix` error. Inside the project
+  directory the suffix does double duty: the loader skips `.vars.yaml`/`.vars.yml` files
+  rather than treating them as resource specs, so a stray `staging.yaml` var file would fail
+  loading with a spec parse error.
 - Comments (`#`) and blank lines are fine.
 - Paths are resolved relative to your current working directory.
 
@@ -262,6 +263,7 @@ error[project/var-substitution]: undefined variable "DB_PASSWORD"
 | `undefined variable` | `{{ .VAR }}` not found in env vars or var files, and no default given. |
 | `invalid variable syntax` | Malformed token, e.g. missing dot (`{{ VAR }}`) or an invalid name (`{{ .1A }}`). |
 | `variable file not found` | A `--var-file` path does not exist. |
+| `variable file must use the .vars.yaml or .vars.yml suffix` | A `--var-file` path does not end in `.vars.yaml`/`.vars.yml`. |
 | `failed to parse variable file` | The file is invalid YAML, has nested values, or has a null/empty value. |
 
 When any spec has a substitution error, nothing is applied — the original specs are left

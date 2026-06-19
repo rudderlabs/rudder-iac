@@ -79,6 +79,6 @@ func NewCmdValidate() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
-	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a YAML file with variables for substitution (repeatable; later files take priority)")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	return cmd
 }

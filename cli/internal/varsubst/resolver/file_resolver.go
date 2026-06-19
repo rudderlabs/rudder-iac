@@ -3,12 +3,26 @@ package resolver
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// VarFileSuffixYAML and VarFileSuffixYML are the suffixes a variable file must
+	// end in. The requirement holds for every var file, whether it lives inside
+	// the project directory or is passed via --var-file from elsewhere.
+	VarFileSuffixYAML = ".vars.yaml"
+	VarFileSuffixYML  = ".vars.yml"
+)
+
 type fileResolver struct {
 	vars map[string]string
+}
+
+// hasVarFileSuffix reports whether path ends in one of the required var-file suffixes.
+func hasVarFileSuffix(path string) bool {
+	return strings.HasSuffix(path, VarFileSuffixYAML) || strings.HasSuffix(path, VarFileSuffixYML)
 }
 
 // NewFileResolver loads variables from a flat YAML file whose top-level keys
@@ -18,7 +32,14 @@ type fileResolver struct {
 // explicit null (`KEY: null`) returns ErrVarFileParseFailed — setting null
 // values is not supported. To represent an empty value, use empty quotes:
 // `KEY: ""`.
+//
+// The path must end in .vars.yaml or .vars.yml; otherwise ErrVarFileInvalidName
+// is returned. This is checked before the file is read.
 func NewFileResolver(path string) (Resolver, error) {
+	if !hasVarFileSuffix(path) {
+		return nil, fmt.Errorf("%w: %s", ErrVarFileInvalidName, path)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

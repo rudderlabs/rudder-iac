@@ -11,7 +11,7 @@ import (
 
 func writeVarFile(t *testing.T, content string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "vars.yaml")
+	path := filepath.Join(t.TempDir(), "config.vars.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(content), 0644))
 	return path
 }
@@ -71,7 +71,7 @@ func TestNewFileResolver(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var path string
 			if tt.noFile {
-				path = filepath.Join(t.TempDir(), "nonexistent.yaml")
+				path = filepath.Join(t.TempDir(), "nonexistent.vars.yaml")
 			} else {
 				path = writeVarFile(t, tt.content)
 			}
@@ -82,6 +82,37 @@ func TestNewFileResolver(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestNewFileResolver_NameSuffix(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileName string
+		wantErr  error
+	}{
+		{name: ".vars.yaml accepted", fileName: "config.vars.yaml"},
+		{name: ".vars.yml accepted", fileName: "config.vars.yml"},
+		{name: "plain .yaml rejected", fileName: "config.yaml", wantErr: ErrVarFileInvalidName},
+		{name: "plain .yml rejected", fileName: "config.yml", wantErr: ErrVarFileInvalidName},
+		{name: "bare vars.yaml (no dot) rejected", fileName: "vars.yaml", wantErr: ErrVarFileInvalidName},
+		{name: "no extension rejected", fileName: "config", wantErr: ErrVarFileInvalidName},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The file content and existence are valid; only the name varies, so a
+			// failure can only come from the suffix check.
+			path := filepath.Join(t.TempDir(), tt.fileName)
+			require.NoError(t, os.WriteFile(path, []byte("FOO: bar"), 0644))
+
+			_, err := NewFileResolver(path)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
 		})
 	}
 }
