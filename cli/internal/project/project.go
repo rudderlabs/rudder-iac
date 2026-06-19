@@ -43,7 +43,7 @@ type Project interface {
 type project struct {
 	location               string
 	provider               ProjectProvider
-	importManifestProvider *importmanifest.Provider
+	importManifestProvider ProjectProvider
 	loader                 Loader
 	workspaceID            string
 	specs                  map[string]*specs.Spec
@@ -132,7 +132,7 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	// Project-level specs (e.g. import-manifest) are handled outside the resource
 	// provider tree by their dedicated provider; resource-level specs flow through
 	// the version-based dispatch below.
-	if specs.Classify(spec) == specs.ProjectSpec {
+	if classify(spec) == ProjectSpec {
 		return p.importManifestProvider.LoadSpec(path, spec)
 	}
 

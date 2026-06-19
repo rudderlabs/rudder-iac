@@ -16,7 +16,7 @@ func TestParseWorkspaces(t *testing.T) {
 		t.Parallel()
 
 		s := &specs.Spec{
-			Kind:    specs.KindImportManifest,
+			Kind:    KindImportManifest,
 			Version: specs.SpecVersionV1,
 			Spec: map[string]any{
 				"workspaces": []any{

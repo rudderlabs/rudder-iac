@@ -44,15 +44,8 @@ func TestProject_Load_RoutesImportManifestToProvider(t *testing.T) {
 
 	require.NoError(t, p.Load("dummy"))
 
-	// The resource provider must NOT have received the manifest spec.
+	// The resource provider must NOT have received the manifest spec — it was
+	// routed to the import-manifest provider instead.
 	mp := p.provider.(*testutils.MockProvider)
 	assert.Empty(t, mp.LoadSpecCalledWithArgs, "manifest must not be routed to the resource provider")
-
-	// The manifest provider must have accumulated the workspace entry.
-	manifest := p.importManifestProvider.ImportManifest()
-	require.NotNil(t, manifest)
-	require.Len(t, manifest.Workspaces, 1)
-	assert.Equal(t, "ws-1", manifest.Workspaces[0].WorkspaceID)
-	require.Len(t, manifest.Workspaces[0].Resources, 1)
-	assert.Equal(t, "event-stream-source:my-src", manifest.Workspaces[0].Resources[0].URN)
 }

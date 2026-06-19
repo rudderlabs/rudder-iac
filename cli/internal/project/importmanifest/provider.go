@@ -13,6 +13,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// KindImportManifest is the spec kind this provider owns. It is a project-level
+// kind handled outside the resource provider tree, so the provider that gives it
+// meaning is its source of truth.
+const KindImportManifest = "import-manifest"
+
 type Provider struct {
 	entries []specs.WorkspaceImportMetadata
 }
@@ -22,7 +27,7 @@ func New() *Provider {
 }
 
 func (p *Provider) SupportedKinds() []string {
-	return []string{specs.KindImportManifest}
+	return []string{KindImportManifest}
 }
 
 func (p *Provider) SupportedTypes() []string {
@@ -31,7 +36,7 @@ func (p *Provider) SupportedTypes() []string {
 
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	return []rules.MatchPattern{
-		rules.MatchKindVersion(specs.KindImportManifest, specs.SpecVersionV1),
+		rules.MatchKindVersion(KindImportManifest, specs.SpecVersionV1),
 	}
 }
 
@@ -75,15 +80,4 @@ func (p *Provider) SemanticRules() []rules.Rule {
 // (and therefore ProjectProvider).
 func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 	return nil
-}
-
-// ImportManifest returns a copy of the aggregated manifest, or nil when no
-// manifest was loaded. The copy keeps callers from corrupting append-only state.
-func (p *Provider) ImportManifest() *specs.WorkspacesImportMetadata {
-	if len(p.entries) == 0 {
-		return nil
-	}
-	workspaces := make([]specs.WorkspaceImportMetadata, len(p.entries))
-	copy(workspaces, p.entries)
-	return &specs.WorkspacesImportMetadata{Workspaces: workspaces}
 }

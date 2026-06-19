@@ -1,8 +1,10 @@
-package specs
+package project
 
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,27 +13,27 @@ func TestClassify(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		spec     *Spec
+		spec     *specs.Spec
 		expected SpecLevel
 	}{
 		{
 			name:     "import-manifest is project-level",
-			spec:     &Spec{Kind: KindImportManifest, Version: SpecVersionV1},
+			spec:     &specs.Spec{Kind: importmanifest.KindImportManifest, Version: specs.SpecVersionV1},
 			expected: ProjectSpec,
 		},
 		{
 			name:     "resource kind is resource-level",
-			spec:     &Spec{Kind: "source", Version: SpecVersionV1},
+			spec:     &specs.Spec{Kind: "source", Version: specs.SpecVersionV1},
 			expected: ResourceSpec,
 		},
 		{
 			name:     "empty kind is resource-level",
-			spec:     &Spec{Kind: "", Version: SpecVersionV1},
+			spec:     &specs.Spec{Kind: "", Version: specs.SpecVersionV1},
 			expected: ResourceSpec,
 		},
 		{
 			name:     "legacy resource kind is resource-level",
-			spec:     &Spec{Kind: "destination", Version: SpecVersionV0_1},
+			spec:     &specs.Spec{Kind: "destination", Version: specs.SpecVersionV0_1},
 			expected: ResourceSpec,
 		},
 	}
@@ -39,7 +41,7 @@ func TestClassify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.expected, Classify(tt.spec))
+			assert.Equal(t, tt.expected, classify(tt.spec))
 		})
 	}
 }
