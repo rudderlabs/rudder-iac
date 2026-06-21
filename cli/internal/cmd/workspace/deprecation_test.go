@@ -26,16 +26,12 @@ func TestEventStreamSourcesList_Deprecated(t *testing.T) {
 	assert.Contains(t, cmd.Deprecated, "get event-stream-source")
 }
 
-// TestAccountsList_NotDeprecated asserts that accounts list is deliberately NOT
-// deprecated: "get account" is not yet supported (the workspace provider is not
-// registered in the composite), so pointing users there would break their workflow.
-// Remove this test (and add a deprecation) once get account is fully wired up.
-func TestAccountsList_NotDeprecated(t *testing.T) {
+func TestAccountsList_Deprecated(t *testing.T) {
 	t.Parallel()
 
 	cmd := findSubcommand(NewCmdAccounts(), "list")
 	require.NotNil(t, cmd)
-	assert.Empty(t, cmd.Deprecated)
+	assert.Contains(t, cmd.Deprecated, "get account")
 }
 
 func TestRetlSourcesList_Deprecated(t *testing.T) {

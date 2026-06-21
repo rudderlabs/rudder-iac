@@ -173,6 +173,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		"retl":            p.RETL,
 		"eventstream":     p.EventStream,
 		"transformations": p.Transformations,
+		"workspace":       p.Workspace,
 	}
 
 	if cfg.ExperimentalFlags.DataGraph {
