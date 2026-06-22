@@ -130,10 +130,16 @@ func (p *LocalCatalogPlanProvider) buildEventRule(ev *localcatalog.TPEvent) (*pl
 		return nil, err
 	}
 
+	variants, err := p.buildVariants(ev.Variants, reg)
+	if err != nil {
+		return nil, fmt.Errorf("building variants: %w", err)
+	}
+
 	return &plan.EventRule{
-		Event:   plan.Event{Name: ev.Name, Description: ev.Description, EventType: evType},
-		Section: section,
-		Schema:  *schema,
+		Event:    plan.Event{Name: ev.Name, Description: ev.Description, EventType: evType},
+		Section:  section,
+		Schema:   *schema,
+		Variants: variants,
 	}, nil
 }
 
@@ -325,7 +331,75 @@ func (p *LocalCatalogPlanProvider) customType(typeStr string, reg map[string]*pl
 		}
 	}
 
+	variants, err := p.buildVariants(ct.Variants, reg)
+	if err != nil {
+		return nil, false, fmt.Errorf("custom type %q: %w", ct.Name, err)
+	}
+	pct.Variants = variants
+
 	return pct, true, nil
+}
+
+func (p *LocalCatalogPlanProvider) buildVariants(vs localcatalog.VariantsV1, reg map[string]*plan.CustomType) ([]plan.Variant, error) {
+	if len(vs) == 0 {
+		return nil, nil
+	}
+
+	out := make([]plan.Variant, 0, len(vs))
+	for _, v := range vs {
+		discriminator, err := p.resolvePropertyName(v.Discriminator)
+		if err != nil {
+			return nil, fmt.Errorf("resolving discriminator: %w", err)
+		}
+
+		cases := make([]plan.VariantCase, 0, len(v.Cases))
+		for _, c := range v.Cases {
+			schema, err := p.buildVariantCaseSchema(c.Properties, reg)
+			if err != nil {
+				return nil, err
+			}
+			cases = append(cases, plan.VariantCase{
+				DisplayName: c.DisplayName,
+				Match:       c.Match,
+				Description: c.Description,
+				Schema:      *schema,
+			})
+		}
+
+		var defaultSchema *plan.ObjectSchema
+		if len(v.Default.Properties) > 0 {
+			defaultSchema, err = p.buildVariantCaseSchema(v.Default.Properties, reg)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		out = append(out, plan.Variant{
+			Type:          "discriminator",
+			Discriminator: discriminator,
+			Cases:         cases,
+			DefaultSchema: defaultSchema,
+		})
+	}
+	return out, nil
+}
+
+func (p *LocalCatalogPlanProvider) buildVariantCaseSchema(refs []localcatalog.PropertyReferenceV1, reg map[string]*plan.CustomType) (*plan.ObjectSchema, error) {
+	// Variant case schemas do not allow unplanned properties, matching the remote
+	// provider (which defaults variant-case additionalProperties to false).
+	schema := &plan.ObjectSchema{Properties: make(map[string]plan.PropertySchema, len(refs))}
+	for _, r := range refs {
+		prop, err := p.resolveProperty(r.Property)
+		if err != nil {
+			return nil, err
+		}
+		ps, err := p.buildPropertyFromDef(prop, r.Required, reg)
+		if err != nil {
+			return nil, err
+		}
+		schema.Properties[prop.Name] = ps
+	}
+	return schema, nil
 }
 
 func (p *LocalCatalogPlanProvider) resolveProperty(ref string) (*localcatalog.PropertyV1, error) {
@@ -338,6 +412,14 @@ func (p *LocalCatalogPlanProvider) resolveProperty(ref string) (*localcatalog.Pr
 		return nil, fmt.Errorf("property %q not found in local specs", m[1])
 	}
 	return prop, nil
+}
+
+func (p *LocalCatalogPlanProvider) resolvePropertyName(ref string) (string, error) {
+	prop, err := p.resolveProperty(ref)
+	if err != nil {
+		return "", err
+	}
+	return prop.Name, nil
 }
 
 func toPrimitiveTypes(types []string) ([]plan.PropertyType, error) {

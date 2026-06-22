@@ -121,6 +121,65 @@ func TestLocalCatalogPlanProvider_GetTrackingPlan(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+func TestLocalCatalogPlanProvider_Variants(t *testing.T) {
+	dc := buildCatalog()
+	dc.TrackingPlans[0].Rules[0].Variants = localcatalog.VariantsV1{
+		{
+			Type:          "discriminator",
+			Discriminator: "#property:str", // resolves to the property name "strProp"
+			Cases: []localcatalog.VariantCaseV1{
+				{
+					DisplayName: "Case 1",
+					Description: "first case",
+					Match:       []any{"a"},
+					Properties:  []localcatalog.PropertyReferenceV1{{Property: "#property:child", Required: true}},
+				},
+			},
+			Default: localcatalog.DefaultPropertiesV1{
+				Properties: []localcatalog.PropertyReferenceV1{{Property: "#property:enm"}},
+			},
+		},
+	}
+
+	got, err := providers.NewLocalCatalogPlanProvider(dc, "tp").GetTrackingPlan(context.Background())
+	require.NoError(t, err)
+
+	want := []plan.Variant{
+		{
+			Type:          "discriminator",
+			Discriminator: "strProp",
+			Cases: []plan.VariantCase{
+				{
+					DisplayName: "Case 1",
+					Description: "first case",
+					Match:       []any{"a"},
+					Schema: plan.ObjectSchema{
+						Properties: map[string]plan.PropertySchema{
+							"childProp": {
+								Property: plan.Property{Name: "childProp", Types: []plan.PropertyType{plan.PrimitiveTypeInteger}},
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+			DefaultSchema: &plan.ObjectSchema{
+				Properties: map[string]plan.PropertySchema{
+					"enumProp": {
+						Property: plan.Property{
+							Name:   "enumProp",
+							Types:  []plan.PropertyType{plan.PrimitiveTypeString},
+							Config: &plan.PropertyConfig{Enum: []any{"a", "b"}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, want, got.Rules[0].Variants)
+}
+
 func TestLocalCatalogPlanProvider_TrackingPlanNotFound(t *testing.T) {
 	_, err := providers.NewLocalCatalogPlanProvider(buildCatalog(), "missing").GetTrackingPlan(context.Background())
 	require.Error(t, err)
