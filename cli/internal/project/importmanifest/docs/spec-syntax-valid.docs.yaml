@@ -2,7 +2,7 @@ rule_id: "import-manifest/spec-syntax-valid"
 match_behavior:
   - applies_to:
       - kind: "import-manifest"
-        version: "*"
+        version: "rudder/v1"
     valid:
       - example_id: "manifest-spec-valid-ok"
         title: "Well-formed import manifest"

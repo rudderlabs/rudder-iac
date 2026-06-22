@@ -60,27 +60,9 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("import-manifest spec %s does not support legacy version %s", path, s.Version)
 }
 
-// ParseSpec extracts one URNEntry per manifest resource, each paired with the
-// JSON-pointer path into spec.workspaces for precise diagnostics. Cross-file and
-// orphan rules consume these entries.
+// ParseSpec returns an empty ParsedSpec — manifest specs carry no resource URNs.
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	workspaces, err := parseWorkspaces(s)
-	if err != nil {
-		return nil, err
-	}
-	urns := make([]specs.URNEntry, 0)
-	for wi, ws := range workspaces {
-		for ri, r := range ws.Resources {
-			if r.URN == "" {
-				continue
-			}
-			urns = append(urns, specs.URNEntry{
-				URN:             r.URN,
-				JSONPointerPath: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", wi, ri),
-			})
-		}
-	}
-	return &specs.ParsedSpec{URNs: urns}, nil
+	return &specs.ParsedSpec{}, nil
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {

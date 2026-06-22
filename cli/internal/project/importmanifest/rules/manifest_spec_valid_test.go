@@ -27,7 +27,7 @@ func TestManifestSpecSyntaxValidRule_Metadata(t *testing.T) {
 	assert.Equal(t, "import-manifest/spec-syntax-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
 	assert.Equal(t,
-		[]vrules.MatchPattern{vrules.MatchKind(manifestspec.KindImportManifest)},
+		[]vrules.MatchPattern{vrules.MatchKindVersion(manifestspec.KindImportManifest, specs.SpecVersionV1)},
 		rule.AppliesTo(),
 	)
 }

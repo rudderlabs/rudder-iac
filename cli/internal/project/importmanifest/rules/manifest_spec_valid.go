@@ -33,7 +33,7 @@ func (r *manifestSpecValidRule) Description() string {
 }
 
 func (r *manifestSpecValidRule) AppliesTo() []vrules.MatchPattern {
-	return []vrules.MatchPattern{vrules.MatchKind(manifestspec.KindImportManifest)}
+	return []vrules.MatchPattern{vrules.MatchKindVersion(manifestspec.KindImportManifest, specs.SpecVersionV1)}
 }
 
 func (r *manifestSpecValidRule) Examples() vrules.Examples { return vrules.Examples{} }
