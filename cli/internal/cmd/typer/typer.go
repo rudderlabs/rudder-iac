@@ -67,6 +67,10 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("unsupported platform: %s (supported platforms: %s)", platform, strings.Join(supported, ", "))
 			}
 
+			if local && !config.GetConfig().ExperimentalFlags.LocalTyper {
+				return fmt.Errorf("--local is experimental; enable it by setting the 'localTyper' flag (e.g. RUDDERSTACK_X_LOCAL_TYPER=true)")
+			}
+
 			defer func() {
 				telemetry.TrackCommand("typer", nil, []telemetry.KV{
 					{K: "platform", V: platform},
@@ -110,7 +114,7 @@ func newCmdGenerate() *cobra.Command {
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
 
-	cmd.Flags().BoolVar(&local, "local", false, "Generate from local specs instead of the remote workspace (no apply or network needed)")
+	cmd.Flags().BoolVar(&local, "local", false, "[experimental] Generate from local specs instead of the remote workspace (no apply or network needed); requires the 'localTyper' flag")
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory or spec file (used with --local)")
 
 	cmd.Flags().StringArrayVar(&options, "option", []string{},
