@@ -60,13 +60,15 @@ func TestBuild_GatekeeperOnly(t *testing.T) {
 	for _, r := range doc.Rules {
 		ids = append(ids, r.RuleID)
 	}
-	// The four gatekeeper rules BuildRegistry always registers, plus the two
-	// import-manifest rules the manifest provider contributes.
+	// The gatekeeper rules BuildRegistry always registers (incl. the cross-source
+	// manifest-inline conflict rule), plus the two import-manifest rules the
+	// manifest provider contributes.
 	assert.ElementsMatch(t, []string{
 		"project/spec-syntax-valid",
 		"project/resource-kind-version-valid",
 		"project/metadata-syntax-valid",
 		"project/duplicate-urn",
+		"project/manifest-inline-conflict",
 		"import-manifest/spec-syntax-valid",
 		"import-manifest/duplicate-urn",
 	}, ids)

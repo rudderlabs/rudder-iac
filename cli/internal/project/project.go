@@ -348,6 +348,11 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		// excluded. See MultiSpecRule filtering.
 		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
 		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
+
+		// Cross-source: a URN must not appear in both an import-manifest and an
+		// inline metadata.import block. Applies to the union (both kinds), and
+		// needs both providers' ParseSpec.
+		prules.NewManifestInlineConflictRule(manifestProvider.ParseSpec, provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
