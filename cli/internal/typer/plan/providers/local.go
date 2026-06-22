@@ -3,17 +3,24 @@ package providers
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
-	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 )
 
 // LocalCatalogPlanProvider builds a tracking plan from local YAML specs so that
 // `typer generate --local` can produce code without fetching from (or applying
-// to) the remote workspace. It renders the loaded catalog into the same
-// JSON-Schema representation the remote returns and reuses BuildTrackingPlan, so
-// local and remote output stay identical.
+// to) the remote workspace.
+//
+// It converts the loaded catalog directly into the typer's plan.TrackingPlan
+// contract. plan.TrackingPlan — not the remote's JSON-Schema wire format — is the
+// internal contract the generators consume, so the local and remote providers are
+// two adapters onto the same struct; equivalence is enforced by tests, not by
+// routing local specs through the remote serialization.
 type LocalCatalogPlanProvider struct {
 	dc             *localcatalog.DataCatalog
 	trackingPlanID string
@@ -21,6 +28,46 @@ type LocalCatalogPlanProvider struct {
 
 func NewLocalCatalogPlanProvider(dc *localcatalog.DataCatalog, trackingPlanID string) *LocalCatalogPlanProvider {
 	return &LocalCatalogPlanProvider{dc: dc, trackingPlanID: trackingPlanID}
+}
+
+// NewLocalCatalogPlanProviderForProject loads and validates the project at
+// location offline (no auth or network) and returns a provider for its tracking
+// plan. trackingPlanID is optional when the project has exactly one plan.
+func NewLocalCatalogPlanProviderForProject(location, trackingPlanID string) (*LocalCatalogPlanProvider, error) {
+	dcProvider := datacatalog.New(nil)
+	proj := project.New(dcProvider)
+	if err := proj.Load(location); err != nil {
+		return nil, fmt.Errorf("loading and validating project: %w", err)
+	}
+
+	dc := dcProvider.GetLocalCatalog()
+	id, err := resolveTrackingPlanID(dc, trackingPlanID)
+	if err != nil {
+		return nil, err
+	}
+	return NewLocalCatalogPlanProvider(dc, id), nil
+}
+
+// resolveTrackingPlanID defaults to the only plan when the project has exactly one
+// and none was requested; otherwise it requires an explicit id.
+func resolveTrackingPlanID(dc *localcatalog.DataCatalog, trackingPlanID string) (string, error) {
+	if trackingPlanID != "" {
+		return trackingPlanID, nil
+	}
+
+	switch len(dc.TrackingPlans) {
+	case 0:
+		return "", fmt.Errorf("no tracking plans found in the project")
+	case 1:
+		return dc.TrackingPlans[0].LocalID, nil
+	default:
+		ids := make([]string, 0, len(dc.TrackingPlans))
+		for _, tp := range dc.TrackingPlans {
+			ids = append(ids, tp.LocalID)
+		}
+		sort.Strings(ids)
+		return "", fmt.Errorf("multiple tracking plans found, specify --tracking-plan-id (available: %s)", strings.Join(ids, ", "))
+	}
 }
 
 func (p *LocalCatalogPlanProvider) GetTrackingPlan(_ context.Context) (*plan.TrackingPlan, error) {
@@ -35,293 +82,289 @@ func (p *LocalCatalogPlanProvider) GetTrackingPlan(_ context.Context) (*plan.Tra
 		return nil, fmt.Errorf("tracking plan %q not found in local specs", p.trackingPlanID)
 	}
 
-	// ExpandRefs resolves every event/property/custom-type reference in the rules
-	// into tp.EventProps, leaving custom-typed properties as ref strings that the
-	// renderer turns into $defs entries.
+	// ExpandRefs resolves every event/property reference in the rules into typed
+	// TPEvent/TPEventProperty structs, leaving custom-typed properties as ref
+	// strings that buildProperty resolves against the catalog.
 	if err := tp.ExpandRefs(p.dc); err != nil {
 		return nil, fmt.Errorf("expanding tracking plan refs: %w", err)
 	}
 
-	apitp, err := renderTrackingPlanSchemas(tp, p.dc)
+	rules := make([]plan.EventRule, 0, len(tp.EventProps))
+	for _, ev := range tp.EventProps {
+		rule, err := p.buildEventRule(ev)
+		if err != nil {
+			return nil, fmt.Errorf("building rule for event %q: %w", ev.Name, err)
+		}
+		rules = append(rules, *rule)
+	}
+
+	return &plan.TrackingPlan{
+		Name:     tp.Name,
+		Rules:    rules,
+		Metadata: plan.PlanMetadata{TrackingPlanID: tp.LocalID},
+	}, nil
+}
+
+func (p *LocalCatalogPlanProvider) buildEventRule(ev *localcatalog.TPEvent) (*plan.EventRule, error) {
+	evType, err := parseEventType(ev.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	return BuildTrackingPlan(apitp)
-}
-
-func renderTrackingPlanSchemas(tp *localcatalog.TrackingPlanV1, dc *localcatalog.DataCatalog) (*catalog.TrackingPlanWithSchemas, error) {
-	events := make([]catalog.TrackingPlanEventSchema, 0, len(tp.EventProps))
-
-	for _, ev := range tp.EventProps {
-		if len(ev.Variants) > 0 {
-			return nil, errVariantUnsupported(fmt.Sprintf("event %q", ev.Name))
-		}
-
-		section := ev.IdentitySection
-		if section == "" {
-			section = "properties"
-		}
-
-		defs := map[string]any{}
-		objSchema, err := renderObjectSchema(ev.Properties, ev.AllowUnplanned, dc, defs)
-		if err != nil {
-			return nil, fmt.Errorf("rendering event %q: %w", ev.Name, err)
-		}
-
-		sectionProps, err := wrapIdentitySection(section, objSchema)
-		if err != nil {
-			return nil, fmt.Errorf("rendering event %q: %w", ev.Name, err)
-		}
-
-		schema := catalog.TrackingPlanEventSchema{
-			Name:            ev.Name,
-			Description:     ev.Description,
-			EventType:       ev.Type,
-			IdentitySection: section,
-		}
-		schema.Rules.Type = "object"
-		schema.Rules.Properties = sectionProps
-		if len(defs) > 0 {
-			schema.Rules.Defs = defs
-		}
-
-		events = append(events, schema)
+	sectionStr := ev.IdentitySection
+	if sectionStr == "" {
+		sectionStr = "properties"
+	}
+	section, err := parseIdentitySection(sectionStr)
+	if err != nil {
+		return nil, err
 	}
 
-	return &catalog.TrackingPlanWithSchemas{
-		ID:     tp.LocalID,
-		Name:   tp.Name,
-		Events: events,
+	// Custom types are scoped per event rule, matching the remote provider which
+	// builds them from each event's $defs. The registry shares instances across
+	// references within the rule and breaks reference cycles.
+	reg := map[string]*plan.CustomType{}
+
+	schema, err := p.buildObjectSchema(ev.Properties, ev.AllowUnplanned, reg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &plan.EventRule{
+		Event:   plan.Event{Name: ev.Name, Description: ev.Description, EventType: evType},
+		Section: section,
+		Schema:  *schema,
 	}, nil
 }
 
-// wrapIdentitySection nests the event's object schema under the key path the
-// parser expects for the given identity section.
-func wrapIdentitySection(section string, objSchema map[string]any) (map[string]any, error) {
-	switch section {
-	case "properties", "traits":
-		return map[string]any{section: objSchema}, nil
-	case "context.traits":
-		return map[string]any{
-			"context": map[string]any{
-				"properties": map[string]any{
-					"traits": objSchema,
-				},
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported identity section %q", section)
+func (p *LocalCatalogPlanProvider) buildObjectSchema(props []*localcatalog.TPEventProperty, additionalProps bool, reg map[string]*plan.CustomType) (*plan.ObjectSchema, error) {
+	schema := &plan.ObjectSchema{
+		Properties:           make(map[string]plan.PropertySchema, len(props)),
+		AdditionalProperties: additionalProps,
 	}
-}
-
-func renderObjectSchema(props []*localcatalog.TPEventProperty, additionalProps bool, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, error) {
-	properties := map[string]any{}
-	var required []any
-
 	for _, prop := range props {
-		node, err := renderProperty(prop, dc, defs)
+		property, nested, err := p.buildProperty(propInput{
+			Name:                 prop.Name,
+			Type:                 prop.Type,
+			Types:                prop.Types,
+			ItemType:             prop.ItemType,
+			ItemTypes:            prop.ItemTypes,
+			Config:               prop.Config,
+			Nested:               prop.Properties,
+			AdditionalProperties: prop.AdditionalProperties,
+		}, reg)
 		if err != nil {
 			return nil, err
 		}
-		properties[prop.Name] = node
-		if prop.Required {
-			required = append(required, prop.Name)
-		}
-	}
-
-	schema := map[string]any{
-		"type":                 "object",
-		"additionalProperties": additionalProps,
-		"properties":           properties,
-	}
-	if len(required) > 0 {
-		schema["required"] = required
+		schema.Properties[prop.Name] = plan.PropertySchema{Property: property, Required: prop.Required, Schema: nested}
 	}
 	return schema, nil
 }
 
-// renderProperty renders a tracking-plan rule property. Object properties take
-// their nested fields from the rule (prop.Properties), unlike custom types.
-func renderProperty(prop *localcatalog.TPEventProperty, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, error) {
-	if ref, ok, err := renderCustomRef(prop.Type, dc, defs); err != nil {
-		return nil, err
+// propInput is the shape buildProperty needs, decoupled from whether it came from
+// a resolved rule property (which supplies Nested object fields) or a property
+// definition used inside a custom type or variant case (which does not).
+type propInput struct {
+	Name      string
+	Type      string
+	Types     []string
+	ItemType  string
+	ItemTypes []string
+	Config    map[string]any
+	// Nested holds an object's fields when the caller has them (rule properties);
+	// nil yields an empty object schema, matching the remote provider for bare
+	// object properties in $defs.
+	Nested               []*localcatalog.TPEventProperty
+	AdditionalProperties *bool
+}
+
+func (p *LocalCatalogPlanProvider) buildProperty(in propInput, reg map[string]*plan.CustomType) (plan.Property, *plan.ObjectSchema, error) {
+	property := plan.Property{Name: in.Name}
+
+	if ct, ok, err := p.customType(in.Type, reg); err != nil {
+		return property, nil, err
 	} else if ok {
-		return ref, nil
+		property.Types = []plan.PropertyType{ct}
+		return property, nil, nil
 	}
 
-	if len(prop.Types) > 0 {
-		return withEnum(map[string]any{"type": toAnySlice(prop.Types)}, prop.Config), nil
-	}
-
-	switch prop.Type {
-	case "object":
-		return renderObjectSchema(prop.Properties, derefBool(prop.AdditionalProperties, true), dc, defs)
-	case "array":
-		node := map[string]any{"type": "array"}
-		items, err := renderArrayItems(prop.ItemType, prop.ItemTypes, dc, defs)
+	if len(in.Types) > 0 {
+		types, err := toPrimitiveTypes(in.Types)
 		if err != nil {
-			return nil, err
+			return property, nil, err
 		}
-		if items != nil {
-			node["items"] = items
+		property.Types = types
+		property.Config = toConfig(in.Config)
+		return property, nil, nil
+	}
+
+	switch in.Type {
+	case "object":
+		property.Types = []plan.PropertyType{plan.PrimitiveTypeObject}
+		nested, err := p.buildObjectSchema(in.Nested, derefBool(in.AdditionalProperties, true), reg)
+		if err != nil {
+			return property, nil, err
 		}
-		return withEnum(node, prop.Config), nil
+		return property, nested, nil
+
+	case "array":
+		property.Types = []plan.PropertyType{plan.PrimitiveTypeArray}
+		itemTypes, err := p.buildItemTypes(in.ItemType, in.ItemTypes, reg)
+		if err != nil {
+			return property, nil, err
+		}
+		property.ItemTypes = itemTypes
+		property.Config = toConfig(in.Config)
+		return property, nil, nil
+
 	case "":
-		return nil, fmt.Errorf("property %q has no type", prop.Name)
+		return property, nil, fmt.Errorf("property %q has no type", in.Name)
+
 	default:
-		return withEnum(map[string]any{"type": prop.Type}, prop.Config), nil
+		pt, err := parsePrimitiveType(in.Type)
+		if err != nil {
+			return property, nil, err
+		}
+		property.Types = []plan.PropertyType{pt}
+		property.Config = toConfig(in.Config)
+		return property, nil, nil
 	}
 }
 
-// renderCustomRef detects a custom-type reference, registers the referenced type
-// into defs, and returns a $ref node. ok is false when typeStr is not a ref.
-func renderCustomRef(typeStr string, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, bool, error) {
+// buildPropertyFromDef converts a property referenced by its definition (a custom
+// type field or a variant case property), which carries no rule-supplied nesting.
+func (p *LocalCatalogPlanProvider) buildPropertyFromDef(prop *localcatalog.PropertyV1, required bool, reg map[string]*plan.CustomType) (plan.PropertySchema, error) {
+	property, nested, err := p.buildProperty(propInput{
+		Name:      prop.Name,
+		Type:      prop.Type,
+		Types:     prop.Types,
+		ItemType:  prop.ItemType,
+		ItemTypes: prop.ItemTypes,
+		Config:    prop.Config,
+	}, reg)
+	if err != nil {
+		return plan.PropertySchema{}, err
+	}
+	return plan.PropertySchema{Property: property, Required: required, Schema: nested}, nil
+}
+
+func (p *LocalCatalogPlanProvider) buildItemTypes(itemType string, itemTypes []string, reg map[string]*plan.CustomType) ([]plan.PropertyType, error) {
+	if itemType != "" {
+		if ct, ok, err := p.customType(itemType, reg); err != nil {
+			return nil, err
+		} else if ok {
+			return []plan.PropertyType{ct}, nil
+		}
+		pt, err := parsePrimitiveType(itemType)
+		if err != nil {
+			return nil, err
+		}
+		return []plan.PropertyType{pt}, nil
+	}
+
+	var types []plan.PropertyType
+	for _, it := range itemTypes {
+		pt, err := parsePrimitiveType(it)
+		if err != nil {
+			return nil, err
+		}
+		types = append(types, pt)
+	}
+	return types, nil // nil for array-of-any
+}
+
+// customType resolves a custom-type reference into a *plan.CustomType, caching
+// instances in reg so repeated references share one instance and cycles
+// terminate. ok is false when typeStr is not a custom-type reference.
+func (p *LocalCatalogPlanProvider) customType(typeStr string, reg map[string]*plan.CustomType) (*plan.CustomType, bool, error) {
 	m := localcatalog.CustomTypeRegex.FindStringSubmatch(typeStr)
 	if len(m) != 2 {
 		return nil, false, nil
 	}
-
-	ct := dc.CustomType(m[1])
+	ct := p.dc.CustomType(m[1])
 	if ct == nil {
 		return nil, false, fmt.Errorf("custom type %q not found in local specs", m[1])
 	}
-	if err := registerCustomType(ct, dc, defs); err != nil {
-		return nil, false, err
-	}
-	return map[string]any{"$ref": "#/$defs/" + ct.Name}, true, nil
-}
 
-func registerCustomType(ct *localcatalog.CustomTypeV1, dc *localcatalog.DataCatalog, defs map[string]any) error {
-	if _, exists := defs[ct.Name]; exists {
-		return nil
-	}
-	if len(ct.Variants) > 0 {
-		return errVariantUnsupported(fmt.Sprintf("custom type %q", ct.Name))
+	if existing, ok := reg[ct.Name]; ok {
+		return existing, true, nil
 	}
 
-	// Reserve the name before rendering children so a self/mutual reference does
-	// not recurse forever.
-	defs[ct.Name] = map[string]any{}
+	pct := &plan.CustomType{Name: ct.Name, Description: ct.Description}
+	reg[ct.Name] = pct // register before children so cyclic references terminate
 
-	node, err := renderCustomTypeNode(ct, dc, defs)
+	primType, err := parsePrimitiveType(ct.Type)
 	if err != nil {
-		return err
+		return nil, false, fmt.Errorf("custom type %q: %w", ct.Name, err)
 	}
-	defs[ct.Name] = node
-	return nil
-}
+	pct.Type = primType
+	pct.Config = toConfig(ct.Config)
 
-// renderCustomTypeNode renders a custom type definition. Object custom types take
-// their fields from ct.Properties (each a reference to a property).
-func renderCustomTypeNode(ct *localcatalog.CustomTypeV1, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, error) {
 	switch ct.Type {
 	case "object":
-		properties := map[string]any{}
-		var required []any
+		schema := &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}, AdditionalProperties: true}
 		for _, ctp := range ct.Properties {
-			m := localcatalog.PropRegex.FindStringSubmatch(ctp.Property)
-			if len(m) != 2 {
-				return nil, fmt.Errorf("custom type %q: invalid property ref %q", ct.Name, ctp.Property)
-			}
-			prop := dc.Property(m[1])
-			if prop == nil {
-				return nil, fmt.Errorf("custom type %q: property %q not found", ct.Name, m[1])
-			}
-			node, err := renderPropertyDefinition(prop, dc, defs)
+			prop, err := p.resolveProperty(ctp.Property)
 			if err != nil {
-				return nil, err
+				return nil, false, fmt.Errorf("custom type %q: %w", ct.Name, err)
 			}
-			properties[prop.Name] = node
-			if ctp.Required {
-				required = append(required, prop.Name)
+			ps, err := p.buildPropertyFromDef(prop, ctp.Required, reg)
+			if err != nil {
+				return nil, false, err
 			}
+			schema.Properties[prop.Name] = ps
 		}
-		schema := map[string]any{"type": "object", "properties": properties}
-		if len(required) > 0 {
-			schema["required"] = required
-		}
-		return schema, nil
+		pct.Schema = schema
 	case "array":
-		node := map[string]any{"type": "array"}
-		items, err := renderArrayItems(ct.ItemType, ct.ItemTypes, dc, defs)
+		itemTypes, err := p.buildItemTypes(ct.ItemType, ct.ItemTypes, reg)
+		if err != nil {
+			return nil, false, err
+		}
+		if len(itemTypes) > 0 {
+			pct.ItemType = itemTypes[0]
+		}
+	}
+
+	return pct, true, nil
+}
+
+func (p *LocalCatalogPlanProvider) resolveProperty(ref string) (*localcatalog.PropertyV1, error) {
+	m := localcatalog.PropRegex.FindStringSubmatch(ref)
+	if len(m) != 2 {
+		return nil, fmt.Errorf("invalid property reference %q", ref)
+	}
+	prop := p.dc.Property(m[1])
+	if prop == nil {
+		return nil, fmt.Errorf("property %q not found in local specs", m[1])
+	}
+	return prop, nil
+}
+
+func toPrimitiveTypes(types []string) ([]plan.PropertyType, error) {
+	out := make([]plan.PropertyType, 0, len(types))
+	for _, t := range types {
+		pt, err := parsePrimitiveType(t)
 		if err != nil {
 			return nil, err
 		}
-		if items != nil {
-			node["items"] = items
-		}
-		return withEnum(node, ct.Config), nil
-	default:
-		return withEnum(map[string]any{"type": ct.Type}, ct.Config), nil
+		out = append(out, pt)
 	}
+	return out, nil
 }
 
-// renderPropertyDefinition renders a property from its definition (used for the
-// fields of an object custom type). Unlike rule properties, a bare object
-// property carries no nested fields.
-func renderPropertyDefinition(prop *localcatalog.PropertyV1, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, error) {
-	if ref, ok, err := renderCustomRef(prop.Type, dc, defs); err != nil {
-		return nil, err
-	} else if ok {
-		return ref, nil
-	}
-
-	if len(prop.Types) > 0 {
-		return withEnum(map[string]any{"type": toAnySlice(prop.Types)}, prop.Config), nil
-	}
-
-	switch prop.Type {
-	case "array":
-		node := map[string]any{"type": "array"}
-		items, err := renderArrayItems(prop.ItemType, prop.ItemTypes, dc, defs)
-		if err != nil {
-			return nil, err
-		}
-		if items != nil {
-			node["items"] = items
-		}
-		return withEnum(node, prop.Config), nil
-	case "object":
-		return map[string]any{"type": "object"}, nil
-	case "":
-		return nil, fmt.Errorf("property %q has no type", prop.Name)
-	default:
-		return withEnum(map[string]any{"type": prop.Type}, prop.Config), nil
-	}
-}
-
-func renderArrayItems(itemType string, itemTypes []string, dc *localcatalog.DataCatalog, defs map[string]any) (map[string]any, error) {
-	if itemType != "" {
-		if ref, ok, err := renderCustomRef(itemType, dc, defs); err != nil {
-			return nil, err
-		} else if ok {
-			return ref, nil
-		}
-		return map[string]any{"type": itemType}, nil
-	}
-	if len(itemTypes) > 0 {
-		return map[string]any{"type": toAnySlice(itemTypes)}, nil
-	}
-	return nil, nil // array of any: no items constraint
-}
-
-func withEnum(node map[string]any, config map[string]any) map[string]any {
+func toConfig(config map[string]any) *plan.PropertyConfig {
 	if config == nil {
-		return node
+		return nil
 	}
-	if enum, ok := config["enum"]; ok {
-		node["enum"] = enum
+	enum, ok := config["enum"]
+	if !ok {
+		return nil
 	}
-	return node
-}
-
-func toAnySlice(ss []string) []any {
-	out := make([]any, len(ss))
-	for i, s := range ss {
-		out[i] = s
+	enumSlice, ok := enum.([]any)
+	if !ok {
+		return nil
 	}
-	return out
+	return &plan.PropertyConfig{Enum: enumSlice}
 }
 
 func derefBool(b *bool, def bool) bool {
@@ -329,12 +372,4 @@ func derefBool(b *bool, def bool) bool {
 		return def
 	}
 	return *b
-}
-
-func errVariantUnsupported(where string) error {
-	return fmt.Errorf(
-		"%s uses variants, which are not yet supported by `typer generate --local`; "+
-			"apply the plan and generate from remote, or remove the variant",
-		where,
-	)
 }

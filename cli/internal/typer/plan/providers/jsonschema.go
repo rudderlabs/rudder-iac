@@ -26,15 +26,6 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 		return nil, err
 	}
 
-	return BuildTrackingPlan(apitp)
-}
-
-// BuildTrackingPlan converts the JSON-Schema tracking-plan representation into the
-// typer's plan.TrackingPlan model. It is the single parser shared by every plan
-// source: the remote provider feeds it an API response, and the local provider
-// feeds it a representation rendered from local specs. Keeping one parser
-// guarantees local and remote output stay identical.
-func BuildTrackingPlan(apitp *catalog.TrackingPlanWithSchemas) (*plan.TrackingPlan, error) {
 	rules := make([]plan.EventRule, 0, len(apitp.Events))
 	for _, ev := range apitp.Events {
 		rule, err := parseTrackingPlanEventSchema(&ev)

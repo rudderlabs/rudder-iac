@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
@@ -11,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// buildCatalog assembles a DataCatalog covering the constructs the v1 renderer
-// supports: primitives, enum config, arrays, nested objects, and a custom type.
+// buildCatalog assembles a DataCatalog covering primitives, enum config, arrays,
+// nested objects, and a custom type.
 func buildCatalog() *localcatalog.DataCatalog {
 	dc := localcatalog.New()
 	dc.Properties = []localcatalog.PropertyV1{
@@ -62,11 +63,8 @@ func TestLocalCatalogPlanProvider_GetTrackingPlan(t *testing.T) {
 	require.NoError(t, err)
 
 	want := &plan.TrackingPlan{
-		Name: "TP",
-		Metadata: plan.PlanMetadata{
-			TrackingPlanID: "tp",
-			URL:            "https://app.rudderstack.com/trackingPlans/tp",
-		},
+		Name:     "TP",
+		Metadata: plan.PlanMetadata{TrackingPlanID: "tp"},
 		Rules: []plan.EventRule{
 			{
 				Event:   plan.Event{Name: "My Event", EventType: plan.EventTypeTrack, Description: "an event"},
@@ -123,19 +121,56 @@ func TestLocalCatalogPlanProvider_GetTrackingPlan(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestLocalCatalogPlanProvider_FailsLoudOnVariants(t *testing.T) {
-	dc := buildCatalog()
-	dc.TrackingPlans[0].Rules[0].Variants = localcatalog.VariantsV1{
-		{Type: "discriminator", Discriminator: "#property:str"},
-	}
-
-	_, err := providers.NewLocalCatalogPlanProvider(dc, "tp").GetTrackingPlan(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "variants")
-}
-
 func TestLocalCatalogPlanProvider_TrackingPlanNotFound(t *testing.T) {
 	_, err := providers.NewLocalCatalogPlanProvider(buildCatalog(), "missing").GetTrackingPlan(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
+}
+
+// TestLocalAndRemoteProduceEquivalentPlan is the guard that justifies having two
+// independent adapters onto plan.TrackingPlan: for the same logical plan, the
+// local converter and the remote JSON-Schema parser must produce the same rules.
+// (Metadata differs by design — the local plan has no remote URL/version.)
+func TestLocalAndRemoteProduceEquivalentPlan(t *testing.T) {
+	ctx := context.Background()
+
+	localPlan, err := providers.NewLocalCatalogPlanProvider(buildCatalog(), "tp").GetTrackingPlan(ctx)
+	require.NoError(t, err)
+
+	// Hand-authored JSON-Schema representation of the same plan buildCatalog builds.
+	ev := catalog.TrackingPlanEventSchema{
+		Name:            "My Event",
+		Description:     "an event",
+		EventType:       "track",
+		IdentitySection: "properties",
+	}
+	ev.Rules.Type = "object"
+	ev.Rules.Properties = map[string]any{
+		"properties": map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"strProp":  map[string]any{"type": "string"},
+				"enumProp": map[string]any{"type": "string", "enum": []any{"a", "b"}},
+				"arrProp":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"custProp": map[string]any{"$ref": "#/$defs/Email"},
+				"objProp": map[string]any{
+					"type":                 "object",
+					"additionalProperties": true,
+					"properties":           map[string]any{"childProp": map[string]any{"type": "integer"}},
+					"required":             []any{"childProp"},
+				},
+			},
+			"required": []any{"strProp"},
+		},
+	}
+	ev.Rules.Defs = map[string]any{
+		"Email": map[string]any{"type": "string", "enum": []any{"x"}},
+	}
+
+	remoteResp := constructTrackingPlanWithSchemas("tp", "TP", []catalog.TrackingPlanEventSchema{ev})
+	remotePlan, err := providers.NewJSONSchemaPlanProvider("tp", &mockTrackingPlanStore{trackingPlanWithSchemas: remoteResp}).GetTrackingPlan(ctx)
+	require.NoError(t, err)
+
+	assert.Equal(t, remotePlan.Rules, localPlan.Rules)
 }

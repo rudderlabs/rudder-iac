@@ -7,13 +7,9 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
@@ -83,9 +79,9 @@ func newCmdGenerate() *cobra.Command {
 				err          error
 			)
 			if local {
-				planProvider, err = newLocalPlanProvider(location, trackingPlanID)
+				planProvider, err = providers.NewLocalCatalogPlanProviderForProject(location, trackingPlanID)
 			} else {
-				planProvider, err = newRemotePlanProvider(trackingPlanID)
+				planProvider, err = providers.NewRemoteCatalogPlanProvider(trackingPlanID)
 			}
 			if err != nil {
 				return err
@@ -121,72 +117,6 @@ func newCmdGenerate() *cobra.Command {
 		"Platform-specific options in key=value format (use 'rudder-cli typer options <platform>' to see available options)")
 
 	return cmd
-}
-
-// newRemotePlanProvider builds a plan provider that fetches the tracking plan
-// from the remote workspace by ID.
-func newRemotePlanProvider(trackingPlanID string) (typer.PlanProvider, error) {
-	if trackingPlanID == "" {
-		return nil, fmt.Errorf("tracking-plan-id is required")
-	}
-
-	deps, err := app.NewDeps()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
-	}
-
-	cfg := config.GetConfig()
-	dataCatalogClient, err := catalog.NewRudderDataCatalog(
-		deps.Client(),
-		catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
-	}
-
-	return providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient), nil
-}
-
-// newLocalPlanProvider loads and validates the project at location, then builds a
-// plan provider that sources the tracking plan from the local specs. No auth or
-// network access is required.
-func newLocalPlanProvider(location, trackingPlanID string) (typer.PlanProvider, error) {
-	dcProvider := datacatalog.New(nil)
-	proj := project.New(dcProvider)
-	if err := proj.Load(location); err != nil {
-		return nil, fmt.Errorf("loading and validating project: %w", err)
-	}
-
-	dc := dcProvider.GetLocalCatalog()
-
-	id, err := resolveLocalTrackingPlanID(dc, trackingPlanID)
-	if err != nil {
-		return nil, err
-	}
-
-	return providers.NewLocalCatalogPlanProvider(dc, id), nil
-}
-
-// resolveLocalTrackingPlanID returns the requested tracking plan id, defaulting
-// to the only plan when the project has exactly one and none was requested.
-func resolveLocalTrackingPlanID(dc *localcatalog.DataCatalog, trackingPlanID string) (string, error) {
-	if trackingPlanID != "" {
-		return trackingPlanID, nil
-	}
-
-	switch len(dc.TrackingPlans) {
-	case 0:
-		return "", fmt.Errorf("no tracking plans found in the project")
-	case 1:
-		return dc.TrackingPlans[0].LocalID, nil
-	default:
-		ids := make([]string, 0, len(dc.TrackingPlans))
-		for _, tp := range dc.TrackingPlans {
-			ids = append(ids, tp.LocalID)
-		}
-		sort.Strings(ids)
-		return "", fmt.Errorf("multiple tracking plans found, specify --tracking-plan-id (available: %s)", strings.Join(ids, ", "))
-	}
 }
 
 // parsePlatformOptions converts a slice of "key=value" strings into a map[string]string
