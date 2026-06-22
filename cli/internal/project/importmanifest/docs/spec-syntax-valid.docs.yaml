@@ -1,0 +1,66 @@
+rule_id: "import-manifest/spec-syntax-valid"
+match_behavior:
+  - applies_to:
+      - kind: "import-manifest"
+        version: "*"
+    valid:
+      - example_id: "manifest-spec-valid-ok"
+        title: "Well-formed import manifest"
+        description: >
+          A manifest with one workspace and urn-based resources. Every resource
+          carries a urn and a remote_id, so the manifest is valid.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "src_remote_456"
+    invalid:
+      - example_id: "manifest-spec-valid-missing-workspace-id"
+        title: "Workspace missing workspace_id"
+        description: >
+          Each workspace block must declare a workspace_id.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - resources:
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "src_remote_456"
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/workspace_id"
+            severity: "error"
+            message_contains: "workspace_id is required"
+      - example_id: "manifest-spec-valid-local-id"
+        title: "Resource using local_id instead of urn"
+        description: >
+          Manifests require urn; local_id is rejected because manifests are a
+          forward-looking format.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - local_id: "my-source"
+                      remote_id: "src_remote_456"
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "urn is required in manifests (local_id not supported)"

@@ -10,6 +10,7 @@ import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
@@ -254,7 +255,7 @@ func (d *deps) CompositeProvider() provider.Provider {
 // sharing the same construction as project validation so the docs generator
 // observes an identical rule set.
 func (d *deps) Registry() (rules.Registry, error) {
-	return project.BuildRegistry(d.CompositeProvider())
+	return project.BuildRegistry(d.CompositeProvider(), importmanifest.New())
 }
 
 // NewProject creates a project with composite provider.

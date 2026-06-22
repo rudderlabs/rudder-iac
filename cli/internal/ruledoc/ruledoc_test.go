@@ -45,17 +45,29 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 // TestBuild_GatekeeperOnly proves Build assembles a valid catalog from a
 // provider in isolation — no client, config, or auth. The provider declares the
 // resource match patterns the gatekeeper rules are scoped to (via BuildRegistry),
-// so the four project-level gatekeeper rules and their embedded fragments cover
-// each other exactly and the catalog validates with zero errors. This is the
+// and Build always wires the import-manifest provider, so the four project-level
+// gatekeeper rules plus the two import-manifest rules and their embedded fragments
+// cover each other exactly and the catalog validates with zero errors. This is the
 // assembly seam that package app exercises end-to-end against the real providers.
 func TestBuild_GatekeeperOnly(t *testing.T) {
 	cp := &testutils.MockProvider{MatchPatterns: gatekeeperScopedPatterns()}
 
 	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z")
 	require.NoError(t, err)
-	assert.Empty(t, verrs, "gatekeeper fragments must cover the gatekeeper rules exactly")
+	assert.Empty(t, verrs, "fragments must cover the registered rules exactly")
 
-	// spec-syntax-valid, resource-kind-version-valid, metadata-syntax-valid,
-	// duplicate-urn — the rules BuildRegistry always registers.
-	require.Len(t, doc.Rules, 4)
+	ids := make([]string, 0, len(doc.Rules))
+	for _, r := range doc.Rules {
+		ids = append(ids, r.RuleID)
+	}
+	// The four gatekeeper rules BuildRegistry always registers, plus the two
+	// import-manifest rules the manifest provider contributes.
+	assert.ElementsMatch(t, []string{
+		"project/spec-syntax-valid",
+		"project/resource-kind-version-valid",
+		"project/metadata-syntax-valid",
+		"project/duplicate-urn",
+		"import-manifest/spec-syntax-valid",
+		"import-manifest/duplicate-urn",
+	}, ids)
 }
