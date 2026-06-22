@@ -1,0 +1,56 @@
+rule_id: "import-manifest/orphaned-urn"
+match_behavior:
+  - applies_to:
+      - kind: "import-manifest"
+        version: "rudder/v1"
+    valid:
+      - example_id: "orphaned-urn-resolves"
+        title: "Manifest URN matches a resource in the project"
+        description: >
+          The manifest imports event:order_completed, and an events spec defines a
+          resource resolving to that URN, so the entry is not orphaned.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event:order_completed"
+                      remote_id: "remote_a"
+          events.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+    invalid:
+      - example_id: "orphaned-urn-missing"
+        title: "Manifest URN with no matching resource in the project"
+        description: >
+          The manifest imports event:order_completed, but no spec defines a
+          resource with that URN — a stale entry or a typo. The rule flags it for
+          the active workspace.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event:order_completed"
+                      remote_id: "remote_a"
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "manifest URN 'event:order_completed' does not match any resource in the project"

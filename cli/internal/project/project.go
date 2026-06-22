@@ -233,7 +233,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
-	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
+	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
@@ -363,9 +363,8 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		}
 	}
 
-	// Only the resource provider contributes semantic rules today; the manifest
-	// provider's SemanticRules() seam is wired when its first semantic rule lands.
-	for _, rule := range provider.SemanticRules() {
+	semantic := append(provider.SemanticRules(), manifestProvider.SemanticRules()...)
+	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}

@@ -61,8 +61,8 @@ func TestBuild_GatekeeperOnly(t *testing.T) {
 		ids = append(ids, r.RuleID)
 	}
 	// The gatekeeper rules BuildRegistry always registers (incl. the cross-source
-	// manifest-inline conflict rule), plus the two import-manifest rules the
-	// manifest provider contributes.
+	// manifest-inline conflict rule), plus the import-manifest rules the manifest
+	// provider contributes (two syntactic + the orphaned-urn semantic rule).
 	assert.ElementsMatch(t, []string{
 		"project/spec-syntax-valid",
 		"project/resource-kind-version-valid",
@@ -71,5 +71,6 @@ func TestBuild_GatekeeperOnly(t *testing.T) {
 		"project/manifest-inline-conflict",
 		"import-manifest/spec-syntax-valid",
 		"import-manifest/duplicate-urn",
+		"import-manifest/orphaned-urn",
 	}, ids)
 }

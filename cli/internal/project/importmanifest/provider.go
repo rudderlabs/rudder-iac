@@ -95,7 +95,9 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return nil
+	return []rules.Rule{
+		mrules.NewOrphanedURNRule(),
+	}
 }
 
 // RuleDocEntries returns the authored documentation fragments for the manifest

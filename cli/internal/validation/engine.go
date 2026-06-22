@@ -24,8 +24,10 @@ type ValidationEngine interface {
 
 	// ValidateSemantic runs semantic validation after resource graph is built.
 	// Rules receive ValidationContext with populated Graph for cross-resource validation.
+	// workspaceID is the run's target workspace ("" when none), surfaced to
+	// workspace-scoped rules via ValidationContext.WorkspaceID.
 	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
-	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph) (Diagnostics, error)
+	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error)
 }
 
 type validationEngine struct {
@@ -59,6 +61,7 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 			e.registry.SyntacticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			nil,
+			"", // syntactic validation is workspace-agnostic
 		)
 		if err != nil {
 			return nil, fmt.Errorf("syntactic validation for %s: %w", path, err)
@@ -176,7 +179,7 @@ func filterContextsByPatterns(
 
 // ValidateSemantic runs semantic validation after resource graph is built.
 // Rules receive ValidationContext with populated Graph for cross-resource validation.
-func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph) (Diagnostics, error) {
+func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error) {
 	toReturn := make(Diagnostics, 0)
 
 	for path, spec := range rawSpecs {
@@ -185,6 +188,7 @@ func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[st
 			e.registry.SemanticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			graph,
+			workspaceID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("semantic validation for %s: %w", path, err)
@@ -201,6 +205,7 @@ func (e *validationEngine) runValidationRules(
 	toValidateAgainst []rules.Rule,
 	rawSpec *specs.RawSpec,
 	graph *resources.Graph,
+	workspaceID string,
 ) ([]Diagnostic, error) {
 
 	pi, err := rawSpec.PathIndexer()
@@ -213,13 +218,14 @@ func (e *validationEngine) runValidationRules(
 	diagnostics := make([]Diagnostic, 0)
 	for _, rule := range toValidateAgainst {
 		results := rule.Validate(&rules.ValidationContext{
-			FilePath: path,
-			FileName: filepath.Base(path),
-			Spec:     rawSpec.Parsed().Spec,
-			Kind:     rawSpec.Parsed().Kind,
-			Version:  rawSpec.Parsed().Version,
-			Metadata: rawSpec.Parsed().Metadata,
-			Graph:    graph,
+			FilePath:    path,
+			FileName:    filepath.Base(path),
+			Spec:        rawSpec.Parsed().Spec,
+			Kind:        rawSpec.Parsed().Kind,
+			Version:     rawSpec.Parsed().Version,
+			Metadata:    rawSpec.Parsed().Metadata,
+			Graph:       graph,
+			WorkspaceID: workspaceID,
 		})
 
 		for _, result := range results {
