@@ -261,6 +261,26 @@ func (p *CompositeProvider) FormatForExport(
 	return formattable, nil
 }
 
+// LoadImportManifest fans the aggregated manifest out to every sub-provider
+// that implements ImportManifestConsumer. Sub-providers that do not implement
+// the interface are silently skipped — they receive import metadata via their
+// own inline metadata.import path instead. Nil-safe.
+func (p *CompositeProvider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for name, sub := range p.Providers {
+		consumer, ok := sub.(ImportManifestConsumer)
+		if !ok {
+			continue
+		}
+		if err := consumer.LoadImportManifest(m); err != nil {
+			return fmt.Errorf("loading import manifest into provider %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 // Helper methods
 func (p *CompositeProvider) providerForKind(kind string) (Provider, error) {
 	provider, ok := p.registeredKinds[kind]

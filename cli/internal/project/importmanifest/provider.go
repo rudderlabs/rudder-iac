@@ -81,3 +81,31 @@ func (p *Provider) SemanticRules() []rules.Rule {
 func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 	return nil
 }
+
+// ImportManifest returns the aggregated workspace entries, scoped to the
+// active workspace, wrapped in the shared WorkspacesImportMetadata type.
+//
+// Returns nil when no manifest specs were loaded. An empty activeWorkspaceID
+// means "all workspaces" (unscoped — used by validate); otherwise only the
+// entries for the active workspace are returned (D13: at-most-one remote per
+// URN reaches a handler). Returns nil when no entry matches the active
+// workspace. The orchestrator broadcasts this into the resource provider tree
+// via ImportManifestConsumer.
+func (p *Provider) ImportManifest(activeWorkspaceID string) *specs.WorkspacesImportMetadata {
+	if len(p.entries) == 0 {
+		return nil
+	}
+	if activeWorkspaceID == "" {
+		return &specs.WorkspacesImportMetadata{Workspaces: p.entries}
+	}
+	scoped := make([]specs.WorkspaceImportMetadata, 0, len(p.entries))
+	for _, ws := range p.entries {
+		if ws.WorkspaceID == activeWorkspaceID {
+			scoped = append(scoped, ws)
+		}
+	}
+	if len(scoped) == 0 {
+		return nil
+	}
+	return &specs.WorkspacesImportMetadata{Workspaces: scoped}
+}

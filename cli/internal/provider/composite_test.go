@@ -478,3 +478,47 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 		})
 	}
 }
+
+// mockConsumerProvider embeds MockProvider and implements ImportManifestConsumer,
+// recording the manifest it receives.
+type mockConsumerProvider struct {
+	*testutils.MockProvider
+	got *specs.WorkspacesImportMetadata
+}
+
+func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+	m.got = manifest
+	return nil
+}
+
+func TestCompositeProvider_LoadImportManifest(t *testing.T) {
+	t.Parallel()
+
+	manifest := &specs.WorkspacesImportMetadata{
+		Workspaces: []specs.WorkspaceImportMetadata{{
+			WorkspaceID: "ws-a",
+			Resources:   []specs.ImportIds{{URN: "a:1", RemoteID: "r1"}},
+		}},
+	}
+
+	t.Run("nil manifest is a no-op", func(t *testing.T) {
+		t.Parallel()
+
+		consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil)}
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": consumer})
+		assert.NoError(t, err)
+		assert.NoError(t, cp.(*provider.CompositeProvider).LoadImportManifest(nil))
+		assert.Nil(t, consumer.got)
+	})
+
+	t.Run("broadcasts to consumers, skips non-consumers", func(t *testing.T) {
+		t.Parallel()
+
+		consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil)}
+		plain := testutils.NewMockProvider([]string{"kindB"}, nil) // does NOT implement ImportManifestConsumer
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": consumer, "b": plain})
+		assert.NoError(t, err)
+		assert.NoError(t, cp.(*provider.CompositeProvider).LoadImportManifest(manifest))
+		assert.Equal(t, manifest, consumer.got)
+	})
+}

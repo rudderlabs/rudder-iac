@@ -33,6 +33,15 @@ type ProjectProvider interface {
 	provider.TypeProvider
 }
 
+// ImportManifestProvider is a ProjectProvider that also exposes the aggregated,
+// workspace-scoped import metadata for broadcast into the resource provider
+// tree. It sits parallel to the resource providers; the CompositeProvider never
+// sees the import-manifest kind.
+type ImportManifestProvider interface {
+	ProjectProvider
+	ImportManifest(activeWorkspaceID string) *specs.WorkspacesImportMetadata
+}
+
 type Project interface {
 	Location() string
 	Load(location string) error
@@ -43,7 +52,7 @@ type Project interface {
 type project struct {
 	location               string
 	provider               ProjectProvider
-	importManifestProvider ProjectProvider
+	importManifestProvider ImportManifestProvider
 	loader                 Loader
 	workspaceID            string
 	specs                  map[string]*specs.Spec
@@ -217,6 +226,19 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			rawSpec.Parsed(),
 		); err != nil {
 			return fmt.Errorf("loading spec %s: %w", path, err)
+		}
+	}
+
+	// Broadcast the aggregated, workspace-scoped import-manifest into the
+	// resource provider tree before graph construction, so handlers attach
+	// ImportMetadata from the same maps that inline metadata.import populates.
+	// Inline metadata is loaded during the loadSpec loop above; this runs after,
+	// so the manifest wins on URN overlap (last writer).
+	if manifest := p.importManifestProvider.ImportManifest(p.workspaceID); manifest != nil {
+		if consumer, ok := p.provider.(provider.ImportManifestConsumer); ok {
+			if err := consumer.LoadImportManifest(manifest); err != nil {
+				return fmt.Errorf("broadcasting import manifest: %w", err)
+			}
 		}
 	}
 

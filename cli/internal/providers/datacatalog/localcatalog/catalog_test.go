@@ -2077,3 +2077,37 @@ func TestDataCatalog_transformReferencesInSpec(t *testing.T) {
 	assert.Equal(t, "#tracking-plan:tp_d", items[1])
 	assert.Equal(t, "#/tp/common_rules/event_rule/rule_checkout", items[2])
 }
+
+func TestDataCatalog_LoadImportManifest(t *testing.T) {
+	t.Run("nil is a no-op", func(t *testing.T) {
+		dc := New()
+		require.NoError(t, dc.LoadImportManifest(nil))
+		assert.Empty(t, dc.ImportMetadata)
+	})
+
+	t.Run("keys ImportMetadata by URN", func(t *testing.T) {
+		dc := New()
+		m := &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
+			}},
+		}
+		require.NoError(t, dc.LoadImportManifest(m))
+		assert.Equal(t,
+			&WorkspaceRemoteIDMapping{WorkspaceID: "ws-a", RemoteID: "rem-1"},
+			dc.ImportMetadata["event:login"],
+		)
+	})
+
+	t.Run("errors when a manifest entry is missing urn", func(t *testing.T) {
+		dc := New()
+		m := &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources:   []specs.ImportIds{{RemoteID: "rem-1"}},
+			}},
+		}
+		assert.Error(t, dc.LoadImportManifest(m))
+	})
+}

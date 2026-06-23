@@ -17,6 +17,7 @@ type Handler interface {
 	ResourceType() string
 	SpecKind() string
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	Resources() ([]*resources.Resource, error)
 	Create(ctx context.Context, data any) (any, error)
@@ -120,6 +121,21 @@ func (p *BaseProvider) LoadSpec(path string, s *specs.Spec) error {
 func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
 	// fallback to LoadSpec for now till we implement legacy spec loading for all providers
 	return p.LoadSpec(path, s)
+}
+
+// LoadImportManifest fans the aggregated manifest out to every handler so their
+// internal import-metadata maps are populated from a central manifest file,
+// mirroring what inline metadata.import blocks do during LoadSpec. Nil-safe.
+func (p *BaseProvider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(m); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *BaseProvider) ResourceGraph() (*resources.Graph, error) {

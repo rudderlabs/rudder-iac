@@ -23,6 +23,7 @@ import (
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
@@ -60,6 +61,22 @@ func New(client esClient.EventStreamStore) *Provider {
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	return p
+}
+
+// LoadImportManifest fans the aggregated manifest out to every registered
+// handler so URN → remote-ID mappings from a central import-manifest file
+// populate the same per-source import-metadata maps that inline
+// metadata.import does. Nil-safe.
+func (p *Provider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(m); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) SupportedKinds() []string {
