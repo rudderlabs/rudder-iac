@@ -45,7 +45,7 @@ for page != nil {
 dst, err := c.Destinations.Create(context.Background(), &Destination{
   Type: 'POSTGRES',
   Name: 'my postgres',
-  Version: 'v2',
+  Version: 2,
   Config: json.RawMessage(`{
     "host": "example.com",
     "username": "rudder",

@@ -10,7 +10,7 @@ type Destination struct {
 	ID          string          `json:"id,omitempty"`
 	Name        string          `json:"name"`
 	Type        string          `json:"type"`
-	Version     string          `json:"version,omitempty"`
+	Version     int             `json:"version,omitempty"`
 	VersionInfo *VersionInfo    `json:"versionInfo,omitempty"`
 	IsEnabled   bool            `json:"enabled"`
 	Config      json.RawMessage `json:"config"`

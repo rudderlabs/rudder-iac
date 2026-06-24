@@ -104,7 +104,7 @@ func TestClientDestinationsGet(t *testing.T) {
 					"name": "some-name",
 					"type": "some-type",
 					"config": {"key1": "val1"},
-					"version": "v2",
+					"version": 2,
 					"versionInfo": {
 						"status": "deprecated",
 						"action": "upgrade",
@@ -130,7 +130,7 @@ func TestClientDestinationsGet(t *testing.T) {
 		ID:      "some-id",
 		Name:    "some-name",
 		Type:    "some-type",
-		Version: "v2",
+		Version: 2,
 		VersionInfo: &client.VersionInfo{
 			Status:           "deprecated",
 			Action:           "upgrade",
@@ -192,7 +192,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/destinations", `{
 					"name": "some-name",
 					"type": "some-type",
-					"version": "v2",
+					"version": 2,
 					"enabled": true,
 					"config": { "key1": "val1" }
 				}`)
@@ -221,7 +221,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 	destination, err := c.Destinations.Create(ctx, &client.Destination{
 		Name:      "some-name",
 		Type:      "some-type",
-		Version:   "v2",
+		Version:   2,
 		IsEnabled: true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
@@ -293,7 +293,7 @@ func TestClientDestinationsUpdate(t *testing.T) {
 				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id", `{
 					"name": "some-name",
 					"type": "some-type",
-					"version": "v2",
+					"version": 2,
 					"enabled": true,
 					"config": { "key1": "val1" }
 				}`)
@@ -323,7 +323,7 @@ func TestClientDestinationsUpdate(t *testing.T) {
 		ID:        "some-id",
 		Name:      "some-name",
 		Type:      "some-type",
-		Version:   "v2",
+		Version:   2,
 		IsEnabled: true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
