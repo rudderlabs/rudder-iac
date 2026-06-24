@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -112,6 +113,13 @@ func NewCmdApply() *cobra.Command {
 				return err
 			}
 
+			fmt.Fprintf(
+				cmd.OutOrStdout(),
+				"Workspace: %s (%s)\n",
+				formatWorkspaceField(workspace.Name, "Unknown workspace"),
+				formatWorkspaceField(workspace.ID, "unknown"),
+			)
+
 			// Apply the changes
 			err = s.Sync(context.Background(), graph)
 			if err != nil {
@@ -134,4 +142,12 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
+}
+
+func formatWorkspaceField(value string, fallback string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	return trimmed
 }
