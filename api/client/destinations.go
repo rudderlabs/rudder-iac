@@ -7,13 +7,22 @@ import (
 )
 
 type Destination struct {
-	ID        string          `json:"id,omitempty"`
-	Name      string          `json:"name"`
-	Type      string          `json:"type"`
-	IsEnabled bool            `json:"enabled"`
-	Config    json.RawMessage `json:"config"`
-	CreatedAt *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time      `json:"updatedAt,omitempty"`
+	ID          string          `json:"id,omitempty"`
+	Name        string          `json:"name"`
+	Type        string          `json:"type"`
+	Version     int             `json:"version,omitempty"`
+	VersionInfo *VersionInfo    `json:"versionInfo,omitempty"`
+	IsEnabled   bool            `json:"enabled"`
+	Config      json.RawMessage `json:"config"`
+	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+}
+
+type VersionInfo struct {
+	Status           string  `json:"status,omitempty"`
+	Action           string  `json:"action,omitempty"`
+	RetirementDate   *string `json:"retirementDate,omitempty"`
+	MigrationDocsURL *string `json:"migrationDocsURL,omitempty"`
 }
 
 type destinations struct {

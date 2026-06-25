@@ -21,3 +21,8 @@ Read these when working on event stream source listing:
 - `cli/internal/cmd/workspace/event-stream-sources.go`: workspace command entry for `workspace event-stream-sources list`.
 - `cli/internal/providers/event-stream/provider.go`: provider dispatch point for list requests.
 - `cli/internal/providers/event-stream/source/handler.go`: source-level list mapping and row shaping.
+
+## INT-6489 — Destination API Contract Entry
+<!-- ticket:INT-6489 -->
+Read this first when working on destination API contract fields or destination versioning:
+- `api/client/destinations.go`: shared destination DTO, exported `VersionInfo` type, and destination CRUD service methods.
