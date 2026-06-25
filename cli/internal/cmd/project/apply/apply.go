@@ -101,6 +101,12 @@ func NewCmdApply() *cobra.Command {
 			if err := validateApplyFlags(files, cmd.Flags().Changed("location")); err != nil {
 				return err
 			}
+			// The scoped -f mode is part of the experimental resource-command suite.
+			if len(files) > 0 {
+				if err := config.RequireResourceCommands(); err != nil {
+					return err
+				}
+			}
 
 			deps, err = app.NewDeps()
 			if err != nil {
@@ -201,7 +207,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
-	cmd.Flags().StringArrayVarP(&files, "file", "f", nil, "Apply ONLY the resources in these files or directories (scoped: creates/updates only, never deletes). Mutually exclusive with --location.")
+	cmd.Flags().StringArrayVarP(&files, "file", "f", nil, "(experimental) Apply ONLY the resources in these files or directories (scoped: creates/updates only, never deletes). Mutually exclusive with --location. Enable with: rudder-cli experimental enable resourceCommands")
 
 	return cmd
 }

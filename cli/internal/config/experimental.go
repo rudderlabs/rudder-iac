@@ -24,6 +24,24 @@ type ExperimentalConfig struct {
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
 	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
+	// ResourceCommands enables the kubectl-style resource verbs (get, describe,
+	// delete, set-external-id) and the scoped `apply -f` mode.
+	ResourceCommands bool `mapstructure:"resourceCommands"`
+}
+
+// ResourceCommandsFlag is the experimental flag gating the resource-verb suite.
+const ResourceCommandsFlag = "resourceCommands"
+
+// RequireResourceCommands returns a friendly, actionable error when the
+// resource-verb suite (get/describe/delete/set-external-id and `apply -f`) is
+// not enabled. Commands call it before doing any work.
+func RequireResourceCommands() error {
+	if GetConfig().ExperimentalFlags.ResourceCommands {
+		return nil
+	}
+	return fmt.Errorf(
+		"the get / describe / delete / set-external-id verbs and `apply -f` are experimental; "+
+			"enable them with: rudder-cli experimental enable %s", ResourceCommandsFlag)
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

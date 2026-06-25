@@ -8,6 +8,17 @@ Each recording runs **live** against a real workspace. Sources are typed as
 on-screen `#` comments so every step explains itself. Configs are in each demo
 dir; regenerate with `bash docs/demos/record-demos.sh` (see [README](README.md)).
 
+> **Experimental.** This whole suite is gated behind the `resourceCommands`
+> experimental flag. Enable it first:
+>
+> ```bash
+> rudder-cli experimental enable resourceCommands
+> # or, ephemerally: RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RESOURCE_COMMANDS=true rudder-cli get ...
+> ```
+>
+> Without it the verbs are hidden and error with the enable instructions. (The
+> demo recordings set the env vars in hidden setup.)
+
 ---
 
 ## 1. Observe — discover resources (read-only)

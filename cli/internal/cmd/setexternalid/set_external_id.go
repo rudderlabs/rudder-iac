@@ -7,6 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resourceops"
 	"github.com/spf13/cobra"
@@ -31,8 +32,12 @@ with a local external ID, making it manageable by this tool.
 Examples:
   # Claim an event-stream source
   rudder-cli set-external-id event-stream-source src_remote_1 my-source`,
-		Args: cobra.ExactArgs(3),
+		Args:   cobra.ExactArgs(3),
+		Hidden: true, // experimental; unhidden in root.go when the flag is on
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := config.RequireResourceCommands(); err != nil {
+				return err
+			}
 			var err error
 			defer func() {
 				telemetry.TrackCommand("set-external-id", err, []telemetry.KV{

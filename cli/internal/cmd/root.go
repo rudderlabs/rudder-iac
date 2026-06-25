@@ -67,6 +67,10 @@ var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
 	datagraphCmd    *cobra.Command
+
+	// The kubectl-style resource verbs are gated behind the experimental
+	// `resourceCommands` flag: hidden by default, unhidden in initConfig.
+	resourceVerbCmds []*cobra.Command
 )
 
 func init() {
@@ -91,10 +95,15 @@ func init() {
 	rootCmd.AddCommand(importcmd.NewCmdImport())
 	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
 
-	rootCmd.AddCommand(getcmd.NewCmdGet())
-	rootCmd.AddCommand(describecmd.NewCmdDescribe())
-	rootCmd.AddCommand(setexternalid.NewCmdSetExternalID())
-	rootCmd.AddCommand(deletecmd.NewCmdDelete())
+	resourceVerbCmds = []*cobra.Command{
+		getcmd.NewCmdGet(),
+		describecmd.NewCmdDescribe(),
+		setexternalid.NewCmdSetExternalID(),
+		deletecmd.NewCmdDelete(),
+	}
+	for _, c := range resourceVerbCmds {
+		rootCmd.AddCommand(c)
+	}
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
@@ -130,6 +139,12 @@ func initConfig() {
 
 	if config.GetConfig().ExperimentalFlags.DataGraph {
 		datagraphCmd.Hidden = false
+	}
+
+	if config.GetConfig().ExperimentalFlags.ResourceCommands {
+		for _, c := range resourceVerbCmds {
+			c.Hidden = false
+		}
 	}
 }
 

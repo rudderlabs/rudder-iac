@@ -38,6 +38,8 @@ const config: DemoConfig = {
   setup: [
     'export PATH="$(git rev-parse --show-toplevel)/bin:$PATH"',
     'export PS1="$ "',
+    'export RUDDERSTACK_CLI_EXPERIMENTAL=true',
+    'export RUDDERSTACK_X_RESOURCE_COMMANDS=true', // resource verbs are experimental
     'cd "$(git rev-parse --show-toplevel)/docs/demos/20260625-build/catalog"',
   ],
   // sleepBeforeMs lets the terminal fully settle before vhs types the next

@@ -42,6 +42,8 @@ const config: DemoConfig = {
   setup: [
     'export PATH="$(git rev-parse --show-toplevel)/bin:$PATH"',
     'export PS1="$ "',
+    'export RUDDERSTACK_CLI_EXPERIMENTAL=true',
+    'export RUDDERSTACK_X_RESOURCE_COMMANDS=true', // resource verbs are experimental
     // Seed an UNMANAGED throwaway source via the api (no external id) and
     // capture its remote id in $RID.
     'export RID=$(seed-unmanaged -name "Legacy Orders Source" | sed -n "s/.*id=\\([^ ]*\\).*/\\1/p")',

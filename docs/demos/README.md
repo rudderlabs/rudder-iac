@@ -8,6 +8,11 @@ via the `create-vhs` skill (`.claude/skills/create-vhs/`).
 **▶ Watch the demos with embedded GIFs: [DEMOS.md](DEMOS.md).** This file covers
 how the recordings are produced and regenerated.
 
+> The verb suite is **experimental** — gated behind the `resourceCommands` flag.
+> Enable with `rudder-cli experimental enable resourceCommands` (the demos set
+> `RUDDERSTACK_CLI_EXPERIMENTAL=true` + `RUDDERSTACK_X_RESOURCE_COMMANDS=true` in
+> hidden setup).
+
 Each demo dir holds the committed **`scenes.config.ts`** (source of truth). The
 `tape.tape` and `recording.{gif,mp4}` are generated and git-ignored.
 

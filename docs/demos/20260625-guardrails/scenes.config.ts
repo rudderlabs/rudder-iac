@@ -37,6 +37,8 @@ const config: DemoConfig = {
   setup: [
     'export PATH="$(git rev-parse --show-toplevel)/bin:$PATH"',
     'export PS1="$ "',
+    'export RUDDERSTACK_CLI_EXPERIMENTAL=true',
+    'export RUDDERSTACK_X_RESOURCE_COMMANDS=true', // resource verbs are experimental
   ],
   scenes: [
     { command: 'echo "=== Guardrails: capability-gated verbs, loud errors, safe blast radius ==="', sleepAfterMs: 2500 },

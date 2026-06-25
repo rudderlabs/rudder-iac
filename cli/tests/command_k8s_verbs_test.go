@@ -25,6 +25,12 @@ import (
 //  3. Modify A's display name → apply -f reports an update; B is untouched.
 //  4. Cleanup via delete.
 func TestK8sVerbs_GetApplyRoundTrip_ScopedNoDelete(t *testing.T) {
+	// The resource verbs (get/describe/delete/set-external-id, apply -f) are
+	// gated behind the experimental `resourceCommands` flag; enable it for the
+	// child rudder-cli processes this test spawns.
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDERSTACK_X_RESOURCE_COMMANDS", "true")
+
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
