@@ -5,6 +5,9 @@ Terminal recordings of the kubectl-style verb layer (`get` / `describe` /
 resource). Built with [charmbracelet/vhs](https://github.com/charmbracelet/vhs)
 via the `create-vhs` skill (`.claude/skills/create-vhs/`).
 
+**▶ Watch the demos with embedded GIFs: [DEMOS.md](DEMOS.md).** This file covers
+how the recordings are produced and regenerated.
+
 Each demo dir holds the committed **`scenes.config.ts`** (source of truth). The
 `tape.tape` and `recording.{gif,mp4}` are generated and git-ignored.
 
