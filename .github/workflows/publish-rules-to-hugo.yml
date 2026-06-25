@@ -4,6 +4,10 @@ name: publish rules to rudder-hugo
 # re-run manually for a specific tag. Mirrors release.yml / docker.yml so a
 # cross-repo publish failure never blocks the binary release.
 on:
+  # TEST ONLY — remove before merge: lets the workflow run on pushes to this
+  # branch so it can be exercised before it lands on the default branch.
+  push:
+    branches: [feature/dex-369-workflow-publish-to-rudder-hugo-on-releases]
   repository_dispatch:
     types: [release-created]
   workflow_dispatch:
@@ -32,8 +36,11 @@ jobs:
           # repository_dispatch carries the tag in client_payload; workflow_dispatch in inputs.
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
+          # TEST ONLY — remove before merge: push events carry no tag, so fall
+          # back to a known released tag to exercise the rest of the workflow.
+          TEST_TAG: v0.18.0
         run: |
-          TAG="${DISPATCH_TAG:-$INPUT_TAG}"
+          TAG="${DISPATCH_TAG:-${INPUT_TAG:-$TEST_TAG}}"
           if [ -z "$TAG" ]; then
             echo "::error::No tag provided (client_payload.tag / inputs.tag both empty)"
             exit 1
