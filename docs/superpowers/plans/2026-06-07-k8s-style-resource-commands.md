@@ -4,7 +4,7 @@
 
 **Goal:** Add top-level `get` / `describe` / `delete` / `set-external-id` verbs plus a scoped, delete-free `apply -f` mode to `rudder-cli`, working uniformly over registered resource types (beachhead: `event-stream-source`, `retl-source-sql-model`).
 
-**Architecture:** Thin Cobra commands over a new testable `cli/internal/resourceops/` package. Reads use the composite provider's remote loaders + `Exporter.FormatForExport`. `delete` calls `LifecycleManager.Delete`. `apply -f` reuses the existing apply pipeline (`project.Load` → `ResourceGraph` → `syncer`) and diverges at exactly one new seam — `syncer.WithScopeToTarget()` filters the source graph to the target's URNs so the planner emits only creates/updates, never deletes. `set-external-id` calls a new optional `ExternalIDSetter` capability.
+**Architecture:** Thin Cobra commands over a new testable `cli/internal/resourceops/` package. Reads use the composite provider's remote loaders + `Exporter.FormatForExport`. `delete` calls `LifecycleManager.Delete`. `apply -f` reuses the existing apply pipeline (`project.Load` → `ResourceGraph` → `syncer`) and diverges at exactly one new seam — `syncer.WithScopeToTarget()` filters the source graph to the target's URNs so the planner emits only creates/updates, never deletes. `set-externadpcl-id` calls a new optional `ExternalIDSetter` capability.
 
 **Tech Stack:** Go, Cobra, testify. Existing internals: `cli/internal/provider` (CompositeProvider), `cli/internal/resources` (Graph/RemoteResources/state), `cli/internal/syncer` (planner/differ/executePlan), `cli/internal/lister`, `cli/internal/ui`.
 
@@ -697,6 +697,7 @@ git commit -m "test(e2e): get -o yaml | apply -f round-trip and scoped no-delete
 ## Notes / known follow-ups (out of scope here)
 
 - Widen beyond beachhead (datagraph, transformations, datacatalog) by implementing/verifying `ExternalIDSetter` per type.
+- Accounts: SDK gained CUD (origin/main #617) but no `SetExternalID`. Wire the workspace provider to `LifecycleManager` to enable `delete`; `apply -f` additionally needs an account identity story (no external ID → never managed in state). See spec "Open questions".
 - Evolve `apply` to safe-by-default `+ --prune` (tabled Decision 12).
 - Adoption facade `import <type> <id>` (see TABLED doc).
 - Short type aliases; rich context-aware `describe`.

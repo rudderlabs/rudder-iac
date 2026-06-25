@@ -273,7 +273,7 @@ later as composition.
 | `data-graph` (+ model, relationship) | ✅ | ✅ | ✅ (experimental flag) |
 | `transformation`, `library` | ✅ | ✅ | ✅ |
 | `property`, `event`, `tracking-plan`, `custom-type`, `category` | ✅ | ✅ | gated per setter availability |
-| `account` | ✅ | ❌ read-only | ❌ |
+| `account` | ✅ | ⚠️ SDK CUD exists (origin/main #617); workspace provider not yet wired to `LifecycleManager` | ❌ no SDK setter |
 
 > **Beachhead is verified; other rows are aspirational.** Only
 > `event-stream-source` and `retl-source-sql-model` (full CRUD + setter) are
@@ -305,6 +305,13 @@ later as composition.
 
 ## Open questions / future
 
+- **Accounts CUD (origin/main #617):** SDK now has `Create`/`Update`/`Delete`
+  but no `SetExternalID`. To expose `delete`/`apply -f` for `account`, wire the
+  workspace provider to `LifecycleManager` (widen-beyond-beachhead). `delete`
+  works via remote-id; **`apply -f` needs an identity story** — with no external
+  ID, accounts never appear as managed in `MapRemoteToState`, so scoped reconcile
+  always classifies them as create. Resolve (external-id support for accounts, or
+  name/remote-id matching in the provider) before enabling account `apply -f`.
 - Evolve `apply` to safe-by-default `+ --prune` (Decision-12 follow-up).
 - Short type aliases.
 - Rich, context-aware `describe`.
