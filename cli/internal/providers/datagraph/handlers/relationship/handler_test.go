@@ -844,7 +844,7 @@ func TestFormatForExport(t *testing.T) {
 		},
 	}
 
-	result, err := h.FormatForExport(collection, nil, nil)
+	result, _, err := h.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
