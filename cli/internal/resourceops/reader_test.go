@@ -56,6 +56,42 @@ func TestReader_List_MergesAndDedupes(t *testing.T) {
 	}, rows)
 }
 
+// LoadImportable attaches a namer-suggested external id to unmanaged resources.
+// The reader must NOT treat that as managed: such rows surface with a blank
+// external id and MANAGED=no.
+func TestReader_List_UnmanagedSuggestedExternalIDIsCleared(t *testing.T) {
+	managed := resources.NewRemoteResources()
+	importable := resources.NewRemoteResources()
+	importable.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src_remote_9": {ID: "src_remote_9", ExternalID: "suggested-name"}, // namer suggestion
+	})
+	prov := &fakeProvider{remote: managed, importable: importable}
+	rows, err := resourceops.ListRows(context.Background(), prov, "event-stream-source", resourceops.ScopeAll)
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []resourceops.Row{
+		{ExternalID: "", RemoteID: "src_remote_9", Managed: false},
+	}, rows)
+}
+
+type namedStruct struct{ Name string }
+
+// extractName reads the Name field from a typed struct (e.g. *EventStreamSource),
+// not just from a map, so the NAME column is populated for those providers.
+func TestReader_List_NameExtractedFromStruct(t *testing.T) {
+	managed := resources.NewRemoteResources()
+	managed.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"src_1": {ID: "src_1", ExternalID: "a", Data: &namedStruct{Name: "Payments JS"}},
+	})
+	prov := &fakeProvider{remote: managed, importable: resources.NewRemoteResources()}
+	rows, err := resourceops.ListRows(context.Background(), prov, "event-stream-source", resourceops.ScopeAll)
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []resourceops.Row{
+		{ExternalID: "a", RemoteID: "src_1", Name: "Payments JS", Managed: true},
+	}, rows)
+}
+
 func TestReader_List_ScopeManaged(t *testing.T) {
 	managed := resources.NewRemoteResources()
 	managed.Set("event-stream-source", map[string]*resources.RemoteResource{

@@ -3,6 +3,7 @@ package resourceops
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -121,7 +122,14 @@ func mergedRemote(ctx context.Context, prov provider.ManagedRemoteResourceLoader
 	}
 	for id, res := range importableCollection.GetAll(resourceType) {
 		if _, exists := result[id]; !exists {
-			result[id] = res
+			// Unmanaged resources are surfaced for discovery only. LoadImportable
+			// attaches a namer-suggested external id; clear it so the read layer
+			// reports them as unmanaged (blank external-id / MANAGED=no), and so
+			// delete correctly rejects them. The suggestion is an import-time
+			// concern, not a managed-ness signal.
+			u := *res
+			u.ExternalID = ""
+			result[id] = &u
 		}
 	}
 
@@ -131,12 +139,19 @@ func mergedRemote(ctx context.Context, prov provider.ManagedRemoteResourceLoader
 // extractName attempts to pull a "name" field out of a resource's Data when it
 // is a map. Returns an empty string when the field is absent or Data is not a map.
 func extractName(data any) string {
-	m, ok := data.(map[string]any)
-	if !ok {
-		return ""
+	if m, ok := data.(map[string]any); ok {
+		name, _ := m["name"].(string)
+		return name
 	}
-	name, _ := m["name"].(string)
-	return name
+	// Providers may carry Data as a typed struct (e.g. *EventStreamSource); read
+	// its Name field reflectively so the table's NAME column is populated.
+	v := reflect.Indirect(reflect.ValueOf(data))
+	if v.IsValid() && v.Kind() == reflect.Struct {
+		if f := v.FieldByName("Name"); f.IsValid() && f.Kind() == reflect.String {
+			return f.String()
+		}
+	}
+	return ""
 }
 
 // SpecYAML materializes a single managed remote resource into a re-appliable YAML spec string.
