@@ -49,3 +49,7 @@ memory-bank
 .idea
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle
+# create-vhs demo recordings (binaries; regenerate with docs/demos/record-demos.sh)
+docs/demos/**/recording.gif
+docs/demos/**/recording.mp4
+docs/demos/**/tape.tape

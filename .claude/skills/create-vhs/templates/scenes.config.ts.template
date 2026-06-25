@@ -1,0 +1,74 @@
+/**
+ * scenes.config.ts — single source of truth for one rudder-cli demo.
+ *
+ * Edit this file, then run:
+ *   npx tsx .claude/skills/create-vhs/scripts/compile.ts docs/demos/<this-dir>
+ *   vhs docs/demos/<this-dir>/tape.tape
+ *
+ * The type below is intentionally inlined so this file is self-contained (no
+ * cross-repo imports). It mirrors the DemoConfig in compile.ts.
+ */
+interface Scene {
+  card?: { title: string; subtitle?: string; holdMs?: number };   // full-screen banner
+  note?: { heading: string; detail?: string; holdMs?: number };   // "what's happening" header
+  title?: string;          // optional on-screen header (typed as a shell comment)
+  command?: string;        // the command to type and run (optional for card/note beats)
+  typingSpeedMs?: number;  // per-scene typing speed override
+  sleepBeforeMs?: number;  // pause before typing this command
+  sleepAfterMs?: number;   // pause after output renders (read time); default 3000
+  replayFile?: string;     // print outputs/<file> instead of running live (secrets/one-shot)
+}
+
+interface DemoConfig {
+  output: string;          // recording.gif (no ffmpeg needed) or recording.mp4
+  width?: number;          // default 1400; raise for wide tables
+  height?: number;         // default 900; raise for long output
+  fontSize?: number;
+  theme?: string;          // any VHS theme, e.g. "Dracula"
+  shell?: string;          // "bash" (default) | "zsh"
+  typingSpeedMs?: number;  // default 50
+  setup?: string[];        // hidden pre-roll: PATH exports, cd, clear (no timeline cost)
+  scenes: Scene[];
+}
+
+const config: DemoConfig = {
+  output: "recording.gif",
+  width: 1400,
+  height: 900,
+  fontSize: 20,
+  theme: "Dracula",
+  typingSpeedMs: 50,
+
+  // Make the repo-local build callable. compile.ts adds a trailing `clear`
+  // itself, so you don't need one here. Adjust the path if you record from a
+  // different working directory.
+  setup: ['export PATH="$PWD/bin:$PATH"'],
+
+  scenes: [
+    // Gripping structure: intro card → (note + command) per step → outro card.
+    { card: { title: "rudder-iac", subtitle: "Infrastructure-as-Code for RudderStack" } },
+
+    // --- Replace the steps below with your actual flow. ---
+    {
+      note: { heading: "See the commands", detail: "One CLI for sources, tracking plans & transformations." },
+      command: "rudder-cli --help",
+      sleepAfterMs: 4000,
+    },
+    {
+      note: { heading: "Validate", detail: "Catch problems locally before touching the remote workspace." },
+      command: "rudder-cli validate -l ./catalog",
+      sleepAfterMs: 4000,
+    },
+    {
+      note: { heading: "Preview changes (safe)", detail: "A dry-run shows what would change. Nothing is applied." },
+      command: "rudder-cli apply --dry-run -l ./catalog",
+      sleepAfterMs: 6000,
+      // For interactive/secret or one-shot commands, capture output to
+      // outputs/NN.txt and add: replayFile: "NN.txt"
+    },
+
+    { card: { title: "Infrastructure as Code, for RudderStack", subtitle: "github.com/rudderlabs/rudder-iac" } },
+  ],
+};
+
+export default config;
