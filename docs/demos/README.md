@@ -42,9 +42,15 @@ bash docs/demos/record-demos.sh
 bash docs/demos/record-demos.sh docs/demos/20260625-build
 ```
 
-The script builds `./bin/rudder-cli`, compiles each `scenes.config.ts` to a
-`tape.tape`, and runs `vhs` for `.gif` then `.mp4`. Override `NODE_BIN` /
-`VHS_BIN` if your toolchain lives elsewhere.
+The script builds `./bin/rudder-cli` + `./bin/seed-unmanaged`, compiles each
+`scenes.config.ts` to a `tape.tape`, records the **GIF live** with `vhs`, then
+**transcodes the GIF to MP4** with `ffmpeg`. (Recording MP4 live starves ttyd and
+scrambles keystrokes on longer demos, so we transcode instead — it also avoids
+running a mutating demo twice.) Finally it runs `cleanup.sh` to remove any
+throwaway left behind by a recording race. Override `NODE_BIN` / `VHS_BIN` if your
+toolchain lives elsewhere.
+
+Manual cleanup anytime: `bash docs/demos/cleanup.sh`.
 
 Prereqs: `vhs`, `ttyd`, `ffmpeg` (mp4), and node ≥ 18. Check with
 `bash .claude/skills/create-vhs/scripts/check-prereqs.sh`.

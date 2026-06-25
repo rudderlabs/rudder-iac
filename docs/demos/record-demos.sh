@@ -29,19 +29,31 @@ fi
 for d in "${dirs[@]}"; do
   d="${d%/}"
   [ -f "$d/scenes.config.ts" ] || { echo "skip (no scenes.config.ts): $d"; continue; }
-  for fmt in gif mp4; do
-    echo "==> $d  →  recording.$fmt"
-    DEMO_OUT="recording.$fmt" "$NPX" tsx "$compile" "$d"
-    out="$d/recording.$fmt"
-    # vhs occasionally races ttyd and produces a 0-byte file; retry up to 3x.
-    for attempt in 1 2 3; do
-      rm -f "$out"
-      "$VHS_BIN" "$d/tape.tape" || true
-      if [ -s "$out" ]; then break; fi
-      echo "   (attempt $attempt produced no output; retrying)"
-    done
-    [ -s "$out" ] || echo "   WARN: $out still empty after retries"
+  # Record the GIF live, then transcode it to MP4 with ffmpeg. We do NOT record
+  # the MP4 live: live h264 encoding starves ttyd and drops/scrambles keystrokes
+  # on longer demos. Transcoding the finished GIF gives a faithful, clean MP4 and
+  # avoids running the (mutating) demo a second time.
+  echo "==> $d  →  recording.gif"
+  DEMO_OUT="recording.gif" "$NPX" tsx "$compile" "$d"
+  gif="$d/recording.gif"
+  for attempt in 1 2 3; do
+    rm -f "$gif"
+    "$VHS_BIN" "$d/tape.tape" || true
+    if [ -s "$gif" ]; then break; fi
+    echo "   (attempt $attempt produced no output; retrying)"
   done
+  if [ -s "$gif" ]; then
+    echo "==> $d  →  recording.mp4 (transcoded from gif)"
+    ffmpeg -y -i "$gif" -movflags +faststart -pix_fmt yuv420p \
+      -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "$d/recording.mp4" >/dev/null 2>&1 \
+      || echo "   WARN: mp4 transcode failed"
+  else
+    echo "   WARN: $gif still empty after retries"
+  fi
 done
+
+# Defensive: a recording race can occasionally skip a demo's final `delete`
+# scene, leaving a throwaway behind. Sweep them so the workspace is left clean.
+bash "$root/docs/demos/cleanup.sh" || true
 
 echo "Done. Recordings: docs/demos/*/recording.{gif,mp4}"
