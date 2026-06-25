@@ -20,6 +20,14 @@ var varRegex = regexp.MustCompile(`\{\{\s*([^}\s|]+)(?:\s*\|\s*((?:[^}]|}[^}])*?
 
 var validVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// IsValidVariableName reports whether name satisfies the variable name grammar
+// a {{ .name }} token requires. Code that generates tokens (e.g. import
+// scaffolding) uses it to reject a bad name at the moment the token is
+// created, rather than when substitution later fails on it.
+func IsValidVariableName(name string) bool {
+	return validVarName.MatchString(name)
+}
+
 // Substitutor performs `{{ .VAR }}` substitution against a chain of resolvers.
 //
 // Known limitations:

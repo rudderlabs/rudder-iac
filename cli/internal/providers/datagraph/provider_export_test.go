@@ -400,7 +400,7 @@ func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
 						PrimaryID:   "user_id",
 					},
 					Columns: []dgClient.ColumnMetadataRow{
-						{Name: "email", DisplayName: "Email"},
+						{Name: "email", DisplayName: "Email", PiiMask: true},
 						{Name: "user_id", DisplayName: "User ID"},
 					},
 				},
@@ -439,8 +439,9 @@ func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
 	}
 
 	// User has column metadata — the block is emitted in remote order.
+	piiMask := true
 	assert.Equal(t, []dgModel.ColumnMetadataYAML{
-		{Name: "email", DisplayName: "Email"},
+		{Name: "email", DisplayName: "Email", PiiMask: &piiMask},
 		{Name: "user_id", DisplayName: "User ID"},
 	}, byID["user"].Columns)
 

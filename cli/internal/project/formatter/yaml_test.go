@@ -144,6 +144,30 @@ level1:
 	}
 }
 
+// Variable substitution tokens must come out unquoted: substitution rewrites
+// the raw bytes before YAML parsing, and the unquoted form marks the value as
+// a reference rather than a string literal. Tokens embedded in larger strings
+// stay quoted — only a whole-scalar token is a reference.
+func TestYAMLFormatter_UnquotesVariableTokens(t *testing.T) {
+	t.Parallel()
+
+	input := map[string]interface{}{
+		"accessKey": "{{ .BOOKS_ACCESS_KEY }}",
+		"items":     []string{"{{ .ITEM_TOKEN }}"},
+		"partial":   "prefix {{ .EMBEDDED }} suffix",
+	}
+
+	output, err := YAMLFormatter{}.Format(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, heredoc.Doc(`
+		accessKey: {{ .BOOKS_ACCESS_KEY }}
+		items:
+		  - {{ .ITEM_TOKEN }}
+		partial: "prefix {{ .EMBEDDED }} suffix"
+	`), string(output))
+}
+
 func TestYAMLFormatter_Extension(t *testing.T) {
 	t.Parallel()
 	formatter := YAMLFormatter{}

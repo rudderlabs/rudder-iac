@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/project/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -40,13 +41,15 @@ type Project interface {
 }
 
 type project struct {
-	location         string
-	provider         ProjectProvider
-	loader           Loader
-	specs            map[string]*specs.Spec
-	validationEngine validation.ValidationEngine
-	renderer         renderer.Renderer
-	substitutor      varsubst.Substitutor
+	location               string
+	provider               ProjectProvider
+	importManifestProvider ProjectProvider
+	loader                 Loader
+	workspaceID            string
+	specs                  map[string]*specs.Spec
+	validationEngine       validation.ValidationEngine
+	renderer               renderer.Renderer
+	substitutor            varsubst.Substitutor
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -80,12 +83,23 @@ func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
 	}
 }
 
+// WithWorkspaceID sets the resolved workspace ID for the project. This scopes
+// workspace-aware operations (e.g. import-manifest broadcast) to only the
+// entries belonging to the active workspace.
+// When empty, workspace-aware operations fall back to unscoped behavior.
+func WithWorkspaceID(id string) ProjectOption {
+	return func(p *project) {
+		p.workspaceID = id
+	}
+}
+
 // New creates a new Project instance.
 // By default, it uses a loader.Loader.
 func New(provider provider.Provider, opts ...ProjectOption) Project {
 	p := &project{
-		provider: provider,
-		specs:    make(map[string]*specs.Spec),
+		provider:               provider,
+		importManifestProvider: importmanifest.New(),
+		specs:                  make(map[string]*specs.Spec),
 	}
 
 	for _, opt := range opts {
@@ -115,6 +129,13 @@ func (p *project) Specs() map[string]*specs.Spec {
 }
 
 func (p *project) loadSpec(path string, spec *specs.Spec) error {
+	// Project-level specs (e.g. import-manifest) are handled outside the resource
+	// provider tree by their dedicated provider; resource-level specs flow through
+	// the version-based dispatch below.
+	if classify(spec) == ProjectSpec {
+		return p.importManifestProvider.LoadSpec(path, spec)
+	}
+
 	switch {
 	case spec.IsLegacyVersion():
 		return p.provider.LoadLegacySpec(path, spec)

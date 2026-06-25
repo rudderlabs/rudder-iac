@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.18.0](https://github.com/rudderlabs/rudder-iac/compare/v0.17.0...v0.18.0) (2026-06-19)
+
+
+### Features
+
+* add accounts CUD to API client ([#617](https://github.com/rudderlabs/rudder-iac/issues/617)) ([1a80346](https://github.com/rudderlabs/rudder-iac/commit/1a803468fa33c96fd11ad582754552bbe3d7e44b))
+* **datagraph:** add pii_mask to column-metadata CLI and client ([#618](https://github.com/rudderlabs/rudder-iac/issues/618)) ([396922c](https://github.com/rudderlabs/rudder-iac/commit/396922c502801da646b9427440f61c0c5597b450))
+* import manifest provider and classifier ([#603](https://github.com/rudderlabs/rudder-iac/issues/603)) ([9d3608d](https://github.com/rudderlabs/rudder-iac/commit/9d3608d9e443113b056899131261a08b87a771ad))
+* **import:** scaffold secrets as variable references with a companion var file (DEX-410) ([#616](https://github.com/rudderlabs/rudder-iac/issues/616)) ([0ed8e50](https://github.com/rudderlabs/rudder-iac/commit/0ed8e508eef9dfae81618fe2d386397d5521ddbb))
+* **secret:** add self-redacting secret.String value type (DEX-407) ([#608](https://github.com/rudderlabs/rudder-iac/issues/608)) ([3c86797](https://github.com/rudderlabs/rudder-iac/commit/3c86797c0cfd98db1ac39b0aaaee314b63990130))
+* **syncer:** make the apply-cycle diff secret-aware (DEX-408) ([#614](https://github.com/rudderlabs/rudder-iac/issues/614)) ([63d55b3](https://github.com/rudderlabs/rudder-iac/commit/63d55b366b737d708074db79f5585840b8fb145b))
+* **varsubst:** require .vars.yaml or .vars.yml suffix for all var files ([#624](https://github.com/rudderlabs/rudder-iac/issues/624)) ([15e3236](https://github.com/rudderlabs/rudder-iac/commit/15e323668214b6b403a747df60cf6bfcd397326b))
+
+
+### Miscellaneous
+
+* add WithWorkspaceID project option and resolve workspace before project load ([#602](https://github.com/rudderlabs/rudder-iac/issues/602)) ([6c03ce2](https://github.com/rudderlabs/rudder-iac/commit/6c03ce24cd349a98ee0813a53c78268add64f158))
+
+## [0.17.0](https://github.com/rudderlabs/rudder-iac/compare/v0.16.0...v0.17.0) (2026-06-05)
+
+
+### Features
+
+* add FileResolver for varsubst package ([#589](https://github.com/rudderlabs/rudder-iac/issues/589)) ([61066ab](https://github.com/rudderlabs/rudder-iac/commit/61066ab80148df203bf8605af0324f5c50d8c441))
+* add Substitutor core engine for variable substitution ([#591](https://github.com/rudderlabs/rudder-iac/issues/591)) ([772a742](https://github.com/rudderlabs/rudder-iac/commit/772a742bcdff5d8647e29c5b653d49c587c0c8b3))
+* add varsubst package foundation ([#585](https://github.com/rudderlabs/rudder-iac/issues/585)) ([ee7a716](https://github.com/rudderlabs/rudder-iac/commit/ee7a716564a944fb50ca7dbca25ac3d978dc2df6))
+* add workspace list command for event stream sources ([#579](https://github.com/rudderlabs/rudder-iac/issues/579)) ([0033718](https://github.com/rudderlabs/rudder-iac/commit/0033718f01a493f4c8172a4908322de9d98fcd8a))
+* added foundation for rule docs ([#471](https://github.com/rudderlabs/rudder-iac/issues/471)) ([8e5f37c](https://github.com/rudderlabs/rudder-iac/commit/8e5f37cfbd89cf2608116d52bfe9fe5489d9e05b))
+* **cli:** wire --var-file flag and experimental gate for variable substitution (DEX-362) ([#594](https://github.com/rudderlabs/rudder-iac/issues/594)) ([da1c0fd](https://github.com/rudderlabs/rudder-iac/commit/da1c0fd8b848cb284d0fd341b745f8b5e297501c))
+* **data-graph:** colum metadata description ([#606](https://github.com/rudderlabs/rudder-iac/issues/606)) ([8bf77c3](https://github.com/rudderlabs/rudder-iac/commit/8bf77c32b6bf2407ecc124cbefb8749a43ba5238))
+* **datagraph:** column metadata via PATCH-with-deleteColumns ([#598](https://github.com/rudderlabs/rudder-iac/issues/598)) ([b027d0c](https://github.com/rudderlabs/rudder-iac/commit/b027d0c7decbd87fe77901d359de5f71ae7264cb))
+* **project:** wire varsubst.Substitutor into project loading (DEX-361) ([#592](https://github.com/rudderlabs/rudder-iac/issues/592)) ([e3c8c40](https://github.com/rudderlabs/rudder-iac/commit/e3c8c40c27c5285e7856243dec0faa16a041d60c))
+
+
+### Bug Fixes
+
+* **cli:** later --var-file overrides earlier (DEX-384) ([#600](https://github.com/rudderlabs/rudder-iac/issues/600)) ([2e7fb98](https://github.com/rudderlabs/rudder-iac/commit/2e7fb98341c5d6bfee458076d9326e85c63fa806))
+* **transformations:** resolve telemetry tracking bug and apply convention fixes ([#555](https://github.com/rudderlabs/rudder-iac/issues/555)) ([acbbbce](https://github.com/rudderlabs/rudder-iac/commit/acbbbce7a91246f1c4850ab9344777ca973c63a4))
+
 ## [0.16.0](https://github.com/rudderlabs/rudder-iac/compare/v0.15.0...v0.16.0) (2026-05-26)
 
 

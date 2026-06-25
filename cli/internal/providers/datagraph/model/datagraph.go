@@ -41,12 +41,13 @@ type ModelSpec struct {
 // ColumnMetadataYAML is one entry in a model's `columns:` block. Constraints
 // match the rudder-api column-metadata contract: length-bounded, trimmed, no
 // control characters, and (for display_name) case-insensitively unique within a
-// model. Each entry must set at least one of display_name / description — that
-// cross-field rule is enforced by the spec validator, not struct tags.
+// model. Each entry must set at least one of display_name, description, or
+// pii_mask — that cross-field rule is enforced by the spec validator, not struct tags.
 type ColumnMetadataYAML struct {
 	Name        string `json:"name" yaml:"name" mapstructure:"name" validate:"required,max=255"`
 	DisplayName string `json:"display_name,omitempty" yaml:"display_name,omitempty" mapstructure:"display_name" validate:"omitempty,max=255"`
 	Description string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description" validate:"omitempty,max=255"`
+	PiiMask     *bool  `json:"pii_mask,omitempty" yaml:"pii_mask,omitempty" mapstructure:"pii_mask"`
 }
 
 // RelationshipSpec represents configuration for relationships from YAML

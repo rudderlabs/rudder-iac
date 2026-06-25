@@ -5,6 +5,11 @@ import (
 	"sync"
 )
 
+// WorkspaceID is the fixed workspace all backend resources belong to, so
+// import metadata generated from this backend matches the workspace used by
+// tests that apply imported specs.
+const WorkspaceID = "test-workspace-id"
+
 // Backend provides in-memory storage for the example provider
 // It uses maps with remote IDs as keys to simulate a remote system
 type Backend struct {
@@ -20,6 +25,9 @@ type RemoteBook struct {
 	ExternalID string
 	Name       string
 	AuthorID   string // Remote ID of the writer
+	// AccessKey simulates a secret: the backend stores the real value, but —
+	// like a real API — the provider never maps it back as a known value.
+	AccessKey string
 }
 
 // RemoteWriter represents a writer in the remote system
@@ -48,7 +56,7 @@ func (b *Backend) remoteID(resourceType string, externalID string) string {
 }
 
 // Book operations
-func (b *Backend) CreateBook(name, authorID, externalID string) (*RemoteBook, error) {
+func (b *Backend) CreateBook(name, authorID, externalID, accessKey string) (*RemoteBook, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -58,12 +66,13 @@ func (b *Backend) CreateBook(name, authorID, externalID string) (*RemoteBook, er
 		ExternalID: externalID,
 		Name:       name,
 		AuthorID:   authorID,
+		AccessKey:  accessKey,
 	}
 	b.books[id] = book
 	return book, nil
 }
 
-func (b *Backend) UpdateBook(id, name, authorID string) (*RemoteBook, error) {
+func (b *Backend) UpdateBook(id, name, authorID, accessKey string) (*RemoteBook, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -73,6 +82,7 @@ func (b *Backend) UpdateBook(id, name, authorID string) (*RemoteBook, error) {
 	}
 	book.Name = name
 	book.AuthorID = authorID
+	book.AccessKey = accessKey
 	return book, nil
 }
 
