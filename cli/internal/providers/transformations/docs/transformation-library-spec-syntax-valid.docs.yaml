@@ -1,116 +1,111 @@
-rule_id: "transformations/transformation-library/spec-syntax-valid"
+rule_id: transformations/transformation-library/spec-syntax-valid
 match_behavior:
-  - applies_to:
-      - kind: "transformation-library"
-        version: "rudder/v1"
-    valid:
-      - example_id: "transformation-library-spec-syntax-valid-inline-js"
-        title: "Valid transformation library spec with inline JavaScript code"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: transformation-library
-            metadata:
-              name: my-libraries
-            spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  import_name: mathUtils
-                  description: Utility functions for math operations
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
-    invalid:
-      - example_id: "transformation-library-spec-syntax-valid-missing-id"
-        title: "Transformation library spec missing required id field"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: transformation-library
-            metadata:
-              name: my-libraries
-            spec:
-              libraries:
-                - name: Math Utils
-                  import_name: mathUtils
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/id"
-            severity: "error"
-            message_contains: "'id' is required"
-      - example_id: "transformation-library-spec-syntax-valid-missing-import-name"
-        title: "Transformation library spec missing required import_name field"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: transformation-library
-            metadata:
-              name: my-libraries
-            spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/import_name"
-            severity: "error"
-            message_contains: "'import_name' is required"
-      - example_id: "transformation-library-spec-syntax-valid-wrong-import-name-case"
-        title: "Transformation library import_name not in camelCase of name"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: transformation-library
-            metadata:
-              name: my-libraries
-            spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  import_name: MathUtils
-                  language: javascript
-                  code: |
-                    export function round(value) {
-                      return Math.round(value);
-                    }
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/import_name"
-            severity: "error"
-            message_contains: "'import_name' must be camelCase of 'name'"
-      - example_id: "transformation-library-spec-syntax-valid-invalid-language"
-        title: "Transformation library spec with unsupported language"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: transformation-library
-            metadata:
-              name: my-libraries
-            spec:
-              libraries:
-                - id: math-utils
-                  name: Math Utils
-                  import_name: mathUtils
-                  language: ruby
-                  code: |
-                    def round(value)
-                      value.round
-                    end
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/language"
-            severity: "error"
-            message_contains: "'language' must be one of [javascript python]"
+- applies_to:
+  - kind: transformation-library
+    version: rudder/v1
+  valid:
+  - example_id: transformation-library-spec-syntax-valid-inline-js
+    title: Valid transformation library spec with inline JavaScript
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: transformation-library
+        metadata:
+          name: my-libraries
+        spec:
+          id: math-utils
+          name: Math Utils
+          import_name: mathUtils
+          description: Utility functions for math operations
+          language: javascript
+          code: |
+            export function round(value) {
+              return Math.round(value);
+            }
+  invalid:
+  - example_id: transformation-library-spec-syntax-valid-missing-id
+    title: Transformation library spec missing required id
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: transformation-library
+        metadata:
+          name: my-libraries
+        spec:
+          name: Math Utils
+          import_name: mathUtils
+          language: javascript
+          code: |
+            export function round(value) {
+              return Math.round(value);
+            }
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /id
+      severity: error
+      message_contains: '''id'' is required'
+  - example_id: transformation-library-spec-syntax-valid-missing-import-name
+    title: Transformation library spec missing required import_name
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: transformation-library
+        metadata:
+          name: my-libraries
+        spec:
+          id: math-utils
+          name: Math Utils
+          language: javascript
+          code: |
+            export function round(value) {
+              return Math.round(value);
+            }
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /import_name
+      severity: error
+      message_contains: '''import_name'' is required'
+  - example_id: transformation-library-spec-syntax-valid-wrong-import-name-case
+    title: Transformation library import_name is not camelCase of name
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: transformation-library
+        metadata:
+          name: my-libraries
+        spec:
+          id: math-utils
+          name: Math Utils
+          import_name: MathUtils
+          language: javascript
+          code: |
+            export function round(value) {
+              return Math.round(value);
+            }
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /import_name
+      severity: error
+      message_contains: '''import_name'' must be camelCase of ''name'''
+  - example_id: transformation-library-spec-syntax-valid-invalid-language
+    title: Transformation library spec with unsupported language
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: transformation-library
+        metadata:
+          name: my-libraries
+        spec:
+          id: math-utils
+          name: Math Utils
+          import_name: mathUtils
+          language: ruby
+          code: |
+            def round(value)
+              value.round
+            end
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /language
+      severity: error
+      message_contains: '''language'' must be one of [javascript python]'

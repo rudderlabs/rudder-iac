@@ -1,0 +1,139 @@
+name: publish rules to rudder-hugo
+
+# Fires on a cut release (via release-please's repository_dispatch) and can be
+# re-run manually for a specific tag. Mirrors release.yml / docker.yml so a
+# cross-repo publish failure never blocks the binary release.
+on:
+  # TEST ONLY — remove before merge: lets the workflow run on pushes to this
+  # branch so it can be exercised before it lands on the default branch.
+  push:
+    branches: [feature/dex-369-workflow-publish-to-rudder-hugo-on-releases]
+  repository_dispatch:
+    types: [release-created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "rudder-iac tag to publish rules from (e.g. v1.2.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish-rules:
+    name: "publish validation rule catalog to rudder-hugo"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Resolve release tag
+        id: ctx
+        env:
+          # repository_dispatch carries the tag in client_payload; workflow_dispatch in inputs.
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          # TEST ONLY — remove before merge: push events carry no tag, so fall
+          # back to a known released tag to exercise the rest of the workflow.
+          TEST_TAG: v0.18.0
+        run: |
+          TAG="${DISPATCH_TAG:-${INPUT_TAG:-$TEST_TAG}}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag provided (client_payload.tag / inputs.tag both empty)"
+            exit 1
+          fi
+          # Tag flows into a git ref and a branch name; reject anything that
+          # isn't a plain version-like token to fail fast with a clear error.
+          if ! printf '%s' "$TAG" | grep -Eq '^v?[0-9A-Za-z._-]+$'; then
+            echo "::error::Invalid tag '$TAG' (expected a version-like token, e.g. v1.2.3)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout rudder-iac at the released tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ steps.ctx.outputs.tag }}
+          # This job builds and reads the tree, then publishes elsewhere; don't
+          # leave the rudder-iac git credential on disk (zizmor artipacked).
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          # Generation is fast and this output is published downstream; a
+          # poisoned cache could be baked in (zizmor cache-poisoning).
+          cache: false
+
+      - name: Generate rule catalog
+        run: make gen-rule-docs
+
+      - name: Verify catalog was produced
+        run: test -s docs/generated/rules.yaml
+
+      # GITHUB_TOKEN can't reach another repo; mint a short-lived token from the
+      # org GitHub App (RELEASE_APP_ID / RELEASE_PRIVATE_KEY), scoped to rudder-hugo.
+      - name: Generate rudder-hugo token
+        id: hugo-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+          owner: rudderlabs
+          repositories: rudder-hugo
+
+      - name: Checkout rudderlabs/rudder-hugo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: rudderlabs/rudder-hugo
+          token: ${{ steps.hugo-token.outputs.token }}
+          path: rudder-hugo
+          persist-credentials: true
+
+      - name: Copy catalog into rudder-hugo data dir
+        run: |
+          mkdir -p rudder-hugo/data
+          cp docs/generated/rules.yaml rudder-hugo/data/rudder-cli-rules.yaml
+
+      # Open the PR with git + gh (preinstalled, GitHub-authored) instead of a
+      # third-party action — the enterprise actions allowlist blocks those.
+      - name: Open PR in rudder-hugo
+        working-directory: rudder-hugo
+        env:
+          GH_TOKEN: ${{ steps.hugo-token.outputs.token }}
+          TAG: ${{ steps.ctx.outputs.tag }}
+        run: |
+          set -euo pipefail
+          BRANCH="auto/rudder-cli-rules-${TAG}"
+          git config user.name "rudderstack-cli-bot[bot]"
+          git config user.email "rudderstack-cli-bot[bot]@users.noreply.github.com"
+
+          git switch -C "$BRANCH"
+          git add data/rudder-cli-rules.yaml
+          if git diff --cached --quiet; then
+            echo "Catalog unchanged; nothing to publish."
+            exit 0
+          fi
+
+          git commit -m "chore: update rudder-cli validation rules (${TAG})"
+          # Force-push so re-running for the same tag refreshes the branch.
+          git push -f origin "$BRANCH"
+
+          # create-pull-request is a no-op when a PR for the branch already exists.
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR already open for $BRANCH."
+            exit 0
+          fi
+          gh pr create \
+            --title "chore: update rudder-cli validation rules (${TAG})" \
+            --body "Auto-generated by rudder-iac release ${TAG}.
+
+          Updates \`data/rudder-cli-rules.yaml\` from \`make gen-rule-docs\` at
+          rudder-iac@${TAG}. Hugo serves this as \`index .Site.Data \"rudder-cli-rules\"\`.
+
+          Source: https://github.com/rudderlabs/rudder-iac/releases/tag/${TAG}" \
+            --head "$BRANCH"

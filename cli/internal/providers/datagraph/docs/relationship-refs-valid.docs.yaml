@@ -1,65 +1,65 @@
-rule_id: "datagraph/data-graph/relationship-refs-valid"
+rule_id: datagraph/data-graph/relationship-refs-valid
 match_behavior:
-  - applies_to:
-      - kind: "data-graph"
-        version: "rudder/v1"
-    valid:
-      - example_id: "dg-refs-valid-target-exists"
-        title: "Relationship target references an existing model in the same data-graph"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: data-graph
-            metadata:
-              name: my-data-graph
-            spec:
-              id: my-data-graph
-              account_id: wh-account-123
-              models:
-                - id: user
-                  display_name: User
-                  type: entity
-                  table: db.schema.users
-                  primary_id: user_id
-                  relationships:
-                    - id: user-account
-                      display_name: User Account
-                      cardinality: one-to-one
-                      target: "#data-graph-model:account"
-                      source_join_key: account_id
-                      target_join_key: account_id
-                - id: account
-                  display_name: Account
-                  type: entity
-                  table: db.schema.accounts
-                  primary_id: account_id
-    invalid:
-      - example_id: "dg-refs-invalid-target-missing"
-        title: "Relationship target references a model that does not exist"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: data-graph
-            metadata:
-              name: my-data-graph
-            spec:
-              id: my-data-graph
-              account_id: wh-account-123
-              models:
-                - id: user
-                  display_name: User
-                  type: entity
-                  table: db.schema.users
-                  primary_id: user_id
-                  relationships:
-                    - id: user-missing
-                      display_name: User Missing
-                      cardinality: one-to-one
-                      target: "#data-graph-model:non-existent"
-                      source_join_key: ref_id
-                      target_join_key: ref_id
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/models/0/relationships/0/target"
-            severity: "error"
-            message_contains: "does not exist"
+- applies_to:
+  - kind: data-graph
+    version: rudder/v1
+  valid:
+  - example_id: dg-refs-valid-target-exists
+    title: Relationship target references an existing model in the Data Graph
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: data-graph
+        metadata:
+          name: my-data-graph
+        spec:
+          id: my-data-graph
+          account_id: wh-account-123
+          models:
+            - id: user
+              display_name: User
+              type: entity
+              table: db.schema.users
+              primary_id: user_id
+              relationships:
+                - id: user-account
+                  display_name: User Account
+                  cardinality: one-to-one
+                  target: "#data-graph-model:account"
+                  source_join_key: account_id
+                  target_join_key: account_id
+            - id: account
+              display_name: Account
+              type: entity
+              table: db.schema.accounts
+              primary_id: account_id
+  invalid:
+  - example_id: dg-refs-invalid-target-missing
+    title: Relationship target references a missing model
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: data-graph
+        metadata:
+          name: my-data-graph
+        spec:
+          id: my-data-graph
+          account_id: wh-account-123
+          models:
+            - id: user
+              display_name: User
+              type: entity
+              table: db.schema.users
+              primary_id: user_id
+              relationships:
+                - id: user-missing
+                  display_name: User Missing
+                  cardinality: one-to-one
+                  target: "#data-graph-model:non-existent"
+                  source_join_key: ref_id
+                  target_join_key: ref_id
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /models/0/relationships/0/target
+      severity: error
+      message_contains: target model "data-graph-model:non-existent" does not exist

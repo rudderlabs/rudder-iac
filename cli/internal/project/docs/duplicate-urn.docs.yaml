@@ -1,68 +1,64 @@
-rule_id: "project/duplicate-urn"
+rule_id: project/duplicate-urn
 match_behavior:
-  # Project-level (gatekeeper) rule. It runs across the whole project as a
-  # ProjectRule, so it is documented with a single wildcard applies_to entry.
-  # The {kind: "*", version: "*"} pattern is what AppliesTo() reports, keeping
-  # the generated catalog deterministic regardless of active providers.
-  - applies_to:
-      - kind: "*"
-        version: "*"
-    valid:
-      - example_id: "duplicate-urn-distinct-urns"
-        title: "Distinct URNs across files"
-        description: >
-          Two specs that each declare a different resource. The URNs do not
-          collide, so the project is valid.
-        files:
-          a.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: events-a
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-          b.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: events-b
-            spec:
-              events:
-                - id: cart_viewed
-                  name: Cart Viewed
-    invalid:
-      - example_id: "duplicate-urn-across-files"
-        title: "Same URN declared in two files"
-        description: >
-          Both files declare an event with id "order_completed", which resolves
-          to the same URN. The rule flags every occurrence.
-        files:
-          a.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: events-a
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-          b.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: events-b
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed (duplicate)
-        expected_diagnostics:
-          - file: "a.yaml"
-            reference: "/spec/events/0/id"
-            severity: "error"
-            message_contains: "duplicate URN 'event:order_completed'"
-          - file: "b.yaml"
-            reference: "/spec/events/0/id"
-            severity: "error"
-            message_contains: "duplicate URN 'event:order_completed'"
+- applies_to:
+  - kind: '*'
+    version: '*'
+  valid:
+  - example_id: duplicate-urn-distinct-urns
+    title: Distinct URNs across files
+    description: Each spec declares a different resource, so URNs do not collide.
+    files:
+      a.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: events-a
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed
+      b.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: events-b
+        spec:
+          events:
+            - id: cart_viewed
+              event_type: track
+              name: Cart Viewed
+  invalid:
+  - example_id: duplicate-urn-across-files
+    title: Same URN declared in two files
+    description: Both files declare the same event ID, which resolves to one URN. The rule flags each occurrence.
+    files:
+      a.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: events-a
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed
+      b.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: events-b
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed (duplicate)
+    expected_diagnostics:
+    - file: a.yaml
+      reference: /spec/events/0/id
+      severity: error
+      message_contains: duplicate URN 'event:order_completed'
+    - file: b.yaml
+      reference: /spec/events/0/id
+      severity: error
+      message_contains: duplicate URN 'event:order_completed'

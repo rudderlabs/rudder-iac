@@ -1,187 +1,192 @@
-rule_id: "event-stream/source/semantic-valid"
+rule_id: event-stream/source/semantic-valid
 match_behavior:
-  # Legacy spec versions (rudder/0.1 and rudder/v0.1) apply the same semantic checks
-  # (tracking plan existence and source name uniqueness), so they are documented together.
-  - applies_to:
-      - kind: "event-stream-source"
-        version: "rudder/0.1"
-      - kind: "event-stream-source"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "es-source-legacy-semantic-valid-no-governance"
-        title: "Valid legacy source without governance — no cross-references to resolve"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My JavaScript Source
-              type: javascript
-      - example_id: "es-source-legacy-semantic-valid-with-tp"
-        title: "Valid legacy source whose tracking plan exists in the project"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My JavaScript Source
-              type: javascript
-              governance:
-                validations:
-                  tracking_plan: "#/tp/my-group/tp-main"
-                  config: {}
-          tracking_plan.yaml: |
-            version: rudder/0.1
-            kind: tracking-plan
-            metadata:
-              name: tp-main
-            spec:
-              id: tp-main
-              name: Main Tracking Plan
-              description: Default plan
-              rules: []
-    invalid:
-      - example_id: "es-source-legacy-semantic-tp-not-found"
-        title: "Legacy source references a tracking plan that does not exist in the project"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My JavaScript Source
-              type: javascript
-              governance:
-                validations:
-                  tracking_plan: "#/tp/my-group/tp-missing"
-                  config: {}
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/governance/validations/tracking_plan"
-            severity: "error"
-            message_contains: "not found in the project"
-      - example_id: "es-source-legacy-semantic-duplicate-name"
-        title: "Legacy source shares a name with another source in the same project"
-        files:
-          source-a.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: source-a
-            spec:
-              id: src-a
-              name: Shared Name
-              type: javascript
-          source-b.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: source-b
-            spec:
-              id: src-b
-              name: Shared Name
-              type: node
-        expected_diagnostics:
-          - file: "source-a.yaml"
-            reference: "/name"
-            severity: "error"
-            message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
-  # Current spec version (rudder/v1) applies the same semantic checks with the modern ref format.
-  - applies_to:
-      - kind: "event-stream-source"
-        version: "rudder/v1"
-    valid:
-      - example_id: "es-source-v1-semantic-valid-no-governance"
-        title: "Valid v1 source without governance"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Python Source
-              type: python
-      - example_id: "es-source-v1-semantic-valid-with-tp"
-        title: "Valid v1 source whose tracking plan exists in the project"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Python Source
-              type: python
-              governance:
-                validations:
-                  tracking_plan: "#tracking-plan:tp-main"
-                  config: {}
-          tracking_plan.yaml: |
-            version: rudder/v1
-            kind: tracking-plan
-            metadata:
-              name: tp-main
-            spec:
-              id: tp-main
-              name: Main Tracking Plan
-              description: Default plan
-              rules: []
-    invalid:
-      - example_id: "es-source-v1-semantic-tp-not-found"
-        title: "v1 source references a tracking plan that does not exist in the project"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Python Source
-              type: python
-              governance:
-                validations:
-                  tracking_plan: "#tracking-plan:tp-missing"
-                  config: {}
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/governance/validations/tracking_plan"
-            severity: "error"
-            message_contains: "not found in the project"
-      - example_id: "es-source-v1-semantic-duplicate-name"
-        title: "v1 source shares a name with another source in the same project"
-        files:
-          source-a.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: source-a
-            spec:
-              id: src-a
-              name: Shared Name
-              type: javascript
-          source-b.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: source-b
-            spec:
-              id: src-b
-              name: Shared Name
-              type: node
-        expected_diagnostics:
-          - file: "source-a.yaml"
-            reference: "/name"
-            severity: "error"
-            message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
+- applies_to:
+  - kind: event-stream-source
+    version: rudder/0.1
+  - kind: event-stream-source
+    version: rudder/v0.1
+  valid:
+  - example_id: es-source-legacy-semantic-valid-no-governance
+    title: Valid legacy source without governance
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My JavaScript Source
+          type: javascript
+  - example_id: es-source-legacy-semantic-valid-with-tp
+    title: Valid legacy source with an existing Tracking Plan reference
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My JavaScript Source
+          type: javascript
+          governance:
+            validations:
+              tracking_plan: "#/tp/my-group/tp-main"
+              config: {}
+      tracking_plan.yaml: |
+        version: rudder/0.1
+        kind: tp
+        metadata:
+          name: tp-main
+        spec:
+          id: tp-main
+          display_name: Main Tracking Plan
+          description: Default plan
+          rules: []
+  invalid:
+  - example_id: es-source-legacy-semantic-tp-not-found
+    title: Legacy source references a missing Tracking Plan
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My JavaScript Source
+          type: javascript
+          governance:
+            validations:
+              tracking_plan: "#/tp/my-group/tp-missing"
+              config: {}
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /governance/validations/tracking_plan
+      severity: error
+      message_contains: tracking plan 'tp-missing' not found in the project
+  - example_id: es-source-legacy-semantic-duplicate-name
+    title: Legacy source name duplicates another source in the project
+    files:
+      source-a.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: source-a
+        spec:
+          id: src-a
+          name: Shared Name
+          type: javascript
+      source-b.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: source-b
+        spec:
+          id: src-b
+          name: Shared Name
+          type: node
+    expected_diagnostics:
+    - file: source-a.yaml
+      reference: /name
+      severity: error
+      message_contains: duplicate name 'Shared Name' within kind 'event-stream-source'
+    - file: source-b.yaml
+      reference: /name
+      severity: error
+      message_contains: duplicate name 'Shared Name' within kind 'event-stream-source'
+- applies_to:
+  - kind: event-stream-source
+    version: rudder/v1
+  valid:
+  - example_id: es-source-v1-semantic-valid-no-governance
+    title: Valid source without governance
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Python Source
+          type: python
+  - example_id: es-source-v1-semantic-valid-with-tp
+    title: Valid source with an existing Tracking Plan reference
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Python Source
+          type: python
+          governance:
+            validations:
+              tracking_plan: "#tracking-plan:tp-main"
+              config: {}
+      tracking_plan.yaml: |
+        version: rudder/v1
+        kind: tracking-plan
+        metadata:
+          name: tp-main
+        spec:
+          id: tp-main
+          display_name: Main Tracking Plan
+          description: Default plan
+          rules: []
+  invalid:
+  - example_id: es-source-v1-semantic-tp-not-found
+    title: v1 source references a missing Tracking Plan
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Python Source
+          type: python
+          governance:
+            validations:
+              tracking_plan: "#tracking-plan:tp-missing"
+              config: {}
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /governance/validations/tracking_plan
+      severity: error
+      message_contains: tracking plan 'tp-missing' not found in the project
+  - example_id: es-source-v1-semantic-duplicate-name
+    title: v1 source name duplicates another source in the project
+    files:
+      source-a.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: source-a
+        spec:
+          id: src-a
+          name: Shared Name
+          type: javascript
+      source-b.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: source-b
+        spec:
+          id: src-b
+          name: Shared Name
+          type: node
+    expected_diagnostics:
+    - file: source-a.yaml
+      reference: /name
+      severity: error
+      message_contains: duplicate name 'Shared Name' within kind 'event-stream-source'
+    - file: source-b.yaml
+      reference: /name
+      severity: error
+      message_contains: duplicate name 'Shared Name' within kind 'event-stream-source'

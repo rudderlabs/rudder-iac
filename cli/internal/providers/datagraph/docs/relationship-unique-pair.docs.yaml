@@ -1,127 +1,127 @@
-rule_id: "datagraph/data-graph/relationship-unique-pair"
+rule_id: datagraph/data-graph/relationship-unique-pair
 match_behavior:
-  - applies_to:
-      - kind: "data-graph"
-        version: "rudder/v1"
-    valid:
-      - example_id: "dg-unique-pair-different-targets"
-        title: "Multiple relationships from the same model to different targets are allowed"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: data-graph
-            metadata:
-              name: my-data-graph
-            spec:
-              id: my-data-graph
-              account_id: wh-account-123
-              models:
-                - id: user
-                  display_name: User
-                  type: entity
-                  table: db.schema.users
-                  primary_id: user_id
-                  relationships:
-                    - id: user-account
-                      display_name: User Account
-                      cardinality: one-to-one
-                      target: "#data-graph-model:account"
-                      source_join_key: account_id
-                      target_join_key: account_id
-                    - id: user-profile
-                      display_name: User Profile
-                      cardinality: one-to-one
-                      target: "#data-graph-model:profile"
-                      source_join_key: profile_id
-                      target_join_key: profile_id
-                - id: account
-                  display_name: Account
-                  type: entity
-                  table: db.schema.accounts
-                  primary_id: account_id
-                - id: profile
-                  display_name: Profile
-                  type: entity
-                  table: db.schema.profiles
-                  primary_id: profile_id
-      - example_id: "dg-unique-pair-reversed-pair-allowed"
-        title: "A relationship A-to-B and B-to-A are distinct and both allowed"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: data-graph
-            metadata:
-              name: my-data-graph
-            spec:
-              id: my-data-graph
-              account_id: wh-account-123
-              models:
-                - id: user
-                  display_name: User
-                  type: entity
-                  table: db.schema.users
-                  primary_id: user_id
-                  relationships:
-                    - id: user-to-account
-                      display_name: User to Account
-                      cardinality: one-to-one
-                      target: "#data-graph-model:account"
-                      source_join_key: account_id
-                      target_join_key: account_id
-                - id: account
-                  display_name: Account
-                  type: entity
-                  table: db.schema.accounts
-                  primary_id: account_id
-                  relationships:
-                    - id: account-to-user
-                      display_name: Account to User
-                      cardinality: one-to-one
-                      target: "#data-graph-model:user"
-                      source_join_key: account_id
-                      target_join_key: account_id
-    invalid:
-      - example_id: "dg-unique-pair-duplicate-source-target"
-        title: "Two relationships with the same source-target model pair are not allowed"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: data-graph
-            metadata:
-              name: my-data-graph
-            spec:
-              id: my-data-graph
-              account_id: wh-account-123
-              models:
-                - id: user
-                  display_name: User
-                  type: entity
-                  table: db.schema.users
-                  primary_id: user_id
-                  relationships:
-                    - id: user-account-v1
-                      display_name: User Account v1
-                      cardinality: one-to-one
-                      target: "#data-graph-model:account"
-                      source_join_key: account_id
-                      target_join_key: account_id
-                    - id: user-account-v2
-                      display_name: User Account v2
-                      cardinality: one-to-many
-                      target: "#data-graph-model:account"
-                      source_join_key: account_id
-                      target_join_key: id
-                - id: account
-                  display_name: Account
-                  type: entity
-                  table: db.schema.accounts
-                  primary_id: account_id
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/models/0/relationships/0"
-            severity: "error"
-            message_contains: "at most one relationship is allowed per source-target pair"
-          - file: "spec.yaml"
-            reference: "/models/0/relationships/1"
-            severity: "error"
-            message_contains: "at most one relationship is allowed per source-target pair"
+- applies_to:
+  - kind: data-graph
+    version: rudder/v1
+  valid:
+  - example_id: dg-unique-pair-different-targets
+    title: Multiple relationships from one model to different targets are allowed
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: data-graph
+        metadata:
+          name: my-data-graph
+        spec:
+          id: my-data-graph
+          account_id: wh-account-123
+          models:
+            - id: user
+              display_name: User
+              type: entity
+              table: db.schema.users
+              primary_id: user_id
+              relationships:
+                - id: user-account
+                  display_name: User Account
+                  cardinality: one-to-one
+                  target: "#data-graph-model:account"
+                  source_join_key: account_id
+                  target_join_key: account_id
+                - id: user-profile
+                  display_name: User Profile
+                  cardinality: one-to-one
+                  target: "#data-graph-model:profile"
+                  source_join_key: profile_id
+                  target_join_key: profile_id
+            - id: account
+              display_name: Account
+              type: entity
+              table: db.schema.accounts
+              primary_id: account_id
+            - id: profile
+              display_name: Profile
+              type: entity
+              table: db.schema.profiles
+              primary_id: profile_id
+  - example_id: dg-unique-pair-reversed-pair-allowed
+    title: A-to-B and B-to-A relationships are distinct and both allowed
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: data-graph
+        metadata:
+          name: my-data-graph
+        spec:
+          id: my-data-graph
+          account_id: wh-account-123
+          models:
+            - id: user
+              display_name: User
+              type: entity
+              table: db.schema.users
+              primary_id: user_id
+              relationships:
+                - id: user-to-account
+                  display_name: User to Account
+                  cardinality: one-to-one
+                  target: "#data-graph-model:account"
+                  source_join_key: account_id
+                  target_join_key: account_id
+            - id: account
+              display_name: Account
+              type: entity
+              table: db.schema.accounts
+              primary_id: account_id
+              relationships:
+                - id: account-to-user
+                  display_name: Account to User
+                  cardinality: one-to-one
+                  target: "#data-graph-model:user"
+                  source_join_key: account_id
+                  target_join_key: account_id
+  invalid:
+  - example_id: dg-unique-pair-duplicate-source-target
+    title: Duplicate source-target model pairs are not allowed
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: data-graph
+        metadata:
+          name: my-data-graph
+        spec:
+          id: my-data-graph
+          account_id: wh-account-123
+          models:
+            - id: user
+              display_name: User
+              type: entity
+              table: db.schema.users
+              primary_id: user_id
+              relationships:
+                - id: user-account-v1
+                  display_name: User Account v1
+                  cardinality: one-to-one
+                  target: "#data-graph-model:account"
+                  source_join_key: account_id
+                  target_join_key: account_id
+                - id: user-account-v2
+                  display_name: User Account v2
+                  cardinality: one-to-many
+                  target: "#data-graph-model:account"
+                  source_join_key: account_id
+                  target_join_key: id
+            - id: account
+              display_name: Account
+              type: entity
+              table: db.schema.accounts
+              primary_id: account_id
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /models/0/relationships/0
+      severity: error
+      message_contains: a relationship from model "data-graph-model:user" to model "data-graph-model:account" already exists; at most one relationship is allowed per source-target pair
+    - file: spec.yaml
+      reference: /models/0/relationships/1
+      severity: error
+      message_contains: a relationship from model "data-graph-model:user" to model "data-graph-model:account" already exists; at most one relationship is allowed per source-target pair

@@ -1,103 +1,101 @@
-rule_id: "datacatalog/custom-types/config-valid"
+rule_id: datacatalog/custom-types/config-valid
 match_behavior:
-  # Legacy spec versions share the same config validation path.
-  - applies_to:
-      - kind: "custom-types"
-        version: "rudder/0.1"
-      - kind: "custom-types"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "ct-cfg-legacy-valid-string"
-        title: "Valid string config with enum (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: custom-types
-            metadata:
-              name: my-custom-types
-            spec:
-              types:
-                - id: user_status
-                  name: UserStatus
-                  type: string
-                  config:
-                    enum: ["active", "inactive"]
-                    pattern: "^[a-z]+$"
-      - example_id: "ct-cfg-legacy-valid-integer"
-        title: "Valid integer config with range (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: custom-types
-            metadata:
-              name: my-custom-types
-            spec:
-              types:
-                - id: age
-                  name: Age
-                  type: integer
-                  config:
-                    minimum: 0
-                    maximum: 120
-    invalid:
-      - example_id: "ct-cfg-legacy-invalid-format"
-        title: "String config with invalid format value (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: custom-types
-            metadata:
-              name: my-custom-types
-            spec:
-              types:
-                - id: user_email
-                  name: UserEmail
-                  type: string
-                  config:
-                    format: invalid_format
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/types/0/config/format"
-            severity: "error"
-            message_contains: "invalid_format"
-  # Current spec version (rudder/v1).
-  - applies_to:
-      - kind: "custom-types"
-        version: "rudder/v1"
-    valid:
-      - example_id: "ct-cfg-v1-valid-string"
-        title: "Valid v1 string config with pattern"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: custom-types
-            metadata:
-              name: my-custom-types
-            spec:
-              types:
-                - id: user_status
-                  name: UserStatus
-                  type: string
-                  config:
-                    enum: ["active", "inactive"]
-    invalid:
-      - example_id: "ct-cfg-v1-invalid-format"
-        title: "v1 string config with invalid format value"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: custom-types
-            metadata:
-              name: my-custom-types
-            spec:
-              types:
-                - id: user_email
-                  name: UserEmail
-                  type: string
-                  config:
-                    format: not_a_valid_format
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/types/0/config/format"
-            severity: "error"
-            message_contains: "not_a_valid_format"
+- applies_to:
+  - kind: custom-types
+    version: rudder/0.1
+  - kind: custom-types
+    version: rudder/v0.1
+  valid:
+  - example_id: ct-cfg-legacy-valid-string
+    title: Valid string config with enum (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: custom-types
+        metadata:
+          name: my-custom-types
+        spec:
+          types:
+            - id: user_status
+              name: UserStatus
+              type: string
+              config:
+                enum: ["active", "inactive"]
+                pattern: "^[a-z]+$"
+  - example_id: ct-cfg-legacy-valid-integer
+    title: Valid integer config with range (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: custom-types
+        metadata:
+          name: my-custom-types
+        spec:
+          types:
+            - id: age
+              name: Age
+              type: integer
+              config:
+                minimum: 0
+                maximum: 120
+  invalid:
+  - example_id: ct-cfg-legacy-invalid-format
+    title: String config with invalid format (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: custom-types
+        metadata:
+          name: my-custom-types
+        spec:
+          types:
+            - id: user_email
+              name: UserEmail
+              type: string
+              config:
+                format: invalid_format
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /types/0/config/format
+      severity: error
+      message_contains: '''format'' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]'
+- applies_to:
+  - kind: custom-types
+    version: rudder/v1
+  valid:
+  - example_id: ct-cfg-v1-valid-string
+    title: Valid string config with pattern
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: custom-types
+        metadata:
+          name: my-custom-types
+        spec:
+          types:
+            - id: user_status
+              name: UserStatus
+              type: string
+              config:
+                enum: ["active", "inactive"]
+  invalid:
+  - example_id: ct-cfg-v1-invalid-format
+    title: v1 string config with invalid format
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: custom-types
+        metadata:
+          name: my-custom-types
+        spec:
+          types:
+            - id: user_email
+              name: UserEmail
+              type: string
+              config:
+                format: not_a_valid_format
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /types/0/config/format
+      severity: error
+      message_contains: '''format'' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]'

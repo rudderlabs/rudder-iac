@@ -1,48 +1,43 @@
-rule_id: "project/resource-kind-version-valid"
+rule_id: project/resource-kind-version-valid
 match_behavior:
-  # Project-level (gatekeeper) rule that runs against every spec regardless of
-  # kind or version, so it is documented with a single wildcard applies_to
-  # entry. The {kind: "*", version: "*"} pattern is what the rule reports from
-  # AppliesTo(), keeping the generated catalog deterministic regardless of which
-  # providers or experimental kinds are active.
-  - applies_to:
-      - kind: "*"
-        version: "*"
-    valid:
-      - example_id: "kind-version-supported-pair"
-        title: "Kind declared with a supported version"
-        description: >
-          The events kind is supported at version rudder/v1, so this spec is
-          accepted. The rule only flags a kind/version combination when the kind
-          is recognised but the specific version is not registered for it.
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: my-events
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-    invalid:
-      - example_id: "kind-version-unsupported-version"
-        title: "Known kind declared with an unsupported version"
-        description: >
-          The events kind is recognised, but it is not registered for version
-          rudder/v0.1. The rule reports the unsupported kind/version pairing.
-        files:
-          spec.yaml: |
-            version: rudder/v0.1
-            kind: events
-            metadata:
-              name: my-events
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/kind"
-            severity: "error"
-            message_contains: "is not supported with version"
+- applies_to:
+  - kind: '*'
+    version: '*'
+  valid:
+  - example_id: kind-version-supported-pair
+    title: Kind declared with a supported version
+    description: The events kind supports rudder/v1, so this spec is accepted. The rule flags kind/version pairs where the kind is recognized but the version is not registered.
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: my-events
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed
+  invalid:
+  - example_id: kind-version-unsupported-version
+    title: Known kind declared with an unsupported version
+    description: The transformation kind is recognized but registered only for rudder/v1, not rudder/0.1. The rule reports the unsupported kind/version pair.
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: transformation
+        metadata:
+          name: my-transformations
+        spec:
+          id: my-transformation
+          name: My Transformation
+          language: javascript
+          code: |
+            export function transformEvent(event, metadata) {
+              return event;
+            }
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /kind
+      severity: error
+      message_contains: kind 'transformation' is not supported with version 'rudder/0.1'

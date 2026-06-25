@@ -1,85 +1,80 @@
-rule_id: "project/metadata-syntax-valid"
+rule_id: project/metadata-syntax-valid
 match_behavior:
-  # This is a project-level (gatekeeper) rule that runs against every spec
-  # regardless of kind or version, so it is documented with a single wildcard
-  # applies_to entry. The {kind: "*", version: "*"} pattern is what the rule
-  # reports from AppliesTo(), which keeps the generated catalog deterministic
-  # (independent of which providers or experimental kinds are active).
-  - applies_to:
-      - kind: "*"
-        version: "*"
-    valid:
-      - example_id: "metadata-name-only"
-        title: "Metadata with only the required name"
-        description: "The minimal valid metadata block: a name and nothing else."
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: my-events
-            spec:
-              events: []
-      - example_id: "metadata-with-import"
-        title: "Metadata with a well-formed import block"
-        description: >
-          An import block where every workspace has a workspace_id and every
-          resource references a URN that exists in the spec body.
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: my-events
-              import:
-                workspaces:
-                  - workspace_id: ws-123
-                    resources:
-                      - urn: "event:order_completed"
-                        remote_id: ev-remote-456
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-    invalid:
-      - example_id: "metadata-missing-name"
-        title: "Metadata missing the required name field"
-        description: "Every spec's metadata must declare a name."
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              import:
-                workspaces:
-                  - workspace_id: ws-123
-            spec:
-              events: []
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/metadata/name"
-            severity: "error"
-            message_contains: "'name' is required"
-      - example_id: "metadata-import-missing-workspace-id"
-        title: "Import workspace missing the required workspace_id"
-        description: "Each workspace entry in an import block must declare a workspace_id."
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: events
-            metadata:
-              name: my-events
-              import:
-                workspaces:
-                  - resources:
-                      - urn: "event:order_completed"
-                        remote_id: ev-remote-456
-            spec:
-              events:
-                - id: order_completed
-                  name: Order Completed
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/metadata/import/workspaces/0/workspace_id"
-            severity: "error"
-            message_contains: "'workspace_id' is required"
+- applies_to:
+  - kind: '*'
+    version: '*'
+  valid:
+  - example_id: metadata-name-only
+    title: Metadata with only the required name
+    description: 'Minimal valid metadata: a name only.'
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: my-events
+        spec:
+          events: []
+  - example_id: metadata-with-import
+    title: Metadata with a well-formed import block
+    description: An import block where each workspace declares workspace_id and each resource references a URN in the spec body.
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: my-events
+          import:
+            workspaces:
+              - workspace_id: ws-123
+                resources:
+                  - urn: "event:order_completed"
+                    remote_id: ev-remote-456
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed
+  invalid:
+  - example_id: metadata-missing-name
+    title: Metadata missing required name
+    description: Every spec metadata block must declare a name.
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          import:
+            workspaces:
+              - workspace_id: ws-123
+        spec:
+          events: []
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /metadata/name
+      severity: error
+      message_contains: '''name'' is required'
+  - example_id: metadata-import-missing-workspace-id
+    title: Import workspace missing required workspace_id
+    description: Each import workspace entry must declare a workspace_id.
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: events
+        metadata:
+          name: my-events
+          import:
+            workspaces:
+              - resources:
+                  - urn: "event:order_completed"
+                    remote_id: ev-remote-456
+        spec:
+          events:
+            - id: order_completed
+              event_type: track
+              name: Order Completed
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /metadata/import/workspaces/0/workspace_id
+      severity: error
+      message_contains: '''workspace_id'' is required'
