@@ -1,100 +1,98 @@
-rule_id: "datacatalog/properties/spec-syntax-valid"
+rule_id: datacatalog/properties/spec-syntax-valid
 match_behavior:
-  # Legacy spec versions share the same property spec shape and validation.
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/0.1"
-      - kind: "properties"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "prop-spec-legacy-valid"
-        title: "Valid legacy properties spec"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id
-                  name: User ID
-                  description: Unique identifier for the user
-                  type: string
-                - id: email
-                  name: Email
-                  type: string
-    invalid:
-      - example_id: "prop-spec-legacy-missing-id"
-        title: "Legacy property missing the required id field"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - name: User ID
-                  type: string
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0/id"
-            severity: "error"
-            message_contains: "'id' is required"
-      - example_id: "prop-spec-legacy-missing-name"
-        title: "Legacy property missing the required name field"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id
-                  type: string
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0/name"
-            severity: "error"
-            message_contains: "'name' is required"
-  # Current spec version (rudder/v1).
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/v1"
-    valid:
-      - example_id: "prop-spec-v1-valid"
-        title: "Valid v1 properties spec"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id
-                  name: User ID
-                  type: string
-                - id: age
-                  name: Age
-                  type: integer
-    invalid:
-      - example_id: "prop-spec-v1-missing-id"
-        title: "v1 property missing the required id field"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - name: User ID
-                  type: string
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0/id"
-            severity: "error"
-            message_contains: "'id' is required"
+- applies_to:
+  - kind: properties
+    version: rudder/0.1
+  - kind: properties
+    version: rudder/v0.1
+  valid:
+  - example_id: prop-spec-legacy-valid
+    title: Valid legacy properties spec
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              description: Unique identifier for the user
+              type: string
+            - id: email
+              name: Email
+              type: string
+  invalid:
+  - example_id: prop-spec-legacy-missing-id
+    title: Legacy property missing required id field
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - name: User ID
+              type: string
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0/id
+      severity: error
+      message_contains: '''id'' is required'
+  - example_id: prop-spec-legacy-missing-name
+    title: Legacy property missing required name field
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              type: string
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0/name
+      severity: error
+      message_contains: '''name'' is required'
+- applies_to:
+  - kind: properties
+    version: rudder/v1
+  valid:
+  - example_id: prop-spec-v1-valid
+    title: Valid properties spec
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              type: string
+            - id: age
+              name: Age
+              type: integer
+  invalid:
+  - example_id: prop-spec-v1-missing-id
+    title: v1 property missing required id field
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - name: User ID
+              type: string
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0/id
+      severity: error
+      message_contains: '''id'' is required'

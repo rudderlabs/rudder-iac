@@ -1,164 +1,161 @@
-rule_id: "event-stream/source/spec-syntax-valid"
+rule_id: event-stream/source/spec-syntax-valid
 match_behavior:
-  # Legacy spec versions (rudder/0.1 and rudder/v0.1) share the same source spec
-  # shape and tracking plan ref pattern (#/tp/<group>/<id>), so they are documented together.
-  - applies_to:
-      - kind: "event-stream-source"
-        version: "rudder/0.1"
-      - kind: "event-stream-source"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "es-source-legacy-valid-minimal"
-        title: "Valid legacy source spec with required fields"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-js-source
-            spec:
-              id: src-js-1
-              name: My JavaScript Source
-              type: javascript
-      - example_id: "es-source-legacy-valid-with-governance"
-        title: "Valid legacy source spec with tracking plan governance"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-node-source
-            spec:
-              id: src-node-1
-              name: My Node.js Source
-              type: node
-              governance:
-                validations:
-                  tracking_plan: "#/tp/my-group/tp-main"
-                  config: {}
-    invalid:
-      - example_id: "es-source-legacy-missing-id"
-        title: "Legacy source spec missing required id field"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              name: My Source
-              type: javascript
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/id"
-            severity: "error"
-            message_contains: "'id' is required"
-      - example_id: "es-source-legacy-invalid-type"
-        title: "Legacy source spec with an unsupported source type"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Source
-              type: unknown_sdk
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/type"
-            severity: "error"
-            message_contains: "'type' must be one of"
-      - example_id: "es-source-legacy-invalid-tp-ref"
-        title: "Legacy source spec with tracking plan ref in wrong format"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Source
-              type: javascript
-              governance:
-                validations:
-                  tracking_plan: "#tracking-plan:tp-1"
-                  config: {}
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/governance/validations/tracking_plan"
-            severity: "error"
-            message_contains: "'tracking_plan' is invalid: must be of pattern #/tp/<group>/<id>"
-  # Current spec version (rudder/v1) uses the modern tracking plan ref format (#tracking-plan:<id>).
-  - applies_to:
-      - kind: "event-stream-source"
-        version: "rudder/v1"
-    valid:
-      - example_id: "es-source-v1-valid-minimal"
-        title: "Valid v1 source spec with required fields"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-python-source
-            spec:
-              id: src-py-1
-              name: My Python Source
-              type: python
-      - example_id: "es-source-v1-valid-with-governance"
-        title: "Valid v1 source spec with tracking plan governance"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-android-source
-            spec:
-              id: src-android-1
-              name: My Android Source
-              type: android
-              governance:
-                validations:
-                  tracking_plan: "#tracking-plan:tp-main"
-                  config: {}
-    invalid:
-      - example_id: "es-source-v1-missing-name"
-        title: "v1 source spec missing required name field"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              type: javascript
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/name"
-            severity: "error"
-            message_contains: "'name' is required"
-      - example_id: "es-source-v1-invalid-tp-ref"
-        title: "v1 source spec with tracking plan ref in legacy format"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: event-stream-source
-            metadata:
-              name: my-source
-            spec:
-              id: src-1
-              name: My Source
-              type: javascript
-              governance:
-                validations:
-                  tracking_plan: "#/tp/my-group/tp-1"
-                  config: {}
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/governance/validations/tracking_plan"
-            severity: "error"
-            message_contains: "'tracking_plan' is invalid: must be of pattern #tracking-plan:<id>"
+- applies_to:
+  - kind: event-stream-source
+    version: rudder/0.1
+  - kind: event-stream-source
+    version: rudder/v0.1
+  valid:
+  - example_id: es-source-legacy-valid-minimal
+    title: Valid legacy source spec with required fields
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-js-source
+        spec:
+          id: src-js-1
+          name: My JavaScript Source
+          type: javascript
+  - example_id: es-source-legacy-valid-with-governance
+    title: Valid legacy source spec with Tracking Plan governance
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-node-source
+        spec:
+          id: src-node-1
+          name: My Node.js Source
+          type: node
+          governance:
+            validations:
+              tracking_plan: "#/tp/my-group/tp-main"
+              config: {}
+  invalid:
+  - example_id: es-source-legacy-missing-id
+    title: Legacy source spec missing required id
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          name: My Source
+          type: javascript
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /id
+      severity: error
+      message_contains: '''id'' is required'
+  - example_id: es-source-legacy-invalid-type
+    title: Legacy source spec with unsupported source type
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Source
+          type: unknown_sdk
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /type
+      severity: error
+      message_contains: '''type'' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin]'
+  - example_id: es-source-legacy-invalid-tp-ref
+    title: Legacy source spec with invalid Tracking Plan reference format
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Source
+          type: javascript
+          governance:
+            validations:
+              tracking_plan: "#tracking-plan:tp-1"
+              config: {}
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /governance/validations/tracking_plan
+      severity: error
+      message_contains: '''tracking_plan'' is invalid: must be of pattern #/tp/<group>/<id>'
+- applies_to:
+  - kind: event-stream-source
+    version: rudder/v1
+  valid:
+  - example_id: es-source-v1-valid-minimal
+    title: Valid source spec with required fields
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-python-source
+        spec:
+          id: src-py-1
+          name: My Python Source
+          type: python
+  - example_id: es-source-v1-valid-with-governance
+    title: Valid source spec with Tracking Plan governance
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-android-source
+        spec:
+          id: src-android-1
+          name: My Android Source
+          type: android
+          governance:
+            validations:
+              tracking_plan: "#tracking-plan:tp-main"
+              config: {}
+  invalid:
+  - example_id: es-source-v1-missing-name
+    title: v1 source spec missing required name
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          type: javascript
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /name
+      severity: error
+      message_contains: '''name'' is required'
+  - example_id: es-source-v1-invalid-tp-ref
+    title: v1 source spec with legacy Tracking Plan reference format
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: event-stream-source
+        metadata:
+          name: my-source
+        spec:
+          id: src-1
+          name: My Source
+          type: javascript
+          governance:
+            validations:
+              tracking_plan: "#/tp/my-group/tp-1"
+              config: {}
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /governance/validations/tracking_plan
+      severity: error
+      message_contains: '''tracking_plan'' is invalid: must be of pattern #tracking-plan:<id>'

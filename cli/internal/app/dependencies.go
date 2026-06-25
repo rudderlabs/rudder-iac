@@ -96,7 +96,7 @@ func NewDeps() (Deps, error) {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
 
-	cp, p, err := composeProviders(c)
+	cp, p, err := composeProviders(c, false)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,10 @@ func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, err
 // it skips the auth check NewDeps enforces and feeds client.New a placeholder
 // token (an empty token is rejected outright, which would otherwise break
 // generation in CI where no credentials are configured). It shares
-// composeProviders with NewDeps so the documented rule set stays identical to
-// the one project validation observes — they can't drift.
+// composeProviders with NewDeps so the documented rule set stays in lockstep
+// with the one project validation observes — with one deliberate exception: it
+// passes includeExperimental=true so docs publish experimental providers' rules
+// (e.g. datagraph) regardless of whether their experimental flag is enabled.
 func newCompositeProvider() (provider.Provider, error) {
 	cfg := config.GetConfig()
 
@@ -149,7 +151,7 @@ func newCompositeProvider() (provider.Provider, error) {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
 
-	cp, _, err := composeProviders(c)
+	cp, _, err := composeProviders(c, true)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +162,11 @@ func newCompositeProvider() (provider.Provider, error) {
 // composeProviders builds the provider set and aggregates it into a composite
 // provider. Shared by NewDeps and newCompositeProvider so every consumer
 // observes the same providers (and therefore the same registered rules).
-func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
+// includeExperimental forces experimental providers into the set regardless of
+// their experimental flag — used by rule-doc generation so a feature's rules
+// are always documented; the application path passes false to keep experimental
+// providers behind their flags.
+func composeProviders(c *client.Client, includeExperimental bool) (provider.Provider, *Providers, error) {
 	p, err := setupProviders(c)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
@@ -175,7 +181,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		"transformations": p.Transformations,
 	}
 
-	if cfg.ExperimentalFlags.DataGraph {
+	if includeExperimental || cfg.ExperimentalFlags.DataGraph {
 		providerMap["datagraph"] = p.DataGraph
 	}
 
@@ -221,11 +227,11 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		Workspace:       wsp,
 	}
 
-	// Initialize data graph provider if experimental flag is enabled
-	if cfg.ExperimentalFlags.DataGraph {
-		dgStore := dgClient.NewRudderDataGraphClient(c)
-		providers.DataGraph = dgProvider.NewProvider(dgStore, c.Accounts)
-	}
+	// Always construct the datagraph provider: it's pure wiring (no network),
+	// and whether it's exposed is decided at composition time — gated by the
+	// experimental flag for the app, always included for rule-doc generation.
+	dgStore := dgClient.NewRudderDataGraphClient(c)
+	providers.DataGraph = dgProvider.NewProvider(dgStore, c.Accounts)
 
 	return providers, nil
 }

@@ -1,86 +1,112 @@
-rule_id: "datacatalog/properties/semantic-valid"
+rule_id: datacatalog/properties/semantic-valid
 match_behavior:
-  # Legacy spec versions share the same semantic validation path.
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/0.1"
-      - kind: "properties"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "prop-sem-legacy-valid"
-        title: "Unique (name, type) property combinations (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id
-                  name: User ID
-                  type: string
-                - id: email
-                  name: Email
-                  type: string
-    invalid:
-      - example_id: "prop-sem-legacy-duplicate"
-        title: "Duplicate (name, type, itemTypes) property combination across files (legacy)"
-        description: "Two properties with the same name, type, and itemTypes in the resource graph trigger this error."
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id_2
-                  name: User ID
-                  type: string
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0"
-            severity: "error"
-            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
-  # Current spec version (rudder/v1).
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/v1"
-    valid:
-      - example_id: "prop-sem-v1-valid"
-        title: "Unique (name, type) property combinations (v1)"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id
-                  name: User ID
-                  type: string
-                - id: email
-                  name: Email
-                  type: string
-    invalid:
-      - example_id: "prop-sem-v1-duplicate"
-        title: "Duplicate (name, type, itemTypes) property combination across files (v1)"
-        description: "Two properties with the same name, type, and itemTypes in the resource graph trigger this error."
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_id_2
-                  name: User ID
-                  type: string
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0"
-            severity: "error"
-            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
+- applies_to:
+  - kind: properties
+    version: rudder/0.1
+  - kind: properties
+    version: rudder/v0.1
+  valid:
+  - example_id: prop-sem-legacy-valid
+    title: Unique property name and type combinations (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              type: string
+            - id: email
+              name: Email
+              type: string
+  invalid:
+  - example_id: prop-sem-legacy-duplicate
+    title: Duplicate property name, type, and itemTypes across files (legacy)
+    description: Duplicate property name, type, and itemTypes in the resource graph fail validation.
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              type: string
+      spec2.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties-2
+        spec:
+          properties:
+            - id: user_id_copy
+              name: User ID
+              type: string
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0
+      severity: error
+      message_contains: 'duplicate name, type and itemTypes: ''User ID'' within kind ''properties'''
+    - file: spec2.yaml
+      reference: /properties/0
+      severity: error
+      message_contains: 'duplicate name, type and itemTypes: ''User ID'' within kind ''properties'''
+- applies_to:
+  - kind: properties
+    version: rudder/v1
+  valid:
+  - example_id: prop-sem-v1-valid
+    title: Unique property name and type combinations (v1)
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              type: string
+            - id: email
+              name: Email
+              type: string
+  invalid:
+  - example_id: prop-sem-v1-duplicate
+    title: Duplicate property name, type, and itemTypes across files (v1)
+    description: Duplicate property name, type, and itemTypes in the resource graph fail validation.
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_id
+              name: User ID
+              type: string
+      spec2.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties-2
+        spec:
+          properties:
+            - id: user_id_copy
+              name: User ID
+              type: string
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0
+      severity: error
+      message_contains: 'duplicate name, type and itemTypes: ''User ID'' within kind ''properties'''
+    - file: spec2.yaml
+      reference: /properties/0
+      severity: error
+      message_contains: 'duplicate name, type and itemTypes: ''User ID'' within kind ''properties'''

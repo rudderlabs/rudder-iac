@@ -1,105 +1,103 @@
-rule_id: "datacatalog/properties/config-valid"
+rule_id: datacatalog/properties/config-valid
 match_behavior:
-  # Legacy spec versions share the same config validation path.
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/0.1"
-      - kind: "properties"
-        version: "rudder/v0.1"
-    valid:
-      - example_id: "prop-cfg-legacy-valid-string"
-        title: "Valid string property config with format (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_email
-                  name: User Email
-                  type: string
-                  propConfig:
-                    format: "email"
-                    minLength: 5
-                    maxLength: 100
-      - example_id: "prop-cfg-legacy-valid-integer"
-        title: "Valid integer property config with range (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: age
-                  name: Age
-                  type: integer
-                  propConfig:
-                    minimum: 0
-                    maximum: 120
-    invalid:
-      - example_id: "prop-cfg-legacy-invalid-format"
-        title: "String property config with invalid format value (legacy)"
-        files:
-          spec.yaml: |
-            version: rudder/0.1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_email
-                  name: User Email
-                  type: string
-                  propConfig:
-                    format: not_valid
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0/propConfig/format"
-            severity: "error"
-            message_contains: "not_valid"
-  # Current spec version (rudder/v1).
-  - applies_to:
-      - kind: "properties"
-        version: "rudder/v1"
-    valid:
-      - example_id: "prop-cfg-v1-valid-string"
-        title: "Valid v1 string property config"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_email
-                  name: User Email
-                  type: string
-                  config:
-                    format: "email"
-                    min_length: 5
-    invalid:
-      - example_id: "prop-cfg-v1-invalid-format"
-        title: "v1 string property config with invalid format value"
-        files:
-          spec.yaml: |
-            version: rudder/v1
-            kind: properties
-            metadata:
-              name: my-properties
-            spec:
-              properties:
-                - id: user_email
-                  name: User Email
-                  type: string
-                  config:
-                    format: totally_wrong
-        expected_diagnostics:
-          - file: "spec.yaml"
-            reference: "/properties/0/propConfig/format"
-            severity: "error"
-            message_contains: "totally_wrong"
+- applies_to:
+  - kind: properties
+    version: rudder/0.1
+  - kind: properties
+    version: rudder/v0.1
+  valid:
+  - example_id: prop-cfg-legacy-valid-string
+    title: Valid string property config with format (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_email
+              name: User Email
+              type: string
+              propConfig:
+                format: "email"
+                minLength: 5
+                maxLength: 100
+  - example_id: prop-cfg-legacy-valid-integer
+    title: Valid integer property config with range (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: age
+              name: Age
+              type: integer
+              propConfig:
+                minimum: 0
+                maximum: 120
+  invalid:
+  - example_id: prop-cfg-legacy-invalid-format
+    title: String property config with invalid format (legacy)
+    files:
+      spec.yaml: |
+        version: rudder/0.1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_email
+              name: User Email
+              type: string
+              propConfig:
+                format: not_valid
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0/propConfig/format
+      severity: error
+      message_contains: '''format'' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]'
+- applies_to:
+  - kind: properties
+    version: rudder/v1
+  valid:
+  - example_id: prop-cfg-v1-valid-string
+    title: Valid string property config
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_email
+              name: User Email
+              type: string
+              config:
+                format: "email"
+                min_length: 5
+  invalid:
+  - example_id: prop-cfg-v1-invalid-format
+    title: v1 string property config with invalid format
+    files:
+      spec.yaml: |
+        version: rudder/v1
+        kind: properties
+        metadata:
+          name: my-properties
+        spec:
+          properties:
+            - id: user_email
+              name: User Email
+              type: string
+              config:
+                format: totally_wrong
+    expected_diagnostics:
+    - file: spec.yaml
+      reference: /properties/0/propConfig/format
+      severity: error
+      message_contains: '''format'' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]'
