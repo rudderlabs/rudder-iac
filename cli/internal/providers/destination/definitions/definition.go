@@ -1,10 +1,8 @@
 package definitions
 
 import (
-	"encoding/json"
 	"fmt"
-
-	"github.com/kaptinlin/jsonschema"
+	"reflect"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
@@ -17,11 +15,13 @@ var sourceTypeConfigKeys = []string{
 
 // DestinationDefinition is the input to Registry.Register().
 type DestinationDefinition struct {
-	Type       string
-	Version    int64
-	Properties []converter.ConfigProperty
-	SecretKeys []string
-	Schema     json.RawMessage
+	Type            string
+	Version         int64
+	Properties      []converter.ConfigProperty
+	SecretKeys      []string
+	NewConfig       func() any
+	SourceTypes     []string
+	ConnectionModes map[string][]string
 }
 
 // ConfigError represents a single validation failure with a JSON-pointer path.
@@ -30,16 +30,14 @@ type ConfigError struct {
 	Message string
 }
 
-// RegisteredDefinition wraps a DestinationDefinition with compiled schema and extracted metadata.
+// RegisteredDefinition wraps a DestinationDefinition with config model metadata.
 type RegisteredDefinition struct {
 	*DestinationDefinition
-	compiled        *jsonschema.Schema
-	sourceTypes     []string
-	connectionModes map[string][]string
+	configType reflect.Type
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
-	return validateConfig(d.compiled, config)
+	return validateConfigModel(config, d.configType, "")
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {
@@ -58,11 +56,14 @@ func (d *RegisteredDefinition) SecretKeys() []string {
 }
 
 func (d *RegisteredDefinition) SupportedSourceTypes() []string {
-	return append([]string(nil), d.sourceTypes...)
+	if d.DestinationDefinition == nil || len(d.SourceTypes) == 0 {
+		return nil
+	}
+	return append([]string(nil), d.SourceTypes...)
 }
 
 func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, error) {
-	modes, ok := d.connectionModes[sourceType]
+	modes, ok := d.DestinationDefinition.ConnectionModes[sourceType]
 	if !ok {
 		return nil, fmt.Errorf("unsupported source type %q for destination %s", sourceType, d.Type)
 	}
@@ -70,7 +71,7 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 }
 
 func (d *RegisteredDefinition) IsSourceTypeSupported(sourceType string) bool {
-	_, ok := d.connectionModes[sourceType]
+	_, ok := d.DestinationDefinition.ConnectionModes[sourceType]
 	return ok
 }
 
@@ -79,52 +80,18 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 }
 
 func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition, error) {
-	compiled, err := compileSchema(def.Schema)
-	if err != nil {
-		return nil, err
+	if def.NewConfig == nil {
+		return nil, fmt.Errorf("NewConfig is required")
 	}
 
-	sourceTypes, connectionModes, err := extractConnectionModeMetadata(def.Schema)
-	if err != nil {
-		return nil, err
+	sample := def.NewConfig()
+	configType := reflect.TypeOf(sample)
+	if configType == nil || configType.Kind() != reflect.Pointer || configType.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("NewConfig must return a pointer to struct")
 	}
 
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
-		compiled:                compiled,
-		sourceTypes:             sourceTypes,
-		connectionModes:         connectionModes,
+		configType:            configType.Elem(),
 	}, nil
-}
-
-func extractConnectionModeMetadata(schema json.RawMessage) ([]string, map[string][]string, error) {
-	var parsed struct {
-		Properties map[string]json.RawMessage `json:"properties"`
-	}
-	if err := json.Unmarshal(schema, &parsed); err != nil {
-		return nil, nil, fmt.Errorf("parsing schema: %w", err)
-	}
-
-	connectionModeRaw, ok := parsed.Properties["connection_mode"]
-	if !ok {
-		return nil, map[string][]string{}, nil
-	}
-
-	var connectionMode struct {
-		Properties map[string]struct {
-			Enum []string `json:"enum"`
-		} `json:"properties"`
-	}
-	if err := json.Unmarshal(connectionModeRaw, &connectionMode); err != nil {
-		return nil, nil, fmt.Errorf("parsing connection_mode schema: %w", err)
-	}
-
-	sourceTypes := make([]string, 0, len(connectionMode.Properties))
-	connectionModes := make(map[string][]string, len(connectionMode.Properties))
-	for sourceType, property := range connectionMode.Properties {
-		sourceTypes = append(sourceTypes, sourceType)
-		connectionModes[sourceType] = append([]string(nil), property.Enum...)
-	}
-
-	return sourceTypes, connectionModes, nil
 }

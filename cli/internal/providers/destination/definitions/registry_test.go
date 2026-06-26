@@ -1,21 +1,19 @@
 package definitions_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
 func TestRegistryRegisterAndGet(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	def := sampleDefinition("WEBHOOK", 1)
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
 
 	require.NoError(t, registry.Register(def))
 
@@ -28,7 +26,7 @@ func TestRegistryDuplicateRegistration(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	def := sampleDefinition("WEBHOOK", 1)
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
 
 	require.NoError(t, registry.Register(def))
 	err := registry.Register(def)
@@ -39,9 +37,9 @@ func TestRegistrySupportedTypesAndVersions(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(sampleDefinition("WEBHOOK", 1)))
-	require.NoError(t, registry.Register(sampleDefinition("WEBHOOK", 2)))
-	require.NoError(t, registry.Register(sampleDefinition("GA4", 1)))
+	require.NoError(t, registry.Register(definitions.WebhookTestDefinition("WEBHOOK", 1)))
+	require.NoError(t, registry.Register(definitions.WebhookTestDefinition("WEBHOOK", 2)))
+	require.NoError(t, registry.Register(definitions.GA4TestDefinition()))
 
 	assert.ElementsMatch(t, []string{"GA4", "WEBHOOK"}, registry.SupportedTypes())
 	assert.True(t, registry.IsSupported("WEBHOOK"))
@@ -67,17 +65,7 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	def := &definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
-		Properties: []converter.ConfigProperty{
-			converter.Simple("apiSecret", "api_secret"),
-			converter.Simple("measurementId", "measurement_id"),
-		},
-		SecretKeys: []string{"api_secret"},
-		Schema:     json.RawMessage(testSchema),
-	}
-	require.NoError(t, registry.Register(def))
+	require.NoError(t, registry.Register(definitions.GA4TestDefinition()))
 
 	registered, err := registry.Get("GA4", 1)
 	require.NoError(t, err)
@@ -107,29 +95,4 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	back, err := registered.APIToLocal(api)
 	require.NoError(t, err)
 	assert.Equal(t, local, back)
-}
-
-func sampleDefinition(destType string, version int64) *definitions.DestinationDefinition {
-	return &definitions.DestinationDefinition{
-		Type:    destType,
-		Version: version,
-		Properties: []converter.ConfigProperty{
-			converter.Simple("webhookUrl", "webhook_url"),
-		},
-		Schema: json.RawMessage(`{
-			"$schema": "http://json-schema.org/draft-07/schema#",
-			"type": "object",
-			"required": ["webhook_url"],
-			"properties": {
-				"webhook_url": { "type": "string" },
-				"connection_mode": {
-					"type": "object",
-					"properties": {
-						"web": { "type": "string", "enum": ["cloud"] }
-					}
-				}
-			},
-			"additionalProperties": false
-		}`),
-	}
 }

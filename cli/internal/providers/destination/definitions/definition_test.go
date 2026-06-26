@@ -1,7 +1,6 @@
 package definitions
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,33 +9,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-const definitionTestSchema = `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["api_secret"],
-  "properties": {
-    "api_secret": { "type": "string" },
-    "connection_mode": {
-      "type": "object",
-      "properties": {
-        "web": { "type": "string", "enum": ["cloud", "device", "hybrid"] },
-        "android": { "type": "string", "enum": ["cloud", "device"] }
-      }
-    }
-  }
-}`
-
 func TestNewRegisteredDefinition(t *testing.T) {
 	t.Parallel()
 
-	def := &DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
-		Properties: []converter.ConfigProperty{
-			converter.Simple("apiSecret", "api_secret"),
-		},
-		SecretKeys: []string{"api_secret"},
-		Schema:     json.RawMessage(definitionTestSchema),
+	def := GA4TestDefinition()
+	def.Properties = []converter.ConfigProperty{
+		converter.Simple("apiSecret", "api_secret"),
 	}
 
 	registered, err := newRegisteredDefinition(def)
@@ -53,7 +31,7 @@ func TestNewRegisteredDefinition(t *testing.T) {
 
 	errors := registered.ValidateConfig(map[string]any{})
 	require.NotEmpty(t, errors)
-	assertConfigError(t, errors, "/api_secret", "Required property 'api_secret' is missing")
+	assertConfigError(t, errors, "/api_secret", "'api_secret' is required")
 }
 
 func assertConfigError(t *testing.T, errors []ConfigError, path, message string) {
@@ -70,32 +48,21 @@ func assertConfigError(t *testing.T, errors []ConfigError, path, message string)
 	t.Fatalf("expected validation error at %q with message %q, got %#v", path, message, errors)
 }
 
-func TestNewRegisteredDefinitionInvalidSchema(t *testing.T) {
+func TestNewRegisteredDefinitionMissingNewConfig(t *testing.T) {
 	t.Parallel()
 
 	_, err := newRegisteredDefinition(&DestinationDefinition{
 		Type:    "GA4",
 		Version: 1,
-		Schema:  json.RawMessage(`{"type":`),
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "compiling schema")
+	assert.Contains(t, err.Error(), "NewConfig is required")
 }
 
 func TestNewRegisteredDefinitionWithoutConnectionMode(t *testing.T) {
 	t.Parallel()
 
-	registered, err := newRegisteredDefinition(&DestinationDefinition{
-		Type:    "WEBHOOK",
-		Version: 1,
-		Schema: json.RawMessage(`{
-			"$schema": "http://json-schema.org/draft-07/schema#",
-			"type": "object",
-			"properties": {
-				"webhook_url": { "type": "string" }
-			}
-		}`),
-	})
+	registered, err := newRegisteredDefinition(WebhookTestDefinitionWithoutConnectionMode())
 	require.NoError(t, err)
 	assert.Nil(t, registered.SupportedSourceTypes())
 	assert.False(t, registered.IsSourceTypeSupported("web"))

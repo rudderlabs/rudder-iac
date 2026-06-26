@@ -13,16 +13,39 @@ import (
 // arrayIndexRegex matches array indices like [0], [1], etc.
 var arrayIndexRegex = regexp.MustCompile(`\[(\d+)\]`)
 
+type fieldTagResolver func(field reflect.StructField) (string, bool)
+
 // ParseValidationErrors converts validation errors from the struct validator to validation results.
 // rootType enables cross-field tags (required_without, excluded_with) to resolve struct field
 // names to their JSON tag display names via reflection. Pass nil when not using cross-field tags.
 func ParseValidationErrors(errs validator.ValidationErrors, rootType reflect.Type) []rules.ValidationResult {
-	results := []rules.ValidationResult{}
+	return parseValidationErrors(errs, rootType, jsonFieldTag, func(err validator.FieldError, _ reflect.Type) string {
+		return namespaceToJSONPointer(err.Namespace())
+	})
+}
+
+// ParseMapstructureValidationErrors converts validation errors using mapstructure tag names
+// for references and cross-field message resolution.
+// Requires the validator to have been configured with mapstructure tag priority via
+// ValidateStructWithTagPriority so that err.Namespace() already carries mapstructure tag names.
+func ParseMapstructureValidationErrors(errs validator.ValidationErrors, rootType reflect.Type) []rules.ValidationResult {
+	return parseValidationErrors(errs, rootType, mapstructureFieldTag, func(err validator.FieldError, _ reflect.Type) string {
+		return namespaceToJSONPointer(err.Namespace())
+	})
+}
+
+func parseValidationErrors(
+	errs validator.ValidationErrors,
+	rootType reflect.Type,
+	resolveTag fieldTagResolver,
+	referencePath func(err validator.FieldError, rootType reflect.Type) string,
+) []rules.ValidationResult {
+	results := make([]rules.ValidationResult, 0, len(errs))
 
 	for _, err := range errs {
 		results = append(results, rules.ValidationResult{
-			Reference: namespaceToJSONPointer(err.Namespace()),
-			Message:   getErrorMessage(err, rootType),
+			Reference: referencePath(err, rootType),
+			Message:   getErrorMessage(err, rootType, resolveTag),
 		})
 	}
 
@@ -43,7 +66,40 @@ func namespaceToJSONPointer(namespace string) string {
 	return fmt.Sprintf("/%s", namespace)
 }
 
-func getErrorMessage(err validator.FieldError, rootType reflect.Type) string {
+
+func jsonFieldTag(field reflect.StructField) (string, bool) {
+	jsonTag := field.Tag.Get("json")
+	if jsonTag == "" {
+		return "", false
+	}
+
+	name, _, _ := strings.Cut(jsonTag, ",")
+	if name == "" || name == "-" {
+		return "", false
+	}
+
+	return name, true
+}
+
+func mapstructureFieldTag(field reflect.StructField) (string, bool) {
+	tag, ok := field.Tag.Lookup("mapstructure")
+	if !ok {
+		return "", false
+	}
+
+	name, _, _ := strings.Cut(tag, ",")
+	if name == "" || name == "-" {
+		return "", false
+	}
+
+	return name, true
+}
+
+func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag fieldTagResolver) string {
+	if resolveTag == nil {
+		resolveTag = jsonFieldTag
+	}
+
 	fieldName := err.Field()
 
 	switch err.ActualTag() {
@@ -101,20 +157,28 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type) string {
 	case "array_item_types":
 		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
 
+	case "required_if":
+		params := strings.Fields(err.Param())
+		if len(params) < 2 {
+			return fmt.Sprintf("'%s' is required", fieldName)
+		}
+		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
+		return fmt.Sprintf("'%s' is required when '%s' is %s", fieldName, otherField, params[1])
+
 	case "excluded_unless":
 		// `validate:"excluded_unless=Type value"`
 		params := strings.Split(err.Param(), " ")
 
 		// We need to resolve the "Type"
-		otherField := resolveFieldDisplayName(params[0], err, rootType)
+		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' is not allowed unless '%s %s'", fieldName, otherField, params[1])
 
 	case "required_without":
-		otherField := resolveFieldDisplayName(err.Param(), err, rootType)
+		otherField := resolveFieldDisplayName(err.Param(), err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' is required when '%s' is not specified", fieldName, otherField)
 
 	case "excluded_with":
-		otherField := resolveFieldDisplayName(err.Param(), err, rootType)
+		otherField := resolveFieldDisplayName(err.Param(), err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' and '%s' cannot be specified together", fieldName, otherField)
 
 	default:
@@ -144,9 +208,17 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type) string {
 // To solve for this, we leverage the StructNamespace on the field error
 // which in example would be "ABCSpec.FieldA" and then locate the parent struct type
 // and we then use reflection to get the desired structFieldName and extract it's json tag name
-func resolveFieldDisplayName(structFieldName string, err validator.FieldError, rootType reflect.Type) string {
+func resolveFieldDisplayName(
+	structFieldName string,
+	err validator.FieldError,
+	rootType reflect.Type,
+	resolveTag fieldTagResolver,
+) string {
 	if rootType == nil {
 		return structFieldName
+	}
+	if resolveTag == nil {
+		resolveTag = jsonFieldTag
 	}
 
 	// Walk StructNamespace to find the parent struct type.
@@ -186,10 +258,8 @@ func resolveFieldDisplayName(structFieldName string, err validator.FieldError, r
 		return structFieldName
 	}
 
-	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-		if name, _, _ := strings.Cut(jsonTag, ","); name != "" && name != "-" {
-			return name
-		}
+	if name, ok := resolveTag(field); ok {
+		return name
 	}
 
 	return structFieldName
