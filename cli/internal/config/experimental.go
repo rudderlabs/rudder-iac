@@ -33,14 +33,15 @@ type ExperimentalConfig struct {
 const ResourceCommandsFlag = "resourceCommands"
 
 // RequireResourceCommands returns a friendly, actionable error when the
-// resource-verb suite (get/describe/delete/set-external-id and `apply -f`) is
-// not enabled. Commands call it before doing any work.
+// resource-verb suite (get/describe/delete/set-external-id) is not enabled.
+// Commands call it before doing any work. (The scoped `apply -f` lives in the
+// separate rudder-api binary, which enables this gate for its own process.)
 func RequireResourceCommands() error {
 	if GetConfig().ExperimentalFlags.ResourceCommands {
 		return nil
 	}
 	return fmt.Errorf(
-		"the get / describe / delete / set-external-id verbs and `apply -f` are experimental; "+
+		"the get / describe / delete / set-external-id verbs are experimental; "+
 			"enable them with: rudder-cli experimental enable %s", ResourceCommandsFlag)
 }
 

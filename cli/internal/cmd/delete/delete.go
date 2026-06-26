@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resourceops"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -42,11 +41,8 @@ Examples:
   # Delete without the interactive prompt
   rudder-cli delete event-stream-source my-source --confirm`,
 		Args:   cobra.ExactArgs(2),
-		Hidden: true, // experimental; unhidden in root.go when the flag is on
+		Hidden: true, // experimental in rudder-cli (unhidden in root.go when the flag is on); first-class in rudder-api
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := config.RequireResourceCommands(); err != nil {
-				return err
-			}
 			var err error
 			defer func() {
 				telemetry.TrackCommand("delete", err, []telemetry.KV{

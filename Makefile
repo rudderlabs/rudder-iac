@@ -29,6 +29,18 @@ build:
 		-o bin/rudder-cli \
 		./cli/cmd/rudder-cli
 
+.PHONY: build-rudder-api
+build-rudder-api:
+	go build \
+		-ldflags "\
+			-s -w \
+			-X 'main.version=$(VERSION)' \
+			-X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryWriteKey=$(TELEMETRY_WRITE_KEY)' \
+			-X 'github.com/rudderlabs/rudder-iac/cli/internal/config.TelemetryDataplaneURL=$(TELEMETRY_DATAPLANE_URL)' \
+		" \
+		-o bin/rudder-api \
+		./cli/cmd/rudder-api
+
 .PHONY: clean
 clean:
 	rm -rf bin
