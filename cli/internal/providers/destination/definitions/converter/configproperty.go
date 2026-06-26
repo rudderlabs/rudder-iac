@@ -3,7 +3,6 @@ package converter
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -13,8 +12,6 @@ import (
 type ConfigProperty struct {
 	ToLocalFunc   ToLocalFunc
 	FromLocalFunc FromLocalFunc
-	localKeys     []string
-	apiKeys       []string
 }
 
 // FromLocalFunc modifies an API config JSON object using local config information.
@@ -28,8 +25,6 @@ func Simple(apiKey, localKey string, filters ...ValueFilter) ConfigProperty {
 	return ConfigProperty{
 		FromLocalFunc: copyFromLocal(apiKey, localKey, filters...),
 		ToLocalFunc:   copyToLocal(apiKey, localKey),
-		localKeys:     []string{localKey},
-		apiKeys:       []string{topLevelKey(apiKey)},
 	}
 }
 
@@ -61,8 +56,6 @@ func Conditional(apiKey, localKey string, condition ConfigConditionFunc) ConfigP
 	return ConfigProperty{
 		FromLocalFunc: copyFromLocal(apiKey, localKey),
 		ToLocalFunc:   copyToLocalConditional(apiKey, localKey, condition),
-		localKeys:     []string{localKey},
-		apiKeys:       []string{topLevelKey(apiKey)},
 	}
 }
 
@@ -81,16 +74,9 @@ func Equals(key, value string) ConfigConditionFunc {
 // Discriminator returns a ConfigProperty that is not stored directly in local config.
 // The corresponding API config value is set based on the provided DiscriminatorValues.
 func Discriminator(apiKey string, values DiscriminatorValues) ConfigProperty {
-	localKeys := make([]string, 0, len(values))
-	for key := range values {
-		localKeys = append(localKeys, key)
-	}
-
 	return ConfigProperty{
 		FromLocalFunc: discriminatorValue(apiKey, values),
 		ToLocalFunc:   func(local, config string) (string, error) { return local, nil },
-		localKeys:     localKeys,
-		apiKeys:       []string{apiKey},
 	}
 }
 
@@ -99,8 +85,6 @@ type DiscriminatorValues map[string]any
 
 func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigProperty {
 	return ConfigProperty{
-		localKeys: []string{localKey},
-		apiKeys:   []string{topLevelKey(rootAPIKey)},
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config
 			v := gjson.Get(local, localKey)
@@ -169,8 +153,6 @@ func ArrayWithObjects(rootAPIKey, localKey string, fields map[string]any) Config
 	inverseFields := GetInverseFields(fields)
 
 	return ConfigProperty{
-		localKeys: []string{localKey},
-		apiKeys:   []string{topLevelKey(rootAPIKey)},
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config
 			v := gjson.Get(local, localKey)
@@ -352,9 +334,3 @@ func discriminatorValue(apiKey string, values DiscriminatorValues) FromLocalFunc
 	}
 }
 
-func topLevelKey(path string) string {
-	if idx := strings.Index(path, "."); idx >= 0 {
-		return path[:idx]
-	}
-	return path
-}

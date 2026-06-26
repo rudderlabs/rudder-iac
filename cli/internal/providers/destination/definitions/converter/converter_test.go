@@ -34,21 +34,18 @@ func TestSimpleRoundTripViaMaps(t *testing.T) {
 	local := map[string]any{
 		"webhook_url": "https://example.com",
 		"debug_mode":  false,
-		"extra_key":   "preserved",
 	}
 
 	api, err := converter.LocalToAPI(props, local)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
 		"webhookUrl": "https://example.com",
-		"extra_key":  "preserved",
 	}, api)
 
 	back, err := converter.APIToLocal(props, api)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
 		"webhook_url": "https://example.com",
-		"extra_key":   "preserved",
 	}, back)
 }
 
