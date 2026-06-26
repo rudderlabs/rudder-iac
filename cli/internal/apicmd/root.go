@@ -70,10 +70,19 @@ func init() {
 		c.Hidden = false
 		rootCmd.AddCommand(c)
 	}
+
+	// Scoped, delete-free `apply -f` lives only here — rudder-cli's `apply`
+	// stays the whole-project reconcile (untouched vs main).
+	rootCmd.AddCommand(newCmdApply())
 }
 
 func initConfig() {
 	config.InitConfig(cfgFile)
+	// rudder-api is the dedicated, un-gated home for the resource verbs. The verb
+	// commands call config.RequireResourceCommands(); force that gate open
+	// in-memory only — viper.Set never writes the config file, so this does not
+	// leak into rudder-cli's shared config.
+	viper.Set("flags."+config.ResourceCommandsFlag, true)
 }
 
 func initLogger() {

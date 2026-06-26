@@ -15,6 +15,7 @@ func TestRootRegistersVerbsVisible(t *testing.T) {
 		"describe":        false,
 		"set-external-id": false,
 		"delete":          false,
+		"apply":           false, // scoped apply -f lives only in rudder-api
 	}
 
 	for _, c := range rootCmd.Commands() {
