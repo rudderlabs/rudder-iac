@@ -78,11 +78,8 @@ func init() {
 
 func initConfig() {
 	config.InitConfig(cfgFile)
-	// rudder-api is the dedicated, un-gated home for the resource verbs. The verb
-	// commands call config.RequireResourceCommands(); force that gate open
-	// in-memory only — viper.Set never writes the config file, so this does not
-	// leak into rudder-cli's shared config.
-	viper.Set("flags."+config.ResourceCommandsFlag, true)
+	// No experimental gating here: the resource verbs are first-class in
+	// rudder-api. The `resourceCommands` flag gates them in rudder-cli only.
 }
 
 func initLogger() {
