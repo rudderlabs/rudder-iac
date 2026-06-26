@@ -22,10 +22,9 @@ func NewCmdAccounts() *cobra.Command {
 
 func newCmdListAccounts() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:        "list",
-		Short:      "List accounts in the workspace",
-		Args:       cobra.NoArgs,
-		Deprecated: "use 'rudder-cli get account' instead",
+		Use:   "list",
+		Short: "List accounts in the workspace",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			category, _ := cmd.Flags().GetString("category")
 			accountType, _ := cmd.Flags().GetString("type")
