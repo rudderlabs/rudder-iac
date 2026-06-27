@@ -22,7 +22,8 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - name: MyTestProperty
+                - id: my_test_property
+                  name: MyTestProperty
                   type: string
     invalid:
       - example_id: "spec-syntax-missing-kind"
@@ -70,7 +71,8 @@ match_behavior:
             kind: properties
             spec:
               properties:
-                - name: MyTestProperty
+                - id: my_test_property
+                  name: MyTestProperty
                   type: string
         expected_diagnostics:
           - file: "spec.yaml"

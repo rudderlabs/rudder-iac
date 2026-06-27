@@ -22,6 +22,7 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
           b.yaml: |
             version: rudder/v1
@@ -31,6 +32,7 @@ match_behavior:
             spec:
               events:
                 - id: cart_viewed
+                  event_type: track
                   name: Cart Viewed
     invalid:
       - example_id: "duplicate-urn-across-files"
@@ -47,6 +49,7 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
           b.yaml: |
             version: rudder/v1
@@ -56,6 +59,7 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed (duplicate)
         expected_diagnostics:
           - file: "a.yaml"

@@ -23,7 +23,7 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
-	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")
+	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z", false)
 	require.NoError(t, err)
 	assert.Empty(t, verrs, "every registered rule must have an authored fragment and vice versa")
 	assert.NotEmpty(t, doc.Rules, "catalog should document at least one rule")

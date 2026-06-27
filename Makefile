@@ -39,8 +39,12 @@ RULE_DOCS_OUTPUT_DIR ?= docs/generated
 gen-rule-docs: ## Generate the validation rule documentation artifact
 	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
 
+.PHONY: verify-rule-docs
+verify-rule-docs: ## Verify authored rule-doc examples against the engine (writes nothing into the tree)
+	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(shell mktemp -d)
+
 .PHONY: test
-test: ## Run all unit tests (excluding e2e)
+test: verify-rule-docs ## Run all unit tests (excluding e2e)
 	@go test --race --covermode=atomic --coverprofile=coverage-unit.out $(shell go list ./... | grep -v /cli/tests)
 
 .PHONY: test-e2e

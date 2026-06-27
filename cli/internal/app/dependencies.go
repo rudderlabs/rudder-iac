@@ -120,13 +120,18 @@ func NewDeps() (Deps, error) {
 // verrs carries catalog validation failures (e.g. a registered rule with no
 // authored fragment); a non-nil error means the catalog could not be assembled
 // at all. generatedAt is injected so callers own the timestamp.
-func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
+func GenerateRuleCatalog(generatedAt string, strict bool) (docs.DocumentedRules, []error, error) {
 	cp, err := newCompositeProvider()
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
 	}
 
-	return ruledoc.Build(cp, GetVersion(), generatedAt)
+	mode := docs.ModeSubset
+	if strict {
+		mode = docs.ModeStrict
+	}
+
+	return ruledoc.Build(cp, GetVersion(), generatedAt, mode)
 }
 
 // newCompositeProvider builds the composite provider without requiring
