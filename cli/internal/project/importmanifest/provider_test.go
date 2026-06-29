@@ -62,14 +62,52 @@ func TestProvider_LoadLegacySpec_Unsupported(t *testing.T) {
 	assert.Contains(t, err.Error(), "does not support legacy version")
 }
 
-func TestProvider_ParseSpec_EmptyUntilConsumerLands(t *testing.T) {
+func TestProvider_ParseSpec_ExtractsURNs(t *testing.T) {
 	t.Parallel()
 
-	// ParseSpec is a stub until the cross-source inline-conflict rule consumes it.
-	parsed, err := New().ParseSpec("a.yaml", manifestSpec("ws-1",
-		specs.ImportIds{URN: "source:src-1", RemoteID: "remote-1"}))
+	spec := manifestSpec("ws-1",
+		specs.ImportIds{URN: "source:src-1", RemoteID: "remote-1"},
+		specs.ImportIds{URN: "destination:dst-1", RemoteID: "remote-2"},
+	)
+
+	parsed, err := New().ParseSpec("a.yaml", spec)
 	require.NoError(t, err)
-	assert.Equal(t, &specs.ParsedSpec{}, parsed)
+	assert.Equal(t, &specs.ParsedSpec{
+		URNs: []specs.URNEntry{
+			{URN: "source:src-1", JSONPointerPath: "/spec/workspaces/0/resources/0/urn"},
+			{URN: "destination:dst-1", JSONPointerPath: "/spec/workspaces/0/resources/1/urn"},
+		},
+	}, parsed)
+}
+
+func TestProvider_ParseSpec_MultiWorkspace(t *testing.T) {
+	t.Parallel()
+
+	spec := &specs.Spec{
+		Kind:    KindImportManifest,
+		Version: specs.SpecVersionV1,
+		Spec: map[string]any{
+			"workspaces": []any{
+				map[string]any{
+					"workspace_id": "ws-1",
+					"resources":    []any{map[string]any{"urn": "source:src-1", "remote_id": "r1"}},
+				},
+				map[string]any{
+					"workspace_id": "ws-2",
+					"resources":    []any{map[string]any{"urn": "source:src-2", "remote_id": "r2"}},
+				},
+			},
+		},
+	}
+
+	parsed, err := New().ParseSpec("a.yaml", spec)
+	require.NoError(t, err)
+	assert.Equal(t, &specs.ParsedSpec{
+		URNs: []specs.URNEntry{
+			{URN: "source:src-1", JSONPointerPath: "/spec/workspaces/0/resources/0/urn"},
+			{URN: "source:src-2", JSONPointerPath: "/spec/workspaces/1/resources/0/urn"},
+		},
+	}, parsed)
 }
 
 func TestProvider_ResourceGraph_Empty(t *testing.T) {
