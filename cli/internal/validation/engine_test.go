@@ -366,7 +366,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), map[string]*specs.RawSpec{}, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), map[string]*specs.RawSpec{}, graph, "")
 
 			require.NoError(t, err)
 			assert.Empty(t, diagnostics)
@@ -399,7 +399,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			assert.Empty(t, diagnostics)
@@ -430,7 +430,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			require.Len(t, diagnostics, 1)
@@ -468,7 +468,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			testGraph := resources.NewGraph()
-			_, err = engine.ValidateSemantic(context.Background(), rawSpecs, testGraph)
+			_, err = engine.ValidateSemantic(context.Background(), rawSpecs, testGraph, "")
 
 			require.NoError(t, err)
 			assert.NotNil(t, receivedGraph)
@@ -513,7 +513,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			require.Len(t, diagnostics, 2)

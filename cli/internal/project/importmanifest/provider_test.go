@@ -134,6 +134,10 @@ func TestProvider_RuleSets(t *testing.T) {
 		"import-manifest/duplicate-urn",
 	}, ids)
 
-	// Semantic rules land with the orphaned-URN rule in a later change.
-	assert.Nil(t, p.SemanticRules())
+	semantic := p.SemanticRules()
+	semanticIDs := make([]string, 0, len(semantic))
+	for _, r := range semantic {
+		semanticIDs = append(semanticIDs, r.ID())
+	}
+	assert.Equal(t, []string{"import-manifest/orphaned-urn"}, semanticIDs)
 }
