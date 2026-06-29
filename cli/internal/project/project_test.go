@@ -67,6 +67,11 @@ func TestProject_BroadcastsImportManifest(t *testing.T) {
 	t.Parallel()
 
 	consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+	// Declare the resource kind so the gatekeeper SpecSyntaxValidRule treats
+	// "Source" as known (the manifest pattern alone would reject it otherwise).
+	consumer.MatchPatterns = []rules.MatchPattern{
+		rules.MatchKindVersion("Source", specs.SpecVersionV1),
+	}
 	manifestYAML := "version: rudder/v1\n" +
 		"kind: import-manifest\n" +
 		"metadata:\n  name: import-manifest\n" +
