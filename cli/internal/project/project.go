@@ -330,16 +330,17 @@ func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
-		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. spec-syntax-valid and resource-kind-version-valid use
-		// activePatterns as source of truth for the supported kinds and versions.
-		// metadata-syntax-valid and duplicate-urn match all specs and do not
-		// consume activePatterns.
+		// Gatekeeper rules (spec-syntax-valid, resource-kind-version-valid) keep
+		// MatchAll AppliesTo and use activePatterns as the source of truth for the
+		// supported kinds and versions.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(provider.ParseSpec),
-		prules.NewDuplicateURNRule(provider.ParseSpec),
+		// metadata-syntax-valid and duplicate-urn are scoped to the resource patterns
+		// (activePatterns) so the engine only hands them resource specs — non-resource
+		// project-level kinds are excluded. See MultiSpecRule filtering.
+		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, activePatterns),
+		prules.NewDuplicateURNRule(provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 
