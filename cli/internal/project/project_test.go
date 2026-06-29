@@ -12,8 +12,21 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
+
+// fixtureMatchPatterns declares the test fixture kinds (Source/Destination) so a
+// MockProvider reports them as supported. Without this the gatekeeper rule
+// SpecSyntaxValidRule rejects them as unknown kinds — these tests exercise
+// loading/routing/substitution, not kind validation, so they need a provider
+// that treats their fixture kinds as known (as a real provider would).
+var fixtureMatchPatterns = []rules.MatchPattern{
+	{Kind: "Source", Version: "rudder/0.1"},
+	{Kind: "Source", Version: "rudder/v1"},
+	{Kind: "Source", Version: "rudder/v2.0"},
+	{Kind: "Destination", Version: "rudder/0.1"},
+}
 
 // mapResolver is a tiny in-memory varsubst.Resolver used to drive substitution
 // from test cases without depending on env vars or files.
@@ -58,6 +71,7 @@ func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
 	mockLoader := &MockLoader{}
 
 	proj := project.New(mockProvider, project.WithLoader(mockLoader))
@@ -94,6 +108,7 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
 	mockLoader := &MockLoader{}
 
 	proj := project.New(mockProvider, project.WithLoader(mockLoader))
@@ -190,6 +205,7 @@ func TestProject_LoadSpec_VersionRouting(t *testing.T) {
 			t.Parallel()
 
 			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.MatchPatterns = fixtureMatchPatterns
 			mockLoader := &MockLoader{}
 
 			opts := []project.ProjectOption{project.WithLoader(mockLoader)}
@@ -324,6 +340,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			t.Parallel()
 
 			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.MatchPatterns = fixtureMatchPatterns
 			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
 				raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
 				for path, data := range tc.rawSpecs {

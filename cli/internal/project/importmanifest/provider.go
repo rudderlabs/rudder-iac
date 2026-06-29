@@ -7,6 +7,9 @@ package importmanifest
 import (
 	"fmt"
 
+	manifestdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/manifestspec"
+	mrules "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -15,8 +18,9 @@ import (
 
 // KindImportManifest is the spec kind this provider owns. It is a project-level
 // kind handled outside the resource provider tree, so the provider that gives it
-// meaning is its source of truth.
-const KindImportManifest = "import-manifest"
+// meaning is its source of truth. The canonical value lives in the manifestspec
+// leaf so the validation rules can reference it without importing this package.
+const KindImportManifest = manifestspec.KindImportManifest
 
 type Provider struct {
 	entries []specs.WorkspaceImportMetadata
@@ -56,28 +60,49 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("import-manifest spec %s does not support legacy version %s", path, s.Version)
 }
 
-// ParseSpec returns an empty ParsedSpec — manifest specs carry no resource URNs.
+// ParseSpec extracts one URNEntry per manifest resource, each paired with the
+// JSON-pointer path into spec.workspaces. The cross-source manifest-inline
+// conflict rule consumes these to intersect manifest URNs with inline ones.
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	return &specs.ParsedSpec{}, nil
+	workspaces, err := parseWorkspaces(s)
+	if err != nil {
+		return nil, err
+	}
+	urns := make([]specs.URNEntry, 0)
+	for wi, ws := range workspaces {
+		for ri, r := range ws.Resources {
+			if r.URN == "" {
+				continue
+			}
+			urns = append(urns, specs.URNEntry{
+				URN:             r.URN,
+				JSONPointerPath: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", wi, ri),
+			})
+		}
+	}
+	return &specs.ParsedSpec{URNs: urns}, nil
 }
 
 func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return resources.NewGraph(), nil
 }
 
-// Rule sets are nil until the manifest validation rules land in a later change.
-
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return nil
+	return []rules.Rule{
+		mrules.NewManifestSpecSyntaxValidRule(),
+		mrules.NewManifestDuplicateURNRule(),
+	}
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return nil
+	return []rules.Rule{
+		mrules.NewOrphanedURNRule(),
+	}
 }
 
-// RuleDocEntries returns nil — the manifest provider contributes no doc fragments
-// until its validation rules land. Present so the provider satisfies RuleProvider
-// (and therefore ProjectProvider).
+// RuleDocEntries returns the authored documentation fragments for the manifest
+// rules, embedded alongside the provider.
 func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
-	return nil
+	entries, _ := docs.LoadRuleDocEntries(manifestdocs.FragmentsFS, ".")
+	return entries
 }
