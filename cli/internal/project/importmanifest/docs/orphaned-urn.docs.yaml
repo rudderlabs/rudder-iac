@@ -4,7 +4,7 @@ match_behavior:
       - kind: "import-manifest"
         version: "rudder/v1"
     valid:
-      - example_id: "orphaned-urn-resolves"
+      - example_id: "urn-resolves"
         title: "Manifest URN matches a resource in the project"
         description: >
           The manifest imports event:order_completed, and an events spec defines a
@@ -31,7 +31,7 @@ match_behavior:
                 - id: order_completed
                   name: Order Completed
     invalid:
-      - example_id: "orphaned-urn-missing"
+      - example_id: "urn-missing"
         title: "Manifest URN with no matching resource in the project"
         description: >
           The manifest imports event:order_completed, but no spec defines a
