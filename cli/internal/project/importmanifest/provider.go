@@ -7,6 +7,9 @@ package importmanifest
 import (
 	"fmt"
 
+	manifestdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/manifestspec"
+	mrules "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -15,8 +18,9 @@ import (
 
 // KindImportManifest is the spec kind this provider owns. It is a project-level
 // kind handled outside the resource provider tree, so the provider that gives it
-// meaning is its source of truth.
-const KindImportManifest = "import-manifest"
+// meaning is its source of truth. The canonical value lives in the manifestspec
+// leaf so the validation rules can reference it without importing this package.
+const KindImportManifest = manifestspec.KindImportManifest
 
 type Provider struct {
 	entries []specs.WorkspaceImportMetadata
@@ -65,19 +69,20 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return resources.NewGraph(), nil
 }
 
-// Rule sets are nil until the manifest validation rules land in a later change.
-
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return nil
+	return []rules.Rule{
+		mrules.NewManifestSpecSyntaxValidRule(),
+		mrules.NewManifestDuplicateURNRule(),
+	}
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
 	return nil
 }
 
-// RuleDocEntries returns nil — the manifest provider contributes no doc fragments
-// until its validation rules land. Present so the provider satisfies RuleProvider
-// (and therefore ProjectProvider).
+// RuleDocEntries returns the authored documentation fragments for the manifest
+// rules, embedded alongside the provider.
 func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
-	return nil
+	entries, _ := docs.LoadRuleDocEntries(manifestdocs.FragmentsFS, ".")
+	return entries
 }

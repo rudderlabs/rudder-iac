@@ -62,10 +62,12 @@ func TestProvider_LoadLegacySpec_Unsupported(t *testing.T) {
 	assert.Contains(t, err.Error(), "does not support legacy version")
 }
 
-func TestProvider_ParseSpec_Empty(t *testing.T) {
+func TestProvider_ParseSpec_EmptyUntilConsumerLands(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := New().ParseSpec("a.yaml", manifestSpec("ws-1"))
+	// ParseSpec is a stub until the cross-source inline-conflict rule consumes it.
+	parsed, err := New().ParseSpec("a.yaml", manifestSpec("ws-1",
+		specs.ImportIds{URN: "source:src-1", RemoteID: "remote-1"}))
 	require.NoError(t, err)
 	assert.Equal(t, &specs.ParsedSpec{}, parsed)
 }
@@ -79,10 +81,21 @@ func TestProvider_ResourceGraph_Empty(t *testing.T) {
 	assert.Empty(t, graph.Resources())
 }
 
-func TestProvider_RuleSets_NilForNow(t *testing.T) {
+func TestProvider_RuleSets(t *testing.T) {
 	t.Parallel()
 
 	p := New()
-	assert.Nil(t, p.SyntacticRules())
+
+	syntactic := p.SyntacticRules()
+	ids := make([]string, 0, len(syntactic))
+	for _, r := range syntactic {
+		ids = append(ids, r.ID())
+	}
+	assert.Equal(t, []string{
+		"import-manifest/spec-syntax-valid",
+		"import-manifest/duplicate-urn",
+	}, ids)
+
+	// Semantic rules land with the orphaned-URN rule in a later change.
 	assert.Nil(t, p.SemanticRules())
 }
