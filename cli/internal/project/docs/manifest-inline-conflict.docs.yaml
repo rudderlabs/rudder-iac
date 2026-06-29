@@ -1,0 +1,173 @@
+rule_id: "project/manifest-inline-conflict"
+match_behavior:
+  - applies_to:
+      - kind: "categories"
+        version: "rudder/0.1"
+      - kind: "categories"
+        version: "rudder/v0.1"
+      - kind: "categories"
+        version: "rudder/v1"
+      - kind: "custom-types"
+        version: "rudder/0.1"
+      - kind: "custom-types"
+        version: "rudder/v0.1"
+      - kind: "custom-types"
+        version: "rudder/v1"
+      - kind: "event-stream-source"
+        version: "rudder/0.1"
+      - kind: "event-stream-source"
+        version: "rudder/v0.1"
+      - kind: "event-stream-source"
+        version: "rudder/v1"
+      - kind: "events"
+        version: "rudder/0.1"
+      - kind: "events"
+        version: "rudder/v0.1"
+      - kind: "events"
+        version: "rudder/v1"
+      - kind: "properties"
+        version: "rudder/0.1"
+      - kind: "properties"
+        version: "rudder/v0.1"
+      - kind: "properties"
+        version: "rudder/v1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/0.1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/v0.1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/v1"
+      - kind: "tp"
+        version: "rudder/0.1"
+      - kind: "tp"
+        version: "rudder/v0.1"
+      - kind: "tracking-plan"
+        version: "rudder/v1"
+      - kind: "transformation"
+        version: "rudder/v1"
+      - kind: "transformation-library"
+        version: "rudder/v1"
+      - kind: "import-manifest"
+        version: "rudder/v1"
+    valid:
+      - example_id: "manifest-inline-no-overlap"
+        title: "Manifest and inline metadata import distinct resources"
+        description: >
+          One resource is imported via the manifest, a different one via inline
+          metadata. No URN appears in both, so the project is valid.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event:order_completed"
+                      remote_id: "remote_a"
+          events.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events
+              import:
+                workspaces:
+                  - workspace_id: "ws-1"
+                    resources:
+                      - urn: "event:cart_viewed"
+                        remote_id: "remote_b"
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+                - id: cart_viewed
+                  name: Cart Viewed
+    invalid:
+      - example_id: "manifest-inline-overlap"
+        title: "Same URN imported by both a manifest and inline metadata"
+        description: >
+          The URN event:order_completed is declared in both the manifest and an
+          inline metadata.import block — an ambiguous double import. The rule
+          flags both locations; remove one.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event:order_completed"
+                      remote_id: "remote_a"
+          events.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events
+              import:
+                workspaces:
+                  - workspace_id: "ws-1"
+                    resources:
+                      - urn: "event:order_completed"
+                        remote_id: "remote_b"
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "URN 'event:order_completed' is defined in both an import-manifest and inline metadata"
+          - file: "events.yaml"
+            reference: "/metadata/import/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "URN 'event:order_completed' is defined in both an import-manifest and inline metadata"
+      - example_id: "manifest-inline-overlap-legacy"
+        title: "Manifest URN overlaps a legacy rudder/0.1 inline local_id import"
+        description: >
+          The events spec uses the legacy rudder/0.1 format, whose inline imports
+          reference resources by local_id + remote_id. The local_id order_completed
+          resolves to the URN event:order_completed — the same URN the manifest
+          imports. Legacy specs are still subject to the conflict rule, so both
+          locations are flagged; remove the inline metadata entry.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event:order_completed"
+                      remote_id: "remote_a"
+          events.yaml: |
+            version: rudder/0.1
+            kind: events
+            metadata:
+              name: events
+              import:
+                workspaces:
+                  - workspace_id: "ws-1"
+                    resources:
+                      - local_id: order_completed
+                        remote_id: "remote_b"
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "URN 'event:order_completed' is defined in both an import-manifest and inline metadata"
+          - file: "events.yaml"
+            reference: "/metadata/import/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "URN 'event:order_completed' is defined in both an import-manifest and inline metadata"

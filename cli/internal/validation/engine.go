@@ -24,8 +24,10 @@ type ValidationEngine interface {
 
 	// ValidateSemantic runs semantic validation after resource graph is built.
 	// Rules receive ValidationContext with populated Graph for cross-resource validation.
+	// workspaceID is the run's target workspace ("" when none), surfaced to
+	// workspace-scoped rules via ValidationContext.WorkspaceID.
 	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
-	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph) (Diagnostics, error)
+	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error)
 }
 
 type validationEngine struct {
@@ -47,18 +49,19 @@ func NewValidationEngine(
 
 // ValidateSyntax runs syntactic validation on raw specs before resource graph is built.
 // It operates in two phases:
-//  1. Per-spec rules: validates each spec individually (ProjectRules return nil here)
-//  2. Project rules: if Phase 1 passes, runs project-wide rules with all specs at once
+//  1. Per-spec rules: validates each spec individually (MultiSpecRules return nil here)
+//  2. Multiple-resource rules: if Phase 1 passes, runs each with the specs matching its patterns
 func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
 	toReturn := make(Diagnostics, 0)
 
-	// Phase 1: per-spec validation (ProjectRules harmlessly return nil from Validate)
+	// Phase 1: per-spec validation (MultiSpecRules harmlessly return nil from Validate)
 	for path, spec := range rawSpecs {
 		diagnostics, err := e.runValidationRules(
 			path,
 			e.registry.SyntacticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			nil,
+			"", // syntactic validation is workspace-agnostic
 		)
 		if err != nil {
 			return nil, fmt.Errorf("syntactic validation for %s: %w", path, err)
@@ -83,19 +86,21 @@ func (e *validationEngine) ValidateSyntax(ctx context.Context, rawSpecs map[stri
 	return toReturn, nil
 }
 
-// runProjectValidationRules discovers rules implementing ProjectRule from all registered
-// syntactic rules and executes them with all specs at once.
+// runProjectValidationRules discovers rules implementing MultiSpecRule from all
+// registered syntactic rules and executes each with the specs matching its AppliesTo()
+// patterns. Unlike per-spec rules, these need more than one spec at once (e.g. cross-file
+// uniqueness), but they still only see the specs they apply to — not the whole project.
 func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.RawSpec) (Diagnostics, error) {
-	// ProjectRules may have any AppliesTo() pattern (not just MatchAll), so we
-	// scan all registered syntactic rules and filter by the ProjectRule interface.
-	var projectRules []rules.ProjectRule
+	// MultiSpecRules may have any AppliesTo() pattern (not just MatchAll), so we
+	// scan all registered syntactic rules and filter by the MultiSpecRule interface.
+	var multiSpecRules []rules.MultiSpecRule
 	for _, rule := range e.registry.AllSyntacticRules() {
-		if pr, ok := rule.(rules.ProjectRule); ok {
-			projectRules = append(projectRules, pr)
+		if mr, ok := rule.(rules.MultiSpecRule); ok {
+			multiSpecRules = append(multiSpecRules, mr)
 		}
 	}
 
-	if len(projectRules) == 0 {
+	if len(multiSpecRules) == 0 {
 		return nil, nil
 	}
 
@@ -113,9 +118,9 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 
 	diagnostics := make(Diagnostics, 0)
 
-	for _, pr := range projectRules {
-		rule := pr.(rules.Rule)
-		resultsMap := pr.ValidateProject(contexts)
+	for _, mr := range multiSpecRules {
+		rule := mr.(rules.Rule)
+		resultsMap := mr.ValidateSpecs(filterContextsByPatterns(contexts, rule.AppliesTo()))
 
 		for filePath, results := range resultsMap {
 			rawSpec, ok := rawSpecs[filePath]
@@ -152,9 +157,29 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 	return diagnostics, nil
 }
 
+// filterContextsByPatterns returns the subset of contexts whose (kind, version)
+// matches at least one of the given patterns. A MultiSpecRule receives only
+// the specs it applies to, so resource-only rules never see manifest specs (and vice
+// versa) even though they all run in the same project-wide validation pass.
+func filterContextsByPatterns(
+	contexts map[string]*rules.ValidationContext,
+	patterns []rules.MatchPattern,
+) map[string]*rules.ValidationContext {
+	filtered := make(map[string]*rules.ValidationContext)
+	for path, ctx := range contexts {
+		for _, p := range patterns {
+			if p.Matches(ctx.Kind, ctx.Version) {
+				filtered[path] = ctx
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 // ValidateSemantic runs semantic validation after resource graph is built.
 // Rules receive ValidationContext with populated Graph for cross-resource validation.
-func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph) (Diagnostics, error) {
+func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error) {
 	toReturn := make(Diagnostics, 0)
 
 	for path, spec := range rawSpecs {
@@ -163,6 +188,7 @@ func (e *validationEngine) ValidateSemantic(ctx context.Context, rawSpecs map[st
 			e.registry.SemanticRulesFor(spec.Parsed().Kind, spec.Parsed().Version),
 			spec,
 			graph,
+			workspaceID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("semantic validation for %s: %w", path, err)
@@ -179,6 +205,7 @@ func (e *validationEngine) runValidationRules(
 	toValidateAgainst []rules.Rule,
 	rawSpec *specs.RawSpec,
 	graph *resources.Graph,
+	workspaceID string,
 ) ([]Diagnostic, error) {
 
 	pi, err := rawSpec.PathIndexer()
@@ -191,13 +218,14 @@ func (e *validationEngine) runValidationRules(
 	diagnostics := make([]Diagnostic, 0)
 	for _, rule := range toValidateAgainst {
 		results := rule.Validate(&rules.ValidationContext{
-			FilePath: path,
-			FileName: filepath.Base(path),
-			Spec:     rawSpec.Parsed().Spec,
-			Kind:     rawSpec.Parsed().Kind,
-			Version:  rawSpec.Parsed().Version,
-			Metadata: rawSpec.Parsed().Metadata,
-			Graph:    graph,
+			FilePath:    path,
+			FileName:    filepath.Base(path),
+			Spec:        rawSpec.Parsed().Spec,
+			Kind:        rawSpec.Parsed().Kind,
+			Version:     rawSpec.Parsed().Version,
+			Metadata:    rawSpec.Parsed().Metadata,
+			Graph:       graph,
+			WorkspaceID: workspaceID,
 		})
 
 		for _, result := range results {

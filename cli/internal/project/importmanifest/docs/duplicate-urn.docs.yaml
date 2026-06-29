@@ -1,0 +1,128 @@
+rule_id: "import-manifest/duplicate-urn"
+match_behavior:
+  - applies_to:
+      - kind: "import-manifest"
+        version: "rudder/v1"
+    valid:
+      - example_id: "manifest-duplicate-urn-distinct"
+        title: "Distinct URNs across manifest files"
+        description: >
+          Two manifest files declaring different URNs in the same workspace. No
+          collision, so the project is valid.
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:source-a"
+                      remote_id: "remote_a"
+          b.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:source-b"
+                      remote_id: "remote_b"
+      - example_id: "manifest-duplicate-urn-different-workspaces"
+        title: "Same URN under different workspaces across files"
+        description: >
+          The same urn maps to a different remote per workspace. Because the
+          uniqueness key is (workspace_id, urn), this is allowed.
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:shared"
+                      remote_id: "remote_ws1"
+          b.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-2"
+                  resources:
+                    - urn: "event-stream-source:shared"
+                      remote_id: "remote_ws2"
+    invalid:
+      - example_id: "manifest-duplicate-urn-across-files"
+        title: "Same (workspace, urn) in two manifest files"
+        description: >
+          Both files map the same urn under the same workspace. The rule flags
+          every occurrence across the colliding files.
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "remote_a"
+          b.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "remote_b"
+        expected_diagnostics:
+          - file: "a.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "duplicate URN 'event-stream-source:my-source' in workspace 'ws-1'"
+          - file: "b.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "duplicate URN 'event-stream-source:my-source' in workspace 'ws-1'"
+      - example_id: "manifest-duplicate-urn-within-file"
+        title: "Same (workspace, urn) twice in one manifest file"
+        description: >
+          A urn repeated under one workspace in a single file is a collision too.
+          The rule flags every occurrence.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "remote_1"
+                    - urn: "event-stream-source:my-source"
+                      remote_id: "remote_2"
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/urn"
+            severity: "error"
+            message_contains: "duplicate URN 'event-stream-source:my-source' in workspace 'ws-1'"
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/1/urn"
+            severity: "error"
+            message_contains: "duplicate URN 'event-stream-source:my-source' in workspace 'ws-1'"

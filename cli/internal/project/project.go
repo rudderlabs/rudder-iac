@@ -255,7 +255,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
-	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
+	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
@@ -338,32 +338,46 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	return BuildRegistry(p.provider)
+	return BuildRegistry(p.provider, p.importManifestProvider)
 }
 
-// BuildRegistry constructs the validation rule registry for a provider. It is
-// shared by project loading and the docs generator so both observe an identical
-// rule set built from the provider's supported match patterns.
-func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
-	// Active patterns become the source of truth for the
-	// validation pipeline to determine which unique kinds and versions
-	// are supported in the system.
-	activePatterns := provider.SupportedMatchPatterns()
+// BuildRegistry constructs the validation rule registry from the resource
+// provider and the project-level import-manifest provider. It is shared by
+// project loading and the docs generator so both observe an identical rule set.
+//
+// The two providers' match patterns are unioned into the active set so the
+// gatekeeper rules treat both resource kinds and import-manifest as known. The
+// resource-scoped gatekeepers (metadata-syntax-valid, duplicate-urn) are scoped
+// to resourcePatterns alone so the engine never hands them a manifest spec.
+func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, error) {
+	resourcePatterns := provider.SupportedMatchPatterns()
+	manifestPatterns := manifestProvider.SupportedMatchPatterns()
+
+	// Union of both providers' patterns: the source of truth for which kinds and
+	// versions the validation pipeline treats as known.
+	activePatterns := append(append([]rules.MatchPattern{}, resourcePatterns...), manifestPatterns...)
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
-		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. spec-syntax-valid and resource-kind-version-valid use
-		// activePatterns as source of truth for the supported kinds and versions.
-		// metadata-syntax-valid and duplicate-urn match all specs and do not
-		// consume activePatterns.
+		// Gatekeeper rules (spec-syntax-valid, resource-kind-version-valid) keep
+		// MatchAll AppliesTo and use activePatterns as the source of truth for the
+		// supported kinds and versions.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(provider.ParseSpec),
-		prules.NewDuplicateURNRule(provider.ParseSpec),
+		// metadata-syntax-valid and duplicate-urn are scoped to resourcePatterns so
+		// the engine only hands them resource specs — the import-manifest kind is
+		// excluded. See MultiSpecRule filtering.
+		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
+		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
+
+		// Cross-source: a URN must not appear in both an import-manifest and an
+		// inline metadata.import block. Applies to the union (both kinds), and
+		// needs both providers' ParseSpec.
+		prules.NewManifestInlineConflictRule(manifestProvider.ParseSpec, provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
+	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -371,7 +385,8 @@ func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 		}
 	}
 
-	for _, rule := range provider.SemanticRules() {
+	semantic := append(provider.SemanticRules(), manifestProvider.SemanticRules()...)
+	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}
