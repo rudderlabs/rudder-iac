@@ -211,7 +211,7 @@ export type CustomTypeUserAccess = CustomTypeUserAccessCaseFalse | CustomTypeUse
 
 
 /** Desktop page view */
-export interface EventWithVariantsCaseDesktop {
+export interface TrackEventWithVariantsPropertiesCaseDesktop {
     /** Type of device */
     deviceType: "desktop";
     /** User's first name */
@@ -226,7 +226,7 @@ export interface EventWithVariantsCaseDesktop {
 
 
 /** Mobile device page view */
-export interface EventWithVariantsCaseMobile {
+export interface TrackEventWithVariantsPropertiesCaseMobile {
     /** Type of device */
     deviceType: "mobile";
     /** Page context information */
@@ -239,7 +239,7 @@ export interface EventWithVariantsCaseMobile {
 
 
 /** Default case */
-export interface EventWithVariantsDefault {
+export interface TrackEventWithVariantsPropertiesDefault {
     /** Type of device */
     deviceType: Exclude<PropertyDeviceType, "mobile" | "desktop">;
     /** Page context information */
@@ -252,13 +252,13 @@ export interface EventWithVariantsDefault {
 
 
 /** Example event to demonstrate variants */
-export type EventWithVariants = EventWithVariantsCaseDesktop | EventWithVariantsCaseMobile | EventWithVariantsDefault;
+export type TrackEventWithVariantsProperties = TrackEventWithVariantsPropertiesCaseDesktop | TrackEventWithVariantsPropertiesCaseMobile | TrackEventWithVariantsPropertiesDefault;
 
 
 // ===== Nested Object Types =====
 
 /** demonstrates multiple levels of nesting */
-export interface UserSignedUpContextNestedContext {
+export interface TrackUserSignedUpPropertiesContextNestedContext {
     /** Array of favorite colors using custom type */
     favoriteColors?: CustomTypeColor[];
     /** User profile data */
@@ -267,11 +267,11 @@ export interface UserSignedUpContextNestedContext {
 
 
 /** example of object property */
-export interface UserSignedUpContext {
+export interface TrackUserSignedUpPropertiesContext {
     /** IP address of the user */
     ipAddress: string;
     /** demonstrates multiple levels of nesting */
-    nestedContext: UserSignedUpContextNestedContext;
+    nestedContext: TrackUserSignedUpPropertiesContextNestedContext;
 }
 
 
@@ -303,21 +303,21 @@ export interface PageProperties {
 
 
 /** Event with dollar signs to test string interpolation escaping */
-export interface VariableString {
+export interface TrackVariableStringProperties {
     /** Field with $ for testing string interpolation: $variable and ${expression} */
     dollarField: PropertyDollarField;
 }
 
 
 /** Event with special characters that collide after sanitization */
-export interface EventWithNameCamelCase {
+export interface TrackEventWithNameCamelCaseProperties {
     /** User's email address */
     email?: CustomTypeEmail;
 }
 
 
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
-export interface ProductPremiumClicked {
+export interface TrackProductPremiumClickedProperties {
     /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
     specialField: string;
     /** HTTP status with special characters */
@@ -326,7 +326,7 @@ export interface ProductPremiumClicked {
 
 
 /** Triggered when a user signs up */
-export interface UserSignedUp {
+export interface TrackUserSignedUpProperties {
     /** User active status */
     active: CustomTypeActive;
     /** User's addresses */
@@ -340,7 +340,7 @@ export interface UserSignedUp {
     /** Array of user contacts */
     contacts?: CustomTypeEmail[];
     /** example of object property */
-    context?: UserSignedUpContext;
+    context?: TrackUserSignedUpPropertiesContext;
     /** Property using custom null type */
     customNullField?: CustomTypeNullType;
     /** Type of device */
@@ -409,7 +409,7 @@ export interface UserSignedUp {
 
 
 /** Event with camel case name */
-export interface EventWithNameCamelCase1 {
+export interface TrackEventWithNameCamelCaseProperties1 {
     /** User active status */
     active?: CustomTypeActive;
 }
@@ -573,7 +573,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackVariableString(
-        props: VariableString,
+        props: TrackVariableStringProperties,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
@@ -593,7 +593,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEventWithNameCamelCase(
-        props: EventWithNameCamelCase,
+        props: TrackEventWithNameCamelCaseProperties,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
@@ -651,7 +651,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEventWithVariants(
-        props: EventWithVariants,
+        props: TrackEventWithVariantsProperties,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
@@ -671,7 +671,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackProductPremiumClicked(
-        props: ProductPremiumClicked,
+        props: TrackProductPremiumClickedProperties,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
@@ -691,7 +691,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackUserSignedUp(
-        props: UserSignedUp,
+        props: TrackUserSignedUpProperties,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
@@ -711,7 +711,7 @@ export class RudderTyper {
      * @param callback - Optional callback fired after the call is dispatched
      */
     public trackEventWithNameCamelCase1(
-        props: EventWithNameCamelCase1,
+        props: TrackEventWithNameCamelCaseProperties1,
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
