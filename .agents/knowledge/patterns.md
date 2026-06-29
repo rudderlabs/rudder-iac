@@ -26,3 +26,9 @@
 - Workspace list commands follow a consistent orchestration shape: parse flags, defer telemetry tracking, build dependencies via app bootstrap, select a `lister.ListProvider`, choose table/JSON format from `--json`, then execute `List` with resource type and filters.
 - Provider-side list behavior is centralized behind provider `List(ctx, resourceType, filters)` methods, creating a stable extension seam for adding new listable workspace resources.
 - List result rows are expected to map into common resource keys (`id`, `name`, `type`, `enabled`) with optional domain-specific keys such as `externalId`, aligning with shared lister table/JSON output expectations.
+
+## INT-6489 — Destination CRUD Struct Passthrough
+<!-- ticket:INT-6489 -->
+- Destination Create and Update copy the input `Destination`, clear only `ID`, and marshal the full struct through the shared service helper.
+- Destination Get unmarshals `response.destination` into the same `Destination` type used by write paths.
+- Because CRUD uses whole-struct passthrough, new optional public contract fields with `json:",omitempty"` can often be added to the DTO without changing individual service methods.

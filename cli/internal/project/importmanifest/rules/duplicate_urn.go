@@ -58,10 +58,10 @@ func (r *manifestDuplicateURNRule) ValidateSpecs(
 
 	results := map[string][]vrules.ValidationResult{}
 	for path, ctx := range manifests {
-		forEachResourceURN(ctx, func(wi, ri int, key wsURN) {
+		forEachResourceURN(ctx, func(i, j int, key wsURN) {
 			if counts[key] > 1 {
 				results[path] = append(results[path], vrules.ValidationResult{
-					Reference: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", wi, ri),
+					Reference: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", i, j),
 					Message:   fmt.Sprintf("duplicate URN '%s' in workspace '%s'", key.urn, key.workspaceID),
 				})
 			}
@@ -84,20 +84,20 @@ func countURNs(manifests map[string]*vrules.ValidationContext) map[wsURN]int {
 // non-empty urn under an identified workspace. Malformed specs, unidentified
 // workspaces, and urn-less resources are skipped — the spec-syntax-valid rule
 // reports those.
-func forEachResourceURN(ctx *vrules.ValidationContext, fn func(wi, ri int, key wsURN)) {
+func forEachResourceURN(ctx *vrules.ValidationContext, fn func(i, j int, key wsURN)) {
 	workspaces, err := manifestspec.DecodeWorkspaces(ctx.Spec)
 	if err != nil {
 		return
 	}
-	for wi, ws := range workspaces {
-		if ws.WorkspaceID == "" {
+	for i, workspace := range workspaces {
+		if workspace.WorkspaceID == "" {
 			continue
 		}
-		for ri, res := range ws.Resources {
-			if res.URN == "" {
+		for j, resource := range workspace.Resources {
+			if resource.URN == "" {
 				continue
 			}
-			fn(wi, ri, wsURN{workspaceID: ws.WorkspaceID, urn: res.URN})
+			fn(i, j, wsURN{workspaceID: workspace.WorkspaceID, urn: resource.URN})
 		}
 	}
 }

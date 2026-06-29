@@ -48,26 +48,26 @@ func (r *manifestSpecValidRule) Validate(ctx *vrules.ValidationContext) []vrules
 	}
 
 	var results []vrules.ValidationResult
-	for wi, ws := range workspaces {
-		results = append(results, validateWorkspace(wi, ws)...)
+	for i, workspace := range workspaces {
+		results = append(results, validateWorkspace(i, workspace)...)
 	}
 	return results
 }
 
 // validateWorkspace checks one workspace block: workspace_id present and each
 // resource well-formed. URN uniqueness is the duplicate-urn rule's concern.
-func validateWorkspace(wi int, ws specs.WorkspaceImportMetadata) []vrules.ValidationResult {
+func validateWorkspace(i int, workspace specs.WorkspaceImportMetadata) []vrules.ValidationResult {
 	var results []vrules.ValidationResult
 
-	if ws.WorkspaceID == "" {
+	if workspace.WorkspaceID == "" {
 		results = append(results, vrules.ValidationResult{
-			Reference: fmt.Sprintf("/spec/workspaces/%d/workspace_id", wi),
+			Reference: fmt.Sprintf("/spec/workspaces/%d/workspace_id", i),
 			Message:   "workspace_id is required",
 		})
 	}
 
-	for ri, res := range ws.Resources {
-		results = append(results, validateResource(wi, ri, res)...)
+	for j, resource := range workspace.Resources {
+		results = append(results, validateResource(i, j, resource)...)
 	}
 
 	return results
@@ -76,17 +76,17 @@ func validateWorkspace(wi int, ws specs.WorkspaceImportMetadata) []vrules.Valida
 // validateResource checks one resource is importable, reporting every problem:
 // urn is required (local_id is not supported for manifests) and remote_id is
 // required.
-func validateResource(wi, ri int, res specs.ImportIds) []vrules.ValidationResult {
-	base := fmt.Sprintf("/spec/workspaces/%d/resources/%d", wi, ri)
+func validateResource(i, j int, resource specs.ImportIds) []vrules.ValidationResult {
+	base := fmt.Sprintf("/spec/workspaces/%d/resources/%d", i, j)
 	var results []vrules.ValidationResult
 
-	if res.URN == "" {
+	if resource.URN == "" {
 		results = append(results, vrules.ValidationResult{
 			Reference: base + "/urn",
 			Message:   "urn is required in manifests (local_id not supported)",
 		})
 	}
-	if res.RemoteID == "" {
+	if resource.RemoteID == "" {
 		results = append(results, vrules.ValidationResult{
 			Reference: base + "/remote_id",
 			Message:   "remote_id is required",
