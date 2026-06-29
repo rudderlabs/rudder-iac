@@ -9,6 +9,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/internal/testutils"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,8 +103,13 @@ func TestClientDestinationsGet(t *testing.T) {
 					"id": "some-id",
 					"name": "some-name",
 					"type": "some-type",
-					"config": {
-						"key1": "val1"
+					"config": {"key1": "val1"},
+					"version": 2,
+					"versionInfo": {
+						"status": "deprecated",
+						"action": "upgrade",
+						"retirementDate": "2026-12-31",
+						"migrationDocsURL": "https://docs.example.com/destinations/migration"
 					},
 					"createdAt": "2020-01-01T01:01:01Z",
 					"updatedAt": "2020-01-02T01:01:01Z"	
@@ -120,11 +126,59 @@ func TestClientDestinationsGet(t *testing.T) {
 	destination, err := c.Destinations.Get(ctx, "some-id")
 	require.NoError(t, err)
 	assert.NotNil(t, destination)
-	assert.Equal(t, "some-id", destination.ID)
-	assert.Equal(t, "some-name", destination.Name)
-	assert.Equal(t, "some-type", destination.Type)
-	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *destination.CreatedAt)
-	assert.Equal(t, time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC), *destination.UpdatedAt)
+	assert.Equal(t, &client.Destination{
+		ID:      "some-id",
+		Name:    "some-name",
+		Type:    "some-type",
+		Version: 2,
+		VersionInfo: &client.VersionInfo{
+			Status:           "deprecated",
+			Action:           "upgrade",
+			RetirementDate:   lo.ToPtr("2026-12-31"),
+			MigrationDocsURL: lo.ToPtr("https://docs.example.com/destinations/migration"),
+		},
+		Config:    []byte(`{"key1": "val1"}`),
+		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
+		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
+	}, destination)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinationsGetWithoutVersionInfo(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations/some-id", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destination": {
+					"id": "some-id",
+					"name": "some-name",
+					"type": "some-type",
+					"config": {"key1": "val1"}
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	destination, err := c.Destinations.Get(ctx, "some-id")
+	require.NoError(t, err)
+	assert.Equal(t, &client.Destination{
+		ID:     "some-id",
+		Name:   "some-name",
+		Type:   "some-type",
+		Config: []byte(`{"key1": "val1"}`),
+	}, destination)
+	assert.Nil(t, destination.VersionInfo)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -138,6 +192,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/destinations", `{
 					"name": "some-name",
 					"type": "some-type",
+					"version": 2,
 					"enabled": true,
 					"config": { "key1": "val1" }
 				}`)
@@ -166,6 +221,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 	destination, err := c.Destinations.Create(ctx, &client.Destination{
 		Name:      "some-name",
 		Type:      "some-type",
+		Version:   2,
 		IsEnabled: true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
@@ -182,6 +238,52 @@ func TestClientDestinationsCreate(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestClientDestinationsCreateOmitsEmptyVersion(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/destinations", `{
+					"name": "some-name",
+					"type": "some-type",
+					"enabled": true,
+					"config": { "key1": "val1" }
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destination": {
+					"id": "some-id",
+					"name": "some-name",
+					"type": "some-type",
+					"config": {
+						"key1": "val1"
+					}
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	destination, err := c.Destinations.Create(ctx, &client.Destination{
+		Name:      "some-name",
+		Type:      "some-type",
+		IsEnabled: true,
+		Config: json.RawMessage([]byte(`{
+			"key1": "val1"
+		}`)),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some-id", destination.ID)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestClientDestinationsUpdate(t *testing.T) {
 	ctx := context.Background()
 
@@ -191,6 +293,7 @@ func TestClientDestinationsUpdate(t *testing.T) {
 				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id", `{
 					"name": "some-name",
 					"type": "some-type",
+					"version": 2,
 					"enabled": true,
 					"config": { "key1": "val1" }
 				}`)
@@ -220,6 +323,7 @@ func TestClientDestinationsUpdate(t *testing.T) {
 		ID:        "some-id",
 		Name:      "some-name",
 		Type:      "some-type",
+		Version:   2,
 		IsEnabled: true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
@@ -232,6 +336,53 @@ func TestClientDestinationsUpdate(t *testing.T) {
 	assert.Equal(t, "some-type", destination.Type)
 	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *destination.CreatedAt)
 	assert.Equal(t, time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC), *destination.UpdatedAt)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinationsUpdateOmitsEmptyVersion(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id", `{
+					"name": "some-name",
+					"type": "some-type",
+					"enabled": true,
+					"config": { "key1": "val1" }
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destination": {
+					"id": "some-id",
+					"name": "some-name",
+					"type": "some-type",
+					"config": {
+						"key1": "val1"
+					}
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	destination, err := c.Destinations.Update(ctx, &client.Destination{
+		ID:        "some-id",
+		Name:      "some-name",
+		Type:      "some-type",
+		IsEnabled: true,
+		Config: json.RawMessage([]byte(`{
+			"key1": "val1"
+		}`)),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "some-id", destination.ID)
 
 	httpClient.AssertNumberOfCalls()
 }
