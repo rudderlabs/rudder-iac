@@ -26,3 +26,9 @@ Read these when working on event stream source listing:
 <!-- ticket:INT-6489 -->
 Read this first when working on destination API contract fields or destination versioning:
 - `api/client/destinations.go`: shared destination DTO, exported `VersionInfo` type, and destination CRUD service methods.
+
+## DEX-456 — Account API Contract Entry
+<!-- ticket:DEX-456 -->
+Read these first when working on account API contract fields:
+- `api/client/accounts.go`: account DTOs and thin account service wrapper.
+- `api/client/accounts_test.go`: existing co-located account client tests; extend this file rather than introducing a separate account test harness.
