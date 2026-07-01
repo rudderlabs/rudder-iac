@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "dg-unique-names-all-unique"
-        title: "All model and relationship display names are unique within the data graph"
+        title: "Unique model and relationship display names within the Data Graph"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -35,7 +35,7 @@ match_behavior:
                   primary_id: order_id
     invalid:
       - example_id: "dg-unique-names-duplicate-model-display-name"
-        title: "Two models share the same display name within a data graph"
+        title: "Duplicate model display names within a Data Graph"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -66,7 +66,7 @@ match_behavior:
             severity: "error"
             message_contains: "duplicate model display name"
       - example_id: "dg-unique-names-duplicate-relationship-display-name"
-        title: "Two relationships share the same display name within a data graph"
+        title: "Duplicate relationship display names within a Data Graph"
         files:
           spec.yaml: |
             version: rudder/v1

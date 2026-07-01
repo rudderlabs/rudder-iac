@@ -9,7 +9,7 @@ match_behavior:
         version: "rudder/v0.1"
     valid:
       - example_id: "es-source-legacy-semantic-valid-no-governance"
-        title: "Valid legacy source without governance — no cross-references to resolve"
+        title: "Valid legacy source without governance"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -21,7 +21,7 @@ match_behavior:
               name: My JavaScript Source
               type: javascript
       - example_id: "es-source-legacy-semantic-valid-with-tp"
-        title: "Valid legacy source whose tracking plan exists in the project"
+        title: "Valid legacy source with an existing Tracking Plan reference"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -48,7 +48,7 @@ match_behavior:
               rules: []
     invalid:
       - example_id: "es-source-legacy-semantic-tp-not-found"
-        title: "Legacy source references a tracking plan that does not exist in the project"
+        title: "Legacy source references a missing Tracking Plan"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -69,7 +69,7 @@ match_behavior:
             severity: "error"
             message_contains: "not found in the project"
       - example_id: "es-source-legacy-semantic-duplicate-name"
-        title: "Legacy source shares a name with another source in the same project"
+        title: "Legacy source name duplicates another source in the project"
         files:
           source-a.yaml: |
             version: rudder/0.1
@@ -100,7 +100,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "es-source-v1-semantic-valid-no-governance"
-        title: "Valid v1 source without governance"
+        title: "Valid source without governance"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -112,7 +112,7 @@ match_behavior:
               name: My Python Source
               type: python
       - example_id: "es-source-v1-semantic-valid-with-tp"
-        title: "Valid v1 source whose tracking plan exists in the project"
+        title: "Valid source with an existing Tracking Plan reference"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -139,7 +139,7 @@ match_behavior:
               rules: []
     invalid:
       - example_id: "es-source-v1-semantic-tp-not-found"
-        title: "v1 source references a tracking plan that does not exist in the project"
+        title: "v1 source references a missing Tracking Plan"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -160,7 +160,7 @@ match_behavior:
             severity: "error"
             message_contains: "not found in the project"
       - example_id: "es-source-v1-semantic-duplicate-name"
-        title: "v1 source shares a name with another source in the same project"
+        title: "v1 source name duplicates another source in the project"
         files:
           source-a.yaml: |
             version: rudder/v1

@@ -8,7 +8,7 @@ match_behavior:
         version: "rudder/v0.1"
     valid:
       - example_id: "ev-sem-legacy-valid"
-        title: "Unique event (name, type) combinations (legacy)"
+        title: "Unique event name and type combinations (legacy)"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -25,8 +25,8 @@ match_behavior:
                   name: Product Clicked
     invalid:
       - example_id: "ev-sem-legacy-duplicate"
-        title: "Duplicate (name, type) event combination across files (legacy)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        title: "Duplicate event name and type across files (legacy)"
+        description: "Duplicate event name and event_type pairs in the resource graph fail validation."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -49,7 +49,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "ev-sem-v1-valid"
-        title: "Unique event (name, type) combinations (v1)"
+        title: "Unique event name and type combinations (v1)"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -66,8 +66,8 @@ match_behavior:
                   name: Product Clicked
     invalid:
       - example_id: "ev-sem-v1-duplicate"
-        title: "Duplicate (name, type) event combination across files (v1)"
-        description: "Two events with the same name and event_type in the resource graph trigger this error."
+        title: "Duplicate event name and type across files (v1)"
+        description: "Duplicate event name and event_type pairs in the resource graph fail validation."
         files:
           spec.yaml: |
             version: rudder/v1

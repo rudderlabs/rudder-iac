@@ -27,7 +27,7 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-spec-legacy-missing-name"
-        title: "Legacy custom type missing the required name field"
+        title: "Legacy custom type missing required name field"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -44,7 +44,7 @@ match_behavior:
             severity: "error"
             message_contains: "'name' is required"
       - example_id: "ct-spec-legacy-missing-type"
-        title: "Legacy custom type missing the required type field"
+        title: "Legacy custom type missing required type field"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -66,7 +66,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "ct-spec-v1-valid"
-        title: "Valid v1 custom-types spec"
+        title: "Valid custom-types spec"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -83,7 +83,7 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-spec-v1-missing-id"
-        title: "v1 custom type missing the required id field"
+        title: "v1 custom type missing required id field"
         files:
           spec.yaml: |
             version: rudder/v1
