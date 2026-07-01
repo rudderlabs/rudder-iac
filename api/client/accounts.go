@@ -1,8 +1,12 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -15,9 +19,10 @@ type Account struct {
 		Type     string `json:"type"`
 		Category string `json:"category"`
 	} `json:"definition"`
-	Options   json.RawMessage `json:"options"`
-	CreatedAt *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time      `json:"updatedAt,omitempty"`
+	Options    json.RawMessage `json:"options"`
+	CreatedAt  *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt  *time.Time      `json:"updatedAt,omitempty"`
+	ExternalID string          `json:"externalId,omitempty"`
 }
 
 type CreateAccountRequest struct {
@@ -54,9 +59,35 @@ func (s *accounts) Next(ctx context.Context, paging Paging) (*AccountsPage, erro
 	return page, err
 }
 
-func (s *accounts) List(ctx context.Context) (*AccountsPage, error) {
+type ListAccountsOptions struct {
+	HasExternalID *bool
+}
+
+type ListAccountsOption func(*ListAccountsOptions)
+
+// WithHasExternalID filters the account list to managed (true) or
+// unmanaged/importable (false) accounts.
+func WithHasExternalID(v bool) ListAccountsOption {
+	return func(o *ListAccountsOptions) { o.HasExternalID = &v }
+}
+
+func (s *accounts) List(ctx context.Context, opts ...ListAccountsOption) (*AccountsPage, error) {
+	options := &ListAccountsOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	path := s.basePath
+	query := url.Values{}
+	if options.HasExternalID != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*options.HasExternalID))
+	}
+	if encoded := query.Encode(); encoded != "" {
+		path = fmt.Sprintf("%s?%s", path, encoded)
+	}
+
 	page := &AccountsPage{}
-	if err := s.list(ctx, page); err != nil {
+	if _, err := s.next(ctx, Paging{Next: path}, page); err != nil {
 		return nil, err
 	}
 
@@ -122,4 +153,18 @@ func (s *accounts) Update(ctx context.Context, id string, account *UpdateAccount
 
 func (s *accounts) Delete(ctx context.Context, id string) error {
 	return s.service.delete(ctx, id)
+}
+
+// SetExternalID assigns a caller-owned stable external id to a remote account.
+// PUT /v2/accounts/{id}/external-id  body: {"externalId": externalID}
+func (s *accounts) SetExternalID(ctx context.Context, id string, externalID string) error {
+	path := fmt.Sprintf("%s/%s/external-id", s.basePath, id)
+	data, err := json.Marshal(map[string]string{"externalId": externalID})
+	if err != nil {
+		return fmt.Errorf("marshalling external id: %w", err)
+	}
+	if _, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(data)); err != nil {
+		return fmt.Errorf("setting external id: %w", err)
+	}
+	return nil
 }
