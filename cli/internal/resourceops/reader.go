@@ -206,14 +206,29 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 		managed = resources.NewRemoteResources()
 	}
 
-	all := managed.GetAll(resourceType)
+	// Managed resources (those with an external id) come from LoadResourcesFromRemote.
+	found := findInMap(managed.GetAll(resourceType), id)
+	isManaged := found != nil
 
-	found := findInMap(all, id)
+	// Fall back to unmanaged (importable) resources so `-o yaml` / describe also
+	// work for a resource that only lives upstream — the table path (ListRows)
+	// already surfaces those, so materialization must too. LoadImportable attaches
+	// a namer-suggested external id, so the emitted spec is adopt-ready (applying
+	// it with `apply -f` brings the resource under management).
+	if found == nil {
+		if loader, ok := prov.(provider.UnmanagedRemoteResourceLoader); ok {
+			importable, err := loader.LoadImportable(ctx, namer.NewExternalIdNamer(namer.NewKebabCase()))
+			if err != nil {
+				return nil, false, fmt.Errorf("loading importable resources: %w", err)
+			}
+			if importable != nil {
+				found = findInMap(importable.GetAll(resourceType), id)
+			}
+		}
+	}
 	if found == nil {
 		return nil, false, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)
 	}
-
-	isManaged := found.ExternalID != ""
 
 	coll := resources.NewRemoteResources()
 	coll.Set(resourceType, map[string]*resources.RemoteResource{found.ID: found})

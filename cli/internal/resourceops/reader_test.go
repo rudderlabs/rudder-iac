@@ -308,3 +308,52 @@ func TestReader_SpecYAMLWithManaged_NotFound(t *testing.T) {
 	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
 }
 
+// newEventStreamProviderWithUnmanaged returns a provider whose only source has no
+// external id (i.e. it lives upstream but isn't IaC-managed) — the case the table
+// `get <id>` path surfaces but that yaml/describe used to report as "not found".
+func newEventStreamProviderWithUnmanaged() *eventstream.Provider {
+	mockClient := esSource.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{
+			{
+				ID:           "src-unmanaged-1",
+				ExternalID:   "", // unmanaged
+				Name:         "Legacy Source",
+				Type:         "javascript",
+				Enabled:      true,
+				WorkspaceID:  "ws-123",
+				TrackingPlan: nil,
+			},
+		}, nil
+	})
+	return eventstream.New(mockClient)
+}
+
+// Regression: -o yaml / describe of an UNMANAGED resource (found by remote id) must
+// materialize a spec, not error with "resource not found". managed must be false.
+func TestReader_SpecYAMLWithManaged_UnmanagedSource(t *testing.T) {
+	prov := newEventStreamProviderWithUnmanaged()
+
+	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "src-unmanaged-1")
+	require.NoError(t, err)
+	require.NotEmpty(t, out)
+	assert.False(t, managed, "source without ExternalID must be reported as unmanaged")
+
+	spec, err := specs.New([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, esSource.ResourceKind, spec.Kind)
+	// The emitted spec carries the namer-suggested external id, so it is adopt-ready.
+	assert.Equal(t, "legacy-source", spec.Spec["id"])
+}
+
+func TestReader_SpecYAML_UnmanagedSource(t *testing.T) {
+	prov := newEventStreamProviderWithUnmanaged()
+
+	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "src-unmanaged-1")
+	require.NoError(t, err)
+
+	spec, err := specs.New([]byte(out))
+	require.NoError(t, err)
+	assert.Equal(t, esSource.ResourceKind, spec.Kind)
+}
+
