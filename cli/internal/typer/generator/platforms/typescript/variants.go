@@ -204,6 +204,7 @@ func buildVariantInterface(
 			Comment:    propSchema.Property.Description,
 			Optional:   optional,
 			QuotedName: quoted,
+			SerialName: propName,
 		})
 	}
 

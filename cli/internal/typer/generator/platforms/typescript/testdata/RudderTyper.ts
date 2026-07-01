@@ -415,6 +415,171 @@ export interface EventWithNameCamelCase1 {
 }
 
 
+// ===== Key Maps =====
+//
+// Interface fields are camelCased for ergonomics, but the tracking plan expects
+// the original keys on the wire. Each map below rebinds a camelCase field name
+// back to its original plan key; applyKeyMap applies them (recursively for
+// nested objects) just before the SDK call. See DAW-3732.
+
+type KeyMapValue = string | { key: string; map: KeyMap };
+type KeyMap = Record<string, KeyMapValue>;
+
+function applyKeyMap(input: unknown, map: KeyMap): unknown {
+    if (Array.isArray(input)) {
+        return input.map((item) => applyKeyMap(item, map));
+    }
+    if (input === null || typeof input !== "object") {
+        return input;
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+        const entry = map[key];
+        if (entry === undefined) {
+            out[key] = value;
+        } else if (typeof entry === "string") {
+            out[key] = value;
+            // Rename after copying so an identity map is a no-op.
+            if (entry !== key) {
+                delete out[key];
+                out[entry] = value;
+            }
+        } else {
+            out[entry.key] = applyKeyMapNested(value, entry.map);
+        }
+    }
+    return out;
+}
+
+// applyKeyMapNested descends into a nested value (object or array of objects),
+// remapping each contained object's keys with the nested map.
+function applyKeyMapNested(value: unknown, map: KeyMap): unknown {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    return applyKeyMap(value, map);
+}
+
+const CustomTypeAddressDetailsKeyMap: KeyMap = {
+    postalCode: "postal_code",
+};
+
+const CustomTypeFeatureConfigCaseBetaKeyMap: KeyMap = {
+    featureFlag: "feature_flag",
+};
+
+const CustomTypeFeatureConfigCaseFalseKeyMap: KeyMap = {
+    featureFlag: "feature_flag",
+    firstName: "first_name",
+};
+
+const CustomTypeFeatureConfigCaseTrueKeyMap: KeyMap = {
+    featureFlag: "feature_flag",
+};
+
+const CustomTypeFeatureConfigDefaultKeyMap: KeyMap = {
+    featureFlag: "feature_flag",
+};
+
+const CustomTypePageContextCaseHomeKeyMap: KeyMap = {
+    pageType: "page_type",
+};
+
+const CustomTypePageContextCaseProductKeyMap: KeyMap = {
+    pageType: "page_type",
+    productId: "product_id",
+};
+
+const CustomTypePageContextCaseSearchKeyMap: KeyMap = {
+    pageType: "page_type",
+};
+
+const CustomTypePageContextDefaultKeyMap: KeyMap = {
+    pageData: "page_data",
+    pageType: "page_type",
+};
+
+const CustomTypeUserProfileKeyMap: KeyMap = {
+    firstName: "first_name",
+    lastName: "last_name",
+};
+
+const EventWithVariantsCaseDesktopKeyMap: KeyMap = {
+    deviceType: "device_type",
+    firstName: "first_name",
+    lastName: "last_name",
+    pageContext: "page_context",
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+};
+
+const EventWithVariantsCaseMobileKeyMap: KeyMap = {
+    deviceType: "device_type",
+    pageContext: "page_context",
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+};
+
+const EventWithVariantsDefaultKeyMap: KeyMap = {
+    deviceType: "device_type",
+    pageContext: "page_context",
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+    untypedField: "untyped_field",
+};
+
+const PagePropertiesKeyMap: KeyMap = {
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+};
+
+const ProductPremiumClickedKeyMap: KeyMap = {
+    specialField: "special_field",
+    statusCode: "status_code",
+};
+
+const UserSignedUpContextNestedContextKeyMap: KeyMap = {
+    favoriteColors: "favorite_colors",
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+};
+
+const UserSignedUpContextKeyMap: KeyMap = {
+    ipAddress: "ip_address",
+    nestedContext: { key: "nested_context", map: UserSignedUpContextNestedContextKeyMap },
+};
+
+const UserSignedUpKeyMap: KeyMap = {
+    arrayOfAny: "array_of_any",
+    arrayWithNullItems: "array_with_null_items",
+    context: { key: "context", map: UserSignedUpContextKeyMap },
+    customNullField: "custom_null_field",
+    deviceType: "device_type",
+    emailList: "email_list",
+    emptyObjectNoAdditionalProps: "empty_object_no_additional_props",
+    emptyObjectWithAdditionalProps: "empty_object_with_additional_props",
+    featureConfig: "feature_config",
+    mixedUnicode: "mixed_unicode",
+    mixedValue: "mixed_value",
+    multiTypeArray: "multi_type_array",
+    multiTypeField: "multi_type_field",
+    multiTypeWithNull: "multi_type_with_null",
+    nestedEmptyObject: "nested_empty_object",
+    nestedEmptyObjectNoAdditionalProps: "nested_empty_object_no_additional_props",
+    nullField: "null_field",
+    numberOrNull: "number_or_null",
+    objectProperty: "object_property",
+    phoneNumbers: "phone_numbers",
+    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
+    profileList: "profile_list",
+    propertyOfAny: "property_of_any",
+    stringOrNull: "string_or_null",
+    unicodeCustomType: "unicode_custom_type",
+    unicodeEnumField: "unicode_enum_field",
+    untypedArray: "untyped_array",
+    untypedField: "untyped_field",
+    userAccess: "user_access",
+};
+
+const VariableStringKeyMap: KeyMap = {
+    dollarField: "dollar_field",
+};
+
 // ===== RudderTyper =====
 
 /**
@@ -579,7 +744,7 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "$Variable$String",
-            props as unknown as SDKApiObject,
+            applyKeyMap(props, VariableStringKeyMap) as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
             callback,
         );
@@ -677,7 +842,7 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "Product \"Premium\" Clicked",
-            props as unknown as SDKApiObject,
+            applyKeyMap(props, ProductPremiumClickedKeyMap) as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
             callback,
         );
@@ -697,7 +862,7 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "User Signed Up",
-            props as unknown as SDKApiObject,
+            applyKeyMap(props, UserSignedUpKeyMap) as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
             callback,
         );
