@@ -34,7 +34,7 @@ match_behavior:
                   table: db.schema.accounts
                   primary_id: account_id
       - example_id: "dg-cardinality-event-to-entity-many-to-one"
-        title: "Event-to-entity relationship must use many-to-one cardinality"
+        title: "Event-to-entity relationship uses many-to-one cardinality"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -64,7 +64,7 @@ match_behavior:
                   primary_id: user_id
     invalid:
       - example_id: "dg-cardinality-event-to-event-rejected"
-        title: "Event models cannot be connected to other event models"
+        title: "Event models cannot connect to other event models"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -98,7 +98,7 @@ match_behavior:
             severity: "error"
             message_contains: "event models cannot be connected to other event models"
       - example_id: "dg-cardinality-event-to-entity-wrong-cardinality"
-        title: "Event-to-entity relationship must have cardinality many-to-one"
+        title: "Event-to-entity relationship requires many-to-one cardinality"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -132,7 +132,7 @@ match_behavior:
             severity: "error"
             message_contains: "must have cardinality 'many-to-one'"
       - example_id: "dg-cardinality-entity-to-event-wrong-cardinality"
-        title: "Entity-to-event relationship must have cardinality one-to-many"
+        title: "Entity-to-event relationship requires one-to-many cardinality"
         files:
           spec.yaml: |
             version: rudder/v1
