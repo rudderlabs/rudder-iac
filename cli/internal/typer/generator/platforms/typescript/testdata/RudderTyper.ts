@@ -86,7 +86,7 @@ export interface CustomTypeAddressDetails {
     /** City name */
     city: string;
     /** Postal code */
-    postalCode?: string;
+    postal_code?: string;
     /** Street address */
     street: string;
 }
@@ -97,9 +97,9 @@ export interface CustomTypeUserProfile {
     /** User's email address */
     email: CustomTypeEmail;
     /** User's first name */
-    firstName: string;
+    first_name: string;
     /** User's last name */
-    lastName?: string;
+    last_name?: string;
 }
 
 
@@ -108,7 +108,7 @@ export interface CustomTypeUserProfile {
 /** Feature in beta (string 'beta') */
 export interface CustomTypeFeatureConfigCaseBeta {
     /** Feature flag that can be boolean or string */
-    featureFlag: "beta";
+    feature_flag: "beta";
     /** User tags as array of strings */
     tags?: string[];
 }
@@ -117,9 +117,9 @@ export interface CustomTypeFeatureConfigCaseBeta {
 /** Feature disabled (boolean false) */
 export interface CustomTypeFeatureConfigCaseFalse {
     /** Feature flag that can be boolean or string */
-    featureFlag: false;
+    feature_flag: false;
     /** User's first name */
-    firstName?: string;
+    first_name?: string;
 }
 
 
@@ -128,14 +128,14 @@ export interface CustomTypeFeatureConfigCaseTrue {
     /** User's age */
     age?: CustomTypeAge;
     /** Feature flag that can be boolean or string */
-    featureFlag: true;
+    feature_flag: true;
 }
 
 
 /** Default case */
 export interface CustomTypeFeatureConfigDefault {
     /** Feature flag that can be boolean or string */
-    featureFlag: Exclude<boolean | string, true | false | "beta">;
+    feature_flag: Exclude<boolean | string, true | false | "beta">;
 }
 
 
@@ -146,23 +146,23 @@ export type CustomTypeFeatureConfig = CustomTypeFeatureConfigCaseBeta | CustomTy
 /** Home page variant with no additional properties */
 export interface CustomTypePageContextCaseHome {
     /** Type of page */
-    pageType: "home";
+    page_type: "home";
 }
 
 
 /** Product page variant */
 export interface CustomTypePageContextCaseProduct {
     /** Type of page */
-    pageType: "product";
+    page_type: "product";
     /** Product identifier */
-    productId: string;
+    product_id: string;
 }
 
 
 /** Search page variant */
 export interface CustomTypePageContextCaseSearch {
     /** Type of page */
-    pageType: "search";
+    page_type: "search";
     /** Search query */
     query: string;
 }
@@ -171,9 +171,9 @@ export interface CustomTypePageContextCaseSearch {
 /** Default case */
 export interface CustomTypePageContextDefault {
     /** Additional page data */
-    pageData?: Record<string, unknown>;
+    page_data?: Record<string, unknown>;
     /** Type of page */
-    pageType: Exclude<string, "search" | "product" | "home">;
+    page_type: Exclude<string, "search" | "product" | "home">;
 }
 
 
@@ -213,13 +213,13 @@ export type CustomTypeUserAccess = CustomTypeUserAccessCaseFalse | CustomTypeUse
 /** Desktop page view */
 export interface EventWithVariantsCaseDesktop {
     /** Type of device */
-    deviceType: "desktop";
+    device_type: "desktop";
     /** User's first name */
-    firstName: string;
+    first_name: string;
     /** User's last name */
-    lastName?: string;
+    last_name?: string;
     /** Page context information */
-    pageContext?: CustomTypePageContext;
+    page_context?: CustomTypePageContext;
     /** User profile data */
     profile: CustomTypeUserProfile;
 }
@@ -228,9 +228,9 @@ export interface EventWithVariantsCaseDesktop {
 /** Mobile device page view */
 export interface EventWithVariantsCaseMobile {
     /** Type of device */
-    deviceType: "mobile";
+    device_type: "mobile";
     /** Page context information */
-    pageContext?: CustomTypePageContext;
+    page_context?: CustomTypePageContext;
     /** User profile data */
     profile: CustomTypeUserProfile;
     /** User tags as array of strings */
@@ -241,13 +241,13 @@ export interface EventWithVariantsCaseMobile {
 /** Default case */
 export interface EventWithVariantsDefault {
     /** Type of device */
-    deviceType: Exclude<PropertyDeviceType, "mobile" | "desktop">;
+    device_type: Exclude<PropertyDeviceType, "mobile" | "desktop">;
     /** Page context information */
-    pageContext?: CustomTypePageContext;
+    page_context?: CustomTypePageContext;
     /** User profile data */
     profile: CustomTypeUserProfile;
     /** A field with no explicit type (treated as any) */
-    untypedField?: unknown;
+    untyped_field?: unknown;
 }
 
 
@@ -260,7 +260,7 @@ export type EventWithVariants = EventWithVariantsCaseDesktop | EventWithVariants
 /** demonstrates multiple levels of nesting */
 export interface UserSignedUpContextNestedContext {
     /** Array of favorite colors using custom type */
-    favoriteColors?: CustomTypeColor[];
+    favorite_colors?: CustomTypeColor[];
     /** User profile data */
     profile?: CustomTypeUserProfile;
 }
@@ -269,9 +269,9 @@ export interface UserSignedUpContextNestedContext {
 /** example of object property */
 export interface UserSignedUpContext {
     /** IP address of the user */
-    ipAddress: string;
+    ip_address: string;
     /** demonstrates multiple levels of nesting */
-    nestedContext: UserSignedUpContextNestedContext;
+    nested_context: UserSignedUpContextNestedContext;
 }
 
 
@@ -305,7 +305,7 @@ export interface PageProperties {
 /** Event with dollar signs to test string interpolation escaping */
 export interface VariableString {
     /** Field with $ for testing string interpolation: $variable and ${expression} */
-    dollarField: PropertyDollarField;
+    dollar_field: PropertyDollarField;
 }
 
 
@@ -319,9 +319,9 @@ export interface EventWithNameCamelCase {
 /** Triggered when user clicks on a "premium" product /\* important *\/ */
 export interface ProductPremiumClicked {
     /** Field with special chars: "quotes", backslash\path, and /\* comment *\/ */
-    specialField: string;
+    special_field: string;
     /** HTTP status with special characters */
-    statusCode?: PropertyStatusCode;
+    status_code?: PropertyStatusCode;
 }
 
 
@@ -334,75 +334,75 @@ export interface UserSignedUp {
     /** User's age */
     age?: CustomTypeAge;
     /** An array that can contain any type of items */
-    arrayOfAny?: unknown[];
+    array_of_any?: unknown[];
     /** Array with items that can be string or null */
-    arrayWithNullItems?: Array<string | null>;
+    array_with_null_items?: Array<string | null>;
     /** Array of user contacts */
     contacts?: CustomTypeEmail[];
     /** example of object property */
     context?: UserSignedUpContext;
     /** Property using custom null type */
-    customNullField?: CustomTypeNullType;
+    custom_null_field?: CustomTypeNullType;
     /** Type of device */
-    deviceType?: PropertyDeviceType;
+    device_type?: PropertyDeviceType;
     /** User's email addresses */
-    emailList?: CustomTypeEmailList;
+    email_list?: CustomTypeEmailList;
     /** Property with empty object not allowing additional properties */
-    emptyObjectNoAdditionalProps?: CustomTypeEmptyObjectNoAdditionalProps;
+    empty_object_no_additional_props?: CustomTypeEmptyObjectNoAdditionalProps;
     /** Property with empty object allowing additional properties */
-    emptyObjectWithAdditionalProps?: CustomTypeEmptyObjectWithAdditionalProps;
+    empty_object_with_additional_props?: CustomTypeEmptyObjectWithAdditionalProps;
     /** Feature enabled flag */
     enabled?: PropertyEnabled;
     /** Feature configuration information */
-    featureConfig?: CustomTypeFeatureConfig;
+    feature_config?: CustomTypeFeatureConfig;
     /** Property with mixed unicode: café, naïve, 日本語 */
-    mixedUnicode?: string;
+    mixed_unicode?: string;
     /** Mixed type enum */
-    mixedValue?: PropertyMixedValue;
+    mixed_value?: PropertyMixedValue;
     /** An array with items that can be string or integer */
-    multiTypeArray?: Array<string | number>;
+    multi_type_array?: Array<string | number>;
     /** A field that can be string, integer, or boolean */
-    multiTypeField?: string | number | boolean;
+    multi_type_field?: string | number | boolean;
     /** Property that can be string, integer, or null */
-    multiTypeWithNull?: string | number | null;
+    multi_type_with_null?: string | number | null;
     /** Nested property with empty object allowing additional properties */
-    nestedEmptyObject?: Record<string, unknown>;
+    nested_empty_object?: Record<string, unknown>;
     /** Nested property with empty object not allowing additional properties */
-    nestedEmptyObjectNoAdditionalProps?: Record<string, never>;
+    nested_empty_object_no_additional_props?: Record<string, never>;
     /** Property that is always null */
-    nullField?: null;
+    null_field?: null;
     /** Property that can be number or null */
-    numberOrNull?: number | null;
+    number_or_null?: number | null;
     /** An object field with no defined structure */
-    objectProperty?: Record<string, unknown>;
+    object_property?: Record<string, unknown>;
     /** Array of phone numbers using custom type */
-    phoneNumbers?: CustomTypePhoneNumber[];
+    phone_numbers?: CustomTypePhoneNumber[];
     /** Priority level */
     priority?: PropertyPriority;
     /** User profile data */
     profile: CustomTypeUserProfile;
     /** List of related user profiles */
-    profileList?: CustomTypeProfileList;
+    profile_list?: CustomTypeProfileList;
     /** A field that can contain any type of value */
-    propertyOfAny?: unknown;
+    property_of_any?: unknown;
     /** Rating value */
     rating?: PropertyRating;
     /** User account status */
     status?: CustomTypeStatus;
     /** Property that can be string or null */
-    stringOrNull?: string | null;
+    string_or_null?: string | null;
     /** User tags as array of strings */
     tags?: string[];
     /** Property using custom type with Unicode */
-    unicodeCustomType?: CustomTypeТипыДанных;
+    unicode_custom_type?: CustomTypeТипыДанных;
     /** Field demonstrating various Unicode characters in enum values */
-    unicodeEnumField?: PropertyUnicodeEnumField;
+    unicode_enum_field?: PropertyUnicodeEnumField;
     /** An array with no explicit item type (treated as any) */
-    untypedArray?: unknown[];
+    untyped_array?: unknown[];
     /** A field with no explicit type (treated as any) */
-    untypedField?: unknown;
+    untyped_field?: unknown;
     /** User access information */
-    userAccess?: CustomTypeUserAccess;
+    user_access?: CustomTypeUserAccess;
     /** Username in Chinese characters */
     "用户名"?: string;
 }
