@@ -241,7 +241,7 @@ func newEventStreamProvider() *eventstream.Provider {
 func TestReader_SpecYAML_RoundTrips(t *testing.T) {
 	prov := newEventStreamProvider()
 
-	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "my-source")
+	out, err := resourceops.SpecYAML(context.Background(), prov, nil, esSource.ResourceType, "my-source")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 
@@ -255,7 +255,7 @@ func TestReader_SpecYAML_MatchByRemoteID(t *testing.T) {
 
 	// "src-remote-id" is the remote (non-external) ID; external-ID lookup fails first,
 	// then remote-ID lookup should find it.
-	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "src-remote-id")
+	out, err := resourceops.SpecYAML(context.Background(), prov, nil, esSource.ResourceType, "src-remote-id")
 	require.NoError(t, err)
 
 	spec, err := specs.New([]byte(out))
@@ -266,14 +266,14 @@ func TestReader_SpecYAML_MatchByRemoteID(t *testing.T) {
 func TestReader_SpecYAML_NotFound(t *testing.T) {
 	prov := newEventStreamProvider()
 
-	_, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "does-not-exist")
+	_, err := resourceops.SpecYAML(context.Background(), prov, nil, esSource.ResourceType, "does-not-exist")
 	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
 }
 
 func TestReader_SpecJSON_RoundTrips(t *testing.T) {
 	prov := newEventStreamProvider()
 
-	out, err := resourceops.SpecJSON(context.Background(), prov, esSource.ResourceType, "my-source")
+	out, err := resourceops.SpecJSON(context.Background(), prov, nil, esSource.ResourceType, "my-source")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 
@@ -291,7 +291,7 @@ func TestReader_SpecYAMLWithManaged_ManagedSource(t *testing.T) {
 	prov := newEventStreamProvider()
 
 	// "my-source" has ExternalID set → managed == true.
-	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "my-source")
+	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, nil, esSource.ResourceType, "my-source")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 	assert.True(t, managed, "source with ExternalID must be reported as managed")
@@ -304,7 +304,7 @@ func TestReader_SpecYAMLWithManaged_ManagedSource(t *testing.T) {
 func TestReader_SpecYAMLWithManaged_NotFound(t *testing.T) {
 	prov := newEventStreamProvider()
 
-	_, _, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "does-not-exist")
+	_, _, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, nil, esSource.ResourceType, "does-not-exist")
 	require.ErrorIs(t, err, resourceops.ErrResourceNotFound)
 }
 
@@ -334,7 +334,7 @@ func newEventStreamProviderWithUnmanaged() *eventstream.Provider {
 func TestReader_SpecYAMLWithManaged_UnmanagedSource(t *testing.T) {
 	prov := newEventStreamProviderWithUnmanaged()
 
-	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, esSource.ResourceType, "src-unmanaged-1")
+	out, managed, err := resourceops.SpecYAMLWithManaged(context.Background(), prov, nil, esSource.ResourceType, "src-unmanaged-1")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
 	assert.False(t, managed, "source without ExternalID must be reported as unmanaged")
@@ -349,7 +349,7 @@ func TestReader_SpecYAMLWithManaged_UnmanagedSource(t *testing.T) {
 func TestReader_SpecYAML_UnmanagedSource(t *testing.T) {
 	prov := newEventStreamProviderWithUnmanaged()
 
-	out, err := resourceops.SpecYAML(context.Background(), prov, esSource.ResourceType, "src-unmanaged-1")
+	out, err := resourceops.SpecYAML(context.Background(), prov, nil, esSource.ResourceType, "src-unmanaged-1")
 	require.NoError(t, err)
 
 	spec, err := specs.New([]byte(out))

@@ -81,7 +81,7 @@ func RunDescribe(ctx context.Context, out io.Writer, router provider.TypeRouter,
 
 	// Single remote load: SpecYAMLWithManaged returns both the YAML and managed
 	// flag without an extra FindRemote round-trip.
-	yamlStr, managed, err := resourceops.SpecYAMLWithManaged(ctx, prov, resourceType, id)
+	yamlStr, managed, err := resourceops.SpecYAMLWithManaged(ctx, prov, router, resourceType, id)
 	if err != nil {
 		return err
 	}

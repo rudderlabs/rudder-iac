@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -157,8 +156,8 @@ func extractName(data any) string {
 // SpecYAML materializes a single managed remote resource into a re-appliable YAML spec string.
 // It finds the resource matching id (external-ID first, then remote-ID), runs it through
 // the provider's FormatForExport, and encodes the first entity as YAML.
-func SpecYAML(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
-	content, _, err := specContent(ctx, prov, resourceType, id)
+func SpecYAML(ctx context.Context, prov provider.Provider, router provider.TypeRouter, resourceType, id string) (string, error) {
+	content, _, err := specContent(ctx, prov, router, resourceType, id)
 	if err != nil {
 		return "", err
 	}
@@ -168,8 +167,8 @@ func SpecYAML(ctx context.Context, prov provider.Provider, resourceType, id stri
 // SpecYAMLWithManaged materializes the re-appliable YAML spec for a single resource
 // and reports whether it is managed (has an external ID), reusing the same single-resource
 // lookup as SpecYAML with no extra remote round-trip beyond it.
-func SpecYAMLWithManaged(ctx context.Context, prov provider.Provider, resourceType, id string) (string, bool, error) {
-	content, managed, err := specContent(ctx, prov, resourceType, id)
+func SpecYAMLWithManaged(ctx context.Context, prov provider.Provider, router provider.TypeRouter, resourceType, id string) (string, bool, error) {
+	content, managed, err := specContent(ctx, prov, router, resourceType, id)
 	if err != nil {
 		return "", false, err
 	}
@@ -183,21 +182,93 @@ func SpecYAMLWithManaged(ctx context.Context, prov provider.Provider, resourceTy
 // SpecJSON materializes a single managed remote resource into a re-appliable JSON string.
 // It finds the resource matching id (external-ID first, then remote-ID), runs it through
 // the provider's FormatForExport, and encodes the first entity as JSON.
-func SpecJSON(ctx context.Context, prov provider.Provider, resourceType, id string) (string, error) {
-	content, _, err := specContent(ctx, prov, resourceType, id)
+func SpecJSON(ctx context.Context, prov provider.Provider, router provider.TypeRouter, resourceType, id string) (string, error) {
+	content, _, err := specContent(ctx, prov, router, resourceType, id)
 	if err != nil {
 		return "", err
 	}
 	return EncodeJSON(content)
 }
 
+// exportRefResolver resolves a cross-resource reference (e.g. a source's tracking
+// plan) encountered while materializing a single resource's spec. It routes the
+// referenced type to its own provider (so cross-PROVIDER references work) and,
+// per the reference:
+//   - if the dependency is MANAGED, returns its local `#type:external-id` reference;
+//   - if it is UNMANAGED but exists, returns its namer-suggested (adopt-ready) reference;
+//   - if it can't be found, degrades to the raw `#type:remote-id` so single-resource
+//     export never hard-fails on a dangling reference.
+//
+// Lookups are lazy and cached per type, so only the types actually referenced are
+// loaded. A nil router degrades every reference (used where cross-provider context
+// is unavailable, e.g. unit tests without a composite).
+type exportRefResolver struct {
+	ctx        context.Context
+	router     provider.TypeRouter
+	managed    map[string]map[string]*resources.RemoteResource
+	importable map[string]map[string]*resources.RemoteResource
+}
+
+func newExportRefResolver(ctx context.Context, router provider.TypeRouter) *exportRefResolver {
+	return &exportRefResolver{
+		ctx:        ctx,
+		router:     router,
+		managed:    map[string]map[string]*resources.RemoteResource{},
+		importable: map[string]map[string]*resources.RemoteResource{},
+	}
+}
+
+func (r *exportRefResolver) managedOf(entityType string) map[string]*resources.RemoteResource {
+	if m, ok := r.managed[entityType]; ok {
+		return m
+	}
+	m := map[string]*resources.RemoteResource{}
+	if r.router != nil {
+		if p, err := r.router.ProviderForType(entityType); err == nil {
+			if coll, err := p.LoadResourcesFromRemote(r.ctx); err == nil && coll != nil {
+				m = coll.GetAll(entityType)
+			}
+		}
+	}
+	r.managed[entityType] = m
+	return m
+}
+
+func (r *exportRefResolver) importableOf(entityType string) map[string]*resources.RemoteResource {
+	if m, ok := r.importable[entityType]; ok {
+		return m
+	}
+	m := map[string]*resources.RemoteResource{}
+	if r.router != nil {
+		if p, err := r.router.ProviderForType(entityType); err == nil {
+			if loader, ok := p.(provider.UnmanagedRemoteResourceLoader); ok {
+				if coll, err := loader.LoadImportable(r.ctx, namer.NewExternalIdNamer(namer.NewKebabCase())); err == nil && coll != nil {
+					m = coll.GetAll(entityType)
+				}
+			}
+		}
+	}
+	r.importable[entityType] = m
+	return m
+}
+
+func (r *exportRefResolver) ResolveToReference(entityType, remoteID string) (string, error) {
+	if res, ok := r.managedOf(entityType)[remoteID]; ok && res.ExternalID != "" {
+		return fmt.Sprintf("#%s:%s", entityType, res.ExternalID), nil
+	}
+	if res, ok := r.importableOf(entityType)[remoteID]; ok && res.Reference != "" {
+		return res.Reference, nil
+	}
+	return fmt.Sprintf("#%s:%s", entityType, remoteID), nil
+}
+
 // specContent is the shared find-and-export path used by SpecYAML, SpecYAMLWithManaged,
-// and SpecJSON. It loads managed remote resources, finds the one matching id
-// (external-ID-first then remote-ID, mirroring Resolver.FindRemote), builds a
-// single-entry collection, and delegates to FormatForExport to get the formattable
-// entity content. The returned bool reports whether the resource is managed
-// (has a non-empty ExternalID).
-func specContent(ctx context.Context, prov provider.Provider, resourceType, id string) (any, bool, error) {
+// and SpecJSON. It loads managed (and, as a fallback, unmanaged) remote resources,
+// finds the one matching id (external-ID-first then remote-ID), builds a single-entry
+// collection, and delegates to FormatForExport. Cross-resource references in the
+// exported spec are resolved via router (see exportRefResolver). The returned bool
+// reports whether the resource is managed (found in the managed load).
+func specContent(ctx context.Context, prov provider.Provider, router provider.TypeRouter, resourceType, id string) (any, bool, error) {
 	managed, err := prov.LoadResourcesFromRemote(ctx)
 	if err != nil {
 		return nil, false, fmt.Errorf("loading remote resources: %w", err)
@@ -234,21 +305,15 @@ func specContent(ctx context.Context, prov provider.Provider, resourceType, id s
 	coll.Set(resourceType, map[string]*resources.RemoteResource{found.ID: found})
 
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-	// Remote is populated with this provider's full managed collection so that
-	// same-provider cross-resource references (e.g. a tracking plan owned by this
-	// provider) can be resolved via ImportRefResolver.ResolveToReference.
-	// Known limitation: cross-PROVIDER references (e.g. a tracking plan owned by a
-	// different provider) cannot be resolved here because only this provider's remote
-	// is loaded; treated as a follow-up.
-	refResolver := &resolver.ImportRefResolver{
-		Remote:     managed,
-		Graph:      resources.NewGraph(),
-		Importable: coll,
-	}
+	// Resolve cross-resource references (e.g. a source's tracking plan) against the
+	// full workspace via the router: managed dependencies resolve to a local
+	// reference, unmanaged ones to an adopt-ready suggestion, and anything missing
+	// degrades to a raw remote-id reference so export never hard-fails.
+	refResolver := newExportRefResolver(ctx, router)
 
 	entities, err := prov.FormatForExport(coll, idNamer, refResolver)
 	if err != nil {
-		return nil, false, fmt.Errorf("materializing spec for %s %q (cross-resource references such as tracking plans may not resolve in single-resource export): %w", resourceType, id, err)
+		return nil, false, fmt.Errorf("materializing spec for %s %q: %w", resourceType, id, err)
 	}
 	if len(entities) == 0 {
 		return nil, false, fmt.Errorf("%s %q: %w", resourceType, id, ErrResourceNotFound)

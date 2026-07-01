@@ -40,6 +40,10 @@ func (f *fakeComposite) SupportedTypes() []string {
 	return f.supportedTypes
 }
 
+// RefRouter is unused by these tests (no cross-provider references in the
+// fixtures), so a nil router (degrade-only resolution) is fine.
+func (f *fakeComposite) RefRouter() provider.TypeRouter { return nil }
+
 // newFakeComposite builds a fakeComposite backed by a real event-stream provider
 // whose mock client returns the given sources.
 func newFakeComposite(sources []sourceClient.EventStreamSource) *fakeComposite {
@@ -384,6 +388,8 @@ func (c *managedOnlyComposite) ProviderForType(resourceType string) (get.GetProv
 }
 
 func (c *managedOnlyComposite) SupportedTypes() []string { return c.supportedTypes }
+
+func (c *managedOnlyComposite) RefRouter() provider.TypeRouter { return nil }
 
 func TestRunGet_DegradedNote_ManagedOnlyProvider(t *testing.T) {
 	t.Parallel()

@@ -34,6 +34,9 @@ type GetProvider interface {
 type Composite interface {
 	ProviderForType(resourceType string) (GetProvider, error)
 	SupportedTypes() []string
+	// RefRouter returns a router for resolving cross-resource references during
+	// single-resource export (-o yaml/json). May return nil when unavailable.
+	RefRouter() provider.TypeRouter
 }
 
 // typeRouter is satisfied by *provider.CompositeProvider, which exposes
@@ -54,6 +57,10 @@ func (s *compositeShim) ProviderForType(t string) (GetProvider, error) {
 }
 
 func (s *compositeShim) SupportedTypes() []string { return s.r.SupportedTypes() }
+
+// RefRouter exposes the underlying router (a *provider.CompositeProvider) so the
+// single-resource export path can resolve cross-provider references.
+func (s *compositeShim) RefRouter() provider.TypeRouter { return s.r }
 
 // GetOptions holds the parsed flag values for the get command.
 type GetOptions struct {
@@ -165,7 +172,7 @@ func RunGet(ctx context.Context, out io.Writer, cp Composite, args []string, opt
 	scope := toScope(opts)
 
 	if len(args) == 2 {
-		return runSingle(ctx, out, prov, resourceType, args[1], opts)
+		return runSingle(ctx, out, prov, cp.RefRouter(), resourceType, args[1], opts)
 	}
 
 	return runList(ctx, out, prov, resourceType, scope, opts)
@@ -289,7 +296,7 @@ func rowMatchesSelector(row resourceops.Row, selector map[string]string) bool {
 // runSingle fetches and renders a single resource by its id.
 // yaml/json output formats require the provider to also implement provider.Provider
 // (Exporter + full spec materialization); table output only needs ManagedRemoteResourceLoader.
-func runSingle(ctx context.Context, out io.Writer, prov GetProvider, resourceType, id string, opts GetOptions) error {
+func runSingle(ctx context.Context, out io.Writer, prov GetProvider, router provider.TypeRouter, resourceType, id string, opts GetOptions) error {
 	switch opts.Output {
 	case "yaml", "json":
 		// Full spec materialization requires the provider to export.
@@ -300,9 +307,9 @@ func runSingle(ctx context.Context, out io.Writer, prov GetProvider, resourceTyp
 		var s string
 		var err error
 		if opts.Output == "yaml" {
-			s, err = resourceops.SpecYAML(ctx, fullProv, resourceType, id)
+			s, err = resourceops.SpecYAML(ctx, fullProv, router, resourceType, id)
 		} else {
-			s, err = resourceops.SpecJSON(ctx, fullProv, resourceType, id)
+			s, err = resourceops.SpecJSON(ctx, fullProv, router, resourceType, id)
 		}
 		if err != nil {
 			return err
