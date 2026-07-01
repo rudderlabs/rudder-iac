@@ -79,3 +79,9 @@
 - The shared API client owns destination DTO shape and CRUD transport in `api/client/destinations.go`, so public API destination contract fields should be modeled there first.
 - Destination versioning is represented on the public client DTO as `Destination.Version` and `Destination.VersionInfo`, allowing Create, Update, and Get paths to share one contract type.
 - Optional destination version metadata flows through the existing shared service helper and response unmarshal path without separate service-method changes.
+
+## RUD-2860 — Destination External ID Mutation Boundary
+<!-- ticket:RUD-2860 -->
+- Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
+- Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
+- Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.

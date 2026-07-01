@@ -26,3 +26,8 @@ Read these when working on event stream source listing:
 <!-- ticket:INT-6489 -->
 Read this first when working on destination API contract fields or destination versioning:
 - `api/client/destinations.go`: shared destination DTO, exported `VersionInfo` type, and destination CRUD service methods.
+
+## RUD-2860 — Destination External ID Contract Entry
+<!-- ticket:RUD-2860 -->
+Read this first when working on destination external IDs or destination ownership metadata:
+- `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.
