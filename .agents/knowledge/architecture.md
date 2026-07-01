@@ -85,3 +85,9 @@
 - DataGraph is now a default project/provider capability rather than an experimental feature: dependency assembly should initialize `providers.DataGraph` and include `"datagraph"` in the composite provider map unconditionally alongside DataCatalog, RETL, EventStream, and Transformations.
 - The `data-graphs` command is intended to be visible in the root Cobra command tree by default; command visibility should not depend on `ExperimentalFlags.DataGraph`.
 - DataGraph GA means project-level validation and apply flows can encounter `kind: data-graph` / `version: rudder/v1` specs without opt-in, so shared project gatekeeper rule surfaces need to account for that match pattern.
+
+## RUD-2860 — Destination External ID Mutation Boundary
+<!-- ticket:RUD-2860 -->
+- Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
+- Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
+- Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.
