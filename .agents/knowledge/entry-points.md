@@ -26,3 +26,9 @@ Read these when working on event stream source listing:
 <!-- ticket:INT-6489 -->
 Read this first when working on destination API contract fields or destination versioning:
 - `api/client/destinations.go`: shared destination DTO, exported `VersionInfo` type, and destination CRUD service methods.
+
+## INT-6671 — RETL Connection Sync Behaviour Contract Entry
+<!-- ticket:INT-6671 -->
+Read this first when working on RETL connection `syncBehaviour` request/response modeling:
+- `api/client/retl/connection_types.go`: contains both `CreateRETLConnectionRequest` for create payloads and `RETLConnection` for response payloads; keep the create request's optional `syncBehaviour` distinct from the response model's resolved value.
+- `api/client/retl/connections_test.go`: existing create-request tests directly assign `SyncBehaviour`, so pointer optionality changes need matching test fixture updates.
