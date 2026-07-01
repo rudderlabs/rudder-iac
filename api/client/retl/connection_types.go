@@ -112,7 +112,7 @@ type CreateRETLConnectionRequest struct {
 	ExternalID        string          `json:"externalId,omitempty"`
 	Schedule          Schedule        `json:"schedule"`
 	SyncSettings      *SyncSettings   `json:"syncSettings,omitempty"`
-	SyncBehaviour     SyncBehaviour   `json:"syncBehaviour"`
+	SyncBehaviour     *SyncBehaviour  `json:"syncBehaviour,omitempty"`
 	Identifiers       []Mapping       `json:"identifiers"`
 	Mappings          []Mapping       `json:"mappings,omitempty"`
 	Event             *Event          `json:"event,omitempty"`
