@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "dg-refs-valid-target-exists"
-        title: "Relationship target references an existing model in the same data-graph"
+        title: "Relationship target references an existing model in the Data Graph"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -35,7 +35,7 @@ match_behavior:
                   primary_id: account_id
     invalid:
       - example_id: "dg-refs-invalid-target-missing"
-        title: "Relationship target references a model that does not exist"
+        title: "Relationship target references a missing model"
         files:
           spec.yaml: |
             version: rudder/v1

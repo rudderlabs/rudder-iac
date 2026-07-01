@@ -54,7 +54,7 @@ match_behavior:
     valid:
       - example_id: "metadata-name-only"
         title: "Metadata with only the required name"
-        description: "The minimal valid metadata block: a name and nothing else."
+        description: "Minimal valid metadata: a name only."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -65,9 +65,8 @@ match_behavior:
               events: []
       - example_id: "metadata-with-import"
         title: "Metadata with a well-formed import block"
-        description: >
-          An import block where every workspace has a workspace_id and every
-          resource references a URN that exists in the spec body.
+        description: >-
+          An import block where each workspace declares workspace_id and each resource references a URN in the spec body.
         files:
           spec.yaml: |
             version: rudder/v1
@@ -86,8 +85,8 @@ match_behavior:
                   name: Order Completed
     invalid:
       - example_id: "metadata-missing-name"
-        title: "Metadata missing the required name field"
-        description: "Every spec's metadata must declare a name."
+        title: "Metadata missing required name"
+        description: "Every spec metadata block must declare a name."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -104,8 +103,8 @@ match_behavior:
             severity: "error"
             message_contains: "'name' is required"
       - example_id: "metadata-import-missing-workspace-id"
-        title: "Import workspace missing the required workspace_id"
-        description: "Each workspace entry in an import block must declare a workspace_id."
+        title: "Import workspace missing required workspace_id"
+        description: "Each import workspace entry must declare a workspace_id."
         files:
           spec.yaml: |
             version: rudder/v1
