@@ -1,8 +1,10 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -32,6 +34,64 @@ type destinations struct {
 type DestinationsPage struct {
 	APIPage
 	Destinations []Destination `json:"destinations"`
+}
+
+type DestinationTransformation struct {
+	DestinationID    string    `json:"destinationId"`
+	TransformationID string    `json:"transformationId"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+func (s *destinations) transformationPath(destinationID string) string {
+	return strings.Join([]string{s.basePath, destinationID, "transformation"}, "/")
+}
+
+func (s *destinations) ConnectTransformation(ctx context.Context, destinationID, transformationID string) (*DestinationTransformation, error) {
+	body, err := json.Marshal(map[string]string{"transformationId": transformationID})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := s.client.Do(ctx, "PUT", s.transformationPath(destinationID), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	result := &DestinationTransformation{}
+	if err = json.Unmarshal(res, result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *destinations) DisconnectTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
+	res, err := s.client.Do(ctx, "DELETE", s.transformationPath(destinationID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &DestinationTransformation{}
+	if err = json.Unmarshal(res, result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *destinations) GetTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
+	res, err := s.client.Do(ctx, "GET", s.transformationPath(destinationID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &DestinationTransformation{}
+	if err = json.Unmarshal(res, result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (s *destinations) Next(ctx context.Context, paging Paging) (*DestinationsPage, error) {
