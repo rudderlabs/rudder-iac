@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"gopkg.in/yaml.v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -246,4 +247,18 @@ enabled: true
 			}
 		})
 	}
+}
+
+func TestYAMLFormatter_Format_PreservesNodeHeadComment(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	require.NoError(t, node.Encode(map[string]any{"kind": "import-manifest"}))
+	node.HeadComment = " generated — do not edit"
+
+	out, err := YAMLFormatter{}.Format(&node)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(out), "#"), "got:\n%s", out)
+	assert.Contains(t, string(out), "generated — do not edit")
+	assert.Contains(t, string(out), `kind: "import-manifest"`)
 }

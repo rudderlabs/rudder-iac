@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -111,12 +112,12 @@ func (p *EventImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting events for export to file")
 
 	events := collection.GetAll(types.EventResourceType)
 	if len(events) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -130,7 +131,7 @@ func (p *EventImportProvider) FormatForExport(
 
 		data, ok := event.Data.(*catalog.Event)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog event")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog event")
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the events
@@ -143,7 +144,7 @@ func (p *EventImportProvider) FormatForExport(
 		importableEvent := &model.ImportableEventV1{}
 		formatted, err := importableEvent.ForExport(event.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting event: %w", err)
+			return nil, nil, fmt.Errorf("formatting event: %w", err)
 		}
 		formattedEvents = append(formattedEvents, formatted)
 	}
@@ -157,7 +158,7 @@ func (p *EventImportProvider) FormatForExport(
 			"events": formattedEvents,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -165,5 +166,5 @@ func (p *EventImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, importEntriesFromWorkspace(workspaceMetadata), nil
 }

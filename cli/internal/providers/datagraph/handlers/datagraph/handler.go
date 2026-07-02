@@ -6,6 +6,7 @@ import (
 
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
@@ -174,8 +175,8 @@ func (h *HandlerImpl) FormatForExport(
 	collection map[string]*model.RemoteDataGraph,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
-	return nil, nil
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	return nil, nil, nil
 }
 
 // CreateDataGraphReference creates a PropertyRef that points to a data graph's remote ID
