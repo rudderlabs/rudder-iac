@@ -349,10 +349,11 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
 		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
 
-		// Cross-source: a URN must not appear in both an import-manifest and an
-		// inline metadata.import block. Applies to the union (both kinds), and
-		// needs both providers' ParseSpec.
-		prules.NewManifestInlineConflictRule(manifestProvider.ParseSpec, provider.ParseSpec, activePatterns),
+		// Cross-source: a (workspace_id, urn) must not appear in both an
+		// import-manifest and an inline metadata.import block with differing
+		// remote_ids. Applies to the union (both kinds); needs the resource
+		// ParseSpec to resolve inline local_id entries.
+		prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
