@@ -274,6 +274,7 @@ func TestValidationEngine_ValidateSyntax(t *testing.T) {
 
 			diag := diagnostics[0]
 			assert.Equal(t, "/path/to/test.yaml", diag.File)
+			assert.Equal(t, "properties", diag.Kind)
 			assert.Greater(t, diag.Position.Line, 0)
 			assert.Greater(t, diag.Position.Column, 0)
 		})
