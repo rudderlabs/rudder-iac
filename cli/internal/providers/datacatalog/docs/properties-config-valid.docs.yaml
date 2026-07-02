@@ -42,7 +42,7 @@ match_behavior:
                     maximum: 120
     invalid:
       - example_id: "prop-cfg-legacy-invalid-format"
-        title: "String property config with invalid format value (legacy)"
+        title: "String property config with invalid format (legacy)"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -67,7 +67,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "prop-cfg-v1-valid-string"
-        title: "Valid v1 string property config"
+        title: "Valid string property config"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -84,7 +84,7 @@ match_behavior:
                     min_length: 5
     invalid:
       - example_id: "prop-cfg-v1-invalid-format"
-        title: "v1 string property config with invalid format value"
+        title: "v1 string property config with invalid format"
         files:
           spec.yaml: |
             version: rudder/v1

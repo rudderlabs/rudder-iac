@@ -50,9 +50,8 @@ match_behavior:
     valid:
       - example_id: "duplicate-urn-distinct-urns"
         title: "Distinct URNs across files"
-        description: >
-          Two specs that each declare a different resource. The URNs do not
-          collide, so the project is valid.
+        description: >-
+          Each spec declares a different resource, so URNs do not collide.
         files:
           a.yaml: |
             version: rudder/v1
@@ -75,9 +74,8 @@ match_behavior:
     invalid:
       - example_id: "duplicate-urn-across-files"
         title: "Same URN declared in two files"
-        description: >
-          Both files declare an event with id "order_completed", which resolves
-          to the same URN. The rule flags every occurrence.
+        description: >-
+          Both files declare the same event ID, which resolves to one URN. The rule flags each occurrence.
         files:
           a.yaml: |
             version: rudder/v1

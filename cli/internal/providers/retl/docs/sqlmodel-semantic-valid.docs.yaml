@@ -9,7 +9,7 @@ match_behavior:
         version: "rudder/v0.1"
     valid:
       - example_id: "sqlmodel-semantic-legacy-valid"
-        title: "Valid legacy SQL model — display_name is unique across all models"
+        title: "Valid legacy SQL model with unique display_name"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -25,7 +25,7 @@ match_behavior:
               sql: SELECT id, amount FROM revenue
     invalid:
       - example_id: "sqlmodel-semantic-legacy-duplicate-display-name"
-        title: "Legacy SQL model with a display_name that duplicates another model in the workspace"
+        title: "Legacy SQL model with duplicate display_name"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -45,12 +45,13 @@ match_behavior:
             severity: "error"
             message_contains: "duplicate display_name 'Revenue Model' within kind 'retl-source-sql-model'"
   # Current spec version (rudder/v1).
+        description: Two SQL models sharing the same display_name collide in the resource graph and fail validation.
   - applies_to:
       - kind: "retl-source-sql-model"
         version: "rudder/v1"
     valid:
       - example_id: "sqlmodel-semantic-v1-valid"
-        title: "Valid v1 SQL model — display_name is unique across all models"
+        title: "Valid SQL model with unique display_name"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -66,7 +67,7 @@ match_behavior:
               sql: SELECT user_id FROM churn_signals
     invalid:
       - example_id: "sqlmodel-semantic-v1-duplicate-display-name"
-        title: "v1 SQL model with a display_name that duplicates another model in the workspace"
+        title: "v1 SQL model with duplicate display_name"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -85,3 +86,4 @@ match_behavior:
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"
+        description: Two SQL models sharing the same display_name collide in the resource graph and fail validation.
