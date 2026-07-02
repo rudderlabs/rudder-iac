@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -385,4 +386,209 @@ func TestClientDestinationsUpdateOmitsEmptyVersion(t *testing.T) {
 	assert.Equal(t, "some-id", destination.ID)
 
 	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinations_ConnectTransformation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-destination-id/transformation", `{
+					"transformationId": "some-transformation-id"
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destinationId": "some-destination-id",
+				"transformationId": "some-transformation-id",
+				"createdAt": "2020-01-01T01:01:01Z",
+				"updatedAt": "2020-01-02T01:01:01Z"
+			}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		result, err := c.Destinations.ConnectTransformation(ctx, "some-destination-id", "some-transformation-id")
+		require.NoError(t, err)
+		assert.Equal(t, &client.DestinationTransformation{
+			DestinationID:    "some-destination-id",
+			TransformationID: "some-transformation-id",
+			CreatedAt:        time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC),
+			UpdatedAt:        time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC),
+		}, result)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-destination-id/transformation", `{
+					"transformationId": "some-transformation-id"
+				}`)
+			},
+			ResponseStatus: 404,
+			ResponseBody:   `{"message": "not found"}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		_, err = c.Destinations.ConnectTransformation(ctx, "some-destination-id", "some-transformation-id")
+		require.Error(t, err)
+
+		var apiErr *client.APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, 404, apiErr.HTTPStatusCode)
+
+		httpClient.AssertNumberOfCalls()
+	})
+}
+
+func TestClientDestinations_DisconnectTransformation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(
+					t,
+					req,
+					"DELETE",
+					"https://api.rudderstack.com/v2/destinations/some-destination-id/transformation",
+					"",
+				)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destinationId": "some-destination-id",
+				"transformationId": "some-transformation-id",
+				"createdAt": "2020-01-01T01:01:01Z",
+				"updatedAt": "2020-01-02T01:01:01Z"
+			}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		result, err := c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
+		require.NoError(t, err)
+		assert.Equal(t, &client.DestinationTransformation{
+			DestinationID:    "some-destination-id",
+			TransformationID: "some-transformation-id",
+			CreatedAt:        time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC),
+			UpdatedAt:        time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC),
+		}, result)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(
+					t,
+					req,
+					"DELETE",
+					"https://api.rudderstack.com/v2/destinations/some-destination-id/transformation",
+					"",
+				)
+			},
+			ResponseStatus: 404,
+			ResponseBody:   `{"message": "not found"}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		_, err = c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
+		require.Error(t, err)
+
+		var apiErr *client.APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, 404, apiErr.HTTPStatusCode)
+
+		httpClient.AssertNumberOfCalls()
+	})
+}
+
+func TestClientDestinations_GetTransformation(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(
+					t,
+					req,
+					"GET",
+					"https://api.rudderstack.com/v2/destinations/some-destination-id/transformation",
+					"",
+				)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destinationId": "some-destination-id",
+				"transformationId": "some-transformation-id",
+				"createdAt": "2020-01-01T01:01:01Z",
+				"updatedAt": "2020-01-02T01:01:01Z"
+			}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		result, err := c.Destinations.GetTransformation(ctx, "some-destination-id")
+		require.NoError(t, err)
+		assert.Equal(t, &client.DestinationTransformation{
+			DestinationID:    "some-destination-id",
+			TransformationID: "some-transformation-id",
+			CreatedAt:        time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC),
+			UpdatedAt:        time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC),
+		}, result)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations/some-destination-id/transformation", "")
+			},
+			ResponseStatus: 404,
+			ResponseBody:   `{"message": "not found"}`,
+		})
+
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		_, err = c.Destinations.GetTransformation(ctx, "some-destination-id")
+		require.Error(t, err)
+
+		var apiErr *client.APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, 404, apiErr.HTTPStatusCode)
+
+		httpClient.AssertNumberOfCalls()
+	})
 }
