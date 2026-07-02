@@ -261,20 +261,12 @@ func (p *CompositeProvider) FormatForExport(
 	return formattable, nil
 }
 
-// LoadImportManifest fans the aggregated manifest out to every sub-provider
-// that implements ImportManifestConsumer. Sub-providers that do not implement
-// the interface are silently skipped — they receive import metadata via their
-// own inline metadata.import path instead. Nil-safe.
-func (p *CompositeProvider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
-	if m == nil {
-		return nil
-	}
+// LoadImportManifest fans the active workspace's manifest out to every
+// sub-provider. Providers with no matching URNs simply store nothing, so the
+// broadcast is a no-op for them.
+func (p *CompositeProvider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
 	for name, sub := range p.Providers {
-		consumer, ok := sub.(ImportManifestConsumer)
-		if !ok {
-			continue
-		}
-		if err := consumer.LoadImportManifest(m); err != nil {
+		if err := sub.LoadImportManifest(m); err != nil {
 			return fmt.Errorf("loading import manifest into provider %s: %w", name, err)
 		}
 	}

@@ -33,13 +33,13 @@ type ProjectProvider interface {
 	provider.TypeProvider
 }
 
-// ImportManifestProvider is a ProjectProvider that also exposes the aggregated,
-// workspace-scoped import metadata for broadcast into the resource provider
-// tree. It sits parallel to the resource providers; the CompositeProvider never
-// sees the import-manifest kind.
+// ImportManifestProvider is a ProjectProvider that also exposes the aggregated
+// import metadata for every loaded manifest, for broadcast into the resource
+// provider tree. It sits parallel to the resource providers; the
+// CompositeProvider never sees the import-manifest kind.
 type ImportManifestProvider interface {
 	ProjectProvider
-	ImportManifest(activeWorkspaceID string) *specs.WorkspacesImportMetadata
+	ImportManifest() []specs.WorkspaceImportMetadata
 }
 
 type Project interface {
@@ -51,7 +51,7 @@ type Project interface {
 
 type project struct {
 	location               string
-	provider               ProjectProvider
+	provider               provider.Provider
 	importManifestProvider ImportManifestProvider
 	loader                 Loader
 	workspaceID            string
@@ -229,17 +229,22 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		}
 	}
 
-	// Broadcast the aggregated, workspace-scoped import-manifest into the
-	// resource provider tree before graph construction, so handlers attach
-	// ImportMetadata from the same maps that inline metadata.import populates.
-	// Inline metadata is loaded during the loadSpec loop above; this runs after,
-	// so the manifest wins on URN overlap (last writer).
-	if manifest := p.importManifestProvider.ImportManifest(p.workspaceID); manifest != nil {
-		if consumer, ok := p.provider.(provider.ImportManifestConsumer); ok {
-			if err := consumer.LoadImportManifest(manifest); err != nil {
-				return fmt.Errorf("broadcasting import manifest: %w", err)
-			}
+	// Broadcast the active workspace's import-manifest into the resource provider
+	// tree before graph construction, so handlers attach ImportMetadata from the
+	// same maps that inline metadata.import populates. Inline metadata is loaded
+	// during the loadSpec loop above; this runs after, so the manifest wins on URN
+	// overlap (last writer).
+	//
+	// Scoping to a single workspace is done here (not in the provider) so a URN
+	// maps to at most one remote ID per handler.
+	for _, ws := range p.importManifestProvider.ImportManifest() {
+		if ws.WorkspaceID != p.workspaceID {
+			continue
 		}
+		if err := p.provider.LoadImportManifest(&ws); err != nil {
+			return fmt.Errorf("broadcasting import manifest: %w", err)
+		}
+		break
 	}
 
 	// Graph is built once here - single source of truth for all resource relationships.

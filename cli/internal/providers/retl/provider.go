@@ -50,16 +50,13 @@ func New(client retlClient.RETLStore) *Provider {
 	return p
 }
 
-// LoadImportManifest fans the aggregated manifest out to every registered
+// LoadImportManifest fans the active workspace's manifest out to every registered
 // handler so URN → remote-ID mappings from a central import-manifest file
 // populate the same import-metadata map that inline metadata.import does.
-// Nil-safe.
-func (p *Provider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
-	if m == nil {
-		return nil
-	}
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	workspaces := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*m}}
 	for resourceType, h := range p.handlers {
-		if err := h.LoadImportMetadata(m); err != nil {
+		if err := h.LoadImportMetadata(workspaces); err != nil {
 			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
 		}
 	}

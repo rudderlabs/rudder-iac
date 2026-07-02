@@ -49,25 +49,19 @@ func (h *captureHandler) FormatForExport(*resources.RemoteResources, namer.Namer
 }
 
 func TestBaseProvider_LoadImportManifest(t *testing.T) {
-	t.Run("nil manifest is a no-op", func(t *testing.T) {
-		h := &captureHandler{resourceType: "x"}
-		p := NewBaseProvider([]Handler{h})
-		require.NoError(t, p.LoadImportManifest(nil))
-		assert.Nil(t, h.got)
-	})
-
-	t.Run("fans out to every handler", func(t *testing.T) {
+	t.Run("fans the active workspace out to every handler", func(t *testing.T) {
 		h1 := &captureHandler{resourceType: "a"}
 		h2 := &captureHandler{resourceType: "b"}
 		p := NewBaseProvider([]Handler{h1, h2})
-		m := &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{{
-				WorkspaceID: "ws-a",
-				Resources:   []specs.ImportIds{{URN: "a:1", RemoteID: "r1"}},
-			}},
+		ws := &specs.WorkspaceImportMetadata{
+			WorkspaceID: "ws-a",
+			Resources:   []specs.ImportIds{{URN: "a:1", RemoteID: "r1"}},
 		}
-		require.NoError(t, p.LoadImportManifest(m))
-		assert.Equal(t, m, h1.got)
-		assert.Equal(t, m, h2.got)
+		require.NoError(t, p.LoadImportManifest(ws))
+
+		// Handlers receive the workspace wrapped in the shared plural type.
+		want := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*ws}}
+		assert.Equal(t, want, h1.got)
+		assert.Equal(t, want, h2.got)
 	})
 }

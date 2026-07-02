@@ -2079,19 +2079,11 @@ func TestDataCatalog_transformReferencesInSpec(t *testing.T) {
 }
 
 func TestDataCatalog_LoadImportManifest(t *testing.T) {
-	t.Run("nil is a no-op", func(t *testing.T) {
-		dc := New()
-		require.NoError(t, dc.LoadImportManifest(nil))
-		assert.Empty(t, dc.ImportMetadata)
-	})
-
 	t.Run("keys ImportMetadata by URN", func(t *testing.T) {
 		dc := New()
-		m := &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{{
-				WorkspaceID: "ws-a",
-				Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
-			}},
+		m := &specs.WorkspaceImportMetadata{
+			WorkspaceID: "ws-a",
+			Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
 		}
 		require.NoError(t, dc.LoadImportManifest(m))
 		assert.Equal(t,
@@ -2102,11 +2094,9 @@ func TestDataCatalog_LoadImportManifest(t *testing.T) {
 
 	t.Run("errors when a manifest entry is missing urn", func(t *testing.T) {
 		dc := New()
-		m := &specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{{
-				WorkspaceID: "ws-a",
-				Resources:   []specs.ImportIds{{RemoteID: "rem-1"}},
-			}},
+		m := &specs.WorkspaceImportMetadata{
+			WorkspaceID: "ws-a",
+			Resources:   []specs.ImportIds{{RemoteID: "rem-1"}},
 		}
 		assert.Error(t, dc.LoadImportManifest(m))
 	})

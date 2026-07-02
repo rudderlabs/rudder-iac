@@ -154,30 +154,16 @@ func TestProvider_ImportManifest(t *testing.T) {
 		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-b"}},
 	}
 
-	t.Run("nil when no entries loaded", func(t *testing.T) {
+	t.Run("empty when no entries loaded", func(t *testing.T) {
 		p := New()
-		assert.Nil(t, p.ImportManifest(""))
-		assert.Nil(t, p.ImportManifest("ws-a"))
+		assert.Empty(t, p.ImportManifest())
 	})
 
-	t.Run("empty workspaceID returns all entries", func(t *testing.T) {
+	t.Run("returns all loaded workspace entries unscoped", func(t *testing.T) {
 		p := &Provider{entries: []specs.WorkspaceImportMetadata{wsA, wsB}}
 		assert.Equal(t,
-			&specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{wsA, wsB}},
-			p.ImportManifest(""),
+			[]specs.WorkspaceImportMetadata{wsA, wsB},
+			p.ImportManifest(),
 		)
-	})
-
-	t.Run("filters to the active workspace", func(t *testing.T) {
-		p := &Provider{entries: []specs.WorkspaceImportMetadata{wsA, wsB}}
-		assert.Equal(t,
-			&specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{wsB}},
-			p.ImportManifest("ws-b"),
-		)
-	})
-
-	t.Run("nil when no workspace matches", func(t *testing.T) {
-		p := &Provider{entries: []specs.WorkspaceImportMetadata{wsA}}
-		assert.Nil(t, p.ImportManifest("ws-zzz"))
 	})
 }

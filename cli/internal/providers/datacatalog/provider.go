@@ -67,10 +67,10 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return p.dc.LoadLegacySpec(path, s)
 }
 
-// LoadImportManifest delegates the manifest to the local catalog so resources
-// whose URNs match a manifest entry get ImportMetadata attached at
-// ResourceGraph() time, mirroring the inline metadata.import path. Nil-safe.
-func (p *Provider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
+// LoadImportManifest delegates the active workspace's manifest to the local
+// catalog so resources whose URNs match a manifest entry get ImportMetadata
+// attached at ResourceGraph() time, mirroring the inline metadata.import path.
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
 	return p.dc.LoadImportManifest(m)
 }
 

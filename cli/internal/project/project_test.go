@@ -51,14 +51,14 @@ func (m *MockLoader) Load(location string) (map[string]*specs.RawSpec, error) {
 }
 
 // mockConsumerProvider embeds MockProvider and implements
-// provider.ImportManifestConsumer, recording the manifest it receives via the
-// read-path broadcast.
+// provider.ImportManifestLoader, recording the workspace manifest it receives via
+// the read-path broadcast.
 type mockConsumerProvider struct {
 	*testutils.MockProvider
-	gotManifest *specs.WorkspacesImportMetadata
+	gotManifest *specs.WorkspaceImportMetadata
 }
 
-func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspacesImportMetadata) error {
+func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImportMetadata) error {
 	m.gotManifest = manifest
 	return nil
 }
@@ -99,11 +99,9 @@ func TestProject_BroadcastsImportManifest(t *testing.T) {
 
 	require.NotNil(t, consumer.gotManifest, "consumer should have received the broadcast manifest")
 	// Scoped to the active workspace ws-a only.
-	assert.Equal(t, &specs.WorkspacesImportMetadata{
-		Workspaces: []specs.WorkspaceImportMetadata{{
-			WorkspaceID: "ws-a",
-			Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
-		}},
+	assert.Equal(t, &specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-a",
+		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
 	}, consumer.gotManifest)
 }
 

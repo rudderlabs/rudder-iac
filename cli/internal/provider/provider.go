@@ -178,15 +178,15 @@ type ConsolidateSyncer interface {
 	ConsolidateSync(ctx context.Context, graph *resources.Graph, state *state.State) error
 }
 
-// ImportManifestConsumer receives the aggregated, workspace-scoped import
-// metadata after all manifest specs have been loaded. It is implemented by
-// resource providers that populate their internal import-metadata state from a
-// central import-manifest file (see docs/import-manifest-hld.md) instead of, or
-// in addition to, inline metadata.import blocks on resource specs.
+// ImportManifestLoader receives a single workspace's import metadata after all
+// manifest specs have been loaded and scoped to the active workspace. It is
+// implemented by resource providers that populate their internal import-metadata
+// state from a central import-manifest file instead of, or in addition to, inline
+// metadata.import blocks on resource specs.
 //
-// Implementations must be nil-safe: LoadImportManifest(nil) returns nil.
-type ImportManifestConsumer interface {
-	LoadImportManifest(m *specs.WorkspacesImportMetadata) error
+// LoadImportManifest delegates to the underlying handlers' LoadImportMetadata.
+type ImportManifestLoader interface {
+	LoadImportManifest(m *specs.WorkspaceImportMetadata) error
 }
 
 // RuleProvider is an optional interface that providers can implement
@@ -246,4 +246,5 @@ type Provider interface {
 	SpecMigrator
 	ConsolidateSyncer
 	RuleProvider
+	ImportManifestLoader
 }

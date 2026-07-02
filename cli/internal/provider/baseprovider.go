@@ -123,15 +123,15 @@ func (p *BaseProvider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return p.LoadSpec(path, s)
 }
 
-// LoadImportManifest fans the aggregated manifest out to every handler so their
-// internal import-metadata maps are populated from a central manifest file,
-// mirroring what inline metadata.import blocks do during LoadSpec. Nil-safe.
-func (p *BaseProvider) LoadImportManifest(m *specs.WorkspacesImportMetadata) error {
-	if m == nil {
-		return nil
-	}
+// LoadImportManifest fans the active workspace's manifest out to every handler so
+// their internal import-metadata maps are populated from a central manifest file,
+// mirroring what inline metadata.import blocks do during LoadSpec.
+func (p *BaseProvider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	// Handlers share LoadImportMetadata with the inline path, which takes the
+	// multi-workspace type; wrap the single scoped workspace to match.
+	workspaces := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*m}}
 	for resourceType, h := range p.handlers {
-		if err := h.LoadImportMetadata(m); err != nil {
+		if err := h.LoadImportMetadata(workspaces); err != nil {
 			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
 		}
 	}
