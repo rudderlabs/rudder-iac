@@ -12,8 +12,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
+	deletecmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/delete"
+	describecmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/describe"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
+	getcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/get"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
+	setexternalid "github.com/rudderlabs/rudder-iac/cli/internal/cmd/setexternalid"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
@@ -63,6 +67,10 @@ var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
 	datagraphCmd    *cobra.Command
+
+	// The kubectl-style resource verbs are gated behind the experimental
+	// `resourceCommands` flag: hidden by default, unhidden in initConfig.
+	resourceVerbCmds []*cobra.Command
 )
 
 func init() {
@@ -86,6 +94,16 @@ func init() {
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
 	rootCmd.AddCommand(importcmd.NewCmdImport())
 	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
+
+	resourceVerbCmds = []*cobra.Command{
+		getcmd.NewCmdGet(),
+		describecmd.NewCmdDescribe(),
+		setexternalid.NewCmdSetExternalID(),
+		deletecmd.NewCmdDelete(),
+	}
+	for _, c := range resourceVerbCmds {
+		rootCmd.AddCommand(c)
+	}
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
@@ -121,6 +139,12 @@ func initConfig() {
 
 	if config.GetConfig().ExperimentalFlags.DataGraph {
 		datagraphCmd.Hidden = false
+	}
+
+	if config.GetConfig().ExperimentalFlags.ResourceCommands {
+		for _, c := range resourceVerbCmds {
+			c.Hidden = false
+		}
 	}
 }
 

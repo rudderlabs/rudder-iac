@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -305,7 +306,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -316,7 +317,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
@@ -337,7 +338,7 @@ func TestProvider(t *testing.T) {
 			"remote123": {
 				ID:         "remote123",
 				ExternalID: "external-123",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote123",
 					ExternalID: "external-123",
 					Name:       "Test Source 1",
@@ -348,7 +349,7 @@ func TestProvider(t *testing.T) {
 			"remote456": {
 				ID:         "remote456",
 				ExternalID: "external-456",
-				Data: sourceClient.EventStreamSource{
+				Data: &sourceClient.EventStreamSource{
 					ID:         "remote456",
 					ExternalID: "external-456",
 					Name:       "Test Source 2",
@@ -535,4 +536,26 @@ type mockResolver struct{}
 
 func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
 	return remoteID, nil
+}
+
+func TestProvider_SetExternalID(t *testing.T) {
+	t.Run("KnownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := source.NewMockSourceClient()
+		p := eventstream.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), source.ResourceType, "src_remote_123", "my-source")
+		require.NoError(t, err)
+		assert.True(t, mockClient.SetExternalIDCalled())
+	})
+
+	t.Run("UnknownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := source.NewMockSourceClient()
+		p := eventstream.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), "not-a-type", "x", "y")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, provider.ErrUnsupportedType)
+	})
 }

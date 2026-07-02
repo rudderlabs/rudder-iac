@@ -1296,7 +1296,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote123",
 			ExternalID: "external-123",
-			Data: sourceClient.EventStreamSource{
+			Data: &sourceClient.EventStreamSource{
 				ID:         "remote123",
 				ExternalID: "external-123",
 				Name:       "Test Source 1",
@@ -1311,7 +1311,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		assert.Equal(t, &resources.RemoteResource{
 			ID:         "remote456",
 			ExternalID: "external-456",
-			Data: sourceClient.EventStreamSource{
+			Data: &sourceClient.EventStreamSource{
 				ID:         "remote456",
 				ExternalID: "external-456",
 				Name:       "Test Source 2",
@@ -1333,7 +1333,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote123": {
 					ID:         "remote123",
 					ExternalID: "external-123",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote123",
 						ExternalID: "external-123",
 						Name:       "Test Source 1",
@@ -1344,7 +1344,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote456": {
 					ID:         "remote456",
 					ExternalID: "external-456",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote456",
 						ExternalID: "",
 						Name:       "Test Source 2",
@@ -1355,7 +1355,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote789": {
 					ID:         "remote789",
 					ExternalID: "external-789",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote789",
 						ExternalID: "external-789",
 						Name:       "Test Source 3",
@@ -1443,7 +1443,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				"remote123": {
 					ID:         "remote123",
 					ExternalID: "external-123",
-					Data: sourceClient.EventStreamSource{
+					Data: &sourceClient.EventStreamSource{
 						ID:         "remote123",
 						ExternalID: "external-123",
 						Name:       "Test Source 1",

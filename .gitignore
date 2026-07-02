@@ -49,3 +49,7 @@ memory-bank
 .idea
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
 cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle
+# create-vhs demo recordings. GIFs are committed so they embed in DEMOS.md;
+# MP4s + generated tapes stay out (regenerate with docs/demos/record-demos.sh).
+docs/demos/**/recording.mp4
+docs/demos/**/tape.tape

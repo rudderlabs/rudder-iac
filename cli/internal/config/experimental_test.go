@@ -79,6 +79,13 @@ func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
 }
 
+func TestIsValidExperimentalFlag_ResourceCommands(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag(ResourceCommandsFlag))
+	assert.Equal(t, "resourceCommands", ResourceCommandsFlag)
+}
+
 func TestGetAvailableExperimentalFlags(t *testing.T) {
 	t.Parallel()
 

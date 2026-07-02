@@ -291,7 +291,7 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 		return nil, fmt.Errorf("getting RETL source: %w", err)
 	}
 
-	err = h.client.SetExternalId(ctx, remoteId, ID)
+	err = h.SetExternalID(ctx, remoteId, ID)
 	if err != nil {
 		return nil, fmt.Errorf("setting external ID for RETL source: %w", err)
 	}
@@ -558,6 +558,10 @@ func toResourceData(source *retlClient.RETLSource) (*resources.ResourceData, err
 		result[UpdatedAtKey] = source.UpdatedAt
 	}
 	return &result, nil
+}
+
+func (h *Handler) SetExternalID(ctx context.Context, remoteID, externalID string) error {
+	return h.client.SetExternalId(ctx, remoteID, externalID)
 }
 
 func toRETLSQLModelConfig(data resources.ResourceData) retlClient.RETLSQLModelConfig {
