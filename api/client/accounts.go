@@ -47,9 +47,9 @@ type accounts struct {
 
 type ListAccountsOption func(*ListAccountsOptions)
 
-func WithHasExternalID(hasExternalID *bool) ListAccountsOption {
+func WithHasExternalID(hasExternalID bool) ListAccountsOption {
 	return func(o *ListAccountsOptions) {
-		o.HasExternalID = hasExternalID
+		o.HasExternalID = &hasExternalID
 	}
 }
 

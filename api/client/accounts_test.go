@@ -109,7 +109,6 @@ func TestClientAccountsList(t *testing.T) {
 
 func TestClientAccountsListWithHasExternalID(t *testing.T) {
 	ctx := context.Background()
-	hasExternalID := true
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -136,7 +135,7 @@ func TestClientAccountsListWithHasExternalID(t *testing.T) {
 	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
 	require.NoError(t, err)
 
-	page, err := c.Accounts.List(ctx, client.WithHasExternalID(&hasExternalID))
+	page, err := c.Accounts.List(ctx, client.WithHasExternalID(true))
 	require.NoError(t, err)
 	require.NotNil(t, page)
 	require.Len(t, page.Accounts, 1)
