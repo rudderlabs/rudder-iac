@@ -28,6 +28,7 @@ func TestClientDestinationsList(t *testing.T) {
 					"id": "id-1",
 					"type": "type-1",
 					"name": "name-1",
+					"externalId": "external-1",
 					"config": {"key":"val-1"}
 				},  {
 					"id": "id-2",
@@ -69,7 +70,7 @@ func TestClientDestinationsList(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, page)
 	assert.Len(t, page.Destinations, 2)
-	assert.Equal(t, client.Destination{ID: "id-1", Type: "type-1", Name: "name-1", Config: []byte(`{"key":"val-1"}`)}, page.Destinations[0])
+	assert.Equal(t, client.Destination{ID: "id-1", Type: "type-1", Name: "name-1", ExternalID: "external-1", Config: []byte(`{"key":"val-1"}`)}, page.Destinations[0])
 	assert.Equal(t, client.Destination{ID: "id-2", Type: "type-2", Name: "name-2", Config: []byte(`{"key":"val-2"}`)}, page.Destinations[1])
 	assert.Equal(t, 3, page.Paging.Total)
 	assert.Equal(t, "/destinations?page=2", page.Paging.Next)
@@ -103,6 +104,7 @@ func TestClientDestinationsGet(t *testing.T) {
 					"id": "some-id",
 					"name": "some-name",
 					"type": "some-type",
+					"externalId": "some-external-id",
 					"config": {"key1": "val1"},
 					"version": 2,
 					"versionInfo": {
@@ -127,10 +129,11 @@ func TestClientDestinationsGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, destination)
 	assert.Equal(t, &client.Destination{
-		ID:      "some-id",
-		Name:    "some-name",
-		Type:    "some-type",
-		Version: 2,
+		ID:         "some-id",
+		Name:       "some-name",
+		Type:       "some-type",
+		ExternalID: "some-external-id",
+		Version:    2,
 		VersionInfo: &client.VersionInfo{
 			Status:           "deprecated",
 			Action:           "upgrade",
@@ -193,6 +196,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 					"name": "some-name",
 					"type": "some-type",
 					"version": 2,
+					"externalId": "some-external-id",
 					"enabled": true,
 					"config": { "key1": "val1" }
 				}`)
@@ -203,6 +207,7 @@ func TestClientDestinationsCreate(t *testing.T) {
 					"id": "some-id",
 					"name": "some-name",
 					"type": "some-type",
+					"externalId": "some-external-id",
 					"config": {
 						"key1": "val1"
 					},
@@ -219,21 +224,28 @@ func TestClientDestinationsCreate(t *testing.T) {
 	require.NoError(t, err)
 
 	destination, err := c.Destinations.Create(ctx, &client.Destination{
-		Name:      "some-name",
-		Type:      "some-type",
-		Version:   2,
-		IsEnabled: true,
+		Name:       "some-name",
+		Type:       "some-type",
+		ExternalID: "some-external-id",
+		Version:    2,
+		IsEnabled:  true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
 		}`)),
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, destination)
-	assert.Equal(t, "some-id", destination.ID)
-	assert.Equal(t, "some-name", destination.Name)
-	assert.Equal(t, "some-type", destination.Type)
-	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *destination.CreatedAt)
-	assert.Equal(t, time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC), *destination.UpdatedAt)
+	assert.Equal(t, &client.Destination{
+		ID:         "some-id",
+		Name:       "some-name",
+		Type:       "some-type",
+		ExternalID: "some-external-id",
+		Config: []byte(`{
+						"key1": "val1"
+					}`),
+		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
+		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
+	}, destination)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -320,11 +332,12 @@ func TestClientDestinationsUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	destination, err := c.Destinations.Update(ctx, &client.Destination{
-		ID:        "some-id",
-		Name:      "some-name",
-		Type:      "some-type",
-		Version:   2,
-		IsEnabled: true,
+		ID:         "some-id",
+		Name:       "some-name",
+		Type:       "some-type",
+		ExternalID: "some-external-id",
+		Version:    2,
+		IsEnabled:  true,
 		Config: json.RawMessage([]byte(`{
 			"key1": "val1"
 		}`)),
@@ -383,6 +396,58 @@ func TestClientDestinationsUpdateOmitsEmptyVersion(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "some-id", destination.ID)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinationsSetExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id/external-id", `{
+					"externalId": "some-external-id"
+				}`)
+			},
+			ResponseStatus: 200,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Destinations.SetExternalID(ctx, "some-id", "some-external-id")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinationsSetExternalIDAPIError(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id/external-id", `{
+					"externalId": "some-external-id"
+				}`)
+			},
+			ResponseStatus: 500,
+			ResponseBody:   `{"error":"Internal Server Error"}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Destinations.SetExternalID(ctx, "some-id", "some-external-id")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "setting external ID for destination")
 
 	httpClient.AssertNumberOfCalls()
 }
