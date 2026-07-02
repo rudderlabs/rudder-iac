@@ -9,19 +9,20 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
+	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
+	graphcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/graph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
-	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/workspace"
@@ -91,6 +92,7 @@ func init() {
 	rootCmd.AddCommand(validate.NewCmdValidate())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(migrate.NewCmdMigrate())
+	rootCmd.AddCommand(graphcmd.NewCmdGraph())
 
 	debugCmd = d.NewCmdDebug()
 	experimentalCmd = experimental.NewCmdExperimental()
