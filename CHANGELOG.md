@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.19.0](https://github.com/rudderlabs/rudder-iac/compare/v0.18.0...v0.19.0) (2026-07-02)
+
+
+### Features
+
+* add destination version fields to client ([#625](https://github.com/rudderlabs/rudder-iac/issues/625)) ([9da6a97](https://github.com/rudderlabs/rudder-iac/commit/9da6a973d89ceb353b343805d285e3016eb55be2))
+* add import-manifest semantic validation rules ([#630](https://github.com/rudderlabs/rudder-iac/issues/630)) ([8c18575](https://github.com/rudderlabs/rudder-iac/commit/8c18575f835799b2793093b86edeb7af5c5cf7c6))
+* add import-manifest syntactic validation rules ([#627](https://github.com/rudderlabs/rudder-iac/issues/627)) ([6843c7d](https://github.com/rudderlabs/rudder-iac/commit/6843c7dbfff39f199f27ad3a55d044ba0ba5d473))
+* add manifest-inline conflict rule ([#629](https://github.com/rudderlabs/rudder-iac/issues/629)) ([4275ecf](https://github.com/rudderlabs/rudder-iac/commit/4275ecf51bb197d3256f10cd51a9e068f2bbea86))
+* **cli:** add destination definition registry framework ([#635](https://github.com/rudderlabs/rudder-iac/issues/635)) ([2df8551](https://github.com/rudderlabs/rudder-iac/commit/2df8551697684b9b8a143a7903dd8922f9335ab9))
+
+
+### Miscellaneous
+
+* make the claude.md file LLM agnostic by symlinking it with agent.md ([#584](https://github.com/rudderlabs/rudder-iac/issues/584)) ([d5bff01](https://github.com/rudderlabs/rudder-iac/commit/d5bff0122be0f500f4bc20ad0883b1cc0b1be01f))
+* rename ProjectRule to MultipleResourceRule and filter specs per rule ([#621](https://github.com/rudderlabs/rudder-iac/issues/621)) ([a885297](https://github.com/rudderlabs/rudder-iac/commit/a88529719d675779d79d48e10be71a7d168d4f7f))
+
 ## [0.18.0](https://github.com/rudderlabs/rudder-iac/compare/v0.17.0...v0.18.0) (2026-06-19)
 
 
