@@ -9,23 +9,20 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-var tagNameFunc = func(fld reflect.StructField) string {
-
+// defaultTagNameFunc resolves field names using yaml then json tags (json takes priority).
+var defaultTagNameFunc = func(fld reflect.StructField) string {
 	var (
 		ymlTag, ymlOK   = fld.Tag.Lookup("yaml")
 		jsonTag, jsonOK = fld.Tag.Lookup("json")
 	)
 
-	// By default, the field name to be used
-	// is the lowercase of the struct's FieldName
 	name := strings.ToLower(fld.Name)
 
 	if ymlOK {
 		name = strings.SplitN(ymlTag, ",", 2)[0]
 	}
 
-	// If both JSON and YAML tags are present,
-	// then JSON tag overrides the YAML tag
+	// json overrides yaml
 	if jsonOK {
 		name = strings.SplitN(jsonTag, ",", 2)[0]
 	}
@@ -56,36 +53,52 @@ func RegisterDefaultValidator(fn CustomValidateFunc) {
 // validation results with JSON Pointer references. The basePath is prepended to all
 // references to support nested struct validation (e.g., basePath="/metadata" for
 // validating metadata produces references like "/metadata/name").
+// Field names in errors are resolved using yaml/json tags (json takes priority).
 func ValidateStruct(data any, basePath string, funcs ...CustomValidateFunc) (validator.ValidationErrors, error) {
+	return validateStruct(data, defaultTagNameFunc, funcs...)
+}
 
+// ValidateStructWithTagPriority validates like ValidateStruct but resolves field names
+// using the provided tag priority list instead of the default yaml/json order.
+// Earlier tags in the list take priority. Falls back to lowercase field name if no tag found.
+// Example: tags=["mapstructure"] makes err.Field() and err.Namespace() use mapstructure tag names.
+func ValidateStructWithTagPriority(data any, tags []string, funcs ...CustomValidateFunc) (validator.ValidationErrors, error) {
+	return validateStruct(data, buildTagNameFunc(tags), funcs...)
+}
+
+func buildTagNameFunc(tags []string) func(reflect.StructField) string {
+	return func(fld reflect.StructField) string {
+		for _, tag := range tags {
+			if val, ok := fld.Tag.Lookup(tag); ok {
+				name, _, _ := strings.Cut(val, ",")
+				if name != "" && name != "-" {
+					return name
+				}
+			}
+		}
+		return strings.ToLower(fld.Name)
+	}
+}
+
+func validateStruct(data any, tagFn func(reflect.StructField) string, funcs ...CustomValidateFunc) (validator.ValidationErrors, error) {
 	v := validator.New()
-	v.RegisterTagNameFunc(tagNameFunc)
+	v.RegisterTagNameFunc(tagFn)
 
-	// Register default validators first
 	for _, fn := range defaultValidators {
-		err := v.RegisterValidation(fn.Tag, fn.Func)
-		if err != nil {
+		if err := v.RegisterValidation(fn.Tag, fn.Func); err != nil {
 			return nil, fmt.Errorf("registering default validation rule: %w", err)
 		}
 	}
 
-	// Then register user-provided validators (can override defaults)
 	for _, fn := range funcs {
-		err := v.RegisterValidation(fn.Tag, fn.Func)
-		if err == nil {
-			continue
+		if err := v.RegisterValidation(fn.Tag, fn.Func); err != nil {
+			return nil, fmt.Errorf("registering validation rule: %w", err)
 		}
-		return nil, fmt.Errorf("registering validation rule: %w", err)
 	}
 
 	if err := v.Struct(data); err != nil {
-		// This check is needed because we can pass in a nil pointer to this function
-		// so the validator returns an invalid validation error.
 		var invalidValidationError *validator.InvalidValidationError
-		if errors.As(
-			err,
-			&invalidValidationError,
-		) {
+		if errors.As(err, &invalidValidationError) {
 			return nil, fmt.Errorf("invalid validation error: %w", err)
 		}
 
