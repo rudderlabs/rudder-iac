@@ -125,27 +125,33 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 	if err != nil {
 		return err
 	}
+	return h.LoadImportMetadata(metadata.Import)
+}
 
-	if metadata.Import != nil {
-		workspaces := metadata.Import.Workspaces
-		for _, workspaceMetadata := range workspaces {
-			workspaceId := workspaceMetadata.WorkspaceID
-			for _, resourceMetadata := range workspaceMetadata.Resources {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resourceMetadata.URN != "" {
-					urn = resourceMetadata.URN
-				} else {
-					urn = resources.URN(resourceMetadata.LocalID, ResourceType)
-				}
-				importMetadata[urn] = &ImportResourceInfo{
-					WorkspaceId: workspaceId,
-					RemoteId:    resourceMetadata.RemoteID,
-				}
+// LoadImportMetadata populates the package-level importMetadata map from an
+// aggregated WorkspacesImportMetadata payload. Shared by inline metadata.import
+// processing (loadImportMetadata) and central import-manifest broadcast
+// (retl.Provider.LoadImportManifest). Nil-safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, workspaceMetadata := range m.Workspaces {
+		workspaceId := workspaceMetadata.WorkspaceID
+		for _, resourceMetadata := range workspaceMetadata.Resources {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resourceMetadata.URN != "" {
+				urn = resourceMetadata.URN
+			} else {
+				urn = resources.URN(resourceMetadata.LocalID, ResourceType)
+			}
+			importMetadata[urn] = &ImportResourceInfo{
+				WorkspaceId: workspaceId,
+				RemoteId:    resourceMetadata.RemoteID,
 			}
 		}
 	}
-
 	return nil
 }
 
