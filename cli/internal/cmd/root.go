@@ -17,6 +17,7 @@ import (
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
+	graphcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/graph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
@@ -91,6 +92,7 @@ func init() {
 	rootCmd.AddCommand(validate.NewCmdValidate())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(migrate.NewCmdMigrate())
+	rootCmd.AddCommand(graphcmd.NewCmdGraph())
 
 	debugCmd = d.NewCmdDebug()
 	experimentalCmd = experimental.NewCmdExperimental()
