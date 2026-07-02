@@ -24,6 +24,8 @@ type ExperimentalConfig struct {
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
 	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
+	// LocalTyper enables `typer generate --local`, generating typed code from local specs without applying to remote
+	LocalTyper bool `mapstructure:"localTyper"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
