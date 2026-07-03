@@ -29,7 +29,8 @@ func TestClientDestinationsList(t *testing.T) {
 					"id": "id-1",
 					"type": "type-1",
 					"name": "name-1",
-					"config": {"key":"val-1"}
+					"config": {"key":"val-1"},
+					"transformation": {"id":"trans-1"}
 				},  {
 					"id": "id-2",
 					"type": "type-2",
@@ -70,8 +71,15 @@ func TestClientDestinationsList(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, page)
 	assert.Len(t, page.Destinations, 2)
-	assert.Equal(t, client.Destination{ID: "id-1", Type: "type-1", Name: "name-1", Config: []byte(`{"key":"val-1"}`)}, page.Destinations[0])
+	assert.Equal(t, client.Destination{
+		ID:             "id-1",
+		Type:           "type-1",
+		Name:           "name-1",
+		Config:         []byte(`{"key":"val-1"}`),
+		Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
+	}, page.Destinations[0])
 	assert.Equal(t, client.Destination{ID: "id-2", Type: "type-2", Name: "name-2", Config: []byte(`{"key":"val-2"}`)}, page.Destinations[1])
+	assert.Nil(t, page.Destinations[1].Transformation)
 	assert.Equal(t, 3, page.Paging.Total)
 	assert.Equal(t, "/destinations?page=2", page.Paging.Next)
 
