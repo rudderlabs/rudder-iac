@@ -14,6 +14,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
+	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -39,6 +41,7 @@ type Providers struct {
 	RETL            *retl.Provider
 	EventStream     *esProvider.Provider
 	Transformations *transformations.Provider
+	Destination     *destProvider.Provider
 	Workspace       *workspace.Provider
 	DataGraph       *dgProvider.Provider
 }
@@ -174,6 +177,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		"retl":            p.RETL,
 		"eventstream":     p.EventStream,
 		"transformations": p.Transformations,
+		"destination":     p.Destination,
 	}
 
 	if cfg.ExperimentalFlags.DataGraph {
@@ -212,6 +216,8 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	trp := transformations.NewProvider(c)
+	destRegistry := definitions.NewRegistry()
+	dsp := destProvider.NewProvider(c, destRegistry)
 	wsp := workspace.New(c)
 
 	providers := &Providers{
@@ -219,6 +225,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		RETL:            retlp,
 		EventStream:     esp,
 		Transformations: trp,
+		Destination:     dsp,
 		Workspace:       wsp,
 	}
 

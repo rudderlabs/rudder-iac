@@ -47,6 +47,8 @@ match_behavior:
         version: "rudder/v1"
       - kind: "transformation-library"
         version: "rudder/v1"
+      - kind: "destination"
+        version: "rudder/v1"
     valid:
       - example_id: "metadata-name-only"
         title: "Metadata with only the required name"

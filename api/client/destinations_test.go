@@ -600,6 +600,44 @@ func TestClientDestinations_GetTransformation(t *testing.T) {
 		httpClient.AssertNumberOfCalls()
 	})
 }
+
+func TestClientDestinationsGetWithExternalID(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations/some-id", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"destination": {
+				"id": "some-id",
+				"externalId": "ga4-production",
+				"name": "some-name",
+				"type": "GA4",
+				"config": {"apiSecret": "secret"}
+			}
+		}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	destination, err := c.Destinations.Get(ctx, "some-id")
+	require.NoError(t, err)
+	assert.Equal(t, &client.Destination{
+		ID:         "some-id",
+		ExternalID: "ga4-production",
+		Name:       "some-name",
+		Type:       "GA4",
+		Config:     []byte(`{"apiSecret": "secret"}`),
+	}, destination)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestClientDestinations_GetAll(t *testing.T) {
 	ctx := context.Background()
 
