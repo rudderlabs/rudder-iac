@@ -426,6 +426,26 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	return nil
 }
 
+// LoadImportManifest merges the active workspace's import metadata into the
+// catalog. Manifest URNs are already fully qualified (resource-type:id), so
+// unlike the inline addImportMetadata path no kind translation is needed. Used by
+// the datacatalog Provider to receive a central import-manifest broadcast.
+//
+// The manifest is already scoped to a single workspace, so each URN maps to
+// exactly one remote ID.
+func (dc *DataCatalog) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	for _, resource := range m.Resources {
+		if resource.URN == "" {
+			return fmt.Errorf("import-manifest entry in workspace %q is missing urn", m.WorkspaceID)
+		}
+		dc.ImportMetadata[resource.URN] = &WorkspaceRemoteIDMapping{
+			WorkspaceID: m.WorkspaceID,
+			RemoteID:    resource.RemoteID,
+		}
+	}
+	return nil
+}
+
 // extractEntities parses the entity from file bytes
 // and updates the datacatalog struct with it.
 func extractEntities(s *specs.Spec, dc *DataCatalog) error {
