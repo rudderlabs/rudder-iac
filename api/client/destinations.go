@@ -15,6 +15,7 @@ type DestinationTransformationLink struct {
 
 type Destination struct {
 	ID             string                         `json:"id,omitempty"`
+	ExternalID     string                         `json:"externalId,omitempty"`
 	Name           string                         `json:"name"`
 	Type           string                         `json:"type"`
 	Version        int                            `json:"version,omitempty"`

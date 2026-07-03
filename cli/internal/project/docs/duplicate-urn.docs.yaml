@@ -49,6 +49,8 @@ match_behavior:
         version: "rudder/v1"
       - kind: "transformation-library"
         version: "rudder/v1"
+      - kind: "destination"
+        version: "rudder/v1"
     valid:
       - example_id: "duplicate-urn-distinct-urns"
         title: "Distinct URNs across files"
