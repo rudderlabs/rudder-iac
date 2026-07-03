@@ -1,0 +1,66 @@
+# Builds prebuilt rudder-cli binaries on every push to the experimental
+# resource-verbs branch and stores them as workflow artifacts, so testers can
+# `gh run download` them without Docker or a Go toolchain. Artifacts are gated
+# behind GitHub auth (not on the public Releases page) and auto-expire.
+# See docs/demos/TESTING.md for the download flow.
+name: build test binaries
+
+on:
+  push:
+    branches:
+      - feat/k8s-style-imperative-commands
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: "build ${{ matrix.goos }}/${{ matrix.goarch }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Full history + tags so `git describe` stamps the same version the
+          # local `make build` produces. We don't push, so drop the credential.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          # Publishes a runtime artifact, so a poisoned build cache could be
+          # baked in. Matches release.yml / gen-rule-docs.yml (zizmor).
+          cache: false
+
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          VERSION=$(git describe --tags --always)
+          go build -ldflags "-s -w -X 'main.version=${VERSION}'" \
+            -o "rudder-cli-${GOOS}-${GOARCH}" ./cli/cmd/rudder-cli
+
+      - name: upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rudder-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: rudder-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          if-no-files-found: error
+          retention-days: 90

@@ -15,24 +15,31 @@ adopt → guardrails).
 
 ### Option A — download a prebuilt binary (no Docker, no Go toolchain)
 
-Prebuilt binaries for macOS and Linux live on the `demo/k8s-verbs-cli-binaries`
-branch. This one-liner auto-detects your OS/arch, downloads, and makes it
-runnable:
+The [`build test binaries`](../../.github/workflows/build-test-binaries.yml)
+workflow rebuilds macOS/Linux binaries on every push to the branch and uploads
+them as **workflow artifacts** — gated behind GitHub sign-in (not on a public
+Releases page). Grab them with the [`gh` CLI](https://cli.github.com/) after
+`gh auth login`.
+
+This one-liner finds the latest successful build and pulls the artifact for your
+OS/arch:
 
 ```bash
-BASE=https://raw.githubusercontent.com/rudderlabs/rudder-iac/demo/k8s-verbs-cli-binaries
+REPO=rudderlabs/rudder-iac
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')                              # darwin | linux
 ARCH=$(uname -m); [ "$ARCH" = x86_64 ] && ARCH=amd64; [ "$ARCH" = aarch64 ] && ARCH=arm64
-curl -fsSL "$BASE/rudder-cli-$OS-$ARCH" -o rudder-cli
-chmod +x rudder-cli
+RID=$(gh run list -R "$REPO" -w "build test binaries" -s success -L1 \
+        --json databaseId -q '.[0].databaseId')
+gh run download -R "$REPO" "$RID" -n "rudder-cli-$OS-$ARCH"
+mv "rudder-cli-$OS-$ARCH" rudder-cli && chmod +x rudder-cli
 xattr -d com.apple.quarantine rudder-cli 2>/dev/null || true            # macOS: clear Gatekeeper
 ./rudder-cli --version
 ```
 
-Or grab a specific target directly:
+Artifact names, one per target:
 
-| Platform | File |
-|----------|------|
+| Platform | Artifact |
+|----------|----------|
 | macOS Apple Silicon | `rudder-cli-darwin-arm64` |
 | macOS Intel | `rudder-cli-darwin-amd64` |
 | Linux x86_64 | `rudder-cli-linux-amd64` |
@@ -146,5 +153,5 @@ rudder-cli delete event-stream-source my-source    # prompts unless --confirm
 
 Drop comments on **[PR #633](https://github.com/rudderlabs/rudder-iac/pull/633)** —
 rough edges, missing types, naming, ergonomics. Both the `pr-633` image and the
-`demo/k8s-verbs-cli-binaries` binaries are rebuilt on every push to the branch —
-`docker pull` or re-run the download one-liner to get the latest.
+workflow-artifact binaries are rebuilt on every push to the branch — `docker
+pull` or re-run the download one-liner to get the latest.
