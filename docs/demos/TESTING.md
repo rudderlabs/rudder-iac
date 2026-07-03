@@ -28,8 +28,10 @@ OS/arch:
 REPO=rudderlabs/rudder-iac
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')                              # darwin | linux
 ARCH=$(uname -m); [ "$ARCH" = x86_64 ] && ARCH=amd64; [ "$ARCH" = aarch64 ] && ARCH=arm64
-RID=$(gh run list -R "$REPO" -w "build test binaries" -s success -L1 \
-        --json databaseId -q '.[0].databaseId')
+RID=$(gh run list -R "$REPO" -w "build test binaries" \
+        -b feat/k8s-style-imperative-commands -L10 \
+        --json databaseId,conclusion \
+        -q 'map(select(.conclusion=="success"))[0].databaseId')
 gh run download -R "$REPO" "$RID" -n "rudder-cli-$OS-$ARCH"
 mv "rudder-cli-$OS-$ARCH" rudder-cli && chmod +x rudder-cli
 xattr -d com.apple.quarantine rudder-cli 2>/dev/null || true            # macOS: clear Gatekeeper
