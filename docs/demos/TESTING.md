@@ -17,12 +17,16 @@ adopt → guardrails).
 
 The [`build test binaries`](../../.github/workflows/build-test-binaries.yml)
 workflow rebuilds macOS/Linux binaries on every push to the branch and uploads
-them as **workflow artifacts** — gated behind GitHub sign-in (not on a public
-Releases page). Grab them with the [`gh` CLI](https://cli.github.com/) after
-`gh auth login`.
+them as **[workflow artifacts](https://github.com/rudderlabs/rudder-iac/actions/workflows/build-test-binaries.yml?query=branch%3Afeat%2Fk8s-style-imperative-commands)**
+— gated behind GitHub sign-in (not on a public Releases page).
 
-This one-liner finds the latest successful build and pulls the artifact for your
-OS/arch:
+**Browser:** open the [latest run](https://github.com/rudderlabs/rudder-iac/actions/workflows/build-test-binaries.yml?query=branch%3Afeat%2Fk8s-style-imperative-commands)
+and download the artifact for your platform from the **Artifacts** section at the
+bottom of the run page.
+
+**CLI:** grab it with the [`gh` CLI](https://cli.github.com/) after `gh auth
+login`. This one-liner finds the latest successful build and pulls the artifact
+for your OS/arch:
 
 ```bash
 REPO=rudderlabs/rudder-iac
