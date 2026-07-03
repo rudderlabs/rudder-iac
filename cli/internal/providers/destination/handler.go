@@ -179,9 +179,7 @@ func (h *HandlerImpl) MapRemoteToState(
 	urnResolver handler.URNResolver,
 ) (*DestinationResource, *DestinationState, error) {
 	if remote.ExternalID == "" {
-		// Should not happen for managed resources — BaseHandler.LoadResourcesFromRemote
-		// filters these out — but guard anyway.
-		return nil, nil, nil
+		return nil, nil, fmt.Errorf("managed destination %s has empty external ID", remote.ID)
 	}
 
 	if !h.registry.IsSupported(remote.Type) {
@@ -189,16 +187,6 @@ func (h *HandlerImpl) MapRemoteToState(
 	}
 
 	version := int64(remote.Version)
-	if version == 0 {
-		// API responses for legacy destinations may omit version; fall back to the
-		// latest registered version so APIToLocal can resolve the converter set.
-		latest, err := h.latestDefinitionVersion(remote.Type)
-		if err != nil {
-			return nil, nil, fmt.Errorf("resolving definition version for %s: %w", remote.Type, err)
-		}
-		version = latest
-	}
-
 	localConfig, err := h.apiConfigToLocal(remote.Type, version, remote.Config)
 	if err != nil {
 		return nil, nil, err

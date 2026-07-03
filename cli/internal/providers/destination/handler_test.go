@@ -591,6 +591,7 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		ExternalID:     "ga4-production",
 		Name:           "Production GA4",
 		Type:           "GA4",
+		Version:        1,
 		IsEnabled:      true,
 		Config:         []byte(`{"apiSecret":"secret-value","measurementId":"G-123"}`),
 		Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
@@ -630,6 +631,7 @@ func TestHandlerImpl_MapRemoteToStateNoTransformation(t *testing.T) {
 		ExternalID: "webhook-1",
 		Name:       "Hook",
 		Type:       "WEBHOOK",
+		Version:    1,
 		IsEnabled:  true,
 		Config:     []byte(`{"webhookUrl":"https://h"}`),
 	}}
@@ -652,6 +654,7 @@ func TestHandlerImpl_MapRemoteToStateTransformationNotCLIManaged(t *testing.T) {
 		ExternalID:     "ga4-2",
 		Name:           "GA4",
 		Type:           "GA4",
+		Version:        1,
 		Config:         []byte(`{"apiSecret":"s"}`),
 		Transformation: &client.DestinationTransformationLink{ID: "ui-trans"},
 	}}
@@ -682,7 +685,7 @@ func TestHandlerImpl_MapRemoteToStateUnregisteredTypeErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "unregistered type")
 }
 
-func TestHandlerImpl_MapRemoteToStateEmptyExternalIDSkips(t *testing.T) {
+func TestHandlerImpl_MapRemoteToStateEmptyExternalIDErrors(t *testing.T) {
 	t.Parallel()
 
 	registry := testRegistry(t)
@@ -696,7 +699,8 @@ func TestHandlerImpl_MapRemoteToStateEmptyExternalIDSkips(t *testing.T) {
 	}}
 
 	resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{})
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty external ID")
 	assert.Nil(t, resource)
 	assert.Nil(t, state)
 }

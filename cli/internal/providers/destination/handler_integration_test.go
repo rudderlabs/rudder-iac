@@ -93,6 +93,7 @@ func TestHandlerImpl_GA4RoundTrip(t *testing.T) {
 		ExternalID: "ga4-production",
 		Name:       "Production GA4",
 		Type:       "GA4",
+		Version:    1,
 		IsEnabled:  true,
 		Config:     []byte(apiConfigJSON),
 	}}
@@ -146,6 +147,7 @@ func TestHandlerImpl_GA4RoundTripWithTransformationLink(t *testing.T) {
 		ExternalID:     "ga4",
 		Name:           "GA4",
 		Type:           "GA4",
+		Version:        1,
 		Config:         []byte(`{"apiSecret":"s"}`),
 		Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
 	}}
