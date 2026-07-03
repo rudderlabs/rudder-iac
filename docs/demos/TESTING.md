@@ -13,7 +13,36 @@ adopt → guardrails).
 
 ## 1. Get the build
 
-### Option A — Docker image from the PR (no Go toolchain needed)
+### Option A — download a prebuilt binary (no Docker, no Go toolchain)
+
+Prebuilt binaries for macOS and Linux live on the `demo/k8s-verbs-cli-binaries`
+branch. This one-liner auto-detects your OS/arch, downloads, and makes it
+runnable:
+
+```bash
+BASE=https://raw.githubusercontent.com/rudderlabs/rudder-iac/demo/k8s-verbs-cli-binaries
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')                              # darwin | linux
+ARCH=$(uname -m); [ "$ARCH" = x86_64 ] && ARCH=amd64; [ "$ARCH" = aarch64 ] && ARCH=arm64
+curl -fsSL "$BASE/rudder-cli-$OS-$ARCH" -o rudder-cli
+chmod +x rudder-cli
+xattr -d com.apple.quarantine rudder-cli 2>/dev/null || true            # macOS: clear Gatekeeper
+./rudder-cli --version
+```
+
+Or grab a specific target directly:
+
+| Platform | File |
+|----------|------|
+| macOS Apple Silicon | `rudder-cli-darwin-arm64` |
+| macOS Intel | `rudder-cli-darwin-amd64` |
+| Linux x86_64 | `rudder-cli-linux-amd64` |
+| Linux ARM64 | `rudder-cli-linux-arm64` |
+
+Put it on your `PATH` (`sudo mv rudder-cli /usr/local/bin/`) to run `rudder-cli`
+instead of `./rudder-cli` below. The binaries are unsigned — on macOS the
+`xattr` line above is what lets Gatekeeper run them.
+
+### Option B — Docker image from the PR
 
 ```bash
 docker pull rudderlabs/rudder-cli:pr-633
@@ -45,7 +74,7 @@ rcli apply -f /work/sources.yaml --dry-run
 
 (The `-v "$PWD":/work -w /work` mount lets `apply -f`/`-l` see your local specs.)
 
-### Option B — build from source
+### Option C — build from source
 
 ```bash
 git fetch origin && git checkout feat/k8s-style-imperative-commands
@@ -116,5 +145,6 @@ rudder-cli delete event-stream-source my-source    # prompts unless --confirm
 ## 6. Feedback
 
 Drop comments on **[PR #633](https://github.com/rudderlabs/rudder-iac/pull/633)** —
-rough edges, missing types, naming, ergonomics. The image tag `pr-633` is
-rebuilt on every push to the branch, so `docker pull` again to get the latest.
+rough edges, missing types, naming, ergonomics. Both the `pr-633` image and the
+`demo/k8s-verbs-cli-binaries` binaries are rebuilt on every push to the branch —
+`docker pull` or re-run the download one-liner to get the latest.
