@@ -79,3 +79,9 @@
 - The shared API client owns destination DTO shape and CRUD transport in `api/client/destinations.go`, so public API destination contract fields should be modeled there first.
 - Destination versioning is represented on the public client DTO as `Destination.Version` and `Destination.VersionInfo`, allowing Create, Update, and Get paths to share one contract type.
 - Optional destination version metadata flows through the existing shared service helper and response unmarshal path without separate service-method changes.
+
+## RUD-2899 — DataGraph General Availability Wiring
+<!-- ticket:RUD-2899 -->
+- DataGraph is now a default project/provider capability rather than an experimental feature: dependency assembly should initialize `providers.DataGraph` and include `"datagraph"` in the composite provider map unconditionally alongside DataCatalog, RETL, EventStream, and Transformations.
+- The `data-graphs` command is intended to be visible in the root Cobra command tree by default; command visibility should not depend on `ExperimentalFlags.DataGraph`.
+- DataGraph GA means project-level validation and apply flows can encounter `kind: data-graph` / `version: rudder/v1` specs without opt-in, so shared project gatekeeper rule surfaces need to account for that match pattern.

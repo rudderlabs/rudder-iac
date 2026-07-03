@@ -167,17 +167,12 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cfg := config.GetConfig()
-
 	providerMap := map[string]provider.Provider{
 		"datacatalog":     p.DataCatalog,
 		"retl":            p.RETL,
 		"eventstream":     p.EventStream,
 		"transformations": p.Transformations,
-	}
-
-	if cfg.ExperimentalFlags.DataGraph {
-		providerMap["datagraph"] = p.DataGraph
+		"datagraph":       p.DataGraph,
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)
@@ -213,6 +208,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
+	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
 	providers := &Providers{
 		DataCatalog:     dcp,
@@ -220,12 +216,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		EventStream:     esp,
 		Transformations: trp,
 		Workspace:       wsp,
-	}
-
-	// Initialize data graph provider if experimental flag is enabled
-	if cfg.ExperimentalFlags.DataGraph {
-		dgStore := dgClient.NewRudderDataGraphClient(c)
-		providers.DataGraph = dgProvider.NewProvider(dgStore, c.Accounts)
+		DataGraph:       dgp,
 	}
 
 	return providers, nil

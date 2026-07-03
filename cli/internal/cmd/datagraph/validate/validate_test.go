@@ -7,6 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCmdValidatePreRunValidatesModeBeforeDependencies(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdValidate()
+
+	err := cmd.PreRunE(cmd, []string{})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must specify either")
+	assert.NotContains(t, err.Error(), "experimental flag")
+}
+
 func TestValidateFlags(t *testing.T) {
 	t.Parallel()
 

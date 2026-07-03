@@ -59,11 +59,6 @@ func NewCmdValidate() *cobra.Command {
 			$ rudder-cli data-graphs validate --all --json
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			cfg := config.GetConfig()
-			if !cfg.ExperimentalFlags.DataGraph {
-				return fmt.Errorf("data-graphs commands require the experimental flag 'dataGraph' to be enabled in your configuration")
-			}
-
 			if err := validateFlags(args, all, modified); err != nil {
 				return err
 			}
@@ -95,7 +90,7 @@ func NewCmdValidate() *cobra.Command {
 
 			ctx := context.Background()
 
-				var workspace *client.Workspace
+			var workspace *client.Workspace
 			workspace, err = deps.Client().Workspaces.GetByAuthToken(ctx)
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
