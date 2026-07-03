@@ -326,14 +326,6 @@ func (h *HandlerImpl) apiConfigToLocal(destType string, version int64, apiConfig
 	return local, nil
 }
 
-func (h *HandlerImpl) latestDefinitionVersion(destType string) (int64, error) {
-	versions, err := h.registry.Versions(destType)
-	if err != nil {
-		return 0, err
-	}
-	return versions[len(versions)-1], nil
-}
-
 // mapTransformationRef resolves the remote transformation link back to a
 // spec-side PropertyRef. When the linked transformation is not CLI-managed
 // (ErrRemoteResourceExternalIdNotFound) the ref is dropped but the remote ID is
