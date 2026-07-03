@@ -29,7 +29,8 @@ func TestClientDestinationsList(t *testing.T) {
 					"id": "id-1",
 					"type": "type-1",
 					"name": "name-1",
-					"config": {"key":"val-1"}
+					"config": {"key":"val-1"},
+					"transformation": {"id":"trans-1"}
 				},  {
 					"id": "id-2",
 					"type": "type-2",
@@ -70,8 +71,15 @@ func TestClientDestinationsList(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, page)
 	assert.Len(t, page.Destinations, 2)
-	assert.Equal(t, client.Destination{ID: "id-1", Type: "type-1", Name: "name-1", Config: []byte(`{"key":"val-1"}`)}, page.Destinations[0])
+	assert.Equal(t, client.Destination{
+		ID:             "id-1",
+		Type:           "type-1",
+		Name:           "name-1",
+		Config:         []byte(`{"key":"val-1"}`),
+		Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
+	}, page.Destinations[0])
 	assert.Equal(t, client.Destination{ID: "id-2", Type: "type-2", Name: "name-2", Config: []byte(`{"key":"val-2"}`)}, page.Destinations[1])
+	assert.Nil(t, page.Destinations[1].Transformation)
 	assert.Equal(t, 3, page.Paging.Total)
 	assert.Equal(t, "/destinations?page=2", page.Paging.Next)
 
@@ -591,4 +599,155 @@ func TestClientDestinations_GetTransformation(t *testing.T) {
 
 		httpClient.AssertNumberOfCalls()
 	})
+}
+func TestClientDestinations_GetAll(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name          string
+		calls         []testutils.Call
+		want          []client.Destination
+		wantErrSubstr string
+	}{
+		{
+			name: "multi page",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "id-1",
+							"type": "type-1",
+							"name": "name-1",
+							"config": {"key":"val-1"}
+						},  {
+							"id": "id-2",
+							"type": "type-2",
+							"name": "name-2",
+							"config": {"key":"val-2"}
+						}],
+						"paging": {
+							"total": 3,
+							"next": "/destinations?page=2"
+						}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations?page=2", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "id-3",
+							"type": "type-3",
+							"name": "name-3",
+							"config": {"key":"val-3"}
+						}],
+						"paging": {
+							"total": 3
+						}
+					}`,
+				},
+			},
+			want: []client.Destination{
+				{ID: "id-1", Type: "type-1", Name: "name-1", Config: []byte(`{"key":"val-1"}`)},
+				{ID: "id-2", Type: "type-2", Name: "name-2", Config: []byte(`{"key":"val-2"}`)},
+				{ID: "id-3", Type: "type-3", Name: "name-3", Config: []byte(`{"key":"val-3"}`)},
+			},
+		},
+		{
+			name: "single page",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "id-1",
+							"type": "type-1",
+							"name": "name-1",
+							"config": {"key":"val-1"}
+						}],
+						"paging": {
+							"total": 1
+						}
+					}`,
+				},
+			},
+			want: []client.Destination{
+				{ID: "id-1", Type: "type-1", Name: "name-1", Config: []byte(`{"key":"val-1"}`)},
+			},
+		},
+		{
+			name: "list error",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 500,
+					ResponseBody:   `{"error":"Internal Server Error"}`,
+				},
+			},
+			wantErrSubstr: "listing destinations",
+		},
+		{
+			name: "next page error",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "id-1",
+							"type": "type-1",
+							"name": "name-1",
+							"config": {"key":"val-1"}
+						}],
+						"paging": {
+							"total": 2,
+							"next": "/destinations?page=2"
+						}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations?page=2", "")
+					},
+					ResponseStatus: 500,
+					ResponseBody:   `{"error":"Internal Server Error"}`,
+				},
+			},
+			wantErrSubstr: "fetching next destinations page",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpClient := testutils.NewMockHTTPClient(t, tc.calls...)
+
+			c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+			require.NoError(t, err)
+
+			got, err := c.Destinations.GetAll(ctx)
+			if tc.wantErrSubstr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrSubstr)
+				assert.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			}
+
+			httpClient.AssertNumberOfCalls()
+		})
+	}
 }
