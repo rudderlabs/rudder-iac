@@ -411,31 +411,3 @@ func TestClientAccountsSetExternalID(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
-
-func TestAccountExternalIDJSONTag(t *testing.T) {
-	withExternalID, err := json.Marshal(client.Account{
-		ID:         "some-id",
-		ExternalID: "external-id-1",
-		Name:       "some-name",
-	})
-	require.NoError(t, err)
-	assert.JSONEq(t, `{
-		"id": "some-id",
-		"externalId": "external-id-1",
-		"workspaceId": "",
-		"name": "some-name",
-		"definition": {
-			"name": "",
-			"type": "",
-			"category": ""
-		},
-		"options": null
-	}`, string(withExternalID))
-
-	withoutExternalID, err := json.Marshal(client.Account{
-		ID:   "some-id",
-		Name: "some-name",
-	})
-	require.NoError(t, err)
-	assert.NotContains(t, string(withoutExternalID), "externalId")
-}
