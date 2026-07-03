@@ -9,16 +9,21 @@ import (
 	"time"
 )
 
+type DestinationTransformationLink struct {
+	ID string `json:"id"`
+}
+
 type Destination struct {
-	ID          string          `json:"id,omitempty"`
-	Name        string          `json:"name"`
-	Type        string          `json:"type"`
-	Version     int             `json:"version,omitempty"`
-	VersionInfo *VersionInfo    `json:"versionInfo,omitempty"`
-	IsEnabled   bool            `json:"enabled"`
-	Config      json.RawMessage `json:"config"`
-	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+	ID             string                         `json:"id,omitempty"`
+	Name           string                         `json:"name"`
+	Type           string                         `json:"type"`
+	Version        int                            `json:"version,omitempty"`
+	VersionInfo    *VersionInfo                   `json:"versionInfo,omitempty"`
+	IsEnabled      bool                           `json:"enabled"`
+	Config         json.RawMessage                `json:"config"`
+	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
+	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
+	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
 }
 
 type VersionInfo struct {
