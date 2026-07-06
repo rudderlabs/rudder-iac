@@ -35,7 +35,17 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - id: user_id_2
+                - id: user_id
+                  name: User ID
+                  type: string
+          spec2.yaml: |
+            version: rudder/0.1
+            kind: properties
+            metadata:
+              name: my-properties-2
+            spec:
+              properties:
+                - id: user_id_copy
                   name: User ID
                   type: string
         expected_diagnostics:
@@ -44,6 +54,10 @@ match_behavior:
             severity: "error"
             message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
   # Current spec version (rudder/v1).
+          - file: "spec2.yaml"
+            reference: "/properties/0"
+            severity: "error"
+            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
   - applies_to:
       - kind: "properties"
         version: "rudder/v1"
@@ -76,11 +90,25 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - id: user_id_2
+                - id: user_id
+                  name: User ID
+                  type: string
+          spec2.yaml: |
+            version: rudder/v1
+            kind: properties
+            metadata:
+              name: my-properties-2
+            spec:
+              properties:
+                - id: user_id_copy
                   name: User ID
                   type: string
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/properties/0"
+            severity: "error"
+            message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"
+          - file: "spec2.yaml"
             reference: "/properties/0"
             severity: "error"
             message_contains: "duplicate name, type and itemTypes: 'User ID' within kind 'properties'"

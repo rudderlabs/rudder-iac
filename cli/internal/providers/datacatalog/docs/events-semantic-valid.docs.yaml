@@ -35,7 +35,17 @@ match_behavior:
               name: my-events
             spec:
               events:
-                - id: page_viewed_2
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
+          spec2.yaml: |
+            version: rudder/0.1
+            kind: events
+            metadata:
+              name: my-events-2
+            spec:
+              events:
+                - id: page_viewed_copy
                   event_type: track
                   name: Page Viewed
         expected_diagnostics:
@@ -44,6 +54,10 @@ match_behavior:
             severity: "error"
             message_contains: "duplicate name 'Page Viewed' within kind 'events'"
   # Current spec version (rudder/v1).
+          - file: "spec2.yaml"
+            reference: "/events/0"
+            severity: "error"
+            message_contains: "duplicate name 'Page Viewed' within kind 'events'"
   - applies_to:
       - kind: "events"
         version: "rudder/v1"
@@ -76,11 +90,25 @@ match_behavior:
               name: my-events
             spec:
               events:
-                - id: page_viewed_2
+                - id: page_viewed
+                  event_type: track
+                  name: Page Viewed
+          spec2.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: my-events-2
+            spec:
+              events:
+                - id: page_viewed_copy
                   event_type: track
                   name: Page Viewed
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/events/0"
+            severity: "error"
+            message_contains: "duplicate name 'Page Viewed' within kind 'events'"
+          - file: "spec2.yaml"
             reference: "/events/0"
             severity: "error"
             message_contains: "duplicate name 'Page Viewed' within kind 'events'"
