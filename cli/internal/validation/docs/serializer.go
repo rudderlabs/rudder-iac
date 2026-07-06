@@ -20,7 +20,13 @@ func Serialize(doc DocumentedRules, outDir string) error {
 		return fmt.Errorf("creating output dir %s: %w", outDir, err)
 	}
 
-	yamlBytes, err := yaml.Marshal(doc)
+	var node yaml.Node
+	if err := node.Encode(doc); err != nil {
+		return fmt.Errorf("encoding yaml node: %w", err)
+	}
+	preferDoubleQuotes(&node)
+
+	yamlBytes, err := yaml.Marshal(&node)
 	if err != nil {
 		return fmt.Errorf("marshaling yaml: %w", err)
 	}
@@ -30,6 +36,21 @@ func Serialize(doc DocumentedRules, outDir string) error {
 	}
 
 	return nil
+}
+
+// preferDoubleQuotes rewrites single-quoted scalars to double-quoted. yaml.v3
+// defaults a string containing a single quote to single-quoted style with the
+// quote doubled (e.g. ”'name” is required'); the hand-authored reference
+// catalog uses the more readable double-quoted form ("'name' is required").
+// Matching it keeps the generated artifact byte-stable against that reference
+// and easier to read. Only the quoting style changes — never the value.
+func preferDoubleQuotes(n *yaml.Node) {
+	if n.Kind == yaml.ScalarNode && n.Style == yaml.SingleQuotedStyle {
+		n.Style = yaml.DoubleQuotedStyle
+	}
+	for _, child := range n.Content {
+		preferDoubleQuotes(child)
+	}
 }
 
 func writeFile(path string, data []byte) error {
