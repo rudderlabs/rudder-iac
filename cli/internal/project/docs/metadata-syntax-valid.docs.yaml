@@ -82,6 +82,7 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
     invalid:
       - example_id: "metadata-missing-name"
@@ -119,6 +120,7 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
         expected_diagnostics:
           - file: "spec.yaml"
