@@ -1989,3 +1989,37 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
+	t.Run("nil is a no-op", func(t *testing.T) {
+		h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		require.NoError(t, h.LoadImportMetadata(nil))
+	})
+
+	t.Run("attaches manifest import metadata to resources by URN", func(t *testing.T) {
+		h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		require.NoError(t, h.LoadSpec("m.yaml", createTestSpec("manifest-model", "M", "d", "SELECT 1")))
+
+		urn := resources.URN("manifest-model", sqlmodel.ResourceType)
+		m := &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "rem-1"}},
+			}},
+		}
+		require.NoError(t, h.LoadImportMetadata(m))
+
+		got, err := h.GetResources()
+		require.NoError(t, err)
+		var found *resources.Resource
+		for _, r := range got {
+			if r.ID() == "manifest-model" {
+				found = r
+			}
+		}
+		require.NotNil(t, found)
+		require.NotNil(t, found.ImportMetadata())
+		assert.Equal(t, "ws-a", found.ImportMetadata().WorkspaceId)
+		assert.Equal(t, "rem-1", found.ImportMetadata().RemoteId)
+	})
+}

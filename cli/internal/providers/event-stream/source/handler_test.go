@@ -1848,3 +1848,50 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
+	t.Run("nil is a no-op", func(t *testing.T) {
+		h := source.NewHandler(source.NewMockSourceClient(), importDir)
+		require.NoError(t, h.LoadImportMetadata(nil))
+	})
+
+	t.Run("attaches manifest metadata to the matching source only", func(t *testing.T) {
+		h := source.NewHandler(source.NewMockSourceClient(), importDir)
+		cleanSpec := func(id string) *specs.Spec {
+			return &specs.Spec{
+				Version: "rudder/v0.1",
+				Kind:    "event-stream-source",
+				Spec: map[string]interface{}{
+					"id":   id,
+					"name": id,
+					"type": "javascript",
+				},
+			}
+		}
+		require.NoError(t, h.LoadSpec("", cleanSpec("src-1")))
+		require.NoError(t, h.LoadSpec("", cleanSpec("src-2")))
+
+		m := &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources: []specs.ImportIds{{
+					URN:      resources.URN("src-1", source.ResourceType),
+					RemoteID: "rem-1",
+				}},
+			}},
+		}
+		require.NoError(t, h.LoadImportMetadata(m))
+
+		res, err := h.GetResources()
+		require.NoError(t, err)
+		byID := make(map[string]*resources.Resource)
+		for _, r := range res {
+			byID[r.ID()] = r
+		}
+		require.NotNil(t, byID["src-1"].ImportMetadata())
+		assert.Equal(t, "ws-a", byID["src-1"].ImportMetadata().WorkspaceId)
+		assert.Equal(t, "rem-1", byID["src-1"].ImportMetadata().RemoteId)
+		// src-2 has no matching manifest URN, so it stays unimported.
+		assert.Nil(t, byID["src-2"].ImportMetadata())
+	})
+}

@@ -703,23 +703,46 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 	if err != nil {
 		return err
 	}
+	if metadata.Import == nil {
+		return nil
+	}
+	return srcResource.applyImportManifest(metadata.Import)
+}
 
-	if metadata.Import != nil {
-		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resource.URN != "" {
-					urn = resource.URN
-				} else {
-					urn = resources.URN(resource.LocalID, ResourceType)
-				}
-				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
-					WorkspaceId: workspace.WorkspaceID,
-					RemoteId:    resource.RemoteID,
-				}
-			})
+// applyImportManifest writes manifest entries into this source's ImportMetadata
+// map. Shared by the inline metadata.import path (addImportMetadata) and the
+// central import-manifest broadcast (Handler.LoadImportMetadata).
+func (srcResource *sourceResource) applyImportManifest(m *specs.WorkspacesImportMetadata) error {
+	lo.ForEach(m.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resource.URN != "" {
+				urn = resource.URN
+			} else {
+				urn = resources.URN(resource.LocalID, ResourceType)
+			}
+			srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
 		})
+	})
+	return nil
+}
+
+// LoadImportMetadata replicates the aggregated manifest into every loaded
+// source. Each source reads only its own URN from ImportMetadata at graph time
+// (see GetResources), so replicating the full manifest into every source is
+// safe. Nil-safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, srcResource := range h.resources {
+		if err := srcResource.applyImportManifest(m); err != nil {
+			return err
+		}
 	}
 	return nil
 }

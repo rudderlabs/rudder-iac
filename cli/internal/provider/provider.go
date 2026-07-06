@@ -180,6 +180,17 @@ type ConsolidateSyncer interface {
 	ConsolidateSync(ctx context.Context, graph *resources.Graph, state *state.State) error
 }
 
+// ImportManifestLoader receives a single workspace's import metadata after all
+// manifest specs have been loaded and scoped to the active workspace. It is
+// implemented by resource providers that populate their internal import-metadata
+// state from a central import-manifest file instead of, or in addition to, inline
+// metadata.import blocks on resource specs.
+//
+// LoadImportManifest delegates to the underlying handlers' LoadImportMetadata.
+type ImportManifestLoader interface {
+	LoadImportManifest(m *specs.WorkspaceImportMetadata) error
+}
+
 // RuleProvider is an optional interface that providers can implement
 // to contribute validation rules. Providers aggregate rules from their
 // handlers (if using BaseProvider pattern) or define them directly.
@@ -237,4 +248,5 @@ type Provider interface {
 	SpecMigrator
 	ConsolidateSyncer
 	RuleProvider
+	ImportManifestLoader
 }
