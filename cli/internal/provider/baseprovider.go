@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -31,7 +32,7 @@ type Handler interface {
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 // RuleHandler is an optional interface that handlers can implement
@@ -233,20 +234,22 @@ func (p *BaseProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	result := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(
+		entities, handlerEntries, err := handler.FormatForExport(
 			collection,
 			idNamer,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler: %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler: %w", err)
 		}
 		result = append(result, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 // GetHandler returns the handler for a given resource type

@@ -124,7 +124,7 @@ func TestFormatForExport_FullCompositeExport(t *testing.T) {
 		},
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -209,7 +209,7 @@ func TestFormatForExport_DataGraphWithoutModels(t *testing.T) {
 		nil, nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -256,7 +256,7 @@ func TestFormatForExport_MultipleDataGraphs(t *testing.T) {
 		nil, nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
 
@@ -277,7 +277,7 @@ func TestFormatForExport_EmptyCollection(t *testing.T) {
 
 	collection := resources.NewRemoteResources()
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -335,7 +335,7 @@ func TestFormatForExport_SkipsUnmanagedModelsUnderManagedDataGraphs(t *testing.T
 		nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -424,7 +424,7 @@ func TestFormatForExport_IncludesColumnsBlock(t *testing.T) {
 		nil,
 	)
 
-	result, err := provider.FormatForExport(collection, nil, nil)
+	result, _, err := provider.FormatForExport(collection, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 

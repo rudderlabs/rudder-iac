@@ -281,7 +281,7 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 				Graph:      graph,
 			}
 
-			entities, err := handler.FormatForExport(importable, &mockNamer{}, resolverImpl)
+			entities, _, err := handler.FormatForExport(importable, &mockNamer{}, resolverImpl)
 
 			if tt.expectedErrContains != "" {
 				require.Error(t, err)

@@ -1623,7 +1623,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		}
 		collection.Set(types.TrackingPlanResourceType, trackingPlanResourceMap)
 
-		entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
+		entities, _, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{
 			resolveFunc: func(entityType string, remoteID string) (string, error) {
 				return "#/tp/tracking-plan/test-tp-456", nil
 			},
@@ -1755,7 +1755,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 			}
 			collection.Set(source.ResourceType, resourceMap)
 
-			entities, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{})
+			entities, _, err := handler.FormatForExport(collection, &mockNamer{}, &mockResolver{})
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)

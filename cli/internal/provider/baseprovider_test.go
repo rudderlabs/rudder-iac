@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -44,8 +45,8 @@ func (h *captureHandler) MapRemoteToState(*resources.RemoteResources) (*state.St
 func (h *captureHandler) LoadImportable(context.Context, namer.Namer) (*resources.RemoteResources, error) {
 	return nil, nil
 }
-func (h *captureHandler) FormatForExport(*resources.RemoteResources, namer.Namer, resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
-	return nil, nil
+func (h *captureHandler) FormatForExport(*resources.RemoteResources, namer.Namer, resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	return nil, nil, nil
 }
 
 func TestBaseProvider_LoadImportManifest(t *testing.T) {

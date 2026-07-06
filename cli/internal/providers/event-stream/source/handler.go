@@ -12,6 +12,7 @@ import (
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -600,19 +601,20 @@ func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
 	var result []writer.FormattableEntity
+	var entries []importmanifest.ImportEntry
 	for _, source := range sources {
 		data, ok := source.Data.(*sourceClient.EventStreamSource)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
@@ -622,6 +624,11 @@ func (h *Handler) FormatForExport(
 				RemoteID: source.ID,
 			},
 		}
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         urn,
+			RemoteID:    source.ID,
+		})
 		spec, err := h.toImportSpec(
 			data,
 			source.ExternalID,
@@ -629,14 +636,14 @@ func (h *Handler) FormatForExport(
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec: %w", err)
+			return nil, nil, fmt.Errorf("creating spec: %w", err)
 		}
 		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 func (p *Handler) toImportSpec(

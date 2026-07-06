@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -103,12 +104,12 @@ func (p *CustomTypeImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting custom types for export to file")
 
 	customTypes := collection.GetAll(types.CustomTypeResourceType)
 	if len(customTypes) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -122,7 +123,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 
 		data, ok := customType.Data.(*catalog.CustomType)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog custom type")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog custom type")
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the custom types
@@ -135,7 +136,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 		importableCustomType := &model.ImportableCustomTypeV1{}
 		formatted, err := importableCustomType.ForExport(customType.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting custom type: %w", err)
+			return nil, nil, fmt.Errorf("formatting custom type: %w", err)
 		}
 		formattedTypes = append(formattedTypes, formatted)
 	}
@@ -149,7 +150,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			"types": formattedTypes,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -157,5 +158,5 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, importEntriesFromWorkspace(workspaceMetadata), nil
 }

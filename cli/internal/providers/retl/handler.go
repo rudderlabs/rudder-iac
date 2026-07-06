@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -89,5 +90,5 @@ type resourceHandler interface {
 	// The idNamer is used to generate unique IDs for the resources.
 	// The inputResolver is used to resolve references to other resources.
 	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
+	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
