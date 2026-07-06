@@ -123,8 +123,13 @@ func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 	return entries
 }
 
-// ImportManifest returns the merged workspace entries, one per workspace. The
-// slice is empty when no manifest specs were loaded.
+// ImportManifest returns all aggregated workspace entries across every loaded
+// manifest file. The slice is empty when no manifest specs were loaded.
+//
+// Workspace scoping is the caller's concern: the orchestrator filters these
+// entries to the active workspace before broadcasting a single workspace's
+// metadata into the resource provider tree, so a URN maps to at most one remote
+// ID per handler.
 func (p *Provider) ImportManifest() []specs.WorkspaceImportMetadata {
 	return p.entries
 }

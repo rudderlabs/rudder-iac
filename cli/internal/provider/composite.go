@@ -261,6 +261,18 @@ func (p *CompositeProvider) FormatForExport(
 	return formattable, nil
 }
 
+// LoadImportManifest fans the active workspace's manifest out to every
+// sub-provider. Providers with no matching URNs simply store nothing, so the
+// broadcast is a no-op for them.
+func (p *CompositeProvider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	for name, sub := range p.Providers {
+		if err := sub.LoadImportManifest(m); err != nil {
+			return fmt.Errorf("loading import manifest into provider %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 // Helper methods
 func (p *CompositeProvider) providerForKind(kind string) (Provider, error) {
 	provider, ok := p.registeredKinds[kind]
