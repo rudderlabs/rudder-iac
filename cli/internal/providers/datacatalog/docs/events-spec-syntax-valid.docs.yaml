@@ -57,7 +57,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/events/0/event_type"
             severity: "error"
-            message_contains: "oneof"
+            message_contains: "'event_type' must be one of [track screen identify group page]"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "events"
