@@ -805,7 +805,7 @@ func TestHandlerImpl_ImportAndExportNotImplemented(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "import not implemented yet")
 
-	_, err = h.Impl.FormatForExport(nil, nil, nil)
+	_, _, err = h.Impl.FormatForExport(nil, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "export not implemented yet")
 }

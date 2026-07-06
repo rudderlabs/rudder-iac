@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
@@ -285,8 +286,8 @@ func (h *HandlerImpl) FormatForExport(
 	_ map[string]*RemoteDestination,
 	_ namer.Namer,
 	_ resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
-	return nil, fmt.Errorf("export not implemented yet")
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	return nil, nil, fmt.Errorf("export not implemented yet")
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case
