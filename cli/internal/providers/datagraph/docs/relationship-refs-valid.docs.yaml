@@ -62,4 +62,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/models/0/relationships/0/target"
             severity: "error"
-            message_contains: "does not exist"
+            message_contains: "target model \"data-graph-model:non-existent\" does not exist"

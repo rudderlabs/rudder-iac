@@ -69,7 +69,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/type"
             severity: "error"
-            message_contains: "'type' must be one of"
+            message_contains: "'type' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin]"
       - example_id: "es-source-legacy-invalid-tp-ref"
         title: "Legacy source spec with invalid Tracking Plan reference format"
         files:

@@ -67,7 +67,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/governance/validations/tracking_plan"
             severity: "error"
-            message_contains: "not found in the project"
+            message_contains: "tracking plan 'tp-missing' not found in the project"
       - example_id: "es-source-legacy-semantic-duplicate-name"
         title: "Legacy source name duplicates another source in the project"
         files:
@@ -158,7 +158,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/governance/validations/tracking_plan"
             severity: "error"
-            message_contains: "not found in the project"
+            message_contains: "tracking plan 'tp-missing' not found in the project"
       - example_id: "es-source-v1-semantic-duplicate-name"
         title: "v1 source name duplicates another source in the project"
         files:
