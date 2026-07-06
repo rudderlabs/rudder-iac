@@ -44,7 +44,7 @@ type HandlerImpl struct {
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
 func NewHandler(c *client.Client, registry *definitions.Registry) *DestinationHandler {
 	h := &HandlerImpl{client: c, registry: registry}
-	return handler.NewHandler(h)
+	return handler.NewHandler[DestinationSpec, DestinationResource, DestinationState, RemoteDestination](h)
 }
 
 func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
