@@ -7,6 +7,8 @@ package importmanifest
 import (
 	"fmt"
 
+	"github.com/samber/lo"
+
 	manifestdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/manifestspec"
 	mrules "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/rules"
@@ -23,6 +25,8 @@ import (
 const KindImportManifest = manifestspec.KindImportManifest
 
 type Provider struct {
+	// entries holds one merged entry per workspace, unifying a workspace split
+	// across multiple manifest files.
 	entries []specs.WorkspaceImportMetadata
 }
 
@@ -44,15 +48,27 @@ func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	}
 }
 
-// LoadSpec appends the spec's workspace entries to provider state. Appending is
-// safe because cross-file URN collisions are caught by validation before this
-// runs — no merge step needed.
+// LoadSpec merges the spec's workspace entries into provider state, keeping one
+// entry per workspace so a workspace split across multiple manifest files is
+// unified. Validation guarantees no duplicate (workspace_id, urn), so appending
+// resources needs no deduplication.
 func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 	workspaces, err := parseWorkspaces(s)
 	if err != nil {
 		return fmt.Errorf("parsing import-manifest %s: %w", path, err)
 	}
-	p.entries = append(p.entries, workspaces...)
+
+	for _, ws := range workspaces {
+		_, i, found := lo.FindIndexOf(p.entries, func(e specs.WorkspaceImportMetadata) bool {
+			return e.WorkspaceID == ws.WorkspaceID
+		})
+
+		if found {
+			p.entries[i].Resources = append(p.entries[i].Resources, ws.Resources...)
+			continue
+		}
+		p.entries = append(p.entries, ws)
+	}
 	return nil
 }
 
