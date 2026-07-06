@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -363,6 +364,22 @@ func TestCompositeProvider_RuleDocEntries(t *testing.T) {
 		assert.Contains(t, ids, "rule-2")
 		assert.Contains(t, ids, "rule-3")
 	})
+}
+
+func TestCompositeProvider_ProviderForType(t *testing.T) {
+	p := testutils.NewMockProvider(nil, []string{"event-stream-source"})
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"es": p})
+	require.NoError(t, err)
+
+	router, ok := cp.(provider.TypeRouter)
+	require.True(t, ok, "CompositeProvider must satisfy TypeRouter")
+
+	got, err := router.ProviderForType("event-stream-source")
+	require.NoError(t, err)
+	assert.Same(t, p, got)
+
+	_, err = router.ProviderForType("nope")
+	assert.ErrorIs(t, err, provider.ErrUnsupportedType)
 }
 
 func TestCompositeProvider_ResourceOperations(t *testing.T) {

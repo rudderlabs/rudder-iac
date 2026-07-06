@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: demo-orders-source
+spec:
+  id: demo-orders-source
+  name: Demo Orders Source
+  type: javascript

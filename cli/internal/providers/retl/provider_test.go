@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -33,6 +34,8 @@ type mockRETLStore struct {
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	// SetExternalId tracking
+	setExternalIDCalled bool
 }
 
 // Mock RETL source operations
@@ -85,6 +88,15 @@ func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID str
 		return m.getPreviewResultFunc(ctx, resultID)
 	}
 	return &retlClient.PreviewResultResponse{Status: retlClient.Completed}, nil
+}
+
+func (m *mockRETLStore) SetExternalId(ctx context.Context, id string, externalId string) error {
+	m.setExternalIDCalled = true
+	return nil
+}
+
+func (m *mockRETLStore) SetExternalIDCalled() bool {
+	return m.setExternalIDCalled
 }
 
 // newDefaultMockClient creates a new mock client with default behavior
@@ -1136,11 +1148,33 @@ func TestProviderMigrateSpec(t *testing.T) {
 		}
 
 		mockClient := newDefaultMockClient()
-		provider := retl.New(mockClient)
+		p := retl.New(mockClient)
 
-		migratedSpec, err := provider.MigrateSpec(spec)
+		migratedSpec, err := p.MigrateSpec(spec)
 		require.NoError(t, err)
 		require.NotNil(t, migratedSpec)
 		assert.Equal(t, spec, migratedSpec)
+	})
+}
+
+func TestProvider_SetExternalID(t *testing.T) {
+	t.Run("KnownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		p := retl.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), sqlmodel.ResourceType, "remote-id-123", "my-sql-model")
+		require.NoError(t, err)
+		assert.True(t, mockClient.SetExternalIDCalled())
+	})
+
+	t.Run("UnknownType", func(t *testing.T) {
+		t.Parallel()
+		mockClient := newDefaultMockClient()
+		p := retl.New(mockClient)
+
+		err := p.SetExternalID(context.Background(), "not-a-type", "x", "y")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, provider.ErrUnsupportedType)
 	})
 }

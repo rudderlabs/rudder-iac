@@ -162,6 +162,14 @@ type Exporter interface {
 	) ([]writer.FormattableEntity, error)
 }
 
+// ExternalIDSetter is an OPTIONAL provider capability: it associates an existing
+// remote resource (remoteID) with a local external ID, making it managed.
+// Providers whose backing SDK exposes a setter implement it; others do not, and
+// the verb layer rejects `set-external-id` for their types via type assertion.
+type ExternalIDSetter interface {
+	SetExternalID(ctx context.Context, resourceType, remoteID, externalID string) error
+}
+
 // SpecMigrator handles migration of project specifications from one version to another.
 type SpecMigrator interface {
 	// MigrateSpec migrates project specifications from rudder/0.1 to rudder/1.

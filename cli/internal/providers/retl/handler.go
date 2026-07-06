@@ -65,6 +65,10 @@ type resourceHandler interface {
 	// Returns the processed resource data or an error if import fails.
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 
+	// SetExternalID associates an existing remote resource (remoteID) with a local
+	// external ID, making it managed by this tool.
+	SetExternalID(ctx context.Context, remoteID, externalID string) error
+
 	// Preview returns the preview results for a resource.
 	// Returns:
 	// - []string: column names

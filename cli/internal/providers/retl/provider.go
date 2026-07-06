@@ -232,6 +232,14 @@ func (p *Provider) Import(ctx context.Context, ID string, resourceType string, d
 	return handler.Import(ctx, ID, data, remoteId)
 }
 
+func (p *Provider) SetExternalID(ctx context.Context, resourceType, remoteID, externalID string) error {
+	h, ok := p.handlers[resourceType]
+	if !ok {
+		return fmt.Errorf("%q: %w", resourceType, provider.ErrUnsupportedType)
+	}
+	return h.SetExternalID(ctx, remoteID, externalID)
+}
+
 // FetchImportData fetches a single remote RETL resource formatted for import
 func (p *Provider) FetchImportData(ctx context.Context, resourceType string, importIDs specs.ImportIds) (writer.FormattableEntity, error) {
 	// Only support SQL models for import in this phase
