@@ -7,6 +7,7 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -23,6 +24,7 @@ import (
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
@@ -38,7 +40,7 @@ type handler interface {
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 var _ provider.Provider = &Provider{}
@@ -60,6 +62,20 @@ func New(client esClient.EventStreamStore) *Provider {
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	return p
+}
+
+// LoadImportManifest fans the active workspace's manifest out to every registered
+// handler so URN → remote-ID mappings from a central import-manifest file
+// populate the same per-source import-metadata maps that inline
+// metadata.import does.
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	workspaces := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*m}}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(workspaces); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) SupportedKinds() []string {
@@ -235,20 +251,22 @@ func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	result := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(
+		entities, handlerEntries, err := handler.FormatForExport(
 			collection,
 			idNamer,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler %w", err)
 		}
 		result = append(result, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 // RuleDocEntries returns the authored documentation fragments embedded with

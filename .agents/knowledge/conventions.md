@@ -27,3 +27,6 @@
 <!-- ticket:RUD-2899 -->
 - When maintaining project-level gatekeeper rule docs/tests, include the DataGraph V1 match pattern (`kind: data-graph`, `version: rudder/v1`) now that DataGraph is always available.
 - Rule documentation coverage should stay aligned for rules such as `project/duplicate-urn`, `project/manifest-inline-conflict`, and `project/metadata-syntax-valid`; the ruledoc gatekeeper test helper patterns are the companion surface to keep in sync.
+## DEX-456 — SDK ID Initialism Style
+<!-- ticket:DEX-456 -->
+- The Go SDK uses fully capitalized `ID` initialisms in identifiers and JSON field helpers. New account-related SDK fields and helpers should follow that existing `ID` spelling rather than mixed-case variants.

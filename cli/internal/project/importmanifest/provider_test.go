@@ -141,3 +141,53 @@ func TestProvider_RuleSets(t *testing.T) {
 	}
 	assert.Equal(t, []string{"import-manifest/orphaned-urn"}, semanticIDs)
 }
+
+func TestProvider_ImportManifest(t *testing.T) {
+	t.Parallel()
+
+	wsB := specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-b",
+		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-b"}},
+	}
+
+	t.Run("empty when no specs loaded", func(t *testing.T) {
+		p := New()
+		assert.Empty(t, p.ImportManifest())
+	})
+
+	t.Run("returns one entry per workspace", func(t *testing.T) {
+		p := New()
+		require.NoError(t, p.LoadSpec("a.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-a"})))
+		require.NoError(t, p.LoadSpec("b.yaml", manifestSpec("ws-b",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-b"})))
+
+		assert.Equal(t, []specs.WorkspaceImportMetadata{
+			{WorkspaceID: "ws-a", Resources: []specs.ImportIds{{URN: "event:login", RemoteID: "rem-a"}}},
+			wsB,
+		}, p.ImportManifest())
+	})
+
+	t.Run("merges resources of a workspace split across files", func(t *testing.T) {
+		p := New()
+		// ws-a is declared in two files, each contributing a different URN;
+		// ws-b is interleaved to confirm ordering is preserved.
+		require.NoError(t, p.LoadSpec("a1.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-a"})))
+		require.NoError(t, p.LoadSpec("b.yaml", manifestSpec("ws-b",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-b"})))
+		require.NoError(t, p.LoadSpec("a2.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:signup", RemoteID: "rem-c"})))
+
+		assert.Equal(t, []specs.WorkspaceImportMetadata{
+			{
+				WorkspaceID: "ws-a",
+				Resources: []specs.ImportIds{
+					{URN: "event:login", RemoteID: "rem-a"},
+					{URN: "event:signup", RemoteID: "rem-c"},
+				},
+			},
+			wsB,
+		}, p.ImportManifest())
+	})
+}

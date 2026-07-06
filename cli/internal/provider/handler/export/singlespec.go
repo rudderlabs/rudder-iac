@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
@@ -24,27 +25,34 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 	remotes map[string]*Remote,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	importResources := make([]specs.ImportIds, 0, len(remotes))
+	var entries []importmanifest.ImportEntry
 	workspaceID := ""
 	for localID, remote := range remotes {
 		remoteMetadata := (*remote).Metadata()
 		if workspaceID != "" && workspaceID != remoteMetadata.WorkspaceID {
-			return nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
+			return nil, nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
 		}
 		if workspaceID == "" {
 			workspaceID = remoteMetadata.WorkspaceID
 		}
 
+		urn := resources.URN(localID, s.Handler.Metadata().ResourceType)
 		importResources = append(importResources, specs.ImportIds{
-			URN:      resources.URN(localID, s.Handler.Metadata().ResourceType),
+			URN:      urn,
 			RemoteID: remoteMetadata.ID,
+		})
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: remoteMetadata.WorkspaceID,
+			URN:         urn,
+			RemoteID:    remoteMetadata.ID,
 		})
 	}
 
 	exportData, err := s.Handler.MapRemoteToSpec(remotes, inputResolver)
 	if err != nil {
-		return nil, fmt.Errorf("mapping remote to spec: %w", err)
+		return nil, nil, fmt.Errorf("mapping remote to spec: %w", err)
 	}
 
 	specMetadata := specs.Metadata{
@@ -61,12 +69,12 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 
 	metadataMap, err := specMetadata.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("converting metadata to map: %w", err)
+		return nil, nil, fmt.Errorf("converting metadata to map: %w", err)
 	}
 
 	specData, err := exportData.ToMap()
 	if err != nil {
-		return nil, fmt.Errorf("converting spec data to map: %w", err)
+		return nil, nil, fmt.Errorf("converting spec data to map: %w", err)
 	}
 
 	spec := &specs.Spec{
@@ -83,5 +91,5 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 		},
 	}
 
-	return result, nil
+	return result, entries, nil
 }

@@ -17,10 +17,16 @@ var (
 type YAMLFormatter struct{}
 
 // Format converts data to YAML format with 2-space indentation and quoted string values.
+//
+// When data is already a *yaml.Node it is used as-is rather than re-encoded, so
+// node-level details such as HeadComment (e.g. the import-manifest header) are
+// preserved; re-encoding through node.Encode would drop them.
 func (f YAMLFormatter) Format(data any) ([]byte, error) {
 	var node yaml.Node
 
-	if err := node.Encode(data); err != nil {
+	if n, ok := data.(*yaml.Node); ok {
+		node = *n
+	} else if err := node.Encode(data); err != nil {
 		return nil, fmt.Errorf("encoding data to YAML node: %w", err)
 	}
 	forceStringQuotes(&node)

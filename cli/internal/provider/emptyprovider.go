@@ -62,6 +62,13 @@ func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *resources.Graph, _
 	return nil
 }
 
+// LoadImportManifest is a no-op default. Providers that consume import manifests
+// override it (e.g. via BaseProvider); this keeps providers with no import-manifest
+// state satisfying the mandatory ImportManifestLoader on the Provider interface.
+func (p *EmptyProvider) LoadImportManifest(_ *specs.WorkspaceImportMetadata) error {
+	return nil
+}
+
 func (p *EmptyProvider) SupportedMatchPatterns() []rules.MatchPattern {
 	return nil
 }

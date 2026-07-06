@@ -50,6 +50,61 @@ func (m *MockLoader) Load(location string) (map[string]*specs.RawSpec, error) {
 	return nil, errors.New("MockLoader.LoadFunc is not set")
 }
 
+// mockConsumerProvider embeds MockProvider and implements
+// provider.ImportManifestLoader, recording the workspace manifest it receives via
+// the read-path broadcast.
+type mockConsumerProvider struct {
+	*testutils.MockProvider
+	gotManifest *specs.WorkspaceImportMetadata
+}
+
+func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImportMetadata) error {
+	m.gotManifest = manifest
+	return nil
+}
+
+func TestProject_BroadcastsImportManifest(t *testing.T) {
+	t.Parallel()
+
+	consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+	// Declare the resource kind so the gatekeeper SpecSyntaxValidRule treats
+	// "Source" as known (the manifest pattern alone would reject it otherwise).
+	consumer.MatchPatterns = []rules.MatchPattern{
+		rules.MatchKindVersion("Source", specs.SpecVersionV1),
+	}
+	manifestYAML := "version: rudder/v1\n" +
+		"kind: import-manifest\n" +
+		"metadata:\n  name: import-manifest\n" +
+		"spec:\n" +
+		"  workspaces:\n" +
+		"    - workspace_id: ws-a\n" +
+		"      resources:\n" +
+		"        - urn: event:login\n" +
+		"          remote_id: rem-1\n" +
+		"    - workspace_id: ws-b\n" +
+		"      resources:\n" +
+		"        - urn: event:logout\n" +
+		"          remote_id: rem-2\n"
+	resourceYAML := "kind: Source\nversion: rudder/v1\nmetadata:\n  name: my_source\nspec:\n  k: v"
+
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"import-manifest.yaml": {Data: []byte(manifestYAML)},
+			"source.yaml":          {Data: []byte(resourceYAML)},
+		}, nil
+	}}
+
+	proj := project.New(consumer, project.WithLoader(mockLoader), project.WithWorkspaceID("ws-a"))
+	require.NoError(t, proj.Load("test_dir"))
+
+	require.NotNil(t, consumer.gotManifest, "consumer should have received the broadcast manifest")
+	// Scoped to the active workspace ws-a only.
+	assert.Equal(t, &specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-a",
+		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
+	}, consumer.gotManifest)
+}
+
 func TestNewProject_Load_Error(t *testing.T) {
 	t.Parallel()
 

@@ -33,6 +33,15 @@ type ProjectProvider interface {
 	provider.TypeProvider
 }
 
+// ImportManifestProvider is a ProjectProvider that also exposes the aggregated
+// import metadata for every loaded manifest, for broadcast into the resource
+// provider tree. It sits parallel to the resource providers; the
+// CompositeProvider never sees the import-manifest kind.
+type ImportManifestProvider interface {
+	ProjectProvider
+	ImportManifest() []specs.WorkspaceImportMetadata
+}
+
 type Project interface {
 	Location() string
 	Load(location string) error
@@ -42,8 +51,8 @@ type Project interface {
 
 type project struct {
 	location               string
-	provider               ProjectProvider
-	importManifestProvider ProjectProvider
+	provider               provider.Provider
+	importManifestProvider ImportManifestProvider
 	loader                 Loader
 	workspaceID            string
 	specs                  map[string]*specs.Spec
@@ -220,6 +229,24 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		}
 	}
 
+	// Broadcast the active workspace's import-manifest into the resource provider
+	// tree before graph construction, so handlers attach ImportMetadata from the
+	// same maps that inline metadata.import populates. Inline metadata is loaded
+	// during the loadSpec loop above; this runs after, so the manifest wins on URN
+	// overlap (last writer).
+	//
+	// Scoping to a single workspace is done here (not in the provider) so a URN
+	// maps to at most one remote ID per handler.
+	for _, ws := range p.importManifestProvider.ImportManifest() {
+		if ws.WorkspaceID != p.workspaceID {
+			continue
+		}
+		if err := p.provider.LoadImportManifest(&ws); err != nil {
+			return fmt.Errorf("broadcasting import manifest: %w", err)
+		}
+		break
+	}
+
 	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
@@ -349,10 +376,11 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
 		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
 
-		// Cross-source: a URN must not appear in both an import-manifest and an
-		// inline metadata.import block. Applies to the union (both kinds), and
-		// needs both providers' ParseSpec.
-		prules.NewManifestInlineConflictRule(manifestProvider.ParseSpec, provider.ParseSpec, activePatterns),
+		// Cross-source: a (workspace_id, urn) must not appear in both an
+		// import-manifest and an inline metadata.import block with differing
+		// remote_ids. Applies to the union (both kinds); needs the resource
+		// ParseSpec to resolve inline local_id entries.
+		prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
