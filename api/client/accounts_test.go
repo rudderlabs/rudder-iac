@@ -25,6 +25,7 @@ func TestClientAccountsList(t *testing.T) {
 			ResponseBody: `{
 				"data": [{
 					"id": "id-1",
+					"externalId": "external-id-1",
 					"name": "name-1",
 					"definition": {
 						"name": "def-1",
@@ -76,6 +77,7 @@ func TestClientAccountsList(t *testing.T) {
 	assert.NotNil(t, page)
 	assert.Len(t, page.Accounts, 2)
 	assert.Equal(t, "id-1", page.Accounts[0].ID)
+	assert.Equal(t, "external-id-1", page.Accounts[0].ExternalID)
 	assert.Equal(t, "name-1", page.Accounts[0].Name)
 	assert.Equal(t, "def-1", page.Accounts[0].Definition.Name)
 	assert.Equal(t, "type-1", page.Accounts[0].Definition.Type)
@@ -101,6 +103,43 @@ func TestClientAccountsList(t *testing.T) {
 	page, err = c.Accounts.Next(ctx, page.Paging)
 	require.NoError(t, err)
 	assert.Nil(t, page)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientAccountsListWithHasExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/accounts?hasExternalId=true", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"data": [{
+				"id": "id-1",
+				"externalId": "external-id-1",
+				"name": "name-1",
+				"definition": {
+					"name": "def-1",
+					"type": "type-1",
+					"category": "category-1"
+				}
+			}],
+			"paging": {
+				"total": 1
+			}
+		}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	page, err := c.Accounts.List(ctx, client.WithHasExternalID(true))
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	require.Len(t, page.Accounts, 1)
+	assert.Equal(t, "external-id-1", page.Accounts[0].ExternalID)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -346,6 +385,28 @@ func TestClientAccountsDelete(t *testing.T) {
 	require.NoError(t, err)
 
 	err = c.Accounts.Delete(ctx, "some-id")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientAccountsSetExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/accounts/some-id/external-id", `{
+				"externalId": "external-id-1"
+			}`)
+		},
+		ResponseStatus: 204,
+		ResponseBody:   "",
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Accounts.SetExternalID(ctx, "some-id", "external-id-1")
 	require.NoError(t, err)
 
 	httpClient.AssertNumberOfCalls()
