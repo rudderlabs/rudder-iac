@@ -84,7 +84,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*DestinationState, error) {
 	apiConfig, err := h.localConfigToAPI(data.Type, data.DefinitionVersion, data.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("converting local config to API: %w", err)
 	}
 
 	created, err := h.client.Destinations.Create(ctx, &client.Destination{
@@ -98,9 +98,14 @@ func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*D
 		return nil, fmt.Errorf("creating destination: %w", err)
 	}
 
-	transformationID, err := h.connectTransformationIfPresent(ctx, created.ID, data.Transformation)
+	transformationID, err := h.syncTransformationLink(
+		ctx,
+		created.ID,
+		data.Transformation,
+		"", // no previous transformation ID
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("syncing transformation link: %w", err)
 	}
 
 	return &DestinationState{ID: created.ID, TransformationID: transformationID}, nil
@@ -192,7 +197,7 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, err
 	}
 
-	transformationRef, transformationID, err := h.mapTransformationRef(remote, urnResolver)
+	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,6 +266,8 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 			continue
 		}
 		if !h.registry.IsSupported(d.Type) {
+			// Only destinations which are supported by the registry
+			// in the CLI are considered importable.
 			continue
 		}
 		result = append(result, &RemoteDestination{Destination: d})
@@ -281,8 +288,6 @@ func (h *HandlerImpl) FormatForExport(
 ) ([]writer.FormattableEntity, error) {
 	return nil, fmt.Errorf("export not implemented yet")
 }
-
-// --- helpers ---
 
 // localConfigToAPI resolves the registered definition and converts snake_case
 // config to the camelCase form the API expects, returning JSON-serializable bytes.
@@ -326,15 +331,12 @@ func (h *HandlerImpl) apiConfigToLocal(destType string, version int64, apiConfig
 	return local, nil
 }
 
-// mapTransformationRef resolves the remote transformation link back to a
+// transformationRef resolves the remote transformation link back to a
 // spec-side PropertyRef. When the linked transformation is not CLI-managed
 // (ErrRemoteResourceExternalIdNotFound) the ref is dropped but the remote ID is
 // still tracked in state so the link re-applies on every run — the established
 // tradeoff from the event-stream source handler.
-func (h *HandlerImpl) mapTransformationRef(
-	remote *RemoteDestination,
-	urnResolver handler.URNResolver,
-) (*resources.PropertyRef, string, error) {
+func (h *HandlerImpl) transformationRef(remote *RemoteDestination, urnResolver handler.URNResolver) (*resources.PropertyRef, string, error) {
 	if remote.Transformation == nil || remote.Transformation.ID == "" {
 		return nil, "", nil
 	}
@@ -343,6 +345,8 @@ func (h *HandlerImpl) mapTransformationRef(
 	urn, err := urnResolver.GetURNByID(ttypes.TransformationResourceType, transformationID)
 	if err != nil {
 		if err == resources.ErrRemoteResourceExternalIdNotFound {
+			// It might be a transformation which the upstream user's manually added but
+			// not managed by the CLI yet.
 			return nil, transformationID, nil
 		}
 		return nil, "", fmt.Errorf("resolving transformation URN: %w", err)
@@ -354,24 +358,6 @@ func (h *HandlerImpl) mapTransformationRef(
 	}, transformationID, nil
 }
 
-// connectTransformationIfPresent calls ConnectTransformation when the ref is
-// resolved. Returns the resolved transformation ID ("" when no ref / unresolved).
-func (h *HandlerImpl) connectTransformationIfPresent(
-	ctx context.Context,
-	destinationID string,
-	ref *resources.PropertyRef,
-) (string, error) {
-	transformationID, ok := resolvedTransformationID(ref)
-	if !ok {
-		return "", nil
-	}
-
-	if _, err := h.client.Destinations.ConnectTransformation(ctx, destinationID, transformationID); err != nil {
-		return "", fmt.Errorf("connecting transformation to destination: %w", err)
-	}
-	return transformationID, nil
-}
-
 // syncTransformationLink reconciles the link state during Update. The differ
 // has already flagged the resource as changed; this method picks the right
 // connect/disconnect call based on the new ref vs the previously stored ID.
@@ -381,37 +367,40 @@ func (h *HandlerImpl) syncTransformationLink(
 	newRef *resources.PropertyRef,
 	oldTransformationID string,
 ) (string, error) {
-	newID, hasNewRef := resolvedTransformationID(newRef)
+	newTransformationID, err := resolveTransformationID(newRef)
+	if err != nil {
+		return "", fmt.Errorf("resolving transformation: %w", err)
+	}
 
-	switch {
-	case hasNewRef && oldTransformationID == "":
-		if _, err := h.client.Destinations.ConnectTransformation(ctx, destinationID, newID); err != nil {
-			return "", fmt.Errorf("connecting transformation to destination: %w", err)
-		}
-		return newID, nil
-	case hasNewRef && oldTransformationID != "" && newID != oldTransformationID:
-		// Backend replaces the existing link on connect.
-		if _, err := h.client.Destinations.ConnectTransformation(ctx, destinationID, newID); err != nil {
-			return "", fmt.Errorf("replacing transformation link on destination: %w", err)
-		}
-		return newID, nil
-	case !hasNewRef && oldTransformationID != "":
+	if oldTransformationID == newTransformationID {
+		return newTransformationID, nil
+	}
+
+	if newTransformationID == "" {
 		if _, err := h.client.Destinations.DisconnectTransformation(ctx, destinationID); err != nil {
 			return "", fmt.Errorf("disconnecting transformation from destination: %w", err)
 		}
 		return "", nil
-	default:
-		// No ref and no prior link, or ref unchanged — nothing to do.
-		return oldTransformationID, nil
 	}
+
+	if _, err := h.client.Destinations.ConnectTransformation(ctx, destinationID, newTransformationID); err != nil {
+		return "", fmt.Errorf("connecting transformation to destination: %w", err)
+	}
+
+	return newTransformationID, nil
 }
 
-// resolvedTransformationID extracts the remote ID from a resolved PropertyRef.
-func resolvedTransformationID(ref *resources.PropertyRef) (string, bool) {
-	if ref == nil || !ref.IsResolved || ref.Value == "" {
-		return "", false
+// resolveTransformationID extracts the remote ID from a resolved PropertyRef.
+func resolveTransformationID(ref *resources.PropertyRef) (string, error) {
+	if ref == nil {
+		return "", nil
 	}
-	return ref.Value, true
+
+	if !ref.IsResolved || ref.Value == "" {
+		return "", fmt.Errorf("transformation reference is not resolved or has empty value")
+	}
+
+	return ref.Value, nil
 }
 
 // parseTransformationRef parses a scalar "#transformation:<id>" reference into
@@ -440,7 +429,7 @@ func parseTransformationRef(ref string) (*resources.PropertyRef, error) {
 // "id" property so the differ's comparePropertyRefs sees a stable shape on
 // both the spec and state sides.
 func createTransformationRef(urn string) *resources.PropertyRef {
-	ref := handler.CreatePropertyRef[tmodel.TransformationState](
+	ref := handler.CreatePropertyRef(
 		urn,
 		func(state *tmodel.TransformationState) (string, error) {
 			if state.ID == "" {
