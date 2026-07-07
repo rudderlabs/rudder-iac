@@ -1,6 +1,8 @@
 rule_id: "project/manifest-inline-conflict"
 match_behavior:
   - applies_to:
+      - kind: "accounts"
+        version: "rudder/v1"
       - kind: "categories"
         version: "rudder/0.1"
       - kind: "categories"
