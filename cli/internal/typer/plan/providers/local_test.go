@@ -2,6 +2,9 @@ package providers_test
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"sort"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -253,49 +256,102 @@ func TestLocalCatalogPlanProvider_MatchesRemoteConventions(t *testing.T) {
 }
 
 // TestLocalAndRemoteProduceEquivalentPlan is the guard that justifies having two
-// independent adapters onto plan.TrackingPlan: for the same logical plan, the
+// independent adapters onto plan.TrackingPlan: for the same tracking plan, the
 // local converter and the remote JSON-Schema parser must produce the same rules.
-// (Metadata differs by design — the local plan has no remote URL/version.)
+//
+// Both sides are driven from a shared on-disk fixture rather than hand-authored
+// structs, so a genuine divergence between the two code paths fails here instead
+// of reaching users:
+//   - local: the real sample project testdata/project loaded through the real
+//     offline provider (LoadSpec -> ExpandRefs -> converter);
+//   - remote: a real GetTrackingPlanWithSchemas response captured from a workspace
+//     after applying that same project (regenerate with `go run capture_golden.go`).
+//
+// Metadata differs by design (the local plan has no remote URL/version), so only
+// Rules are compared. Rule order is not part of the contract — local follows spec
+// order, remote follows API order — so they are compared by event name.
 func TestLocalAndRemoteProduceEquivalentPlan(t *testing.T) {
 	ctx := context.Background()
 
-	localPlan, err := providers.NewLocalCatalogPlanProvider(buildCatalog(), "tp").GetTrackingPlan(ctx)
+	local, err := providers.NewLocalCatalogPlanProviderForProject("../testdata/project", "typer-test-tracking-plan")
+	require.NoError(t, err)
+	localPlan, err := local.GetTrackingPlan(ctx)
 	require.NoError(t, err)
 
-	// Hand-authored JSON-Schema representation of the same plan buildCatalog builds.
-	ev := catalog.TrackingPlanEventSchema{
-		Name:            "My Event",
-		Description:     "an event",
-		EventType:       "track",
-		IdentitySection: "properties",
-	}
-	ev.Rules.Type = "object"
-	ev.Rules.Properties = map[string]any{
-		"properties": map[string]any{
-			"type":                 "object",
-			"additionalProperties": false,
-			"properties": map[string]any{
-				"strProp":  map[string]any{"type": "string"},
-				"enumProp": map[string]any{"type": "string", "enum": []any{"a", "b"}},
-				"arrProp":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-				"custProp": map[string]any{"$ref": "#/$defs/Email"},
-				"objProp": map[string]any{
-					"type":                 "object",
-					"additionalProperties": true,
-					"properties":           map[string]any{"childProp": map[string]any{"type": "integer"}},
-					"required":             []any{"childProp"},
-				},
-			},
-			"required": []any{"strProp"},
-		},
-	}
-	ev.Rules.Defs = map[string]any{
-		"Email": map[string]any{"type": "string", "enum": []any{"x"}},
-	}
-
-	remoteResp := constructTrackingPlanWithSchemas("tp", "TP", []catalog.TrackingPlanEventSchema{ev})
-	remotePlan, err := providers.NewJSONSchemaPlanProvider("tp", &mockTrackingPlanStore{trackingPlanWithSchemas: remoteResp}).GetTrackingPlan(ctx)
+	data, err := os.ReadFile("testdata/remote_tracking_plan.golden.json")
 	require.NoError(t, err)
+	var golden catalog.TrackingPlanWithSchemas
+	require.NoError(t, json.Unmarshal(data, &golden))
+	remotePlan, err := providers.NewJSONSchemaPlanProvider("tp", &mockTrackingPlanStore{trackingPlanWithSchemas: &golden}).GetTrackingPlan(ctx)
+	require.NoError(t, err)
+
+	byEvent := func(rules []plan.EventRule) {
+		sort.Slice(rules, func(i, j int) bool { return rules[i].Event.Name < rules[j].Event.Name })
+	}
+	byEvent(localPlan.Rules)
+	byEvent(remotePlan.Rules)
+
+	// Known, documented asymmetry: a variant case's DisplayName/Description are
+	// carried by the local specs but not by the remote JSON-Schema wire format
+	// (the allOf/if/then envelope has nowhere to put them — see jsonschema.go's
+	// "could be extracted from metadata if available"). Local is the richer side
+	// here; rather than degrade it to match, we blank these two fields on both
+	// sides before comparing, so the test still guards every structural field.
+	// Everything else must be byte-identical.
+	blankVariantLabels(localPlan.Rules)
+	blankVariantLabels(remotePlan.Rules)
 
 	assert.Equal(t, remotePlan.Rules, localPlan.Rules)
+}
+
+// blankVariantLabels clears the two variant-case fields the remote wire format
+// cannot carry (DisplayName, Description) everywhere they can appear — event-rule
+// variants and variants nested inside object custom types — so the equivalence
+// assertion compares only what both paths can represent. See the call site for
+// the rationale. Custom types are pointer-shared and can be cyclic, so a visited
+// set bounds the walk.
+func blankVariantLabels(rules []plan.EventRule) {
+	seen := map[*plan.CustomType]bool{}
+	var walkSchema func(*plan.ObjectSchema)
+	var walkVariants func([]plan.Variant)
+	var walkType func(plan.PropertyType)
+
+	walkType = func(t plan.PropertyType) {
+		ct := plan.AsCustomType(t)
+		if ct == nil || seen[ct] {
+			return
+		}
+		seen[ct] = true
+		walkSchema(ct.Schema)
+		walkType(ct.ItemType)
+		walkVariants(ct.Variants)
+	}
+	walkSchema = func(s *plan.ObjectSchema) {
+		if s == nil {
+			return
+		}
+		for _, ps := range s.Properties {
+			for _, t := range ps.Property.Types {
+				walkType(t)
+			}
+			for _, t := range ps.Property.ItemTypes {
+				walkType(t)
+			}
+			walkSchema(ps.Schema)
+		}
+	}
+	walkVariants = func(vs []plan.Variant) {
+		for i := range vs {
+			for j := range vs[i].Cases {
+				vs[i].Cases[j].DisplayName = ""
+				vs[i].Cases[j].Description = ""
+				walkSchema(&vs[i].Cases[j].Schema)
+			}
+			walkSchema(vs[i].DefaultSchema)
+		}
+	}
+	for i := range rules {
+		walkSchema(&rules[i].Schema)
+		walkVariants(rules[i].Variants)
+	}
 }
