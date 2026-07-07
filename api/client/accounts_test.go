@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -408,6 +409,36 @@ func TestClientAccountsSetExternalID(t *testing.T) {
 
 	err = c.Accounts.SetExternalID(ctx, "some-id", "external-id-1")
 	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientAccountsSetExternalIDConflictReturnsAPIError(t *testing.T) {
+	ctx := context.Background()
+	conflictMessage := "externalId already exists for another account"
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/accounts/some-id/external-id", `{
+				"externalId": "external-id-1"
+			}`)
+		},
+		ResponseStatus: 409,
+		ResponseBody:   `{"message":"externalId already exists for another account"}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Accounts.SetExternalID(ctx, "some-id", "external-id-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "setting external ID")
+	assert.Contains(t, err.Error(), conflictMessage)
+
+	var apiErr *client.APIError
+	require.True(t, errors.As(err, &apiErr))
+	assert.Equal(t, 409, apiErr.HTTPStatusCode)
+	assert.Contains(t, apiErr.Error(), conflictMessage)
 
 	httpClient.AssertNumberOfCalls()
 }
