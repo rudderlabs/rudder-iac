@@ -80,6 +80,12 @@
 - Destination versioning is represented on the public client DTO as `Destination.Version` and `Destination.VersionInfo`, allowing Create, Update, and Get paths to share one contract type.
 - Optional destination version metadata flows through the existing shared service helper and response unmarshal path without separate service-method changes.
 
+## INT-6671 — RETL Sync Behaviour Request Versus Response Contract
+<!-- ticket:INT-6671 -->
+- `CreateRETLConnectionRequest` in `api/client/retl/connection_types.go` owns the request-only `syncBehaviour` contract and models it as optional, so nil create requests omit the JSON key.
+- `RETLConnection.SyncBehaviour` in the same file intentionally remains a non-pointer value field because create/list/get responses should continue exposing the resolved server mode.
+- Keep RETL create-request DTO changes separate from RETL response DTO changes; request optionality should not erase the resolved sync mode returned by the API.
+
 ## RUD-2899 — DataGraph General Availability Wiring
 <!-- ticket:RUD-2899 -->
 - DataGraph is now a default project/provider capability rather than an experimental feature: dependency assembly should initialize `providers.DataGraph` and include `"datagraph"` in the composite provider map unconditionally alongside DataCatalog, RETL, EventStream, and Transformations.
