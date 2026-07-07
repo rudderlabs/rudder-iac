@@ -12,10 +12,14 @@ type ParseSpecFunc func(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 
 type duplicateURNRule struct {
 	parseSpec ParseSpecFunc
+	patterns  []rules.MatchPattern
 }
 
-func NewDuplicateURNRule(parseSpec ParseSpecFunc) rules.Rule {
-	return &duplicateURNRule{parseSpec: parseSpec}
+// NewDuplicateURNRule scopes the rule to the given resource match patterns. The
+// engine delivers only specs matching these patterns (see MultiSpecRule), so
+// non-resource kinds such as import-manifest are never handed to this rule.
+func NewDuplicateURNRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
+	return &duplicateURNRule{parseSpec: parseSpec, patterns: patterns}
 }
 
 func (r *duplicateURNRule) ID() string               { return "project/duplicate-urn" }
@@ -24,22 +28,22 @@ func (r *duplicateURNRule) Description() string {
 	return "URNs must be unique across the project"
 }
 func (r *duplicateURNRule) AppliesTo() []rules.MatchPattern {
-	return []rules.MatchPattern{rules.MatchAll()}
+	return r.patterns
 }
 func (r *duplicateURNRule) Examples() rules.Examples {
 	return rules.Examples{}
 }
 
-// Validate is a no-op — this rule operates as a ProjectRule via ValidateProject.
+// Validate is a no-op — this rule operates as a MultiSpecRule via ValidateSpecs.
 func (r *duplicateURNRule) Validate(_ *rules.ValidationContext) []rules.ValidationResult {
 	return nil
 }
 
-// ValidateProject checks for duplicate URNs across all specs.
+// ValidateSpecs checks for duplicate URNs across all specs.
 // URNs encode the resource type, so duplicates are only flagged when both
 // the type and local ID match. This correctly allows the same local ID
 // across different resource types.
-func (r *duplicateURNRule) ValidateProject(allSpecs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+func (r *duplicateURNRule) ValidateSpecs(allSpecs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 	type occurrence struct {
 		filePath string
 		jsonPath string

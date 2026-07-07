@@ -10,6 +10,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -125,27 +126,33 @@ func (h *Handler) loadImportMetadata(s *specs.Spec) error {
 	if err != nil {
 		return err
 	}
+	return h.LoadImportMetadata(metadata.Import)
+}
 
-	if metadata.Import != nil {
-		workspaces := metadata.Import.Workspaces
-		for _, workspaceMetadata := range workspaces {
-			workspaceId := workspaceMetadata.WorkspaceID
-			for _, resourceMetadata := range workspaceMetadata.Resources {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resourceMetadata.URN != "" {
-					urn = resourceMetadata.URN
-				} else {
-					urn = resources.URN(resourceMetadata.LocalID, ResourceType)
-				}
-				importMetadata[urn] = &ImportResourceInfo{
-					WorkspaceId: workspaceId,
-					RemoteId:    resourceMetadata.RemoteID,
-				}
+// LoadImportMetadata populates the package-level importMetadata map from an
+// aggregated WorkspacesImportMetadata payload. Shared by inline metadata.import
+// processing (loadImportMetadata) and central import-manifest broadcast
+// (retl.Provider.LoadImportManifest). Nil-safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, workspaceMetadata := range m.Workspaces {
+		workspaceId := workspaceMetadata.WorkspaceID
+		for _, resourceMetadata := range workspaceMetadata.Resources {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resourceMetadata.URN != "" {
+				urn = resourceMetadata.URN
+			} else {
+				urn = resources.URN(resourceMetadata.LocalID, ResourceType)
+			}
+			importMetadata[urn] = &ImportResourceInfo{
+				WorkspaceId: workspaceId,
+				RemoteId:    resourceMetadata.RemoteID,
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -472,23 +479,24 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	return collection, nil
 }
 
-func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
 	var result []writer.FormattableEntity
+	var entries []importmanifest.ImportEntry
 	for _, source := range sources {
 		sourceData, ok := source.Data.(*retlClient.RETLSource)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast resource to retl source")
+			return nil, nil, fmt.Errorf("unable to cast resource to retl source")
 		}
 		cfg, err := retlClient.DecodeConfig[retlClient.RETLSQLModelConfig](sourceData.Config)
 		if err != nil {
-			return nil, fmt.Errorf("decoding SQL model config for source %s: %w", sourceData.ID, err)
+			return nil, nil, fmt.Errorf("decoding SQL model config for source %s: %w", sourceData.ID, err)
 		}
 		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
@@ -498,6 +506,11 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 				RemoteID: source.ID,
 			},
 		}
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: sourceData.WorkspaceID,
+			URN:         urn,
+			RemoteID:    source.ID,
+		})
 
 		metadata := specs.Metadata{
 			Name: source.ExternalID,
@@ -508,7 +521,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 
 		metadataMap, err := metadata.ToMap()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		spec := &specs.Spec{
@@ -531,7 +544,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 func toResourceData(source *retlClient.RETLSource) (*resources.ResourceData, error) {

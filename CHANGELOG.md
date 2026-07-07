@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.19.0](https://github.com/rudderlabs/rudder-iac/compare/v0.18.0...v0.19.0) (2026-07-07)
+
+
+### Features
+
+* add account external-id client support ([#638](https://github.com/rudderlabs/rudder-iac/issues/638)) ([4ed7443](https://github.com/rudderlabs/rudder-iac/commit/4ed7443431b924ee0e74ff891ea0712fc0c08639))
+* add destination externalId support to iac client ([#640](https://github.com/rudderlabs/rudder-iac/issues/640)) ([ee983f8](https://github.com/rudderlabs/rudder-iac/commit/ee983f8768b91d709323f68718b0fb1a7f7e4065))
+* add destination version fields to client ([#625](https://github.com/rudderlabs/rudder-iac/issues/625)) ([9da6a97](https://github.com/rudderlabs/rudder-iac/commit/9da6a973d89ceb353b343805d285e3016eb55be2))
+* add import-manifest semantic validation rules ([#630](https://github.com/rudderlabs/rudder-iac/issues/630)) ([8c18575](https://github.com/rudderlabs/rudder-iac/commit/8c18575f835799b2793093b86edeb7af5c5cf7c6))
+* add import-manifest syntactic validation rules ([#627](https://github.com/rudderlabs/rudder-iac/issues/627)) ([6843c7d](https://github.com/rudderlabs/rudder-iac/commit/6843c7dbfff39f199f27ad3a55d044ba0ba5d473))
+* add manifest-inline conflict rule ([#629](https://github.com/rudderlabs/rudder-iac/issues/629)) ([4275ecf](https://github.com/rudderlabs/rudder-iac/commit/4275ecf51bb197d3256f10cd51a9e068f2bbea86))
+* **api:** add destination transformation connect/disconnect/get client ([#645](https://github.com/rudderlabs/rudder-iac/issues/645)) ([02deebe](https://github.com/rudderlabs/rudder-iac/commit/02deebecebb6da9c059d6b11ad5d89ffef6c64a0))
+* **api:** add GetAll pagination helper for destinations ([#646](https://github.com/rudderlabs/rudder-iac/issues/646)) ([65882d2](https://github.com/rudderlabs/rudder-iac/commit/65882d244c62bad6fb84404e4850a417e43f4420))
+* **api:** deserialize embedded destination transformation link ([#652](https://github.com/rudderlabs/rudder-iac/issues/652)) ([907b04c](https://github.com/rudderlabs/rudder-iac/commit/907b04cd5c0e0cc5b9d89086cc64184966ade6fa))
+* broadcast import-manifest into resource providers via consumer interface ([#632](https://github.com/rudderlabs/rudder-iac/issues/632)) ([40c5aa4](https://github.com/rudderlabs/rudder-iac/commit/40c5aa46e940105e35d442539720afafcb78c1f8))
+* **cli:** add destination definition registry framework ([#635](https://github.com/rudderlabs/rudder-iac/issues/635)) ([2df8551](https://github.com/rudderlabs/rudder-iac/commit/2df8551697684b9b8a143a7903dd8922f9335ab9))
+* **cli:** add destination handler with CRUD lifecycle and state mapping ([#655](https://github.com/rudderlabs/rudder-iac/issues/655)) ([12825a4](https://github.com/rudderlabs/rudder-iac/commit/12825a4f75c095d382364e98b5333a0018cf9178))
+* **cli:** make data graph generally available ([#654](https://github.com/rudderlabs/rudder-iac/issues/654)) ([70859d7](https://github.com/rudderlabs/rudder-iac/commit/70859d7d75bd3fe54a1fe1bbeff1254c43cda400))
+* **import:** emit import-manifest entries from export and write import-manifest yaml ([#634](https://github.com/rudderlabs/rudder-iac/issues/634)) ([a7a97fd](https://github.com/rudderlabs/rudder-iac/commit/a7a97fd3c22d1cc7672ec35a13907938b44b347b))
+
+
+### Bug Fixes
+
+* make retl create sync behaviour optional ([#639](https://github.com/rudderlabs/rudder-iac/issues/639)) ([d0e812f](https://github.com/rudderlabs/rudder-iac/commit/d0e812f22d92f1e2b40369cbbf6a3784abdd6827))
+
+
+### Miscellaneous
+
+* make the claude.md file LLM agnostic by symlinking it with agent.md ([#584](https://github.com/rudderlabs/rudder-iac/issues/584)) ([d5bff01](https://github.com/rudderlabs/rudder-iac/commit/d5bff0122be0f500f4bc20ad0883b1cc0b1be01f))
+* rename ProjectRule to MultipleResourceRule and filter specs per rule ([#621](https://github.com/rudderlabs/rudder-iac/issues/621)) ([a885297](https://github.com/rudderlabs/rudder-iac/commit/a88529719d675779d79d48e10be71a7d168d4f7f))
+* scope manifest-inline-conflict to (workspace_id, urn) with remote_id check and merge manifest workspaces ([#647](https://github.com/rudderlabs/rudder-iac/issues/647)) ([3eb4ca5](https://github.com/rudderlabs/rudder-iac/commit/3eb4ca565ac0488048cf8592763e2aa9009e7c63))
+
+## [0.18.0](https://github.com/rudderlabs/rudder-iac/compare/v0.17.0...v0.18.0) (2026-06-19)
+
+
+### Features
+
+* add accounts CUD to API client ([#617](https://github.com/rudderlabs/rudder-iac/issues/617)) ([1a80346](https://github.com/rudderlabs/rudder-iac/commit/1a803468fa33c96fd11ad582754552bbe3d7e44b))
+* **datagraph:** add pii_mask to column-metadata CLI and client ([#618](https://github.com/rudderlabs/rudder-iac/issues/618)) ([396922c](https://github.com/rudderlabs/rudder-iac/commit/396922c502801da646b9427440f61c0c5597b450))
+* import manifest provider and classifier ([#603](https://github.com/rudderlabs/rudder-iac/issues/603)) ([9d3608d](https://github.com/rudderlabs/rudder-iac/commit/9d3608d9e443113b056899131261a08b87a771ad))
+* **import:** scaffold secrets as variable references with a companion var file (DEX-410) ([#616](https://github.com/rudderlabs/rudder-iac/issues/616)) ([0ed8e50](https://github.com/rudderlabs/rudder-iac/commit/0ed8e508eef9dfae81618fe2d386397d5521ddbb))
+* **secret:** add self-redacting secret.String value type (DEX-407) ([#608](https://github.com/rudderlabs/rudder-iac/issues/608)) ([3c86797](https://github.com/rudderlabs/rudder-iac/commit/3c86797c0cfd98db1ac39b0aaaee314b63990130))
+* **syncer:** make the apply-cycle diff secret-aware (DEX-408) ([#614](https://github.com/rudderlabs/rudder-iac/issues/614)) ([63d55b3](https://github.com/rudderlabs/rudder-iac/commit/63d55b366b737d708074db79f5585840b8fb145b))
+* **varsubst:** require .vars.yaml or .vars.yml suffix for all var files ([#624](https://github.com/rudderlabs/rudder-iac/issues/624)) ([15e3236](https://github.com/rudderlabs/rudder-iac/commit/15e323668214b6b403a747df60cf6bfcd397326b))
+
+
+### Miscellaneous
+
+* add WithWorkspaceID project option and resolve workspace before project load ([#602](https://github.com/rudderlabs/rudder-iac/issues/602)) ([6c03ce2](https://github.com/rudderlabs/rudder-iac/commit/6c03ce24cd349a98ee0813a53c78268add64f158))
+
 ## [0.17.0](https://github.com/rudderlabs/rudder-iac/compare/v0.16.0...v0.17.0) (2026-06-05)
 
 

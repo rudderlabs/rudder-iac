@@ -7,6 +7,7 @@ import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // mockFieldError is a mock implementation of validator.FieldError for testing
@@ -16,12 +17,13 @@ type mockFieldError struct {
 	actualTag       string
 	kind            reflect.Kind
 	param           string
+	namespace       string
 	structNamespace string
 }
 
 func (m mockFieldError) Tag() string             { return m.tag }
 func (m mockFieldError) ActualTag() string       { return m.actualTag }
-func (m mockFieldError) Namespace() string       { return "" }
+func (m mockFieldError) Namespace() string       { return m.namespace }
 func (m mockFieldError) StructNamespace() string { return m.structNamespace }
 func (m mockFieldError) Field() string           { return m.field }
 func (m mockFieldError) StructField() string     { return "" }
@@ -302,7 +304,7 @@ func TestGetErrorMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getErrorMessage(tt.err, nil)
+			result := getErrorMessage(tt.err, nil, nil)
 			assert.Contains(t, result, tt.expected)
 		})
 	}
@@ -354,7 +356,7 @@ func TestGetErrorMessage_CrossFieldWithRootType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getErrorMessage(tt.err, rootType)
+			result := getErrorMessage(tt.err, rootType, nil)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -365,28 +367,28 @@ func TestResolveFieldDisplayName(t *testing.T) {
 
 	t.Run("nil rootType falls back to struct name", func(t *testing.T) {
 		err := mockFieldError{structNamespace: "Spec.SQL"}
-		result := resolveFieldDisplayName("File", err, nil)
+		result := resolveFieldDisplayName("File", err, nil, nil)
 		assert.Equal(t, "File", result)
 	})
 
 	t.Run("resolves top-level field JSON tag", func(t *testing.T) {
 		rootType := reflect.TypeOf(testParentSpec{})
 		err := mockFieldError{structNamespace: "testParentSpec.SQL"}
-		result := resolveFieldDisplayName("File", err, rootType)
+		result := resolveFieldDisplayName("File", err, rootType, nil)
 		assert.Equal(t, "file", result)
 	})
 
 	t.Run("resolves nested field JSON tag", func(t *testing.T) {
 		rootType := reflect.TypeOf(testParentSpec{})
 		err := mockFieldError{structNamespace: "testParentSpec.Inner.FieldA"}
-		result := resolveFieldDisplayName("FieldB", err, rootType)
+		result := resolveFieldDisplayName("FieldB", err, rootType, nil)
 		assert.Equal(t, "field_b", result)
 	})
 
 	t.Run("unknown field falls back to struct name", func(t *testing.T) {
 		rootType := reflect.TypeOf(testParentSpec{})
 		err := mockFieldError{structNamespace: "testParentSpec.SQL"}
-		result := resolveFieldDisplayName("NonExistent", err, rootType)
+		result := resolveFieldDisplayName("NonExistent", err, rootType, nil)
 		assert.Equal(t, "NonExistent", result)
 	})
 }
@@ -416,6 +418,58 @@ func TestParseValidationErrors(t *testing.T) {
 	t.Run("returns empty for no errors", func(t *testing.T) {
 		errs := validator.ValidationErrors{}
 		results := ParseValidationErrors(errs, nil)
+		assert.Empty(t, results)
+	})
+}
+
+type testMapstructureConfig struct {
+	APISecret     string                  `json:"api_secret" mapstructure:"api_secret" validate:"required"`
+	TypesOfClient string                  `json:"types_of_client" mapstructure:"types_of_client" validate:"required"`
+	MeasurementID string                  `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
+	ConnectionMode testMapstructureConnMode `json:"connection_mode" mapstructure:"connection_mode"`
+}
+
+type testMapstructureConnMode struct {
+	Web *string `json:"web" mapstructure:"web" validate:"omitempty,oneof=cloud device hybrid"`
+}
+
+func TestParseMapstructureValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	rootType := reflect.TypeOf(testMapstructureConfig{})
+
+	t.Run("uses mapstructure paths and cross-field tag names", func(t *testing.T) {
+		// Simulate what ValidateStructWithTagPriority([]string{"mapstructure"}) produces:
+		// err.Namespace() uses mapstructure tags, err.StructNamespace() keeps Go field names.
+		errs := validator.ValidationErrors{
+			mockFieldError{
+				field:           "measurement_id",
+				actualTag:       "required_if",
+				param:           "TypesOfClient gtag",
+				namespace:       "testMapstructureConfig.measurement_id",
+				structNamespace: "testMapstructureConfig.MeasurementID",
+			},
+			mockFieldError{
+				field:           "web",
+				actualTag:       "oneof",
+				param:           "cloud device hybrid",
+				namespace:       "testMapstructureConfig.connection_mode.web",
+				structNamespace: "testMapstructureConfig.ConnectionMode.Web",
+			},
+		}
+
+		results := ParseMapstructureValidationErrors(errs, rootType)
+		require.Len(t, results, 2)
+
+		assert.Equal(t, "/measurement_id", results[0].Reference)
+		assert.Equal(t, "'measurement_id' is required when 'types_of_client' is gtag", results[0].Message)
+
+		assert.Equal(t, "/connection_mode/web", results[1].Reference)
+		assert.Equal(t, "'web' must be one of [cloud device hybrid]", results[1].Message)
+	})
+
+	t.Run("returns empty for no errors", func(t *testing.T) {
+		results := ParseMapstructureValidationErrors(validator.ValidationErrors{}, rootType)
 		assert.Empty(t, results)
 	})
 }

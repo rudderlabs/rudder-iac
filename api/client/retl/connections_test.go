@@ -18,6 +18,8 @@ func intPtr(i int) *int { return &i }
 
 func stringPtr(s string) *string { return &s }
 
+func syncBehaviourPtr(s retl.SyncBehaviour) *retl.SyncBehaviour { return &s }
+
 // assertCall validates an incoming mock HTTP request against the expected
 // method, URL, and JSON body. testutils.ValidateRequest currently ignores its
 // url argument, so we assert the URL here explicitly.
@@ -67,7 +69,7 @@ func TestCreateConnection(t *testing.T) {
 		DestinationID: "dest-456",
 		Enabled:       boolPtr(true),
 		Schedule:      retl.Schedule{Type: retl.ScheduleTypeBasic, EveryMinutes: intPtr(60)},
-		SyncBehaviour: retl.SyncBehaviourUpsert,
+		SyncBehaviour: syncBehaviourPtr(retl.SyncBehaviourUpsert),
 		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
 		Mappings:      []retl.Mapping{{From: "name", To: "first_name"}},
 		Event:         &retl.Event{Type: retl.EventTypeIdentify},
@@ -86,6 +88,45 @@ func TestCreateConnection(t *testing.T) {
 	assert.Equal(t, 60, *created.Schedule.EveryMinutes)
 	assert.Equal(t, []retl.Mapping{{From: "email", To: "user_id"}}, created.Identifiers)
 
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestCreateConnection_OmitsNilSyncBehaviour(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			expected := `{
+				"sourceId": "retl-src-123",
+				"destinationId": "dest-456",
+				"schedule": {"type": "manual"},
+				"identifiers": [{"from": "email", "to": "user_id"}]
+			}`
+			return assertCall(t, req, "POST", "https://api.rudderstack.com/v2/retl-connections", expected)
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "conn-1",
+			"sourceId": "retl-src-123",
+			"destinationId": "dest-456",
+			"enabled": true,
+			"schedule": {"type": "manual"},
+			"syncBehaviour": "upsert",
+			"identifiers": [{"from": "email", "to": "user_id"}]
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	retlClient := retl.NewRudderRETLStore(c)
+
+	created, err := retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{
+		SourceID:      "retl-src-123",
+		DestinationID: "dest-456",
+		Schedule:      retl.Schedule{Type: retl.ScheduleTypeManual},
+		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, retl.SyncBehaviourUpsert, created.SyncBehaviour)
 	httpClient.AssertNumberOfCalls()
 }
 
@@ -363,7 +404,7 @@ func TestCreateConnection_RequiresSchedule(t *testing.T) {
 	_, err = retlClient.CreateConnection(context.Background(), &retl.CreateRETLConnectionRequest{
 		SourceID:      "retl-src-123",
 		DestinationID: "dest-456",
-		SyncBehaviour: retl.SyncBehaviourUpsert,
+		SyncBehaviour: syncBehaviourPtr(retl.SyncBehaviourUpsert),
 		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
 	})
 	require.Error(t, err)
@@ -523,7 +564,7 @@ func TestCreateConnection_CronSchedule(t *testing.T) {
 		SourceID:      "retl-src-123",
 		DestinationID: "dest-456",
 		Schedule:      retl.Schedule{Type: retl.ScheduleTypeCron, CronExpression: stringPtr("0 */6 * * *")},
-		SyncBehaviour: retl.SyncBehaviourUpsert,
+		SyncBehaviour: syncBehaviourPtr(retl.SyncBehaviourUpsert),
 		Identifiers:   []retl.Mapping{{From: "email", To: "user_id"}},
 	})
 	require.NoError(t, err)

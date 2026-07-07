@@ -18,6 +18,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	projectdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
@@ -31,15 +32,20 @@ import (
 // be assembled at all. generatedAt is injected so callers own the timestamp —
 // the real clock in the command, a fixed value in tests.
 func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.DocumentedRules, []error, error) {
-	reg, err := project.BuildRegistry(cp)
+	manifestProvider := importmanifest.New()
+
+	reg, err := project.BuildRegistry(cp, manifestProvider)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
 	}
 
 	// Project-level (gatekeeper) rules are registered outside any provider, so
 	// their authored fragments are embedded here and appended to the
-	// provider-contributed entries.
+	// provider-contributed entries. The import-manifest provider contributes both
+	// its rules (via BuildRegistry) and their fragments (here) — collect from the
+	// same instance so the two stay in sync.
 	entries := cp.RuleDocEntries()
+	entries = append(entries, manifestProvider.RuleDocEntries()...)
 	projectEntries, err := docs.LoadRuleDocEntries(projectdocs.FragmentsFS, ".")
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("loading project rule docs: %w", err)

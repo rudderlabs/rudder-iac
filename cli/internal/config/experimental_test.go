@@ -79,6 +79,13 @@ func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
 }
 
+func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "data" + "Graph"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestGetAvailableExperimentalFlags(t *testing.T) {
 	t.Parallel()
 

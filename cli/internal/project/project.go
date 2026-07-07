@@ -33,6 +33,15 @@ type ProjectProvider interface {
 	provider.TypeProvider
 }
 
+// ImportManifestProvider is a ProjectProvider that also exposes the aggregated
+// import metadata for every loaded manifest, for broadcast into the resource
+// provider tree. It sits parallel to the resource providers; the
+// CompositeProvider never sees the import-manifest kind.
+type ImportManifestProvider interface {
+	ProjectProvider
+	ImportManifest() []specs.WorkspaceImportMetadata
+}
+
 type Project interface {
 	Location() string
 	Load(location string) error
@@ -42,8 +51,8 @@ type Project interface {
 
 type project struct {
 	location               string
-	provider               ProjectProvider
-	importManifestProvider ProjectProvider
+	provider               provider.Provider
+	importManifestProvider ImportManifestProvider
 	loader                 Loader
 	workspaceID            string
 	specs                  map[string]*specs.Spec
@@ -220,6 +229,24 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		}
 	}
 
+	// Broadcast the active workspace's import-manifest into the resource provider
+	// tree before graph construction, so handlers attach ImportMetadata from the
+	// same maps that inline metadata.import populates. Inline metadata is loaded
+	// during the loadSpec loop above; this runs after, so the manifest wins on URN
+	// overlap (last writer).
+	//
+	// Scoping to a single workspace is done here (not in the provider) so a URN
+	// maps to at most one remote ID per handler.
+	for _, ws := range p.importManifestProvider.ImportManifest() {
+		if ws.WorkspaceID != p.workspaceID {
+			continue
+		}
+		if err := p.provider.LoadImportManifest(&ws); err != nil {
+			return fmt.Errorf("broadcasting import manifest: %w", err)
+		}
+		break
+	}
+
 	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
@@ -233,7 +260,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
-	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph)
+	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
@@ -316,32 +343,47 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	return BuildRegistry(p.provider)
+	return BuildRegistry(p.provider, p.importManifestProvider)
 }
 
-// BuildRegistry constructs the validation rule registry for a provider. It is
-// shared by project loading and the docs generator so both observe an identical
-// rule set built from the provider's supported match patterns.
-func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
-	// Active patterns become the source of truth for the
-	// validation pipeline to determine which unique kinds and versions
-	// are supported in the system.
-	activePatterns := provider.SupportedMatchPatterns()
+// BuildRegistry constructs the validation rule registry from the resource
+// provider and the project-level import-manifest provider. It is shared by
+// project loading and the docs generator so both observe an identical rule set.
+//
+// The two providers' match patterns are unioned into the active set so the
+// gatekeeper rules treat both resource kinds and import-manifest as known. The
+// resource-scoped gatekeepers (metadata-syntax-valid, duplicate-urn) are scoped
+// to resourcePatterns alone so the engine never hands them a manifest spec.
+func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, error) {
+	resourcePatterns := provider.SupportedMatchPatterns()
+	manifestPatterns := manifestProvider.SupportedMatchPatterns()
+
+	// Union of both providers' patterns: the source of truth for which kinds and
+	// versions the validation pipeline treats as known.
+	activePatterns := append(append([]rules.MatchPattern{}, resourcePatterns...), manifestPatterns...)
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
-		// GatekeeperRules: MatchAll rules, checks structure + known kinds/versions
-		// independently. spec-syntax-valid and resource-kind-version-valid use
-		// activePatterns as source of truth for the supported kinds and versions.
-		// metadata-syntax-valid and duplicate-urn match all specs and do not
-		// consume activePatterns.
+		// Gatekeeper rules (spec-syntax-valid, resource-kind-version-valid) keep
+		// MatchAll AppliesTo and use activePatterns as the source of truth for the
+		// supported kinds and versions.
 		prules.NewSpecSyntaxValidRule(activePatterns),
 		prules.NewResourceKindVersionValidRule(activePatterns),
 
-		prules.NewMetadataSyntaxValidRule(provider.ParseSpec),
-		prules.NewDuplicateURNRule(provider.ParseSpec),
+		// metadata-syntax-valid and duplicate-urn are scoped to resourcePatterns so
+		// the engine only hands them resource specs — the import-manifest kind is
+		// excluded. See MultiSpecRule filtering.
+		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
+		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
+
+		// Cross-source: a (workspace_id, urn) must not appear in both an
+		// import-manifest and an inline metadata.import block with differing
+		// remote_ids. Applies to the union (both kinds); needs the resource
+		// ParseSpec to resolve inline local_id entries.
+		prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns),
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
+	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -349,7 +391,8 @@ func BuildRegistry(provider ProjectProvider) (rules.Registry, error) {
 		}
 	}
 
-	for _, rule := range provider.SemanticRules() {
+	semantic := append(provider.SemanticRules(), manifestProvider.SemanticRules()...)
+	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)
 		}

@@ -62,12 +62,52 @@ func TestProvider_LoadLegacySpec_Unsupported(t *testing.T) {
 	assert.Contains(t, err.Error(), "does not support legacy version")
 }
 
-func TestProvider_ParseSpec_Empty(t *testing.T) {
+func TestProvider_ParseSpec_ExtractsURNs(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := New().ParseSpec("a.yaml", manifestSpec("ws-1"))
+	spec := manifestSpec("ws-1",
+		specs.ImportIds{URN: "source:src-1", RemoteID: "remote-1"},
+		specs.ImportIds{URN: "destination:dst-1", RemoteID: "remote-2"},
+	)
+
+	parsed, err := New().ParseSpec("a.yaml", spec)
 	require.NoError(t, err)
-	assert.Equal(t, &specs.ParsedSpec{}, parsed)
+	assert.Equal(t, &specs.ParsedSpec{
+		URNs: []specs.URNEntry{
+			{URN: "source:src-1", JSONPointerPath: "/spec/workspaces/0/resources/0/urn"},
+			{URN: "destination:dst-1", JSONPointerPath: "/spec/workspaces/0/resources/1/urn"},
+		},
+	}, parsed)
+}
+
+func TestProvider_ParseSpec_MultiWorkspace(t *testing.T) {
+	t.Parallel()
+
+	spec := &specs.Spec{
+		Kind:    KindImportManifest,
+		Version: specs.SpecVersionV1,
+		Spec: map[string]any{
+			"workspaces": []any{
+				map[string]any{
+					"workspace_id": "ws-1",
+					"resources":    []any{map[string]any{"urn": "source:src-1", "remote_id": "r1"}},
+				},
+				map[string]any{
+					"workspace_id": "ws-2",
+					"resources":    []any{map[string]any{"urn": "source:src-2", "remote_id": "r2"}},
+				},
+			},
+		},
+	}
+
+	parsed, err := New().ParseSpec("a.yaml", spec)
+	require.NoError(t, err)
+	assert.Equal(t, &specs.ParsedSpec{
+		URNs: []specs.URNEntry{
+			{URN: "source:src-1", JSONPointerPath: "/spec/workspaces/0/resources/0/urn"},
+			{URN: "source:src-2", JSONPointerPath: "/spec/workspaces/1/resources/0/urn"},
+		},
+	}, parsed)
 }
 
 func TestProvider_ResourceGraph_Empty(t *testing.T) {
@@ -79,10 +119,75 @@ func TestProvider_ResourceGraph_Empty(t *testing.T) {
 	assert.Empty(t, graph.Resources())
 }
 
-func TestProvider_RuleSets_NilForNow(t *testing.T) {
+func TestProvider_RuleSets(t *testing.T) {
 	t.Parallel()
 
 	p := New()
-	assert.Nil(t, p.SyntacticRules())
-	assert.Nil(t, p.SemanticRules())
+
+	syntactic := p.SyntacticRules()
+	ids := make([]string, 0, len(syntactic))
+	for _, r := range syntactic {
+		ids = append(ids, r.ID())
+	}
+	assert.Equal(t, []string{
+		"import-manifest/spec-syntax-valid",
+		"import-manifest/duplicate-urn",
+	}, ids)
+
+	semantic := p.SemanticRules()
+	semanticIDs := make([]string, 0, len(semantic))
+	for _, r := range semantic {
+		semanticIDs = append(semanticIDs, r.ID())
+	}
+	assert.Equal(t, []string{"import-manifest/orphaned-urn"}, semanticIDs)
+}
+
+func TestProvider_ImportManifest(t *testing.T) {
+	t.Parallel()
+
+	wsB := specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-b",
+		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-b"}},
+	}
+
+	t.Run("empty when no specs loaded", func(t *testing.T) {
+		p := New()
+		assert.Empty(t, p.ImportManifest())
+	})
+
+	t.Run("returns one entry per workspace", func(t *testing.T) {
+		p := New()
+		require.NoError(t, p.LoadSpec("a.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-a"})))
+		require.NoError(t, p.LoadSpec("b.yaml", manifestSpec("ws-b",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-b"})))
+
+		assert.Equal(t, []specs.WorkspaceImportMetadata{
+			{WorkspaceID: "ws-a", Resources: []specs.ImportIds{{URN: "event:login", RemoteID: "rem-a"}}},
+			wsB,
+		}, p.ImportManifest())
+	})
+
+	t.Run("merges resources of a workspace split across files", func(t *testing.T) {
+		p := New()
+		// ws-a is declared in two files, each contributing a different URN;
+		// ws-b is interleaved to confirm ordering is preserved.
+		require.NoError(t, p.LoadSpec("a1.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-a"})))
+		require.NoError(t, p.LoadSpec("b.yaml", manifestSpec("ws-b",
+			specs.ImportIds{URN: "event:login", RemoteID: "rem-b"})))
+		require.NoError(t, p.LoadSpec("a2.yaml", manifestSpec("ws-a",
+			specs.ImportIds{URN: "event:signup", RemoteID: "rem-c"})))
+
+		assert.Equal(t, []specs.WorkspaceImportMetadata{
+			{
+				WorkspaceID: "ws-a",
+				Resources: []specs.ImportIds{
+					{URN: "event:login", RemoteID: "rem-a"},
+					{URN: "event:signup", RemoteID: "rem-c"},
+				},
+			},
+			wsB,
+		}, p.ImportManifest())
+	})
 }

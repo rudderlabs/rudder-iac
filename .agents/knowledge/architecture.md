@@ -73,3 +73,27 @@
 - Workspace event-stream source listing is intentionally implemented at CLI/provider layers, not by changing control-plane or low-level API client behavior.
 - The command entry delegates through provider `List` dispatch into source handler list logic, preserving existing list-command architecture and keeping blast radius limited.
 - This layering relies on pre-existing paginated source retrieval in the event stream API client, so feature additions can be composed above client transport when read-path primitives already exist.
+
+## INT-6489 — Destination API Versioning DTO Surface
+<!-- ticket:INT-6489 -->
+- The shared API client owns destination DTO shape and CRUD transport in `api/client/destinations.go`, so public API destination contract fields should be modeled there first.
+- Destination versioning is represented on the public client DTO as `Destination.Version` and `Destination.VersionInfo`, allowing Create, Update, and Get paths to share one contract type.
+- Optional destination version metadata flows through the existing shared service helper and response unmarshal path without separate service-method changes.
+
+## INT-6671 — RETL Sync Behaviour Request Versus Response Contract
+<!-- ticket:INT-6671 -->
+- `CreateRETLConnectionRequest` in `api/client/retl/connection_types.go` owns the request-only `syncBehaviour` contract and models it as optional, so nil create requests omit the JSON key.
+- `RETLConnection.SyncBehaviour` in the same file intentionally remains a non-pointer value field because create/list/get responses should continue exposing the resolved server mode.
+- Keep RETL create-request DTO changes separate from RETL response DTO changes; request optionality should not erase the resolved sync mode returned by the API.
+
+## RUD-2899 — DataGraph General Availability Wiring
+<!-- ticket:RUD-2899 -->
+- DataGraph is now a default project/provider capability rather than an experimental feature: dependency assembly should initialize `providers.DataGraph` and include `"datagraph"` in the composite provider map unconditionally alongside DataCatalog, RETL, EventStream, and Transformations.
+- The `data-graphs` command is intended to be visible in the root Cobra command tree by default; command visibility should not depend on `ExperimentalFlags.DataGraph`.
+- DataGraph GA means project-level validation and apply flows can encounter `kind: data-graph` / `version: rudder/v1` specs without opt-in, so shared project gatekeeper rule surfaces need to account for that match pattern.
+
+## RUD-2860 — Destination External ID Mutation Boundary
+<!-- ticket:RUD-2860 -->
+- Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
+- Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
+- Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.

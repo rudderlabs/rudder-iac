@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -23,6 +24,10 @@ type resourceHandler interface {
 	// The path parameter specifies the location of the spec file, and s contains
 	// the parsed spec data. Returns an error if the spec is invalid or cannot be loaded.
 	LoadSpec(path string, s *specs.Spec) error
+
+	// LoadImportMetadata populates the handler's import-metadata state from an
+	// aggregated manifest, mirroring inline metadata.import. Nil-safe.
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 
 	// GetResources returns all resources managed by this handler.
 	// The returned resources will be added to the resource graph for
@@ -85,5 +90,5 @@ type resourceHandler interface {
 	// The idNamer is used to generate unique IDs for the resources.
 	// The inputResolver is used to resolve references to other resources.
 	// Returns a list of importable entities or an error if formatting fails.
-	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error)
+	FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
