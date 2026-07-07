@@ -299,13 +299,16 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 	// (unlike the list endpoint used by LoadImportableResources), so it's
 	// fetched separately. No existing link is treated the same as an error
 	// here since the API has no "not found" sentinel for this sub-resource.
-	existingTransformationID := ""
-	if trans, err := h.client.Destinations.GetTransformation(ctx, remoteId); err == nil && trans != nil {
-		existingTransformationID = trans.TransformationID
+	connectedTransformation, err := h.client.Destinations.GetTransformation(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting transformation during import: %w", err)
 	}
 
 	oldData := &DestinationResource{Type: remote.Type}
-	oldState := &DestinationState{ID: remoteId, TransformationID: existingTransformationID}
+	oldState := &DestinationState{
+		ID:               remoteId,
+		TransformationID: connectedTransformation.TransformationID,
+	}
 
 	newState, err := h.Update(ctx, data, oldData, oldState)
 	if err != nil {
@@ -401,7 +404,10 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	}
 
 	if remote.Transformation != nil && remote.Transformation.ID != "" {
-		ref, err := inputResolver.ResolveToReference(ttypes.TransformationResourceType, remote.Transformation.ID)
+		ref, err := inputResolver.ResolveToReference(
+			ttypes.TransformationResourceType,
+			remote.Transformation.ID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("resolving transformation reference for destination %s: %w", remote.ID, err)
 		}
