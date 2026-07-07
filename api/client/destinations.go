@@ -21,6 +21,7 @@ type Destination struct {
 	Version        int64                          `json:"version,omitempty"`
 	IsEnabled      bool                           `json:"enabled"`
 	Config         json.RawMessage                `json:"config"`
+	WorkspaceID    string                         `json:"workspaceId,omitempty"`
 	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
 	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
