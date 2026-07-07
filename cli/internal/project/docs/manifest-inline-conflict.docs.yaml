@@ -13,6 +13,8 @@ match_behavior:
         version: "rudder/v0.1"
       - kind: "custom-types"
         version: "rudder/v1"
+      - kind: "data-graph"
+        version: "rudder/v1"
       - kind: "event-stream-source"
         version: "rudder/0.1"
       - kind: "event-stream-source"
