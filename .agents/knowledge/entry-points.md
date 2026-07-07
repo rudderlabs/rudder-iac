@@ -32,3 +32,8 @@ Read this first when working on destination API contract fields or destination v
 Read these first when working on account API contract fields:
 - `api/client/accounts.go`: account DTOs and thin account service wrapper.
 - `api/client/accounts_test.go`: existing co-located account client tests; extend this file rather than introducing a separate account test harness.
+
+## RUD-2860 — Destination External ID Contract Entry
+<!-- ticket:RUD-2860 -->
+Read this first when working on destination external IDs or destination ownership metadata:
+- `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.

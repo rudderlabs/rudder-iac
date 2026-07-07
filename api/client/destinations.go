@@ -137,6 +137,7 @@ func (s *destinations) Update(ctx context.Context, destination *Destination) (*D
 	// copy input and remove ID from request body without modifying input
 	dst := *destination
 	dst.ID = ""
+	dst.ExternalID = ""
 
 	response := struct{ Destination *Destination }{}
 	if err := s.update(ctx, destination.ID, &dst, &response); err != nil {
@@ -165,6 +166,19 @@ func (s *destinations) GetAll(ctx context.Context) ([]Destination, error) {
 			return nil, fmt.Errorf("fetching next destinations page: %w", err)
 		}
 	}
-
 	return all, nil
+}
+
+func (s *destinations) SetExternalID(ctx context.Context, id string, externalID string) error {
+	body, err := json.Marshal(map[string]string{"externalId": externalID})
+	if err != nil {
+		return fmt.Errorf("marshalling set external ID request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/external-id", s.basePath, id)
+	if _, err = s.client.Do(ctx, "PUT", path, bytes.NewReader(body)); err != nil {
+		return fmt.Errorf("setting external ID for destination: %w", err)
+	}
+
+	return nil
 }
