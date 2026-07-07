@@ -30,7 +30,7 @@ func TestNewCategorySemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/categories/semantic-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
-	assert.Equal(t, "category names must be unique across the catalog", rule.Description())
+	assert.Equal(t, "Category names must be unique across the Data Catalog", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns(localcatalog.KindCategories),

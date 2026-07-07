@@ -146,7 +146,7 @@ func TestSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "project/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "spec syntax must be valid", rule.Description())
+	assert.Equal(t, "Spec syntax must be valid", rule.Description())
 	assert.Equal(t, []rules.MatchPattern{rules.MatchAll()}, rule.AppliesTo())
 
 	examples := rule.Examples()

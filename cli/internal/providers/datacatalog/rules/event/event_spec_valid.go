@@ -120,7 +120,7 @@ func NewEventSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/events/spec-syntax-valid",
 		rules.Error,
-		"event spec syntax must be valid",
+		"Event spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindEvents),

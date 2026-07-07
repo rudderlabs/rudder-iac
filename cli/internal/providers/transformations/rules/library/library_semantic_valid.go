@@ -57,7 +57,7 @@ func NewLibrarySemanticValidRule() vrules.Rule {
 	return rules.NewTypedRule(
 		"transformations/transformation-library/semantic-valid",
 		vrules.Error,
-		"transformation library must be semantically valid",
+		"Transformation library must be semantically valid",
 		vrules.Examples{},
 		rules.NewSemanticPatternValidator(
 			rules.V1VersionPatterns(ttypes.LibrarySpecKind),

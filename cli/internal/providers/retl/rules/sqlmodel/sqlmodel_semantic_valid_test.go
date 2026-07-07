@@ -3,8 +3,8 @@ package sqlmodel
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -28,7 +28,7 @@ func TestSQLModelSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "retl/sqlmodel/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "retl sql model semantic constraints must be satisfied", rule.Description())
+	assert.Equal(t, "RETL SQL model semantic constraints must be satisfied", rule.Description())
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 }
 

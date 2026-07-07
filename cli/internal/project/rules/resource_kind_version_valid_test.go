@@ -65,7 +65,7 @@ func TestResourceKindVersionValidRule_Metadata(t *testing.T) {
 	t.Run("rule metadata is correct", func(t *testing.T) {
 		assert.Equal(t, "project/resource-kind-version-valid", rule.ID())
 		assert.Equal(t, rules.Error, rule.Severity())
-		assert.Equal(t, "resource kind must be supported with the specified version", rule.Description())
+		assert.Equal(t, "Resource kind must be supported with the specified version", rule.Description())
 		assert.Equal(t, []rules.MatchPattern{rules.MatchAll()}, rule.AppliesTo())
 	})
 }

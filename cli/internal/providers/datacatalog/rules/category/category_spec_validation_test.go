@@ -39,7 +39,7 @@ func TestNewCategorySpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/categories/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "category spec syntax must be valid", rule.Description())
+	assert.Equal(t, "Category spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns(localcatalog.KindCategories),

@@ -3,8 +3,8 @@ package property
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -18,7 +18,7 @@ func TestPropertyConfigValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/properties/config-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "property config must be valid for the given type", rule.Description())
+	assert.Equal(t, "Property config must be valid for the given type", rule.Description())
 	assert.ElementsMatch(t, append(prules.LegacyVersionPatterns("properties"), prules.V1VersionPatterns("properties")...), rule.AppliesTo())
 
 	examples := rule.Examples()

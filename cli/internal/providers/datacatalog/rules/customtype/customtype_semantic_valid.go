@@ -216,7 +216,7 @@ func NewCustomTypeSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/custom-types/semantic-valid",
 		rules.Error,
-		"custom type references must resolve to existing resources",
+		"Custom type references must resolve to existing resources",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),

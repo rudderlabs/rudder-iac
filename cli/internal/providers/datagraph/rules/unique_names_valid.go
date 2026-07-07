@@ -107,7 +107,7 @@ func NewUniqueNamesValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datagraph/data-graph/unique-names-valid",
 		rules.Error,
-		"model and relationship names must be unique within a data graph",
+		"Model and relationship names must be unique within a Data Graph",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),

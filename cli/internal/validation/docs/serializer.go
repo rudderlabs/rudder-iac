@@ -1,6 +1,7 @@
 package docs
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,12 +27,19 @@ func Serialize(doc DocumentedRules, outDir string) error {
 	}
 	preferDoubleQuotes(&node)
 
-	yamlBytes, err := yaml.Marshal(&node)
-	if err != nil {
+	// Emit 2-space indentation to match the rudder-hugo catalog (the file this
+	// converges to), rather than yaml.v3's 4-space default.
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&node); err != nil {
 		return fmt.Errorf("marshaling yaml: %w", err)
 	}
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("closing yaml encoder: %w", err)
+	}
 
-	if err := writeFile(filepath.Join(outDir, "rules.yaml"), yamlBytes); err != nil {
+	if err := writeFile(filepath.Join(outDir, "rules.yaml"), buf.Bytes()); err != nil {
 		return err
 	}
 
