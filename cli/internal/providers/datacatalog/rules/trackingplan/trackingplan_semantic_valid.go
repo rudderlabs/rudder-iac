@@ -346,7 +346,7 @@ func NewTrackingPlanSemanticValidRule(eventRuleIncludesEnabled bool) rules.Rule 
 	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/semantic-valid",
 		rules.Error,
-		"tracking plan references must resolve to existing resources",
+		"Tracking Plan references must resolve to existing resources",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),

@@ -11,7 +11,7 @@ import (
 
 const (
 	ruleID          = "datacatalog/custom-types/config-valid"
-	ruleDescription = "custom type config must be valid for the given type"
+	ruleDescription = "Custom type config must be valid for the given type"
 )
 
 var configExamples = rules.Examples{

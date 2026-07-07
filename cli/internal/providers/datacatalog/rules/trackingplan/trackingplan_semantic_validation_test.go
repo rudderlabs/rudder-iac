@@ -37,7 +37,7 @@ func TestTrackingPlanSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/tracking-plans/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "tracking plan references must resolve to existing resources", rule.Description())
+	assert.Equal(t, "Tracking Plan references must resolve to existing resources", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),

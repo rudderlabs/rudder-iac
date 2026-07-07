@@ -36,7 +36,7 @@ func NewRelationshipRefsValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datagraph/data-graph/relationship-refs-valid",
 		rules.Error,
-		"relationship target references must resolve to existing models",
+		"Relationship target references must resolve to existing models",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),

@@ -3,8 +3,8 @@ package rules
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -489,7 +489,7 @@ func TestNewEventSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/events/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "event references must resolve to existing resources", rule.Description())
+	assert.Equal(t, "Event references must resolve to existing resources", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("events"),

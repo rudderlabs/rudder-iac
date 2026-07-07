@@ -38,7 +38,7 @@ func (r *MetadataSyntaxValidRule) Severity() rules.Severity {
 }
 
 func (r *MetadataSyntaxValidRule) Description() string {
-	return "metadata syntax must be valid"
+	return "Metadata syntax must be valid"
 }
 
 func (r *MetadataSyntaxValidRule) AppliesTo() []rules.MatchPattern {

@@ -21,7 +21,7 @@ func TestNewTransformationImportsSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "transformations/transformation/semantic-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
-	assert.Equal(t, "transformation imports must resolve to existing transformation libraries", rule.Description())
+	assert.Equal(t, "Transformation imports must resolve to existing transformation libraries", rule.Description())
 	assert.Equal(t, prules.V1VersionPatterns("transformation"), rule.AppliesTo())
 }
 

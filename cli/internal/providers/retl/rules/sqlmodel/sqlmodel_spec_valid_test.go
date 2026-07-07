@@ -3,8 +3,8 @@ package sqlmodel
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ func TestSQLModelSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "retl sql model spec syntax must be valid", rule.Description())
+	assert.Equal(t, "RETL SQL model spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("retl-source-sql-model"),

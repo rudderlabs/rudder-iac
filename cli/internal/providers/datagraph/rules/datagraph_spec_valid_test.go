@@ -33,7 +33,7 @@ func TestNewDataGraphSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datagraph/data-graph/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "data graph spec syntax must be valid", rule.Description())
+	assert.Equal(t, "Data Graph spec syntax must be valid", rule.Description())
 
 	assert.Equal(t, prules.V1VersionPatterns("data-graph"), rule.AppliesTo())
 

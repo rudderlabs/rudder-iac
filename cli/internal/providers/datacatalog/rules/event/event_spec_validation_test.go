@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +39,7 @@ func TestNewEventSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/events/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "event spec syntax must be valid", rule.Description())
+	assert.Equal(t, "Event spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("events"),
@@ -670,9 +670,9 @@ func TestEventSpecV1SyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expectedErrors: 1,
 			expectedRefs:   []string{"/events/0/category"},
-expectedMsgs:   []string{"'category' is not valid: must be of pattern #category:<id>"},
-			},
-			{
+			expectedMsgs:   []string{"'category' is not valid: must be of pattern #category:<id>"},
+		},
+		{
 			name: "legacy category ref format rejected in V1",
 			spec: localcatalog.EventSpecV1{
 				Events: []localcatalog.EventV1{

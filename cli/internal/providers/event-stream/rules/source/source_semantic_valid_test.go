@@ -3,9 +3,9 @@ package source
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -23,7 +23,7 @@ func TestSourceSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "event-stream/source/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "event stream source references must resolve to existing resources", rule.Description())
+	assert.Equal(t, "Event Stream source references must resolve to existing resources", rule.Description())
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 }
 
