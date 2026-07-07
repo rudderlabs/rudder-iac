@@ -14,6 +14,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
+	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -41,6 +43,7 @@ type Providers struct {
 	Transformations *transformations.Provider
 	Workspace       *workspace.Provider
 	DataGraph       *dgProvider.Provider
+	Destination     *destProvider.Provider
 }
 
 type deps struct {
@@ -173,6 +176,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		"eventstream":     p.EventStream,
 		"transformations": p.Transformations,
 		"datagraph":       p.DataGraph,
+		"destination":     p.Destination,
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)
@@ -210,6 +214,12 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
+	// Destination registry ships empty this ticket — production destination
+	// definitions (webhook/ga4/s3) are onboarded in a follow-up. The handler
+	// consumes whatever definitions the registry holds at construction time.
+	destRegistry := definitions.NewRegistry()
+	dp := destProvider.NewProvider(c, destRegistry)
+
 	providers := &Providers{
 		DataCatalog:     dcp,
 		RETL:            retlp,
@@ -217,6 +227,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
+		Destination:     dp,
 	}
 
 	return providers, nil

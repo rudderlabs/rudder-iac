@@ -136,16 +136,10 @@ func TestClientDestinationsGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, destination)
 	assert.Equal(t, &client.Destination{
-		ID:      "some-id",
-		Name:    "some-name",
-		Type:    "some-type",
-		Version: 2,
-		VersionInfo: &client.VersionInfo{
-			Status:           "deprecated",
-			Action:           "upgrade",
-			RetirementDate:   lo.ToPtr("2026-12-31"),
-			MigrationDocsURL: lo.ToPtr("https://docs.example.com/destinations/migration"),
-		},
+		ID:        "some-id",
+		Name:      "some-name",
+		Type:      "some-type",
+		Version:   2,
 		Config:    []byte(`{"key1": "val1"}`),
 		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
 		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
@@ -187,7 +181,6 @@ func TestClientDestinationsGetWithoutVersionInfo(t *testing.T) {
 		Type:   "some-type",
 		Config: []byte(`{"key1": "val1"}`),
 	}, destination)
-	assert.Nil(t, destination.VersionInfo)
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -750,4 +743,47 @@ func TestClientDestinations_GetAll(t *testing.T) {
 			httpClient.AssertNumberOfCalls()
 		})
 	}
+}
+
+func TestClientDestinationsGetExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/destinations/some-id", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destination": {
+					"id": "some-id",
+					"externalId": "ga4-production",
+					"name": "Production GA4",
+					"type": "GA4",
+					"config": {"apiSecret":"secret-value"},
+					"enabled": true
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	destination, err := c.Destinations.Get(ctx, "some-id")
+	require.NoError(t, err)
+	require.NotNil(t, destination)
+	assert.Equal(t, "ga4-production", destination.ExternalID)
+	assert.Equal(t, &client.Destination{
+		ID:         "some-id",
+		ExternalID: "ga4-production",
+		Name:       "Production GA4",
+		Type:       "GA4",
+		IsEnabled:  true,
+		Config:     []byte(`{"apiSecret":"secret-value"}`),
+	}, destination)
+
+	httpClient.AssertNumberOfCalls()
 }
