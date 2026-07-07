@@ -41,7 +41,7 @@ func NewManifestInlineConflictRule(
 func (r *manifestInlineConflictRule) ID() string               { return "project/manifest-inline-conflict" }
 func (r *manifestInlineConflictRule) Severity() rules.Severity { return rules.Error }
 func (r *manifestInlineConflictRule) Description() string {
-	return "a (workspace_id, urn) must not be defined in both an import-manifest and inline metadata.import with differing remote_ids"
+	return "A (workspace_id, urn) must not be defined in both an import-manifest and inline metadata.import with differing remote_ids"
 }
 
 // AppliesTo is the union of manifest + resource patterns, so the engine delivers

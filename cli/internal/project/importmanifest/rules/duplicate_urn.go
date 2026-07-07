@@ -24,7 +24,7 @@ func (r *manifestDuplicateURNRule) ID() string { return "import-manifest/duplica
 func (r *manifestDuplicateURNRule) Severity() vrules.Severity { return vrules.Error }
 
 func (r *manifestDuplicateURNRule) Description() string {
-	return "a (workspace_id, urn) must not be defined more than once across import-manifest files"
+	return "A (workspace_id, urn) must not be defined more than once across import-manifest files"
 }
 
 func (r *manifestDuplicateURNRule) AppliesTo() []vrules.MatchPattern {
