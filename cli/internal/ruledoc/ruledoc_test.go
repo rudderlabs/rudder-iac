@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	providerrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	accountsprov "github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -43,6 +44,7 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dtypes.DestinationSpecKind)...)
+	p = append(p, providerrules.V1VersionPatterns(accountsprov.HandlerMetadata.SpecKind)...)
 	return p
 }
 

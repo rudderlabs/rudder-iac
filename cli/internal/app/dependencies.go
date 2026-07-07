@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	accountsProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
@@ -44,6 +45,7 @@ type Providers struct {
 	Workspace       *workspace.Provider
 	DataGraph       *dgProvider.Provider
 	Destination     *destProvider.Provider
+	Accounts        *accountsProvider.Provider
 }
 
 type deps struct {
@@ -177,6 +179,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		"transformations": p.Transformations,
 		"datagraph":       p.DataGraph,
 		"destination":     p.Destination,
+		"accounts":        p.Accounts,
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)
@@ -220,6 +223,8 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	destRegistry := definitions.NewRegistry()
 	dp := destProvider.NewProvider(c, destRegistry)
 
+	accp := accountsProvider.NewProvider(c.Accounts)
+
 	providers := &Providers{
 		DataCatalog:     dcp,
 		RETL:            retlp,
@@ -228,6 +233,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		Workspace:       wsp,
 		DataGraph:       dgp,
 		Destination:     dp,
+		Accounts:        accp,
 	}
 
 	return providers, nil

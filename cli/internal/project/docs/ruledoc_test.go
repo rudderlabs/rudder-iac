@@ -6,10 +6,11 @@ import (
 	projectdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/docs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/project/rules"
 	providerrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	accountsprov "github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
-	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	dtypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -47,6 +48,7 @@ func gatekeeperScopedPatterns() []rules.MatchPattern {
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dtypes.DestinationSpecKind)...)
+	p = append(p, providerrules.V1VersionPatterns(accountsprov.HandlerMetadata.SpecKind)...)
 	return p
 }
 
