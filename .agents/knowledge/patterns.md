@@ -32,3 +32,13 @@
 - Destination Create and Update copy the input `Destination`, clear only `ID`, and marshal the full struct through the shared service helper.
 - Destination Get unmarshals `response.destination` into the same `Destination` type used by write paths.
 - Because CRUD uses whole-struct passthrough, new optional public contract fields with `json:",omitempty"` can often be added to the DTO without changing individual service methods.
+
+## DEX-456 — Account Client Thin-Service Placement
+<!-- ticket:DEX-456 -->
+- `api/client/accounts.go` follows the repo's thin-service pattern: the concrete `accounts` wrapper delegates list/get/create/update/delete behavior to shared `service` helpers. Additive account contract work should stay in that account-specific client surface and its co-located tests, not in `client.go` or the shared transport layer.
+
+## RUD-2860 — Shared Destination DTO Write Scrubbing
+<!-- ticket:RUD-2860 -->
+- Destination support is centralized in `api/client/destinations.go`; the same `Destination` struct is used as the request and response contract for create, update, get, and list.
+- Because destination create/update marshal copied whole structs, adding response-oriented or ownership-metadata fields to `Destination` can affect write payloads unless each write method explicitly clears fields that do not belong on that endpoint.
+- `Destinations.Update` is expected to copy the input destination and clear `ExternalID` before marshaling, while `Destinations.SetExternalID` owns the dedicated external-ID write endpoint.

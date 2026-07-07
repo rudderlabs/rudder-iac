@@ -13,6 +13,8 @@ match_behavior:
         version: "rudder/v0.1"
       - kind: "custom-types"
         version: "rudder/v1"
+      - kind: "data-graph"
+        version: "rudder/v1"
       - kind: "event-stream-source"
         version: "rudder/0.1"
       - kind: "event-stream-source"
@@ -46,6 +48,8 @@ match_behavior:
       - kind: "transformation"
         version: "rudder/v1"
       - kind: "transformation-library"
+        version: "rudder/v1"
+      - kind: "destination"
         version: "rudder/v1"
     valid:
       - example_id: "metadata-name-only"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -82,9 +83,17 @@ func WorkspaceImport(
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
-	entities, err := p.FormatForExport(importable, idNamer, resolver)
+	entities, importEntries, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
 		return fmt.Errorf("normalizing for import: %w", err)
+	}
+
+	// Aggregate the URN → remote-ID mappings the providers emitted into a single
+	// project-level import-manifest, written alongside the resource specs. The
+	// node carries a header comment discouraging hand-edits.
+	manifestNode, err := importmanifest.BuildNode(importEntries)
+	if err != nil {
+		return fmt.Errorf("building import manifest: %w", err)
 	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
@@ -93,6 +102,16 @@ func WorkspaceImport(
 	importDir := filepath.Join(location, ImportedDir)
 	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
+	}
+
+	if manifestNode != nil {
+		manifestEntity := writer.FormattableEntity{
+			Content:      manifestNode,
+			RelativePath: importmanifest.FileName,
+		}
+		if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
+			return fmt.Errorf("writing import manifest: %w", err)
+		}
 	}
 
 	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)

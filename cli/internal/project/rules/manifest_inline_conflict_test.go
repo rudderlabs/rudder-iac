@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/manifestspec"
@@ -18,29 +17,6 @@ var conflictPatterns = []rules.MatchPattern{
 	rules.MatchKindVersion(conflictResourceType, specs.SpecVersionV1),
 }
 
-// manifestParseSpecExtracting returns a ParseSpecFunc that emits the manifest's
-// urn entries (mirrors the real manifest provider's ParseSpec).
-func manifestParseSpecExtracting() ParseSpecFunc {
-	return func(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
-		var urns []specs.URNEntry
-		ws, _ := s.Spec["workspaces"].([]any)
-		for wi, w := range ws {
-			wm, _ := w.(map[string]any)
-			res, _ := wm["resources"].([]any)
-			for ri, r := range res {
-				rm, _ := r.(map[string]any)
-				if urn, ok := rm["urn"].(string); ok && urn != "" {
-					urns = append(urns, specs.URNEntry{
-						URN:             urn,
-						JSONPointerPath: fmt.Sprintf("/spec/workspaces/%d/resources/%d/urn", wi, ri),
-					})
-				}
-			}
-		}
-		return &specs.ParsedSpec{URNs: urns}, nil
-	}
-}
-
 // resourceParseSpecLegacy reports the legacy resource type so inline local_id
 // entries resolve to URNs.
 func resourceParseSpecLegacy() ParseSpecFunc {
@@ -49,23 +25,25 @@ func resourceParseSpecLegacy() ParseSpecFunc {
 	}
 }
 
-func manifestConflictCtx(urns ...string) *rules.ValidationContext {
-	res := make([]any, 0, len(urns))
-	for _, u := range urns {
-		res = append(res, map[string]any{"urn": u, "remote_id": "r"})
-	}
+// manifestConflictCtx builds a manifest declaring urn under workspaceID with the
+// given remote_id.
+func manifestConflictCtx(workspaceID, urn, remoteID string) *rules.ValidationContext {
 	return &rules.ValidationContext{
 		FilePath: "import-manifest.yaml",
 		Kind:     manifestspec.KindImportManifest,
 		Version:  specs.SpecVersionV1,
 		Spec: map[string]any{
-			"workspaces": []any{map[string]any{"workspace_id": "ws-1", "resources": res}},
+			"workspaces": []any{map[string]any{
+				"workspace_id": workspaceID,
+				"resources":    []any{map[string]any{"urn": urn, "remote_id": remoteID}},
+			}},
 		},
 	}
 }
 
-// resourceCtxInlineURN builds a resource spec carrying an inline metadata.import urn.
-func resourceCtxInlineURN(path, urn string) *rules.ValidationContext {
+// resourceCtxInlineURN builds a resource spec carrying an inline metadata.import
+// urn under workspaceID with the given remote_id.
+func resourceCtxInlineURN(path, workspaceID, urn, remoteID string) *rules.ValidationContext {
 	return &rules.ValidationContext{
 		FilePath: path,
 		Kind:     conflictResourceType,
@@ -75,8 +53,8 @@ func resourceCtxInlineURN(path, urn string) *rules.ValidationContext {
 			"import": map[string]any{
 				"workspaces": []any{
 					map[string]any{
-						"workspace_id": "ws-9",
-						"resources":    []any{map[string]any{"urn": urn, "remote_id": "r"}},
+						"workspace_id": workspaceID,
+						"resources":    []any{map[string]any{"urn": urn, "remote_id": remoteID}},
 					},
 				},
 			},
@@ -87,29 +65,29 @@ func resourceCtxInlineURN(path, urn string) *rules.ValidationContext {
 
 func newRule() rules.MultiSpecRule {
 	return NewManifestInlineConflictRule(
-		manifestParseSpecExtracting(), resourceParseSpecLegacy(), conflictPatterns,
+		resourceParseSpecLegacy(), conflictPatterns,
 	).(rules.MultiSpecRule)
 }
 
 func TestManifestInlineConflictRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewManifestInlineConflictRule(manifestParseSpecExtracting(), resourceParseSpecLegacy(), conflictPatterns)
+	r := NewManifestInlineConflictRule(resourceParseSpecLegacy(), conflictPatterns)
 	assert.Equal(t, "project/manifest-inline-conflict", r.ID())
 	assert.Equal(t, rules.Error, r.Severity())
 	assert.Equal(t, conflictPatterns, r.AppliesTo())
-	assert.Nil(t, r.Validate(manifestConflictCtx("a:b")))
+	assert.Nil(t, r.Validate(manifestConflictCtx("ws-1", "a:b", "r")))
 }
 
 func TestManifestInlineConflictRule_ValidateSpecs(t *testing.T) {
 	t.Parallel()
 
-	t.Run("urn in both manifest and inline errors at both", func(t *testing.T) {
+	t.Run("same (ws, urn) with differing remote_ids errors at both", func(t *testing.T) {
 		t.Parallel()
 		results := newRule().ValidateSpecs(map[string]*rules.ValidationContext{
-			"import-manifest.yaml": manifestConflictCtx("event-stream-source:shared"),
-			"src.yaml":             resourceCtxInlineURN("src.yaml", "event-stream-source:shared"),
+			"import-manifest.yaml": manifestConflictCtx("ws-1", "event-stream-source:shared", "remote-a"),
+			"src.yaml":             resourceCtxInlineURN("src.yaml", "ws-1", "event-stream-source:shared", "remote-b"),
 		})
-		msg := "URN 'event-stream-source:shared' is defined in both an import-manifest and inline metadata; remove the inline metadata entry"
+		msg := "URN 'event-stream-source:shared' in workspace 'ws-1' is defined in both an import-manifest and inline metadata with differing remote_ids; remove the inline metadata entry"
 		assert.Equal(t, []rules.ValidationResult{
 			{Reference: "/spec/workspaces/0/resources/0/urn", Message: msg},
 		}, results["import-manifest.yaml"])
@@ -118,20 +96,29 @@ func TestManifestInlineConflictRule_ValidateSpecs(t *testing.T) {
 		}, results["src.yaml"])
 	})
 
-	t.Run("manifest-only urn is clean", func(t *testing.T) {
+	t.Run("same (ws, urn) with matching remote_id is clean", func(t *testing.T) {
 		t.Parallel()
 		results := newRule().ValidateSpecs(map[string]*rules.ValidationContext{
-			"import-manifest.yaml": manifestConflictCtx("event-stream-source:only-manifest"),
-			"src.yaml":             resourceCtxInlineURN("src.yaml", "event-stream-source:only-inline"),
+			"import-manifest.yaml": manifestConflictCtx("ws-1", "event-stream-source:shared", "remote-a"),
+			"src.yaml":             resourceCtxInlineURN("src.yaml", "ws-1", "event-stream-source:shared", "remote-a"),
 		})
 		assert.Empty(t, results)
 	})
 
-	t.Run("inline local_id resolving to a manifest urn conflicts", func(t *testing.T) {
+	t.Run("manifest-only urn is clean", func(t *testing.T) {
+		t.Parallel()
+		results := newRule().ValidateSpecs(map[string]*rules.ValidationContext{
+			"import-manifest.yaml": manifestConflictCtx("ws-1", "event-stream-source:only-manifest", "remote-a"),
+			"src.yaml":             resourceCtxInlineURN("src.yaml", "ws-1", "event-stream-source:only-inline", "remote-b"),
+		})
+		assert.Empty(t, results)
+	})
+
+	t.Run("inline local_id resolving to a manifest urn conflicts when remote_ids differ", func(t *testing.T) {
 		t.Parallel()
 		// inline entry uses local_id "shared"; the resource legacy type is
 		// event-stream-source, so it resolves to event-stream-source:shared,
-		// which the manifest also declares.
+		// which the manifest also declares under the same workspace.
 		inline := &rules.ValidationContext{
 			FilePath: "src.yaml",
 			Kind:     conflictResourceType,
@@ -140,28 +127,29 @@ func TestManifestInlineConflictRule_ValidateSpecs(t *testing.T) {
 				"name": "src",
 				"import": map[string]any{
 					"workspaces": []any{map[string]any{
-						"workspace_id": "ws-9",
-						"resources":    []any{map[string]any{"local_id": "shared", "remote_id": "r"}},
+						"workspace_id": "ws-1",
+						"resources":    []any{map[string]any{"local_id": "shared", "remote_id": "remote-b"}},
 					}},
 				},
 			},
 			Spec: map[string]any{"id": "src"},
 		}
 		results := newRule().ValidateSpecs(map[string]*rules.ValidationContext{
-			"import-manifest.yaml": manifestConflictCtx("event-stream-source:shared"),
+			"import-manifest.yaml": manifestConflictCtx("ws-1", "event-stream-source:shared", "remote-a"),
 			"src.yaml":             inline,
 		})
 		require.Len(t, results, 2)
 		assert.Equal(t, "/metadata/import/workspaces/0/resources/0/urn", results["src.yaml"][0].Reference)
 	})
 
-	t.Run("conflict holds even when workspace_ids differ (workspace-agnostic)", func(t *testing.T) {
+	t.Run("same urn under different workspaces is clean (workspace-scoped)", func(t *testing.T) {
 		t.Parallel()
-		// manifest workspace is ws-1, inline workspace is ws-9 — still a conflict.
+		// manifest workspace is ws-1, inline workspace is ws-9 — different
+		// (workspace_id, urn) keys, so no conflict even though remote_ids differ.
 		results := newRule().ValidateSpecs(map[string]*rules.ValidationContext{
-			"import-manifest.yaml": manifestConflictCtx("event-stream-source:shared"),
-			"src.yaml":             resourceCtxInlineURN("src.yaml", "event-stream-source:shared"),
+			"import-manifest.yaml": manifestConflictCtx("ws-1", "event-stream-source:shared", "remote-a"),
+			"src.yaml":             resourceCtxInlineURN("src.yaml", "ws-9", "event-stream-source:shared", "remote-b"),
 		})
-		require.Len(t, results, 2)
+		assert.Empty(t, results)
 	})
 }

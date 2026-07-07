@@ -32,3 +32,14 @@ Read this first when working on destination API contract fields or destination v
 Read this first when working on RETL connection `syncBehaviour` request/response modeling:
 - `api/client/retl/connection_types.go`: contains both `CreateRETLConnectionRequest` for create payloads and `RETLConnection` for response payloads; keep the create request's optional `syncBehaviour` distinct from the response model's resolved value.
 - `api/client/retl/connections_test.go`: existing create-request tests directly assign `SyncBehaviour`, so pointer optionality changes need matching test fixture updates.
+
+## DEX-456 — Account API Contract Entry
+<!-- ticket:DEX-456 -->
+Read these first when working on account API contract fields:
+- `api/client/accounts.go`: account DTOs and thin account service wrapper.
+- `api/client/accounts_test.go`: existing co-located account client tests; extend this file rather than introducing a separate account test harness.
+
+## RUD-2860 — Destination External ID Contract Entry
+<!-- ticket:RUD-2860 -->
+Read this first when working on destination external IDs or destination ownership metadata:
+- `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.

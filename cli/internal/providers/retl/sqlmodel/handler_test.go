@@ -369,7 +369,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -406,7 +406,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := resources.NewRemoteResources()
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			assert.Nil(t, entities)
 		})
@@ -419,7 +419,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
 				"bad": {ID: "bad", ExternalID: "x", Data: "not-a-pointer"},
 			})
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			assert.Error(t, err)
 			assert.Nil(t, entities)
 			assert.Contains(t, err.Error(), "unable to cast resource to retl source")
@@ -431,7 +431,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
-			entities, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, nil)
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)
@@ -1987,5 +1987,39 @@ func TestHandler_LoadSpec_StrictValidation(t *testing.T) {
 
 		err := handler.LoadSpec("test.yaml", spec)
 		require.NoError(t, err)
+	})
+}
+
+func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
+	t.Run("nil is a no-op", func(t *testing.T) {
+		h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		require.NoError(t, h.LoadImportMetadata(nil))
+	})
+
+	t.Run("attaches manifest import metadata to resources by URN", func(t *testing.T) {
+		h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		require.NoError(t, h.LoadSpec("m.yaml", createTestSpec("manifest-model", "M", "d", "SELECT 1")))
+
+		urn := resources.URN("manifest-model", sqlmodel.ResourceType)
+		m := &specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "rem-1"}},
+			}},
+		}
+		require.NoError(t, h.LoadImportMetadata(m))
+
+		got, err := h.GetResources()
+		require.NoError(t, err)
+		var found *resources.Resource
+		for _, r := range got {
+			if r.ID() == "manifest-model" {
+				found = r
+			}
+		}
+		require.NotNil(t, found)
+		require.NotNil(t, found.ImportMetadata())
+		assert.Equal(t, "ws-a", found.ImportMetadata().WorkspaceId)
+		assert.Equal(t, "rem-1", found.ImportMetadata().RemoteId)
 	})
 }

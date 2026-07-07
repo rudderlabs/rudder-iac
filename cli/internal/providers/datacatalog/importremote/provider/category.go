@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -109,12 +110,12 @@ func (p *CategoryImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting categories for export to file")
 
 	categories := collection.GetAll(types.CategoryResourceType)
 	if len(categories) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -128,7 +129,7 @@ func (p *CategoryImportProvider) FormatForExport(
 
 		data, ok := category.Data.(*catalog.Category)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog category")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog category")
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
@@ -141,7 +142,7 @@ func (p *CategoryImportProvider) FormatForExport(
 		importableCategory := &model.ImportableCategoryV1{}
 		formatted, err := importableCategory.ForExport(category.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting category: %w", err)
+			return nil, nil, fmt.Errorf("formatting category: %w", err)
 		}
 		formattedCategories = append(formattedCategories, formatted)
 	}
@@ -155,7 +156,7 @@ func (p *CategoryImportProvider) FormatForExport(
 			"categories": formattedCategories,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -163,5 +164,5 @@ func (p *CategoryImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, importEntriesFromWorkspace(workspaceMetadata), nil
 }

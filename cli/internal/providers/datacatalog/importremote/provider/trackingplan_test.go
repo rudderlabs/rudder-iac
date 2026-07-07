@@ -140,7 +140,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -229,7 +229,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -285,7 +285,7 @@ func TestTrackingPlanFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
