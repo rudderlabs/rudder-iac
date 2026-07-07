@@ -36,7 +36,10 @@ type AccountResource struct {
 	ID                    string         `json:"id"`
 	AccountDefinitionName string         `json:"accountDefinitionName"`
 	Options               map[string]any `json:"options"`
-	Credentials           *secret.String `json:"credentials"`
+	// secret:"true" opts credentials into the BaseHandler secret-field support
+	// (DEX-457): it is scrubbed from remote state (always-diff) and exported as a
+	// {{ .VAR }} token rather than a literal.
+	Credentials *secret.String `json:"credentials" secret:"true"`
 }
 
 // AccountState is the computed output — the remote account id.
