@@ -18,7 +18,12 @@ type SingleSpecExportHandler[Spec any, Remote handler.RemoteResource] interface 
 }
 
 type SingleSpecExportStrategy[Spec any, Remote handler.RemoteResource] struct {
-	Handler SingleSpecExportHandler[Spec, Remote]
+	Handler      SingleSpecExportHandler[Spec, Remote]
+	secretFields []handler.SecretField
+}
+
+func (s *SingleSpecExportStrategy[Spec, Remote]) SetSecretFields(fields []handler.SecretField) {
+	s.secretFields = fields
 }
 
 func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
@@ -26,28 +31,9 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
-	importResources := make([]specs.ImportIds, 0, len(remotes))
-	var entries []importmanifest.ImportEntry
-	workspaceID := ""
-	for localID, remote := range remotes {
-		remoteMetadata := (*remote).Metadata()
-		if workspaceID != "" && workspaceID != remoteMetadata.WorkspaceID {
-			return nil, nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
-		}
-		if workspaceID == "" {
-			workspaceID = remoteMetadata.WorkspaceID
-		}
-
-		urn := resources.URN(localID, s.Handler.Metadata().ResourceType)
-		importResources = append(importResources, specs.ImportIds{
-			URN:      urn,
-			RemoteID: remoteMetadata.ID,
-		})
-		entries = append(entries, importmanifest.ImportEntry{
-			WorkspaceID: remoteMetadata.WorkspaceID,
-			URN:         urn,
-			RemoteID:    remoteMetadata.ID,
-		})
+	importResources, entries, workspaceID, err := s.buildImportData(remotes)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	exportData, err := s.Handler.MapRemoteToSpec(remotes, inputResolver)
@@ -72,6 +58,10 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 		return nil, nil, fmt.Errorf("converting metadata to map: %w", err)
 	}
 
+	if err := exportData.AttachSecretVariables(s.Handler.Metadata().ResourceType, singleRemoteLocalID(remotes), s.secretFields); err != nil {
+		return nil, nil, fmt.Errorf("attaching secret variables: %w", err)
+	}
+
 	specData, err := exportData.ToMap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("converting spec data to map: %w", err)
@@ -92,4 +82,38 @@ func (s *SingleSpecExportStrategy[Spec, Remote]) FormatForExport(
 	}
 
 	return result, entries, nil
+}
+
+func (s *SingleSpecExportStrategy[Spec, Remote]) buildImportData(remotes map[string]*Remote) ([]specs.ImportIds, []importmanifest.ImportEntry, string, error) {
+	importResources := make([]specs.ImportIds, 0, len(remotes))
+	entries := make([]importmanifest.ImportEntry, 0, len(remotes))
+	workspaceID := ""
+	for localID, remote := range remotes {
+		remoteMetadata := (*remote).Metadata()
+		if workspaceID != "" && workspaceID != remoteMetadata.WorkspaceID {
+			return nil, nil, "", fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
+		}
+		if workspaceID == "" {
+			workspaceID = remoteMetadata.WorkspaceID
+		}
+
+		urn := resources.URN(localID, s.Handler.Metadata().ResourceType)
+		importResources = append(importResources, specs.ImportIds{URN: urn, RemoteID: remoteMetadata.ID})
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: remoteMetadata.WorkspaceID,
+			URN:         urn,
+			RemoteID:    remoteMetadata.ID,
+		})
+	}
+	return importResources, entries, workspaceID, nil
+}
+
+func singleRemoteLocalID[Remote handler.RemoteResource](remotes map[string]*Remote) string {
+	if len(remotes) != 1 {
+		return ""
+	}
+	for localID := range remotes {
+		return localID
+	}
+	return ""
 }

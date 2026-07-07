@@ -22,6 +22,11 @@ import (
 // The MapRemoteToState method can return (nil, nil, nil) to skip resources that should not
 // be included in state (e.g., resources without external IDs). The urnResolver parameter
 // enables resolving cross-resource references during state mapping.
+//
+// Implementations can declare remote-only secrets once by tagging Res or State fields of
+// type secret.String or *secret.String with `secret:"true"`. BaseHandler replaces those
+// fields with secret.NewUnknown() when mapping remote state, and export strategies use the
+// fields' JSON names to emit variable tokens instead of secret literals.
 type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface {
 	Metadata() HandlerMetadata
 
