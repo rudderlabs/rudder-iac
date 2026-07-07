@@ -24,7 +24,6 @@ type Destination struct {
 	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
 	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
-	ExternalID     string                         `json:"externalId,omitempty"`
 }
 
 type destinations struct {
