@@ -218,7 +218,7 @@ func TestHandlerImpl_Create(t *testing.T) {
 		Enabled:           true,
 		DefinitionVersion: 1,
 		Config: map[string]any{
-			"api_secret":    "secret-value",
+			"api_secret":     "secret-value",
 			"measurement_id": "G-123",
 		},
 	})
@@ -244,8 +244,8 @@ func TestHandlerImpl_CreateConnectsTransformation(t *testing.T) {
 	registry := testRegistry(t)
 
 	var (
-		createCalled      bool
-		connectCalled     bool
+		createCalled       bool
+		connectCalled      bool
 		connectDestination string
 		connectTransform   string
 	)
@@ -334,7 +334,7 @@ func TestHandlerImpl_UpdateConfigChange(t *testing.T) {
 		&destination.DestinationResource{
 			ID: "ga4-production", DisplayName: "renamed", Type: "GA4", Enabled: false,
 			DefinitionVersion: 1,
-			Config: map[string]any{"api_secret": "new-secret", "measurement_id": "G-999"},
+			Config:            map[string]any{"api_secret": "new-secret", "measurement_id": "G-999"},
 		},
 		&destination.DestinationResource{ID: "ga4-production", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
 		&destination.DestinationState{ID: "dst-1"},
@@ -661,9 +661,10 @@ func TestHandlerImpl_MapRemoteToStateTransformationNotCLIManaged(t *testing.T) {
 
 	resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{}) // no URN for "ui-trans"
 	require.NoError(t, err)
-	// Graceful degradation: ref dropped, but remote ID tracked so link re-applies each run.
+	// Foreign link is dropped entirely: spec ref nil and ID empty, so a later
+	// unrelated Update never disconnects the user's UI-managed transformation.
 	assert.Nil(t, resource.Transformation)
-	assert.Equal(t, "ui-trans", state.TransformationID)
+	assert.Equal(t, "", state.TransformationID)
 }
 
 func TestHandlerImpl_MapRemoteToStateUnregisteredTypeErrors(t *testing.T) {
@@ -692,9 +693,9 @@ func TestHandlerImpl_MapRemoteToStateEmptyExternalIDErrors(t *testing.T) {
 	h := destination.NewHandler(nil, registry)
 
 	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:   "dst-noext",
-		Name: "NoExt",
-		Type: "GA4",
+		ID:     "dst-noext",
+		Name:   "NoExt",
+		Type:   "GA4",
 		Config: []byte(`{}`),
 	}}
 

@@ -94,6 +94,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*D
 		IsEnabled:  data.Enabled,
 		Config:     apiConfig,
 		ExternalID: data.ID,
+		Version:    data.DefinitionVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating destination: %w", err)
@@ -133,6 +134,7 @@ func (h *HandlerImpl) Update(
 
 	if _, err := h.client.Destinations.Update(ctx, &client.Destination{
 		ID:        oldState.ID,
+		Version:   newData.DefinitionVersion,
 		Name:      newData.DisplayName,
 		Type:      newData.Type,
 		IsEnabled: newData.Enabled,
@@ -334,9 +336,10 @@ func (h *HandlerImpl) apiConfigToLocal(destType string, version int64, apiConfig
 
 // transformationRef resolves the remote transformation link back to a
 // spec-side PropertyRef. When the linked transformation is not CLI-managed
-// (ErrRemoteResourceExternalIdNotFound) the ref is dropped but the remote ID is
-// still tracked in state so the link re-applies on every run — the established
-// tradeoff from the event-stream source handler.
+// (ErrRemoteResourceExternalIdNotFound) both the ref and the remote ID are
+// dropped so the CLI never persists or touches a link it doesn't own —
+// mirrors the event-stream source handler, which does not persist a foreign
+// tracking plan ID into state.
 func (h *HandlerImpl) transformationRef(remote *RemoteDestination, urnResolver handler.URNResolver) (*resources.PropertyRef, string, error) {
 	if remote.Transformation == nil || remote.Transformation.ID == "" {
 		return nil, "", nil
@@ -346,9 +349,9 @@ func (h *HandlerImpl) transformationRef(remote *RemoteDestination, urnResolver h
 	urn, err := urnResolver.GetURNByID(ttypes.TransformationResourceType, transformationID)
 	if err != nil {
 		if err == resources.ErrRemoteResourceExternalIdNotFound {
-			// It might be a transformation which the upstream user's manually added but
-			// not managed by the CLI yet.
-			return nil, transformationID, nil
+			// Linked via UI/API and not managed by the CLI yet: drop both the ref
+			// and the ID so a later unrelated Update doesn't disconnect the link.
+			return nil, "", nil
 		}
 		return nil, "", fmt.Errorf("resolving transformation URN: %w", err)
 	}

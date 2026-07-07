@@ -136,16 +136,10 @@ func TestClientDestinationsGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, destination)
 	assert.Equal(t, &client.Destination{
-		ID:      "some-id",
-		Name:    "some-name",
-		Type:    "some-type",
-		Version: 2,
-		VersionInfo: &client.VersionInfo{
-			Status:           "deprecated",
-			Action:           "upgrade",
-			RetirementDate:   lo.ToPtr("2026-12-31"),
-			MigrationDocsURL: lo.ToPtr("https://docs.example.com/destinations/migration"),
-		},
+		ID:        "some-id",
+		Name:      "some-name",
+		Type:      "some-type",
+		Version:   2,
 		Config:    []byte(`{"key1": "val1"}`),
 		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
 		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
@@ -187,7 +181,6 @@ func TestClientDestinationsGetWithoutVersionInfo(t *testing.T) {
 		Type:   "some-type",
 		Config: []byte(`{"key1": "val1"}`),
 	}, destination)
-	assert.Nil(t, destination.VersionInfo)
 
 	httpClient.AssertNumberOfCalls()
 }

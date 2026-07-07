@@ -18,20 +18,12 @@ type Destination struct {
 	ExternalID     string                         `json:"externalId,omitempty"`
 	Name           string                         `json:"name"`
 	Type           string                         `json:"type"`
-	Version        int                            `json:"version,omitempty"`
-	VersionInfo    *VersionInfo                   `json:"versionInfo,omitempty"`
+	Version        int64                          `json:"version,omitempty"`
 	IsEnabled      bool                           `json:"enabled"`
 	Config         json.RawMessage                `json:"config"`
 	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
 	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
-}
-
-type VersionInfo struct {
-	Status           string  `json:"status,omitempty"`
-	Action           string  `json:"action,omitempty"`
-	RetirementDate   *string `json:"retirementDate,omitempty"`
-	MigrationDocsURL *string `json:"migrationDocsURL,omitempty"`
 }
 
 type destinations struct {
