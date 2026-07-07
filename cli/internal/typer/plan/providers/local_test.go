@@ -186,6 +186,72 @@ func TestLocalCatalogPlanProvider_TrackingPlanNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
+// TestLocalCatalogPlanProvider_MatchesRemoteConventions covers the three
+// constructs buildCatalog omits, each a place the local converter previously
+// diverged from the remote JSON-Schema parser: multi-type array/object
+// properties, and object custom types (additionalProperties + description).
+func TestLocalCatalogPlanProvider_MatchesRemoteConventions(t *testing.T) {
+	dc := localcatalog.New()
+	dc.Properties = []localcatalog.PropertyV1{
+		{LocalID: "child", Name: "childProp", Type: "integer"},
+		{LocalID: "mtarr", Name: "mtArr", Types: []string{"array", "null"}, ItemType: "string"},
+		{LocalID: "mtobj", Name: "mtObj", Types: []string{"object", "null"}},
+		{LocalID: "addrp", Name: "addrProp", Type: "#custom-type:addr"},
+	}
+	dc.CustomTypes = []localcatalog.CustomTypeV1{
+		{
+			LocalID:     "addr",
+			Name:        "Address",
+			Type:        "object",
+			Description: "a postal address",
+			Config:      map[string]any{"additional_properties": false},
+			Properties:  []localcatalog.CustomTypePropertyV1{{Property: "#property:child", Required: true}},
+		},
+	}
+	dc.Events = []localcatalog.EventV1{{LocalID: "evt", Name: "My Event", Type: "track"}}
+	dc.TrackingPlans = []*localcatalog.TrackingPlanV1{
+		{
+			LocalID: "tp",
+			Name:    "TP",
+			Rules: []*localcatalog.TPRuleV1{
+				{
+					Type:            "event_rule",
+					LocalID:         "r1",
+					Event:           "#event:evt",
+					IdentitySection: "properties",
+					Properties: []*localcatalog.TPRulePropertyV1{
+						{Property: "#property:mtarr"},
+						{Property: "#property:mtobj", Properties: []*localcatalog.TPRulePropertyV1{
+							{Property: "#property:child", Required: true},
+						}},
+						{Property: "#property:addrp"},
+					},
+				},
+			},
+		},
+	}
+
+	got, err := providers.NewLocalCatalogPlanProvider(dc, "tp").GetTrackingPlan(context.Background())
+	require.NoError(t, err)
+	props := got.Rules[0].Schema.Properties
+
+	// Multi-type array property still resolves ItemTypes (previously dropped).
+	assert.Equal(t, []plan.PropertyType{plan.PrimitiveTypeArray, plan.PrimitiveTypeNull}, props["mtArr"].Property.Types)
+	assert.Equal(t, []plan.PropertyType{plan.PrimitiveTypeString}, props["mtArr"].Property.ItemTypes)
+
+	// Multi-type object property still builds a nested schema (previously dropped).
+	require.NotNil(t, props["mtObj"].Schema)
+	assert.Contains(t, props["mtObj"].Schema.Properties, "childProp")
+
+	// Object custom type derives additionalProperties from config (was hardcoded
+	// true) and does not carry Description (the remote parser never sets it).
+	ct, ok := props["addrProp"].Property.Types[0].(*plan.CustomType)
+	require.True(t, ok)
+	assert.Empty(t, ct.Description)
+	require.NotNil(t, ct.Schema)
+	assert.False(t, ct.Schema.AdditionalProperties)
+}
+
 // TestLocalAndRemoteProduceEquivalentPlan is the guard that justifies having two
 // independent adapters onto plan.TrackingPlan: for the same logical plan, the
 // local converter and the remote JSON-Schema parser must produce the same rules.

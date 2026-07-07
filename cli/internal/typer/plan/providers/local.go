@@ -201,6 +201,23 @@ func (p *LocalCatalogPlanProvider) buildProperty(in propInput, reg map[string]*p
 		}
 		property.Types = types
 		property.Config = toConfig(in.Config)
+
+		// Mirror the remote parser, which still resolves nested-object and
+		// array-item detail for a multi-type property, keyed off the first type.
+		if types[0] == plan.PrimitiveTypeObject {
+			nested, err := p.buildObjectSchema(in.Nested, derefBool(in.AdditionalProperties, true), reg)
+			if err != nil {
+				return property, nil, err
+			}
+			return property, nested, nil
+		}
+		if types[0] == plan.PrimitiveTypeArray {
+			itemTypes, err := p.buildItemTypes(in.ItemType, in.ItemTypes, reg)
+			if err != nil {
+				return property, nil, err
+			}
+			property.ItemTypes = itemTypes
+		}
 		return property, nil, nil
 	}
 
@@ -296,7 +313,10 @@ func (p *LocalCatalogPlanProvider) customType(typeStr string, reg map[string]*pl
 		return existing, true, nil
 	}
 
-	pct := &plan.CustomType{Name: ct.Name, Description: ct.Description}
+	// Description is intentionally not set: the remote provider never populates
+	// CustomType.Description (the JSON-Schema parser drops it), so setting it here
+	// would make the same custom type render a different doc comment under --local.
+	pct := &plan.CustomType{Name: ct.Name}
 	reg[ct.Name] = pct // register before children so cyclic references terminate
 
 	primType, err := parsePrimitiveType(ct.Type)
@@ -308,7 +328,7 @@ func (p *LocalCatalogPlanProvider) customType(typeStr string, reg map[string]*pl
 
 	switch ct.Type {
 	case "object":
-		schema := &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}, AdditionalProperties: true}
+		schema := &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}, AdditionalProperties: customTypeAdditionalProperties(ct.Config)}
 		for _, ctp := range ct.Properties {
 			prop, err := p.resolveProperty(ctp.Property)
 			if err != nil {
@@ -447,6 +467,21 @@ func toConfig(config map[string]any) *plan.PropertyConfig {
 		return nil
 	}
 	return &plan.PropertyConfig{Enum: enumSlice}
+}
+
+// customTypeAdditionalProperties derives an object custom type's
+// additionalProperties from its config (V1 "additional_properties", V0
+// "additionalProperties"), defaulting to true to match the remote parser, which
+// defaults absent additionalProperties to true.
+func customTypeAdditionalProperties(config map[string]any) bool {
+	for _, k := range []string{"additional_properties", "additionalProperties"} {
+		if v, ok := config[k]; ok {
+			if b, ok := v.(bool); ok {
+				return b
+			}
+		}
+	}
+	return true
 }
 
 func derefBool(b *bool, def bool) bool {
