@@ -26,7 +26,7 @@ func (r *orphanedURNRule) ID() string { return "import-manifest/orphaned-urn" }
 func (r *orphanedURNRule) Severity() vrules.Severity { return vrules.Error }
 
 func (r *orphanedURNRule) Description() string {
-	return "every import-manifest URN must match a resource defined in the project"
+	return "Every import-manifest URN must match a resource defined in the project"
 }
 
 func (r *orphanedURNRule) AppliesTo() []vrules.MatchPattern {

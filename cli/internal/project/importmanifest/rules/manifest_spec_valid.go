@@ -29,7 +29,7 @@ func (r *manifestSpecValidRule) ID() string { return "import-manifest/spec-synta
 func (r *manifestSpecValidRule) Severity() vrules.Severity { return vrules.Error }
 
 func (r *manifestSpecValidRule) Description() string {
-	return "import-manifest spec syntax must be valid"
+	return "Import-manifest spec syntax must be valid"
 }
 
 func (r *manifestSpecValidRule) AppliesTo() []vrules.MatchPattern {
