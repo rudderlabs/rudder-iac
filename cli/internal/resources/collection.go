@@ -13,6 +13,11 @@ type RemoteResource struct {
 	ExternalID string
 	Reference  string
 	Data       interface{}
+	// Matched references the local project resource this remote resource was
+	// resolved to during import --merge. Non-nil means the resource is linked
+	// to the existing local resource (manifest entry only, no spec file);
+	// nil means no match was detected.
+	Matched *Resource
 }
 
 // RemoteResources provides a generic container for mixed resource types
