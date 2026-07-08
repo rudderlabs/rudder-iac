@@ -22,6 +22,9 @@ type ExperimentalConfig struct {
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
 	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
+	// SmartImportMerge enables `import workspace --merge` with conflict detection
+	// that links matching remote resources to existing local project resources
+	SmartImportMerge bool `mapstructure:"smartImportMerge"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

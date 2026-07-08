@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/resolve"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -238,6 +240,25 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 	}
 
 	return collection, nil
+}
+
+// ResourceMatchers aggregates merge-conflict matchers from sub-providers that
+// implement resolve.MatcherProvider. Providers are visited by sorted name —
+// the Providers map is unordered and matcher order must be deterministic —
+// while each provider's own matcher order (parents before children) is kept.
+func (p *CompositeProvider) ResourceMatchers() []resolve.Matcher {
+	names := maps.Keys(p.Providers)
+	sort.Strings(names)
+
+	matchers := make([]resolve.Matcher, 0)
+	for _, name := range names {
+		mp, ok := p.Providers[name].(resolve.MatcherProvider)
+		if !ok {
+			continue
+		}
+		matchers = append(matchers, mp.ResourceMatchers()...)
+	}
+	return matchers
 }
 
 func (p *CompositeProvider) FormatForExport(

@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/resolve"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -511,4 +513,56 @@ func TestCompositeProvider_LoadImportManifest(t *testing.T) {
 		assert.NoError(t, cp.(*provider.CompositeProvider).LoadImportManifest(manifest))
 		assert.Equal(t, manifest, consumer.got)
 	})
+}
+
+type matcherMockProvider struct {
+	*testutils.MockProvider
+	matchers []resolve.Matcher
+}
+
+func (m *matcherMockProvider) ResourceMatchers() []resolve.Matcher {
+	return m.matchers
+}
+
+func TestCompositeProviderResourceMatchers(t *testing.T) {
+	t.Parallel()
+
+	noopMatcher := func(resourceType string) resolve.Matcher {
+		return resolve.Matcher{
+			ResourceType: resourceType,
+			Match: func(resolve.MatchContext, *resources.RemoteResource) *resources.Resource {
+				return nil
+			},
+		}
+	}
+
+	alpha := &matcherMockProvider{
+		MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+		matchers:     []resolve.Matcher{noopMatcher("a1"), noopMatcher("a2")},
+	}
+	beta := &matcherMockProvider{
+		MockProvider: testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"}),
+		matchers:     []resolve.Matcher{noopMatcher("b1")},
+	}
+	// gamma does not implement resolve.MatcherProvider and must be skipped.
+	gamma := testutils.NewMockProvider([]string{"kindC"}, []string{"typeC"})
+
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"beta":  beta,
+		"alpha": alpha,
+		"gamma": gamma,
+	})
+	assert.NoError(t, err)
+
+	mp, ok := cp.(resolve.MatcherProvider)
+	require.True(t, ok, "composite provider must implement resolve.MatcherProvider")
+
+	matchers := mp.ResourceMatchers()
+	types := make([]string, 0, len(matchers))
+	for _, m := range matchers {
+		types = append(types, m.ResourceType)
+	}
+
+	// Providers iterated by sorted name for determinism; per-provider order preserved.
+	assert.Equal(t, []string{"a1", "a2", "b1"}, types)
 }
