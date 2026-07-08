@@ -112,76 +112,62 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }
 
-// --- ExtractResourcesFromSpec ---
-
 func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
-	t.Parallel()
 
-	h := destination.NewHandler(nil, definitions.NewRegistry())
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
 
-	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", &destination.DestinationSpec{
-		ID:                "ga4-production",
-		DisplayName:       "Production GA4",
-		Type:              "GA4",
-		Enabled:           true,
-		DefinitionVersion: 1,
-		Transformation:    "#transformation:my-transform",
-		Config: map[string]any{
-			"api_secret": "secret",
-		},
+		h := destination.NewHandler(nil, definitions.NewRegistry())
+
+		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", &destination.DestinationSpec{
+			ID:                "ga4-production",
+			DisplayName:       "Production GA4",
+			Type:              "GA4",
+			Enabled:           true,
+			DefinitionVersion: 1,
+			Transformation:    "#transformation:my-transform",
+			Config: map[string]any{
+				"api_secret": "secret",
+			},
+		})
+		require.NoError(t, err)
+
+		resource := extracted["ga4-production"]
+		require.NotNil(t, resource)
+		require.NotNil(t, resource.Transformation)
+		require.NotNil(t, resource.Transformation.Resolve, "transformation ref must carry a resolver")
+
+		resource.Transformation.Resolve = nil // func fields are never deeply equal; compare the rest structurally
+		assert.Equal(t, &destination.DestinationResource{
+			ID:                "ga4-production",
+			DisplayName:       "Production GA4",
+			Type:              "GA4",
+			Enabled:           true,
+			DefinitionVersion: 1,
+			Config:            map[string]any{"api_secret": "secret"},
+			Transformation: &resources.PropertyRef{
+				URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
+				Property: "id",
+			},
+		}, resource)
 	})
-	require.NoError(t, err)
 
-	resource := extracted["ga4-production"]
-	require.NotNil(t, resource)
-	assert.Equal(t, "ga4-production", resource.ID)
-	assert.Equal(t, "Production GA4", resource.DisplayName)
-	assert.Equal(t, "GA4", resource.Type)
-	assert.True(t, resource.Enabled)
-	assert.Equal(t, int64(1), resource.DefinitionVersion)
-	assert.Equal(t, map[string]any{"api_secret": "secret"}, resource.Config)
-	require.NotNil(t, resource.Transformation)
-	assert.Equal(t, resources.URN("my-transform", ttypes.TransformationResourceType), resource.Transformation.URN)
-	assert.Equal(t, "id", resource.Transformation.Property)
-}
+	t.Run("error", func(t *testing.T) {
+		t.Parallel()
 
-func TestHandlerImpl_ExtractResourcesFromSpecNoTransformation(t *testing.T) {
-	t.Parallel()
+		h := destination.NewHandler(nil, definitions.NewRegistry())
 
-	h := destination.NewHandler(nil, definitions.NewRegistry())
-
-	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/webhook.yaml", &destination.DestinationSpec{
-		ID:                "webhook-1",
-		DisplayName:       "Webhook One",
-		Type:              "WEBHOOK",
-		Enabled:           false,
-		DefinitionVersion: 1,
-		Config:            map[string]any{"webhook_url": "https://example.com/hook"},
+		_, err := h.Impl.ExtractResourcesFromSpec("destinations/bad.yaml", &destination.DestinationSpec{
+			ID:             "bad",
+			DisplayName:    "Bad",
+			Type:           "GA4",
+			Transformation: "#source:my-source", // wrong kind
+			Config:         map[string]any{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid transformation reference")
 	})
-	require.NoError(t, err)
-
-	resource := extracted["webhook-1"]
-	require.NotNil(t, resource)
-	assert.Nil(t, resource.Transformation)
 }
-
-func TestHandlerImpl_ExtractResourcesFromSpecInvalidTransformationRef(t *testing.T) {
-	t.Parallel()
-
-	h := destination.NewHandler(nil, definitions.NewRegistry())
-
-	_, err := h.Impl.ExtractResourcesFromSpec("destinations/bad.yaml", &destination.DestinationSpec{
-		ID:             "bad",
-		DisplayName:    "Bad",
-		Type:           "GA4",
-		Transformation: "#source:my-source", // wrong kind
-		Config:         map[string]any{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid transformation reference")
-}
-
-// --- Create ---
 
 func TestHandlerImpl_Create(t *testing.T) {
 	t.Parallel()
@@ -232,16 +218,20 @@ func TestHandlerImpl_Create(t *testing.T) {
 	// Verify the request body carried camelCase config and the external ID.
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal([]byte(createBody), &payload))
-	assert.Equal(t, "Production GA4", payload["name"])
-	assert.Equal(t, "GA4", payload["type"])
-	assert.Equal(t, true, payload["enabled"])
-	assert.Equal(t, "ga4-production", payload["externalId"])
-	config, _ := payload["config"].(map[string]any)
-	assert.Equal(t, "secret-value", config["apiSecret"])
-	assert.Equal(t, "G-123", config["measurementId"])
+	assert.Equal(t, map[string]any{
+		"name":       "Production GA4",
+		"type":       "GA4",
+		"enabled":    true,
+		"externalId": "ga4-production",
+		"version":    float64(1),
+		"config": map[string]any{
+			"apiSecret":     "secret-value",
+			"measurementId": "G-123",
+		},
+	}, payload)
 }
 
-func TestHandlerImpl_CreateConnectsTransformation(t *testing.T) {
+func TestHandlerImpl_Create_ConnectsTransformation(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -259,6 +249,7 @@ func TestHandlerImpl_CreateConnectsTransformation(t *testing.T) {
 			createCalled = true
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-9","name":"x","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
+
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-9/transformation":
 			connectCalled = true
 			connectDestination = "dst-9"
@@ -268,6 +259,7 @@ func TestHandlerImpl_CreateConnectsTransformation(t *testing.T) {
 			connectTransform, _ = p["transformationId"].(string)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destinationId":"dst-9","transformationId":"trans-1"}`))
+
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -294,9 +286,7 @@ func TestHandlerImpl_CreateConnectsTransformation(t *testing.T) {
 	assert.Equal(t, &destination.DestinationState{ID: "dst-9", TransformationID: "trans-1"}, state)
 }
 
-// --- Update ---
-
-func TestHandlerImpl_UpdateRejectsTypeChange(t *testing.T) {
+func TestHandlerImpl_Update_RejectsTypeChange(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -313,7 +303,7 @@ func TestHandlerImpl_UpdateRejectsTypeChange(t *testing.T) {
 	assert.Contains(t, err.Error(), "type change is not supported")
 }
 
-func TestHandlerImpl_UpdateConfigChange(t *testing.T) {
+func TestHandlerImpl_Update_ConfigChange(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -336,9 +326,15 @@ func TestHandlerImpl_UpdateConfigChange(t *testing.T) {
 
 	state, err := h.Impl.Update(ctx,
 		&destination.DestinationResource{
-			ID: "ga4-production", DisplayName: "renamed", Type: "GA4", Enabled: false,
+			ID:                "ga4-production",
+			DisplayName:       "renamed",
+			Type:              "GA4",
+			Enabled:           false,
 			DefinitionVersion: 1,
-			Config:            map[string]any{"api_secret": "new-secret", "measurement_id": "G-999"},
+			Config: map[string]any{
+				"api_secret":     "new-secret",
+				"measurement_id": "G-999",
+			},
 		},
 		&destination.DestinationResource{ID: "ga4-production", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
 		&destination.DestinationState{ID: "dst-1"},
@@ -355,362 +351,400 @@ func TestHandlerImpl_UpdateConfigChange(t *testing.T) {
 	assert.Equal(t, "G-999", config["measurementId"])
 }
 
-func TestHandlerImpl_UpdateConnectsTransformationWhenPreviouslyNone(t *testing.T) {
-	t.Parallel()
+func TestHandlerImpl_Update_ConnectsTransformationWhenPreviouslyNone(t *testing.T) {
 
-	ctx := context.Background()
-	registry := testRegistry(t)
+	t.Run("connects transformation when previously none", func(t *testing.T) {
+		t.Parallel()
 
-	var (
-		updateCalled  bool
-		connectCalled bool
-	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
-			updateCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			connectCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-7"}`))
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
+		ctx := context.Background()
+		registry := testRegistry(t)
 
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
+		var (
+			updateCalled  bool
+			connectCalled bool
+		)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
+				updateCalled = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
 
-	state, err := h.Impl.Update(ctx,
-		&destination.DestinationResource{
-			ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
-			Transformation: resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-7"),
-			Config:         map[string]any{},
-		},
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: ""},
-	)
-	require.NoError(t, err)
-	assert.True(t, updateCalled)
-	assert.True(t, connectCalled)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-7"}, state)
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
+				connectCalled = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-7"}`))
+
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		state, err := h.Impl.Update(ctx,
+			&destination.DestinationResource{
+				ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
+				Transformation: resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-7"),
+				Config:         map[string]any{},
+			},
+			&destination.DestinationResource{
+				ID:                "ga4",
+				Type:              "GA4",
+				DefinitionVersion: 1,
+				Config: map[string]any{
+					"api_secret": "secret",
+				}},
+			&destination.DestinationState{ID: "dst-1", TransformationID: ""},
+		)
+		require.NoError(t, err)
+		assert.True(t, updateCalled)
+		assert.True(t, connectCalled)
+		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-7"}, state)
+	})
+
+	t.Run("replaces transformation link", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		registry := testRegistry(t)
+
+		var connectCalled bool
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
+
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
+				connectCalled = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-8"}`))
+
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		state, err := h.Impl.Update(ctx,
+			&destination.DestinationResource{
+				ID:                "ga4",
+				DisplayName:       "GA4",
+				Type:              "GA4",
+				Enabled:           true,
+				DefinitionVersion: 1,
+				Transformation:    resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-8"),
+				Config:            map[string]any{},
+			},
+			&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
+		)
+		require.NoError(t, err)
+		assert.True(t, connectCalled)
+		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-8"}, state)
+	})
+
+	t.Run("disconnects transformation when removed", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		registry := testRegistry(t)
+
+		var disconnectCalled bool
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
+
+			case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1/transformation":
+				disconnectCalled = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-old"}`))
+
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		state, err := h.Impl.Update(ctx,
+			&destination.DestinationResource{
+				ID:                "ga4",
+				DisplayName:       "GA4",
+				Type:              "GA4",
+				Enabled:           true,
+				DefinitionVersion: 1,
+				Transformation:    nil,
+				Config:            map[string]any{},
+			},
+			&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
+		)
+		require.NoError(t, err)
+		assert.True(t, disconnectCalled)
+		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: ""}, state)
+	})
+
+	t.Run("no link change skips transformation call", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		registry := testRegistry(t)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
+
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		state, err := h.Impl.Update(ctx,
+			&destination.DestinationResource{
+				ID:                "ga4",
+				DisplayName:       "GA4",
+				Type:              "GA4",
+				Enabled:           true,
+				DefinitionVersion: 1,
+				Transformation:    resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-same"),
+				Config:            map[string]any{},
+			},
+			&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1", TransformationID: "trans-same"},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-same"}, state)
+	})
 }
 
-func TestHandlerImpl_UpdateReplacesTransformationLink(t *testing.T) {
-	t.Parallel()
+func TestHandlerImpl_Delete(t *testing.T) {
 
-	ctx := context.Background()
-	registry := testRegistry(t)
+	t.Run("disconnects transformation first", func(t *testing.T) {
+		t.Parallel()
 
-	var connectCalled bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			connectCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-8"}`))
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
+		ctx := context.Background()
+		registry := testRegistry(t)
 
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
+		var (
+			disconnectCalled bool
+			deleteCalled     bool
+		)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1/transformation":
+				disconnectCalled = true
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-old"}`))
 
-	state, err := h.Impl.Update(ctx,
-		&destination.DestinationResource{
-			ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
-			Transformation: resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-8"),
-			Config:         map[string]any{},
-		},
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
-	)
-	require.NoError(t, err)
-	assert.True(t, connectCalled)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-8"}, state)
+			case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1":
+				deleteCalled = true
+				w.WriteHeader(http.StatusNoContent)
+
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		err := h.Impl.Delete(ctx, "ga4",
+			&destination.DestinationResource{
+				ID:                "ga4",
+				Type:              "GA4",
+				DefinitionVersion: 1,
+				Config:            map[string]any{},
+			},
+			&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
+		)
+		require.NoError(t, err)
+		assert.True(t, disconnectCalled, "transformation should be disconnected before delete")
+		assert.True(t, deleteCalled)
+	})
+
+	t.Run("deletes destination when no transformation", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		registry := testRegistry(t)
+
+		var deleteCalled bool
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1":
+				deleteCalled = true
+				w.WriteHeader(http.StatusNoContent)
+			default:
+				t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		c := newTestClient(t, srv.URL)
+		h := destination.NewHandler(c, registry)
+
+		err := h.Impl.Delete(ctx, "ga4",
+			&destination.DestinationResource{
+				ID:                "ga4",
+				Type:              "GA4",
+				DefinitionVersion: 1,
+				Config:            map[string]any{},
+			},
+			&destination.DestinationState{ID: "dst-1", TransformationID: ""},
+		)
+		require.NoError(t, err)
+		assert.True(t, deleteCalled)
+	})
 }
-
-func TestHandlerImpl_UpdateDisconnectsTransformationWhenRefRemoved(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	var disconnectCalled bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
-		case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			disconnectCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-old"}`))
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	state, err := h.Impl.Update(ctx,
-		&destination.DestinationResource{
-			ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
-			Transformation: nil,
-			Config:         map[string]any{},
-		},
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
-	)
-	require.NoError(t, err)
-	assert.True(t, disconnectCalled)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: ""}, state)
-}
-
-func TestHandlerImpl_UpdateNoLinkCallWhenUnchanged(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	state, err := h.Impl.Update(ctx,
-		&destination.DestinationResource{
-			ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
-			Transformation: resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-same"),
-			Config:         map[string]any{},
-		},
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: "trans-same"},
-	)
-	require.NoError(t, err)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-same"}, state)
-}
-
-// --- Delete ---
-
-func TestHandlerImpl_DeleteDisconnectsTransformationFirst(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	var (
-		disconnectCalled bool
-		deleteCalled     bool
-	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			disconnectCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-old"}`))
-		case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1":
-			deleteCalled = true
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	err := h.Impl.Delete(ctx, "ga4",
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: "trans-old"},
-	)
-	require.NoError(t, err)
-	assert.True(t, disconnectCalled, "transformation should be disconnected before delete")
-	assert.True(t, deleteCalled)
-}
-
-func TestHandlerImpl_DeleteWithoutTransformation(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	var deleteCalled bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1":
-			deleteCalled = true
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	err := h.Impl.Delete(ctx, "ga4",
-		&destination.DestinationResource{ID: "ga4", Type: "GA4", DefinitionVersion: 1, Config: map[string]any{}},
-		&destination.DestinationState{ID: "dst-1", TransformationID: ""},
-	)
-	require.NoError(t, err)
-	assert.True(t, deleteCalled)
-}
-
-// --- MapRemoteToState ---
 
 func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 	t.Parallel()
 
 	registry := testRegistry(t)
-	h := destination.NewHandler(nil, registry)
 
-	resolver := urnResolver{transformationURNByID: map[string]string{
-		"trans-1": resources.URN("my-transform", ttypes.TransformationResourceType),
-	}}
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
 
-	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:             "dst-1",
-		ExternalID:     "ga4-production",
-		Name:           "Production GA4",
-		Type:           "GA4",
-		Version:        1,
-		IsEnabled:      true,
-		Config:         []byte(`{"apiSecret":"secret-value","measurementId":"G-123"}`),
-		Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
-	}}
+		h := destination.NewHandler(nil, registry)
+		resolver := urnResolver{transformationURNByID: map[string]string{
+			"trans-1": resources.URN("my-transform", ttypes.TransformationResourceType),
+		}}
 
-	resource, state, err := h.Impl.MapRemoteToState(remote, resolver)
-	require.NoError(t, err)
-	require.NotNil(t, resource)
-	require.NotNil(t, state)
+		remote := &destination.RemoteDestination{Destination: &client.Destination{
+			ID:             "dst-1",
+			ExternalID:     "ga4-production",
+			Name:           "Production GA4",
+			Type:           "GA4",
+			Version:        1,
+			IsEnabled:      true,
+			Config:         []byte(`{"apiSecret":"secret-value","measurementId":"G-123"}`),
+			Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
+		}}
 
-	assert.Equal(t, &destination.DestinationResource{
-		ID:                "ga4-production",
-		DisplayName:       "Production GA4",
-		Type:              "GA4",
-		Enabled:           true,
-		DefinitionVersion: 1,
-		Transformation: &resources.PropertyRef{
-			URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
-			Property: "id",
-		},
-		Config: map[string]any{
-			"api_secret":     "secret-value",
-			"measurement_id": "G-123",
-		},
-	}, resource)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-1"}, state)
+		resource, state, err := h.Impl.MapRemoteToState(remote, resolver)
+		require.NoError(t, err)
+		require.NotNil(t, resource)
+		require.NotNil(t, state)
+
+		assert.Equal(t, &destination.DestinationResource{
+			ID:                "ga4-production",
+			DisplayName:       "Production GA4",
+			Type:              "GA4",
+			Enabled:           true,
+			DefinitionVersion: 1,
+			Transformation: &resources.PropertyRef{
+				URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
+				Property: "id",
+			},
+			Config: map[string]any{
+				"api_secret":     "secret-value",
+				"measurement_id": "G-123",
+			},
+		}, resource)
+		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-1"}, state)
+	})
+
+	t.Run("no transformation", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, registry)
+
+		remote := &destination.RemoteDestination{Destination: &client.Destination{
+			ID:         "dst-2",
+			ExternalID: "webhook-1",
+			Name:       "Hook",
+			Type:       "WEBHOOK",
+			Version:    1,
+			IsEnabled:  true,
+			Config:     []byte(`{"webhookUrl":"https://h"}`),
+		}}
+
+		resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+		require.NoError(t, err)
+		require.NotNil(t, resource)
+		assert.Nil(t, resource.Transformation)
+		assert.Equal(t, "", state.TransformationID)
+	})
+
+	t.Run("transformation not CLI managed", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, registry)
+
+		remote := &destination.RemoteDestination{Destination: &client.Destination{
+			ID:             "dst-3",
+			ExternalID:     "ga4-2",
+			Name:           "GA4",
+			Type:           "GA4",
+			Version:        1,
+			Config:         []byte(`{"apiSecret":"s"}`),
+			Transformation: &client.DestinationTransformationLink{ID: "ui-trans"},
+		}}
+
+		resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{}) // no URN for "ui-trans"
+		require.NoError(t, err)
+		// Foreign link is dropped entirely: spec ref nil and ID empty, so a later
+		// unrelated Update never disconnects the user's UI-managed transformation.
+		assert.Nil(t, resource.Transformation)
+		assert.Equal(t, "", state.TransformationID)
+	})
+
+	t.Run("unregistered type and version errors", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, registry)
+
+		remote := &destination.RemoteDestination{Destination: &client.Destination{
+			ID:         "dst-x",
+			ExternalID: "ga4-1",
+			Name:       "GA4",
+			Type:       "GA4",
+			Version:    2, // not registered version / type
+			Config:     []byte(`{}`),
+		}}
+
+		_, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unregistered type")
+	})
+
+	t.Run("empty external ID errors", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, registry)
+
+		remote := &destination.RemoteDestination{Destination: &client.Destination{
+			ID:     "dst-noext",
+			Name:   "NoExt",
+			Type:   "GA4",
+			Config: []byte(`{}`),
+		}}
+
+		resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty external ID")
+		assert.Nil(t, resource)
+		assert.Nil(t, state)
+	})
 }
-
-func TestHandlerImpl_MapRemoteToStateNoTransformation(t *testing.T) {
-	t.Parallel()
-
-	registry := testRegistry(t)
-	h := destination.NewHandler(nil, registry)
-
-	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:         "dst-2",
-		ExternalID: "webhook-1",
-		Name:       "Hook",
-		Type:       "WEBHOOK",
-		Version:    1,
-		IsEnabled:  true,
-		Config:     []byte(`{"webhookUrl":"https://h"}`),
-	}}
-
-	resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{})
-	require.NoError(t, err)
-	require.NotNil(t, resource)
-	assert.Nil(t, resource.Transformation)
-	assert.Equal(t, "", state.TransformationID)
-}
-
-func TestHandlerImpl_MapRemoteToStateTransformationNotCLIManaged(t *testing.T) {
-	t.Parallel()
-
-	registry := testRegistry(t)
-	h := destination.NewHandler(nil, registry)
-
-	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:             "dst-3",
-		ExternalID:     "ga4-2",
-		Name:           "GA4",
-		Type:           "GA4",
-		Version:        1,
-		Config:         []byte(`{"apiSecret":"s"}`),
-		Transformation: &client.DestinationTransformationLink{ID: "ui-trans"},
-	}}
-
-	resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{}) // no URN for "ui-trans"
-	require.NoError(t, err)
-	// Foreign link is dropped entirely: spec ref nil and ID empty, so a later
-	// unrelated Update never disconnects the user's UI-managed transformation.
-	assert.Nil(t, resource.Transformation)
-	assert.Equal(t, "", state.TransformationID)
-}
-
-func TestHandlerImpl_MapRemoteToStateUnregisteredTypeErrors(t *testing.T) {
-	t.Parallel()
-
-	registry := testRegistry(t)
-	h := destination.NewHandler(nil, registry)
-
-	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:         "dst-x",
-		ExternalID: "s3-1",
-		Name:       "S3",
-		Type:       "S3", // not registered
-		Config:     []byte(`{}`),
-	}}
-
-	_, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unregistered type")
-}
-
-func TestHandlerImpl_MapRemoteToStateEmptyExternalIDErrors(t *testing.T) {
-	t.Parallel()
-
-	registry := testRegistry(t)
-	h := destination.NewHandler(nil, registry)
-
-	remote := &destination.RemoteDestination{Destination: &client.Destination{
-		ID:     "dst-noext",
-		Name:   "NoExt",
-		Type:   "GA4",
-		Config: []byte(`{}`),
-	}}
-
-	resource, state, err := h.Impl.MapRemoteToState(remote, urnResolver{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "empty external ID")
-	assert.Nil(t, resource)
-	assert.Nil(t, state)
-}
-
-// --- LoadRemoteResources ---
 
 func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 	t.Parallel()
@@ -765,8 +799,6 @@ func TestHandlerImpl_LoadRemoteResourcesErrorsOnUnregisteredManagedType(t *testi
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unregistered type")
 }
-
-// --- LoadImportableResources ---
 
 func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.T) {
 	t.Parallel()
@@ -861,49 +893,6 @@ func TestHandlerImpl_Import_ReplacesLinkAndSetsExternalIDAfterUpdate(t *testing.
 	)
 }
 
-func TestHandlerImpl_Import_NoExistingLinkTreatsGetTransformationErrorAsNoLink(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	var connectCalled bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"message":"not found"}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","enabled":true,"config":{}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			connectCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-new"}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
-			w.WriteHeader(http.StatusOK)
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	state, err := h.Impl.Import(ctx, &destination.DestinationResource{
-		ID: "webhook-1", DisplayName: "WH", Type: "WEBHOOK", Enabled: true, DefinitionVersion: 1,
-		Transformation: resolvedRef(resources.URN("t", ttypes.TransformationResourceType), "trans-new"),
-		Config:         map[string]any{"webhook_url": "https://h"},
-	}, "dst-1")
-	require.NoError(t, err)
-	assert.True(t, connectCalled, "a no-link GetTransformation response must still allow connecting a desired link")
-	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-new"}, state)
-}
-
 func TestHandlerImpl_Import_DisconnectsTransformationWhenSpecHasNone(t *testing.T) {
 	t.Parallel()
 
@@ -957,14 +946,18 @@ func TestHandlerImpl_Import_NoLinkChangeSkipsTransformationCall(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
+
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-same"}`))
+
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","enabled":true,"config":{}}}`))
+
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
 			w.WriteHeader(http.StatusOK)
+
 		default:
 			t.Errorf("unexpected request: %s %s (transformation link should be a no-op)", r.Method, r.URL.Path)
 		}
@@ -1014,15 +1007,19 @@ func TestHandlerImpl_Import_UpdateErrorSkipsSetExternalID(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
+
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusNotFound)
+
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"message":"boom"}`))
+			_, _ = w.Write([]byte(`{"message":"unable to complete the request"}`))
+
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
 			setExternalIDCalled = true
 			w.WriteHeader(http.StatusOK)
+
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -1033,14 +1030,15 @@ func TestHandlerImpl_Import_UpdateErrorSkipsSetExternalID(t *testing.T) {
 	h := destination.NewHandler(c, registry)
 
 	_, err := h.Impl.Import(ctx, &destination.DestinationResource{
-		ID: "webhook-1", Type: "WEBHOOK", DefinitionVersion: 1, Config: map[string]any{"webhook_url": "https://h"},
+		ID:                "webhook-1",
+		Type:              "WEBHOOK",
+		DefinitionVersion: 1,
+		Config:            map[string]any{"webhook_url": "https://some-dummy-url.com"},
 	}, "dst-1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "updating destination during import")
+	assert.Contains(t, err.Error(), "getting transformation during import")
 	assert.False(t, setExternalIDCalled, "external ID must not be set when Update fails")
 }
-
-// --- FormatForExport ---
 
 // stubResolver is a minimal resolver.ReferenceResolver for FormatForExport tests.
 type stubResolver struct {
@@ -1051,164 +1049,170 @@ func (r stubResolver) ResolveToReference(entityType string, remoteID string) (st
 	return r.fn(entityType, remoteID)
 }
 
-func TestHandlerImpl_FormatForExport_EmptyCollection(t *testing.T) {
+func TestHandlerImpl_FormatForExport(t *testing.T) {
 	t.Parallel()
 
-	h := destination.NewHandler(nil, testRegistry(t))
+	registry := testRegistry(t)
 
-	entities, entries, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{}, nil, nil)
-	require.NoError(t, err)
-	assert.Nil(t, entities)
-	assert.Nil(t, entries)
-}
+	t.Run("empty collection", func(t *testing.T) {
+		t.Parallel()
 
-func TestHandlerImpl_FormatForExport_BasicSpecWithoutSecretsOrTransformation(t *testing.T) {
-	t.Parallel()
+		h := destination.NewHandler(nil, registry)
 
-	h := destination.NewHandler(nil, testRegistry(t))
+		entities, entries, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{}, nil, nil)
+		require.NoError(t, err)
+		assert.Nil(t, entities)
+		assert.Nil(t, entries)
+	})
 
-	collection := map[string]*destination.RemoteDestination{
-		"webhook-1": {Destination: &client.Destination{
-			ID:          "dst-1",
+	t.Run("basic spec without secrets or transformation", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"webhook-1": {Destination: &client.Destination{
+				ID:          "dst-1",
+				WorkspaceID: "ws-1",
+				Name:        "My Webhook",
+				Type:        "WEBHOOK",
+				Version:     1,
+				IsEnabled:   true,
+				Config:      []byte(`{"webhookUrl":"https://example.com/hook"}`),
+			}},
+		}
+
+		entities, entries, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+		require.Len(t, entries, 1)
+
+		assert.Equal(t, importmanifest.ImportEntry{
 			WorkspaceID: "ws-1",
-			Name:        "My Webhook",
-			Type:        "WEBHOOK",
-			Version:     1,
-			IsEnabled:   true,
-			Config:      []byte(`{"webhookUrl":"https://example.com/hook"}`),
-		}},
-	}
+			URN:         resources.URN("webhook-1", destination.DestinationResourceType),
+			RemoteID:    "dst-1",
+		}, entries[0])
 
-	entities, entries, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
-	require.NoError(t, err)
-	require.Len(t, entities, 1)
-	require.Len(t, entries, 1)
+		assert.Equal(t, filepath.Join("destinations", "webhook-1.yaml"), entities[0].RelativePath)
 
-	assert.Equal(t, importmanifest.ImportEntry{
-		WorkspaceID: "ws-1",
-		URN:         resources.URN("webhook-1", destination.DestinationResourceType),
-		RemoteID:    "dst-1",
-	}, entries[0])
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
+		assert.Equal(t, destination.DestinationSpecKind, spec.Kind)
+		assert.Equal(t, map[string]any{
+			"id":                 "webhook-1",
+			"display_name":       "My Webhook",
+			"type":               "WEBHOOK",
+			"enabled":            true,
+			"definition_version": int64(1),
+			"config": map[string]any{
+				"webhook_url": "https://example.com/hook",
+			},
+		}, spec.Spec)
+		assert.Equal(t, destination.DestinationMetadataName, spec.Metadata["name"])
+	})
 
-	assert.Equal(t, filepath.Join("destinations", "webhook-1.yaml"), entities[0].RelativePath)
+	t.Run("masks secret keys with external ID prefix", func(t *testing.T) {
+		t.Parallel()
 
-	spec, ok := entities[0].Content.(*specs.Spec)
-	require.True(t, ok)
-	assert.Equal(t, specs.SpecVersionV1, spec.Version)
-	assert.Equal(t, destination.DestinationSpecKind, spec.Kind)
-	assert.Equal(t, map[string]any{
-		"id":                 "webhook-1",
-		"display_name":       "My Webhook",
-		"type":               "WEBHOOK",
-		"enabled":            true,
-		"definition_version": int64(1),
-		"config": map[string]any{
-			"webhook_url": "https://example.com/hook",
-		},
-	}, spec.Spec)
-	assert.Equal(t, destination.DestinationMetadataName, spec.Metadata["name"])
-}
+		h := destination.NewHandler(nil, registry)
 
-func TestHandlerImpl_FormatForExport_MasksSecretKeysWithExternalIDPrefix(t *testing.T) {
-	t.Parallel()
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(`{"apiSecret":"super-secret","measurementId":"G-123"}`),
+			}},
+		}
 
-	h := destination.NewHandler(nil, testRegistry(t))
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
 
-	collection := map[string]*destination.RemoteDestination{
-		"ga4-production": {Destination: &client.Destination{
-			ID:        "dst-2",
-			Name:      "GA4",
-			Type:      "GA4",
-			Version:   1,
-			IsEnabled: true,
-			Config:    []byte(`{"apiSecret":"super-secret","measurementId":"G-123"}`),
-		}},
-	}
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"], "hyphens in the external ID become underscores")
+		assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
+	})
 
-	entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
-	require.NoError(t, err)
-	require.Len(t, entities, 1)
+	t.Run("resolves transformation reference", func(t *testing.T) {
+		t.Parallel()
 
-	spec, ok := entities[0].Content.(*specs.Spec)
-	require.True(t, ok)
-	config, ok := spec.Spec["config"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"], "hyphens in the external ID become underscores")
-	assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
-}
+		h := destination.NewHandler(nil, registry)
 
-func TestHandlerImpl_FormatForExport_ResolvesTransformationReference(t *testing.T) {
-	t.Parallel()
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:             "dst-2",
+				Name:           "GA4",
+				Type:           "GA4",
+				Version:        1,
+				Config:         []byte(`{"apiSecret":"s","measurementId":"G-1"}`),
+				Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
+			}},
+		}
 
-	h := destination.NewHandler(nil, testRegistry(t))
+		resolver := stubResolver{fn: func(entityType, remoteID string) (string, error) {
+			assert.Equal(t, ttypes.TransformationResourceType, entityType)
+			assert.Equal(t, "trans-1", remoteID)
+			return "#transformation:my-transform", nil
+		}}
 
-	collection := map[string]*destination.RemoteDestination{
-		"ga4-production": {Destination: &client.Destination{
-			ID:             "dst-2",
-			Name:           "GA4",
-			Type:           "GA4",
-			Version:        1,
-			Config:         []byte(`{"apiSecret":"s","measurementId":"G-1"}`),
-			Transformation: &client.DestinationTransformationLink{ID: "trans-1"},
-		}},
-	}
+		entities, _, err := h.Impl.FormatForExport(collection, nil, resolver)
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
 
-	resolver := stubResolver{fn: func(entityType, remoteID string) (string, error) {
-		assert.Equal(t, ttypes.TransformationResourceType, entityType)
-		assert.Equal(t, "trans-1", remoteID)
-		return "#transformation:my-transform", nil
-	}}
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		assert.Equal(t, "#transformation:my-transform", spec.Spec["transformation"])
+	})
 
-	entities, _, err := h.Impl.FormatForExport(collection, nil, resolver)
-	require.NoError(t, err)
-	require.Len(t, entities, 1)
+	t.Run("transformation resolution error fails export", func(t *testing.T) {
+		t.Parallel()
 
-	spec, ok := entities[0].Content.(*specs.Spec)
-	require.True(t, ok)
-	assert.Equal(t, "#transformation:my-transform", spec.Spec["transformation"])
-}
+		h := destination.NewHandler(nil, registry)
 
-func TestHandlerImpl_FormatForExport_TransformationResolutionErrorFailsExport(t *testing.T) {
-	t.Parallel()
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:             "dst-2",
+				Name:           "GA4",
+				Type:           "GA4",
+				Version:        1,
+				Config:         []byte(`{"apiSecret":"s","measurementId":"G-1"}`),
+				Transformation: &client.DestinationTransformationLink{ID: "trans-foreign"},
+			}},
+		}
 
-	h := destination.NewHandler(nil, testRegistry(t))
+		resolver := stubResolver{fn: func(string, string) (string, error) {
+			return "", fmt.Errorf("resource not present in resources collection")
+		}}
 
-	collection := map[string]*destination.RemoteDestination{
-		"ga4-production": {Destination: &client.Destination{
-			ID:             "dst-2",
-			Name:           "GA4",
-			Type:           "GA4",
-			Version:        1,
-			Config:         []byte(`{"apiSecret":"s","measurementId":"G-1"}`),
-			Transformation: &client.DestinationTransformationLink{ID: "trans-foreign"},
-		}},
-	}
+		entities, entries, err := h.Impl.FormatForExport(collection, nil, resolver)
+		require.Error(t, err, "an unresolved transformation link must fail the export, not fall back to a raw ID")
+		assert.Nil(t, entities)
+		assert.Nil(t, entries)
+	})
 
-	resolver := stubResolver{fn: func(string, string) (string, error) {
-		return "", fmt.Errorf("resource not present in resources collection")
-	}}
+	t.Run("unregistered type version errors", func(t *testing.T) {
+		t.Parallel()
 
-	entities, entries, err := h.Impl.FormatForExport(collection, nil, resolver)
-	require.Error(t, err, "an unresolved transformation link must fail the export, not fall back to a raw ID")
-	assert.Nil(t, entities)
-	assert.Nil(t, entries)
-}
+		h := destination.NewHandler(nil, registry)
 
-func TestHandlerImpl_FormatForExport_UnregisteredTypeVersionErrors(t *testing.T) {
-	t.Parallel()
+		collection := map[string]*destination.RemoteDestination{
+			"s3-1": {Destination: &client.Destination{
+				ID:     "dst-3",
+				Name:   "S3",
+				Type:   "S3",
+				Config: []byte(`{}`),
+			}},
+		}
 
-	h := destination.NewHandler(nil, testRegistry(t))
-
-	collection := map[string]*destination.RemoteDestination{
-		"s3-1": {Destination: &client.Destination{
-			ID:     "dst-3",
-			Name:   "S3",
-			Type:   "S3",
-			Config: []byte(`{}`),
-		}},
-	}
-
-	_, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "getting destination definition")
+		_, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "getting destination definition")
+	})
 }

@@ -196,8 +196,8 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, fmt.Errorf("managed destination %s has empty external ID", remote.ID)
 	}
 
-	if !h.registry.IsSupported(remote.Type) {
-		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q", remote.ID, remote.Type)
+	if _, err := h.registry.Get(remote.Type, remote.Version); err != nil {
+		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q and version %d", remote.ID, remote.Type, remote.Version)
 	}
 
 	version := int64(remote.Version)
