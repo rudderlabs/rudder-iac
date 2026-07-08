@@ -246,6 +246,25 @@ func TestDataGraphSpecSyntaxValid_ColumnsValid(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "description at maximum length (2000 chars) is valid",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					{
+						ID:          "user",
+						DisplayName: "User",
+						Type:        "entity",
+						Table:       "db.schema.users",
+						PrimaryID:   "id",
+						Columns: []dgModel.ColumnMetadataYAML{
+							{Name: "notes", Description: strings.Repeat("a", 2000)},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -369,6 +388,21 @@ func TestDataGraphSpecSyntaxValid_ColumnsInvalid(t *testing.T) {
 			},
 			expectedRefs:          []string{"/models/0/columns/0/display_name"},
 			expectedMsgSubstrings: []string{"length must be less than or equal to 255"},
+		},
+		{
+			name: "column description too long",
+			spec: dgModel.DataGraphSpec{
+				ID:        "my-dg",
+				AccountID: "wh-123",
+				Models: []dgModel.ModelSpec{
+					baseModel(dgModel.ColumnMetadataYAML{
+						Name:        "id",
+						Description: strings.Repeat("a", 2001),
+					}),
+				},
+			},
+			expectedRefs:          []string{"/models/0/columns/0/description"},
+			expectedMsgSubstrings: []string{"length must be less than or equal to 2000"},
 		},
 		{
 			name: "column display_name with newline is rejected",

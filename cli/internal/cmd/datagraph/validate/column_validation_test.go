@@ -178,6 +178,63 @@ spec:
 	assert.Contains(t, out, "Found 1 error(s)")
 }
 
+func TestValidate_ColumnsBlock_DescriptionAtMaximumLength(t *testing.T) {
+	t.Parallel()
+
+	description := strings.Repeat("a", 2000)
+	dir := writeDataGraphYAML(t, `version: rudder/v1
+kind: data-graph
+metadata:
+  name: smoke-test
+spec:
+  id: smoke-test
+  account_id: wh-account-123
+  models:
+    - id: user
+      display_name: User
+      type: entity
+      table: db.schema.users
+      primary_id: id
+      columns:
+        - name: id
+          description: "`+description+`"
+`)
+
+	err, out := loadDataGraphProject(t, dir)
+	require.NoError(t, err, "description at the 2000-character limit must pass local validation; renderer output was:\n%s", out)
+	assert.NotContains(t, out, "error[")
+}
+
+func TestValidate_ColumnsBlock_DescriptionTooLong(t *testing.T) {
+	t.Parallel()
+
+	tooLong := strings.Repeat("a", 2001)
+	dir := writeDataGraphYAML(t, `version: rudder/v1
+kind: data-graph
+metadata:
+  name: smoke-test
+spec:
+  id: smoke-test
+  account_id: wh-account-123
+  models:
+    - id: user
+      display_name: User
+      type: entity
+      table: db.schema.users
+      primary_id: id
+      columns:
+        - name: id
+          description: "`+tooLong+`"
+`)
+
+	err, out := loadDataGraphProject(t, dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "syntax validation failed")
+
+	assert.Contains(t, out, "'description' length must be less than or equal to 2000")
+	assert.Contains(t, out, "Found 1 error(s)")
+}
+
 func TestValidate_ColumnsBlock_DisplayNameTooLong(t *testing.T) {
 	t.Parallel()
 
