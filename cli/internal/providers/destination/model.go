@@ -8,11 +8,11 @@ import (
 
 // DestinationSpec is the user-authored YAML representation of a destination.
 type DestinationSpec struct {
-	ID                string         `mapstructure:"id"`
-	DisplayName       string         `mapstructure:"display_name"`
-	Type              string         `mapstructure:"type"`
+	ID                string         `mapstructure:"id" validate:"required"`
+	DisplayName       string         `mapstructure:"display_name" validate:"required"`
+	Type              string         `mapstructure:"type" validate:"required"`
 	Enabled           bool           `mapstructure:"enabled"`
-	DefinitionVersion int64          `mapstructure:"definition_version"`
+	DefinitionVersion int64          `mapstructure:"definition_version" validate:"required"`
 	Transformation    string         `mapstructure:"transformation"` // scalar "#transformation:<id>" — object form deferred
 	Config            map[string]any `mapstructure:"config"`
 }

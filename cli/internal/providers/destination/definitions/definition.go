@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
@@ -60,6 +61,22 @@ func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 		return nil
 	}
 	return append([]string(nil), d.SourceTypes...)
+}
+
+// LocalSourceTypeKeys returns the snake_case config keys for the definition's
+// supported source types — the keys allowed under source-type-scoped config
+// blocks like connection_mode and consent_management.
+func (d *RegisteredDefinition) LocalSourceTypeKeys() []string {
+	sourceTypes := d.SupportedSourceTypes()
+	if len(sourceTypes) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(sourceTypes))
+	for _, sourceType := range sourceTypes {
+		keys = append(keys, common.LocalSourceTypeKey(sourceType))
+	}
+	return keys
 }
 
 func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, error) {

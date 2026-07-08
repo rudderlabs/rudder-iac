@@ -48,6 +48,25 @@ func assertConfigError(t *testing.T, errors []ConfigError, path, message string)
 	t.Fatalf("expected validation error at %q with message %q, got %#v", path, message, errors)
 }
 
+func TestLocalSourceTypeKeys(t *testing.T) {
+	t.Parallel()
+
+	def := GA4TestDefinition()
+	def.SourceTypes = []string{"web", "reactNative", "amp"}
+
+	registered, err := newRegisteredDefinition(def)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"web", "react_native", "amp"}, registered.LocalSourceTypeKeys())
+}
+
+func TestLocalSourceTypeKeysEmpty(t *testing.T) {
+	t.Parallel()
+
+	registered, err := newRegisteredDefinition(WebhookTestDefinitionWithoutConnectionMode())
+	require.NoError(t, err)
+	assert.Nil(t, registered.LocalSourceTypeKeys())
+}
+
 func TestNewRegisteredDefinitionMissingNewConfig(t *testing.T) {
 	t.Parallel()
 
