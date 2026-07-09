@@ -92,7 +92,7 @@ func TestSourceSpecSyntaxValidRule_AllSourceTypes(t *testing.T) {
 	sourceTypes := []string{
 		"java", "dotnet", "php", "flutter", "cordova", "rust",
 		"react_native", "python", "ios", "android", "javascript",
-		"go", "node", "ruby", "unity", "swift", "kotlin",
+		"go", "node", "ruby", "unity", "swift", "kotlin", "ocaml",
 	}
 
 	for _, st := range sourceTypes {
@@ -154,7 +154,7 @@ func TestSourceSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				SourceDefinition: "invalid_type",
 			},
 			wantMessages: []string{
-				"'type' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin]",
+				"'type' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin ocaml]",
 			},
 		},
 		{
@@ -312,7 +312,7 @@ func TestSourceSpecSyntaxValidV1Rule_AllSourceTypes(t *testing.T) {
 	sourceTypes := []string{
 		"java", "dotnet", "php", "flutter", "cordova", "rust",
 		"react_native", "python", "ios", "android", "javascript",
-		"go", "node", "ruby", "unity", "swift", "kotlin",
+		"go", "node", "ruby", "unity", "swift", "kotlin", "ocaml",
 	}
 
 	for _, st := range sourceTypes {
@@ -374,7 +374,7 @@ func TestSourceSpecSyntaxValidV1Rule_InvalidSpecs(t *testing.T) {
 				SourceDefinition: "invalid_type",
 			},
 			wantMessages: []string{
-				"'type' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin]",
+				"'type' must be one of [java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity swift kotlin ocaml]",
 			},
 		},
 		{
