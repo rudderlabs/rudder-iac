@@ -37,11 +37,11 @@ type TaskCompletionCall struct {
 // NewMockReporter creates a new MockReporter with default confirmation response of true
 func NewMockReporter() *MockReporter {
 	return &MockReporter{
-		ConfirmResponse:      true,
-		ReportPlanCalls:      make([]*planner.Plan, 0),
-		SyncStartedCalls:     make([]int, 0),
-		TaskStartedCalls:     make([]TaskCall, 0),
-		TaskCompletedCalls:   make([]TaskCompletionCall, 0),
+		ConfirmResponse:    true,
+		ReportPlanCalls:    make([]*planner.Plan, 0),
+		SyncStartedCalls:   make([]int, 0),
+		TaskStartedCalls:   make([]TaskCall, 0),
+		TaskCompletedCalls: make([]TaskCompletionCall, 0),
 	}
 }
 
