@@ -52,6 +52,5 @@ func newCmdListEventStreamSources() *cobra.Command {
 	}
 
 	cmd.Flags().Bool("json", false, "Output as JSON")
-	cmd.Deprecated = "use 'rudder-cli get event-stream-source' instead"
 	return cmd
 }

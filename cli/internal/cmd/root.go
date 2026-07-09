@@ -102,6 +102,7 @@ func init() {
 		deletecmd.NewCmdDelete(),
 	}
 	for _, c := range resourceVerbCmds {
+		gateBehindResourceCommands(c)
 		rootCmd.AddCommand(c)
 	}
 
@@ -121,6 +122,23 @@ func init() {
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)
+}
+
+// gateBehindResourceCommands makes a resource verb refuse to run unless the
+// experimental `resourceCommands` flag is enabled. This gating is rudder-cli
+// only: the rudder-api binary registers the same verb commands first-class, so
+// the gate lives here at registration rather than inside the shared commands.
+func gateBehindResourceCommands(c *cobra.Command) {
+	inner := c.RunE
+	c.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := config.RequireResourceCommands(); err != nil {
+			return err
+		}
+		if inner != nil {
+			return inner(cmd, args)
+		}
+		return nil
+	}
 }
 
 func initConfig() {

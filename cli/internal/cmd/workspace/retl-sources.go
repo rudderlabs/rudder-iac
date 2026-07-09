@@ -54,7 +54,6 @@ func newCmdListRetlSources() *cobra.Command {
 		},
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")
-	cmd.Deprecated = "use 'rudder-cli get retl-source-sql-model' instead"
 
 	return cmd
 }
