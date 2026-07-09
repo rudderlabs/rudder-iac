@@ -175,23 +175,17 @@ func getOrRegisterEventMethodName(rule *plan.EventRule, nr *core.NameRegistry) (
 // inside an interface, plus a `quoted` flag indicating whether the template
 // must wrap it in double quotes.
 //
-// When the JSON key sanitises to a valid TS identifier, it is registered with
-// the NameRegistry under a per-interface scope so duplicates after sanitisation
-// trigger the collision handler. When it does not (e.g. "用户名", "user-id",
-// "first name"), the original key is preserved verbatim and emitted as a
-// quoted property; registration is unnecessary because JSON object keys are
-// already unique within a single schema.
+// Emit the plan's property key verbatim so the generated field name matches the
+// key sent on the wire; the props object is passed to analytics.track()
+// unchanged, so camelCasing the field name would ship a key that violates the
+// tracking plan. Quote only when the key is not a valid TS identifier
+// (e.g. "用户名", "user-id", "first name"). JSON object keys are unique within a
+// single schema, so no NameRegistry collision registration is needed here.
 func getOrRegisterInterfacePropertyName(interfaceName, propName string, nr *core.NameRegistry) (name string, quoted bool, err error) {
-	formatted := FormatPropertyName(propName)
-	if !isValidTSIdentifier(formatted) {
+	if !isValidTSIdentifier(propName) {
 		return propName, true, nil
 	}
-	scope := fmt.Sprintf("interface:%s:fields", interfaceName)
-	registered, err := nr.RegisterName(propName, scope, formatted)
-	if err != nil {
-		return "", false, err
-	}
-	return registered, false, nil
+	return propName, false, nil
 }
 
 // isValidTSIdentifier reports whether s is a syntactically valid TS identifier.
