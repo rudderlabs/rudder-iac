@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [⚠️ Work in Progress](#️-work-in-progress)
+- [Repository Scope](#repository-scope)
 - [Installation](#installation)
   - [MacOS](#macos)
     - [Apple Silicon](#apple-silicon)
@@ -16,6 +17,11 @@
 > **Warning**
 >
 > Please note that this tool is currently a work in progress. We are actively developing and improving it, and as such, there may be frequent changes and updates. We do not guarantee backwards compatibility at this stage.
+
+## Repository Scope
+
+`rudder-iac` contains the Infrastructure-as-Code tooling (CLI and SDK) used to manage RudderStack resources declaratively.
+Configuration backend service implementation and deployment live in the separate `rudder-config-backend` repository.
 
 ## Installation
 
