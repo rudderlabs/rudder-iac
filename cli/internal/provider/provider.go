@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -220,6 +221,18 @@ type RuleProvider interface {
 	RuleDocEntries() []docs.RuleDocEntry
 }
 
+// ResourceMatcherProvider exposes the uniqueness matchers used by
+// `import workspace --merge` to link unmanaged remote resources to existing
+// local project resources.
+//
+// Matchers are returned in resolution order — parents before children — so
+// matchers for child types can rely on parent matches being recorded already.
+// An empty or nil result means the provider does not support smart import:
+// its resources keep namer-generated identities.
+type ResourceMatcherProvider interface {
+	ResourceMatchers() []importmatcher.Matcher
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -249,4 +262,5 @@ type Provider interface {
 	ConsolidateSyncer
 	RuleProvider
 	ImportManifestLoader
+	ResourceMatcherProvider
 }

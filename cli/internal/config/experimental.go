@@ -24,6 +24,10 @@ type ExperimentalConfig struct {
 	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
 	// LocalTyper enables `typer generate --local`, generating typed code from local specs without applying to remote
 	LocalTyper bool `mapstructure:"localTyper"`
+	// ImportMerge enables `import workspace --merge`, which links matching
+	// remote resources to existing local project resources instead of
+	// generating duplicate specs
+	ImportMerge bool `mapstructure:"importMerge"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

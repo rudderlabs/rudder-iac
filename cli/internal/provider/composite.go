@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -55,6 +56,19 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
 	}, nil
+}
+
+// ResourceMatchers aggregates import --merge matchers from all providers.
+// Cross-provider order is immaterial — resource types are disjoint across
+// providers (enforced at construction) and no matcher reads another
+// provider's marks — so plain map iteration is fine; only the order within a
+// provider's own slice (parent-before-child) is meaningful and is preserved.
+func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
+	var all []importmatcher.Matcher
+	for _, provider := range p.Providers {
+		all = append(all, provider.ResourceMatchers()...)
+	}
+	return all
 }
 
 // SupportedMatchPatterns aggregates match patterns from all providers.

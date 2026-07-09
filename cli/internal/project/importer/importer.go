@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -28,6 +29,7 @@ type ImportProvider interface {
 	provider.RemoteResourceLoader
 	provider.StateLoader
 	provider.Exporter
+	provider.ResourceMatcherProvider
 }
 
 type Project interface {
@@ -38,7 +40,8 @@ type Project interface {
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
-	p ImportProvider) error {
+	p ImportProvider,
+	merge bool) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -57,10 +60,8 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	// HasNonSecretDiff (not HasDiff) so resources that only re-apply an unknown
-	// secret — which is expected on every run — do not permanently block imports.
-	if diff.HasNonSecretDiff() {
-		return fmt.Errorf("%w", ErrProjectNotSynced)
+	if err := checkSyncStatus(diff, merge); err != nil {
+		return err
 	}
 
 	idNamer, err := initNamer(targetGraph)
@@ -76,6 +77,10 @@ func WorkspaceImport(
 	if importable.Len() == 0 {
 		fmt.Println("No resources to import")
 		return nil
+	}
+
+	if merge {
+		markMatchedWith(p, sourceGraph, targetGraph, importable)
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
@@ -124,6 +129,42 @@ func WorkspaceImport(
 	}
 
 	return nil
+}
+
+// checkSyncStatus guards the import against a diverged project. Without merge,
+// any pending change blocks — HasNonSecretDiff (not HasDiff) so resources that
+// only re-apply an unknown secret, which is expected on every run, do not
+// permanently block imports. With merge, divergence is the point; only pending
+// deletions block, as importing over them could resurrect deleted resources.
+func checkSyncStatus(diff *differ.Diff, merge bool) error {
+	if !merge {
+		if diff.HasNonSecretDiff() {
+			return fmt.Errorf("%w", ErrProjectNotSynced)
+		}
+		return nil
+	}
+
+	if len(diff.RemovedResources) > 0 {
+		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
+			ErrProjectNotSynced, diff.RemovedResources)
+	}
+	return nil
+}
+
+// markMatchedWith runs merge conflict detection against the local project
+// graph, marking matched importable resources in place. Providers without
+// matchers contribute nothing, leaving their resources on namer identities.
+func markMatchedWith(
+	p ImportProvider,
+	sourceGraph *resources.Graph,
+	targetGraph *resources.Graph,
+	importable *resources.RemoteResources,
+) {
+	importmatcher.Mark(importmatcher.Scope{
+		LocalGraph:  targetGraph,
+		RemoteGraph: sourceGraph,
+		Importable:  importable,
+	}, p.ResourceMatchers())
 }
 
 func initNamer(graph *resources.Graph) (namer.Namer, error) {
