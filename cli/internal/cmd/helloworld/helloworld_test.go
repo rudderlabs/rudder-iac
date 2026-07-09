@@ -18,7 +18,7 @@ func TestNewCmdHelloWorldPrintsGreeting(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 
-	assert.Equal(t, "Hello, World!\n", out.String())
+	assert.Equal(t, "Debug\nHello, World!\n", out.String())
 }
 
 func TestNewCmdHelloWorldRejectsArgs(t *testing.T) {
@@ -32,4 +32,5 @@ func TestNewCmdHelloWorldRejectsArgs(t *testing.T) {
 
 	require.Error(t, cmd.Execute())
 	assert.NotContains(t, out.String(), "Hello, World!")
+	assert.NotContains(t, out.String(), "Debug")
 }
