@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -88,6 +89,12 @@ func (p *Provider) SupportedTypes() []string {
 		types = append(types, resourceType)
 	}
 	return types
+}
+
+// ResourceMatchers overrides the EmptyProvider default to opt into import
+// --merge smart linking for SQL models.
+func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
+	return []importmatcher.Matcher{sqlmodel.Matcher()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
