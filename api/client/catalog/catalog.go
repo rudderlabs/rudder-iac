@@ -175,7 +175,7 @@ func getFirstPage[T any](ctx context.Context, apiClient *client.Client, endpoint
 	resp, err := apiClient.Do(ctx, "GET", endpoint, nil)
 	if err != nil {
 		var apiErr *client.APIError
-		if ok := errors.As(err, &apiErr); ok && apiErr.FeatureNotEnabled() {
+		if ok := errors.As(err, &apiErr); ok && apiErr.IsFeatureNotEnabled() {
 			return toReturn, nil
 		}
 		return toReturn, fmt.Errorf("sending get request: %w", err)

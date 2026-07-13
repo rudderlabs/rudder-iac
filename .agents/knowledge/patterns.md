@@ -42,3 +42,8 @@
 - Destination support is centralized in `api/client/destinations.go`; the same `Destination` struct is used as the request and response contract for create, update, get, and list.
 - Because destination create/update marshal copied whole structs, adding response-oriented or ownership-metadata fields to `Destination` can affect write payloads unless each write method explicitly clears fields that do not belong on that endpoint.
 - `Destinations.Update` is expected to copy the input destination and clear `ExternalID` before marshaling, while `Destinations.SetExternalID` owns the dedicated external-ID write endpoint.
+
+## RUD-2963 — Optional Feature API Fallback
+<!-- ticket:RUD-2963 -->
+- `api/client.APIError.IsFeatureNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the legacy `Flag is not enabled for your account` prefix or the GA `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.IsFeatureNotEnabled`).
+- Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
