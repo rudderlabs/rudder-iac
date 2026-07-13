@@ -115,6 +115,13 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	case "oneof":
 		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, err.Param())
 
+	case "dynamic_or_oneof":
+		return fmt.Sprintf(
+			"'%s' must be one of [%s] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
+			fieldName,
+			err.Param(),
+		)
+
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {
 			// For string and slice, the gte tag is used to validate the length

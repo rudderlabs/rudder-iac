@@ -74,7 +74,12 @@ func TestValidateConfigConnectionModeEnum(t *testing.T) {
 			"web": "invalid-mode",
 		},
 	})
-	assertConfigError(t, errors, "/connection_mode/web", "'web' must be one of [cloud device hybrid]")
+	assertConfigError(
+		t,
+		errors,
+		"/connection_mode/web",
+		"'web' must be one of [cloud device hybrid] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
+	)
 }
 
 func TestValidateConfigDecodeTypeError(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -20,6 +21,7 @@ const importDir = ""
 // Provider wraps BaseProvider with the single destination handler.
 type Provider struct {
 	*provider.BaseProvider
+	registry *definitions.Registry
 }
 
 // NewProvider constructs the destination provider with the given API client and
@@ -30,6 +32,7 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 		BaseProvider: provider.NewBaseProvider([]provider.Handler{
 			NewHandler(c, registry),
 		}),
+		registry: registry,
 	}
 }
 
@@ -44,18 +47,21 @@ func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	return prules.V1VersionPatterns(DestinationSpecKind)
 }
 
-// SyntacticRules returns no rules this ticket — full validation is RUD-2853.
 func (p *Provider) SyntacticRules() []vrules.Rule {
-	return nil
+	return []vrules.Rule{
+		NewSpecSyntaxValidRule(p.registry),
+	}
 }
 
-// SemanticRules returns no rules this ticket — full validation is RUD-2853.
 func (p *Provider) SemanticRules() []vrules.Rule {
-	return nil
+	return []vrules.Rule{
+		NewSemanticValidRule(),
+	}
 }
 
-// RuleDocEntries returns no authored fragments yet — destination validation
-// rules and their docs land with RUD-2853.
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the destination provider, joined to registered rules by the docs generator.
 func (p *Provider) RuleDocEntries() []vdocs.RuleDocEntry {
-	return nil
+	entries, _ := vdocs.LoadRuleDocEntries(destdocs.FragmentsFS, ".")
+	return entries
 }
