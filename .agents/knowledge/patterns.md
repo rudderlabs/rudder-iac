@@ -45,5 +45,5 @@
 
 ## RUD-2963 — Optional Feature API Fallback
 <!-- ticket:RUD-2963 -->
-- `api/client.APIError.IsFeatureNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the legacy `Flag is not enabled for your account` prefix or the GA `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.IsFeatureNotEnabled`).
+- `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the legacy `Flag is not enabled for your account` prefix or the GA `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
 - Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
