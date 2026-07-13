@@ -344,7 +344,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	return BuildRegistry(p.provider, p.importManifestProvider)
+	return BuildRegistry(p.provider, p.importManifestProvider, config.GetConfig().ExperimentalFlags.ImportMerge)
 }
 
 // BuildRegistry constructs the validation rule registry from the resource
@@ -356,14 +356,15 @@ func (p *project) registry() (rules.Registry, error) {
 // resource-scoped gatekeepers (metadata-syntax-valid, duplicate-urn) are scoped
 // to resourcePatterns alone so the engine never hands them a manifest spec.
 //
-// Import-manifest patterns and dedicated rules are only included when the
-// importMerge experimental flag is enabled — otherwise the kind is unknown and
-// leftover/hand-written manifest files fail syntax validation.
-func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, error) {
+// Import-manifest patterns and dedicated rules are only included when
+// importMergeEnabled is set — otherwise the kind is unknown and
+// leftover/hand-written manifest files fail syntax validation. The flag is
+// resolved by callers and passed in so this stays a pure function of its
+// arguments, testable without touching global config.
+func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnabled bool) (rules.Registry, error) {
 	resourcePatterns := provider.SupportedMatchPatterns()
 
 	activePatterns := append([]rules.MatchPattern{}, resourcePatterns...)
-	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
 	if importMergeEnabled {
 		activePatterns = append(activePatterns, manifestProvider.SupportedMatchPatterns()...)
 	}

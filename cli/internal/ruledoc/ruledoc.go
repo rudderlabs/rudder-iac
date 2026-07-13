@@ -34,8 +34,9 @@ import (
 // the real clock in the command, a fixed value in tests.
 func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.DocumentedRules, []error, error) {
 	manifestProvider := importmanifest.New()
+	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
 
-	reg, err := project.BuildRegistry(cp, manifestProvider)
+	reg, err := project.BuildRegistry(cp, manifestProvider, importMergeEnabled)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
 	}
@@ -45,8 +46,9 @@ func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.Documente
 	// provider-contributed entries. The import-manifest provider contributes both
 	// its rules (via BuildRegistry) and their fragments (here) — collect from the
 	// same instance so the two stay in sync. Only include them when importMerge
-	// is on, matching BuildRegistry's gate.
-	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
+	// is on, matching BuildRegistry's gate. The manifest-inline-conflict fragment
+	// rides with the manifest provider's fragments (not projectEntries) so the
+	// rule and its doc share one gate.
 	entries := cp.RuleDocEntries()
 	if importMergeEnabled {
 		entries = append(entries, manifestProvider.RuleDocEntries()...)
@@ -55,13 +57,7 @@ func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.Documente
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("loading project rule docs: %w", err)
 	}
-	for _, e := range projectEntries {
-		// manifest-inline-conflict only registers when importMerge is on.
-		if !importMergeEnabled && e.RuleID == "project/manifest-inline-conflict" {
-			continue
-		}
-		entries = append(entries, e)
-	}
+	entries = append(entries, projectEntries...)
 
 	doc, verrs := docs.Generate(
 		reg.AllSyntacticRules(),

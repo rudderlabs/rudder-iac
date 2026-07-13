@@ -7,21 +7,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func enableImportMerge(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
-	viper.Set("experimental", true)
-	viper.Set("flags.importMerge", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.importMerge", prevFlag)
-	})
-}
 
 // TestBuildRegistry_AggregatesManifestPatterns proves the two-provider
 // BuildRegistry unions the manifest provider's SupportedMatchPatterns into the
@@ -29,8 +17,6 @@ func enableImportMerge(t *testing.T) {
 // as known by the gatekeeper rules (SpecSyntaxValidRule) instead of being
 // rejected as an unknown kind.
 func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
-	enableImportMerge(t)
-
 	resourceProvider := &testutils.MockProvider{
 		MatchPatterns: []rules.MatchPattern{
 			rules.MatchKindVersion("properties", specs.SpecVersionV1),
@@ -38,7 +24,7 @@ func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
 	}
 	manifestProvider := importmanifest.New()
 
-	reg, err := BuildRegistry(resourceProvider, manifestProvider)
+	reg, err := BuildRegistry(resourceProvider, manifestProvider, true)
 	require.NoError(t, err)
 
 	// The manifest kind/version must resolve to at least the gatekeeper rules,
@@ -77,7 +63,7 @@ func TestBuildRegistry_RejectsManifestKindWhenFlagOff(t *testing.T) {
 	}
 	manifestProvider := importmanifest.New()
 
-	reg, err := BuildRegistry(resourceProvider, manifestProvider)
+	reg, err := BuildRegistry(resourceProvider, manifestProvider, false)
 	require.NoError(t, err)
 
 	var specSyntax rules.Rule
