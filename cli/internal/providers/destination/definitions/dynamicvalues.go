@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	uiEnvValueRegex     = regexp.MustCompile(`^env[.].+`)
+	uiEnvValueRegex      = regexp.MustCompile(`^env[.].+`)
 	uiTemplateValueRegex = regexp.MustCompile(`^\{\{.*\|\|(.*)\}\}$`)
-	iacVarValueRegex    = regexp.MustCompile(`^\{\{\s*\.[A-Za-z_][A-Za-z0-9_]*(?:\s*\|\s*((?:[^}]|}[^}])*?))?\s*\}\}$`)
+	varValueRegex        = regexp.MustCompile(`^\{\{\s*\.[A-Za-z_][A-Za-z0-9_]*(?:\s*\|\s*((?:[^}]|}[^}])*?))?\s*\}\}$`)
 )
 
 // IsDynamicConfigValue reports whether value uses RudderStack UI dynamic syntax
@@ -27,7 +27,7 @@ func IsDynamicConfigValue(value string) bool {
 
 	return uiEnvValueRegex.MatchString(value) ||
 		uiTemplateValueRegex.MatchString(value) ||
-		iacVarValueRegex.MatchString(value)
+		varValueRegex.MatchString(value)
 }
 
 func configValidateFuncs() []rules.CustomValidateFunc {
@@ -60,10 +60,12 @@ func dynamicOrOneOf(fl validator.FieldLevel) bool {
 
 func stringFieldValue(fl validator.FieldLevel) (string, bool) {
 	field := fl.Field()
+
 	switch field.Kind() {
 	case reflect.String:
 		return field.String(), true
-	case reflect.Ptr:
+
+	case reflect.Pointer:
 		if field.IsNil() {
 			return "", true
 		}
@@ -71,6 +73,7 @@ func stringFieldValue(fl validator.FieldLevel) (string, bool) {
 			return "", false
 		}
 		return field.Elem().String(), true
+
 	default:
 		return "", false
 	}

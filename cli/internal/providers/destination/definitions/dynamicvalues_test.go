@@ -3,9 +3,8 @@ package definitions_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsDynamicConfigValue(t *testing.T) {
