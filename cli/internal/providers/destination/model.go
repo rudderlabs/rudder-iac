@@ -9,7 +9,7 @@ import (
 // DestinationSpec is the user-authored YAML representation of a destination.
 type DestinationSpec struct {
 	ID                string         `mapstructure:"id" validate:"required"`
-	DisplayName       string         `mapstructure:"display_name" validate:"required"`
+	DisplayName       string         `mapstructure:"display_name" validate:"required,pattern=destination_display_name"`
 	Type              string         `mapstructure:"type" validate:"required"`
 	Enabled           bool           `mapstructure:"enabled"`
 	DefinitionVersion int64          `mapstructure:"definition_version" validate:"required"`

@@ -1,6 +1,7 @@
 package destination
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -125,6 +126,101 @@ func TestSpecSyntaxValidRuleRequiredFields(t *testing.T) {
 		{Reference: "/spec/type", Message: "'type' is required"},
 		{Reference: "/spec/definition_version", Message: "'definition_version' is required"},
 	}, results)
+}
+
+func TestSpecSyntaxValidRuleDisplayNamePattern(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		value    string
+		expected []vrules.ValidationResult
+	}{
+		{
+			name:  "valid display name",
+			value: "Production Webhook",
+		},
+		{
+			name:  "too short",
+			value: "a",
+			expected: []vrules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "'display_name' is not valid: must be 2-100 characters and contain only letters, digits, underscores, spaces, periods, and hyphens",
+			}},
+		},
+		{
+			name:  "invalid character",
+			value: "Webhook@Prod",
+			expected: []vrules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "'display_name' is not valid: must be 2-100 characters and contain only letters, digits, underscores, spaces, periods, and hyphens",
+			}},
+		},
+		{
+			name:  "too long",
+			value: strings.Repeat("a", 101),
+			expected: []vrules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "'display_name' is not valid: must be 2-100 characters and contain only letters, digits, underscores, spaces, periods, and hyphens",
+			}},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := validSpecMap()
+			spec["display_name"] = c.value
+
+			results := runSyntaxRule(t, ruleTestRegistry(t), spec)
+			if c.expected == nil {
+				assert.Empty(t, results)
+				return
+			}
+			assert.Equal(t, c.expected, results)
+		})
+	}
+}
+
+func TestSpecSyntaxValidRuleConfigDynamicValues(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		config map[string]any
+	}{
+		{
+			name: "allows env reference",
+			config: map[string]any{
+				"webhook_url": "env.WEBHOOK_URL",
+			},
+		},
+		{
+			name: "allows ui template fallback",
+			config: map[string]any{
+				"webhook_url": "{{ config.url || https://example.com/hook }}",
+			},
+		},
+		{
+			name: "allows iac variable substitution",
+			config: map[string]any{
+				"webhook_url": "{{ .WEBHOOK_URL }}",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := validSpecMap()
+			spec["config"] = c.config
+
+			results := runSyntaxRule(t, ruleTestRegistry(t), spec)
+			assert.Empty(t, results)
+		})
+	}
 }
 
 func TestSpecSyntaxValidRuleUnregisteredType(t *testing.T) {
