@@ -59,6 +59,7 @@ type project struct {
 	validationEngine       validation.ValidationEngine
 	renderer               renderer.Renderer
 	substitutor            varsubst.Substitutor
+	ignoreUnknownKinds     bool
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -89,6 +90,20 @@ func WithRenderer(r renderer.Renderer) ProjectOption {
 func WithSubstitutor(s varsubst.Substitutor) ProjectOption {
 	return func(p *project) {
 		p.substitutor = s
+	}
+}
+
+// WithIgnoreUnknownKinds makes Load skip specs whose kind no registered provider
+// owns, instead of failing syntax validation on them.
+//
+// Only for read-only consumers that need a subset of the project: the local
+// typer reads the data catalog and tracking plan, but a project directory may
+// also hold specs owned by providers it does not register (data-graphs,
+// transformations), which are irrelevant to code generation. The apply path must
+// never set this — silently ignoring a spec there would mean not applying it.
+func WithIgnoreUnknownKinds() ProjectOption {
+	return func(p *project) {
+		p.ignoreUnknownKinds = true
 	}
 }
 
@@ -332,6 +347,14 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 			continue
 		}
 
+		// Dropped before validation so the gatekeeper rules never see the spec at
+		// all: the kind belongs to a provider this caller did not register, so
+		// every rule keyed off it would be a false error.
+		if p.ignoreUnknownKinds && !p.isKnownKind(parsed.Kind) {
+			log.Debug("skipping spec of unregistered kind", "path", path, "kind", parsed.Kind)
+			continue
+		}
+
 		// At this point, we have a valid parsed spec which
 		// we need to add to the specs map on the project required by migrate command.
 		p.specs[path] = parsed
@@ -340,6 +363,23 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 
 	diags.Sort()
 	return parsedRawSpecs, diags
+}
+
+// isKnownKind reports whether any registered provider owns the kind. The pattern
+// union mirrors BuildRegistry's activePatterns, so a kind is skipped only when
+// the gatekeeper rules would have rejected it as unknown.
+func (p *project) isKnownKind(kind string) bool {
+	providers := []ProjectProvider{p.provider, p.importManifestProvider}
+
+	for _, prov := range providers {
+		for _, pattern := range prov.SupportedMatchPatterns() {
+			if pattern.Kind == "*" || pattern.Kind == kind {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (p *project) registry() (rules.Registry, error) {
