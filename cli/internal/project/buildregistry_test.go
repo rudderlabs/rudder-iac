@@ -7,16 +7,29 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func enableImportMerge(t *testing.T) {
+	t.Helper()
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
+	viper.Set("experimental", true)
+	viper.Set("flags.importMerge", true)
+	t.Cleanup(func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.importMerge", prevFlag)
+	})
+}
+
 // TestBuildRegistry_AggregatesManifestPatterns proves the two-provider
 // BuildRegistry unions the manifest provider's SupportedMatchPatterns into the
-// active set, so the import-manifest kind is treated as known by the gatekeeper
-// rules (SpecSyntaxValidRule) instead of being rejected as an unknown kind.
+// active set when importMerge is enabled, so the import-manifest kind is treated
+// as known by the gatekeeper rules (SpecSyntaxValidRule) instead of being
+// rejected as an unknown kind.
 func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
-	t.Parallel()
+	enableImportMerge(t)
 
 	resourceProvider := &testutils.MockProvider{
 		MatchPatterns: []rules.MatchPattern{
@@ -51,4 +64,37 @@ func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
 		Spec:     map[string]any{"workspaces": []any{}},
 	})
 	assert.Empty(t, results, "manifest kind must be a known kind/version (no 'unknown kind' error)")
+}
+
+// TestBuildRegistry_RejectsManifestKindWhenFlagOff proves that with importMerge
+// disabled (the default), the import-manifest kind is excluded from the active
+// set and rejected as an unknown kind by spec-syntax-valid.
+func TestBuildRegistry_RejectsManifestKindWhenFlagOff(t *testing.T) {
+	resourceProvider := &testutils.MockProvider{
+		MatchPatterns: []rules.MatchPattern{
+			rules.MatchKindVersion("properties", specs.SpecVersionV1),
+		},
+	}
+	manifestProvider := importmanifest.New()
+
+	reg, err := BuildRegistry(resourceProvider, manifestProvider)
+	require.NoError(t, err)
+
+	var specSyntax rules.Rule
+	for _, r := range reg.AllSyntacticRules() {
+		if r.ID() == "project/spec-syntax-valid" {
+			specSyntax = r
+			break
+		}
+	}
+	require.NotNil(t, specSyntax)
+
+	results := specSyntax.Validate(&rules.ValidationContext{
+		Kind:     importmanifest.KindImportManifest,
+		Version:  specs.SpecVersionV1,
+		Metadata: map[string]any{"name": "import-manifest"},
+		Spec:     map[string]any{"workspaces": []any{}},
+	})
+	require.NotEmpty(t, results, "manifest kind must be rejected when importMerge is off")
+	assert.Contains(t, results[0].Message, "'kind' must be one of")
 }

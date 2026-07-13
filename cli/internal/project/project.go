@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
@@ -354,13 +355,19 @@ func (p *project) registry() (rules.Registry, error) {
 // gatekeeper rules treat both resource kinds and import-manifest as known. The
 // resource-scoped gatekeepers (metadata-syntax-valid, duplicate-urn) are scoped
 // to resourcePatterns alone so the engine never hands them a manifest spec.
+//
+// Import-manifest patterns and dedicated rules are only included when the
+// importMerge experimental flag is enabled — otherwise the kind is unknown and
+// leftover/hand-written manifest files fail syntax validation.
 func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, error) {
 	resourcePatterns := provider.SupportedMatchPatterns()
-	manifestPatterns := manifestProvider.SupportedMatchPatterns()
 
-	// Union of both providers' patterns: the source of truth for which kinds and
-	// versions the validation pipeline treats as known.
-	activePatterns := append(append([]rules.MatchPattern{}, resourcePatterns...), manifestPatterns...)
+	activePatterns := append([]rules.MatchPattern{}, resourcePatterns...)
+	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
+	if importMergeEnabled {
+		activePatterns = append(activePatterns, manifestProvider.SupportedMatchPatterns()...)
+	}
+
 	baseRegistry := rules.NewRegistry(activePatterns)
 
 	syntactic := []rules.Rule{
@@ -375,15 +382,16 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		// excluded. See MultiSpecRule filtering.
 		prules.NewMetadataSyntaxValidRule(provider.ParseSpec, resourcePatterns),
 		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
-
-		// Cross-source: a (workspace_id, urn) must not appear in both an
-		// import-manifest and an inline metadata.import block with differing
-		// remote_ids. Applies to the union (both kinds); needs the resource
-		// ParseSpec to resolve inline local_id entries.
-		prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns),
+	}
+	// Cross-source conflict between import-manifest and inline metadata.import
+	// only applies when the import-manifest kind is recognized.
+	if importMergeEnabled {
+		syntactic = append(syntactic, prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns))
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
-	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
+	if importMergeEnabled {
+		syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
+	}
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -391,7 +399,10 @@ func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, 
 		}
 	}
 
-	semantic := append(provider.SemanticRules(), manifestProvider.SemanticRules()...)
+	semantic := provider.SemanticRules()
+	if importMergeEnabled {
+		semantic = append(semantic, manifestProvider.SemanticRules()...)
+	}
 	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)

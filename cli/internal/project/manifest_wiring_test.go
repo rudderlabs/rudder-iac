@@ -34,7 +34,7 @@ spec:
 // import-manifest spec as project-level and routes it to the import-manifest
 // provider (not the resource provider), and that the provider accumulates it.
 func TestProject_Load_RoutesImportManifestToProvider(t *testing.T) {
-	t.Parallel()
+	enableImportMerge(t)
 
 	loader := &manifestWiringLoader{specs: map[string]*specs.RawSpec{
 		"import-manifest.yaml": {Data: []byte(importManifestYAML)},
