@@ -48,8 +48,9 @@ type RemoteDestination struct {
 // collection and to name importable resources.
 func (r RemoteDestination) Metadata() handler.RemoteResourceMetadata {
 	return handler.RemoteResourceMetadata{
-		ID:         r.ID,
-		ExternalID: r.ExternalID,
-		Name:       r.Name,
+		ID:          r.ID,
+		ExternalID:  r.ExternalID,
+		WorkspaceID: r.WorkspaceID,
+		Name:        r.Name,
 	}
 }

@@ -3,15 +3,19 @@ package destination
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	tmodel "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -44,8 +48,11 @@ type HandlerImpl struct {
 
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
 func NewHandler(c *client.Client, registry *definitions.Registry) *DestinationHandler {
-	h := &HandlerImpl{client: c, registry: registry}
-	return handler.NewHandler[DestinationSpec, DestinationResource, DestinationState, RemoteDestination](h)
+	h := &HandlerImpl{
+		client:   c,
+		registry: registry,
+	}
+	return handler.NewHandler(h)
 }
 
 func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
@@ -190,8 +197,8 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, fmt.Errorf("managed destination %s has empty external ID", remote.ID)
 	}
 
-	if !h.registry.IsSupported(remote.Type) {
-		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q", remote.ID, remote.Type)
+	if _, err := h.registry.Get(remote.Type, remote.Version); err != nil {
+		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q and version %d", remote.ID, remote.Type, remote.Version)
 	}
 
 	version := int64(remote.Version)
@@ -202,7 +209,7 @@ func (h *HandlerImpl) MapRemoteToState(
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("resolving transformation reference: %w", err)
 	}
 
 	resource := &DestinationResource{
@@ -253,7 +260,8 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 }
 
 // LoadImportableResources returns unmanaged destinations (no ExternalID) and
-// silently skips unregistered types — import can only target types the CLI knows.
+// silently skips destinations whose (Type, Version) pair isn't registered —
+// import can only target definitions the CLI knows how to convert.
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
 	all, err := h.client.Destinations.GetAll(ctx)
 	if err != nil {
@@ -268,8 +276,8 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 		if d.ExternalID != "" {
 			continue
 		}
-		if !h.registry.IsSupported(d.Type) {
-			// Only destinations which are supported by the registry
+		if _, err := h.registry.Get(d.Type, d.Version); err != nil {
+			// Only destinations whose exact (type, version) is registered
 			// in the CLI are considered importable.
 			continue
 		}
@@ -278,18 +286,160 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 	return result, nil
 }
 
-// Import is deferred to RUD-2865.
-func (h *HandlerImpl) Import(_ context.Context, _ *DestinationResource, _ string) (*DestinationState, error) {
-	return nil, fmt.Errorf("import not implemented yet")
+// Import adopts an existing remote destination into IaC management: it pushes
+// the spec's config and transformation link via Update (DRY - same reconciliation
+// path as a regular apply), then sets the external ID last so a failed Update
+// never leaves a partially-adopted resource behind.
+func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, remoteId string) (*DestinationState, error) {
+	remote, err := h.client.Destinations.Get(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination during import: %w", err)
+	}
+
+	// The single-resource Get endpoint doesn't embed the transformation link
+	// (unlike the list endpoint used by LoadImportableResources), so it's
+	// fetched separately. No existing link is treated the same as an error
+	// here since the API has no "not found" sentinel for this sub-resource.
+	var transformationID string
+	connectedTransformation, err := h.client.Destinations.GetTransformation(ctx, remoteId)
+	if err != nil {
+		if !errors.Is(err, client.ErrResourceNotFound) {
+			// If the transformation is not found,
+			// we will set empty transformation ID
+			// in the state
+			return nil, fmt.Errorf("getting transformation during import: %w", err)
+		}
+	}
+
+	if connectedTransformation != nil {
+		transformationID = connectedTransformation.TransformationID
+	}
+
+	oldData := &DestinationResource{Type: remote.Type}
+	oldState := &DestinationState{
+		ID:               remoteId,
+		TransformationID: transformationID,
+	}
+
+	newState, err := h.Update(ctx, data, oldData, oldState)
+	if err != nil {
+		return nil, fmt.Errorf("updating destination during import: %w", err)
+	}
+
+	if err := h.client.Destinations.SetExternalID(ctx, remoteId, data.ID); err != nil {
+		return nil, fmt.Errorf("setting external ID for destination during import: %w", err)
+	}
+
+	return newState, nil
 }
 
-// FormatForExport is deferred to RUD-2865.
+// FormatForExport converts unmanaged remote destinations into importable YAML
+// specs: config is converted to local snake_case, registered secret keys are
+// masked with per-resource placeholders, and a linked transformation resolves
+// to a "#transformation:<id>" reference (failing the export if the link can't
+// be resolved — mirrors the source handler, no silent fallback to a raw ID).
 func (h *HandlerImpl) FormatForExport(
-	_ map[string]*RemoteDestination,
+	collection map[string]*RemoteDestination,
 	_ namer.Namer,
-	_ resolver.ReferenceResolver,
+	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
-	return nil, nil, fmt.Errorf("export not implemented yet")
+	if len(collection) == 0 {
+		return nil, nil, nil
+	}
+
+	var (
+		entities []writer.FormattableEntity
+		entries  []importmanifest.ImportEntry
+	)
+
+	for externalID, remote := range collection {
+		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		workspaceMetadata := specs.WorkspaceImportMetadata{
+			WorkspaceID: remote.WorkspaceID,
+			Resources: []specs.ImportIds{
+				{
+					URN:      resources.URN(externalID, DestinationResourceType),
+					RemoteID: remote.ID,
+				},
+			},
+		}
+		entries = append(entries, handlers.ImportEntriesFromWorkspace(workspaceMetadata)...)
+
+		spec, err := handlers.ToImportSpec(
+			DestinationSpecKind,
+			DestinationMetadataName,
+			workspaceMetadata,
+			specMap,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating spec for destination %s: %w", remote.ID, err)
+		}
+
+		entities = append(entities, writer.FormattableEntity{
+			Content: spec,
+			RelativePath: filepath.Join(
+				"destinations",
+				fmt.Sprintf("%s.yaml", externalID),
+			),
+		})
+	}
+
+	return entities, entries, nil
+}
+
+// toExportSpecMap builds the "spec" section of an importable destination's
+// YAML: local config with secrets masked, plus an optional transformation ref.
+func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
+	localConfig, err := h.apiConfigToLocal(remote.Type, remote.Version, remote.Config)
+	if err != nil {
+		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
+	}
+
+	registered, err := h.registry.Get(remote.Type, remote.Version)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition for %s: %w", remote.ID, err)
+	}
+	maskSecrets(localConfig, externalID, registered.SecretKeys())
+
+	specMap := map[string]any{
+		"id":                 externalID,
+		"display_name":       remote.Name,
+		"type":               remote.Type,
+		"enabled":            remote.IsEnabled,
+		"definition_version": remote.Version,
+		"config":             localConfig,
+	}
+
+	if remote.Transformation != nil && remote.Transformation.ID != "" {
+		ref, err := inputResolver.ResolveToReference(
+			ttypes.TransformationResourceType,
+			remote.Transformation.ID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("resolving transformation reference for destination %s: %w", remote.ID, err)
+		}
+		specMap["transformation"] = ref
+	}
+
+	return specMap, nil
+}
+
+// maskSecrets replaces each registered secret key present in config with a
+// Go-template placeholder unique to this resource, e.g. "{{ .GA4_PRODUCTION_API_SECRET }}".
+// The leading "." is required for varsubst.parseVarName to recognize the token
+// as a substitutable variable when scaffolding the secrets var file.
+func maskSecrets(config map[string]any, externalID string, secretKeys []string) {
+	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
+	for _, key := range secretKeys {
+		if _, ok := config[key]; !ok {
+			continue
+		}
+		config[key] = fmt.Sprintf("{{ .%s_%s }}", prefix, strings.ToUpper(key))
+	}
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case

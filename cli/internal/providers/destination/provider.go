@@ -12,6 +12,11 @@ import (
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+// importDir is the top-level base directory import output is written under.
+// Destinations own their full path via ImportPath ("destinations/"), so the
+// base stays empty rather than nesting under another provider's directory.
+const importDir = ""
+
 // Provider wraps BaseProvider with the single destination handler.
 type Provider struct {
 	*provider.BaseProvider

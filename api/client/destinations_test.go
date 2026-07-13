@@ -604,10 +604,7 @@ func TestClientDestinations_GetTransformation(t *testing.T) {
 
 		_, err = c.Destinations.GetTransformation(ctx, "some-destination-id")
 		require.Error(t, err)
-
-		var apiErr *client.APIError
-		require.True(t, errors.As(err, &apiErr))
-		assert.Equal(t, 404, apiErr.HTTPStatusCode)
+		require.True(t, errors.Is(err, client.ErrResourceNotFound))
 
 		httpClient.AssertNumberOfCalls()
 	})
