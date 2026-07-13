@@ -52,7 +52,7 @@ func TestLocalSourceTypeKeys(t *testing.T) {
 	t.Parallel()
 
 	def := GA4TestDefinition()
-	def.SourceTypes = []string{"web", "reactNative", "amp"}
+	def.SourceTypes = []string{"web", "react_native", "amp"}
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
@@ -85,4 +85,25 @@ func TestNewRegisteredDefinitionWithoutConnectionMode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, registered.SupportedSourceTypes())
 	assert.False(t, registered.IsSourceTypeSupported("web"))
+}
+
+func TestIsSourceTypeSupportedUsesSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	registered, err := newRegisteredDefinition(&DestinationDefinition{
+		Type:        "TEST",
+		Version:     1,
+		SourceTypes: []string{"web", "android"},
+		// ConnectionModes intentionally omitted — support must not depend on them.
+		NewConfig: func() any {
+			return &struct {
+				Name string `mapstructure:"name"`
+			}{}
+		},
+	})
+	require.NoError(t, err)
+
+	assert.True(t, registered.IsSourceTypeSupported("web"))
+	assert.True(t, registered.IsSourceTypeSupported("android"))
+	assert.False(t, registered.IsSourceTypeSupported("ios"))
 }

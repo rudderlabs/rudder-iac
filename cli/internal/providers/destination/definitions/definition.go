@@ -3,6 +3,7 @@ package definitions
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -11,18 +12,23 @@ import (
 var sourceTypeConfigKeys = []string{
 	"connection_mode",
 	"use_native_sdk",
-	"consent_management",
 }
 
 // DestinationDefinition is the input to Registry.Register().
 type DestinationDefinition struct {
-	Type            string
+	// Type is the local YAML / registry key (e.g. "s3").
+	Type string
+	// APIType is the upstream API destination type (e.g. "S3").
+	// When empty at registration, it defaults to Type.
+	APIType         string
 	Version         int64
 	Properties      []converter.ConfigProperty
 	SecretKeys      []string
 	NewConfig       func() any
 	SourceTypes     []string
 	ConnectionModes map[string][]string
+	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
+	ConsentValidationOverrides map[string]common.ConsentValidator
 }
 
 // ConfigError represents a single validation failure with a JSON-pointer path.
@@ -38,7 +44,8 @@ type RegisteredDefinition struct {
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
-	return validateConfigModel(config, d.configType, "")
+	errors := validateConfigModel(config, d.configType, "")
+	return append(errors, d.validateConsentManagement(config)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {
@@ -63,20 +70,9 @@ func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 	return append([]string(nil), d.SourceTypes...)
 }
 
-// LocalSourceTypeKeys returns the snake_case config keys for the definition's
-// supported source types — the keys allowed under source-type-scoped config
-// blocks like connection_mode and consent_management.
+// LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.
 func (d *RegisteredDefinition) LocalSourceTypeKeys() []string {
-	sourceTypes := d.SupportedSourceTypes()
-	if len(sourceTypes) == 0 {
-		return nil
-	}
-
-	keys := make([]string, 0, len(sourceTypes))
-	for _, sourceType := range sourceTypes {
-		keys = append(keys, common.LocalSourceTypeKey(sourceType))
-	}
-	return keys
+	return d.SupportedSourceTypes()
 }
 
 func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, error) {
@@ -87,9 +83,12 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
+// IsSourceTypeSupported reports whether sourceType is in SourceTypes
 func (d *RegisteredDefinition) IsSourceTypeSupported(sourceType string) bool {
-	_, ok := d.DestinationDefinition.ConnectionModes[sourceType]
-	return ok
+	if d.DestinationDefinition == nil {
+		return false
+	}
+	return slices.Contains(d.SourceTypes, sourceType)
 }
 
 func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
@@ -106,9 +105,25 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 	if configType == nil || configType.Kind() != reflect.Pointer || configType.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("NewConfig must return a pointer to struct")
 	}
+	configType = configType.Elem()
+
+	if err := validateConsentConfigModel(def, configType); err != nil {
+		return nil, err
+	}
 
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
-		configType:            configType.Elem(),
+		configType:            configType,
 	}, nil
+}
+
+func validateConsentConfigModel(def *DestinationDefinition, configType reflect.Type) error {
+	consentField, hasConsentField := structFieldsByMapstructureTag(configType)["consent_management"]
+	if hasConsentField && derefType(consentField.Type) != reflect.TypeOf(common.ConsentManagement{}) {
+		return fmt.Errorf("consent_management config field must use common.ConsentManagement")
+	}
+	if len(def.ConsentValidationOverrides) > 0 && !hasConsentField {
+		return fmt.Errorf("consent validation overrides require a common.ConsentManagement config field")
+	}
+	return nil
 }

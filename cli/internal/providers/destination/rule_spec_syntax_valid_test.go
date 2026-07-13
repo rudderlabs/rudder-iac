@@ -9,6 +9,7 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -16,10 +17,10 @@ import (
 // model accepts arbitrary platform keys — the source-type key check is then
 // the only guard, which is exactly what these tests exercise.
 type ruleTestConfig struct {
-	WebhookURL        string            `mapstructure:"webhook_url" validate:"required"`
-	ConnectionMode    map[string]string `mapstructure:"connection_mode"`
-	UseNativeSDK      map[string]bool   `mapstructure:"use_native_sdk"`
-	ConsentManagement map[string]any    `mapstructure:"consent_management"`
+	WebhookURL        string                   `mapstructure:"webhook_url" validate:"required"`
+	ConnectionMode    map[string]string        `mapstructure:"connection_mode"`
+	UseNativeSDK      map[string]bool          `mapstructure:"use_native_sdk"`
+	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 func ruleTestRegistry(t *testing.T) *definitions.Registry {
@@ -32,10 +33,10 @@ func ruleTestRegistry(t *testing.T) *definitions.Registry {
 		NewConfig: func() any {
 			return &ruleTestConfig{}
 		},
-		SourceTypes: []string{"web", "reactNative"},
+		SourceTypes: []string{"web", "react_native"},
 		ConnectionModes: map[string][]string{
-			"web":         {"cloud"},
-			"reactNative": {"cloud"},
+			"web":          {"cloud"},
+			"react_native": {"cloud"},
 		},
 	}))
 	return registry
@@ -349,6 +350,21 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			},
 		},
 		{
+			name: "unsupported source type under consent_management",
+			config: map[string]any{
+				"webhook_url": "https://example.com/hook",
+				"consent_management": map[string]any{
+					"ios": []any{},
+				},
+			},
+			expected: []vrules.ValidationResult{
+				{
+					Reference: "/spec/config/consent_management/ios",
+					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
+				},
+			},
+		},
+		{
 			name: "supported snake_case source types pass",
 			config: map[string]any{
 				"webhook_url":     "https://example.com/hook",
@@ -385,7 +401,7 @@ func TestSpecSyntaxValidRuleScalarSourceTypeBlock(t *testing.T) {
 	// The config model owns the shape error; the source-type key check must
 	// skip the scalar without panicking or piling on.
 	require.Len(t, results, 1)
-	assert.Equal(t, "/spec/config", results[0].Reference)
+	assert.Equal(t, "/spec/config/connection_mode", results[0].Reference)
 }
 
 func TestSpecSyntaxValidRuleValidSpec(t *testing.T) {

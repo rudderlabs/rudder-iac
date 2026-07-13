@@ -16,6 +16,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -214,10 +215,10 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
-	// Destination registry ships empty this ticket — production destination
-	// definitions (webhook/ga4/s3) are onboarded in a follow-up. The handler
-	// consumes whatever definitions the registry holds at construction time.
 	destRegistry := definitions.NewRegistry()
+	if err := destRegistry.Register(s3.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
 	dp := destProvider.NewProvider(c, destRegistry)
 
 	providers := &Providers{

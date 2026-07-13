@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 )
 
 type unknownKeysConsentItem struct {
@@ -20,6 +22,10 @@ type unknownKeysConfig struct {
 	APISecret      string                     `mapstructure:"api_secret"`
 	ConnectionMode testConnectionMode         `mapstructure:"connection_mode"`
 	Consent        unknownKeysConsentBySource `mapstructure:"consent_management"`
+}
+
+type unknownKeysMapConfig struct {
+	Consent common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 func TestFindUnknownKeysTopLevel(t *testing.T) {
@@ -57,8 +63,8 @@ func TestFindUnknownKeysMultipleLevels(t *testing.T) {
 	t.Parallel()
 
 	errors := findUnknownKeys(map[string]any{
-		"api_secret":    "secret",
-		"extra_top":     "x",
+		"api_secret": "secret",
+		"extra_top":  "x",
 		"connection_mode": map[string]any{
 			"web":       "cloud",
 			"extra_src": "cloud",
@@ -91,6 +97,25 @@ func TestFindUnknownKeysSliceItem(t *testing.T) {
 			},
 		},
 	}, reflect.TypeOf(unknownKeysConfig{}), "")
+
+	require.Len(t, errors, 1)
+	assert.Equal(t, "/consent_management/web/0/bogus", errors[0].Path)
+	assert.Equal(t, `unknown config field "bogus"`, errors[0].Message)
+}
+
+func TestFindUnknownKeysMapSliceItem(t *testing.T) {
+	t.Parallel()
+
+	errors := findUnknownKeys(map[string]any{
+		"consent_management": map[string]any{
+			"web": []any{
+				map[string]any{
+					"provider": "oneTrust",
+					"bogus":    "x",
+				},
+			},
+		},
+	}, reflect.TypeOf(unknownKeysMapConfig{}), "")
 
 	require.Len(t, errors, 1)
 	assert.Equal(t, "/consent_management/web/0/bogus", errors[0].Path)

@@ -90,6 +90,11 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 // Create provisions the destination remotely, then links a transformation if the
 // spec-side PropertyRef was resolved by the apply framework.
 func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*DestinationState, error) {
+	registered, err := h.registry.Get(data.Type, data.DefinitionVersion)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition: %w", err)
+	}
+
 	apiConfig, err := h.localConfigToAPI(data.Type, data.DefinitionVersion, data.Config)
 	if err != nil {
 		return nil, fmt.Errorf("converting local config to API: %w", err)
@@ -97,7 +102,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*D
 
 	created, err := h.client.Destinations.Create(ctx, &client.Destination{
 		Name:       data.DisplayName,
-		Type:       data.Type,
+		Type:       registered.APIType,
 		IsEnabled:  data.Enabled,
 		Config:     apiConfig,
 		ExternalID: data.ID,
@@ -134,6 +139,11 @@ func (h *HandlerImpl) Update(
 		return nil, fmt.Errorf("destination type change is not supported: old %q, new %q", oldData.Type, newData.Type)
 	}
 
+	registered, err := h.registry.Get(newData.Type, newData.DefinitionVersion)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition: %w", err)
+	}
+
 	apiConfig, err := h.localConfigToAPI(newData.Type, newData.DefinitionVersion, newData.Config)
 	if err != nil {
 		return nil, err
@@ -143,7 +153,7 @@ func (h *HandlerImpl) Update(
 		ID:        oldState.ID,
 		Version:   newData.DefinitionVersion,
 		Name:      newData.DisplayName,
-		Type:      newData.Type,
+		Type:      registered.APIType,
 		IsEnabled: newData.Enabled,
 		Config:    apiConfig,
 	}); err != nil {
@@ -197,12 +207,13 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, fmt.Errorf("managed destination %s has empty external ID", remote.ID)
 	}
 
-	if _, err := h.registry.Get(remote.Type, remote.Version); err != nil {
+	version := int64(remote.Version)
+	registered, err := h.registry.GetByAPIType(remote.Type, version)
+	if err != nil {
 		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q and version %d", remote.ID, remote.Type, remote.Version)
 	}
 
-	version := int64(remote.Version)
-	localConfig, err := h.apiConfigToLocal(remote.Type, version, remote.Config)
+	localConfig, err := h.apiConfigToLocal(registered.Type, version, remote.Config)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,7 +226,7 @@ func (h *HandlerImpl) MapRemoteToState(
 	resource := &DestinationResource{
 		ID:                remote.ExternalID,
 		DisplayName:       remote.Name,
-		Type:              remote.Type,
+		Type:              registered.Type,
 		Enabled:           remote.IsEnabled,
 		DefinitionVersion: version,
 		Transformation:    transformationRef,
@@ -247,11 +258,12 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 			continue
 		}
 
-		if !h.registry.IsSupported(d.Type) {
+		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			return nil, fmt.Errorf(
-				"managed destination %s has unregistered type %q",
+				"managed destination %s has unregistered type %q and version %d",
 				d.ID,
 				d.Type,
+				d.Version,
 			)
 		}
 		result = append(result, &RemoteDestination{Destination: d})
@@ -276,8 +288,8 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 		if d.ExternalID != "" {
 			continue
 		}
-		if _, err := h.registry.Get(d.Type, d.Version); err != nil {
-			// Only destinations whose exact (type, version) is registered
+		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
+			// Only destinations whose exact (apiType, version) is registered
 			// in the CLI are considered importable.
 			continue
 		}
@@ -315,7 +327,14 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 		transformationID = connectedTransformation.TransformationID
 	}
 
-	oldData := &DestinationResource{Type: remote.Type}
+	registered, err := h.registry.GetByAPIType(remote.Type, remote.Version)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition during import: %w", err)
+	}
+
+	// Translate API type to local type so Update's immutable-type check
+	// compares local names (e.g. "s3" vs "s3"), not "s3" vs "S3".
+	oldData := &DestinationResource{Type: registered.Type}
 	oldState := &DestinationState{
 		ID:               remoteId,
 		TransformationID: transformationID,
@@ -394,21 +413,22 @@ func (h *HandlerImpl) FormatForExport(
 // toExportSpecMap builds the "spec" section of an importable destination's
 // YAML: local config with secrets masked, plus an optional transformation ref.
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
-	localConfig, err := h.apiConfigToLocal(remote.Type, remote.Version, remote.Config)
+	registered, err := h.registry.GetByAPIType(remote.Type, remote.Version)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition for %s: %w", remote.ID, err)
+	}
+
+	localConfig, err := h.apiConfigToLocal(registered.Type, remote.Version, remote.Config)
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
 
-	registered, err := h.registry.Get(remote.Type, remote.Version)
-	if err != nil {
-		return nil, fmt.Errorf("getting destination definition for %s: %w", remote.ID, err)
-	}
 	maskSecrets(localConfig, externalID, registered.SecretKeys())
 
 	specMap := map[string]any{
 		"id":                 externalID,
 		"display_name":       remote.Name,
-		"type":               remote.Type,
+		"type":               registered.Type,
 		"enabled":            remote.IsEnabled,
 		"definition_version": remote.Version,
 		"config":             localConfig,
