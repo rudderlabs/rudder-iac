@@ -107,7 +107,7 @@ func TestAPIError_Error(t *testing.T) {
 	}
 }
 
-func TestAPIError_FeatureNotEnabled(t *testing.T) {
+func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 	tests := []struct {
 		name     string
 		apiError *client.APIError
@@ -130,6 +130,14 @@ func TestAPIError_FeatureNotEnabled(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "returns true for 403 with feature message",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "Feature is not enabled for your account: DATA_GRAPH",
+			},
+			want: true,
+		},
+		{
 			name: "returns false for 403 with different message",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
@@ -138,10 +146,18 @@ func TestAPIError_FeatureNotEnabled(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "returns false when status is not 403",
+			name: "returns false when flag-disabled status is not 403",
 			apiError: &client.APIError{
 				HTTPStatusCode: 400,
 				Message:        "Flag is not enabled for your account",
+			},
+			want: false,
+		},
+		{
+			name: "returns false when feature-disabled status is not 403",
+			apiError: &client.APIError{
+				HTTPStatusCode: 500,
+				Message:        "Feature is not enabled for your account: DATA_GRAPH",
 			},
 			want: false,
 		},
@@ -149,7 +165,7 @@ func TestAPIError_FeatureNotEnabled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.apiError.FeatureNotEnabled())
+			assert.Equal(t, tt.want, tt.apiError.FeatureFlagNotEnabled())
 		})
 	}
 }
