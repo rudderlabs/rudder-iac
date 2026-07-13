@@ -415,7 +415,7 @@ func TestClientAccountsSetExternalID(t *testing.T) {
 
 func TestClientAccountsSetExternalIDConflictReturnsAPIError(t *testing.T) {
 	ctx := context.Background()
-	conflictMessage := "externalId already exists for another account"
+	conflictMessage := "An account with this externalId already exists in this workspace"
 
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -424,7 +424,7 @@ func TestClientAccountsSetExternalIDConflictReturnsAPIError(t *testing.T) {
 			}`)
 		},
 		ResponseStatus: 409,
-		ResponseBody:   `{"message":"externalId already exists for another account"}`,
+		ResponseBody:   `{"message":"An account with this externalId already exists in this workspace"}`,
 	})
 
 	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
