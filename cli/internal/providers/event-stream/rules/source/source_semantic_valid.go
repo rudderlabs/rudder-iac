@@ -74,7 +74,7 @@ func NewSourceSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/source/semantic-valid",
 		rules.Error,
-		"Event Stream source references must resolve to existing resources",
+		"event stream source references must resolve to existing resources",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(esSource.ResourceKind),

@@ -28,7 +28,7 @@ func TestSQLModelSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "retl/sqlmodel/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "RETL SQL model semantic constraints must be satisfied", rule.Description())
+	assert.Equal(t, "retl sql model semantic constraints must be satisfied", rule.Description())
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 }
 

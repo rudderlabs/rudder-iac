@@ -14,7 +14,7 @@ import (
 
 const (
 	propConfigRuleID          = "datacatalog/properties/config-valid"
-	propConfigRuleDescription = "Property config must be valid for the given type"
+	propConfigRuleDescription = "property config must be valid for the given type"
 )
 
 var propConfigExamples = rules.Examples{

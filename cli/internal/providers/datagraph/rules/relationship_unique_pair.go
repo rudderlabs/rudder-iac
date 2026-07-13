@@ -61,7 +61,7 @@ func NewRelationshipUniquePairRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datagraph/data-graph/relationship-unique-pair",
 		rules.Error,
-		"At most one relationship is allowed per source-target model pair",
+		"at most one relationship allowed from a source model to a target model",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),

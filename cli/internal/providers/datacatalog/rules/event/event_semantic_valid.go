@@ -90,7 +90,7 @@ func NewEventSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/events/semantic-valid",
 		rules.Error,
-		"Event references must resolve to existing resources",
+		"event references must resolve to existing resources",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindEvents),

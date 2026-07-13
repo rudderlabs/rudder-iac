@@ -24,7 +24,7 @@ func TestSourceSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "event-stream/source/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Event Stream source spec syntax must be valid", rule.Description())
+	assert.Equal(t, "event stream source spec syntax must be valid", rule.Description())
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 }
 

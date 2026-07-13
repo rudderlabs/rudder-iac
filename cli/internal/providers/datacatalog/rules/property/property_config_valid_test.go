@@ -18,7 +18,7 @@ func TestPropertyConfigValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/properties/config-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Property config must be valid for the given type", rule.Description())
+	assert.Equal(t, "property config must be valid for the given type", rule.Description())
 	assert.ElementsMatch(t, append(prules.LegacyVersionPatterns("properties"), prules.V1VersionPatterns("properties")...), rule.AppliesTo())
 
 	examples := rule.Examples()

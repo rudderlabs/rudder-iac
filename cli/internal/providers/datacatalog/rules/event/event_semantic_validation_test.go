@@ -489,7 +489,7 @@ func TestNewEventSemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/events/semantic-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Event references must resolve to existing resources", rule.Description())
+	assert.Equal(t, "event references must resolve to existing resources", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("events"),

@@ -394,7 +394,7 @@ func NewTrackingPlanSpecSyntaxValidRule(eventRuleIncludesEnabled bool) rules.Rul
 	return prules.NewTypedRule(
 		"datacatalog/tracking-plans/spec-syntax-valid",
 		rules.Error,
-		"Tracking Plan spec syntax must be valid",
+		"tracking plan spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),

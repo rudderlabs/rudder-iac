@@ -159,7 +159,7 @@ func NewCustomTypeSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/custom-types/spec-syntax-valid",
 		rules.Error,
-		"Custom type spec syntax must be valid",
+		"custom type spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCustomTypes),

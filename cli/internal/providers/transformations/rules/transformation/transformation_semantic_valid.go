@@ -98,7 +98,7 @@ func NewTransformationSemanticValidRule() vrules.Rule {
 	return rules.NewTypedRule(
 		"transformations/transformation/semantic-valid",
 		vrules.Error,
-		"Transformation imports must resolve to existing transformation libraries",
+		"transformation imports must resolve to existing transformation libraries",
 		vrules.Examples{},
 		rules.NewSemanticPatternValidator(
 			rules.V1VersionPatterns(ttypes.TransformationSpecKind),

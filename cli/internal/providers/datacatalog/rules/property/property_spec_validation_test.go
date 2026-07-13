@@ -41,7 +41,7 @@ func TestNewPropertySpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/properties/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Property spec syntax must be valid", rule.Description())
+	assert.Equal(t, "property spec syntax must be valid", rule.Description())
 	assert.Equal(t, expectedPatterns, rule.AppliesTo())
 
 	examples := rule.Examples()

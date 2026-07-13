@@ -87,7 +87,7 @@ func NewRelationshipCardinalityValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datagraph/data-graph/relationship-cardinality-valid",
 		rules.Error,
-		"Relationship cardinality must be valid for the source and target model types",
+		"relationship cardinality must be valid for the source and target model types",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.V1VersionPatterns("data-graph"),

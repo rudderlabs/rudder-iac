@@ -39,7 +39,7 @@ func TestNewEventSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/events/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Event spec syntax must be valid", rule.Description())
+	assert.Equal(t, "event spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("events"),

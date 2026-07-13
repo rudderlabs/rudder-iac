@@ -18,7 +18,7 @@ func TestSQLModelSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "RETL SQL model spec syntax must be valid", rule.Description())
+	assert.Equal(t, "retl sql model spec syntax must be valid", rule.Description())
 
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns("retl-source-sql-model"),

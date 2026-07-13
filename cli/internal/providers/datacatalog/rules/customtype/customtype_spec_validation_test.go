@@ -36,7 +36,7 @@ func TestNewCustomTypeSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/custom-types/spec-syntax-valid", rule.ID())
 	assert.Equal(t, validationRules.Error, rule.Severity())
-	assert.Equal(t, "Custom type spec syntax must be valid", rule.Description())
+	assert.Equal(t, "custom type spec syntax must be valid", rule.Description())
 	assert.Equal(t, []validationRules.MatchPattern{
 		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1),
 		validationRules.MatchKindVersion(localcatalog.KindCustomTypes, specs.SpecVersionV0_1Variant),

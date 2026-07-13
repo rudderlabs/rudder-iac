@@ -68,7 +68,7 @@ func NewCategorySemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/categories/semantic-valid",
 		rules.Error,
-		"Category names must be unique across the Data Catalog",
+		"category names must be unique across the catalog",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCategories),

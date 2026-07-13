@@ -25,7 +25,7 @@ func NewResourceKindVersionValidRule(supportedPatterns []rules.MatchPattern) rul
 func (r *resourceKindVersionValidRule) ID() string               { return "project/resource-kind-version-valid" }
 func (r *resourceKindVersionValidRule) Severity() rules.Severity { return rules.Error }
 func (r *resourceKindVersionValidRule) Description() string {
-	return "Resource kind must be supported with the specified version"
+	return "resource kind must be supported with the specified version"
 }
 func (r *resourceKindVersionValidRule) AppliesTo() []rules.MatchPattern {
 	return []rules.MatchPattern{rules.MatchAll()}

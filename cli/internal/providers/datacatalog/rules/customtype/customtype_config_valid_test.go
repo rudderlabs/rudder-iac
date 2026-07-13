@@ -17,7 +17,7 @@ func TestCustomTypeConfigValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/custom-types/config-valid", rule.ID())
 	assert.Equal(t, validationRules.Error, rule.Severity())
-	assert.Equal(t, "Custom type config must be valid for the given type", rule.Description())
+	assert.Equal(t, "custom type config must be valid for the given type", rule.Description())
 	assert.ElementsMatch(t,
 		append(
 			prules.LegacyVersionPatterns("custom-types"),
