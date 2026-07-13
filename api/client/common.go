@@ -65,7 +65,7 @@ func formatDetails(details json.RawMessage) string {
 	return "(details: " + trimmed + ")"
 }
 
-func (e *APIError) IsFeatureNotEnabled() bool {
+func (e *APIError) FeatureFlagNotEnabled() bool {
 	return e.HTTPStatusCode == 403 &&
 		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
 			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))

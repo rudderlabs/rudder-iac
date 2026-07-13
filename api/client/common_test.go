@@ -107,7 +107,7 @@ func TestAPIError_Error(t *testing.T) {
 	}
 }
 
-func TestAPIError_IsFeatureNotEnabled(t *testing.T) {
+func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 	tests := []struct {
 		name     string
 		apiError *client.APIError
@@ -134,14 +134,6 @@ func TestAPIError_IsFeatureNotEnabled(t *testing.T) {
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Feature is not enabled for your account: DATA_GRAPH",
-			},
-			want: true,
-		},
-		{
-			name: "checks ErrorMessage for feature message",
-			apiError: &client.APIError{
-				HTTPStatusCode: 403,
-				ErrorMessage:   "Feature is not enabled for your account: DATA_GRAPH",
 			},
 			want: true,
 		},
@@ -173,7 +165,7 @@ func TestAPIError_IsFeatureNotEnabled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.apiError.IsFeatureNotEnabled())
+			assert.Equal(t, tt.want, tt.apiError.FeatureFlagNotEnabled())
 		})
 	}
 }

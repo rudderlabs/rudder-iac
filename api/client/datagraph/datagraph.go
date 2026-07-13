@@ -51,7 +51,7 @@ func (s *rudderDataGraphClient) ListDataGraphs(ctx context.Context, req *ListDat
 	resp, err := s.client.Do(ctx, "GET", path, nil)
 	if err != nil {
 		var apiErr *client.APIError
-		if errors.As(err, &apiErr) && apiErr.IsFeatureNotEnabled() {
+		if errors.As(err, &apiErr) && apiErr.FeatureFlagNotEnabled() {
 			return &ListDataGraphsResponse{}, nil
 		}
 		return nil, fmt.Errorf("listing data graphs: %w", err)
