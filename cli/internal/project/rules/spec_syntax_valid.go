@@ -31,7 +31,7 @@ func (r *SpecSyntaxValidRule) Severity() rules.Severity {
 }
 
 func (r *SpecSyntaxValidRule) Description() string {
-	return "Spec syntax must be valid"
+	return "spec syntax must be valid"
 }
 
 func (r *SpecSyntaxValidRule) AppliesTo() []rules.MatchPattern {

@@ -45,7 +45,7 @@ func NewSQLModelSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"retl/sqlmodel/semantic-valid",
 		rules.Error,
-		"RETL SQL model semantic constraints must be satisfied",
+		"retl sql model semantic constraints must be satisfied",
 		rules.Examples{},
 		prules.NewSemanticPatternValidator(
 			prules.LegacyVersionPatterns(sqlmodel.ResourceKind),

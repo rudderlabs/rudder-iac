@@ -189,7 +189,7 @@ func NewPropertySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/properties/spec-syntax-valid",
 		rules.Error,
-		"Property spec syntax must be valid",
+		"property spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindProperties),

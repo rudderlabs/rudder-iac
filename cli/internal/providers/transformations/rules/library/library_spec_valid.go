@@ -75,7 +75,7 @@ func NewLibrarySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"transformations/transformation-library/spec-syntax-valid",
 		rules.Error,
-		"Transformation library spec syntax must be valid",
+		"transformation library spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPathAwarePatternValidator(
 			prules.V1VersionPatterns(ttypes.LibrarySpecKind),

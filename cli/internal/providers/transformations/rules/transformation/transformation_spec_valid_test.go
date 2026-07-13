@@ -19,7 +19,7 @@ func TestNewTransformationSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "transformations/transformation/spec-syntax-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
-	assert.Equal(t, "Transformation spec syntax must be valid", rule.Description())
+	assert.Equal(t, "transformation spec syntax must be valid", rule.Description())
 	assert.Equal(t, prules.V1VersionPatterns("transformation"), rule.AppliesTo())
 }
 

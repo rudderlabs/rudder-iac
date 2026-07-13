@@ -20,7 +20,7 @@ func TestTrackingPlanSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "datacatalog/tracking-plans/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Tracking Plan spec syntax must be valid", rule.Description())
+	assert.Equal(t, "tracking plan spec syntax must be valid", rule.Description())
 	expectedPatterns := append(
 		prules.LegacyVersionPatterns(localcatalog.KindTrackingPlans),
 		prules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...,

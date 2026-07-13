@@ -29,7 +29,7 @@ func NewSQLModelSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"retl/sqlmodel/spec-syntax-valid",
 		rules.Error,
-		"RETL SQL model spec syntax must be valid",
+		"retl sql model spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(sqlmodel.ResourceKind),

@@ -58,7 +58,7 @@ func NewSourceSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/source/spec-syntax-valid",
 		rules.Error,
-		"Event Stream source spec syntax must be valid",
+		"event stream source spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(esSource.ResourceKind),

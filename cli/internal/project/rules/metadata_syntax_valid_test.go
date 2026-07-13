@@ -315,7 +315,7 @@ func TestMetadataSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "project/metadata-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "Metadata syntax must be valid", rule.Description())
+	assert.Equal(t, "metadata syntax must be valid", rule.Description())
 	assert.Equal(t, metadataTestPatterns, rule.AppliesTo())
 
 	examples := rule.Examples()

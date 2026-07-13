@@ -61,7 +61,7 @@ func NewCategorySpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datacatalog/categories/spec-syntax-valid",
 		rules.Error,
-		"Category spec syntax must be valid",
+		"category spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.LegacyVersionPatterns(localcatalog.KindCategories),

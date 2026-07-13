@@ -277,7 +277,7 @@ func NewDataGraphSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"datagraph/data-graph/spec-syntax-valid",
 		rules.Error,
-		"Data Graph spec syntax must be valid",
+		"data graph spec syntax must be valid",
 		examples,
 		prules.NewPatternValidator(
 			prules.V1VersionPatterns("data-graph"),

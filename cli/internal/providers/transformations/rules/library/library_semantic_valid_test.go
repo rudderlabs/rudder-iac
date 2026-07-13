@@ -19,7 +19,7 @@ func TestNewLibrarySemanticValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "transformations/transformation-library/semantic-valid", rule.ID())
 	assert.Equal(t, vrules.Error, rule.Severity())
-	assert.Equal(t, "Transformation library must be semantically valid", rule.Description())
+	assert.Equal(t, "transformation library must be semantically valid", rule.Description())
 	assert.Equal(t, rules.V1VersionPatterns("transformation-library"), rule.AppliesTo())
 }
 

@@ -194,7 +194,7 @@ func NewTransformationSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"transformations/transformation/spec-syntax-valid",
 		rules.Error,
-		"Transformation spec syntax must be valid",
+		"transformation spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPathAwarePatternValidator(
 			prules.V1VersionPatterns(ttypes.TransformationSpecKind),
