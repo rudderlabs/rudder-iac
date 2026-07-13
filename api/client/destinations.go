@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -83,6 +84,11 @@ func (s *destinations) DisconnectTransformation(ctx context.Context, destination
 func (s *destinations) GetTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
 	res, err := s.client.Do(ctx, "GET", s.transformationPath(destinationID), nil)
 	if err != nil {
+		var apiError *APIError
+
+		if errors.As(err, &apiError) && apiError.HTTPStatusCode == 404 {
+			return nil, ErrResourceNotFound
+		}
 		return nil, err
 	}
 

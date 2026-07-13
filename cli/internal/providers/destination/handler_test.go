@@ -1010,7 +1010,7 @@ func TestHandlerImpl_Import_UpdateErrorSkipsSetExternalID(t *testing.T) {
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
 
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
-			w.WriteHeader(http.StatusNotFound)
+			w.WriteHeader(http.StatusInternalServerError)
 
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1038,6 +1038,51 @@ func TestHandlerImpl_Import_UpdateErrorSkipsSetExternalID(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "getting transformation during import")
 	assert.False(t, setExternalIDCalled, "external ID must not be set when Update fails")
+}
+
+func TestHandlerImpl_Import_TransformatioNotFoundSetsEmptyTransformationID(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := testRegistry(t)
+
+	var setExternalIDCalled bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
+
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
+			w.WriteHeader(http.StatusNotFound)
+
+		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"message":"unable to complete the request"}`))
+
+		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
+			setExternalIDCalled = true
+			w.WriteHeader(http.StatusOK)
+
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newTestClient(t, srv.URL)
+	h := destination.NewHandler(c, registry)
+
+	state, err := h.Impl.Import(ctx, &destination.DestinationResource{
+		ID:                "webhook-1",
+		Type:              "WEBHOOK",
+		DefinitionVersion: 1,
+		Config:            map[string]any{"webhook_url": "https://some-dummy-url.com"},
+	}, "dst-1")
+
+	require.NoError(t, err)
+	assert.True(t, setExternalIDCalled)
+	assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: ""}, state)
 }
 
 // stubResolver is a minimal resolver.ReferenceResolver for FormatForExport tests.

@@ -3,6 +3,7 @@ package destination
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -208,7 +209,7 @@ func (h *HandlerImpl) MapRemoteToState(
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("resolving transformation reference: %w", err)
 	}
 
 	resource := &DestinationResource{
@@ -299,15 +300,25 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 	// (unlike the list endpoint used by LoadImportableResources), so it's
 	// fetched separately. No existing link is treated the same as an error
 	// here since the API has no "not found" sentinel for this sub-resource.
+	var transformationID string
 	connectedTransformation, err := h.client.Destinations.GetTransformation(ctx, remoteId)
 	if err != nil {
-		return nil, fmt.Errorf("getting transformation during import: %w", err)
+		if !errors.Is(err, client.ErrResourceNotFound) {
+			// If the transformation is not found,
+			// we will set empty transformation ID
+			// in the state
+			return nil, fmt.Errorf("getting transformation during import: %w", err)
+		}
+	}
+
+	if connectedTransformation != nil {
+		transformationID = connectedTransformation.TransformationID
 	}
 
 	oldData := &DestinationResource{Type: remote.Type}
 	oldState := &DestinationState{
 		ID:               remoteId,
-		TransformationID: connectedTransformation.TransformationID,
+		TransformationID: transformationID,
 	}
 
 	newState, err := h.Update(ctx, data, oldData, oldState)
