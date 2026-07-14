@@ -97,7 +97,7 @@ func WorkspaceImport(
 		}
 	}
 
-	resolver, err := initResolver(remoteCollection, importable, targetGraph)
+	resolver, err := initResolver(remoteCollection, importable, targetGraph, opts.Merge)
 	if err != nil {
 		return fmt.Errorf("setting up import ref resolver: %w", err)
 	}
@@ -227,11 +227,13 @@ func initResolver(
 	remoteCollection *resources.RemoteResources,
 	importable *resources.RemoteResources,
 	graph *resources.Graph,
+	merge bool,
 ) (*resolver.ImportRefResolver, error) {
 
 	return &resolver.ImportRefResolver{
 		Remote:     remoteCollection,
 		Graph:      graph,
 		Importable: importable,
+		Merge:      merge,
 	}, nil
 }
