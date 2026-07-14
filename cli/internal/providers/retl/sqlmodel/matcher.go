@@ -20,8 +20,9 @@ func Matcher() importmatcher.Matcher {
 }
 
 func matchSQLModel(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*retlClient.RETLSource)
-	if !ok || remote.Name == "" {
+	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
+	remote := r.Data.(*retlClient.RETLSource)
+	if remote.Name == "" {
 		return nil
 	}
 
