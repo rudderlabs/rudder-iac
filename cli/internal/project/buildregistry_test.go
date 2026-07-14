@@ -13,11 +13,10 @@ import (
 
 // TestBuildRegistry_AggregatesManifestPatterns proves the two-provider
 // BuildRegistry unions the manifest provider's SupportedMatchPatterns into the
-// active set, so the import-manifest kind is treated as known by the gatekeeper
-// rules (SpecSyntaxValidRule) instead of being rejected as an unknown kind.
+// active set when importMerge is enabled, so the import-manifest kind is treated
+// as known by the gatekeeper rules (SpecSyntaxValidRule) instead of being
+// rejected as an unknown kind.
 func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
-	t.Parallel()
-
 	resourceProvider := &testutils.MockProvider{
 		MatchPatterns: []rules.MatchPattern{
 			rules.MatchKindVersion("properties", specs.SpecVersionV1),
@@ -25,7 +24,7 @@ func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
 	}
 	manifestProvider := importmanifest.New()
 
-	reg, err := BuildRegistry(resourceProvider, manifestProvider)
+	reg, err := BuildRegistry(resourceProvider, manifestProvider, true)
 	require.NoError(t, err)
 
 	// The manifest kind/version must resolve to at least the gatekeeper rules,
@@ -51,4 +50,37 @@ func TestBuildRegistry_AggregatesManifestPatterns(t *testing.T) {
 		Spec:     map[string]any{"workspaces": []any{}},
 	})
 	assert.Empty(t, results, "manifest kind must be a known kind/version (no 'unknown kind' error)")
+}
+
+// TestBuildRegistry_RejectsManifestKindWhenFlagOff proves that with importMerge
+// disabled (the default), the import-manifest kind is excluded from the active
+// set and rejected as an unknown kind by spec-syntax-valid.
+func TestBuildRegistry_RejectsManifestKindWhenFlagOff(t *testing.T) {
+	resourceProvider := &testutils.MockProvider{
+		MatchPatterns: []rules.MatchPattern{
+			rules.MatchKindVersion("properties", specs.SpecVersionV1),
+		},
+	}
+	manifestProvider := importmanifest.New()
+
+	reg, err := BuildRegistry(resourceProvider, manifestProvider, false)
+	require.NoError(t, err)
+
+	var specSyntax rules.Rule
+	for _, r := range reg.AllSyntacticRules() {
+		if r.ID() == "project/spec-syntax-valid" {
+			specSyntax = r
+			break
+		}
+	}
+	require.NotNil(t, specSyntax)
+
+	results := specSyntax.Validate(&rules.ValidationContext{
+		Kind:     importmanifest.KindImportManifest,
+		Version:  specs.SpecVersionV1,
+		Metadata: map[string]any{"name": "import-manifest"},
+		Spec:     map[string]any{"workspaces": []any{}},
+	})
+	require.NotEmpty(t, results, "manifest kind must be rejected when importMerge is off")
+	assert.Contains(t, results[0].Message, "'kind' must be one of")
 }

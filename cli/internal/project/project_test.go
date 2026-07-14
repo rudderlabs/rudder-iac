@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,6 +16,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
+
+func enableImportMerge(t *testing.T) {
+	t.Helper()
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
+	viper.Set("experimental", true)
+	viper.Set("flags.importMerge", true)
+	t.Cleanup(func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.importMerge", prevFlag)
+	})
+}
 
 // fixtureMatchPatterns declares the test fixture kinds (Source/Destination) so a
 // MockProvider reports them as supported. Without this the gatekeeper rule
@@ -64,7 +76,7 @@ func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImpor
 }
 
 func TestProject_BroadcastsImportManifest(t *testing.T) {
-	t.Parallel()
+	enableImportMerge(t)
 
 	consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
 	// Declare the resource kind so the gatekeeper SpecSyntaxValidRule treats
