@@ -17,8 +17,9 @@ func Matcher() importmatcher.Matcher {
 }
 
 func matchSource(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*sourceClient.EventStreamSource)
-	if !ok || remote.Name == "" {
+	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
+	remote := r.Data.(*sourceClient.EventStreamSource)
+	if remote.Name == "" {
 		return nil
 	}
 
