@@ -328,8 +328,9 @@ func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*sp
 // operates on already-parsed specs.
 func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
 	var (
-		diags          = make(validation.Diagnostics, 0)
-		parsedRawSpecs = make(map[string]*specs.RawSpec)
+		diags              = make(validation.Diagnostics, 0)
+		parsedRawSpecs     = make(map[string]*specs.RawSpec)
+		importMergeEnabled = config.GetConfig().ExperimentalFlags.ImportMerge
 	)
 
 	for path, rawSpec := range raw {
@@ -351,7 +352,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		// Dropped before validation so the gatekeeper rules never see the spec at
 		// all: the kind belongs to a provider this caller did not register, so
 		// every rule keyed off it would be a false error.
-		if p.ignoreUnknownKinds && !p.isKnownKind(parsed.Kind) {
+		if p.ignoreUnknownKinds && !p.isKnownKind(parsed.Kind, importMergeEnabled) {
 			log.Debug("skipping spec of unregistered kind", "path", path, "kind", parsed.Kind)
 			continue
 		}
@@ -366,17 +367,15 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 	return parsedRawSpecs, diags
 }
 
-// isKnownKind reports whether any registered provider owns the kind. The pattern
-// union mirrors BuildRegistry's activePatterns, so a kind is skipped only when
-// the gatekeeper rules would have rejected it as unknown.
-func (p *project) isKnownKind(kind string) bool {
-	providers := []ProjectProvider{p.provider, p.importManifestProvider}
-
-	for _, prov := range providers {
-		for _, pattern := range prov.SupportedMatchPatterns() {
-			if pattern.Kind == "*" || pattern.Kind == kind {
-				return true
-			}
+// isKnownKind reports whether the kind is in the active pattern set given the
+// current import-merge state. Sharing activePatterns with BuildRegistry is what
+// keeps the skip decision and the gatekeeper's notion of "known" from drifting:
+// a kind is skipped only where BuildRegistry would otherwise reject it as
+// unknown. Notably import-manifest is known only when import-merge is enabled.
+func (p *project) isKnownKind(kind string, importMergeEnabled bool) bool {
+	for _, pattern := range activePatterns(p.provider, p.importManifestProvider, importMergeEnabled) {
+		if pattern.Kind == "*" || pattern.Kind == kind {
+			return true
 		}
 	}
 
@@ -385,6 +384,20 @@ func (p *project) isKnownKind(kind string) bool {
 
 func (p *project) registry() (rules.Registry, error) {
 	return BuildRegistry(p.provider, p.importManifestProvider, config.GetConfig().ExperimentalFlags.ImportMerge)
+}
+
+// activePatterns is the set of kind/version patterns the validation pipeline
+// treats as known: the resource provider's patterns, plus the import-manifest
+// provider's only when import-merge is enabled. Shared by BuildRegistry (which
+// rules fire) and isKnownKind (which specs the local typer may skip) so the two
+// never disagree about which kinds are known.
+func activePatterns(provider, manifestProvider ProjectProvider, importMergeEnabled bool) []rules.MatchPattern {
+	patterns := append([]rules.MatchPattern{}, provider.SupportedMatchPatterns()...)
+	if importMergeEnabled {
+		patterns = append(patterns, manifestProvider.SupportedMatchPatterns()...)
+	}
+
+	return patterns
 }
 
 // BuildRegistry constructs the validation rule registry from the resource
@@ -403,20 +416,16 @@ func (p *project) registry() (rules.Registry, error) {
 // arguments, testable without touching global config.
 func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnabled bool) (rules.Registry, error) {
 	resourcePatterns := provider.SupportedMatchPatterns()
+	active := activePatterns(provider, manifestProvider, importMergeEnabled)
 
-	activePatterns := append([]rules.MatchPattern{}, resourcePatterns...)
-	if importMergeEnabled {
-		activePatterns = append(activePatterns, manifestProvider.SupportedMatchPatterns()...)
-	}
-
-	baseRegistry := rules.NewRegistry(activePatterns)
+	baseRegistry := rules.NewRegistry(active)
 
 	syntactic := []rules.Rule{
 		// Gatekeeper rules (spec-syntax-valid, resource-kind-version-valid) keep
-		// MatchAll AppliesTo and use activePatterns as the source of truth for the
-		// supported kinds and versions.
-		prules.NewSpecSyntaxValidRule(activePatterns),
-		prules.NewResourceKindVersionValidRule(activePatterns),
+		// MatchAll AppliesTo and use the active pattern set as the source of truth
+		// for the supported kinds and versions.
+		prules.NewSpecSyntaxValidRule(active),
+		prules.NewResourceKindVersionValidRule(active),
 
 		// metadata-syntax-valid and duplicate-urn are scoped to resourcePatterns so
 		// the engine only hands them resource specs — the import-manifest kind is
@@ -427,7 +436,7 @@ func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnable
 	// Cross-source conflict between import-manifest and inline metadata.import
 	// only applies when the import-manifest kind is recognized.
 	if importMergeEnabled {
-		syntactic = append(syntactic, prules.NewManifestInlineConflictRule(provider.ParseSpec, activePatterns))
+		syntactic = append(syntactic, prules.NewManifestInlineConflictRule(provider.ParseSpec, active))
 	}
 	syntactic = append(syntactic, provider.SyntacticRules()...)
 	if importMergeEnabled {
