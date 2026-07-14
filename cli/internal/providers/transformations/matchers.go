@@ -20,27 +20,26 @@ func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 }
 
 func matchLibrary(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*model.RemoteLibrary)
-	if !ok || remote.ImportName == "" {
+	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
+	remote := r.Data.(*model.RemoteLibrary)
+	if remote.ImportName == "" {
 		return nil
 	}
 
 	local, _ := importmatcher.ByRawData(scope.LocalGraph, ttypes.LibraryResourceType, func(raw any) bool {
-		library, ok := raw.(*model.LibraryResource)
-		return ok && library.ImportName == remote.ImportName
+		return raw.(*model.LibraryResource).ImportName == remote.ImportName
 	})
 	return local
 }
 
 func matchTransformation(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*model.RemoteTransformation)
-	if !ok || remote.Name == "" {
+	remote := r.Data.(*model.RemoteTransformation)
+	if remote.Name == "" {
 		return nil
 	}
 
 	local, _ := importmatcher.ByRawData(scope.LocalGraph, ttypes.TransformationResourceType, func(raw any) bool {
-		transformation, ok := raw.(*model.TransformationResource)
-		return ok && transformation.Name == remote.Name
+		return raw.(*model.TransformationResource).Name == remote.Name
 	})
 	return local
 }
