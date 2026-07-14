@@ -175,10 +175,26 @@ func TestMark_ClaimedFirstWinsBySortedRemoteID(t *testing.T) {
 	// signals flawed matching or dirty upstream data.
 	require.Len(t, claimed, 1)
 	assert.Equal(t, importmatcher.MultipleClaimed{
-		ResourceType: "category",
-		LocalURN:     "category:checkout",
-		RemoteID:     "cat_b",
+		ResourceType:      "category",
+		LocalURN:          "category:checkout",
+		ClaimedByRemoteID: "cat_a",
+		RemoteID:          "cat_b",
 	}, claimed[0])
+}
+
+func TestMultipleClaimed_String(t *testing.T) {
+	t.Parallel()
+
+	claimed := importmatcher.MultipleClaimed{
+		ResourceType:      "category",
+		LocalURN:          "category:checkout",
+		ClaimedByRemoteID: "cat_a",
+		RemoteID:          "cat_b",
+	}
+
+	assert.Equal(t,
+		`local resource "category:checkout" is matched by multiple remotes "cat_a" and "cat_b"`,
+		claimed.String())
 }
 
 func TestMark_NoCollisionReturnsNoClaims(t *testing.T) {

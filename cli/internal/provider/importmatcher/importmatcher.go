@@ -6,6 +6,7 @@
 package importmatcher
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -42,14 +43,21 @@ type Matcher struct {
 	Match        Func
 }
 
-// MultipleClaimed reports a remote resource that matched a local resource
-// already claimed by an earlier (sorted) remote. Matcher predicates are meant
-// to mirror upstream uniqueness, so a claim collision signals flawed matching
-// or dirty upstream data — the caller is expected to fail fast on any of these.
+// MultipleClaimed reports two remote resources that both matched the same
+// local resource: ClaimedByRemoteID won (matched first, sorted), RemoteID is
+// the extra. Matcher predicates are meant to mirror upstream uniqueness, so a
+// claim collision signals flawed matching or dirty upstream data — the caller
+// is expected to fail fast on any of these.
 type MultipleClaimed struct {
-	ResourceType string
-	LocalURN     string
-	RemoteID     string
+	ResourceType      string
+	LocalURN          string
+	ClaimedByRemoteID string
+	RemoteID          string
+}
+
+func (c MultipleClaimed) String() string {
+	return fmt.Sprintf("local resource %q is matched by multiple remotes %q and %q",
+		c.LocalURN, c.ClaimedByRemoteID, c.RemoteID)
 }
 
 // Mark executes the matchers against the importable collection, mutating
@@ -67,14 +75,16 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 			continue
 		}
 
-		// Sort remote IDs so first-wins claiming is deterministic.
+		// Sort remote IDs to maintain deterministic collision reporting
 		ids := make([]string, 0, len(remotes))
 		for id := range remotes {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
 
-		claimed := make(map[string]bool, len(remotes))
+		// claimedBy maps a local ID to the remote ID that first claimed it, so a
+		// collision can report both remotes.
+		claimedBy := make(map[string]string, len(remotes))
 		for _, id := range ids {
 			remote := remotes[id]
 			local := m.Match(scope, remote)
@@ -82,19 +92,19 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 				continue
 			}
 
-			if claimed[local.ID()] {
+			if claimer, ok := claimedBy[local.ID()]; ok {
 				multipleClaimed = append(multipleClaimed, MultipleClaimed{
-					ResourceType: m.ResourceType,
-					LocalURN:     local.URN(),
-					RemoteID:     remote.ID,
+					ResourceType:      m.ResourceType,
+					LocalURN:          local.URN(),
+					ClaimedByRemoteID: claimer,
+					RemoteID:          remote.ID,
 				})
 				continue
 			}
 
-			// Log before mutating, per the codebase's log-then-act convention.
 			log.Debug("matching remote resource to local project resource",
 				"type", m.ResourceType, "remoteID", remote.ID, "localURN", local.URN())
-			claimed[local.ID()] = true
+			claimedBy[local.ID()] = remote.ID
 			remote.MatchedWith = local
 			remote.ExternalID = local.ID()
 			remote.Reference = rewriteTrailingID(remote.Reference, local.ID())

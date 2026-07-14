@@ -1,11 +1,6 @@
 package importer
 
 import (
-	"testing"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"context"
 	"os"
 	"path/filepath"
@@ -15,9 +10,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,6 +123,7 @@ func TestMarkMatchedWith(t *testing.T) {
 		err := markMatchedWith(stub, resources.NewGraph(), localGraph, importable)
 
 		require.ErrorIs(t, err, ErrAmbiguousMatch)
+		assert.ErrorContains(t, err, `local resource "category:checkout" is matched by multiple remotes "cat_a" and "cat_b"`)
 	})
 
 	t.Run("no matcher provider is a no-op", func(t *testing.T) {
@@ -137,6 +135,8 @@ func TestMarkMatchedWith(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+}
+
 func enableImportMerge(t *testing.T) {
 	t.Helper()
 	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
@@ -187,6 +187,10 @@ func (p *stubImportProvider) FormatForExport(
 	return p.entities, p.entries, nil
 }
 
+func (p *stubImportProvider) ResourceMatchers() []importmatcher.Matcher {
+	return nil
+}
+
 func importableCollection() *resources.RemoteResources {
 	c := resources.NewRemoteResources()
 	c.Set("source", map[string]*resources.RemoteResource{
@@ -224,7 +228,7 @@ func TestWorkspaceImport_SkipsManifestWhenFlagOff(t *testing.T) {
 		importable: importableCollection(),
 		entities:   entities,
 		entries:    entries,
-	})
+	}, ImportOptions{})
 	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))
@@ -244,7 +248,7 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 		importable: importableCollection(),
 		entities:   entities,
 		entries:    entries,
-	})
+	}, ImportOptions{})
 	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))

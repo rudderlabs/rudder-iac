@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -186,7 +187,11 @@ func markMatchedWith(
 	}, matchers.ResourceMatchers())
 
 	if len(claimed) > 0 {
-		return fmt.Errorf("%w: %v", ErrAmbiguousMatch, claimed)
+		details := make([]string, len(claimed))
+		for i, c := range claimed {
+			details[i] = c.String()
+		}
+		return fmt.Errorf("%w: %s", ErrAmbiguousMatch, strings.Join(details, "; "))
 	}
 	return nil
 }
