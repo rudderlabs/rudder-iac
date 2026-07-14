@@ -32,15 +32,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {
-		assert.True(t, registered.IsSourceTypeSupported(sourceType))
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
 
-	assert.False(t, registered.IsSourceTypeSupported("amp"))
-	assert.False(t, registered.IsSourceTypeSupported("shopify"))
-	assert.False(t, registered.IsSourceTypeSupported("warehouse"))
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	byAPI, err := registry.GetByAPIType("S3", 1)
 	require.NoError(t, err)

@@ -3,7 +3,6 @@ package definitions
 import (
 	"fmt"
 	"reflect"
-	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -81,14 +80,6 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 		return nil, fmt.Errorf("unsupported source type %q for destination %s", sourceType, d.Type)
 	}
 	return append([]string(nil), modes...), nil
-}
-
-// IsSourceTypeSupported reports whether sourceType is in SourceTypes
-func (d *RegisteredDefinition) IsSourceTypeSupported(sourceType string) bool {
-	if d.DestinationDefinition == nil {
-		return false
-	}
-	return slices.Contains(d.SourceTypes, sourceType)
 }
 
 func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {

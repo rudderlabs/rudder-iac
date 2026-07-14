@@ -41,11 +41,20 @@ func apiSourceType(typ string) (string, bool) {
 	return apiSourceType, ok
 }
 
+// LocalToAPISourceTypes returns a copy of the canonical local→API source-type map.
+func LocalToAPISourceTypes() map[string]string {
+	out := make(map[string]string, len(apiSourceTypeByLocal))
+	for local, api := range apiSourceTypeByLocal {
+		out[local] = api
+	}
+	return out
+}
+
 // ValidateSourceTypes verifies that every local source type has an API config key.
 func ValidateSourceTypes(sourceTypes []string) error {
-	for _, sourceType := range sourceTypes {
-		if _, ok := apiSourceType(sourceType); !ok {
-			return fmt.Errorf("source type %q has no API mapping", sourceType)
+	for _, localSourceType := range sourceTypes {
+		if _, ok := apiSourceType(localSourceType); !ok {
+			return fmt.Errorf("local source type %q has no API mapping", localSourceType)
 		}
 	}
 	return nil

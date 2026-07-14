@@ -43,7 +43,7 @@ func TestRegistryRejectsUnmappedSourceType(t *testing.T) {
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `source type "unsupported_source" has no API mapping`)
+	assert.Contains(t, err.Error(), `local source type "unsupported_source" has no API mapping`)
 }
 
 func TestRegistryRejectsConnectionModeWithoutSourceType(t *testing.T) {
@@ -255,8 +255,8 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 
 	assert.Equal(t, []string{"api_secret"}, registered.SecretKeys())
 	assert.ElementsMatch(t, []string{"web", "android"}, registered.SupportedSourceTypes())
-	assert.True(t, registered.IsSourceTypeSupported("web"))
-	assert.False(t, registered.IsSourceTypeSupported("ios"))
+	assert.Contains(t, registered.SupportedSourceTypes(), "web")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "ios")
 
 	modes, err := registered.ConnectionModes("web")
 	require.NoError(t, err)

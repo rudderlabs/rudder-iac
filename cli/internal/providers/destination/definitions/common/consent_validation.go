@@ -12,7 +12,7 @@ type ConsentManagement map[string][]ConsentEntry
 
 // ConsentEntry is one consent-provider configuration.
 type ConsentEntry struct {
-	Provider           *string  `mapstructure:"provider"`
+	Provider           string   `mapstructure:"provider"`
 	ResolutionStrategy string   `mapstructure:"resolution_strategy"`
 	Consents           []string `mapstructure:"consents"`
 }
@@ -35,17 +35,17 @@ func ValidateConsentEntries(entries []ConsentEntry) []ConsentValidationError {
 	for index, entry := range entries {
 		errors = append(errors, validateConsentEntry(index, entry)...)
 		errors = append(errors, validateConsentValues(index, entry.Consents)...)
-		if entry.Provider == nil {
+		if !isValidConsentProvider(entry.Provider) {
 			continue
 		}
-		if _, exists := seenProviders[*entry.Provider]; exists {
+		if _, exists := seenProviders[entry.Provider]; exists {
 			errors = append(errors, ConsentValidationError{
 				Path:    fmt.Sprintf("/%d/provider", index),
 				Message: "only one consent entry can be configured per provider",
 			})
 			continue
 		}
-		seenProviders[*entry.Provider] = struct{}{}
+		seenProviders[entry.Provider] = struct{}{}
 	}
 	return errors
 }
@@ -57,7 +57,7 @@ func validateConsentEntry(index int, entry ConsentEntry) []ConsentValidationErro
 			Message: "'provider' must be one of [custom iubenda ketch oneTrust]",
 		}}
 	}
-	if entry.Provider == nil || *entry.Provider != "custom" {
+	if entry.Provider != "custom" {
 		return nil
 	}
 	if entry.ResolutionStrategy == "" {
@@ -83,17 +83,14 @@ func validateConsentValues(entryIndex int, consents []string) []ConsentValidatio
 		}
 		errors = append(errors, ConsentValidationError{
 			Path:    fmt.Sprintf("/%d/consents/%d", entryIndex, consentIndex),
-			Message: "'consent' must be at most 100 characters or use template/environment syntax",
+			Message: "'consent' must be at most 100 characters",
 		})
 	}
 	return errors
 }
 
-func isValidConsentProvider(provider *string) bool {
-	if provider == nil {
-		return true
-	}
-	switch *provider {
+func isValidConsentProvider(provider string) bool {
+	switch provider {
 	case "custom", "iubenda", "ketch", "oneTrust":
 		return true
 	default:

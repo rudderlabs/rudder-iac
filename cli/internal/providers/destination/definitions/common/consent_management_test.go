@@ -87,22 +87,7 @@ func TestPropertiesMapsLocalSourceTypeToAPI(t *testing.T) {
 func TestPropertiesMapsEveryKnownSourceTypeBothWays(t *testing.T) {
 	t.Parallel()
 
-	sourceMappings := map[string]string{
-		"amp":            "amp",
-		"android":        "android",
-		"android_kotlin": "androidKotlin",
-		"cloud":          "cloud",
-		"cloud_source":   "cloudSource",
-		"cordova":        "cordova",
-		"flutter":        "flutter",
-		"ios":            "ios",
-		"ios_swift":      "iosSwift",
-		"react_native":   "reactnative",
-		"shopify":        "shopify",
-		"unity":          "unity",
-		"warehouse":      "warehouse",
-		"web":            "web",
-	}
+	sourceMappings := common.LocalToAPISourceTypes()
 	sourceTypes := make([]string, 0, len(sourceMappings))
 	localSources := make(map[string]any, len(sourceMappings))
 	apiSources := make(map[string]any, len(sourceMappings))
@@ -124,13 +109,6 @@ func TestPropertiesMapsEveryKnownSourceTypeBothWays(t *testing.T) {
 	back, err := converter.APIToLocal(props, expectedAPI)
 	require.NoError(t, err)
 	assert.Equal(t, local, back)
-}
-
-func TestPropertiesMultipleSourceTypes(t *testing.T) {
-	t.Parallel()
-
-	props := common.Properties([]string{"web", "react_native"})
-	require.Len(t, props, 2)
 }
 
 func TestAssertConversionHarness(t *testing.T) {

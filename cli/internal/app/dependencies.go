@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
+
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
@@ -126,6 +128,17 @@ func NewDeps() (Deps, error) {
 // authored fragment); a non-nil error means the catalog could not be assembled
 // at all. generatedAt is injected so callers own the timestamp.
 func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
+	// Catalog generation documents the full destination rule surface even when
+	// the operator has not opted into destinationSupport for apply/validate.
+	prevExp := viper.Get("experimental")
+	prevFlag := viper.Get("flags.destinationSupport")
+	viper.Set("experimental", true)
+	viper.Set("flags.destinationSupport", true)
+	defer func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.destinationSupport", prevFlag)
+	}()
+
 	cp, err := newCompositeProvider()
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
@@ -215,9 +228,9 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
-	destRegistry := definitions.NewRegistry()
-	if err := destRegistry.Register(s3.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	destRegistry, err := newDestinationRegistry(cfg)
+	if err != nil {
+		return nil, err
 	}
 	dp := destProvider.NewProvider(c, destRegistry)
 
@@ -232,6 +245,19 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	}
 
 	return providers, nil
+}
+
+// newDestinationRegistry builds the destination definition registry. Definitions
+// are only registered when the destinationSupport experimental flag is on.
+func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
+	registry := definitions.NewRegistry()
+	if !cfg.ExperimentalFlags.DestinationSupport {
+		return registry, nil
+	}
+	if err := registry.Register(s3.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	return registry, nil
 }
 
 func SyncReporter() syncer.SyncReporter {

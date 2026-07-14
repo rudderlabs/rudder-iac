@@ -14,7 +14,7 @@ func TestValidateConsentEntriesRejectsUnknownProvider(t *testing.T) {
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
-		Provider: consentProvider("unknown"),
+		Provider: "unknown",
 	}})
 
 	require.Len(t, errors, 1)
@@ -28,7 +28,7 @@ func TestValidateConsentEntriesRequiresResolutionForCustomProvider(t *testing.T)
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
-		Provider: consentProvider("custom"),
+		Provider: "custom",
 	}})
 
 	require.Len(t, errors, 1)
@@ -42,7 +42,7 @@ func TestValidateConsentEntriesRejectsInvalidCustomResolution(t *testing.T) {
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
-		Provider:           consentProvider("custom"),
+		Provider:           "custom",
 		ResolutionStrategy: "xor",
 	}})
 
@@ -57,8 +57,8 @@ func TestValidateConsentEntriesRejectsDuplicateProvider(t *testing.T) {
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{
-		{Provider: consentProvider("oneTrust")},
-		{Provider: consentProvider("oneTrust")},
+		{Provider: "oneTrust"},
+		{Provider: "oneTrust"},
 	})
 
 	require.Len(t, errors, 1)
@@ -72,13 +72,14 @@ func TestValidateConsentEntriesRejectsLongPlainConsent(t *testing.T) {
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
+		Provider: "oneTrust",
 		Consents: []string{strings.Repeat("a", 101)},
 	}})
 
 	require.Len(t, errors, 1)
 	assert.Equal(t, common.ConsentValidationError{
 		Path:    "/0/consents/0",
-		Message: "'consent' must be at most 100 characters or use template/environment syntax",
+		Message: "'consent' must be at most 100 characters",
 	}, errors[0])
 }
 
@@ -86,6 +87,7 @@ func TestValidateConsentEntriesAcceptsTemplateAndEnvironmentConsents(t *testing.
 	t.Parallel()
 
 	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
+		Provider: "oneTrust",
 		Consents: []string{
 			"{{ .CONSENT_CATEGORY || analytics }}",
 			"env.CONSENT_CATEGORY",
@@ -95,18 +97,10 @@ func TestValidateConsentEntriesAcceptsTemplateAndEnvironmentConsents(t *testing.
 	assert.Empty(t, errors)
 }
 
-func TestValidateConsentEntriesAllowsOptionalProviderAndConsents(t *testing.T) {
+func TestValidateConsentEntriesRejectsMissingProvider(t *testing.T) {
 	t.Parallel()
 
-	assert.Empty(t, common.ValidateConsentEntries([]common.ConsentEntry{{}}))
-}
-
-func TestValidateConsentEntriesRejectsEmptyProvider(t *testing.T) {
-	t.Parallel()
-
-	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
-		Provider: consentProvider(""),
-	}})
+	errors := common.ValidateConsentEntries([]common.ConsentEntry{{}})
 
 	require.Len(t, errors, 1)
 	assert.Equal(t, common.ConsentValidationError{
@@ -115,6 +109,16 @@ func TestValidateConsentEntriesRejectsEmptyProvider(t *testing.T) {
 	}, errors[0])
 }
 
-func consentProvider(value string) *string {
-	return &value
+func TestValidateConsentEntriesRejectsEmptyProvider(t *testing.T) {
+	t.Parallel()
+
+	errors := common.ValidateConsentEntries([]common.ConsentEntry{{
+		Provider: "",
+	}})
+
+	require.Len(t, errors, 1)
+	assert.Equal(t, common.ConsentValidationError{
+		Path:    "/0/provider",
+		Message: "'provider' must be one of [custom iubenda ketch oneTrust]",
+	}, errors[0])
 }

@@ -168,6 +168,42 @@ func TestValidateConfigAppliesCanonicalConsentValidation(t *testing.T) {
 	)
 }
 
+func TestValidateConfigRejectsMissingConsentProvider(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("TEST", 1)
+	require.NoError(t, err)
+
+	errors := registered.ValidateConfig(map[string]any{
+		"consent_management": map[string]any{
+			"web": []any{
+				map[string]any{},
+			},
+		},
+	})
+
+	assertConfigError(
+		t,
+		errors,
+		"/consent_management/web/0/provider",
+		"'provider' must be one of [custom iubenda ketch oneTrust]",
+	)
+}
+
 func TestValidateConfigReplacesCanonicalConsentValidationForSource(t *testing.T) {
 	t.Parallel()
 

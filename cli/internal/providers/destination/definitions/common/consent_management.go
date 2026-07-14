@@ -15,14 +15,14 @@ func Properties(sourceTypes []string) []converter.ConfigProperty {
 	}
 
 	properties := make([]converter.ConfigProperty, 0, len(sourceTypes))
-	for _, sourceType := range sourceTypes {
-		remoteSourceType, ok := apiSourceType(sourceType)
+	for _, localSourceType := range sourceTypes {
+		remoteSourceType, ok := apiSourceType(localSourceType)
 		if !ok {
 			continue
 		}
 		properties = append(properties, converter.ArrayWithObjects(
 			fmt.Sprintf("consentManagement.%s", remoteSourceType),
-			fmt.Sprintf("%s.%s", consentManagementLocalKey, sourceType),
+			fmt.Sprintf("%s.%s", consentManagementLocalKey, localSourceType),
 			map[string]any{
 				"provider":           "provider",
 				"resolutionStrategy": "resolution_strategy",
