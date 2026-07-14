@@ -51,7 +51,7 @@ func decodeConfig(config map[string]any, dest any) error {
 }
 
 func structValidationErrors(decoded any, basePath string, rootType reflect.Type) []ConfigError {
-	validationErrors, err := rules.ValidateStructWithTagPriority(decoded, []string{"mapstructure"})
+	validationErrors, err := rules.ValidateStructWithTagPriority(decoded, []string{"mapstructure"}, configValidateFuncs()...)
 	if err != nil {
 		return []ConfigError{{
 			Path:    basePath,

@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
@@ -97,9 +99,7 @@ func MergeSchemas(base, fragment json.RawMessage) (json.RawMessage, error) {
 		baseSchema["properties"] = baseProperties
 	}
 
-	for key, value := range fragmentSchema {
-		baseProperties[key] = value
-	}
+	maps.Copy(baseProperties, fragmentSchema)
 
 	merged, err := json.Marshal(baseSchema)
 	if err != nil {
@@ -108,17 +108,23 @@ func MergeSchemas(base, fragment json.RawMessage) (json.RawMessage, error) {
 	return json.RawMessage(merged), nil
 }
 
+// LocalSourceTypeKey converts an upstream camelCase source type to the
+// snake_case key used in local YAML config (e.g. reactNative → react_native).
+func LocalSourceTypeKey(sourceType string) string {
+	return camelToSnake(sourceType)
+}
+
 func camelToSnake(s string) string {
-	var res string
+	var res strings.Builder
 	for i, v := range s {
 		if 'A' <= v && v <= 'Z' {
 			if i != 0 {
-				res += "_"
+				res.WriteByte('_')
 			}
-			res += string(v + 32)
+			res.WriteRune(v + 32)
 		} else {
-			res += string(v)
+			res.WriteRune(v)
 		}
 	}
-	return res
+	return res.String()
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ type Destination struct {
 	Version        int64                          `json:"version,omitempty"`
 	IsEnabled      bool                           `json:"enabled"`
 	Config         json.RawMessage                `json:"config"`
+	WorkspaceID    string                         `json:"workspaceId,omitempty"`
 	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
 	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
@@ -82,6 +84,11 @@ func (s *destinations) DisconnectTransformation(ctx context.Context, destination
 func (s *destinations) GetTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
 	res, err := s.client.Do(ctx, "GET", s.transformationPath(destinationID), nil)
 	if err != nil {
+		var apiError *APIError
+
+		if errors.As(err, &apiError) && apiError.HTTPStatusCode == 404 {
+			return nil, ErrResourceNotFound
+		}
 		return nil, err
 	}
 

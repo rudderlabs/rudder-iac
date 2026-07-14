@@ -5,9 +5,23 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// enableImportMerge flips the experimental flag on for tests that exercise the
+// real New/Load path (which reads global config), restoring it afterwards.
+func enableImportMerge(t *testing.T) {
+	t.Helper()
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
+	viper.Set("experimental", true)
+	viper.Set("flags.importMerge", true)
+	t.Cleanup(func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.importMerge", prevFlag)
+	})
+}
 
 // manifestWiringLoader returns a fixed set of raw specs for Load.
 type manifestWiringLoader struct {
@@ -34,7 +48,7 @@ spec:
 // import-manifest spec as project-level and routes it to the import-manifest
 // provider (not the resource provider), and that the provider accumulates it.
 func TestProject_Load_RoutesImportManifestToProvider(t *testing.T) {
-	t.Parallel()
+	enableImportMerge(t)
 
 	loader := &manifestWiringLoader{specs: map[string]*specs.RawSpec{
 		"import-manifest.yaml": {Data: []byte(importManifestYAML)},

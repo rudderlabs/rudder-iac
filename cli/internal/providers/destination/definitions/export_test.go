@@ -5,20 +5,20 @@ import (
 )
 
 type testConnectionMode struct {
-	Web     *string `json:"web" mapstructure:"web" validate:"omitempty,oneof=cloud device hybrid"`
-	Android *string `json:"android" mapstructure:"android" validate:"omitempty,oneof=cloud device"`
+	Web     *string `json:"web" mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
+	Android *string `json:"android" mapstructure:"android" validate:"omitempty,dynamic_or_oneof=cloud device"`
 }
 
 type testGA4Config struct {
 	APISecret      string             `json:"api_secret" mapstructure:"api_secret" validate:"required"`
-	TypesOfClient  string             `json:"types_of_client" mapstructure:"types_of_client" validate:"required,oneof=gtag firebase"`
+	TypesOfClient  string             `json:"types_of_client" mapstructure:"types_of_client" validate:"required,dynamic_or_oneof=gtag firebase"`
 	MeasurementID  string             `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
 	DebugMode      *bool              `json:"debug_mode" mapstructure:"debug_mode"`
 	ConnectionMode testConnectionMode `json:"connection_mode" mapstructure:"connection_mode"`
 }
 
 type testWebhookConnectionMode struct {
-	Web *string `json:"web" mapstructure:"web" validate:"omitempty,oneof=cloud"`
+	Web *string `json:"web" mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud"`
 }
 
 type testWebhookConfig struct {

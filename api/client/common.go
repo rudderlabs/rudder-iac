@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	FeatureFlagNotEnabled = "Flag is not enabled for your account"
+	FeatureFlagNotEnabledMessagePrefix = "Flag is not enabled for your account"
+	FeatureNotEnabledMessagePrefix     = "Feature is not enabled for your account"
 )
 
 type Paging struct {
@@ -64,8 +65,10 @@ func formatDetails(details json.RawMessage) string {
 	return "(details: " + trimmed + ")"
 }
 
-func (e *APIError) FeatureNotEnabled() bool {
-	return e.HTTPStatusCode == 403 && strings.Contains(e.Msg(), FeatureFlagNotEnabled)
+func (e *APIError) FeatureFlagNotEnabled() bool {
+	return e.HTTPStatusCode == 403 &&
+		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
+			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))
 }
 
 func (e *APIError) Msg() string {

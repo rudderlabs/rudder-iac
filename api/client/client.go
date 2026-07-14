@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var ErrResourceNotFound = fmt.Errorf("resource not found")
+
 type HTTPClient interface {
 	Do(*http.Request) (*http.Response, error)
 }

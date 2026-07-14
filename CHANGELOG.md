@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.20.0](https://github.com/rudderlabs/rudder-iac/compare/v0.19.0...v0.20.0) (2026-07-13)
+
+
+### Features
+
+* add import support for the destination resources ([#656](https://github.com/rudderlabs/rudder-iac/issues/656)) ([039eb57](https://github.com/rudderlabs/rudder-iac/commit/039eb57dc7df51309b026dd7fef0e52cfcd27d5e))
+* add support for the destination validations ([#661](https://github.com/rudderlabs/rudder-iac/issues/661)) ([ce01336](https://github.com/rudderlabs/rudder-iac/commit/ce013363c3c9dd08835370ee50179779519560f2))
+* **typer:** add --local flag to generate from local specs ([#628](https://github.com/rudderlabs/rudder-iac/issues/628)) ([f2f45ef](https://github.com/rudderlabs/rudder-iac/commit/f2f45ef937bf37f9a3c081c58df3a070e68d5bd6))
+
+
+### Bug Fixes
+
+* **api:** handle unavailable data graph feature ([#672](https://github.com/rudderlabs/rudder-iac/issues/672)) ([82ab553](https://github.com/rudderlabs/rudder-iac/commit/82ab553f219823750b36c8a50d2d9bd5a7126c21))
+* **datagraph:** allow 2000-character column descriptions ([#662](https://github.com/rudderlabs/rudder-iac/issues/662)) ([c55eaa1](https://github.com/rudderlabs/rudder-iac/commit/c55eaa19de7352c2f5026ab31a863eb8540d0370))
+
 ## [0.19.0](https://github.com/rudderlabs/rudder-iac/compare/v0.18.0...v0.19.0) (2026-07-07)
 
 
