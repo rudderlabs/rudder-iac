@@ -26,8 +26,9 @@ func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 }
 
 func matchCategory(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*catalog.Category)
-	if !ok || remote.Name == "" {
+	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
+	remote := r.Data.(*catalog.Category)
+	if remote.Name == "" {
 		return nil
 	}
 
@@ -39,8 +40,8 @@ func matchCategory(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 }
 
 func matchCustomType(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*catalog.CustomType)
-	if !ok || remote.Name == "" {
+	remote := r.Data.(*catalog.CustomType)
+	if remote.Name == "" {
 		return nil
 	}
 
@@ -52,8 +53,8 @@ func matchCustomType(scope importmatcher.Scope, r *resources.RemoteResource) *re
 }
 
 func matchTrackingPlan(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*catalog.TrackingPlanWithIdentifiers)
-	if !ok || remote.Name == "" {
+	remote := r.Data.(*catalog.TrackingPlanWithIdentifiers)
+	if remote.Name == "" {
 		return nil
 	}
 
@@ -65,8 +66,8 @@ func matchTrackingPlan(scope importmatcher.Scope, r *resources.RemoteResource) *
 }
 
 func matchEvent(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*catalog.Event)
-	if !ok || remote.EventType == "" {
+	remote := r.Data.(*catalog.Event)
+	if remote.EventType == "" {
 		return nil
 	}
 
@@ -81,10 +82,10 @@ func matchEvent(scope importmatcher.Scope, r *resources.RemoteResource) *resourc
 }
 
 func matchProperty(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	remote, ok := r.Data.(*catalog.Property)
+	remote := r.Data.(*catalog.Property)
 	// DefinitionId links the remote property to a custom type; those are
 	// imported normally via the namer, never smart-linked.
-	if !ok || remote.Name == "" || remote.DefinitionId != "" {
+	if remote.Name == "" || remote.DefinitionId != "" {
 		return nil
 	}
 
