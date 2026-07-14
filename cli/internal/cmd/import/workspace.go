@@ -71,7 +71,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			spinner := ui.NewSpinner("Importing ...")
 			spinner.Start()
 
-			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), merge)
+			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
 
 			spinner.Stop()
 			if err == nil {

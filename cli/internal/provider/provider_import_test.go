@@ -48,7 +48,7 @@ func TestExampleImport(t *testing.T) {
 	_, err = b.CreateBook("Book B", wB.ID, "", "")
 	require.NoError(t, err)
 
-	err = importer.WorkspaceImport(context.Background(), proj, provider, false)
+	err = importer.WorkspaceImport(context.Background(), proj, provider, importer.ImportOptions{})
 	require.NoError(t, err, "Failed to import workspace")
 
 	assertDirContents(t, testDir)
@@ -121,7 +121,7 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	importProvider := example.NewProvider(b)
 	proj := project.New(importProvider)
 	require.NoError(t, proj.Load(testDir))
-	require.NoError(t, importer.WorkspaceImport(context.Background(), proj, importProvider, false))
+	require.NoError(t, importer.WorkspaceImport(context.Background(), proj, importProvider, importer.ImportOptions{}))
 
 	// The generated spec carries an unquoted variable reference, not a mask.
 	// The handler names the variable from the resource's identity

@@ -42,12 +42,25 @@ type Matcher struct {
 	Match        Func
 }
 
+// MultipleClaimed reports a remote resource that matched a local resource
+// already claimed by an earlier (sorted) remote. Matcher predicates are meant
+// to mirror upstream uniqueness, so a claim collision signals flawed matching
+// or dirty upstream data — the caller is expected to fail fast on any of these.
+type MultipleClaimed struct {
+	ResourceType string
+	LocalURN     string
+	RemoteID     string
+}
+
 // Mark executes the matchers against the importable collection, mutating
 // matched resources in place: MatchedWith is set, ExternalID becomes the local
 // ID and the Reference's trailing ID segment is rewritten. The first (sorted)
-// remote to match a local resource claims it; later remotes matching the same
-// local keep the namer identity they already carry.
-func Mark(scope Scope, matchers []Matcher) {
+// remote to match a local resource claims it; any later remote matching the
+// same local is returned as a MultipleClaimed and keeps the namer identity it
+// already carries, so the caller can decide (fail fast) rather than silently
+// dropping it.
+func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
+	var multipleClaimed []MultipleClaimed
 	for _, m := range matchers {
 		remotes := scope.Importable.GetAll(m.ResourceType)
 		if len(remotes) == 0 {
@@ -69,23 +82,25 @@ func Mark(scope Scope, matchers []Matcher) {
 				continue
 			}
 
-			// Should never trigger when matcher predicates mirror upstream
-			// uniqueness — a second remote matching the same local signals
-			// upstream data violating that assumption, so surface it.
 			if claimed[local.ID()] {
-				log.Warn("multiple remote resources match one local resource; keeping namer identity for the extra remote",
-					"type", m.ResourceType, "remoteID", remote.ID, "localURN", local.URN())
+				multipleClaimed = append(multipleClaimed, MultipleClaimed{
+					ResourceType: m.ResourceType,
+					LocalURN:     local.URN(),
+					RemoteID:     remote.ID,
+				})
 				continue
 			}
 
+			// Log before mutating, per the codebase's log-then-act convention.
+			log.Debug("matching remote resource to local project resource",
+				"type", m.ResourceType, "remoteID", remote.ID, "localURN", local.URN())
 			claimed[local.ID()] = true
 			remote.MatchedWith = local
 			remote.ExternalID = local.ID()
 			remote.Reference = rewriteTrailingID(remote.Reference, local.ID())
-			log.Debug("matched remote resource to local project resource",
-				"type", m.ResourceType, "remoteID", remote.ID, "localURN", local.URN())
 		}
 	}
+	return multipleClaimed
 }
 
 // ByData finds the local resource of the given type whose Data() map satisfies

@@ -160,7 +160,7 @@ func TestMark_ClaimedFirstWinsBySortedRemoteID(t *testing.T) {
 		Importable: importableWith("category", first, second),
 	}
 
-	importmatcher.Mark(scope, []importmatcher.Matcher{matchByName("category")})
+	claimed := importmatcher.Mark(scope, []importmatcher.Matcher{matchByName("category")})
 
 	require.NotNil(t, first.MatchedWith)
 	assert.Equal(t, "checkout", first.ExternalID)
@@ -169,6 +169,37 @@ func TestMark_ClaimedFirstWinsBySortedRemoteID(t *testing.T) {
 	assert.Nil(t, second.MatchedWith)
 	assert.Equal(t, "checkout-2", second.ExternalID)
 	assert.Equal(t, "#category:checkout-2", second.Reference)
+
+	// The collision is reported so the caller can fail fast: matcher predicates
+	// are meant to mirror upstream uniqueness, so two remotes claiming one local
+	// signals flawed matching or dirty upstream data.
+	require.Len(t, claimed, 1)
+	assert.Equal(t, importmatcher.MultipleClaimed{
+		ResourceType: "category",
+		LocalURN:     "category:checkout",
+		RemoteID:     "cat_b",
+	}, claimed[0])
+}
+
+func TestMark_NoCollisionReturnsNoClaims(t *testing.T) {
+	t.Parallel()
+
+	local := localResource("checkout", "category", resources.ResourceData{"name": "Checkout"})
+	remote := &resources.RemoteResource{
+		ID:         "cat_a",
+		ExternalID: "checkout-1",
+		Reference:  "#category:checkout-1",
+		Data:       "Checkout",
+	}
+
+	scope := importmatcher.Scope{
+		LocalGraph: graphWith(local),
+		Importable: importableWith("category", remote),
+	}
+
+	claimed := importmatcher.Mark(scope, []importmatcher.Matcher{matchByName("category")})
+
+	assert.Empty(t, claimed)
 }
 
 func TestMark_RewritesReferenceShapes(t *testing.T) {

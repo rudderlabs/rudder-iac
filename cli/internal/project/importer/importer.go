@@ -23,7 +23,10 @@ const (
 	ImportedDir = "imported"
 )
 
-var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
+var (
+	ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
+	ErrAmbiguousMatch   = errors.New("merge import matched multiple remote resources to one local resource")
+)
 
 type ImportProvider interface {
 	provider.RemoteResourceLoader
@@ -37,11 +40,18 @@ type Project interface {
 	Location() string
 }
 
+// ImportOptions configures a workspace import. Merge enables smart-import
+// conflict detection (link matching remote resources to existing local
+// resources instead of writing duplicate specs).
+type ImportOptions struct {
+	Merge bool
+}
+
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
 	p ImportProvider,
-	merge bool) error {
+	opts ImportOptions) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -60,7 +70,7 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	if err := checkSyncStatus(diff, merge); err != nil {
+	if err := checkSyncStatus(diff, opts.Merge); err != nil {
 		return err
 	}
 
@@ -79,8 +89,10 @@ func WorkspaceImport(
 		return nil
 	}
 
-	if merge {
-		markMatchedWith(p, sourceGraph, targetGraph, importable)
+	if opts.Merge {
+		if err := markMatchedWith(p, sourceGraph, targetGraph, importable); err != nil {
+			return err
+		}
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
@@ -154,17 +166,27 @@ func checkSyncStatus(diff *differ.Diff, merge bool) error {
 // markMatchedWith runs merge conflict detection against the local project
 // graph, marking matched importable resources in place. Providers without
 // matchers contribute nothing, leaving their resources on namer identities.
+//
+// A claim collision — two remote resources matching one local resource — means
+// a matcher predicate does not mirror upstream uniqueness or the upstream data
+// is dirty. Either way the merge result would be wrong, so fail fast rather
+// than silently importing an ambiguous mapping.
 func markMatchedWith(
-	p ImportProvider,
+	matchers provider.ResourceMatcherProvider,
 	sourceGraph *resources.Graph,
 	targetGraph *resources.Graph,
 	importable *resources.RemoteResources,
-) {
-	importmatcher.Mark(importmatcher.Scope{
+) error {
+	claimed := importmatcher.Mark(importmatcher.Scope{
 		LocalGraph:  targetGraph,
 		RemoteGraph: sourceGraph,
 		Importable:  importable,
-	}, p.ResourceMatchers())
+	}, matchers.ResourceMatchers())
+
+	if len(claimed) > 0 {
+		return fmt.Errorf("%w: %v", ErrAmbiguousMatch, claimed)
+	}
+	return nil
 }
 
 func initNamer(graph *resources.Graph) (namer.Namer, error) {
