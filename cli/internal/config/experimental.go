@@ -24,6 +24,10 @@ type ExperimentalConfig struct {
 	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
 	// LocalTyper enables `typer generate --local`, generating typed code from local specs without applying to remote
 	LocalTyper bool `mapstructure:"localTyper"`
+	// ImportMerge enables import-manifest.yaml generation during `import workspace`
+	// and treats the import-manifest kind as a recognized spec kind during
+	// validation. The feature is incomplete, so it stays off by default.
+	ImportMerge bool `mapstructure:"importMerge"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
