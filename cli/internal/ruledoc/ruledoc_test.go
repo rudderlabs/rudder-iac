@@ -6,8 +6,8 @@ import (
 	providerrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
-	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	dtypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
@@ -55,15 +55,19 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 // cover each other exactly and the catalog validates with zero errors. This is the
 // assembly seam that package app exercises end-to-end against the real providers.
 func TestBuild_GatekeeperOnly(t *testing.T) {
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
+	prevExp, prevFlag, prevDestSupport := viper.Get("experimental"), viper.Get("flags.importMerge"), viper.Get("flags.destinationSupport")
 	viper.Set("experimental", true)
 	viper.Set("flags.importMerge", true)
+	viper.Set("flags.destinationSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
 		viper.Set("flags.importMerge", prevFlag)
+		viper.Set("flags.destinationSupport", prevDestSupport)
 	})
 
-	cp := &testutils.MockProvider{MatchPatterns: gatekeeperScopedPatterns()}
+	cp := &testutils.MockProvider{
+		MatchPatterns: gatekeeperScopedPatterns(),
+	}
 
 	doc, verrs, err := ruledoc.Build(cp, "test", "2026-01-01T00:00:00Z")
 	require.NoError(t, err)

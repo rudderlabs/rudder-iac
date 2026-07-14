@@ -3,8 +3,6 @@ package app
 import (
 	"fmt"
 
-	"github.com/spf13/viper"
-
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
@@ -128,17 +126,6 @@ func NewDeps() (Deps, error) {
 // authored fragment); a non-nil error means the catalog could not be assembled
 // at all. generatedAt is injected so callers own the timestamp.
 func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
-	// Catalog generation documents the full destination rule surface even when
-	// the operator has not opted into destinationSupport for apply/validate.
-	prevExp := viper.Get("experimental")
-	prevFlag := viper.Get("flags.destinationSupport")
-	viper.Set("experimental", true)
-	viper.Set("flags.destinationSupport", true)
-	defer func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.destinationSupport", prevFlag)
-	}()
-
 	cp, err := newCompositeProvider()
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
@@ -169,7 +156,7 @@ func newCompositeProvider() (provider.Provider, error) {
 
 	cp, _, err := composeProviders(c)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
 
 	return cp, nil
@@ -179,18 +166,9 @@ func newCompositeProvider() (provider.Provider, error) {
 // provider. Shared by NewDeps and newCompositeProvider so every consumer
 // observes the same providers (and therefore the same registered rules).
 func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
-	p, err := setupProviders(c)
+	rawProviders, providerMap, err := setupProviders(c)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
-	}
-
-	providerMap := map[string]provider.Provider{
-		"datacatalog":     p.DataCatalog,
-		"retl":            p.RETL,
-		"eventstream":     p.EventStream,
-		"transformations": p.Transformations,
-		"datagraph":       p.DataGraph,
-		"destination":     p.Destination,
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)
@@ -198,7 +176,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
 
-	return cp, p, nil
+	return cp, rawProviders, nil
 }
 
 func setupClient(version string) (*client.Client, error) {
@@ -210,7 +188,7 @@ func setupClient(version string) (*client.Client, error) {
 	)
 }
 
-func setupProviders(c *client.Client) (*Providers, error) {
+func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider, error) {
 	cfg := config.GetConfig()
 
 	catalogClient, err := catalog.NewRudderDataCatalog(
@@ -218,7 +196,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
 	}
 
 	dcp := datacatalog.New(catalogClient)
@@ -228,12 +206,6 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
-	destRegistry, err := newDestinationRegistry(cfg)
-	if err != nil {
-		return nil, err
-	}
-	dp := destProvider.NewProvider(c, destRegistry)
-
 	providers := &Providers{
 		DataCatalog:     dcp,
 		RETL:            retlp,
@@ -241,10 +213,29 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
-		Destination:     dp,
 	}
 
-	return providers, nil
+	providerMap := map[string]provider.Provider{
+		"datacatalog":     dcp,
+		"retl":            retlp,
+		"eventstream":     esp,
+		"transformations": trp,
+		"datagraph":       dgp,
+	}
+
+	if cfg.ExperimentalFlags.DestinationSupport {
+		destRegistry, err := newDestinationRegistry(cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
+		}
+		dp := destProvider.NewProvider(c, destRegistry)
+
+		providerMap["destination"] = dp
+		providers.Destination = dp
+
+	}
+
+	return providers, providerMap, nil
 }
 
 // newDestinationRegistry builds the destination definition registry. Definitions

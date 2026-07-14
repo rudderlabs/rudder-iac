@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -46,25 +45,16 @@ func (p *Provider) LoadLegacySpec(_ string, s *specs.Spec) error {
 // handles. Destinations support only the V1 spec version, and only when the
 // destinationSupport experimental flag is enabled.
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
-	if !destinationSupportEnabled() {
-		return nil
-	}
 	return prules.V1VersionPatterns(DestinationSpecKind)
 }
 
 func (p *Provider) SyntacticRules() []vrules.Rule {
-	if !destinationSupportEnabled() {
-		return nil
-	}
 	return []vrules.Rule{
 		NewSpecSyntaxValidRule(p.registry),
 	}
 }
 
 func (p *Provider) SemanticRules() []vrules.Rule {
-	if !destinationSupportEnabled() {
-		return nil
-	}
 	return []vrules.Rule{
 		NewSemanticValidRule(),
 	}
@@ -73,13 +63,6 @@ func (p *Provider) SemanticRules() []vrules.Rule {
 // RuleDocEntries returns the authored documentation fragments embedded with
 // the destination provider, joined to registered rules by the docs generator.
 func (p *Provider) RuleDocEntries() []vdocs.RuleDocEntry {
-	if !destinationSupportEnabled() {
-		return nil
-	}
 	entries, _ := vdocs.LoadRuleDocEntries(destdocs.FragmentsFS, ".")
 	return entries
-}
-
-func destinationSupportEnabled() bool {
-	return config.GetConfig().ExperimentalFlags.DestinationSupport
 }
