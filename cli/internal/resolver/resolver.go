@@ -1,10 +1,17 @@
 package resolver
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
+
+// ErrPendingDeleteConflict marks a reference whose target is managed remotely
+// but absent from the local graph: its spec was deleted locally and the
+// deletion has not been applied. Reachable only under import --merge — without
+// merge, the sync check blocks any diverged project before resolution runs.
+var ErrPendingDeleteConflict = errors.New("reference target is deleted locally but the deletion is not applied")
 
 type ReferenceResolver interface {
 	ResolveToReference(entityType string, remoteID string) (string, error)
@@ -19,6 +26,12 @@ type ImportRefResolver struct {
 
 	// Importable is a collection of resources that are being imported, not yet managed by the CLI
 	Importable *resources.RemoteResources
+
+	// Merge indicates the import is running with --merge. Only then can a
+	// managed remote missing from the local graph be attributed to a pending
+	// local deletion — without merge, the sync check blocks any diverged
+	// project before resolution runs, so the state has no single known cause.
+	Merge bool
 }
 
 func (i *ImportRefResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
@@ -34,14 +47,14 @@ func (i *ImportRefResolver) ResolveToReference(entityType string, remoteID strin
 		return "", fmt.Errorf("resource not present in resources collection")
 	}
 
-	graphResource, ok := i.Graph.GetResource(
-		resources.URN(
-			resource.ExternalID,
-			entityType,
-		),
-	)
+	urn := resources.URN(resource.ExternalID, entityType)
+	graphResource, ok := i.Graph.GetResource(urn)
 	if !ok {
-		return "", fmt.Errorf("resource not present in resources graph")
+		if i.Merge {
+			return "", fmt.Errorf("%w: %s (remote %s); apply the pending deletion or restore its spec before importing with --merge",
+				ErrPendingDeleteConflict, urn, remoteID)
+		}
+		return "", fmt.Errorf("resource not present in resources graph: %s (remote %s)", urn, remoteID)
 	}
 
 	if graphResource.FileMetadata() == nil || graphResource.FileMetadata().MetadataRef == "" {
