@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "dg-unique-pair-different-targets"
-        title: "Multiple relationships from the same model to different targets are allowed"
+        title: "Multiple relationships from one model to different targets are allowed"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -45,7 +45,7 @@ match_behavior:
                   table: db.schema.profiles
                   primary_id: profile_id
       - example_id: "dg-unique-pair-reversed-pair-allowed"
-        title: "A relationship A-to-B and B-to-A are distinct and both allowed"
+        title: "A-to-B and B-to-A relationships are distinct and both allowed"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -82,7 +82,7 @@ match_behavior:
                       target_join_key: account_id
     invalid:
       - example_id: "dg-unique-pair-duplicate-source-target"
-        title: "Two relationships with the same source-target model pair are not allowed"
+        title: "Duplicate source-target model pairs are not allowed"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -120,8 +120,8 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/models/0/relationships/0"
             severity: "error"
-            message_contains: "at most one relationship is allowed per source-target pair"
+            message_contains: "a relationship from model \"data-graph-model:user\" to model \"data-graph-model:account\" already exists; at most one relationship is allowed per source-target pair"
           - file: "spec.yaml"
             reference: "/models/0/relationships/1"
             severity: "error"
-            message_contains: "at most one relationship is allowed per source-target pair"
+            message_contains: "a relationship from model \"data-graph-model:user\" to model \"data-graph-model:account\" already exists; at most one relationship is allowed per source-target pair"

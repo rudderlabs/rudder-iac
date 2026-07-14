@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "transformation-spec-syntax-valid-inline-js"
-        title: "Valid transformation spec with inline JavaScript code"
+        title: "Valid transformation spec with inline JavaScript"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -25,7 +25,7 @@ match_behavior:
                     }
     invalid:
       - example_id: "transformation-spec-syntax-valid-missing-id"
-        title: "Transformation spec missing required id field"
+        title: "Transformation spec missing required id"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -46,7 +46,7 @@ match_behavior:
             severity: "error"
             message_contains: "'id' is required"
       - example_id: "transformation-spec-syntax-valid-missing-language"
-        title: "Transformation spec missing required language field"
+        title: "Transformation spec missing the required language"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -67,7 +67,7 @@ match_behavior:
             severity: "error"
             message_contains: "'language' is required"
       - example_id: "transformation-spec-syntax-valid-invalid-language"
-        title: "Transformation spec with unsupported language"
+        title: "Transformation spec defined with an unsupported language"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -89,7 +89,7 @@ match_behavior:
             severity: "error"
             message_contains: "'language' must be one of [javascript python]"
       - example_id: "transformation-spec-syntax-valid-missing-code-and-file"
-        title: "Transformation spec with neither code nor file specified"
+        title: "Transformation spec missing code and file"
         files:
           spec.yaml: |
             version: rudder/v1

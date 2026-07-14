@@ -11,9 +11,8 @@ match_behavior:
     valid:
       - example_id: "spec-syntax-all-top-level-fields"
         title: "Spec with all required top-level fields"
-        description: >
-          A well-formed spec declaring version, kind, metadata and spec. These
-          are the four top-level fields every spec must carry.
+        description: >-
+          A well-formed spec with version, kind, metadata, and spec — the four required top-level fields.
         files:
           spec.yaml: |
             version: rudder/v1
@@ -22,11 +21,12 @@ match_behavior:
               name: my-properties
             spec:
               properties:
-                - name: MyTestProperty
+                - id: my_test_property
+                  name: MyTestProperty
                   type: string
     invalid:
       - example_id: "spec-syntax-missing-kind"
-        title: "Spec missing the required kind field"
+        title: "Spec missing required kind"
         description: "Every spec must declare a kind."
         files:
           spec.yaml: |
@@ -44,7 +44,7 @@ match_behavior:
             severity: "error"
             message_contains: "'kind' is required"
       - example_id: "spec-syntax-missing-version"
-        title: "Spec missing the required version field"
+        title: "Spec missing required version"
         description: "Every spec must declare a version."
         files:
           spec.yaml: |
@@ -62,7 +62,7 @@ match_behavior:
             severity: "error"
             message_contains: "'version' is required"
       - example_id: "spec-syntax-missing-metadata"
-        title: "Spec missing the required metadata block"
+        title: "Spec missing required metadata block"
         description: "Every spec must declare a metadata block."
         files:
           spec.yaml: |
@@ -70,7 +70,8 @@ match_behavior:
             kind: properties
             spec:
               properties:
-                - name: MyTestProperty
+                - id: my_test_property
+                  name: MyTestProperty
                   type: string
         expected_diagnostics:
           - file: "spec.yaml"
@@ -78,7 +79,7 @@ match_behavior:
             severity: "error"
             message_contains: "'metadata' is required"
       - example_id: "spec-syntax-missing-spec"
-        title: "Spec missing the required spec body"
+        title: "Spec missing required spec body"
         description: "Every spec must declare a spec body."
         files:
           spec.yaml: |
