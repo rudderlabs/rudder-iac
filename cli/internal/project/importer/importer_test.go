@@ -46,10 +46,11 @@ func TestCheckSyncStatus(t *testing.T) {
 			merge: true,
 		},
 		{
-			name:    "merge still blocks pending deletions",
-			diff:    &differ.Diff{RemovedResources: []string{"category:legacy"}},
-			merge:   true,
-			wantErr: true,
+			// Only conflicting deletions error — precisely at reference
+			// resolution, not as a pre-flight block.
+			name:  "merge allows pending deletions",
+			diff:  &differ.Diff{RemovedResources: []string{"category:legacy"}},
+			merge: true,
 		},
 	}
 
@@ -66,6 +67,24 @@ func TestCheckSyncStatus(t *testing.T) {
 			assert.ErrorIs(t, err, ErrProjectNotSynced)
 		})
 	}
+}
+
+func TestInitNamer_ReservesPendingDeleteIDs(t *testing.T) {
+	t.Parallel()
+
+	// "checkout" was deleted locally (absent from target) but still exists as a
+	// managed remote (present in source): its ID must stay reserved so an
+	// unrelated importable cannot mint it while the deletion is unapplied.
+	target := resources.NewGraph()
+	source := resources.NewGraph()
+	source.AddResource(resources.NewResource("checkout", "category", resources.ResourceData{}, []string{}))
+
+	idNamer, err := initNamer(target, source)
+	require.NoError(t, err)
+
+	minted, err := idNamer.Name(namer.ScopeName{Name: "Checkout", Scope: "category"})
+	require.NoError(t, err)
+	assert.NotEqual(t, "checkout", minted, "pending-delete ID must remain reserved")
 }
 
 type stubMatcherProvider struct {

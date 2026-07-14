@@ -76,7 +76,7 @@ func WorkspaceImport(
 		return err
 	}
 
-	idNamer, err := initNamer(targetGraph)
+	idNamer, err := initNamer(targetGraph, sourceGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -149,19 +149,17 @@ func WorkspaceImport(
 // checkSyncStatus guards the import against a diverged project. Without merge,
 // any pending change blocks — HasNonSecretDiff (not HasDiff) so resources that
 // only re-apply an unknown secret, which is expected on every run, do not
-// permanently block imports. With merge, divergence is the point; only pending
-// deletions block, as importing over them could resurrect deleted resources.
+// permanently block imports. With merge, divergence is the point — including
+// pending deletions: only deletions an importable actually references error,
+// precisely at reference resolution (resolver.ErrPendingDeleteConflict), and
+// before any file is written.
 func checkSyncStatus(diff *differ.Diff, merge bool) error {
-	if !merge {
-		if diff.HasNonSecretDiff() {
-			return fmt.Errorf("%w", ErrProjectNotSynced)
-		}
+	if merge {
 		return nil
 	}
 
-	if len(diff.RemovedResources) > 0 {
-		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
-			ErrProjectNotSynced, diff.RemovedResources)
+	if diff.HasNonSecretDiff() {
+		return fmt.Errorf("%w", ErrProjectNotSynced)
 	}
 	return nil
 }
@@ -196,16 +194,26 @@ func markMatchedWith(
 	return nil
 }
 
-func initNamer(graph *resources.Graph) (namer.Namer, error) {
+// initNamer preloads the union of target (local project) and source (managed
+// remote) IDs. The union matters under merge with pending deletions: a
+// locally-deleted resource is absent from target but its remote twin still
+// holds the ID upstream, so it must stay reserved until the deletion applies.
+func initNamer(targetGraph, sourceGraph *resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 
-	resourcesMap := graph.Resources()
-	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
-	for _, r := range resourcesMap {
-		externalIDs = append(externalIDs, namer.ScopeName{
-			Name:  r.ID(),
-			Scope: r.Type(),
-		})
+	seen := make(map[string]bool)
+	externalIDs := make([]namer.ScopeName, 0)
+	for _, graph := range []*resources.Graph{targetGraph, sourceGraph} {
+		for urn, r := range graph.Resources() {
+			if seen[urn] {
+				continue
+			}
+			seen[urn] = true
+			externalIDs = append(externalIDs, namer.ScopeName{
+				Name:  r.ID(),
+				Scope: r.Type(),
+			})
+		}
 	}
 
 	if err := idNamer.Load(externalIDs); err != nil {
