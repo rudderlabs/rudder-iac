@@ -121,4 +121,8 @@ type TSContext struct {
 	// from the SDK rather than defined locally so the callback signature stays
 	// in sync with whatever shape the SDK accepts.
 	UsesApiCallback bool
+	// EmitV1Compat, when true, appends the opt-in v1 compatibility layer:
+	// un-prefixed free functions bound to a default client that lazily resolves
+	// window.rudderanalytics. See TypeScriptOptions.V1Compat.
+	EmitV1Compat bool
 }

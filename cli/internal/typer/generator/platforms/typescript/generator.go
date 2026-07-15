@@ -57,6 +57,7 @@ func (g *Generator) Generate(p *plan.TrackingPlan, opts core.GenerateOptions, pl
 		TrackingPlanVersion: p.Metadata.TrackingPlanVersion,
 		TrackingPlanURL:     p.Metadata.URL,
 		EventContext:        formatEventContext(p.Metadata, opts.RudderCLIVersion),
+		EmitV1Compat:        tsOpts.V1Compat,
 	}
 
 	nr := core.NewNameRegistry(typescriptCollisionHandler)

@@ -23,11 +23,24 @@ var typealiasTemplate string
 //go:embed templates/ruddertyper.tmpl
 var ruddertyperTemplate string
 
+// compatFreeFunctionName returns the un-prefixed free-function name for the v1
+// compatibility layer. Track methods are named `track<Event>` on the class but
+// were un-prefixed free functions in the v1 module (e.g. `sourceCreated`), so we
+// strip the prefix by re-deriving the name from the event. identify/group/page
+// keep their names.
+func compatFreeFunctionName(m TSAnalyticsMethod) string {
+	if m.SDKMethodName == "track" {
+		return FormatMethodName("", m.EventName)
+	}
+	return m.Name
+}
+
 func GenerateFile(path string, ctx *TSContext) (*core.File, error) {
 	funcMap := template.FuncMap{
 		"escapeString":  EscapeTSStringLiteral,
 		"escapeComment": EscapeJSDocComment,
 		"formatLiteral": FormatTSLiteral,
+		"compatName":    compatFreeFunctionName,
 	}
 
 	tmpl, err := template.New("typescript").Funcs(funcMap).Parse(typescriptTemplate)

@@ -134,3 +134,27 @@ export class RudderTyper {
         };
     }
 }
+{{- if .EmitV1Compat }}
+
+declare global {
+    interface Window {
+        rudderanalytics: RudderAnalytics;
+    }
+}
+
+// ===== v1 compatibility layer (opt-in: --option v1Compat=true) =====
+//
+// Un-prefixed free functions bound to a default client that lazily resolves
+// window.rudderanalytics on every call. This is a drop-in for consumers migrating
+// from the npm `rudder-typer` v1 module: same imports, same un-prefixed call sites,
+// no `new RudderTyper(...)`. Not emitted by default — see the migration guide.
+//
+// Caveats (see PR discussion): (1) un-prefixing track events can collide with
+// identify/page/group or with each other; the generator does not yet guard against
+// that here. (2) .bind narrows overloaded methods (identify/page/group) to a single
+// signature.
+const rudderTyperV1Compat = new RudderTyper(() => window.rudderanalytics);
+{{ range $method := .AnalyticsMethods }}
+export const {{ compatName $method }} = rudderTyperV1Compat.{{ $method.Name }}.bind(rudderTyperV1Compat);
+{{- end }}
+{{- end }}
