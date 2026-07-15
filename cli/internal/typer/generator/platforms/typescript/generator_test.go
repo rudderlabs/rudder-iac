@@ -105,7 +105,7 @@ func TestGenerateV1CompatIsOptIn(t *testing.T) {
 	assert.NoError(t, err)
 	content := on[0].Content
 	assert.Contains(t, content, "v1 compatibility layer")
-	assert.Contains(t, content, "const rudderTyperV1Compat = new RudderTyper(() => window.rudderanalytics);")
+	assert.Contains(t, content, "const rudderTyperV1Compat = new RudderTyper(() => window.rudderanalytics as RudderAnalytics);")
 	// Un-prefixed free function for a track event (class method is trackXxx).
 	assert.Contains(t, content, "export const userSignedUp = rudderTyperV1Compat.trackUserSignedUp.bind(rudderTyperV1Compat);")
 	// Non-track singletons keep their names.

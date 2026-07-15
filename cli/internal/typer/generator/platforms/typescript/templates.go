@@ -3,7 +3,9 @@ package typescript
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 )
@@ -25,12 +27,24 @@ var ruddertyperTemplate string
 
 // compatFreeFunctionName returns the un-prefixed free-function name for the v1
 // compatibility layer. Track methods are named `track<Event>` on the class but
-// were un-prefixed free functions in the v1 module (e.g. `sourceCreated`), so we
-// strip the prefix by re-deriving the name from the event. identify/group/page
-// keep their names.
+// were un-prefixed free functions in the v1 module (e.g. `sourceCreated`). We strip
+// the `track` prefix off the already-registered method name (rather than re-deriving
+// from the event) so the NameRegistry's collision suffixes are preserved — two
+// events that camelCase to the same name stay distinct (`fooBar`, `fooBar1`).
+// identify/group/page keep their names.
+//
+// Residual collision risk: a track event literally named "Identify"/"Page"/"Group"
+// strips to a name that clashes with the singleton method. Not guarded here yet —
+// see the PR discussion.
 func compatFreeFunctionName(m TSAnalyticsMethod) string {
-	if m.SDKMethodName == "track" {
-		return FormatMethodName("", m.EventName)
+	if m.SDKMethodName == "track" && strings.HasPrefix(m.Name, "track") {
+		stripped := strings.TrimPrefix(m.Name, "track")
+		if stripped == "" {
+			return m.Name
+		}
+		r := []rune(stripped)
+		r[0] = unicode.ToLower(r[0])
+		return string(r)
 	}
 	return m.Name
 }
