@@ -36,13 +36,19 @@ var connectionModes = map[string][]string{
 	common.SourceTypeCloud:         {"cloud"},
 }
 
-// s3Config is the local YAML config model. Field set comes from TF
-// destination_s3.go; validation constraints mirror overlapping schema.json rules.
+// s3Config is the local YAML config model. Field set mirrors integrations-config
+// destinations/s3 defaultConfig (schema.json / db-config.json); validation
+// constraints mirror overlapping schema.json rules plus explicit auth-mode
+// mutual exclusion (role ARN vs access keys).
 type s3Config struct {
-	BucketName        string                   `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
-	Prefix            string                   `mapstructure:"prefix" validate:"omitempty,max=100"`
-	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"omitempty,max=100"`
-	AccessKey         string                   `mapstructure:"access_key" validate:"omitempty,max=100"`
+	BucketName    string `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
+	Prefix        string `mapstructure:"prefix" validate:"omitempty,max=100"`
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
+	// IAM role ARN is required when role-based auth is on; forbidden when off.
+	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"excluded_if=RoleBasedAuth false,max=100"`
+	// Access keys are forbidden when role-based auth is on.
+	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"excluded_if=RoleBasedAuth true,omitempty,max=100"`
+	AccessKey         string                   `mapstructure:"access_key" validate:"excluded_if=RoleBasedAuth true,omitempty,max=100"`
 	EnableSSE         *bool                    `mapstructure:"enable_sse"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -52,6 +58,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("bucketName", "bucket_name"),
 		converter.Simple("prefix", "prefix", converter.SkipZeroValue),
+		converter.Simple("roleBasedAuth", "role_based_auth"),
+		converter.Simple("iamRoleARN", "iam_role_arn", converter.SkipZeroValue),
 		converter.Simple("accessKeyID", "access_key_id", converter.SkipZeroValue),
 		converter.Simple("accessKey", "access_key", converter.SkipZeroValue),
 		converter.Simple("enableSSE", "enable_sse", converter.SkipZeroValue),

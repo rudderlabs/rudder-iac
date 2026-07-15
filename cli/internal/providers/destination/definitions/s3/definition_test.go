@@ -56,28 +56,94 @@ func TestS3ConfigValidation(t *testing.T) {
 
 	t.Run("missing bucket_name", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{})
+		errors := registered.ValidateConfig(map[string]any{
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+		})
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/bucket_name", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("valid minimal", func(t *testing.T) {
+	t.Run("valid minimal role based auth", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("valid access key auth", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": false,
+			"access_key_id":   "AKIA...",
+			"access_key":      "secret",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("role_based_auth required", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"bucket_name": "my-bucket",
 		})
-		assert.Empty(t, errors)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/role_based_auth", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	t.Run("iam_role_arn not required when role_based_auth true", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+		})
+		require.Empty(t, errors)
+	})
+
+	t.Run("access keys excluded when role_based_auth true", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+			"access_key_id":   "AKIA...",
+			"access_key":      "secret",
+		})
+		require.Len(t, errors, 2)
+		byPath := map[string]string{}
+		for _, err := range errors {
+			byPath[err.Path] = err.Message
+		}
+		assert.Equal(t, "'access_key_id' is not allowed when 'role_based_auth' is true", byPath["/access_key_id"])
+		assert.Equal(t, "'access_key' is not allowed when 'role_based_auth' is true", byPath["/access_key"])
+	})
+
+	t.Run("iam_role_arn excluded when role_based_auth false", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": false,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/iam_role_arn", errors[0].Path)
+		assert.Equal(t, "'iam_role_arn' is not allowed when 'role_based_auth' is false", errors[0].Message)
 	})
 
 	t.Run("valid with secrets and consent", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"bucket_name":   "my-bucket",
-			"prefix":        "rudder/",
-			"access_key_id": "AKIA...",
-			"access_key":    "secret",
-			"enable_sse":    true,
+			"bucket_name":     "my-bucket",
+			"prefix":          "rudder/",
+			"role_based_auth": false,
+			"access_key_id":   "AKIA...",
+			"access_key":      "secret",
+			"enable_sse":      true,
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -90,14 +156,26 @@ func TestS3ConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	t.Run("valid with role based auth", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+		})
+		assert.Empty(t, errors)
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"bucket_name":     "my-bucket",
 			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+			"not_a_field":     true,
 		})
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/role_based_auth", errors[0].Path)
+		assert.Equal(t, "/not_a_field", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
@@ -105,7 +183,9 @@ func TestS3ConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		errors := registered.ValidateConfig(map[string]any{
-			"bucket_name": "my-bucket",
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
 			"consent_management": map[string]any{
 				"warehouse": []any{},
 			},
@@ -120,7 +200,9 @@ func TestS3ConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		errors := registered.ValidateConfig(map[string]any{
-			"bucket_name": "my-bucket",
+			"bucket_name":     "my-bucket",
+			"role_based_auth": true,
+			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
 			"consent_management": map[string]any{
 				"ios_swift": []any{
 					map[string]any{"provider": "unknown"},
@@ -163,6 +245,34 @@ func TestS3ConversionRoundTrip(t *testing.T) {
 				"accessKeyID": "AKIAEXAMPLE",
 				"accessKey": "secret-value",
 				"enableSSE": true
+			}`,
+		},
+		{
+			Name: "role based auth",
+			LocalJSON: `{
+				"bucket_name": "my-bucket",
+				"role_based_auth": true,
+				"iam_role_arn": "arn:aws:iam::123456789012:role/S3Access"
+			}`,
+			APIJSON: `{
+				"bucketName": "my-bucket",
+				"roleBasedAuth": true,
+				"iamRoleARN": "arn:aws:iam::123456789012:role/S3Access"
+			}`,
+		},
+		{
+			Name: "access key auth with role_based_auth false",
+			LocalJSON: `{
+				"bucket_name": "my-bucket",
+				"role_based_auth": false,
+				"access_key_id": "AKIAEXAMPLE",
+				"access_key": "secret-value"
+			}`,
+			APIJSON: `{
+				"bucketName": "my-bucket",
+				"roleBasedAuth": false,
+				"accessKeyID": "AKIAEXAMPLE",
+				"accessKey": "secret-value"
 			}`,
 		},
 		{
