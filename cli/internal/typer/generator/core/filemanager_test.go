@@ -459,3 +459,29 @@ func TestFileManager_ErrorHandling(t *testing.T) {
 		})
 	}
 }
+
+// TestFileManager_WriteFileIgnoresTmpdir guards against the atomic write routing
+// through the system temp dir. If it does, an unusable $TMPDIR makes the temp-file
+// creation fail (and, when $TMPDIR is on a different volume than the output, the
+// subsequent os.Rename fails with EXDEV). Writing the temp file next to the
+// destination avoids both. Not applicable on Windows, where os.TempDir ignores TMPDIR.
+func TestFileManager_WriteFileIgnoresTmpdir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.TempDir does not consult TMPDIR on Windows")
+	}
+
+	// Point TMPDIR at a path that cannot be used for temp files. The old
+	// implementation (os.CreateTemp("", ...)) would fail here; writing next to the
+	// destination does not touch TMPDIR at all.
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "does-not-exist"))
+
+	outDir := t.TempDir()
+	fm := NewFileManager(outDir)
+	file := &File{Path: "sub/RudderTyper.ts", Content: "export const x = 1;\n"}
+
+	require.NoError(t, fm.WriteFile(file))
+
+	got, err := os.ReadFile(filepath.Join(outDir, file.Path))
+	require.NoError(t, err)
+	assert.Equal(t, file.Content, string(got))
+}
