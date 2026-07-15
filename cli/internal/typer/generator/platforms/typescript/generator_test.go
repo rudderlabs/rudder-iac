@@ -71,6 +71,25 @@ func TestGenerateSingleBranchDispatcher(t *testing.T) {
 	assert.NotContains(t, file.Content, "if (typeof", "single branch must not emit if/else")
 }
 
+// TestGenerateResolvesAnalyticsLazily guards against regressing to eager instance
+// capture. The class must accept a resolver and re-resolve the instance on every
+// call (via the `analytics` getter) so a lazily-loaded browser SDK is picked up
+// instead of the preloader being captured at construction and events dropped.
+func TestGenerateResolvesAnalyticsLazily(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &typescript.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{RudderCLIVersion: "1.0.0"}, typescript.TypeScriptOptions{})
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
+	content := files[0].Content
+
+	assert.Contains(t, content, "constructor(analytics: RudderAnalytics | (() => RudderAnalytics))")
+	assert.Contains(t, content, `this.resolveAnalytics = typeof analytics === "function" ? analytics : () => analytics;`)
+	assert.Contains(t, content, "private get analytics(): RudderAnalytics {")
+	assert.NotContains(t, content, "this.analytics = analytics;", "must not capture the instance eagerly")
+}
+
 func TestGenerateWithCustomOutputFileName(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 

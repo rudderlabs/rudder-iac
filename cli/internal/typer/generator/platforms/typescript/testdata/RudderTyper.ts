@@ -433,12 +433,31 @@ export interface EventWithNameCamelCase1 {
  * analytics.load("YOUR_WRITE_KEY", "YOUR_DATA_PLANE_URL");
  * const rudderTyper = new RudderTyper(analytics);
  * ```
+ *
+ * In a browser app that loads the SDK asynchronously, the standard RudderStack
+ * snippet swaps `window.rudderanalytics` from the buffering preloader to the real
+ * SDK once it loads. Pass a resolver function instead of the instance so every call
+ * re-resolves the current SDK — otherwise the preloader is captured at construction
+ * and events fired after the SDK loads are silently dropped:
+ *
+ * ```ts
+ * const rudderTyper = new RudderTyper(() => window.rudderanalytics);
+ * ```
  */
 export class RudderTyper {
-    private readonly analytics: RudderAnalytics;
+    private readonly resolveAnalytics: () => RudderAnalytics;
 
-    constructor(analytics: RudderAnalytics) {
-        this.analytics = analytics;
+    /**
+     * @param analytics - a RudderAnalytics instance, or a function that returns the
+     * current instance. Prefer the function form in the browser so a lazily-loaded
+     * SDK is resolved on every call rather than captured once at construction.
+     */
+    constructor(analytics: RudderAnalytics | (() => RudderAnalytics)) {
+        this.resolveAnalytics = typeof analytics === "function" ? analytics : () => analytics;
+    }
+
+    private get analytics(): RudderAnalytics {
+        return this.resolveAnalytics();
     }
 
     public group(
