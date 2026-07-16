@@ -20,6 +20,8 @@ type mockStore struct {
 	updateReq   *client.UpdateAccountRequest
 	updateResp  *client.Account
 	deleteID    string
+	getID       string
+	getResp     *client.Account
 	setExtCalls []setExtCall
 	listOpts    *client.ListAccountsOptions
 	listResp    []client.Account
@@ -41,8 +43,9 @@ func (m *mockStore) Delete(_ context.Context, id string) error {
 	return m.err
 }
 
-func (m *mockStore) Get(_ context.Context, _ string) (*client.Account, error) {
-	return nil, m.err
+func (m *mockStore) Get(_ context.Context, id string) (*client.Account, error) {
+	m.getID = id
+	return m.getResp, m.err
 }
 
 func (m *mockStore) ListAll(_ context.Context, opts ...client.ListAccountsOption) ([]client.Account, error) {
@@ -117,6 +120,33 @@ func TestUpdateFullReplaces(t *testing.T) {
 	assert.Equal(t, "a", m.updateReq.Name)
 	assert.JSONEq(t, `{"project":"p2"}`, string(m.updateReq.Options))
 	assert.JSONEq(t, `{"credentials":"newcreds"}`, string(m.updateReq.Secret))
+}
+
+func TestImportLinksExternalIDAndFullReplaces(t *testing.T) {
+	m := &mockStore{
+		getResp:    &client.Account{ID: "remote-uuid"},
+		updateResp: &client.Account{ID: "remote-uuid"},
+	}
+	h := &HandlerImpl{store: m}
+	cred := secret.New("bq-creds")
+
+	st, err := h.Import(context.Background(), &AccountResource{
+		ID:                    "lovable-prod-bq",
+		AccountDefinitionName: "SOURCE_BIGQUERY",
+		Options:               map[string]any{"project": "p1"},
+		Credentials:           &cred,
+	}, "remote-uuid")
+	require.NoError(t, err)
+	assert.Equal(t, &AccountState{ID: "remote-uuid"}, st)
+
+	assert.Equal(t, "remote-uuid", m.getID)
+	require.Len(t, m.setExtCalls, 1)
+	assert.Equal(t, setExtCall{id: "remote-uuid", externalID: "lovable-prod-bq"}, m.setExtCalls[0])
+
+	assert.Equal(t, "remote-uuid", m.updateID)
+	assert.Equal(t, "lovable-prod-bq", m.updateReq.Name)
+	assert.JSONEq(t, `{"project":"p1"}`, string(m.updateReq.Options))
+	assert.JSONEq(t, `{"credentials":"bq-creds"}`, string(m.updateReq.Secret))
 }
 
 func TestDeleteUsesRemoteID(t *testing.T) {

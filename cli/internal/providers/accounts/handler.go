@@ -7,10 +7,8 @@ import (
 	"regexp"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
@@ -51,13 +49,19 @@ var HandlerMetadata = handler.HandlerMetadata{
 }
 
 // HandlerImpl provides the account-specific pieces the BaseHandler composes.
+// It embeds the single-spec export strategy so export (one `kind: accounts`
+// file) and generic secret tokenization come from the framework; the strategy
+// also carries the declared secret fields BaseHandler injects via SetSecretFields.
 type HandlerImpl struct {
+	*export.SingleSpecExportStrategy[accountsExportSpec, RemoteAccount]
 	store AccountStore
 }
 
 // NewHandler builds the account BaseHandler around the given store.
 func NewHandler(store AccountStore) *AccountHandler {
-	return handler.NewHandler(&HandlerImpl{store: store})
+	h := &HandlerImpl{store: store}
+	h.SingleSpecExportStrategy = &export.SingleSpecExportStrategy[accountsExportSpec, RemoteAccount]{Handler: h}
+	return handler.NewHandler(h)
 }
 
 func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
@@ -221,18 +225,68 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, urnResolver handle
 	return res, state, nil
 }
 
-// --- Import + export: stubbed here; implemented in DEX-460. ---
-
+// Import claims an existing remote account for this project: it links the remote
+// to the spec id via externalId, then full-replaces the account with the spec's
+// config so the imported resource immediately matches what the user declared. The
+// next apply then reconciles it like any managed account.
 func (h *HandlerImpl) Import(ctx context.Context, data *AccountResource, remoteId string) (*AccountState, error) {
-	return nil, fmt.Errorf("accounts: Import not implemented (DEX-460)")
+	remote, err := h.store.Get(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting account %s: %w", remoteId, err)
+	}
+
+	if err := h.store.SetExternalID(ctx, remote.ID, data.ID); err != nil {
+		return nil, fmt.Errorf("claiming external id for account %q: %w", data.ID, err)
+	}
+
+	options, secretPayload, err := splitConfig(data)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := h.store.Update(ctx, remote.ID, &client.UpdateAccountRequest{
+		Name:    data.ID,
+		Options: options,
+		Secret:  secretPayload,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("updating account %q: %w", data.ID, err)
+	}
+
+	return &AccountState{ID: updated.ID}, nil
 }
 
-func (h *HandlerImpl) FormatForExport(
-	collection map[string]*RemoteAccount,
-	idNamer namer.Namer,
-	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
-	return nil, nil, fmt.Errorf("accounts: FormatForExport not implemented (DEX-460)")
+// MapRemoteToSpec builds the single `kind: accounts` spec from the managed
+// remotes, one item per account keyed by externalId. Credentials is a placeholder
+// (a remote never returns the real value); the framework's AttachSecretVariables
+// replaces it with a per-account "{{ .VAR }}" token before the spec is written.
+func (h *HandlerImpl) MapRemoteToSpec(
+	remotes map[string]*RemoteAccount,
+	_ resolver.ReferenceResolver,
+) (*export.SpecExportData[accountsExportSpec], error) {
+	items := make([]accountExportItem, 0, len(remotes))
+	for externalID, remote := range remotes {
+		var options map[string]any
+		if len(remote.Options) > 0 {
+			if err := json.Unmarshal(remote.Options, &options); err != nil {
+				return nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
+			}
+		}
+
+		items = append(items, accountExportItem{
+			ID:                    externalID,
+			AccountDefinitionName: remote.Definition.Name,
+			Config: accountExportConfig{
+				Credentials: secret.NewUnknown(),
+				Options:     options,
+			},
+		})
+	}
+
+	return &export.SpecExportData[accountsExportSpec]{
+		RelativePath: "accounts/accounts.yaml",
+		Data:         &accountsExportSpec{Accounts: items},
+	}, nil
 }
 
 // splitConfig routes the flat config into the API's options (non-secret) and

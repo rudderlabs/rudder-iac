@@ -1,6 +1,8 @@
 package accounts
 
 import (
+	"encoding/json"
+
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
@@ -45,6 +47,52 @@ type AccountResource struct {
 // AccountState is the computed output — the remote account id.
 type AccountState struct {
 	ID string
+}
+
+// --- Export spec shapes ---
+//
+// Export uses a struct (not the decode-side AccountSpec/AccountConfig, which
+// carry only mapstructure tags) so the framework's secret reflection
+// (AttachSecretVariables) can discover the credentials field by its `json`
+// name and type `secret.String`, replacing it with a "{{ .VAR }}" token. Item
+// ids carry a `json:"id"` tag too, so each account gets its own variable name.
+
+// accountsExportSpec is the `kind: accounts` spec produced on export — the
+// collection of accounts, mirroring AccountSpec but json-tagged for
+// serialization and secret discovery.
+type accountsExportSpec struct {
+	Accounts []accountExportItem `json:"accounts"`
+}
+
+// accountExportItem is one exported account. `id` is json-tagged so the secret
+// reflection derives a per-account variable name from it.
+type accountExportItem struct {
+	ID                    string              `json:"id"`
+	AccountDefinitionName string              `json:"accountDefinitionName"`
+	Config                accountExportConfig `json:"config"`
+}
+
+// accountExportConfig serializes back to the flat `config` block a user writes:
+// the secret `credentials` field alongside every non-secret option key. It
+// keeps Credentials as a named `secret.String` field (not a map value) so the
+// framework can find and tokenize it; Options is merged in by MarshalJSON since
+// encoding/json has no inline-map support.
+type accountExportConfig struct {
+	Credentials secret.String  `json:"credentials"`
+	Options     map[string]any `json:"-"`
+}
+
+// MarshalJSON flattens Options and Credentials into a single object so the
+// exported `config` round-trips to the flat form the decoder expects. Credentials
+// serializes through secret.String.MarshalJSON, emitting the "{{ .VAR }}" token
+// (or a masked literal when the substitution gate is off) — never the real value.
+func (c accountExportConfig) MarshalJSON() ([]byte, error) {
+	out := make(map[string]any, len(c.Options)+1)
+	for k, v := range c.Options {
+		out[k] = v
+	}
+	out["credentials"] = c.Credentials
+	return json.Marshal(out)
 }
 
 // RemoteAccount wraps the API account to implement the RemoteResource interface.
