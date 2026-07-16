@@ -261,7 +261,7 @@ func TestSpecSyntaxValidRuleInvalidVersion(t *testing.T) {
 	assert.Equal(t, []vrules.ValidationResult{
 		{
 			Reference: "/spec/definition_version",
-			Message:   "definition_version 2 is not valid for destination type 'WEBHOOK'; valid versions: 1",
+			Message:   "version not valid for destination type 'WEBHOOK'; valid versions: 1",
 		},
 	}, results)
 }
