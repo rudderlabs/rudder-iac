@@ -28,6 +28,9 @@ type ExperimentalConfig struct {
 	// and treats the import-manifest kind as a recognized spec kind during
 	// validation. The feature is incomplete, so it stays off by default.
 	ImportMerge bool `mapstructure:"importMerge"`
+	// DestinationSupport enables destination definition registration and
+	// destination kind matching for validate/apply/import flows.
+	DestinationSupport bool `mapstructure:"destinationSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
