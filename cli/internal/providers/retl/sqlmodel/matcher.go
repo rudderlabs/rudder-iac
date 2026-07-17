@@ -28,8 +28,8 @@ func matchSQLModel(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
 		var (
-			displayName, _ = data[DisplayNameKey].(string)
-			accountID, _   = data[AccountIDKey].(string)
+			displayName = data[DisplayNameKey].(string)
+			accountID   = data[AccountIDKey].(string)
 		)
 		return displayName == remote.Name && accountID == remote.AccountID
 	})
