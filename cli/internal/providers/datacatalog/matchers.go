@@ -33,8 +33,7 @@ func matchCategory(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.CategoryResourceType, func(data resources.ResourceData) bool {
-		name, _ := data["name"].(string)
-		return name == remote.Name
+		return data["name"].(string) == remote.Name
 	})
 	return local
 }
@@ -46,8 +45,7 @@ func matchCustomType(scope importmatcher.Scope, r *resources.RemoteResource) *re
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.CustomTypeResourceType, func(data resources.ResourceData) bool {
-		name, _ := data["name"].(string)
-		return name == remote.Name
+		return data["name"].(string) == remote.Name
 	})
 	return local
 }
@@ -59,8 +57,7 @@ func matchTrackingPlan(scope importmatcher.Scope, r *resources.RemoteResource) *
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.TrackingPlanResourceType, func(data resources.ResourceData) bool {
-		name, _ := data["name"].(string)
-		return name == remote.Name
+		return data["name"].(string) == remote.Name
 	})
 	return local
 }
@@ -73,8 +70,8 @@ func matchEvent(scope importmatcher.Scope, r *resources.RemoteResource) *resourc
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.EventResourceType, func(data resources.ResourceData) bool {
 		var (
-			name, _      = data["name"].(string)
-			eventType, _ = data["eventType"].(string)
+			name      = data["name"].(string)
+			eventType = data["eventType"].(string)
 		)
 		return name == remote.Name && eventType == remote.EventType
 	})
@@ -96,8 +93,7 @@ func matchProperty(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.PropertyResourceType, func(data resources.ResourceData) bool {
-		name, _ := data["name"].(string)
-		if name != remote.Name {
+		if data["name"].(string) != remote.Name {
 			return false
 		}
 
