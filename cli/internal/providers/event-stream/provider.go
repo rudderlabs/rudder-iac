@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
@@ -101,6 +102,13 @@ func (p *Provider) SupportedTypes() []string {
 		types = append(types, t)
 	}
 	return types
+}
+
+// ImportableRefs overrides the EmptyProvider default to declare the references
+// event stream importables hold (a source references its tracking plan), so
+// import --merge can detect pending-delete conflicts before formatting.
+func (p *Provider) ImportableRefs() []importmatcher.RefLister {
+	return []importmatcher.RefLister{sourceHandler.RefLister()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
