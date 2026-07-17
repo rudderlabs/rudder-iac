@@ -616,19 +616,26 @@ func (h *Handler) FormatForExport(
 		if !ok {
 			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
-		workspaceMetadata.WorkspaceID = data.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         urn,
+			RemoteID:    source.ID,
+		})
+
+		// Matched sources (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec file is written for them.
+		if source.MatchedWith != nil {
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceID
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}
-		entries = append(entries, importmanifest.ImportEntry{
-			WorkspaceID: data.WorkspaceID,
-			URN:         urn,
-			RemoteID:    source.ID,
-		})
 		spec, err := h.toImportSpec(
 			data,
 			source.ExternalID,

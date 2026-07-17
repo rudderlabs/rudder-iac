@@ -172,6 +172,14 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' is required when '%s' is %s", fieldName, otherField, params[1])
 
+	case "excluded_if":
+		params := strings.Fields(err.Param())
+		if len(params) < 2 {
+			return fmt.Sprintf("'%s' is not allowed", fieldName)
+		}
+		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
+		return fmt.Sprintf("'%s' is not allowed when '%s' is %s", fieldName, otherField, params[1])
+
 	case "excluded_unless":
 		// `validate:"excluded_unless=Type value"`
 		params := strings.Split(err.Param(), " ")

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.0](https://github.com/rudderlabs/rudder-iac/compare/v0.20.0...v0.21.0) (2026-07-14)
+
+
+### Features
+
+* **cli:** gate import-manifest behind ImportMerge flag ([#673](https://github.com/rudderlabs/rudder-iac/issues/673)) ([a733f0f](https://github.com/rudderlabs/rudder-iac/commit/a733f0f4c1ef11fa40164f9b075a0480d34342e9))
+
+
+### Bug Fixes
+
+* **typer:** make isKnownKind flag-aware to mirror import-merge gating ([#677](https://github.com/rudderlabs/rudder-iac/issues/677)) ([f2b7d8a](https://github.com/rudderlabs/rudder-iac/commit/f2b7d8ab0f2bcd268b0bd3f6c337ea6638809b62))
+* **typer:** skip unregistered kinds when loading local specs ([#671](https://github.com/rudderlabs/rudder-iac/issues/671)) ([c55705d](https://github.com/rudderlabs/rudder-iac/commit/c55705d227f3ba9dc75efd30a4df02dc34637475))
+
 ## [0.20.0](https://github.com/rudderlabs/rudder-iac/compare/v0.19.0...v0.20.0) (2026-07-13)
 
 

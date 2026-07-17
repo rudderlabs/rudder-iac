@@ -44,6 +44,9 @@ jobs:
       # fragment (or a fragment references an unknown rule), failing the build.
       - name: generate rule catalog
         run: make gen-rule-docs
+        env:
+          RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL || 'true' }}
+          RUDDERSTACK_X_DESTINATION_SUPPORT: ${{ vars.RUDDERSTACK_X_DESTINATION_SUPPORT || 'true' }}
 
       - name: upload rule catalog
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

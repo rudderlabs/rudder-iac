@@ -1144,3 +1144,14 @@ func TestProviderMigrateSpec(t *testing.T) {
 		assert.Equal(t, spec, migratedSpec)
 	})
 }
+
+func TestProviderResourceMatchers(t *testing.T) {
+	t.Parallel()
+
+	p := retl.New(newDefaultMockClient())
+
+	matchers := p.ResourceMatchers()
+
+	require.Len(t, matchers, 1)
+	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
+}

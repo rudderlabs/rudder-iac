@@ -264,6 +264,16 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'variants' is not allowed unless 'Type object'",
 		},
 		{
+			name: "excluded_if tag with nil rootType falls back to struct name",
+			err: mockFieldError{
+				field:           "access_key_id",
+				actualTag:       "excluded_if",
+				param:           "RoleBasedAuth true",
+				structNamespace: "s3Config.AccessKeyID",
+			},
+			expected: "'access_key_id' is not allowed when 'RoleBasedAuth' is true",
+		},
+		{
 			name: "array_item_types tag",
 			err: mockFieldError{
 				field:     "match",
@@ -351,6 +361,16 @@ func TestGetErrorMessage_CrossFieldWithRootType(t *testing.T) {
 				structNamespace: "testParentSpec.SQL",
 			},
 			expected: "'sql' and 'file' cannot be specified together",
+		},
+		{
+			name: "excluded_if resolves JSON tag from root type",
+			err: mockFieldError{
+				field:           "access_key_id",
+				actualTag:       "excluded_if",
+				param:           "File true",
+				structNamespace: "testParentSpec.SQL",
+			},
+			expected: "'access_key_id' is not allowed when 'file' is true",
 		},
 	}
 
