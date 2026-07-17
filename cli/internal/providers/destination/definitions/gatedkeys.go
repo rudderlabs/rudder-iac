@@ -43,7 +43,7 @@ func buildGatedKeyPaths(def *DestinationDefinition, configType reflect.Type) (ma
 }
 
 // localKeyToPointer converts a gjson dot path over local keys to the JSON
-// pointer form used by ConfigError paths ("a.b" -> "/a/b").
+// pointer form used by ConfigError paths ("a.b" -> "a/b").
 func localKeyToPointer(localKey string) string {
 	return strings.ReplaceAll(localKey, ".", "/")
 }
