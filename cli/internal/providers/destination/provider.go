@@ -42,7 +42,8 @@ func (p *Provider) LoadLegacySpec(_ string, s *specs.Spec) error {
 }
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully
-// handles. Destinations support only the V1 spec version.
+// handles. Destinations support only the V1 spec version, and only when the
+// destinationSupport experimental flag is enabled.
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	return prules.V1VersionPatterns(DestinationSpecKind)
 }

@@ -16,6 +16,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -155,7 +156,7 @@ func newCompositeProvider() (provider.Provider, error) {
 
 	cp, _, err := composeProviders(c)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
 
 	return cp, nil
@@ -165,18 +166,9 @@ func newCompositeProvider() (provider.Provider, error) {
 // provider. Shared by NewDeps and newCompositeProvider so every consumer
 // observes the same providers (and therefore the same registered rules).
 func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
-	p, err := setupProviders(c)
+	rawProviders, providerMap, err := setupProviders(c)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
-	}
-
-	providerMap := map[string]provider.Provider{
-		"datacatalog":     p.DataCatalog,
-		"retl":            p.RETL,
-		"eventstream":     p.EventStream,
-		"transformations": p.Transformations,
-		"datagraph":       p.DataGraph,
-		"destination":     p.Destination,
 	}
 
 	cp, err := provider.NewCompositeProvider(providerMap)
@@ -184,7 +176,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
 
-	return cp, p, nil
+	return cp, rawProviders, nil
 }
 
 func setupClient(version string) (*client.Client, error) {
@@ -196,7 +188,7 @@ func setupClient(version string) (*client.Client, error) {
 	)
 }
 
-func setupProviders(c *client.Client) (*Providers, error) {
+func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider, error) {
 	cfg := config.GetConfig()
 
 	catalogClient, err := catalog.NewRudderDataCatalog(
@@ -204,7 +196,7 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
 	}
 
 	dcp := datacatalog.New(catalogClient)
@@ -214,12 +206,6 @@ func setupProviders(c *client.Client) (*Providers, error) {
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
 
-	// Destination registry ships empty this ticket — production destination
-	// definitions (webhook/ga4/s3) are onboarded in a follow-up. The handler
-	// consumes whatever definitions the registry holds at construction time.
-	destRegistry := definitions.NewRegistry()
-	dp := destProvider.NewProvider(c, destRegistry)
-
 	providers := &Providers{
 		DataCatalog:     dcp,
 		RETL:            retlp,
@@ -227,10 +213,42 @@ func setupProviders(c *client.Client) (*Providers, error) {
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
-		Destination:     dp,
 	}
 
-	return providers, nil
+	providerMap := map[string]provider.Provider{
+		"datacatalog":     dcp,
+		"retl":            retlp,
+		"eventstream":     esp,
+		"transformations": trp,
+		"datagraph":       dgp,
+	}
+
+	if cfg.ExperimentalFlags.DestinationSupport {
+		destRegistry, err := newDestinationRegistry(cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
+		}
+		dp := destProvider.NewProvider(c, destRegistry)
+
+		providerMap["destination"] = dp
+		providers.Destination = dp
+
+	}
+
+	return providers, providerMap, nil
+}
+
+// newDestinationRegistry builds the destination definition registry. Definitions
+// are only registered when the destinationSupport experimental flag is on.
+func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
+	registry := definitions.NewRegistry()
+	if !cfg.ExperimentalFlags.DestinationSupport {
+		return registry, nil
+	}
+	if err := registry.Register(s3.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	return registry, nil
 }
 
 func SyncReporter() syncer.SyncReporter {
