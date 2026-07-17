@@ -24,8 +24,7 @@ func matchSource(scope importmatcher.Scope, r *resources.RemoteResource) *resour
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
-		name, _ := data[NameKey].(string)
-		return name == remote.Name
+		return data[NameKey].(string) == remote.Name
 	})
 	return local
 }
