@@ -1,6 +1,7 @@
 package definitions
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -25,7 +26,7 @@ func validateConfigModel(config map[string]any, configType reflect.Type, basePat
 	decoded := reflect.New(configType).Interface()
 	if err := decodeConfig(config, decoded); err != nil {
 		errors = append(errors, ConfigError{
-			Path:    basePath,
+			Path:    decodeErrorPath(err, basePath),
 			Message: err.Error(),
 		})
 		return errors
@@ -35,7 +36,7 @@ func validateConfigModel(config map[string]any, configType reflect.Type, basePat
 	return errors
 }
 
-func decodeConfig(config map[string]any, dest any) error {
+func decodeConfig(config any, dest any) error {
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           dest,
 		WeaklyTypedInput: false,
@@ -48,6 +49,16 @@ func decodeConfig(config map[string]any, dest any) error {
 		return fmt.Errorf("decoding config: %w", err)
 	}
 	return nil
+}
+
+func decodeErrorPath(err error, basePath string) string {
+	var decodeError *mapstructure.DecodeError
+	if !errors.As(err, &decodeError) || decodeError.Name() == "" {
+		return basePath
+	}
+
+	path := strings.NewReplacer("[", "/", "]", "", ".", "/").Replace(decodeError.Name())
+	return basePath + "/" + strings.TrimPrefix(path, "/")
 }
 
 func structValidationErrors(decoded any, basePath string, rootType reflect.Type) []ConfigError {

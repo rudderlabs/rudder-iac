@@ -74,7 +74,9 @@ func TestHandlerImpl_GA4RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	resource := extracted["ga4-production"]
 	require.NotNil(t, resource)
-	assert.Equal(t, localConfig, resource.Config, "spec side keeps snake_case config")
+	assert.Equal(t, "G-123", resource.Config["measurement_id"])
+	apiSecret := requireSecret(t, resource.Config, "api_secret")
+	assert.Equal(t, "secret-value", apiSecret.Reveal())
 
 	// 2. Create — verify camelCase payload
 	state, err := h.Impl.Create(ctx, resource)
@@ -102,9 +104,10 @@ func TestHandlerImpl_GA4RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, roundTripped)
 
-	// Round-trip stability: the differ compares spec-side and state-side config
-	// as nested maps. If the converter round-trips cleanly, no spurious diff.
-	assert.Equal(t, localConfig, roundTripped.Config, "config must round-trip snake_case → camelCase → snake_case unchanged")
+	// Non-secret keys round-trip; secrets become unknown on the remote side.
+	assert.Equal(t, "G-123", roundTripped.Config["measurement_id"])
+	remoteSecret := requireSecret(t, roundTripped.Config, "api_secret")
+	assert.True(t, remoteSecret.IsUnknown())
 	assert.Equal(t, "ga4-production", roundTripped.ID)
 	assert.Equal(t, "Production GA4", roundTripped.DisplayName)
 	assert.Equal(t, "GA4", roundTripped.Type)

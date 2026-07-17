@@ -12,6 +12,26 @@ import (
 type ConfigProperty struct {
 	ToLocalFunc   ToLocalFunc
 	FromLocalFunc FromLocalFunc
+	// LocalKey is the gjson dot path of this property in local config
+	// (e.g. "webhook_url"). Empty for derived properties that have no
+	// single local key, such as Discriminator.
+	LocalKey string
+	// SourceTypes, when set via Gated, restricts LocalKey to destinations
+	// connected to one of these local source types. Empty means the key is
+	// allowed for every connected source type.
+	SourceTypes []string
+}
+
+// Gated restricts prop's local key to the given local source types. The
+// property must carry a LocalKey (i.e. not be a Discriminator); the registry
+// rejects gated properties without one at registration.
+//
+// We added this abstraction of gating because in future in validation layer of explicit connections,
+// we would need to identify the config keys which can only be added if a corresponding sourcetype
+// is connected to it.
+func Gated(prop ConfigProperty, sourceTypes ...string) ConfigProperty {
+	prop.SourceTypes = sourceTypes
+	return prop
 }
 
 // FromLocalFunc modifies an API config JSON object using local config information.
@@ -23,10 +43,18 @@ type ToLocalFunc func(local, config string) (string, error)
 // Simple returns a ConfigProperty that maps an API config key to a local config key and vice versa.
 func Simple(apiKey, localKey string, filters ...ValueFilter) ConfigProperty {
 	return ConfigProperty{
+		LocalKey:      localKey,
 		FromLocalFunc: copyFromLocal(apiKey, localKey, filters...),
 		ToLocalFunc:   copyToLocal(apiKey, localKey),
 	}
 }
+
+// bucketName -> bucket_name ( Simple )
+// abcdef -> abc-> {def} ( ArrayWith ) ( )
+// abcghi -> abc-> {ghi}
+
+// skipWhilelistEvents > skip_list_events->white_listed
+// skipBlacklistEvents > skip_list_events->black_listed
 
 type ValueFilter func(a any) bool
 
@@ -54,6 +82,7 @@ func SkipZeroValue(a any) bool {
 // only if the provided condition is satisfied for that API config.
 func Conditional(apiKey, localKey string, condition ConfigConditionFunc) ConfigProperty {
 	return ConfigProperty{
+		LocalKey:      localKey,
 		FromLocalFunc: copyFromLocal(apiKey, localKey),
 		ToLocalFunc:   copyToLocalConditional(apiKey, localKey, condition),
 	}
@@ -85,6 +114,7 @@ type DiscriminatorValues map[string]any
 
 func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigProperty {
 	return ConfigProperty{
+		LocalKey: localKey,
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config
 			v := gjson.Get(local, localKey)
@@ -153,6 +183,7 @@ func ArrayWithObjects(rootAPIKey, localKey string, fields map[string]any) Config
 	inverseFields := GetInverseFields(fields)
 
 	return ConfigProperty{
+		LocalKey: localKey,
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config
 			v := gjson.Get(local, localKey)
@@ -333,4 +364,3 @@ func discriminatorValue(apiKey string, values DiscriminatorValues) FromLocalFunc
 		return config, nil
 	}
 }
-

@@ -16,8 +16,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,12 +116,33 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }
 
+func requireSecret(t *testing.T, config map[string]any, key string) *secret.String {
+	t.Helper()
+	v, ok := config[key]
+	require.True(t, ok, "missing secret key %q", key)
+	s, ok := v.(*secret.String)
+	require.True(t, ok, "key %q: expected *secret.String, got %T", key, v)
+	require.NotNil(t, s)
+	return s
+}
+
+func enableVarSubstitution(t *testing.T) {
+	t.Helper()
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
+	viper.Set("experimental", true)
+	viper.Set("flags.enableVarSubstitution", true)
+	t.Cleanup(func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.enableVarSubstitution", prevFlag)
+	})
+}
+
 func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		h := destination.NewHandler(nil, definitions.NewRegistry())
+		h := destination.NewHandler(nil, testRegistry(t))
 
 		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", &destination.DestinationSpec{
 			ID:                "ga4-production",
@@ -127,7 +152,8 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			DefinitionVersion: 1,
 			Transformation:    "#transformation:my-transform",
 			Config: map[string]any{
-				"api_secret": "secret",
+				"api_secret":     "secret",
+				"measurement_id": "G-123",
 			},
 		})
 		require.NoError(t, err)
@@ -137,35 +163,72 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		require.NotNil(t, resource.Transformation)
 		require.NotNil(t, resource.Transformation.Resolve, "transformation ref must carry a resolver")
 
-		resource.Transformation.Resolve = nil // func fields are never deeply equal; compare the rest structurally
-		assert.Equal(t, &destination.DestinationResource{
-			ID:                "ga4-production",
-			DisplayName:       "Production GA4",
+		assert.Equal(t, "ga4-production", resource.ID)
+		assert.Equal(t, "Production GA4", resource.DisplayName)
+		assert.Equal(t, "GA4", resource.Type)
+		assert.True(t, resource.Enabled)
+		assert.Equal(t, int64(1), resource.DefinitionVersion)
+		assert.Equal(t, resources.URN("my-transform", ttypes.TransformationResourceType), resource.Transformation.URN)
+		assert.Equal(t, "id", resource.Transformation.Property)
+
+		assert.Equal(t, "G-123", resource.Config["measurement_id"], "non-secret keys stay plain strings")
+		apiSecret := requireSecret(t, resource.Config, "api_secret")
+		assert.False(t, apiSecret.IsUnknown())
+		assert.Equal(t, "secret", apiSecret.Reveal())
+	})
+
+	t.Run("wraps absent secret keys as empty known secrets", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, testRegistry(t))
+
+		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", &destination.DestinationSpec{
+			ID:                "ga4-no-secret",
+			DisplayName:       "GA4",
 			Type:              "GA4",
-			Enabled:           true,
 			DefinitionVersion: 1,
-			Config:            map[string]any{"api_secret": "secret"},
-			Transformation: &resources.PropertyRef{
-				URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
-				Property: "id",
-			},
-		}, resource)
+			Config:            map[string]any{"measurement_id": "G-1"},
+		})
+		require.NoError(t, err)
+
+		resource := extracted["ga4-no-secret"]
+		apiSecret := requireSecret(t, resource.Config, "api_secret")
+		assert.False(t, apiSecret.IsUnknown())
+		assert.True(t, apiSecret.IsZero())
+		assert.Equal(t, "G-1", resource.Config["measurement_id"])
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
-		h := destination.NewHandler(nil, definitions.NewRegistry())
+		h := destination.NewHandler(nil, testRegistry(t))
 
 		_, err := h.Impl.ExtractResourcesFromSpec("destinations/bad.yaml", &destination.DestinationSpec{
-			ID:             "bad",
-			DisplayName:    "Bad",
-			Type:           "GA4",
-			Transformation: "#source:my-source", // wrong kind
-			Config:         map[string]any{},
+			ID:                "bad",
+			DisplayName:       "Bad",
+			Type:              "GA4",
+			DefinitionVersion: 1,
+			Transformation:    "#source:my-source", // wrong kind
+			Config:            map[string]any{},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid transformation reference")
+	})
+
+	t.Run("unregistered definition errors", func(t *testing.T) {
+		t.Parallel()
+
+		h := destination.NewHandler(nil, definitions.NewRegistry())
+
+		_, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", &destination.DestinationSpec{
+			ID:                "ga4",
+			DisplayName:       "GA4",
+			Type:              "GA4",
+			DefinitionVersion: 1,
+			Config:            map[string]any{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "getting destination definition")
 	})
 }
 
@@ -644,21 +707,18 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		require.NotNil(t, resource)
 		require.NotNil(t, state)
 
-		assert.Equal(t, &destination.DestinationResource{
-			ID:                "ga4-production",
-			DisplayName:       "Production GA4",
-			Type:              "GA4",
-			Enabled:           true,
-			DefinitionVersion: 1,
-			Transformation: &resources.PropertyRef{
-				URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
-				Property: "id",
-			},
-			Config: map[string]any{
-				"api_secret":     "secret-value",
-				"measurement_id": "G-123",
-			},
-		}, resource)
+		assert.Equal(t, "ga4-production", resource.ID)
+		assert.Equal(t, "Production GA4", resource.DisplayName)
+		assert.Equal(t, "GA4", resource.Type)
+		assert.True(t, resource.Enabled)
+		assert.Equal(t, int64(1), resource.DefinitionVersion)
+		assert.Equal(t, &resources.PropertyRef{
+			URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
+			Property: "id",
+		}, resource.Transformation)
+		assert.Equal(t, "G-123", resource.Config["measurement_id"])
+		apiSecret := requireSecret(t, resource.Config, "api_secret")
+		assert.True(t, apiSecret.IsUnknown(), "remote secrets must be unknown — API never returns them")
 		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-1"}, state)
 	})
 
@@ -757,8 +817,8 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
-				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","config":{}},
-				{"id":"dst-2","name":"Unmanaged","type":"GA4","config":{}}
+				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
+				{"id":"dst-2","name":"Unmanaged","type":"GA4","version":1,"config":{}}
 			],
 			"paging": {"total": 2}
 		}`))
@@ -785,7 +845,7 @@ func TestHandlerImpl_LoadRemoteResourcesErrorsOnUnregisteredManagedType(t *testi
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
-				{"id":"dst-1","externalId":"s3-1","name":"S3","type":"S3","config":{}}
+				{"id":"dst-1","externalId":"s3-1","name":"S3","type":"S3","version":1,"config":{}}
 			],
 			"paging": {"total": 1}
 		}`))
@@ -854,7 +914,7 @@ func TestHandlerImpl_Import_ReplacesLinkAndSetsExternalIDAfterUpdate(t *testing.
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			tracker.record("get")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"GA4","type":"GA4","enabled":true,"config":{"apiSecret":"old","measurementId":"G-1"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"apiSecret":"old","measurementId":"G-1"}}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			tracker.record("get-transformation")
 			w.WriteHeader(http.StatusOK)
@@ -862,7 +922,7 @@ func TestHandlerImpl_Import_ReplacesLinkAndSetsExternalIDAfterUpdate(t *testing.
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			tracker.record("update")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","enabled":true,"config":{}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"GA4","version":1,"enabled":true,"config":{}}}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			tracker.record("connect-transformation")
 			w.WriteHeader(http.StatusOK)
@@ -904,13 +964,13 @@ func TestHandlerImpl_Import_DisconnectsTransformationWhenSpecHasNone(t *testing.
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://h"}}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"destinationId":"dst-1","transformationId":"trans-old"}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","enabled":true,"config":{}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","version":1,"enabled":true,"config":{}}}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			disconnectCalled = true
 			w.WriteHeader(http.StatusOK)
@@ -945,7 +1005,7 @@ func TestHandlerImpl_Import_NoLinkChangeSkipsTransformationCall(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://h"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://h"}}}`))
 
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusOK)
@@ -953,7 +1013,7 @@ func TestHandlerImpl_Import_NoLinkChangeSkipsTransformationCall(t *testing.T) {
 
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","enabled":true,"config":{}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","type":"WEBHOOK","version":1,"enabled":true,"config":{}}}`))
 
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
 			w.WriteHeader(http.StatusOK)
@@ -1007,7 +1067,7 @@ func TestHandlerImpl_Import_UpdateErrorSkipsSetExternalID(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
 
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1051,14 +1111,14 @@ func TestHandlerImpl_Import_TransformatioNotFoundSetsEmptyTransformationID(t *te
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK","enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"WH","type":"WEBHOOK", "version":1, "enabled":true,"config":{"webhookUrl":"https://some-dummy-url.com"}}}`))
 
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-1/transformation":
 			w.WriteHeader(http.StatusNotFound)
 
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"message":"unable to complete the request"}`))
+			_, _ = w.Write([]byte(`{"message":"ok"}`))
 
 		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-1/external-id":
 			setExternalIDCalled = true
@@ -1095,12 +1155,11 @@ func (r stubResolver) ResolveToReference(entityType string, remoteID string) (st
 }
 
 func TestHandlerImpl_FormatForExport(t *testing.T) {
-	t.Parallel()
+	// Not parallel: subtests toggle enableVarSubstitution via global viper.
 
 	registry := testRegistry(t)
 
 	t.Run("empty collection", func(t *testing.T) {
-		t.Parallel()
 
 		h := destination.NewHandler(nil, registry)
 
@@ -1158,7 +1217,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("masks secret keys with external ID prefix", func(t *testing.T) {
-		t.Parallel()
+		enableVarSubstitution(t)
 
 		h := destination.NewHandler(nil, registry)
 
@@ -1183,6 +1242,32 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"], "hyphens in the external ID become underscores")
 		assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
+	})
+
+	t.Run("masks secret keys as literal when var substitution is off", func(t *testing.T) {
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(`{"apiSecret":"super-secret","measurementId":"G-123"}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "(unknown)", config["api_secret"])
+		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
 	t.Run("resolves transformation reference", func(t *testing.T) {
@@ -1260,4 +1345,271 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "getting destination definition")
 	})
+}
+
+func s3TestRegistry(t *testing.T) *definitions.Registry {
+	t.Helper()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(s3.NewDefinition()))
+	return registry
+}
+
+func TestHandlerImpl_Create_SendsAPIType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := s3TestRegistry(t)
+
+	var createBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		createBody = string(body)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"destination": {
+				"id": "dst-s3",
+				"externalId": "my-s3",
+				"name": "My S3",
+				"type": "S3",
+				"version": 1,
+				"enabled": true,
+				"config": {"bucketName":"my-bucket"}
+			}
+		}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newTestClient(t, srv.URL)
+	h := destination.NewHandler(c, registry)
+
+	_, err := h.Impl.Create(ctx, &destination.DestinationResource{
+		ID:                "my-s3",
+		DisplayName:       "My S3",
+		Type:              "s3",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config:            map[string]any{"bucket_name": "my-bucket"},
+	})
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(createBody), &payload))
+	assert.Equal(t, "S3", payload["type"], "Create must send upstream APIType, not local type")
+}
+
+func TestHandlerImpl_MapRemoteToState_EmitsLocalType(t *testing.T) {
+	t.Parallel()
+
+	registry := s3TestRegistry(t)
+	h := destination.NewHandler(nil, registry)
+
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-s3",
+		ExternalID: "my-s3",
+		Name:       "My S3",
+		Type:       "S3",
+		Version:    1,
+		IsEnabled:  true,
+		Config:     []byte(`{"bucketName":"my-bucket"}`),
+	}}
+
+	resource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+	assert.Equal(t, "s3", resource.Type)
+	assert.Equal(t, "my-bucket", resource.Config["bucket_name"])
+	accessKey := requireSecret(t, resource.Config, "access_key")
+	assert.True(t, accessKey.IsUnknown())
+	accessKeyID := requireSecret(t, resource.Config, "access_key_id")
+	assert.True(t, accessKeyID.IsUnknown())
+}
+
+func TestHandlerImpl_Import_TranslatesAPITypeToLocal(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := s3TestRegistry(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-s3":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-s3","name":"My S3","type":"S3","version":1,"enabled":true,"config":{"bucketName":"old-bucket"}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v2/destinations/dst-s3/transformation":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"destinationId":"dst-s3","transformationId":""}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-s3":
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.Equal(t, "S3", payload["type"], "Update must send APIType")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-s3","type":"S3","version":1,"enabled":true,"config":{"bucketName":"my-bucket"}}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/v2/destinations/dst-s3/external-id":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newTestClient(t, srv.URL)
+	h := destination.NewHandler(c, registry)
+
+	// Spec uses local type "s3"; remote returns API type "S3". Import must
+	// translate before Update's immutable-type check.
+	state, err := h.Impl.Import(ctx, &destination.DestinationResource{
+		ID:                "my-s3",
+		DisplayName:       "My S3",
+		Type:              "s3",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config:            map[string]any{"bucket_name": "my-bucket"},
+	}, "dst-s3")
+	require.NoError(t, err)
+	assert.Equal(t, &destination.DestinationState{ID: "dst-s3", TransformationID: ""}, state)
+}
+
+func TestHandlerImpl_FormatForExport_EmitsLocalType(t *testing.T) {
+	enableVarSubstitution(t)
+
+	registry := s3TestRegistry(t)
+	h := destination.NewHandler(nil, registry)
+
+	collection := map[string]*destination.RemoteDestination{
+		"my-s3": {Destination: &client.Destination{
+			ID:          "dst-s3",
+			WorkspaceID: "ws-1",
+			Name:        "My S3",
+			Type:        "S3",
+			Version:     1,
+			IsEnabled:   true,
+			Config:      []byte(`{"bucketName":"my-bucket","accessKey":"secret"}`),
+		}},
+	}
+
+	entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+	require.NoError(t, err)
+	require.Len(t, entities, 1)
+
+	spec, ok := entities[0].Content.(*specs.Spec)
+	require.True(t, ok)
+	assert.Equal(t, "s3", spec.Spec["type"])
+	config, ok := spec.Spec["config"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "my-bucket", config["bucket_name"])
+	assert.Equal(t, "{{ .MY_S3_ACCESS_KEY }}", config["access_key"])
+	assert.NotContains(t, config, "access_key_id", "absent secrets are not invented")
+}
+
+func TestHandlerImpl_SecretOnlyDiff(t *testing.T) {
+	t.Parallel()
+
+	registry := testRegistry(t)
+	h := destination.NewHandler(nil, registry)
+
+	local, err := h.Impl.ExtractResourcesFromSpec("x", &destination.DestinationSpec{
+		ID:                "ga4",
+		DisplayName:       "GA4",
+		Type:              "GA4",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config: map[string]any{
+			"api_secret":     "local-secret",
+			"measurement_id": "G-123",
+		},
+	})
+	require.NoError(t, err)
+
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-1",
+		ExternalID: "ga4",
+		Name:       "GA4",
+		Type:       "GA4",
+		Version:    1,
+		IsEnabled:  true,
+		// API omits the secret; measurement_id matches local.
+		Config: []byte(`{"measurementId":"G-123"}`),
+	}}
+	remoteMapped, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	propertyDiffs, secretOnly := differ.CompareData(
+		resources.ResourceData{
+			"id":                 remoteMapped.ID,
+			"display_name":       remoteMapped.DisplayName,
+			"type":               remoteMapped.Type,
+			"enabled":            remoteMapped.Enabled,
+			"definition_version": remoteMapped.DefinitionVersion,
+			"config":             remoteMapped.Config,
+		},
+		resources.ResourceData{
+			"id":                 local["ga4"].ID,
+			"display_name":       local["ga4"].DisplayName,
+			"type":               local["ga4"].Type,
+			"enabled":            local["ga4"].Enabled,
+			"definition_version": local["ga4"].DefinitionVersion,
+			"config":             local["ga4"].Config,
+		},
+	)
+	require.NotEmpty(t, propertyDiffs, "unknown remote secret must differ from known local secret")
+	assert.True(t, secretOnly, "phantom secret drift must be classified as secret-only")
+}
+
+func TestHandlerImpl_Create_RevealsWrappedSecrets(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := testRegistry(t)
+
+	var createBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		createBody = string(body)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"destination": {
+				"id": "dst-1",
+				"externalId": "ga4-production",
+				"name": "Production GA4",
+				"type": "GA4",
+				"enabled": true,
+				"config": {"apiSecret":"secret-value","measurementId":"G-123"}
+			}
+		}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newTestClient(t, srv.URL)
+	h := destination.NewHandler(c, registry)
+
+	extracted, err := h.Impl.ExtractResourcesFromSpec("x", &destination.DestinationSpec{
+		ID:                "ga4-production",
+		DisplayName:       "Production GA4",
+		Type:              "GA4",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config: map[string]any{
+			"api_secret":     "secret-value",
+			"measurement_id": "G-123",
+		},
+	})
+	require.NoError(t, err)
+
+	_, err = h.Impl.Create(ctx, extracted["ga4-production"])
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(createBody), &payload))
+	config, ok := payload["config"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "secret-value", config["apiSecret"], "API payload must carry the revealed secret, not a mask")
+	assert.Equal(t, "G-123", config["measurementId"])
+	assert.NotContains(t, createBody, "(unknown)")
+	assert.NotContains(t, createBody, "***")
 }
