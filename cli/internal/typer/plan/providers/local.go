@@ -33,9 +33,14 @@ func NewLocalCatalogPlanProvider(dc *localcatalog.DataCatalog, trackingPlanID st
 // NewLocalCatalogPlanProviderForProject loads and validates the project at
 // location offline (no auth or network) and returns a provider for its tracking
 // plan. trackingPlanID is optional when the project has exactly one plan.
+//
+// Only the data catalog provider is registered, since that is all code
+// generation reads. A project directory may still hold specs owned by other
+// providers (data-graphs, transformations), so unknown kinds are skipped rather
+// than failing the load.
 func NewLocalCatalogPlanProviderForProject(location, trackingPlanID string) (*LocalCatalogPlanProvider, error) {
 	dcProvider := datacatalog.New(nil)
-	proj := project.New(dcProvider)
+	proj := project.New(dcProvider, project.WithIgnoreUnknownKinds())
 	if err := proj.Load(location); err != nil {
 		return nil, fmt.Errorf("loading and validating project: %w", err)
 	}

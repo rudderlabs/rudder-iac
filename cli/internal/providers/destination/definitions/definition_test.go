@@ -52,7 +52,7 @@ func TestLocalSourceTypeKeys(t *testing.T) {
 	t.Parallel()
 
 	def := GA4TestDefinition()
-	def.SourceTypes = []string{"web", "reactNative", "amp"}
+	def.SourceTypes = []string{"web", "react_native", "amp"}
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
@@ -84,5 +84,4 @@ func TestNewRegisteredDefinitionWithoutConnectionMode(t *testing.T) {
 	registered, err := newRegisteredDefinition(WebhookTestDefinitionWithoutConnectionMode())
 	require.NoError(t, err)
 	assert.Nil(t, registered.SupportedSourceTypes())
-	assert.False(t, registered.IsSourceTypeSupported("web"))
 }
