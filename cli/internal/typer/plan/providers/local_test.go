@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
@@ -181,6 +182,30 @@ func TestLocalCatalogPlanProvider_Variants(t *testing.T) {
 	}
 
 	assert.Equal(t, want, got.Rules[0].Variants)
+}
+
+// A project directory is not necessarily catalog-only: rudder-data-gov keeps
+// data-graphs and transformations alongside the catalog the typer reads. Those
+// kinds belong to providers the local typer does not register, and they are
+// irrelevant to code generation, so loading must skip them rather than fail.
+func TestNewLocalCatalogPlanProviderForProject_IgnoresNonCatalogSpecs(t *testing.T) {
+	location := t.TempDir()
+	require.NoError(t, os.CopyFS(location, os.DirFS("../testdata/project")))
+
+	dataGraph := []byte(`version: "rudder/v1"
+kind: "data-graph"
+metadata:
+  name: "some-data-graph"
+spec:
+  id: "some-data-graph"
+  nodes: []
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(location, "data-graph.yaml"), dataGraph, 0o644))
+
+	provider, err := providers.NewLocalCatalogPlanProviderForProject(location, "typer-test-tracking-plan")
+
+	require.NoError(t, err)
+	assert.NotNil(t, provider)
 }
 
 func TestLocalCatalogPlanProvider_TrackingPlanNotFound(t *testing.T) {

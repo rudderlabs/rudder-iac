@@ -36,7 +36,11 @@ func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.Documente
 	manifestProvider := importmanifest.New()
 	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
 
-	reg, err := project.BuildRegistry(cp, manifestProvider, importMergeEnabled)
+	reg, err := project.BuildRegistry(
+		cp,
+		manifestProvider,
+		importMergeEnabled,
+	)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
 	}
