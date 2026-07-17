@@ -536,3 +536,14 @@ type mockResolver struct{}
 func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
 	return remoteID, nil
 }
+
+func TestProviderResourceMatchers(t *testing.T) {
+	t.Parallel()
+
+	p := eventstream.New(source.NewMockSourceClient())
+
+	matchers := p.ResourceMatchers()
+
+	require.Len(t, matchers, 1)
+	assert.Equal(t, source.ResourceType, matchers[0].ResourceType)
+}
