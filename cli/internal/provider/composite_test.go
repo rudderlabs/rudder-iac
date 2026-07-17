@@ -16,8 +16,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
-	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -564,4 +564,49 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 	assert.Less(t,
 		slices.Index(types, "a1"), slices.Index(types, "a2"),
 		"per-provider matcher order must be preserved")
+}
+
+// refListerMockProvider overrides the MockProvider's nil-default ImportableRefs.
+type refListerMockProvider struct {
+	*testutils.MockProvider
+	listers []importmatcher.RefLister
+}
+
+func (m *refListerMockProvider) ImportableRefs() []importmatcher.RefLister {
+	return m.listers
+}
+
+func TestCompositeProviderImportableRefs(t *testing.T) {
+	t.Parallel()
+
+	noopLister := func(resourceType string) importmatcher.RefLister {
+		return importmatcher.RefLister{
+			ResourceType: resourceType,
+			Refs: func(*resources.RemoteResource) []importmatcher.Ref {
+				return nil
+			},
+		}
+	}
+
+	alpha := &refListerMockProvider{
+		MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+		listers:      []importmatcher.RefLister{noopLister("a1"), noopLister("a2")},
+	}
+	// gamma keeps the nil default: it declares no importable refs and
+	// contributes nothing to the aggregate.
+	gamma := testutils.NewMockProvider([]string{"kindC"}, []string{"typeC"})
+
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"alpha": alpha,
+		"gamma": gamma,
+	})
+	require.NoError(t, err)
+
+	listers := cp.ImportableRefs()
+	types := make([]string, 0, len(listers))
+	for _, l := range listers {
+		types = append(types, l.ResourceType)
+	}
+
+	assert.ElementsMatch(t, []string{"a1", "a2"}, types)
 }

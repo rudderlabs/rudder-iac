@@ -43,6 +43,28 @@ type Matcher struct {
 	Match        Func
 }
 
+// Ref is a cross-resource reference a remote payload holds: the referenced
+// entity's resource type and the upstream (remote) ID it points at.
+type Ref struct {
+	EntityType string
+	RemoteID   string
+}
+
+// RefsFunc reports the cross-resource references an importable resource holds.
+// It reads r.Data (the parsed upstream payload) and returns every reference it
+// contains — the same IDs the handler resolves during FormatForExport. It
+// returns nil when the payload references nothing.
+type RefsFunc func(r *resources.RemoteResource) []Ref
+
+// RefLister pairs a resource type with the function listing its importables'
+// references. `import workspace --merge` uses these to detect, before matching
+// or file generation, when an importable references a resource that is deleted
+// locally but whose deletion is not yet applied.
+type RefLister struct {
+	ResourceType string
+	Refs         RefsFunc
+}
+
 // MultipleClaimed reports two remote resources that both matched the same
 // local resource: ClaimedByRemoteID won (matched first, sorted), RemoteID is
 // the extra. Matcher predicates are meant to mirror upstream uniqueness, so a

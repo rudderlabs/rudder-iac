@@ -233,6 +233,18 @@ type ResourceMatcherProvider interface {
 	ResourceMatchers() []importmatcher.Matcher
 }
 
+// ImportRefListerProvider exposes, per resource type, the cross-resource
+// references its importable resources hold. `import workspace --merge` uses
+// these to detect pending-delete conflicts — an importable referencing a
+// resource that is deleted locally but not yet applied — before matching or
+// file generation, so every conflict is reported up front.
+//
+// An empty or nil result means the provider's importables reference nothing
+// (or the provider does not support smart import).
+type ImportRefListerProvider interface {
+	ImportableRefs() []importmatcher.RefLister
+}
+
 // Provider is the complete interface that all providers must implement.
 // It combines all the individual capabilities required for full resource lifecycle management:
 //
@@ -263,4 +275,5 @@ type Provider interface {
 	RuleProvider
 	ImportManifestLoader
 	ResourceMatcherProvider
+	ImportRefListerProvider
 }
