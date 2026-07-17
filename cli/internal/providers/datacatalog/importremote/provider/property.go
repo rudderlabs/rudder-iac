@@ -119,6 +119,7 @@ func (p *PropertyImportProvider) FormatForExport(
 	version := specs.SpecVersionV1
 
 	formattedProps := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, property := range properties {
 		p.log.Debug("formatting property", "remoteID", property.ID, "externalID", property.ExternalID)
 
@@ -127,8 +128,21 @@ func (p *PropertyImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog property")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
 		urn := resources.URN(property.ExternalID, types.PropertyResourceType)
+
+		// Matched properties (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if property.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceId,
+				URN:         urn,
+				RemoteID:    property.ID,
+			})
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: property.ID,
@@ -140,6 +154,10 @@ func (p *PropertyImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("formatting property: %w", err)
 		}
 		formattedProps = append(formattedProps, formatted)
+	}
+
+	if len(formattedProps) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -159,5 +177,5 @@ func (p *PropertyImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, importEntriesFromWorkspace(workspaceMetadata), nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }
