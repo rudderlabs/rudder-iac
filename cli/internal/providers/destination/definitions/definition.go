@@ -40,6 +40,9 @@ type ConfigError struct {
 type RegisteredDefinition struct {
 	*DestinationDefinition
 	configType reflect.Type
+	// keyPathSourceTypes is the reverse index of gated properties:
+	// local config keypath (JSON pointer) -> source types entitled to it.
+	keyPathSourceTypes map[string][]string
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
@@ -86,25 +89,51 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 	return append([]string(nil), sourceTypeConfigKeys...)
 }
 
+// GatedKeyPaths returns local config keypaths (JSON pointer, e.g.
+// "/event_upload_period_millis") mapped to the source types entitled to use
+// them. Keypaths absent from the map are default keys, allowed for every
+// connected source type.
+func (d *RegisteredDefinition) GatedKeyPaths() map[string][]string {
+	out := make(
+		map[string][]string,
+		len(d.keyPathSourceTypes),
+	)
+
+	for keyPath, sourceTypes := range d.keyPathSourceTypes {
+		out[keyPath] = append([]string(nil), sourceTypes...)
+	}
+
+	return out
+}
+
 func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition, error) {
 	if def.NewConfig == nil {
 		return nil, fmt.Errorf("NewConfig is required")
 	}
 
-	sample := def.NewConfig()
-	configType := reflect.TypeOf(sample)
+	var (
+		sample     = def.NewConfig()
+		configType = reflect.TypeOf(sample)
+	)
+
 	if configType == nil || configType.Kind() != reflect.Pointer || configType.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("NewConfig must return a pointer to struct")
 	}
 	configType = configType.Elem()
 
 	if err := validateConsentConfigModel(def, configType); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validating consent config model: %w", err)
+	}
+
+	keyPathSourceTypes, err := buildGatedKeyPaths(def, configType)
+	if err != nil {
+		return nil, fmt.Errorf("building gated key paths: %w", err)
 	}
 
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
+		keyPathSourceTypes:    keyPathSourceTypes,
 	}, nil
 }
 
