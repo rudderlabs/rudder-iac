@@ -25,6 +25,10 @@ type ConfigProperty struct {
 // Gated restricts prop's local key to the given local source types. The
 // property must carry a LocalKey (i.e. not be a Discriminator); the registry
 // rejects gated properties without one at registration.
+//
+// We added this abstraction of gating because in future in validation layer of explicit connections,
+// we would need to identify the config keys which can only be added if a corresponding sourcetype
+// is connected to it.
 func Gated(prop ConfigProperty, sourceTypes ...string) ConfigProperty {
 	prop.SourceTypes = sourceTypes
 	return prop
@@ -44,6 +48,13 @@ func Simple(apiKey, localKey string, filters ...ValueFilter) ConfigProperty {
 		ToLocalFunc:   copyToLocal(apiKey, localKey),
 	}
 }
+
+// bucketName -> bucket_name ( Simple )
+// abcdef -> abc-> {def} ( ArrayWith ) ( )
+// abcghi -> abc-> {ghi}
+
+// skipWhilelistEvents > skip_list_events->white_listed
+// skipBlacklistEvents > skip_list_events->black_listed
 
 type ValueFilter func(a any) bool
 
@@ -353,4 +364,3 @@ func discriminatorValue(apiKey string, values DiscriminatorValues) FromLocalFunc
 		return config, nil
 	}
 }
-
