@@ -43,3 +43,9 @@ Read these first when working on account API contract fields:
 <!-- ticket:RUD-2860 -->
 Read this first when working on destination external IDs or destination ownership metadata:
 - `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.
+
+## DEX-545 — Named Pattern Validation Entry
+<!-- ticket:DEX-545 -->
+Read these first when working on named `validate:"pattern=<name>"` behavior:
+- `cli/internal/provider/rules/funcs/regex.go`: shared pattern registry and validator function, including allow/reject matching.
+- `cli/internal/provider/rules/funcs/regex_test.go`: co-located coverage for `NewPattern`, `NewPatternWithReject`, and validator behavior.

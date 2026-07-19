@@ -47,3 +47,10 @@
 <!-- ticket:RUD-2963 -->
 - `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the `Flag is not enabled for your account` prefix or the `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
 - Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
+
+## DEX-545 — Named Pattern Allow/Reject Registry
+<!-- ticket:DEX-545 -->
+- Named pattern validation is centralized in `cli/internal/provider/rules/funcs/regex.go`; `validate:"pattern=<name>"` consumers should rely on the registry match path rather than calling stored allow regexes directly.
+- Pattern registration now supports an optional reject regex: `NewPattern`/`Register` remain allow-only wrappers, while `NewPatternWithReject`/`RegisterWithReject` store the allow regex plus optional reject and make matching fail when the reject regex matches.
+- Re-registering a pattern without a reject intentionally clears any stale reject entry for that name, preserving allow-only behavior for existing callers.
+- `RegisterWithReject` defensively initializes nil registry maps before writes, so package-local fixtures or future literal registries do not panic when they omit optional maps such as `rejects`.
