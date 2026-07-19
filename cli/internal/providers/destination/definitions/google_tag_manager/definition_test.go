@@ -1,4 +1,4 @@
-package gtm_test
+package googletagmanager_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
+	googletagmanager "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_tag_manager"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 )
 
@@ -15,12 +15,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(gtm.NewDefinition()))
+	require.NoError(t, registry.Register(googletagmanager.NewDefinition()))
 
-	registered, err := registry.Get("gtm", 1)
+	registered, err := registry.Get("google_tag_manager", 1)
 	require.NoError(t, err)
 
-	assert.Equal(t, "gtm", registered.Type)
+	assert.Equal(t, "google_tag_manager", registered.Type)
 	assert.Equal(t, "GTM", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{}, registered.SecretKeys())
@@ -39,12 +39,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, registered, byAPI)
 }
 
-func TestGTMConfigValidation(t *testing.T) {
+func TestGoogleTagManagerConfigValidation(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(gtm.NewDefinition()))
-	registered, err := registry.Get("gtm", 1)
+	require.NoError(t, registry.Register(googletagmanager.NewDefinition()))
+	registered, err := registry.Get("google_tag_manager", 1)
 	require.NoError(t, err)
 
 	t.Run("missing container_id", func(t *testing.T) {
@@ -165,10 +165,10 @@ func TestGTMConfigValidation(t *testing.T) {
 	})
 }
 
-func TestGTMConversionRoundTrip(t *testing.T) {
+func TestGoogleTagManagerConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	def := gtm.NewDefinition()
+	def := googletagmanager.NewDefinition()
 	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
 		{
 			Name: "minimal container only",

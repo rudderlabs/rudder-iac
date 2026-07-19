@@ -1,4 +1,4 @@
-package gtm
+package googletagmanager
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
@@ -25,10 +25,10 @@ type useNativeSDKConfig struct {
 	Web *bool `mapstructure:"web"`
 }
 
-// gtmConfig is the local YAML config model. Field set mirrors terraform-provider
-// destination_google_tag_manager.go; validation constraints mirror overlapping
-// schema.json rules for those mapped fields.
-type gtmConfig struct {
+// googleTagManagerConfig is the local YAML config model. Field set mirrors
+// terraform-provider destination_google_tag_manager.go; validation constraints
+// mirror overlapping schema.json rules for those mapped fields.
+type googleTagManagerConfig struct {
 	ContainerID       string                   `mapstructure:"container_id" validate:"required,min=1,max=100"`
 	ServerURL         string                   `mapstructure:"server_url" validate:"omitempty,pattern=url"`
 	EventFiltering    *eventFilteringConfig    `mapstructure:"event_filtering"`
@@ -52,12 +52,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "gtm",
+		Type:       "google_tag_manager",
 		APIType:    "GTM",
 		Version:    1,
 		Properties: properties,
 		NewConfig: func() any {
-			return &gtmConfig{}
+			return &googleTagManagerConfig{}
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
