@@ -272,6 +272,32 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "300")
 	})
 
+	t.Run("tracking_server_url with ngrok rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"report_suite_ids":    "rsid1",
+			"tracking_server_url": "https://example.ngrok.io",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/tracking_server_url", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "ngrok")
+	})
+
+	t.Run("tracking_server_url too long rejected", func(t *testing.T) {
+		t.Parallel()
+		long := make([]byte, 101)
+		for i := range long {
+			long[i] = 'a'
+		}
+		errors := registered.ValidateConfig(map[string]any{
+			"report_suite_ids":    "rsid1",
+			"tracking_server_url": string(long),
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/tracking_server_url", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "100")
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
