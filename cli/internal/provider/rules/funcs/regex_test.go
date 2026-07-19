@@ -88,6 +88,21 @@ func TestGetPatternErrorMessage(t *testing.T) {
 	})
 }
 
+func TestURLPattern(t *testing.T) {
+	t.Parallel()
+
+	regex, errMsg, ok := registry.Get("url")
+	require.True(t, ok)
+	assert.Equal(t, "must be a valid URL", errMsg)
+
+	assert.True(t, regex.MatchString("https://gtm.example.com"))
+	assert.True(t, regex.MatchString("http://gtm.example.com/path?x=1"))
+	assert.True(t, regex.MatchString("gtm.example.com"))
+	assert.False(t, regex.MatchString("not-a-url"))
+	assert.False(t, regex.MatchString("localhost"))
+	assert.False(t, regex.MatchString(""))
+}
+
 func TestGetPatternValidator(t *testing.T) {
 	t.Run("Pattern validator with valid pattern", func(t *testing.T) {
 		NewPattern("test_uppercase_validator", "^[A-Z]+$", "must be all uppercase")
