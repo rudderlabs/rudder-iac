@@ -110,6 +110,17 @@ func TestGTMConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	t.Run("invalid server_url rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"container_id": "GTM-XXXXXXX",
+			"server_url":   "not-a-url",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/server_url", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be a valid URL")
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

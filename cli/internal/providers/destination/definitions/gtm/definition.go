@@ -30,7 +30,7 @@ type useNativeSDKConfig struct {
 // schema.json rules for those mapped fields.
 type gtmConfig struct {
 	ContainerID       string                   `mapstructure:"container_id" validate:"required,min=1,max=100"`
-	ServerURL         string                   `mapstructure:"server_url" validate:"omitempty"`
+	ServerURL         string                   `mapstructure:"server_url" validate:"omitempty,pattern=url"`
 	EventFiltering    *eventFilteringConfig    `mapstructure:"event_filtering"`
 	UseNativeSDK      *useNativeSDKConfig      `mapstructure:"use_native_sdk"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
