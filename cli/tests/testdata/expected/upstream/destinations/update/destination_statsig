@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "statsig",
+  "name": "E2E Statsig Updated",
+  "type": "STATSIG",
+  "enabled": true,
+  "config": {
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

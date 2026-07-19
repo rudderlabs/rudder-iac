@@ -1,0 +1,12 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "statsig",
+  "name": "E2E Statsig",
+  "type": "STATSIG",
+  "enabled": true,
+  "config": {},
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
