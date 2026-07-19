@@ -10,4 +10,12 @@ func init() {
 		`^(\||:|,|;|/)$`,
 		"must be one of | : , ; /",
 	)
+
+	// schema.json URL fields: (?!.*\.ngrok\.io)^(.{0,100})$ — allow length, reject ngrok.
+	funcs.NewPatternWithReject(
+		"adobe_analytics_url",
+		`^(.{0,100})$`,
+		`\.ngrok\.io`,
+		"must be at most 100 characters and must not contain .ngrok.io",
+	)
 }

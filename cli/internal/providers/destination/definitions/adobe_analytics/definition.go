@@ -65,15 +65,15 @@ type useNativeSDK struct {
 // terraform-provider destination_adobe_analytics.go; validation constraints
 // mirror overlapping schema.json rules for those mapped fields.
 type adobeAnalyticsConfig struct {
-	TrackingServerUrl             string                   `mapstructure:"tracking_server_url" validate:"omitempty,max=100"`
-	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,max=100"`
+	TrackingServerUrl             string                   `mapstructure:"tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
+	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,min=1,max=300"`
 	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat"`
-	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,max=100"`
+	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	UseUTF8Charset                *bool                    `mapstructure:"use_utf8_charset"`
 	UseSecureServerSide           *bool                    `mapstructure:"use_secure_server_side"`
-	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,max=100"`
-	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,max=100"`
+	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url"`
+	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	EventsToTypes                 []eventToTypeEntry       `mapstructure:"events_to_types" validate:"omitempty,dive"`
 	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,max=100"`
 	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id"`
