@@ -107,6 +107,17 @@ func TestPosthogConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "100")
 	})
 
+	t.Run("endpoint with ngrok rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":  "phc_test_key",
+			"endpoint": "https://example.ngrok.io",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/endpoint", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "ngrok")
+	})
+
 	t.Run("invalid person_profiles rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

@@ -1,10 +1,21 @@
 package posthog
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
+
+func init() {
+	// schema.json yourInstance: (?!.*\.ngrok\.io)^(.{0,100})$ — allow length, reject ngrok hosts.
+	funcs.NewPatternWithReject(
+		"posthog_endpoint",
+		`^(.{0,100})$`,
+		`\.ngrok\.io`,
+		"must be at most 100 characters and must not contain .ngrok.io",
+	)
+}
 
 // Source types from integrations-config destinations/posthog/db-config.json
 // supportedSourceTypes, restricted to types the CLI event-stream provider owns.
@@ -63,10 +74,8 @@ type useNativeSDK struct {
 // posthogConfig is the local YAML config model. Field set mirrors terraform
 // destination_posthog mappings; validation constraints mirror schema.json.
 type posthogConfig struct {
-	APIKey string `mapstructure:"api_key" validate:"required,min=1,max=100"`
-	// schema.json also forbids `.ngrok.io` via negative lookahead; Go RE2 cannot
-	// express that, so only the length half of ^(.{0,100})$ is enforced here.
-	Endpoint                      string                   `mapstructure:"endpoint" validate:"omitempty,max=100"`
+	APIKey                        string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
+	Endpoint                      string                   `mapstructure:"endpoint" validate:"omitempty,pattern=posthog_endpoint"`
 	UseV2Group                    *bool                    `mapstructure:"use_v2_group"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                  *useNativeSDK            `mapstructure:"use_native_sdk"`
