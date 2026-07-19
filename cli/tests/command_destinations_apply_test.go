@@ -35,6 +35,8 @@ var destinationRawSecrets = []string{
 	"AKIARSXXXXXXXXXXXXXX",
 	"rsSecretAccessKeyXXXXXXXXXXXXXXXXXXXXXXXXX",
 	"attentiveTagApiKeyXXXXXXXXXXXX",
+	"customerioAudienceApiKeyXXXXXX",
+	"customerioAudienceAppApiKeyXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

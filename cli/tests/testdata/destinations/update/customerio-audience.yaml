@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: customerio-audience
+spec:
+  id: customerio-audience
+  display_name: E2E Customer.io Audience Updated
+  type: customerio_audience
+  enabled: true
+  definition_version: 1
+  config:
+    site_id: rudderCliE2eSiteIdUpdated
+    api_key: "{{ .CUSTOMERIO_AUDIENCE_API_KEY }}"
+    app_api_key: "{{ .CUSTOMERIO_AUDIENCE_APP_API_KEY }}"
+    region: EU
