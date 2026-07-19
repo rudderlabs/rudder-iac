@@ -18,6 +18,7 @@ import (
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	confluentcloud "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/confluent_cloud"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
@@ -279,6 +280,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+		}
+		if err := registry.Register(bqstream.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
 		}
 		if err := registry.Register(confluentcloud.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering confluent_cloud destination definition: %w", err)
