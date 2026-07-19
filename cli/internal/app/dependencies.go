@@ -16,6 +16,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -247,6 +248,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	if err := registry.Register(customerioaudience.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering customerio_audience destination definition: %w", err)
 	}
 	return registry, nil
 }
