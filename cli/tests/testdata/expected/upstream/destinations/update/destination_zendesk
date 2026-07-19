@@ -1,0 +1,32 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "zendesk",
+  "name": "E2E Zendesk Updated",
+  "type": "ZENDESK",
+  "enabled": true,
+  "config": {
+    "email": "rudder-cli-e2e@example.com",
+    "domain": "rudder-cli-e2e-updated",
+    "sourceName": "rudder-updated",
+    "createUsersAsVerified": true,
+    "sendGroupCallsWithoutUserId": true,
+    "removeUsersFromOrganization": true,
+    "searchByExternalId": true,
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
