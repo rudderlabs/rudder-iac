@@ -69,8 +69,8 @@ type ga4Config struct {
 	BlockPageViewEvent    *bool                    `mapstructure:"block_page_view_event"`
 	ExtendPageViewParams  *bool                    `mapstructure:"extend_page_view_params"`
 	SendUserID            *bool                    `mapstructure:"send_user_id"`
-	SDKBaseURL            string                   `mapstructure:"sdk_base_url"`
-	ServerContainerURL    string                   `mapstructure:"server_container_url"`
+	SDKBaseURL            string                   `mapstructure:"sdk_base_url" validate:"omitempty,pattern=destination_http_url"`
+	ServerContainerURL    string                   `mapstructure:"server_container_url" validate:"omitempty,pattern=destination_http_url"`
 	PIIPropertiesToIgnore []piiProperty            `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
 	EventFiltering        *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK          *useNativeSDK            `mapstructure:"use_native_sdk"`

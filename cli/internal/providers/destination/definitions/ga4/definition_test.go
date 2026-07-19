@@ -244,6 +244,42 @@ func TestGA4ConfigValidation(t *testing.T) {
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/capture_page_view/web", errors[0].Path)
 	})
+
+	t.Run("sdk_base_url ngrok rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"sdk_base_url":   "https://abc.ngrok.io",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/sdk_base_url", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "ngrok")
+	})
+
+	t.Run("server_container_url invalid rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":           "secret",
+			"client_type":          "gtag",
+			"measurement_id":       "G-XXXXXXXXXX",
+			"server_container_url": "not a url",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/server_container_url", errors[0].Path)
+	})
+
+	t.Run("sdk_base_url dynamic value allowed", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"sdk_base_url":   "env.SDK_BASE_URL",
+		})
+		assert.Empty(t, errors)
+	})
 }
 
 func TestGA4ConversionRoundTrip(t *testing.T) {

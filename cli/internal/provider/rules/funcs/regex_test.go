@@ -16,6 +16,7 @@ func TestPatternRegistry(t *testing.T) {
 		t.Parallel()
 		reg := &patternRegistry{
 			patterns: make(map[string]*regexp.Regexp),
+			rejects:  make(map[string]*regexp.Regexp),
 			errors:   make(map[string]string),
 		}
 
@@ -31,6 +32,7 @@ func TestPatternRegistry(t *testing.T) {
 		t.Parallel()
 		reg := &patternRegistry{
 			patterns: make(map[string]*regexp.Regexp),
+			rejects:  make(map[string]*regexp.Regexp),
 			errors:   make(map[string]string),
 		}
 
@@ -42,6 +44,7 @@ func TestPatternRegistry(t *testing.T) {
 		t.Parallel()
 		reg := &patternRegistry{
 			patterns: make(map[string]*regexp.Regexp),
+			rejects:  make(map[string]*regexp.Regexp),
 			errors:   make(map[string]string),
 		}
 
@@ -64,6 +67,39 @@ func TestNewPattern(t *testing.T) {
 		assert.True(t, ok)
 		assert.NotNil(t, regex)
 		assert.Equal(t, "must be lowercase with underscores", errMsg)
+	})
+}
+
+func TestNewPatternWithReject(t *testing.T) {
+	NewPatternWithReject(
+		"test_url_with_reject",
+		`^(?:https?://)?[\w.-]+\.[\w.-]+.*$`,
+		`.*\.ngrok\.io.*`,
+		"must be a valid URL and must not use an ngrok host",
+	)
+
+	type TestStruct struct {
+		URL string `validate:"pattern=test_url_with_reject"`
+	}
+
+	t.Run("valid url", func(t *testing.T) {
+		errs, err := rules.ValidateStruct(TestStruct{URL: "https://www.googletagmanager.com"}, "", GetPatternValidator())
+		require.NoError(t, err)
+		assert.Nil(t, errs)
+	})
+
+	t.Run("rejects ngrok host", func(t *testing.T) {
+		errs, err := rules.ValidateStruct(TestStruct{URL: "https://abc.ngrok.io/path"}, "", GetPatternValidator())
+		require.NoError(t, err)
+		require.NotNil(t, errs)
+		assert.Len(t, errs, 1)
+	})
+
+	t.Run("rejects non url", func(t *testing.T) {
+		errs, err := rules.ValidateStruct(TestStruct{URL: "not a url"}, "", GetPatternValidator())
+		require.NoError(t, err)
+		require.NotNil(t, errs)
+		assert.Len(t, errs, 1)
 	})
 }
 
