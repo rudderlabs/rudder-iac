@@ -34,7 +34,7 @@ type webBoolConfig struct {
 // terraform-provider destination_google_ads.go; validation constraints mirror
 // overlapping schema.json rules for those mapped fields.
 type googleAdsConfig struct {
-	ConversionID             string                   `mapstructure:"conversion_id" validate:"required,min=1,max=103"`
+	ConversionID             string                   `mapstructure:"conversion_id" validate:"required,pattern=googleads_conversion_id"`
 	PageLoadConversions      []conversionEntry        `mapstructure:"page_load_conversions" validate:"omitempty,dive"`
 	ClickEventConversions    []conversionEntry        `mapstructure:"click_event_conversions" validate:"omitempty,dive"`
 	DefaultPageConversion    string                   `mapstructure:"default_page_conversion" validate:"omitempty,max=100"`

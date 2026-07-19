@@ -55,6 +55,26 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
+	t.Run("invalid conversion_id rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "123456789",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/conversion_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be a Google Ads conversion ID starting with AW-")
+	})
+
+	t.Run("env-style conversion_id rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "env.CONVERSION_ID",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/conversion_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be a Google Ads conversion ID starting with AW-")
+	})
+
 	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
