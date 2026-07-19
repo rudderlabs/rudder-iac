@@ -17,6 +17,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -261,6 +262,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	// Verified/native destination definitions register here when available.
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
+		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}
