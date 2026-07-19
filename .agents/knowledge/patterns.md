@@ -47,3 +47,9 @@
 <!-- ticket:RUD-2963 -->
 - `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the `Flag is not enabled for your account` prefix or the `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
 - Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
+
+## DEX-543 — Destination Dotted SecretKeys Lifecycle
+<!-- ticket:DEX-543 -->
+- Destination `SecretKeys` remain `[]string`, but entries may be top-level keys or dotted `map[string]any` paths; destination secret helpers manually traverse maps instead of JSON round-tripping so `*secret.String` pointer identity survives for differ behavior. Ref: `cli/internal/providers/destination/configpath`, `cli/internal/providers/destination/handler.go`.
+- Known/unknown wrapping mutates destination config in place and creates missing intermediate maps for dotted paths, while masking mutates only existing export paths. Ref: `cli/internal/providers/destination/configpath`, `cli/internal/providers/destination/handler.go`.
+- Secret reveal returns a new config map using path clone-on-write: clone the root, clone only ancestors along each secret path, write revealed strings there, and leave the caller's live resource state and nested secret wrappers intact. Ref: `cli/internal/providers/destination/configpath`, `cli/internal/providers/destination/handler.go`.

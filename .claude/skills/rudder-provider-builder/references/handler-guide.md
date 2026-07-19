@@ -208,6 +208,10 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(path string, spec *model.<Resourc
 }
 ```
 
+#### Destination secret config paths
+
+Destination definitions declare sensitive config leaves with `SecretKeys []string`. Entries may be either top-level keys (for example `api_secret`) or dotted map paths (for example `s3.access_key_id`). Keep this support in the destination helper layer (`cli/internal/providers/destination/configpath` plus the destination secret helpers) rather than wiring destination-definition consumers directly. The helpers manually traverse maps so `*secret.String` values keep pointer identity for the differ; they reject empty path segments and numeric array-index segments because slice-indexed secrets are not supported.
+
 ### 2.4 Resource Validation
 
 ```go

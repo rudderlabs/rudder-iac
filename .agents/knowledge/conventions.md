@@ -30,3 +30,9 @@
 ## DEX-456 — SDK ID Initialism Style
 <!-- ticket:DEX-456 -->
 - The Go SDK uses fully capitalized `ID` initialisms in identifiers and JSON field helpers. New account-related SDK fields and helpers should follow that existing `ID` spelling rather than mixed-case variants.
+
+## DEX-543 — Destination Secret Path Syntax
+<!-- ticket:DEX-543 -->
+- Destination `SecretKeys` use dot-separated map-key paths for nested secrets; slice-indexed paths are not supported in this convention.
+- Empty secret path segments, empty paths, and all-digit segments such as `items.0.key` are invalid destination definition configuration and should be propagated as helper errors rather than silently ignored.
+- Export variable names for dotted destination secret paths replace `.` with `_`, so `s3.access_key_id` becomes a suffix like `S3_ACCESS_KEY_ID`; this can collide with a literal top-level key that already contains underscores.

@@ -97,3 +97,9 @@
 - Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
 - Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
 - Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.
+
+## DEX-543 — Destination Secret Path Helper Boundary
+<!-- ticket:DEX-543 -->
+- Nested destination secret support is localized to the destination provider helper layer: `configpath` performs manual `map[string]any` path walks, while `SecretKeys` remains the definition-facing `[]string` API.
+- The destination converter layer can already address dotted local keys separately, so dotted `SecretKeys` should be handled by wrap/mask/reveal/unknown helpers without changing definition shape or flattening nested YAML.
+- Revealing destination secrets is part of API payload preparation, but the source config is live resource state; reveal must isolate writes with path clone-on-write rather than mutating the caller map or relying on a root-only shallow clone for nested paths.

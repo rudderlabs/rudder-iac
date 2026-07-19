@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"path/filepath"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/configpath"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	tmodel "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
@@ -76,13 +76,18 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
+	config, err := wrapKnownSecrets(spec.Config, registered.SecretKeys())
+	if err != nil {
+		return nil, fmt.Errorf("wrapping destination secrets: %w", err)
+	}
+
 	resource := &DestinationResource{
 		ID:                spec.ID,
 		DisplayName:       spec.DisplayName,
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
 		DefinitionVersion: spec.DefinitionVersion,
-		Config:            wrapKnownSecrets(spec.Config, registered.SecretKeys()),
+		Config:            config,
 	}
 
 	if spec.Transformation != "" {
@@ -233,7 +238,10 @@ func (h *HandlerImpl) MapRemoteToState(
 
 	// API responses omit secret values; mark every registered secret key as
 	// unknown so the differ flags them SecretOnly rather than phantom drift.
-	localConfig = wrapUnknownSecrets(localConfig, registered.SecretKeys())
+	localConfig, err = wrapUnknownSecrets(localConfig, registered.SecretKeys())
+	if err != nil {
+		return nil, nil, fmt.Errorf("wrapping destination secrets: %w", err)
+	}
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
@@ -467,33 +475,38 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	return specMap, nil
 }
 
-// maskSecrets replaces each registered secret key present in config with the
+// maskSecrets replaces each registered secret path present in config with the
 // marshaled form of secret.NewUnknown(WithVariableName(...)): a "{{ .VAR }}"
 // token when enableVarSubstitution is on, otherwise the masked literal.
-// Only keys present in config are touched — absent secrets are not invented.
+// Only paths present in config are touched — absent secrets are not invented.
 func maskSecrets(config map[string]any, externalID string, secretKeys []string) error {
 	if config == nil || len(secretKeys) == 0 {
 		return nil
 	}
 
 	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
-	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
+	for _, secretPath := range secretKeys {
+		if _, ok, err := configpath.Get(config, secretPath); err != nil {
+			return fmt.Errorf("getting secret path %q: %w", secretPath, err)
+		} else if !ok {
 			continue
 		}
+
 		varName := fmt.Sprintf(
 			"%s_%s",
 			prefix,
-			strings.ToUpper(key),
+			strings.ToUpper(strings.ReplaceAll(secretPath, ".", "_")),
 		)
 
 		s := secret.NewUnknown(secret.WithVariableName(varName))
 		token, err := marshalSecretToken(s)
 		if err != nil {
-			return fmt.Errorf("masking secret key %q: %w", key, err)
+			return fmt.Errorf("masking secret path %q: %w", secretPath, err)
 		}
 
-		config[key] = token
+		if err := configpath.Set(config, secretPath, token); err != nil {
+			return fmt.Errorf("setting secret path %q: %w", secretPath, err)
+		}
 	}
 	return nil
 }
@@ -512,71 +525,119 @@ func marshalSecretToken(s secret.String) (string, error) {
 	return token, nil
 }
 
-// wrapKnownSecrets wraps every registered secret key as *secret.String with
-// the known local value (empty string when the key is absent). Pointer form
-// survives the differ's struct→map decode.
-func wrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any {
+// wrapKnownSecrets wraps every registered secret path as *secret.String with
+// the known local string value (empty string when the path is absent). Existing
+// non-string leaves are left unchanged. Pointer form survives the differ's
+// struct→map decode.
+func wrapKnownSecrets(config map[string]any, secretKeys []string) (map[string]any, error) {
 	if len(secretKeys) == 0 {
-		return config
+		return config, nil
 	}
 	if config == nil {
 		config = map[string]any{}
 	}
-	for _, key := range secretKeys {
-		raw := ""
-		if v, ok := config[key]; ok {
-			if s, ok := v.(string); ok {
-				raw = s
-			}
+	for _, secretPath := range secretKeys {
+		if err := wrapKnownSecret(config, secretPath); err != nil {
+			return nil, err
+		}
+	}
+	return config, nil
+}
+
+func wrapKnownSecret(config map[string]any, secretPath string) error {
+	value, ok, err := configpath.Get(config, secretPath)
+	if err != nil {
+		return fmt.Errorf("getting secret path %q: %w", secretPath, err)
+	}
+	if ok {
+		raw, ok := value.(string)
+		if !ok {
+			return nil
 		}
 		s := secret.New(raw)
-		config[key] = &s
+		return setSecret(config, secretPath, &s)
 	}
-	return config
+
+	s := secret.New("")
+	return setSecret(config, secretPath, &s)
 }
 
-// wrapUnknownSecrets marks every registered secret key as an unknown
+func setSecret(config map[string]any, secretPath string, value *secret.String) error {
+	if err := configpath.Set(config, secretPath, value); err != nil {
+		return fmt.Errorf("setting secret path %q: %w", secretPath, err)
+	}
+	return nil
+}
+
+// wrapUnknownSecrets marks every registered secret path as an unknown
 // *secret.String. Used when mapping remote state: the API never returns
 // secret values, so presence is undetectable.
-func wrapUnknownSecrets(config map[string]any, secretKeys []string) map[string]any {
+func wrapUnknownSecrets(config map[string]any, secretKeys []string) (map[string]any, error) {
 	if len(secretKeys) == 0 {
-		return config
+		return config, nil
 	}
 	if config == nil {
 		config = map[string]any{}
 	}
-	for _, key := range secretKeys {
+	for _, secretPath := range secretKeys {
 		s := secret.NewUnknown()
-		config[key] = &s
+		if err := configpath.Set(config, secretPath, &s); err != nil {
+			return nil, fmt.Errorf("setting secret path %q: %w", secretPath, err)
+		}
 	}
-	return config
+	return config, nil
 }
 
-// revealSecrets returns a shallow copy of config with registered secret keys
-// replaced by their Reveal() string. Must run before LocalToAPI / json.Marshal
-// so the real value reaches the wire instead of a masked form.
-func revealSecrets(config map[string]any, secretKeys []string) map[string]any {
+// revealSecrets returns a copy of config with registered secret paths replaced
+// by their Reveal() string. Only ancestors along revealed secret paths are
+// cloned, so nested state maps are not mutated before LocalToAPI/json.Marshal.
+func revealSecrets(config map[string]any, secretKeys []string) (map[string]any, error) {
 	if config == nil || len(secretKeys) == 0 {
-		return config
+		return config, nil
 	}
-	out := maps.Clone(config)
-	for _, key := range secretKeys {
-		v, ok := out[key]
+
+	out := cloneRootMap(config)
+	for _, secretPath := range secretKeys {
+		value, ok, err := configpath.Get(out, secretPath)
+		if err != nil {
+			return nil, fmt.Errorf("getting secret path %q: %w", secretPath, err)
+		}
 		if !ok {
 			continue
 		}
-		switch s := v.(type) {
-		case *secret.String:
-			if s == nil {
-				out[key] = ""
-				continue
-			}
-			out[key] = s.Reveal()
-		case secret.String:
-			out[key] = s.Reveal()
+
+		revealed, ok := revealedSecret(value)
+		if !ok {
+			continue
+		}
+		out, err = configpath.SetCopyOnWrite(out, secretPath, revealed)
+		if err != nil {
+			return nil, fmt.Errorf("setting secret path %q: %w", secretPath, err)
 		}
 	}
+	return out, nil
+}
+
+func cloneRootMap(config map[string]any) map[string]any {
+	out := make(map[string]any, len(config))
+	for key, value := range config {
+		out[key] = value
+	}
 	return out
+}
+
+func revealedSecret(value any) (string, bool) {
+	switch s := value.(type) {
+	case *secret.String:
+		if s == nil {
+			return "", true
+		}
+		return s.Reveal(), true
+	case secret.String:
+		return s.Reveal(), true
+	default:
+		return "", false
+	}
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case
@@ -589,10 +650,13 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 
 	// Reveal before conversion: LocalToAPI json.Marshals the map, and a
 	// surviving secret.String would emit its masked form to the API.
-	revealed := revealSecrets(
+	revealed, err := revealSecrets(
 		local,
 		registered.SecretKeys(),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("revealing destination secrets: %w", err)
+	}
 
 	apiConfig, err := registered.LocalToAPI(revealed)
 	if err != nil {
