@@ -206,6 +206,9 @@ Either no variable name was attached (`MapRemoteToSpec` did not use `WithVariabl
 **Why did export fail with "does not satisfy the variable grammar"?**
 The name passed to `WithVariableName` does not match `^[A-Za-z_][A-Za-z0-9_]*$`. Names often derive from user-controlled external IDs, so sanitize them (e.g. uppercase and replace `-` with `_`) before attaching.
 
+**Can destination `SecretKeys` point to nested config values?**
+Yes. Destination definitions keep `SecretKeys []string`, but the destination helper layer also treats entries as dotted map paths such as `s3.access_key_id`. Top-level keys continue to work. Dotted paths are resolved manually in `cli/internal/providers/destination/configpath` so `*secret.String` values are not JSON round-tripped away; empty path segments and numeric array-index segments are rejected because slice secrets are out of scope. During export, dots become underscores in variable names, so destination external ID `my-dest` and secret path `s3.access_key_id` produce `MY_DEST_S3_ACCESS_KEY_ID`.
+
 **Is the masked value ever sent to the API?**
 No. Marshaling only masks specs and exports. Request bodies are built from plain string fields you populate explicitly with `Reveal()`, so what reaches the wire is the real value — or nothing, if you skip the field via `IsZero()`.
 

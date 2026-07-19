@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/configpath"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -45,6 +46,14 @@ func testRegistry(t *testing.T) *definitions.Registry {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(webhookTestDefinition()))
 	require.NoError(t, registry.Register(ga4TestDefinition()))
+	return registry
+}
+
+func nestedSecretRegistry(t *testing.T) *definitions.Registry {
+	t.Helper()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(nestedSecretTestDefinition()))
 	return registry
 }
 
@@ -90,6 +99,34 @@ func ga4TestDefinition() *definitions.DestinationDefinition {
 	}
 }
 
+func nestedSecretTestDefinition() *definitions.DestinationDefinition {
+	return &definitions.DestinationDefinition{
+		Type:    "NESTED",
+		Version: 1,
+		Properties: []converter.ConfigProperty{
+			converter.Simple("topSecret", "top_secret"),
+			converter.Simple("s3.accessKeyId", "s3.access_key_id"),
+			converter.Simple("s3.accessKey", "s3.access_key"),
+			converter.Simple("s3.region", "s3.region"),
+		},
+		SecretKeys: []string{"top_secret", "s3.access_key_id", "s3.access_key"},
+		NewConfig: func() any {
+			return &struct {
+				TopSecret string `mapstructure:"top_secret"`
+				S3        struct {
+					AccessKeyID string `mapstructure:"access_key_id"`
+					AccessKey   string `mapstructure:"access_key"`
+					Region      string `mapstructure:"region"`
+				} `mapstructure:"s3"`
+			}{}
+		},
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+	}
+}
+
 // resolvedRef builds a resolved PropertyRef simulating what the apply framework
 // produces before calling Update.
 func resolvedRef(urn, value string) *resources.PropertyRef {
@@ -118,7 +155,8 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 
 func requireSecret(t *testing.T, config map[string]any, key string) *secret.String {
 	t.Helper()
-	v, ok := config[key]
+	v, ok, err := configpath.Get(config, key)
+	require.NoError(t, err)
 	require.True(t, ok, "missing secret key %q", key)
 	s, ok := v.(*secret.String)
 	require.True(t, ok, "key %q: expected *secret.String, got %T", key, v)
@@ -804,6 +842,258 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		assert.Nil(t, resource)
 		assert.Nil(t, state)
 	})
+}
+
+func TestHandlerImpl_NestedSecretKeysExtractResourcesFromSpec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		config       map[string]any
+		assertConfig func(*testing.T, map[string]any)
+	}{
+		{
+			name: "wraps top-level and nested string leaves",
+			config: map[string]any{
+				"top_secret": "top-value",
+				"s3": map[string]any{
+					"access_key_id": "key-id",
+					"access_key":    "key",
+					"region":        "us-east-1",
+				},
+			},
+			assertConfig: func(t *testing.T, config map[string]any) {
+				t.Helper()
+				assert.Equal(t, "top-value", requireSecret(t, config, "top_secret").Reveal())
+				assert.Equal(t, "key-id", requireSecret(t, config, "s3.access_key_id").Reveal())
+				assert.Equal(t, "key", requireSecret(t, config, "s3.access_key").Reveal())
+				region, ok, err := configpath.Get(config, "s3.region")
+				require.NoError(t, err)
+				assert.True(t, ok)
+				assert.Equal(t, "us-east-1", region)
+			},
+		},
+		{
+			name:   "creates missing dotted parents with empty known secrets",
+			config: map[string]any{"top_secret": "top-value"},
+			assertConfig: func(t *testing.T, config map[string]any) {
+				t.Helper()
+				assert.Equal(t, "top-value", requireSecret(t, config, "top_secret").Reveal())
+				assert.True(t, requireSecret(t, config, "s3.access_key_id").IsZero())
+				assert.True(t, requireSecret(t, config, "s3.access_key").IsZero())
+			},
+		},
+		{
+			name: "leaves unsupported non-string leaves unchanged",
+			config: map[string]any{
+				"s3": map[string]any{
+					"access_key_id": 123,
+				},
+			},
+			assertConfig: func(t *testing.T, config map[string]any) {
+				t.Helper()
+				value, ok, err := configpath.Get(config, "s3.access_key_id")
+				require.NoError(t, err)
+				assert.True(t, ok)
+				assert.Equal(t, 123, value)
+				assert.True(t, requireSecret(t, config, "top_secret").IsZero())
+				assert.True(t, requireSecret(t, config, "s3.access_key").IsZero())
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := destination.NewHandler(nil, nestedSecretRegistry(t))
+
+			extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/nested.yaml", &destination.DestinationSpec{
+				ID:                "nested-dest",
+				DisplayName:       "Nested",
+				Type:              "NESTED",
+				DefinitionVersion: 1,
+				Config:            tt.config,
+			})
+			require.NoError(t, err)
+
+			resource := extracted["nested-dest"]
+			require.NotNil(t, resource)
+			tt.assertConfig(t, resource.Config)
+		})
+	}
+}
+
+func TestHandlerImpl_MapRemoteToStateWrapsNestedSecretsAsUnknown(t *testing.T) {
+	t.Parallel()
+
+	h := destination.NewHandler(nil, nestedSecretRegistry(t))
+
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-nested",
+		ExternalID: "nested-dest",
+		Name:       "Nested",
+		Type:       "NESTED",
+		Version:    1,
+		IsEnabled:  true,
+		Config:     []byte(`{"s3":{"region":"us-east-1"}}`),
+	}}
+
+	resource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	assert.True(t, requireSecret(t, resource.Config, "top_secret").IsUnknown())
+	assert.True(t, requireSecret(t, resource.Config, "s3.access_key_id").IsUnknown())
+	assert.True(t, requireSecret(t, resource.Config, "s3.access_key").IsUnknown())
+	region, ok, err := configpath.Get(resource.Config, "s3.region")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "us-east-1", region)
+}
+
+func TestHandlerImpl_FormatForExportMasksNestedSecretPaths(t *testing.T) {
+	// Not parallel: toggles enableVarSubstitution via global viper.
+	enableVarSubstitution(t)
+
+	h := destination.NewHandler(nil, nestedSecretRegistry(t))
+	collection := map[string]*destination.RemoteDestination{
+		"my-dest": {Destination: &client.Destination{
+			ID:        "dst-nested",
+			Name:      "Nested",
+			Type:      "NESTED",
+			Version:   1,
+			IsEnabled: true,
+			Config:    []byte(`{"topSecret":"top","s3":{"accessKeyId":"id","region":"us-east-1"}}`),
+		}},
+	}
+
+	entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+	require.NoError(t, err)
+	require.Len(t, entities, 1)
+
+	spec, ok := entities[0].Content.(*specs.Spec)
+	require.True(t, ok)
+	config, ok := spec.Spec["config"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "{{ .MY_DEST_TOP_SECRET }}", config["top_secret"])
+	s3Config, ok := config["s3"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "{{ .MY_DEST_S3_ACCESS_KEY_ID }}", s3Config["access_key_id"])
+	assert.Equal(t, "us-east-1", s3Config["region"])
+	assert.NotContains(t, s3Config, "access_key", "export masking must not invent absent secret paths")
+}
+
+func TestHandlerImpl_CreateRevealsNestedSecretsWithoutMutatingCaller(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := nestedSecretRegistry(t)
+
+	var createBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		createBody = string(body)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"destination":{"id":"dst-nested","externalId":"nested-dest","name":"Nested","type":"NESTED","version":1,"enabled":true,"config":{}}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := newTestClient(t, srv.URL)
+	h := destination.NewHandler(c, registry)
+
+	extracted, err := h.Impl.ExtractResourcesFromSpec("x", &destination.DestinationSpec{
+		ID:                "nested-dest",
+		DisplayName:       "Nested",
+		Type:              "NESTED",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config: map[string]any{
+			"top_secret": "top-value",
+			"s3": map[string]any{
+				"access_key_id": "key-id",
+				"access_key":    "key",
+				"region":        "us-east-1",
+			},
+		},
+	})
+	require.NoError(t, err)
+	resource := extracted["nested-dest"]
+
+	_, err = h.Impl.Create(ctx, resource)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal([]byte(createBody), &payload))
+	apiConfig, ok := payload["config"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "top-value", apiConfig["topSecret"])
+	apiS3Config, ok := apiConfig["s3"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "key-id", apiS3Config["accessKeyId"])
+	assert.Equal(t, "key", apiS3Config["accessKey"])
+	assert.Equal(t, "us-east-1", apiS3Config["region"])
+
+	assert.Equal(t, "top-value", requireSecret(t, resource.Config, "top_secret").Reveal())
+	assert.Equal(t, "key-id", requireSecret(t, resource.Config, "s3.access_key_id").Reveal())
+	assert.Equal(t, "key", requireSecret(t, resource.Config, "s3.access_key").Reveal())
+}
+
+func TestHandlerImpl_NestedSecretOnlyDiff(t *testing.T) {
+	t.Parallel()
+
+	h := destination.NewHandler(nil, nestedSecretRegistry(t))
+	local, err := h.Impl.ExtractResourcesFromSpec("x", &destination.DestinationSpec{
+		ID:                "nested-dest",
+		DisplayName:       "Nested",
+		Type:              "NESTED",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config: map[string]any{
+			"top_secret": "top-value",
+			"s3": map[string]any{
+				"access_key_id": "key-id",
+				"access_key":    "key",
+				"region":        "us-east-1",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-nested",
+		ExternalID: "nested-dest",
+		Name:       "Nested",
+		Type:       "NESTED",
+		Version:    1,
+		IsEnabled:  true,
+		Config:     []byte(`{"s3":{"region":"us-east-1"}}`),
+	}}
+	remoteMapped, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	propertyDiffs, secretOnly := differ.CompareData(
+		resources.ResourceData{
+			"id":                 remoteMapped.ID,
+			"display_name":       remoteMapped.DisplayName,
+			"type":               remoteMapped.Type,
+			"enabled":            remoteMapped.Enabled,
+			"definition_version": remoteMapped.DefinitionVersion,
+			"config":             remoteMapped.Config,
+		},
+		resources.ResourceData{
+			"id":                 local["nested-dest"].ID,
+			"display_name":       local["nested-dest"].DisplayName,
+			"type":               local["nested-dest"].Type,
+			"enabled":            local["nested-dest"].Enabled,
+			"definition_version": local["nested-dest"].DefinitionVersion,
+			"config":             local["nested-dest"].Config,
+		},
+	)
+	require.NotEmpty(t, propertyDiffs)
+	assert.True(t, secretOnly, "nested unknown secrets should classify as secret-only drift")
 }
 
 func TestHandlerImpl_LoadRemoteResources(t *testing.T) {

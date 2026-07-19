@@ -43,3 +43,10 @@ Read these first when working on account API contract fields:
 <!-- ticket:RUD-2860 -->
 Read this first when working on destination external IDs or destination ownership metadata:
 - `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.
+
+## DEX-543 — Destination SecretKeys Path Handling Entry
+<!-- ticket:DEX-543 -->
+Read these first when working on destination `SecretKeys`, nested secret paths, or secret wrapping/masking/reveal behavior:
+- `cli/internal/providers/destination/handler.go`: destination secret lifecycle helpers (`maskSecrets`, `wrapKnownSecrets`, `wrapUnknownSecrets`, `revealSecrets`) and their call sites.
+- `cli/internal/providers/destination/configpath`: manual dotted-path map traversal and path clone-on-write utilities for destination secret config maps.
+- `cli/internal/secret/README.md`: secret string behavior and FAQ context for destination dotted `SecretKeys`.
