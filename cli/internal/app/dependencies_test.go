@@ -40,7 +40,7 @@ func TestNewDestinationRegistryRegistersS3WhenFlagEnabled(t *testing.T) {
 
 	registry, err := newDestinationRegistry(config.GetConfig())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"s3"}, registry.SupportedTypes())
+	assert.Equal(t, []string{"s3", "zendesk"}, registry.SupportedTypes())
 }
 
 func TestNewDestinationRegistryEmptyWhenFlagDisabled(t *testing.T) {
