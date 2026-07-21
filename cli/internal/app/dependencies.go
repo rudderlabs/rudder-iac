@@ -17,6 +17,7 @@ import (
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
+	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -247,6 +248,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	if err := registry.Register(tiktokads.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering tiktok_ads destination definition: %w", err)
 	}
 	return registry, nil
 }
