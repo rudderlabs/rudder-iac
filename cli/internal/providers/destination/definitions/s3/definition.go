@@ -46,9 +46,11 @@ type s3Config struct {
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
 	// IAM role ARN is required when role-based auth is on; forbidden when off.
 	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"excluded_if=RoleBasedAuth false,max=100"`
-	// Access keys are forbidden when role-based auth is on.
-	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"excluded_if=RoleBasedAuth true,omitempty,max=100"`
-	AccessKey         string                   `mapstructure:"access_key" validate:"excluded_if=RoleBasedAuth true,omitempty,max=100"`
+	// Access keys are required for key-based auth and forbidden when role-based
+	// auth is on. Import/export never invents these secrets — users must supply
+	// them (e.g. via {{ .VAR }} + a var file) when role_based_auth is false.
+	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,excluded_if=RoleBasedAuth true,max=100"`
+	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,excluded_if=RoleBasedAuth true,max=100"`
 	EnableSSE         *bool                    `mapstructure:"enable_sse"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

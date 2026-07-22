@@ -182,6 +182,66 @@ func TestCompareData_Secret(t *testing.T) {
 		assert.Empty(t, equal)
 		assert.False(t, secretOnly)
 	})
+
+	// Presence-based secret wrapping omits remote keys the API strips; a local
+	// secret with no remote counterpart must stay SecretOnly so it re-applies
+	// without looking like genuine drift.
+	t.Run("known secret vs missing key is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs known secret is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"token": secret.New("hunter2")},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: nil, TargetValue: secret.New("hunter2"), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("pointer secret vs missing key is secret-only", func(t *testing.T) {
+		tok := secret.New("hunter2")
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": &tok},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: &tok, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret vs missing key with real sibling is not secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2"), "name": "a"},
+			resources.ResourceData{"name": "b"},
+		)
+		require.Contains(t, diffs, "token")
+		require.Contains(t, diffs, "name")
+		assert.True(t, diffs["token"].SecretOnly)
+		assert.False(t, diffs["name"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("non-secret missing key stays real drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"name": "a"},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"name": {Property: "name", SourceValue: "a", TargetValue: nil, SecretOnly: false},
+		}, diffs)
+		assert.False(t, secretOnly)
+	})
 }
 
 // TestDiff_HasNonsecretDiff locks the import guard's discriminator. ResourceDiff.SecretOnly

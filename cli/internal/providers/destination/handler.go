@@ -68,8 +68,8 @@ func (h *HandlerImpl) NewSpec() *DestinationSpec {
 // ExtractResourcesFromSpec decodes a parsed spec into a DestinationResource,
 // parsing the scalar "#transformation:<id>" reference into a PropertyRef whose
 // resolver reads TransformationState.ID. Config stays snake_case; registered
-// secret keys are wrapped as *secret.String so the differ's secret-aware
-// branch owns comparison.
+// secret keys present in the spec are wrapped as *secret.String so the
+// differ's secret-aware branch owns comparison.
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) (map[string]*DestinationResource, error) {
 	registered, err := h.registry.Get(spec.Type, spec.DefinitionVersion)
 	if err != nil {
@@ -231,8 +231,9 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, err
 	}
 
-	// API responses omit secret values; mark every registered secret key as
-	// unknown so the differ flags them SecretOnly rather than phantom drift.
+	// API responses omit secret values. Wrap only secret keys that are still
+	// present after conversion (defensive); absent keys stay absent so
+	// presence-based wrapping never invents conditional secrets.
 	localConfig = wrapUnknownSecrets(localConfig, registered.SecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
@@ -370,10 +371,11 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 }
 
 // FormatForExport converts unmanaged remote destinations into importable YAML
-// specs: config is converted to local snake_case, registered secret keys are
-// masked with per-resource placeholders, and a linked transformation resolves
-// to a "#transformation:<id>" reference (failing the export if the link can't
-// be resolved — mirrors the source handler, no silent fallback to a raw ID).
+// specs: config is converted to local snake_case, registered secret keys that
+// are present are masked with per-resource placeholders (absent secrets are
+// not invented), and a linked transformation resolves to a
+// "#transformation:<id>" reference (failing the export if the link can't be
+// resolved — mirrors the source handler, no silent fallback to a raw ID).
 func (h *HandlerImpl) FormatForExport(
 	collection map[string]*RemoteDestination,
 	_ namer.Namer,
@@ -467,10 +469,11 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	return specMap, nil
 }
 
-// maskSecrets replaces each registered secret key present in config with the
-// marshaled form of secret.NewUnknown(WithVariableName(...)): a "{{ .VAR }}"
-// token when enableVarSubstitution is on, otherwise the masked literal.
-// Only keys present in config are touched — absent secrets are not invented.
+// maskSecrets replaces each registered secret key that is already present in
+// config with the marshaled form of secret.NewUnknown(WithVariableName(...)):
+// a "{{ .VAR }}" token when enableVarSubstitution is on, otherwise the masked
+// literal. Absent secrets are not invented — requiredness is owned by the
+// destination config model's validate tags.
 func maskSecrets(config map[string]any, externalID string, secretKeys []string) error {
 	if config == nil || len(secretKeys) == 0 {
 		return nil
@@ -478,6 +481,10 @@ func maskSecrets(config map[string]any, externalID string, secretKeys []string) 
 
 	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
 	for _, key := range secretKeys {
+		if _, ok := config[key]; !ok {
+			continue
+		}
+
 		varName := fmt.Sprintf(
 			"%s_%s",
 			prefix,
@@ -509,22 +516,22 @@ func marshalSecretToken(s secret.String) (string, error) {
 	return token, nil
 }
 
-// wrapKnownSecrets wraps every registered secret key as *secret.String with
-// the known local value (empty string when the key is absent). Pointer form
-// survives the differ's struct→map decode.
+// wrapKnownSecrets wraps each registered secret key that is already present in
+// config as *secret.String with the known local value. Pointer form survives
+// the differ's struct→map decode. Absent secrets are not invented —
+// requiredness is owned by the destination config model's validate tags.
 func wrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any {
-	if len(secretKeys) == 0 {
+	if config == nil || len(secretKeys) == 0 {
 		return config
 	}
-	if config == nil {
-		config = map[string]any{}
-	}
 	for _, key := range secretKeys {
+		v, ok := config[key]
+		if !ok {
+			continue
+		}
 		raw := ""
-		if v, ok := config[key]; ok {
-			if s, ok := v.(string); ok {
-				raw = s
-			}
+		if s, ok := v.(string); ok {
+			raw = s
 		}
 		s := secret.New(raw)
 		config[key] = &s
@@ -532,17 +539,18 @@ func wrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any
 	return config
 }
 
-// wrapUnknownSecrets marks every registered secret key as an unknown
-// *secret.String. Used when mapping remote state: the API never returns
-// secret values, so presence is undetectable.
+// wrapUnknownSecrets marks each registered secret key that is already present
+// in config as an unknown *secret.String. Used when mapping remote state.
+// Absent keys stay absent — the API normally strips secrets, and inventing
+// them would force perpetual re-apply for conditional secrets that do not apply.
 func wrapUnknownSecrets(config map[string]any, secretKeys []string) map[string]any {
-	if len(secretKeys) == 0 {
+	if config == nil || len(secretKeys) == 0 {
 		return config
 	}
-	if config == nil {
-		config = map[string]any{}
-	}
 	for _, key := range secretKeys {
+		if _, ok := config[key]; !ok {
+			continue
+		}
 		s := secret.NewUnknown()
 		config[key] = &s
 	}
