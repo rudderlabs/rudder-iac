@@ -86,7 +86,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 			Scope: h.metadata.ResourceType,
 		})
 
-		reference := fmt.Sprintf("#%s:%s", h.metadata.ResourceType, externalID)
+		reference := fmt.Sprintf("#%s:%s", h.metadata.SpecKind, externalID)
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
 		}
