@@ -147,6 +147,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 					Severity: rule.Severity(),
 					Message:  result.Message,
 					File:     filePath,
+					Kind:     rawSpec.Parsed().Kind,
 					Position: *position,
 					Examples: rule.Examples(),
 				})
@@ -247,6 +248,7 @@ func (e *validationEngine) runValidationRules(
 				Severity: rule.Severity(),
 				Message:  result.Message,
 				File:     path,
+				Kind:     rawSpec.Parsed().Kind,
 				Position: *position,
 				Examples: rule.Examples(),
 			})
