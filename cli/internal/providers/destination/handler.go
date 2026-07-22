@@ -188,7 +188,7 @@ func (h *HandlerImpl) Update(
 // Delete disconnects any linked transformation first, then deletes the destination.
 func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *DestinationResource, oldState *DestinationState) error {
 	if oldState.TransformationID != "" {
-		if _, err := h.client.Destinations.DisconnectTransformation(
+		if err := h.client.Destinations.DisconnectTransformation(
 			ctx,
 			oldState.ID,
 		); err != nil {
@@ -478,9 +478,6 @@ func maskSecrets(config map[string]any, externalID string, secretKeys []string) 
 
 	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
 	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
-			continue
-		}
 		varName := fmt.Sprintf(
 			"%s_%s",
 			prefix,
@@ -640,7 +637,11 @@ func (h *HandlerImpl) transformationRef(remote *RemoteDestination, urnResolver h
 	}
 
 	transformationID := remote.Transformation.ID
-	urn, err := urnResolver.GetURNByID(ttypes.TransformationResourceType, transformationID)
+	urn, err := urnResolver.GetURNByID(
+		ttypes.TransformationResourceType,
+		transformationID,
+	)
+
 	if err != nil {
 		if err == resources.ErrRemoteResourceExternalIdNotFound {
 			// Linked via UI/API and not managed by the CLI yet: drop both the ref
@@ -650,10 +651,7 @@ func (h *HandlerImpl) transformationRef(remote *RemoteDestination, urnResolver h
 		return nil, "", fmt.Errorf("resolving transformation URN: %w", err)
 	}
 
-	return &resources.PropertyRef{
-		URN:      urn,
-		Property: "id",
-	}, transformationID, nil
+	return createTransformationRef(urn), transformationID, nil
 }
 
 // syncTransformationLink reconciles the link state during Update. The differ
@@ -675,7 +673,7 @@ func (h *HandlerImpl) syncTransformationLink(
 	}
 
 	if newTransformationID == "" {
-		if _, err := h.client.Destinations.DisconnectTransformation(ctx, destinationID); err != nil {
+		if err := h.client.Destinations.DisconnectTransformation(ctx, destinationID); err != nil {
 			return "", fmt.Errorf("disconnecting transformation from destination: %w", err)
 		}
 		return "", nil

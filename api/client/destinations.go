@@ -67,18 +67,12 @@ func (s *destinations) ConnectTransformation(ctx context.Context, destinationID,
 	return result, nil
 }
 
-func (s *destinations) DisconnectTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
-	res, err := s.client.Do(ctx, "DELETE", s.transformationPath(destinationID), nil)
+func (s *destinations) DisconnectTransformation(ctx context.Context, destinationID string) error {
+	_, err := s.client.Do(ctx, "DELETE", s.transformationPath(destinationID), nil)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("disconnecting transformation from destination: %w", err)
 	}
-
-	result := &DestinationTransformation{}
-	if err = json.Unmarshal(res, result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return nil
 }
 
 func (s *destinations) GetTransformation(ctx context.Context, destinationID string) (*DestinationTransformation, error) {
