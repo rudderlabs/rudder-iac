@@ -1120,6 +1120,173 @@ func TestSetTransformationExternalID(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestConnectToDestination(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/trans-123/connectToDestination", `{
+						"destinationId": "dest-456"
+					}`)
+				},
+				ResponseStatus: 200,
+				ResponseBody: `{
+					"id": "trans-123",
+					"versionId": "ver-456",
+					"name": "Cool transformation",
+					"description": "A test description",
+					"code": "export function transformEvent(event) { return event; }",
+					"language": "javascript",
+					"destinations": [
+						{
+							"id": "dest-456",
+							"name": "My destination",
+							"enabled": true
+						}
+					]
+				}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.ConnectToDestination(ctx, "trans-123", &transformations.ConnectToDestinationRequest{
+			DestinationID: "dest-456",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "trans-123", result.ID)
+		require.Len(t, result.Destinations, 1)
+		assert.Equal(t, transformations.TransformationDestination{
+			ID:      "dest-456",
+			Name:    "My destination",
+			Enabled: true,
+		}, result.Destinations[0])
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("not published", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 400,
+				ResponseBody:   `{"message": "Transformation is not published"}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.ConnectToDestination(ctx, "trans-123", &transformations.ConnectToDestinationRequest{
+			DestinationID: "dest-456",
+		})
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "connecting transformation to destination")
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("unmarshal failure", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 200,
+				ResponseBody:   `not valid json`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.ConnectToDestination(ctx, "trans-123", &transformations.ConnectToDestinationRequest{
+			DestinationID: "dest-456",
+		})
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "unmarshalling connect to destination response")
+
+		httpClient.AssertNumberOfCalls()
+	})
+}
+
+func TestDisconnectFromDestination(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/transformations/trans-123/disconnectFromDestination", `{
+						"destinationId": "dest-456"
+					}`)
+				},
+				ResponseStatus: 200,
+				ResponseBody: `{
+					"id": "trans-123",
+					"versionId": "ver-456",
+					"name": "Cool transformation",
+					"description": "A test description",
+					"code": "export function transformEvent(event) { return event; }",
+					"language": "javascript"
+				}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.DisconnectFromDestination(ctx, "trans-123", &transformations.ConnectToDestinationRequest{
+			DestinationID: "dest-456",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "trans-123", result.ID)
+		assert.Empty(t, result.Destinations)
+
+		httpClient.AssertNumberOfCalls()
+	})
+
+	t.Run("non-200 status code", func(t *testing.T) {
+		ctx := context.Background()
+
+		calls := []testutils.Call{
+			{
+				ResponseStatus: 404,
+				ResponseBody:   `{"message": "not found"}`,
+			},
+		}
+
+		httpClient := testutils.NewMockHTTPClient(t, calls...)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		store := transformations.NewRudderTransformationStore(c)
+		result, err := store.DisconnectFromDestination(ctx, "trans-123", &transformations.ConnectToDestinationRequest{
+			DestinationID: "dest-456",
+		})
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorContains(t, err, "disconnecting transformation from destination")
+
+		httpClient.AssertNumberOfCalls()
+	})
+}
+
 func TestSetLibraryExternalID(t *testing.T) {
 	ctx := context.Background()
 

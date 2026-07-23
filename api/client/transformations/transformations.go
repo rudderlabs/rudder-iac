@@ -24,6 +24,8 @@ type TransformationStore interface {
 	ListTransformations(ctx context.Context) ([]*Transformation, error)
 	DeleteTransformation(ctx context.Context, id string) error
 	SetTransformationExternalID(ctx context.Context, id string, externalID string) error
+	ConnectToDestination(ctx context.Context, id string, req *ConnectToDestinationRequest) (*Transformation, error)
+	DisconnectFromDestination(ctx context.Context, id string, req *ConnectToDestinationRequest) (*Transformation, error)
 
 	// Library operations
 	CreateLibrary(ctx context.Context, req *CreateLibraryRequest, publish bool) (*TransformationLibrary, error)
@@ -156,6 +158,51 @@ func (r *rudderTransformationStore) SetTransformationExternalID(ctx context.Cont
 		return fmt.Errorf("setting transformation external ID: %w", err)
 	}
 	return nil
+}
+
+// ConnectToDestination connects a published transformation to a destination.
+// A destination can have only one connected transformation at a time, so
+// connecting replaces any transformation already connected to the destination.
+// The transformation must be published before it can be connected.
+func (r *rudderTransformationStore) ConnectToDestination(ctx context.Context, id string, req *ConnectToDestinationRequest) (*Transformation, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling connect to destination request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/connectToDestination", transformationsPrefix, id)
+	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("connecting transformation to destination: %w", err)
+	}
+
+	var transformation Transformation
+	if err := json.Unmarshal(resp, &transformation); err != nil {
+		return nil, fmt.Errorf("unmarshalling connect to destination response: %w", err)
+	}
+
+	return &transformation, nil
+}
+
+// DisconnectFromDestination disconnects a transformation from a destination.
+func (r *rudderTransformationStore) DisconnectFromDestination(ctx context.Context, id string, req *ConnectToDestinationRequest) (*Transformation, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling disconnect from destination request: %w", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/disconnectFromDestination", transformationsPrefix, id)
+	resp, err := r.client.Do(ctx, "POST", path, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("disconnecting transformation from destination: %w", err)
+	}
+
+	var transformation Transformation
+	if err := json.Unmarshal(resp, &transformation); err != nil {
+		return nil, fmt.Errorf("unmarshalling disconnect from destination response: %w", err)
+	}
+
+	return &transformation, nil
 }
 
 // Library operations

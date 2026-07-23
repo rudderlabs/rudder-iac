@@ -2,15 +2,24 @@ package transformations
 
 // Transformation represents a transformation resource from the API
 type Transformation struct {
-	ID          string   `json:"id"`
-	VersionID   string   `json:"versionId"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Code        string   `json:"code"`
-	Language    string   `json:"language"`
-	Imports     []string `json:"imports"`
-	WorkspaceID string   `json:"workspaceId"`
-	ExternalID  string   `json:"externalId,omitempty"`
+	ID           string                      `json:"id"`
+	VersionID    string                      `json:"versionId"`
+	Name         string                      `json:"name"`
+	Description  string                      `json:"description"`
+	Code         string                      `json:"code"`
+	Language     string                      `json:"language"`
+	Imports      []string                    `json:"imports"`
+	WorkspaceID  string                      `json:"workspaceId"`
+	ExternalID   string                      `json:"externalId,omitempty"`
+	Destinations []TransformationDestination `json:"destinations,omitempty"`
+}
+
+// TransformationDestination represents a destination that a transformation is
+// connected to, as returned by the destination connection endpoints.
+type TransformationDestination struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
 }
 
 // TransformationLibrary represents a transformation library resource from the API
@@ -41,6 +50,12 @@ type UpdateTransformationRequest struct {
 	Description string `json:"description"`
 	Code        string `json:"code"`
 	Language    string `json:"language"`
+}
+
+// ConnectToDestinationRequest is the request body for connecting or
+// disconnecting a transformation to/from a destination.
+type ConnectToDestinationRequest struct {
+	DestinationID string `json:"destinationId"`
 }
 
 // CreateLibraryRequest is the request body for creating a library
