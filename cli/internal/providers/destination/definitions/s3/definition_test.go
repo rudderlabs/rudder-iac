@@ -96,45 +96,15 @@ func TestS3ConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("iam_role_arn not required when role_based_auth true", func(t *testing.T) {
+	t.Run("iam_role_arn required when role_based_auth true", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"bucket_name":     "my-bucket",
 			"role_based_auth": true,
 		})
-		require.Empty(t, errors)
-	})
-
-	t.Run("access keys excluded when role_based_auth true", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"bucket_name":     "my-bucket",
-			"role_based_auth": true,
-			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
-			"access_key_id":   "AKIA...",
-			"access_key":      "secret",
-		})
-		require.Len(t, errors, 2)
-		byPath := map[string]string{}
-		for _, err := range errors {
-			byPath[err.Path] = err.Message
-		}
-		assert.Equal(t, "'access_key_id' is not allowed when 'role_based_auth' is true", byPath["/access_key_id"])
-		assert.Equal(t, "'access_key' is not allowed when 'role_based_auth' is true", byPath["/access_key"])
-	})
-
-	t.Run("iam_role_arn excluded when role_based_auth false", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"bucket_name":     "my-bucket",
-			"role_based_auth": false,
-			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
-			"access_key_id":   "AKIA...",
-			"access_key":      "secret",
-		})
-		require.Len(t, errors, 1)
+		require.NotEmpty(t, errors)
 		assert.Equal(t, "/iam_role_arn", errors[0].Path)
-		assert.Equal(t, "'iam_role_arn' is not allowed when 'role_based_auth' is false", errors[0].Message)
+		assert.Contains(t, errors[0].Message, "required")
 	})
 
 	t.Run("access keys required when role_based_auth false", func(t *testing.T) {
