@@ -45,12 +45,12 @@ type s3Config struct {
 	Prefix        string `mapstructure:"prefix" validate:"omitempty,max=100"`
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
 	// IAM role ARN is required when role-based auth is on; forbidden when off.
-	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"excluded_if=RoleBasedAuth false,max=100"`
+	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,max=100"`
 	// Access keys are required for key-based auth and forbidden when role-based
 	// auth is on. Import/export never invents these secrets — users must supply
 	// them (e.g. via {{ .VAR }} + a var file) when role_based_auth is false.
-	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,excluded_if=RoleBasedAuth true,max=100"`
-	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,excluded_if=RoleBasedAuth true,max=100"`
+	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,max=100"`
+	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,max=100"`
 	EnableSSE         *bool                    `mapstructure:"enable_sse"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -59,12 +59,12 @@ type s3Config struct {
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("bucketName", "bucket_name"),
-		converter.Simple("prefix", "prefix", converter.SkipZeroValue),
+		converter.Simple("prefix", "prefix"),
 		converter.Simple("roleBasedAuth", "role_based_auth"),
-		converter.Simple("iamRoleARN", "iam_role_arn", converter.SkipZeroValue),
-		converter.Simple("accessKeyID", "access_key_id", converter.SkipZeroValue),
-		converter.Simple("accessKey", "access_key", converter.SkipZeroValue),
-		converter.Simple("enableSSE", "enable_sse", converter.SkipZeroValue),
+		converter.Simple("iamRoleARN", "iam_role_arn"),
+		converter.Simple("accessKeyID", "access_key_id"),
+		converter.Simple("accessKey", "access_key"),
+		converter.Simple("enableSSE", "enable_sse"),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 
