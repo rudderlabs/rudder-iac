@@ -174,9 +174,15 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 			return
 		}
 
-		newV1, ok := rewriteCompatibleType(v1)
-		if ok {
+		// Rewrite both sides so a []any-of-objects from one decode path (e.g.
+		// JSON remote state) and its equal counterpart from another (e.g. YAML
+		// spec) land on the same type before the type-equality gate below.
+		if newV1, ok := rewriteCompatibleType(v1); ok {
 			v1 = newV1
+		}
+
+		if newV2, ok := rewriteCompatibleType(v2); ok {
+			v2 = newV2
 		}
 
 		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
