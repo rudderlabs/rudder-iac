@@ -32,6 +32,7 @@ type BaseHandler[Spec any, Res any, State any, Remote RemoteResource] struct {
 	metadata       HandlerMetadata
 	resources      map[string]*Res
 	importMetadata map[string]*importResourceInfo
+	secretFields   []SecretField
 	Impl           HandlerImpl[Spec, Res, State, Remote]
 }
 
@@ -44,10 +45,16 @@ func NewHandler[Spec any, Res any, State any, Remote RemoteResource](
 	impl HandlerImpl[Spec, Res, State, Remote],
 ) *BaseHandler[Spec, Res, State, Remote] {
 	m := impl.Metadata()
+	secretFields := declaredSecretFields[Res, State]()
+	if configurable, ok := impl.(secretFieldConfigurator); ok {
+		configurable.SetSecretFields(secretFields)
+	}
+
 	return &BaseHandler[Spec, Res, State, Remote]{
 		metadata:       m,
 		resources:      make(map[string]*Res),
 		importMetadata: make(map[string]*importResourceInfo),
+		secretFields:   secretFields,
 		Impl:           impl,
 	}
 }
@@ -265,6 +272,14 @@ func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *res
 		// Skip if nil (convention: nil Resource = skip)
 		if inputRaw == nil {
 			continue
+		}
+		if len(h.secretFields) > 0 {
+			if err := scrubDeclaredSecrets(inputRaw); err != nil {
+				return nil, fmt.Errorf("scrubbing input secrets for %s: %w", remoteResource.ID, err)
+			}
+			if err := scrubDeclaredSecrets(outputRaw); err != nil {
+				return nil, fmt.Errorf("scrubbing output secrets for %s: %w", remoteResource.ID, err)
+			}
 		}
 
 		s.AddResource(&state.ResourceState{

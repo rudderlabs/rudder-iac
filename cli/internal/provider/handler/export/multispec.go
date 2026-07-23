@@ -18,7 +18,12 @@ type MutliSpecExportHandler[Spec any, Remote handler.RemoteResource] interface {
 }
 
 type MultiSpecExportStrategy[Spec any, Remote handler.RemoteResource] struct {
-	Handler MutliSpecExportHandler[Spec, Remote]
+	Handler      MutliSpecExportHandler[Spec, Remote]
+	secretFields []handler.SecretField
+}
+
+func (s *MultiSpecExportStrategy[Spec, Remote]) SetSecretFields(fields []handler.SecretField) {
+	s.secretFields = fields
 }
 
 func (s *MultiSpecExportStrategy[Spec, Remote]) FormatForExport(
@@ -62,6 +67,9 @@ func (s *MultiSpecExportStrategy[Spec, Remote]) FormatForExport(
 		exportData, err := s.Handler.MapRemoteToSpec(localID, remote)
 		if err != nil {
 			return nil, nil, fmt.Errorf("mapping remote to spec: %w", err)
+		}
+		if err := exportData.AttachSecretVariables(s.Handler.Metadata().ResourceType, localID, s.secretFields); err != nil {
+			return nil, nil, fmt.Errorf("attaching secret variables: %w", err)
 		}
 		specData, err := exportData.ToMap()
 		if err != nil {
