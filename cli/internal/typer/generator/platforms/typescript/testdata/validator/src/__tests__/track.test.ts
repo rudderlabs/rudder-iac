@@ -21,7 +21,7 @@ describe("RudderTyper.track", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   // ---- trackUserSignedUp (comprehensive) ----

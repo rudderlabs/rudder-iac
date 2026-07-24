@@ -21,7 +21,7 @@ describe("RudderTyper.track (multi-type properties)", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   // ---- multiTypeField: string | number | boolean ----
