@@ -424,6 +424,10 @@ export interface EventWithNameCamelCase1 {
  * - ID: plan_12345
  * - Version: 13
  *
+ * The constructor takes a resolver function that returns the current
+ * RudderAnalytics instance. It is re-invoked on every call, so a lazily-loaded
+ * SDK is always resolved fresh rather than captured once at construction.
+ *
  * @example
  * ```ts
  * import { RudderAnalytics } from "@rudderstack/analytics-js";
@@ -431,14 +435,14 @@ export interface EventWithNameCamelCase1 {
  *
  * const analytics = new RudderAnalytics();
  * analytics.load("YOUR_WRITE_KEY", "YOUR_DATA_PLANE_URL");
- * const rudderTyper = new RudderTyper(analytics);
+ * const rudderTyper = new RudderTyper(() => analytics);
  * ```
  *
  * In a browser app that loads the SDK asynchronously, the standard RudderStack
  * snippet swaps `window.rudderanalytics` from the buffering preloader to the real
- * SDK once it loads. Pass a resolver function instead of the instance so every call
- * re-resolves the current SDK — otherwise the preloader is captured at construction
- * and events fired after the SDK loads are silently dropped:
+ * SDK once it loads. Because the resolver re-resolves on every call, events are
+ * always sent through the current SDK — an eagerly captured instance would pin the
+ * preloader and silently drop events fired after the SDK loads:
  *
  * ```ts
  * const rudderTyper = new RudderTyper(() => window.rudderanalytics);
@@ -448,12 +452,12 @@ export class RudderTyper {
     private readonly resolveAnalytics: () => RudderAnalytics;
 
     /**
-     * @param analytics - a RudderAnalytics instance, or a function that returns the
-     * current instance. Prefer the function form in the browser so a lazily-loaded
-     * SDK is resolved on every call rather than captured once at construction.
+     * @param resolveAnalytics - a function that returns the current RudderAnalytics
+     * instance. Re-invoked on every call so a lazily-loaded SDK is resolved fresh
+     * rather than captured once at construction.
      */
-    constructor(analytics: RudderAnalytics | (() => RudderAnalytics)) {
-        this.resolveAnalytics = typeof analytics === "function" ? analytics : () => analytics;
+    constructor(resolveAnalytics: () => RudderAnalytics) {
+        this.resolveAnalytics = resolveAnalytics;
     }
 
     private get analytics(): RudderAnalytics {
