@@ -21,7 +21,7 @@ describe("RudderTyper.page", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   it("dispatches a page event with name and typed properties", async () => {

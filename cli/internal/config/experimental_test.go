@@ -36,6 +36,16 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			flagName: "eventRuleIncludes",
 			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
 		},
+		{
+			name:     "destinationSupport",
+			flagName: "destinationSupport",
+			want:     "RUDDERSTACK_X_DESTINATION_SUPPORT",
+		},
+		{
+			name:     "unverifiedDestinations",
+			flagName: "unverifiedDestinations",
+			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
+		},
 	}
 
 	for _, tt := range tests {

@@ -102,8 +102,9 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		results = append(results, vrules.ValidationResult{
 			Reference: "/definition_version",
 			Message: fmt.Sprintf(
-				"definition_version %d is not valid for destination type '%s'; valid versions: %s",
-				spec.DefinitionVersion, spec.Type, joinInt64(versions),
+				"version not valid for destination type '%s'; valid versions: %s",
+				spec.Type,
+				joinInt64(versions),
 			),
 		})
 		return prefixSpecReferences(results)

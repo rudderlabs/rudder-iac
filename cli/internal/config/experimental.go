@@ -30,6 +30,12 @@ type ExperimentalConfig struct {
 	// remote resources to existing local project resources instead of
 	// generating duplicate specs
 	ImportMerge bool `mapstructure:"importMerge"`
+	// DestinationSupport enables destination definition registration and
+	// destination kind matching for validate/apply/import flows.
+	DestinationSupport bool `mapstructure:"destinationSupport"`
+	// UnverifiedDestinations enables registration of unverified destination
+	// definitions (e.g. S3) when DestinationSupport is also enabled.
+	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

@@ -2,7 +2,9 @@ package definitions
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -70,6 +72,25 @@ func findUnknownKeysForField(value any, fieldType reflect.Type, basePath string)
 					item,
 					elemType,
 					joinConfigPath(basePath, strconv.Itoa(i)),
+				)...,
+			)
+		}
+		return errors
+
+	case reflect.Map:
+		items, ok := value.(map[string]any)
+		if !ok {
+			return nil
+		}
+
+		var errors []ConfigError
+		for _, key := range slices.Sorted(maps.Keys(items)) {
+			errors = append(
+				errors,
+				findUnknownKeysForField(
+					items[key],
+					fieldType.Elem(),
+					joinConfigPath(basePath, key),
 				)...,
 			)
 		}

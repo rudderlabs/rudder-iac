@@ -126,6 +126,7 @@ func (p *EventImportProvider) FormatForExport(
 	version := specs.SpecVersionV1
 
 	formattedEvents := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, event := range events {
 		p.log.Debug("formatting event", "remoteID", event.ID, "externalID", event.ExternalID)
 
@@ -134,8 +135,21 @@ func (p *EventImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog event")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the events
 		urn := resources.URN(event.ExternalID, types.EventResourceType)
+
+		// Matched events (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if event.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceId,
+				URN:         urn,
+				RemoteID:    event.ID,
+			})
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the events
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: event.ID,
@@ -147,6 +161,10 @@ func (p *EventImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("formatting event: %w", err)
 		}
 		formattedEvents = append(formattedEvents, formatted)
+	}
+
+	if len(formattedEvents) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -166,5 +184,5 @@ func (p *EventImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, importEntriesFromWorkspace(workspaceMetadata), nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

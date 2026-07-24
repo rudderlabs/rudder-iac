@@ -86,8 +86,7 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 			Scope: h.metadata.ResourceType,
 		})
 
-		reference := fmt.Sprintf("#/%s/%s/%s", h.metadata.SpecKind, h.metadata.SpecMetadataName, externalID)
-
+		reference := fmt.Sprintf("#%s:%s", h.metadata.SpecKind, externalID)
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
 		}
@@ -335,17 +334,41 @@ func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
 		return nil, nil, nil
 	}
 
+	// Matched resources (import --merge) adopt an existing local spec: they
+	// contribute a manifest entry only, emitted here because the MatchedWith
+	// reference lives on the RemoteResource wrapper the Impl never sees. The
+	// Impl stays the entry source for the resources it exports — disjoint
+	// sets, one emitter each, so entries are never duplicated.
 	remotes := make(map[string]*Remote, len(all))
+	var matchedEntries []importmanifest.ImportEntry
 	for _, res := range all {
 		remote, ok := res.Data.(*Remote)
 		if !ok {
 			return nil, nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
 		}
 
+		if res.MatchedWith != nil {
+			metadata := (*remote).Metadata()
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: metadata.WorkspaceID,
+				URN:         resources.URN(res.ExternalID, h.metadata.ResourceType),
+				RemoteID:    res.ID,
+			})
+			continue
+		}
+
 		remotes[res.ExternalID] = remote
 	}
 
-	return h.Impl.FormatForExport(remotes, idNamer, inputResolver)
+	if len(remotes) == 0 {
+		return nil, matchedEntries, nil
+	}
+
+	entities, entries, err := h.Impl.FormatForExport(remotes, idNamer, inputResolver)
+	if err != nil {
+		return nil, nil, err
+	}
+	return entities, append(entries, matchedEntries...), nil
 }
 
 func CreatePropertyRef[State any](
