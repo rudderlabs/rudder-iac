@@ -21,7 +21,7 @@ describe("RudderTyper.track — variant discriminated unions", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   // ---- trackEventWithVariants (each event-level variant case) ----
