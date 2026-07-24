@@ -104,10 +104,11 @@ func (p *Provider) SupportedTypes() []string {
 	return types
 }
 
-// ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for event stream sources.
-func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sourceHandler.Matcher()}
+// ImportableRefs overrides the EmptyProvider default to declare the references
+// event stream importables hold (a source references its tracking plan), so
+// import --merge can detect pending-delete conflicts before formatting.
+func (p *Provider) ImportableRefs() []importmatcher.RefLister {
+	return []importmatcher.RefLister{sourceHandler.RefLister()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {

@@ -22,6 +22,12 @@ func (p *EmptyProvider) ResourceMatchers() []importmatcher.Matcher {
 	return nil
 }
 
+// ImportableRefs returns nil: by default a provider declares no importable
+// cross-resource references. Providers opt in by overriding.
+func (p *EmptyProvider) ImportableRefs() []importmatcher.RefLister {
+	return nil
+}
+
 // CRUD Operations
 func (p *EmptyProvider) Create(_ context.Context, _ string, _ string, _ resources.ResourceData) (*resources.ResourceData, error) {
 	return nil, errNotImplemented
