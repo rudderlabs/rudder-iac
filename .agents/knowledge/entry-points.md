@@ -49,3 +49,12 @@ Read this first when working on destination external IDs or destination ownershi
 Read these first when working on named `validate:"pattern=<name>"` behavior:
 - `cli/internal/provider/rules/funcs/regex.go`: shared pattern registry and validator function, including allow/reject matching.
 - `cli/internal/provider/rules/funcs/regex_test.go`: co-located coverage for `NewPattern`, `NewPatternWithReject`, and validator behavior.
+
+## DEX-554 — TypeScript Typer Generator Entry
+<!-- ticket:DEX-554 -->
+Read these when working on generated TypeScript `RudderTyper` behavior:
+- `cli/internal/typer/generator/platforms/typescript/templates/ruddertyper.tmpl`: generated class method body template for TypeScript RudderTyper SDK calls.
+- `cli/internal/typer/generator/platforms/typescript/templates.go`: embeds the TypeScript generator templates.
+- `cli/internal/typer/generator/platforms/typescript/templates/RudderTyper.ts.tmpl`: wrapper template for the generated TypeScript client file.
+- `cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts`: golden generated output; refresh with `make typer-typescript-update-testdata`.
+- `cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts`: validator copy target used by `make typer-typescript-validate`.

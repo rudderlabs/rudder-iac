@@ -54,3 +54,8 @@
 - Pattern registration now supports an optional reject regex: `NewPattern`/`Register` remain allow-only wrappers, while `NewPatternWithReject`/`RegisterWithReject` store the allow regex plus optional reject and make matching fail when the reject regex matches.
 - Re-registering a pattern without a reject intentionally clears any stale reject entry for that name, preserving allow-only behavior for existing callers.
 - `RegisterWithReject` defensively initializes nil registry maps before writes, so package-local fixtures or future literal registries do not panic when they omit optional maps such as `rejects`.
+
+## DEX-554 — TypeScript Typer Nullish Analytics Guard
+<!-- ticket:DEX-554 -->
+- Generated TypeScript `RudderTyper` methods preserve per-call lazy resolution by assigning `const analytics = this.resolveAnalytics();` inside each generated method before invoking the SDK.
+- Treat only `null` and `undefined` resolver results as absent: use an explicit `analytics === null || analytics === undefined` guard rather than loose equality or broad truthiness, so linting stays strict and TypeScript narrows the resolver result without rejecting other falsy-like SDK values.
