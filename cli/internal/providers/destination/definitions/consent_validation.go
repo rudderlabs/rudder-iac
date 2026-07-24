@@ -66,8 +66,12 @@ func consentManagementBlock(config map[string]any) (map[string]any, []ConfigErro
 func validateConsentEntriesShape(basePath string, raw any) []ConfigError {
 	entries, ok := raw.([]any)
 	if !ok {
-		return nil
+		return []ConfigError{{Path: basePath, Message: "consent entries must be an array"}}
 	}
+
+	// if len(entries) == 0 {
+	// 	return []ConfigError{{Path: basePath, Message: "consent entries must be a non-empty array"}}
+	// }
 
 	var errors []ConfigError
 	for index, rawEntry := range entries {

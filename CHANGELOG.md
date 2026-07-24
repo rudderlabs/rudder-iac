@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.22.0](https://github.com/rudderlabs/rudder-iac/compare/v0.21.0...v0.22.0) (2026-07-24)
+
+
+### Features
+
+* add base support for s3 destination ([#676](https://github.com/rudderlabs/rudder-iac/issues/676)) ([ed8441f](https://github.com/rudderlabs/rudder-iac/commit/ed8441f0e1d534e8580a08b358c29c76f4d3f96b))
+* add flag to control unverified destinations ([#706](https://github.com/rudderlabs/rudder-iac/issues/706)) ([92f6926](https://github.com/rudderlabs/rudder-iac/commit/92f6926de7d538d70a250299569c5eb366973921))
+* addded support for source type gated path on the configproperties for a definition ([#685](https://github.com/rudderlabs/rudder-iac/issues/685)) ([69486be](https://github.com/rudderlabs/rudder-iac/commit/69486bed10733e08d011b040b302a61c4d67fe98))
+* **cli:** add reject-aware pattern registry ([#701](https://github.com/rudderlabs/rudder-iac/issues/701)) ([4efaa27](https://github.com/rudderlabs/rudder-iac/commit/4efaa27965855987c78966d7789836177ef9740a))
+* **datacatalog:** import-merge matchers for catalog resources ([#668](https://github.com/rudderlabs/rudder-iac/issues/668)) ([68ceb51](https://github.com/rudderlabs/rudder-iac/commit/68ceb51185d07cad0dbef598f99435c194c966be))
+* **datagraph:** import-merge matchers for data graphs and composite children ([#678](https://github.com/rudderlabs/rudder-iac/issues/678)) ([94a381d](https://github.com/rudderlabs/rudder-iac/commit/94a381d3333dbff3afa6778afa5b57acac9f1267))
+* **event-stream:** import-merge matcher for sources ([#669](https://github.com/rudderlabs/rudder-iac/issues/669)) ([c3fb8b2](https://github.com/rudderlabs/rudder-iac/commit/c3fb8b2a75ad40d1d7f71a749640fa6e2a36050a))
+* **import:** core smart-merge machinery behind importMerge flag ([#666](https://github.com/rudderlabs/rudder-iac/issues/666)) ([950fe40](https://github.com/rudderlabs/rudder-iac/commit/950fe40a1d5be0ddc11b5ccc3a3cd32c01a68d85))
+* **retl:** import-merge matcher for sql models ([#670](https://github.com/rudderlabs/rudder-iac/issues/670)) ([4e22505](https://github.com/rudderlabs/rudder-iac/commit/4e22505181242dd76148d0fd41a5da105b1bcbcb))
+* **transformations:** import-merge matchers for libraries and transformations ([#667](https://github.com/rudderlabs/rudder-iac/issues/667)) ([6094094](https://github.com/rudderlabs/rudder-iac/commit/6094094f476542fa3399b08d1880b4bbce558346))
+
+
+### Bug Fixes
+
+* **cli:** destination stability fixes and presence-based secrets ([#709](https://github.com/rudderlabs/rudder-iac/issues/709)) ([8b4a90a](https://github.com/rudderlabs/rudder-iac/commit/8b4a90ab4963b4a9b992d1144fb8552b1a1d182c))
+* **import-merge:** matched-entry workspace ID + custom-type property linking ([#708](https://github.com/rudderlabs/rudder-iac/issues/708)) ([508f166](https://github.com/rudderlabs/rudder-iac/commit/508f166c4bc896cc5b83916e88bcb6622b99ebf6))
+* **tests:** ignore volatile upstream error message in transformations e2e ([#712](https://github.com/rudderlabs/rudder-iac/issues/712)) ([d353215](https://github.com/rudderlabs/rudder-iac/commit/d353215d6aa3857bb79b8d136bb031cb7f79ad77))
+* **typer:** make local generate work off-volume and name both experimental flags ([#680](https://github.com/rudderlabs/rudder-iac/issues/680)) ([7393796](https://github.com/rudderlabs/rudder-iac/commit/7393796898db1b9f2197a8989250649a54c3ed43))
+
 ## [0.21.0](https://github.com/rudderlabs/rudder-iac/compare/v0.20.0...v0.21.0) (2026-07-14)
 
 

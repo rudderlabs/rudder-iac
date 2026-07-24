@@ -21,7 +21,7 @@ describe("RudderTyper.identify", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   it("dispatches an identify event with the provided userId and traits", async () => {
