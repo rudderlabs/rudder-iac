@@ -21,7 +21,7 @@ describe("RudderTyper.group", () => {
       uaChTrackLevel: "none",
     });
     await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-    typer = new RudderTyper(analytics);
+    typer = new RudderTyper(() => analytics);
   });
 
   it("dispatches a group event with groupId and traits routed through context.traits", async () => {
