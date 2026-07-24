@@ -138,3 +138,25 @@ export class RudderTyper {
         };
     }
 }
+{{- if .EmitV1Compat }}
+
+// ===== v1 compatibility layer (opt-in: --option v1Compat=true) =====
+//
+// Un-prefixed free functions bound to a default client that lazily resolves
+// window.rudderanalytics on every call. This is a drop-in for consumers migrating
+// from the npm `rudder-typer` v1 module: same imports, same un-prefixed call sites,
+// no `new RudderTyper(...)`. Not emitted by default — see the migration guide.
+//
+// window.rudderanalytics is declared by @rudderstack/analytics-js as
+// `RudderAnalytics | RudderAnalyticsPreloader | undefined`; the cast mirrors the v1
+// module (which treated the instance as `any`) and the runtime guarantee that the
+// standard snippet defines it before any call fires.
+//
+// Caveats (see PR discussion): (1) a track event literally named Identify/Page/Group
+// strips to a name that collides with the singleton method; not guarded here yet.
+// (2) .bind narrows overloaded methods (identify/page/group) to a single signature.
+const rudderTyperV1Compat = new RudderTyper(() => window.rudderanalytics as RudderAnalytics);
+{{ range $method := .AnalyticsMethods }}
+export const {{ compatName $method }} = rudderTyperV1Compat.{{ $method.Name }}.bind(rudderTyperV1Compat);
+{{- end }}
+{{- end }}

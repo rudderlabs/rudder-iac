@@ -93,6 +93,28 @@ func TestGenerateResolvesAnalyticsLazily(t *testing.T) {
 	assert.NotContains(t, content, "RudderAnalytics | (() => RudderAnalytics)", "must not accept the unsafe instance form")
 }
 
+// TestGenerateV1CompatIsOptIn verifies the v1 compatibility layer is emitted only
+// when --option v1Compat=true, and that it exposes un-prefixed free functions bound
+// to a default client resolving window.rudderanalytics.
+func TestGenerateV1CompatIsOptIn(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+	generator := &typescript.Generator{}
+
+	off, err := generator.Generate(trackingPlan, core.GenerateOptions{RudderCLIVersion: "1.0.0"}, typescript.TypeScriptOptions{})
+	assert.NoError(t, err)
+	assert.NotContains(t, off[0].Content, "v1 compatibility layer", "compat layer must be off by default")
+
+	on, err := generator.Generate(trackingPlan, core.GenerateOptions{RudderCLIVersion: "1.0.0"}, typescript.TypeScriptOptions{V1Compat: true})
+	assert.NoError(t, err)
+	content := on[0].Content
+	assert.Contains(t, content, "v1 compatibility layer")
+	assert.Contains(t, content, "const rudderTyperV1Compat = new RudderTyper(() => window.rudderanalytics as RudderAnalytics);")
+	// Un-prefixed free function for a track event (class method is trackXxx).
+	assert.Contains(t, content, "export const userSignedUp = rudderTyperV1Compat.trackUserSignedUp.bind(rudderTyperV1Compat);")
+	// Non-track singletons keep their names.
+	assert.Contains(t, content, "export const identify = rudderTyperV1Compat.identify.bind(rudderTyperV1Compat);")
+}
+
 func TestGenerateWithCustomOutputFileName(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
