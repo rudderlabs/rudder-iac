@@ -249,15 +249,17 @@ func TestPropertyMatcher(t *testing.T) {
 		require.NotNil(t, local)
 	})
 
-	t.Run("local custom type reference never matches", func(t *testing.T) {
+	t.Run("local custom-type against remote string type does not match", func(t *testing.T) {
 		t.Parallel()
 		scope := scopeWith(localProperty("typed", "typed", resources.PropertyRef{URN: "custom-type:email-type"}, map[string]interface{}{}))
 
 		assert.Nil(t, matcher.Match(scope, remoteProperty(catalog.Property{Name: "typed", Type: "string"})))
 	})
 
-	t.Run("remote custom type reference never matches", func(t *testing.T) {
+	t.Run("remote custom-type against local string type does not match", func(t *testing.T) {
 		t.Parallel()
+		// Remote references a custom type (ct_remote_1) but the local property is
+		// a plain string — even were ct_remote_1 resolvable, the types differ.
 		scope := scopeWith(localProperty("typed", "typed", "string", map[string]interface{}{}))
 
 		assert.Nil(t, matcher.Match(scope, remoteProperty(catalog.Property{
@@ -265,7 +267,7 @@ func TestPropertyMatcher(t *testing.T) {
 		})))
 	})
 
-	t.Run("local custom type item reference never matches", func(t *testing.T) {
+	t.Run("local custom-type item against remote string item does not match", func(t *testing.T) {
 		t.Parallel()
 		scope := scopeWith(localProperty("tags", "tags", "array", map[string]interface{}{
 			"item_types": []interface{}{resources.PropertyRef{URN: "custom-type:email-type"}},
@@ -282,5 +284,94 @@ func TestPropertyMatcher(t *testing.T) {
 		scope := scopeWith(localProperty("broken", "", "string", map[string]interface{}{}))
 
 		assert.Nil(t, matcher.Match(scope, remoteProperty(catalog.Property{Name: "", Type: "string"})))
+	})
+
+	// managedCustomType is a local custom-type resource carrying the remote ID
+	// it was imported from, so resolveTypeRef can map a remote DefinitionId to
+	// its local URN.
+	managedCustomType := func(id, remoteID string) *resources.Resource {
+		return resources.NewResource(id, types.CustomTypeResourceType,
+			resources.ResourceData{"name": id}, []string{},
+			resources.WithResourceImportMetadata(remoteID, "ws-1"))
+	}
+
+	t.Run("custom-type property links via an already-managed custom type", func(t *testing.T) {
+		t.Parallel()
+		// Local property's type is a PropertyRef to custom-type:email-type; the
+		// custom type is already managed, imported from remote id ct_remote_1.
+		scope := scopeWith(
+			localProperty("email", "User Email", resources.PropertyRef{URN: "custom-type:email-type"}, map[string]interface{}{}),
+			managedCustomType("email-type", "ct_remote_1"),
+		)
+
+		local := matcher.Match(scope, remoteProperty(catalog.Property{
+			Name: "User Email", Type: "email-type", DefinitionId: "ct_remote_1",
+		}))
+
+		require.NotNil(t, local)
+		assert.Equal(t, "email", local.ID())
+	})
+
+	t.Run("different custom types do not link", func(t *testing.T) {
+		t.Parallel()
+		// Local references email-type; remote references a different custom type
+		// (email-string, ct_remote_2). Same name, different type ⇒ no match.
+		scope := scopeWith(
+			localProperty("email", "User Email", resources.PropertyRef{URN: "custom-type:email-type"}, map[string]interface{}{}),
+			managedCustomType("email-type", "ct_remote_1"),
+			managedCustomType("email-string", "ct_remote_2"),
+		)
+
+		assert.Nil(t, matcher.Match(scope, remoteProperty(catalog.Property{
+			Name: "User Email", Type: "email-string", DefinitionId: "ct_remote_2",
+		})))
+	})
+
+	t.Run("custom-type property links via a custom type matched in this import", func(t *testing.T) {
+		t.Parallel()
+		// The custom type is not yet managed but is being imported now and has
+		// matched a local custom type; resolveTypeRef uses its MatchedWith URN.
+		localCustomType := resources.NewResource("email-type", types.CustomTypeResourceType,
+			resources.ResourceData{"name": "email-type"}, []string{})
+		importable := resources.NewRemoteResources()
+		importable.Set(types.CustomTypeResourceType, map[string]*resources.RemoteResource{
+			"ct_remote_1": {ID: "ct_remote_1", MatchedWith: localCustomType},
+		})
+		scope := scopeWith(localProperty("email", "User Email", resources.PropertyRef{URN: "custom-type:email-type"}, map[string]interface{}{}))
+		scope.Importable = importable
+
+		local := matcher.Match(scope, remoteProperty(catalog.Property{
+			Name: "User Email", Type: "email-type", DefinitionId: "ct_remote_1",
+		}))
+
+		require.NotNil(t, local)
+		assert.Equal(t, "email", local.ID())
+	})
+
+	t.Run("unresolvable custom type does not link", func(t *testing.T) {
+		t.Parallel()
+		// Remote references a custom type that is neither managed nor imported.
+		scope := scopeWith(localProperty("email", "User Email", resources.PropertyRef{URN: "custom-type:email-type"}, map[string]interface{}{}))
+
+		assert.Nil(t, matcher.Match(scope, remoteProperty(catalog.Property{
+			Name: "User Email", Type: "email-type", DefinitionId: "ct_unknown",
+		})))
+	})
+
+	t.Run("array of custom type links via an already-managed custom type", func(t *testing.T) {
+		t.Parallel()
+		scope := scopeWith(
+			localProperty("tags", "tags", "array", map[string]interface{}{
+				"item_types": []interface{}{resources.PropertyRef{URN: "custom-type:tag-type"}},
+			}),
+			managedCustomType("tag-type", "ct_remote_9"),
+		)
+
+		local := matcher.Match(scope, remoteProperty(catalog.Property{
+			Name: "tags", Type: "array", ItemDefinitionId: "ct_remote_9",
+		}))
+
+		require.NotNil(t, local)
+		assert.Equal(t, "tags", local.ID())
 	})
 }
