@@ -1,0 +1,11 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: prod-bq
+spec:
+  id: prod-bq
+  account_definition_name: SOURCE_BIGQUERY
+  config:
+    project: acme-analytics-prod
+    location: EU
+    credentials: "{{ .BQ_CREDENTIALS }}"
