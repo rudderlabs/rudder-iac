@@ -6,8 +6,10 @@
  * - Version: {{ .TrackingPlanVersion }}
  *
  * The constructor takes a resolver function that returns the current
- * RudderAnalytics instance. It is re-invoked on every call, so a lazily-loaded
- * SDK is always resolved fresh rather than captured once at construction.
+ * RudderAnalytics instance, or null/undefined while the SDK is unavailable. It
+ * is re-invoked on every call, so a lazily-loaded SDK is always resolved fresh
+ * rather than captured once at construction. Calls no-op while the resolver
+ * returns null or undefined.
  *
  * @example
  * ```ts
@@ -28,21 +30,22 @@
  * ```ts
  * const rudderTyper = new RudderTyper(() => window.rudderanalytics);
  * ```
+ *
+ * If the SDK is not yet present, return null or undefined from the resolver.
+ * Generated methods will return without dispatching and will resolve again on
+ * the next call.
  */
 export class RudderTyper {
-    private readonly resolveAnalytics: () => RudderAnalytics;
+    private readonly resolveAnalytics: () => RudderAnalytics | null | undefined;
 
     /**
      * @param resolveAnalytics - a function that returns the current RudderAnalytics
-     * instance. Re-invoked on every call so a lazily-loaded SDK is resolved fresh
-     * rather than captured once at construction.
+     * instance, or null/undefined while unavailable. Re-invoked on every call so
+     * a lazily-loaded SDK is resolved fresh rather than captured once at
+     * construction.
      */
-    constructor(resolveAnalytics: () => RudderAnalytics) {
+    constructor(resolveAnalytics: () => RudderAnalytics | null | undefined) {
         this.resolveAnalytics = resolveAnalytics;
-    }
-
-    private get analytics(): RudderAnalytics {
-        return this.resolveAnalytics();
     }
 {{ range $method := .AnalyticsMethods }}
 {{- if $method.Overloads }}
@@ -63,9 +66,13 @@ export class RudderTyper {
         {{ .Name }}{{ if .Optional }}?{{ end }}: {{ .Type }},
 {{- end }}
     ): void {
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
 {{- if eq (len $method.DispatcherBranches) 1 }}
 {{- with index $method.DispatcherBranches 0 }}
-        this.analytics.{{ $method.SDKMethodName }}(
+        analytics.{{ $method.SDKMethodName }}(
 {{- range .SDKArguments }}
             {{ .Value }},
 {{- end }}
@@ -80,7 +87,7 @@ export class RudderTyper {
 {{- else }}
         } else {
 {{- end }}
-            this.analytics.{{ $method.SDKMethodName }}(
+            analytics.{{ $method.SDKMethodName }}(
 {{- range $branch.SDKArguments }}
                 {{ .Value }},
 {{- end }}
@@ -108,7 +115,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.{{ $method.SDKMethodName }}(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.{{ $method.SDKMethodName }}(
 {{- range $method.SDKArguments }}
             {{ .Value }},
 {{- end }}

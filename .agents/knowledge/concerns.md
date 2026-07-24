@@ -47,3 +47,9 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## DEX-554 — TypeScript Typer Validator Environment Fragility
+<!-- ticket:DEX-554 -->
+- TypeScript typer validator coverage can miss absent-SDK behavior when tests only construct `new RudderTyper(() => analytics)` after loading the SDK; add nullish resolver cases when changing generated SDK-call semantics.
+- `make typer-typescript-validate` can fail before exercising generated TypeScript when the pinned Docker Compose validator image hits `npm error Exit handler never called!`, then `tsc` is missing and the command exits 127.
+- If local validator steps (`npm ci`, `npm run typecheck`, `npm test`) pass in the same validator project while the Docker path fails this way, treat the Docker/npm environment as suspect before attributing the failure to generated `RudderTyper` output.

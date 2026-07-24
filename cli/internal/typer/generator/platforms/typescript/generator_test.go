@@ -67,16 +67,17 @@ func TestGenerateSingleBranchDispatcher(t *testing.T) {
 
 	file, err := typescript.GenerateFile("test.ts", ctx)
 	assert.NoError(t, err)
-	assert.Contains(t, file.Content, "        this.analytics.group(\n            groupId,\n            undefined,\n            this.withRudderTyperContext(options),\n            callback,\n        );")
+	assert.Contains(t, file.Content, "        const analytics = this.resolveAnalytics();\n        if (analytics === null || analytics === undefined) {\n            return;\n        }\n        analytics.group(\n            groupId,\n            undefined,\n            this.withRudderTyperContext(options),\n            callback,\n        );")
+	assert.NotContains(t, file.Content, "this.analytics.group", "must dispatch through the per-call local analytics variable")
 	assert.NotContains(t, file.Content, "if (typeof", "single branch must not emit if/else")
 }
 
 // TestGenerateResolvesAnalyticsLazily guards against regressing to eager instance
 // capture. The class must accept a resolver-only constructor and re-resolve the
-// instance on every call (via the `analytics` getter) so a lazily-loaded browser
-// SDK is picked up instead of the preloader being captured at construction and
-// events dropped. The instance form is intentionally not accepted so the unsafe
-// call cannot compile.
+// instance inside each generated method so a lazily-loaded browser SDK is picked
+// up instead of the preloader being captured at construction and events dropped.
+// The instance form is intentionally not accepted so the unsafe call cannot
+// compile.
 func TestGenerateResolvesAnalyticsLazily(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
@@ -86,9 +87,13 @@ func TestGenerateResolvesAnalyticsLazily(t *testing.T) {
 	assert.Len(t, files, 1)
 	content := files[0].Content
 
-	assert.Contains(t, content, "constructor(resolveAnalytics: () => RudderAnalytics)")
+	assert.Contains(t, content, "constructor(resolveAnalytics: () => RudderAnalytics | null | undefined)")
+	assert.Contains(t, content, "private readonly resolveAnalytics: () => RudderAnalytics | null | undefined;")
 	assert.Contains(t, content, "this.resolveAnalytics = resolveAnalytics;")
-	assert.Contains(t, content, "private get analytics(): RudderAnalytics {")
+	assert.Contains(t, content, "const analytics = this.resolveAnalytics();\n        if (analytics === null || analytics === undefined) {\n            return;\n        }")
+	assert.Contains(t, content, "analytics.track(\n            \"User Signed Up\",")
+	assert.Contains(t, content, "analytics.identify(")
+	assert.NotContains(t, content, "private get analytics", "must not store the resolved SDK beyond a method call")
 	assert.NotContains(t, content, "this.analytics = analytics;", "must not capture the instance eagerly")
 	assert.NotContains(t, content, "RudderAnalytics | (() => RudderAnalytics)", "must not accept the unsafe instance form")
 }

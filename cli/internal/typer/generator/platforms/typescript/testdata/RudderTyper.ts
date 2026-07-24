@@ -425,8 +425,10 @@ export interface EventWithNameCamelCase1 {
  * - Version: 13
  *
  * The constructor takes a resolver function that returns the current
- * RudderAnalytics instance. It is re-invoked on every call, so a lazily-loaded
- * SDK is always resolved fresh rather than captured once at construction.
+ * RudderAnalytics instance, or null/undefined while the SDK is unavailable. It
+ * is re-invoked on every call, so a lazily-loaded SDK is always resolved fresh
+ * rather than captured once at construction. Calls no-op while the resolver
+ * returns null or undefined.
  *
  * @example
  * ```ts
@@ -447,21 +449,22 @@ export interface EventWithNameCamelCase1 {
  * ```ts
  * const rudderTyper = new RudderTyper(() => window.rudderanalytics);
  * ```
+ *
+ * If the SDK is not yet present, return null or undefined from the resolver.
+ * Generated methods will return without dispatching and will resolve again on
+ * the next call.
  */
 export class RudderTyper {
-    private readonly resolveAnalytics: () => RudderAnalytics;
+    private readonly resolveAnalytics: () => RudderAnalytics | null | undefined;
 
     /**
      * @param resolveAnalytics - a function that returns the current RudderAnalytics
-     * instance. Re-invoked on every call so a lazily-loaded SDK is resolved fresh
-     * rather than captured once at construction.
+     * instance, or null/undefined while unavailable. Re-invoked on every call so
+     * a lazily-loaded SDK is resolved fresh rather than captured once at
+     * construction.
      */
-    constructor(resolveAnalytics: () => RudderAnalytics) {
+    constructor(resolveAnalytics: () => RudderAnalytics | null | undefined) {
         this.resolveAnalytics = resolveAnalytics;
-    }
-
-    private get analytics(): RudderAnalytics {
-        return this.resolveAnalytics();
     }
 
     public group(
@@ -484,15 +487,19 @@ export class RudderTyper {
         optionsOrCallback?: ApiOptions | ApiCallback,
         callback?: ApiCallback,
     ): void {
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
         if (typeof groupIdOrTraits === "string") {
-            this.analytics.group(
+            analytics.group(
                 groupIdOrTraits,
                 undefined,
                 this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject),
                 callback,
             );
         } else {
-            this.analytics.group(
+            analytics.group(
                 null,
                 this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject),
                 optionsOrCallback as ApiCallback | undefined,
@@ -520,15 +527,19 @@ export class RudderTyper {
         optionsOrCallback?: ApiOptions | ApiCallback,
         callback?: ApiCallback,
     ): void {
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
         if (typeof userIdOrTraits === "string") {
-            this.analytics.identify(
+            analytics.identify(
                 userIdOrTraits,
                 traitsOrOptions as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
-            this.analytics.identify(
+            analytics.identify(
                 userIdOrTraits as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
@@ -564,8 +575,12 @@ export class RudderTyper {
         arg3?: ApiOptions | ApiCallback,
         arg4?: ApiCallback,
     ): void {
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
         if (typeof arg0 === "string" && typeof arg1 === "string") {
-            this.analytics.page(
+            analytics.page(
                 arg0,
                 arg1,
                 arg2 as unknown as SDKApiObject,
@@ -573,14 +588,14 @@ export class RudderTyper {
                 arg4,
             );
         } else if (typeof arg0 === "string") {
-            this.analytics.page(
+            analytics.page(
                 arg0,
                 arg1 as unknown as SDKApiObject,
                 this.withRudderTyperContext(arg2 as ApiOptions | undefined),
                 arg3 as ApiCallback | undefined,
             );
         } else {
-            this.analytics.page(
+            analytics.page(
                 arg0 as unknown as SDKApiObject,
                 this.withRudderTyperContext(arg1 as ApiOptions | undefined),
                 arg2 as ApiCallback | undefined,
@@ -600,7 +615,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "$Variable$String",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -620,7 +639,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "$eventWithNameCamelCase$!",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -638,7 +661,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "Empty Event No Additional Props",
             {},
             this.withRudderTyperContext(options),
@@ -658,7 +685,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "Empty Event With Additional Props",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -678,7 +709,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "Event With Variants",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -698,7 +733,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "Product \"Premium\" Clicked",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -718,7 +757,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "User Signed Up",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
@@ -738,7 +781,11 @@ export class RudderTyper {
         options?: ApiOptions,
         callback?: ApiCallback,
     ): void {
-        this.analytics.track(
+        const analytics = this.resolveAnalytics();
+        if (analytics === null || analytics === undefined) {
+            return;
+        }
+        analytics.track(
             "eventWithNameCamelCase",
             props as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
