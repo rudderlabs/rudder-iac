@@ -238,15 +238,22 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	return providers, providerMap, nil
 }
 
-// newDestinationRegistry builds the destination definition registry. Definitions
-// are only registered when the destinationSupport experimental flag is on.
+// newDestinationRegistry builds the destination definition registry.
+// DestinationSupport must be on before any definitions are registered.
+// Unverified destinations (currently S3) additionally require
+// UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
 	if !cfg.ExperimentalFlags.DestinationSupport {
 		return registry, nil
 	}
-	if err := registry.Register(s3.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+
+	// Verified/native destination definitions register here when available.
+
+	if cfg.ExperimentalFlags.UnverifiedDestinations {
+		if err := registry.Register(s3.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+		}
 	}
 	return registry, nil
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,34 +26,55 @@ func TestComposeProvidersIncludesDataGraph(t *testing.T) {
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
 }
 
-func TestNewDestinationRegistryRegistersS3WhenFlagEnabled(t *testing.T) {
-	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	prevExp := viper.Get("experimental")
-	prevFlag := viper.Get("flags.destinationSupport")
-	viper.Set("experimental", true)
-	viper.Set("flags.destinationSupport", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.destinationSupport", prevFlag)
-	})
+func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
+	t.Parallel()
 
-	registry, err := newDestinationRegistry(config.GetConfig())
-	require.NoError(t, err)
-	assert.Equal(t, []string{"s3"}, registry.SupportedTypes())
-}
+	cases := []struct {
+		name                   string
+		destinationSupport     bool
+		unverifiedDestinations bool
+		wantTypes              []string
+	}{
+		{
+			name:                   "both flags disabled",
+			destinationSupport:     false,
+			unverifiedDestinations: false,
+			wantTypes:              []string{},
+		},
+		{
+			name:                   "destinationSupport off ignores unverifiedDestinations",
+			destinationSupport:     false,
+			unverifiedDestinations: true,
+			wantTypes:              []string{},
+		},
+		{
+			name:                   "destinationSupport on without unverifiedDestinations",
+			destinationSupport:     true,
+			unverifiedDestinations: false,
+			wantTypes:              []string{},
+		},
+		{
+			name:                   "both flags enabled registers s3",
+			destinationSupport:     true,
+			unverifiedDestinations: true,
+			wantTypes:              []string{"s3"},
+		},
+	}
 
-func TestNewDestinationRegistryEmptyWhenFlagDisabled(t *testing.T) {
-	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	prevExp := viper.Get("experimental")
-	prevFlag := viper.Get("flags.destinationSupport")
-	viper.Set("experimental", true)
-	viper.Set("flags.destinationSupport", false)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.destinationSupport", prevFlag)
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	registry, err := newDestinationRegistry(config.GetConfig())
-	require.NoError(t, err)
-	assert.Empty(t, registry.SupportedTypes())
+			cfg := config.Config{
+				ExperimentalFlags: config.ExperimentalConfig{
+					DestinationSupport:     tc.destinationSupport,
+					UnverifiedDestinations: tc.unverifiedDestinations,
+				},
+			}
+
+			registry, err := newDestinationRegistry(cfg)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTypes, registry.SupportedTypes())
+		})
+	}
 }

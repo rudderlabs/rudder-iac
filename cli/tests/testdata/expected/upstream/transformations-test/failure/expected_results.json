@@ -77,7 +77,7 @@
       "handleName": "badPyLibrary",
       "versionId": "placeholder",
       "pass": false,
-      "message": "BadCodeError(\"'(' was never closed (\u003cunknown\u003e, line 1)\")\n   at parse_code_and_get_modules (base transformation: line 51)\n      raise BadCodeError(str(e))\n   at transformEvent (base transformation: line 55)\n      event[\"modules\"] = parse_code_and_get_modules("
+      "message": "SyntaxError((\"Line 1: SyntaxError: '(' was never closed at statement: 'def broken_function('\",))\n   in base transformation"
     },
     {
       "id": "placeholder",
