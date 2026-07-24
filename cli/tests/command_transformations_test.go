@@ -18,6 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// badPyLibraryHandle is the handle of the intentionally broken Python library in the
+// failure fixture set.
+const badPyLibraryHandle = "badPyLibrary"
+
 func TestTransformationsTest(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -52,7 +56,44 @@ func TestTransformationsTest(t *testing.T) {
 		require.Error(t, err, "test command should fail: %s", string(output))
 
 		verifyTestResults(t, "failure", resultsFile)
+		verifyBadLibraryMessage(t, resultsFile)
 	})
+}
+
+// verifyBadLibraryMessage asserts the stable part of the upstream error reported for
+// the deliberately broken Python library.
+//
+// The full message is snapshot-exempt (see testResultsIgnoreFields) because the
+// wrapper the backend puts around the interpreter error is not stable: the same
+// fixture has produced both
+//
+//	BadCodeError("'(' was never closed (<unknown>, line 1)")
+//	SyntaxError(("Line 1: SyntaxError: '(' was never closed at statement: ...",))
+//
+// on main within days of each other, each passing CI at the time. Pinning either
+// form makes this test flap on whatever the backend happens to return. The
+// interpreter's own diagnostic is the part we actually care about and is common to
+// both, so assert on that and let the wrapper vary.
+func verifyBadLibraryMessage(t *testing.T, resultsFile string) {
+	t.Helper()
+
+	results := readJSONFile(t, resultsFile)
+	libs, ok := results["libraries"].([]any)
+	require.True(t, ok, "test results contain no libraries array")
+
+	for _, entry := range libs {
+		lib, ok := entry.(map[string]any)
+		if !ok || lib["handleName"] != badPyLibraryHandle {
+			continue
+		}
+
+		assert.Equal(t, false, lib["pass"], "%s must be reported as failing", badPyLibraryHandle)
+		assert.Contains(t, lib["message"], "'(' was never closed",
+			"%s must report the unclosed-paren syntax error", badPyLibraryHandle)
+		return
+	}
+
+	t.Fatalf("library %q not found in test results", badPyLibraryHandle)
 }
 
 func verifyTestResults(t *testing.T, dir, resultsFile string) {
@@ -119,6 +160,9 @@ func testResultsIgnoreFields(results map[string]any) []string {
 				prefix+".id",
 				prefix+".versionId",
 				prefix+".externalId",
+				// The upstream error wrapper varies between backend responses;
+				// verifyBadLibraryMessage asserts the stable part instead.
+				prefix+".message",
 			)
 		}
 	}
