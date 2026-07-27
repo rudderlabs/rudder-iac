@@ -289,14 +289,14 @@ func TestBuildVariantGroup_EnumDiscriminatorInDefault(t *testing.T) {
 		Name:    "EventDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "deviceType", Type: `Exclude<PropertyDeviceType, "mobile">`},
+			{Name: "device_type", Type: `Exclude<PropertyDeviceType, "mobile">`},
 		},
 	}, ifaceByName["EventDefault"], "default narrows the enum alias to values no named case covers")
 
 	assert.Equal(t, TSInterface{
 		Name: "EventCaseMobile",
 		Properties: []TSInterfaceProperty{
-			{Name: "deviceType", Type: `"mobile"`},
+			{Name: "device_type", Type: `"mobile"`},
 		},
 	}, ifaceByName["EventCaseMobile"], "named case uses literal")
 }
