@@ -138,6 +138,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	spinner.Stop()
 
+	ui.Printf("Workspace: %s (%s)\n\n", ui.Bold(s.workspace.Name), s.workspace.ID)
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
