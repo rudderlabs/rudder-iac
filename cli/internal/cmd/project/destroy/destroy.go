@@ -65,7 +65,7 @@ func NewCmdDestroy() *cobra.Command {
 			options := []syncer.Option{
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
-				syncer.WithReporter(app.SyncReporter()),
+				syncer.WithReporter(app.SyncReporter(nil)),
 			}
 
 			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
