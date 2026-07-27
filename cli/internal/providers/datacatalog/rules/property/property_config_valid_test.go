@@ -3,8 +3,8 @@ package property
 import (
 	"testing"
 
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	catalogRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"

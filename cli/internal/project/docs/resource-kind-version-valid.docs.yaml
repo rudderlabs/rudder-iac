@@ -11,10 +11,8 @@ match_behavior:
     valid:
       - example_id: "kind-version-supported-pair"
         title: "Kind declared with a supported version"
-        description: >
-          The events kind is supported at version rudder/v1, so this spec is
-          accepted. The rule only flags a kind/version combination when the kind
-          is recognised but the specific version is not registered for it.
+        description: >-
+          The events kind supports rudder/v1, so this spec is accepted. The rule flags kind/version pairs where the kind is recognized but the version is not registered.
         files:
           spec.yaml: |
             version: rudder/v1
@@ -24,13 +22,13 @@ match_behavior:
             spec:
               events:
                 - id: order_completed
+                  event_type: track
                   name: Order Completed
     invalid:
       - example_id: "kind-version-unsupported-version"
         title: "Known kind declared with an unsupported version"
-        description: >
-          The events kind is recognised, but it is not registered for version
-          rudder/v0.1. The rule reports the unsupported kind/version pairing.
+        description: >-
+          The transformation kind is recognized but registered only for rudder/v1, not rudder/0.1. The rule reports the unsupported kind/version pair.
         files:
           spec.yaml: |
             version: rudder/v0.1
