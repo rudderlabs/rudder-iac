@@ -1,0 +1,75 @@
+name: typer data-gov verify
+
+# Non-blocking signal: on every rudder-iac change, verify that `typer generate
+# --local` still works against the LATEST rudder-data-gov — a real repo that keeps
+# data-graphs/ and transformations/ next to its catalog, exercising the
+# skip-unknown-kinds path. Not pinned: rudder-data-gov's own changes are covered in
+# its own repo; here we only care that current rudder-iac handles current data-gov.
+# Do NOT add this to required status checks — a cross-repo hiccup must not block PRs.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cli/**"
+      - "Makefile"
+      - "go.mod"
+      - ".github/workflows/typer-datagov-verify.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "cli/**"
+      - "Makefile"
+      - "go.mod"
+      - ".github/workflows/typer-datagov-verify.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typer-datagov-verify:
+    name: verify --local typer against latest rudder-data-gov
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout rudder-iac
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      # GITHUB_TOKEN can't reach another repo; mint a short-lived token from the
+      # org GitHub App scoped to rudder-data-gov (same app as publish-rules-to-hugo).
+      # Requires RELEASE_APP_ID to be installed on rudderlabs/rudder-data-gov.
+      - name: Generate rudder-data-gov token
+        id: datagov-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+          owner: rudderlabs
+          repositories: rudder-data-gov
+
+      - name: Checkout latest rudderlabs/rudder-data-gov
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: rudderlabs/rudder-data-gov
+          token: ${{ steps.datagov-token.outputs.token }}
+          path: rudder-data-gov
+          persist-credentials: false
+
+      - name: Generate --local and typecheck against the JS SDK
+        run: make typer-verify-datagov DATAGOV_DIR=rudder-data-gov
