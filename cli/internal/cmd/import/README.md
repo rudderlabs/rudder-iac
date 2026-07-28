@@ -51,10 +51,10 @@ applies as usual.
 
 ## What `--merge` does
 
-For each workspace resource that isn't yet managed by the CLI, `--merge` looks
-for a resource **you already have locally** that has the same unique identity
-(the same name, for most types). When it finds one, it **links** the two instead
-of duplicating:
+For each unmanaged workspace resource **of a supported type** (see
+[What gets linked](#what-gets-linked)), `--merge` looks for a resource **you
+already have locally** that has the same unique identity (the same name, for most
+types). When it finds one, it **links** the two instead of duplicating:
 
 - the local resource is recorded as the owner of that workspace resource, in
   `imported/import-manifest.yaml`;
@@ -79,15 +79,15 @@ Two things worth knowing:
 Linking is based on each resource's unique identity, not on comparing its full
 contents:
 
-| Resource | Linked when these match |
-| --- | --- |
-| Category, custom type, tracking plan | name |
-| Event | name and event type |
-| Property | name, type, and item types |
-| Event stream source | name |
-| SQL model (RETL) | display name and account |
-| Transformation | name |
-| Library | import name |
+| Resource                                 | Linked when these match         |
+| ---------------------------------------- | ------------------------------- |
+| Category, custom type, tracking plan     | name                            |
+| Event                                    | name and event type             |
+| Property                                 | name, type, and item types      |
+| Event stream source                      | name                            |
+| SQL model (RETL)                         | display name and account        |
+| Transformation                           | name                            |
+| Library                                  | import name                     |
 | Data graph, its models and relationships | see [Data graphs](#data-graphs) |
 
 If nothing local matches a workspace resource, it is imported as new rather than
@@ -120,7 +120,22 @@ This file is what `apply` uses to know that these resources should be **adopted*
 rather than created. You can keep it in version control alongside the rest of
 your project — it becomes a permanent record of what is linked.
 
-The manifest file is written only while the experimental flag is enabled.
+The `importMerge` flag gates the manifest on **both** sides:
+
+- **Generation** — the manifest is written by `import` only while the flag is
+  enabled.
+- **Recognition** — the `import-manifest` kind is a recognized spec kind (parsed,
+  validated, and honored by `apply`) only while the flag is enabled.
+
+With the flag **off**, `import-manifest` is an unrecognized kind, and any command
+that loads your project — `apply`, `validate`, and `import workspace` itself —
+**fails validation** with an error like `'kind' must be one of [...]` as long as
+a manifest file is present in the project.
+
+The practical consequence: once you've generated a manifest, keep `importMerge`
+enabled. Turning it off doesn't quietly ignore the manifest — it makes your
+project fail to load until you either re-enable the flag or remove the manifest
+file (which drops all the links it recorded).
 
 ---
 
@@ -136,8 +151,11 @@ After a merge import, `apply` uses the manifest:
 - **Everything else** (resources with no workspace counterpart, or imported as
   new) applies exactly as it normally would.
 
-`validate` and the other commands need no special handling — they read the
-manifest the same way they read any import metadata.
+`validate` and the other commands read the manifest the same way — with the
+`importMerge` flag enabled, they treat it as ordinary import metadata, so no
+extra steps are needed on your part. (With the flag off, the manifest kind is
+unrecognized and every command that loads the project fails validation — see
+[The import manifest](#the-import-manifest).)
 
 ---
 
@@ -166,6 +184,11 @@ graph spec.
 `--merge` requires the experimental flag named `importMerge`. Two things must be
 true: experimental mode must be on **and** the flag must be enabled. Pick
 whichever method fits your workflow.
+
+The same flag also gates the import manifest — both its generation during import
+and its recognition by `apply`/`validate` (see [The import manifest](#the-import-manifest)).
+So keep it enabled not just to run `--merge`, but for as long as `apply` needs to
+honor a manifest you've already generated.
 
 ### Option A — Environment variables (great for CI)
 
@@ -203,9 +226,6 @@ Running `--merge` without the flag fails fast:
 --merge requires the "importMerge" experimental flag to be enabled
 ```
 
-See [experimental-flags.md](../../../../docs/experimental-flags.md) for how
-experimental flags work in general.
-
 ---
 
 ## Command reference
@@ -214,10 +234,10 @@ experimental flags work in general.
 rudder-cli import workspace [flags]
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--location`, `-l` | Path to the project directory (default `.`). |
-| `--merge` | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
+| Flag               | Description                                                                                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--location`, `-l` | Path to the project directory (default `.`).                                                                                                                                      |
+| `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
 
 Import writes into an `imported/` subdirectory of the project and **fails if that
 directory already exists** — move or remove a previous `imported/` before
@@ -228,9 +248,9 @@ re-running.
 ## Limitations
 
 - **Pending deletions still block a merge import.** If you have deleted a spec
-  locally but not yet applied that deletion, `import workspace --merge` stops and
-  asks you to apply the deletion first, because importing over it could bring the
-  deleted resource back.
+  locally but not yet applied that deletion, `import workspace --merge` fails with
+  an error telling you to apply the deletion first, because importing over it
+  could bring the deleted resource back.
 - **Linking never overwrites.** A linked resource's local spec is never rewritten
   from the workspace; content differences are resolved at `apply`.
 - **Ambiguous matches stop the import.** If two workspace resources would link to
