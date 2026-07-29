@@ -28,14 +28,14 @@ var HandlerMetadata = handler.HandlerMetadata{
 	SpecMetadataName: AccountMetadataName,
 }
 
-// accountSecretKeys maps an account definition to its secret field set — the
+// registeredAccountSecretKeys maps an account definition to its secret field set — the
 // account-side analogue of a destination definition's SecretKeys().
 //
 // ponytail: BigQuery-only, hardcoded. The real registry fetches secretFields
 // from the control-plane account-definitions API (unversioned, name-keyed).
 // Add a lookup when a second definition lands; the split logic below is already
 // definition-driven, so only this map changes.
-var accountSecretKeys = map[string][]string{
+var registeredAccountSecretKeys = map[string][]string{
 	"SOURCE_BIGQUERY": {"credentials"},
 }
 
@@ -70,7 +70,7 @@ func (h *HandlerImpl) NewSpec() *AccountSpec { return &AccountSpec{} }
 // minus the (type, version) registry lookup (account definitions are
 // unversioned).
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map[string]*AccountResource, error) {
-	keys, ok := accountSecretKeys[spec.AccountDefinitionName]
+	keys, ok := registeredAccountSecretKeys[spec.AccountDefinitionName]
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
@@ -147,7 +147,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 		return nil, nil, fmt.Errorf("managed account %s has empty external ID", remote.ID)
 	}
 
-	keys, ok := accountSecretKeys[remote.Definition.Name]
+	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
 	if !ok {
 		return nil, nil, fmt.Errorf("managed account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -269,7 +269,7 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) (map[string]any, error) {
-	keys, ok := accountSecretKeys[remote.Definition.Name]
+	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
 	if !ok {
 		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -302,7 +302,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 // This is the one account-specific twist over destinations, which keep secrets
 // inside a single config blob.
 func (h *HandlerImpl) splitConfig(data *AccountResource) (json.RawMessage, json.RawMessage, error) {
-	keys, ok := accountSecretKeys[data.AccountDefinitionName]
+	keys, ok := registeredAccountSecretKeys[data.AccountDefinitionName]
 	if !ok {
 		return nil, nil, fmt.Errorf("unsupported account definition %q", data.AccountDefinitionName)
 	}
@@ -351,7 +351,7 @@ func supportedRemoteAccounts(accounts []client.Account) []*RemoteAccount {
 	result := make([]*RemoteAccount, 0, len(accounts))
 	for i := range accounts {
 		a := &accounts[i]
-		if _, ok := accountSecretKeys[a.Definition.Name]; !ok {
+		if _, ok := registeredAccountSecretKeys[a.Definition.Name]; !ok {
 			continue
 		}
 		result = append(result, &RemoteAccount{Account: a})

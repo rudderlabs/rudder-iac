@@ -17,7 +17,7 @@ type AccountSpec struct {
 	ID                    string         `mapstructure:"id" validate:"required"`
 	Name                  string         `mapstructure:"name" validate:"required"`
 	AccountDefinitionName string         `mapstructure:"account_definition_name" validate:"required"`
-	Config                map[string]any `mapstructure:"config"`
+	Config                map[string]any `mapstructure:"config" validate:"required"`
 }
 
 // AccountResource is the resolved representation the differ compares. Registered
