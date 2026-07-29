@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"path/filepath"
 	"strings"
 
@@ -82,7 +81,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
 		DefinitionVersion: spec.DefinitionVersion,
-		Config:            wrapKnownSecrets(spec.Config, registered.SecretKeys()),
+		Config:            secret.WrapKnownSecrets(spec.Config, registered.SecretKeys()),
 	}
 
 	if spec.Transformation != "" {
@@ -234,7 +233,7 @@ func (h *HandlerImpl) MapRemoteToState(
 	// API responses omit secret values. Wrap only secret keys that are still
 	// present after conversion (defensive); absent keys stay absent so
 	// presence-based wrapping never invents conditional secrets.
-	localConfig = wrapUnknownSecrets(localConfig, registered.SecretKeys())
+	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
@@ -442,7 +441,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
 
-	if err := maskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
+	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
 	}
 
@@ -469,121 +468,6 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	return specMap, nil
 }
 
-// maskSecrets replaces each registered secret key that is already present in
-// config with the marshaled form of secret.NewUnknown(WithVariableName(...)):
-// a "{{ .VAR }}" token when enableVarSubstitution is on, otherwise the masked
-// literal. Absent secrets are not invented — requiredness is owned by the
-// destination config model's validate tags.
-func maskSecrets(config map[string]any, externalID string, secretKeys []string) error {
-	if config == nil || len(secretKeys) == 0 {
-		return nil
-	}
-
-	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
-	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
-			continue
-		}
-
-		varName := fmt.Sprintf(
-			"%s_%s",
-			prefix,
-			strings.ToUpper(key),
-		)
-
-		s := secret.NewUnknown(secret.WithVariableName(varName))
-		token, err := marshalSecretToken(s)
-		if err != nil {
-			return fmt.Errorf("masking secret key %q: %w", key, err)
-		}
-
-		config[key] = token
-	}
-	return nil
-}
-
-// marshalSecretToken JSON-marshals a secret.String to its export string form
-// (variable reference or masked literal).
-func marshalSecretToken(s secret.String) (string, error) {
-	bytes, err := json.Marshal(s)
-	if err != nil {
-		return "", err
-	}
-	var token string
-	if err := json.Unmarshal(bytes, &token); err != nil {
-		return "", err
-	}
-	return token, nil
-}
-
-// wrapKnownSecrets wraps each registered secret key that is already present in
-// config as *secret.String with the known local value. Pointer form survives
-// the differ's struct→map decode. Absent secrets are not invented —
-// requiredness is owned by the destination config model's validate tags.
-func wrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any {
-	if config == nil || len(secretKeys) == 0 {
-		return config
-	}
-	for _, key := range secretKeys {
-		v, ok := config[key]
-		if !ok {
-			continue
-		}
-		raw := ""
-		if s, ok := v.(string); ok {
-			raw = s
-		}
-		s := secret.New(raw)
-		config[key] = &s
-	}
-	return config
-}
-
-// wrapUnknownSecrets marks each registered secret key that is already present
-// in config as an unknown *secret.String. Used when mapping remote state.
-// Absent keys stay absent — the API normally strips secrets, and inventing
-// them would force perpetual re-apply for conditional secrets that do not apply.
-func wrapUnknownSecrets(config map[string]any, secretKeys []string) map[string]any {
-	if config == nil || len(secretKeys) == 0 {
-		return config
-	}
-	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
-			continue
-		}
-		s := secret.NewUnknown()
-		config[key] = &s
-	}
-	return config
-}
-
-// revealSecrets returns a shallow copy of config with registered secret keys
-// replaced by their Reveal() string. Must run before LocalToAPI / json.Marshal
-// so the real value reaches the wire instead of a masked form.
-func revealSecrets(config map[string]any, secretKeys []string) map[string]any {
-	if config == nil || len(secretKeys) == 0 {
-		return config
-	}
-	out := maps.Clone(config)
-	for _, key := range secretKeys {
-		v, ok := out[key]
-		if !ok {
-			continue
-		}
-		switch s := v.(type) {
-		case *secret.String:
-			if s == nil {
-				out[key] = ""
-				continue
-			}
-			out[key] = s.Reveal()
-		case secret.String:
-			out[key] = s.Reveal()
-		}
-	}
-	return out
-}
-
 // localConfigToAPI resolves the registered definition and converts snake_case
 // config to the camelCase form the API expects, returning JSON-serializable bytes.
 func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map[string]any) (json.RawMessage, error) {
@@ -594,7 +478,7 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 
 	// Reveal before conversion: LocalToAPI json.Marshals the map, and a
 	// surviving secret.String would emit its masked form to the API.
-	revealed := revealSecrets(
+	revealed := secret.RevealSecrets(
 		local,
 		registered.SecretKeys(),
 	)

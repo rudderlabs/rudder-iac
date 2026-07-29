@@ -1,0 +1,17 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "externalId": "prod-bq",
+  "name": "Production BigQuery",
+  "definition": {
+    "name": "SOURCE_BIGQUERY",
+    "type": "bigquery",
+    "category": "source"
+  },
+  "options": {
+    "project": "acme-analytics-prod",
+    "location": "US"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
