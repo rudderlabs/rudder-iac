@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	accountsProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
@@ -45,6 +46,7 @@ type Providers struct {
 	Workspace       *workspace.Provider
 	DataGraph       *dgProvider.Provider
 	Destination     *destProvider.Provider
+	Account         *accountsProvider.Provider
 }
 
 type deps struct {
@@ -233,6 +235,13 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		providerMap["destination"] = dp
 		providers.Destination = dp
 
+	}
+
+	if cfg.ExperimentalFlags.AccountSupport {
+		ap := accountsProvider.NewProvider(c.Accounts)
+
+		providerMap["account"] = ap
+		providers.Account = ap
 	}
 
 	return providers, providerMap, nil
