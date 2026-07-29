@@ -4,6 +4,7 @@ metadata:
   name: prod-bq
 spec:
   id: prod-bq
+  name: Production BigQuery
   account_definition_name: SOURCE_BIGQUERY
   config:
     project: acme-analytics-prod

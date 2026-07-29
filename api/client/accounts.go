@@ -30,6 +30,10 @@ type CreateAccountRequest struct {
 	Name                  string          `json:"name"`
 	Options               json.RawMessage `json:"options"`
 	Secret                json.RawMessage `json:"secret"`
+	// ExternalID claims the account under a caller-owned id in the same call —
+	// the backend sets it atomically with creation, so no separate SetExternalID
+	// round trip. Omitted (webapp-created) accounts leave it empty.
+	ExternalID string `json:"externalId,omitempty"`
 }
 
 // All fields are required — PUT is a full-state replace, so a missing field means

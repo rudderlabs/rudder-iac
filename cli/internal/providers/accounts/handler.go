@@ -76,16 +76,18 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map
 	}
 	resource := &AccountResource{
 		ID:                    spec.ID,
+		Name:                  spec.Name,
 		AccountDefinitionName: spec.AccountDefinitionName,
 		Config:                secret.WrapKnownSecrets(spec.Config, keys),
 	}
 	return map[string]*AccountResource{spec.ID: resource}, nil
 }
 
-// Create provisions the account, then claims the spec ID as its externalId so
-// the next apply reconciles instead of recreating. External ID is set last so a
-// failed claim never leaves a partially-adopted resource behind (mirrors the
-// destination handler's Import ordering).
+// Create provisions the account and claims the spec ID as its externalId in the
+// same call — the backend sets externalId atomically with creation, so there is
+// no separate SetExternalID round trip that could leave a partially-adopted
+// resource behind. Import still adopts an existing account via Update +
+// SetExternalID (it cannot create).
 func (h *HandlerImpl) Create(ctx context.Context, data *AccountResource) (*AccountState, error) {
 	options, secretPayload, err := h.splitConfig(data)
 	if err != nil {
@@ -94,16 +96,13 @@ func (h *HandlerImpl) Create(ctx context.Context, data *AccountResource) (*Accou
 
 	created, err := h.store.Create(ctx, &client.CreateAccountRequest{
 		AccountDefinitionName: data.AccountDefinitionName,
-		Name:                  data.ID,
+		Name:                  data.Name,
 		Options:               options,
 		Secret:                secretPayload,
+		ExternalID:            data.ID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating account %q: %w", data.ID, err)
-	}
-
-	if err := h.store.SetExternalID(ctx, created.ID, data.ID); err != nil {
-		return nil, fmt.Errorf("claiming external id for account %q: %w", data.ID, err)
 	}
 
 	return &AccountState{ID: created.ID}, nil
@@ -122,7 +121,7 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldD
 	}
 
 	updated, err := h.store.Update(ctx, oldState.ID, &client.UpdateAccountRequest{
-		Name:    newData.ID,
+		Name:    newData.Name,
 		Options: options,
 		Secret:  secretPayload,
 	})
@@ -170,6 +169,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 
 	resource := &AccountResource{
 		ID:                    remote.ExternalID,
+		Name:                  remote.Name,
 		AccountDefinitionName: remote.Definition.Name,
 		Config:                config,
 	}
@@ -291,6 +291,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 
 	return map[string]any{
 		"id":                      externalID,
+		"name":                    remote.Name,
 		"account_definition_name": remote.Definition.Name,
 		"config":                  config,
 	}, nil

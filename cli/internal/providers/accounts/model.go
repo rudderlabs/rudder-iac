@@ -9,8 +9,13 @@ import (
 // single flat map; the handler splits it into the API's options (non-secret) and
 // secret payloads by the account definition's secret-key set — the same shape a
 // destination spec uses (one config map, secrets identified by key).
+//
+// ID is the caller-owned external id (the URN claim); Name is the account's
+// display name in the control plane — a distinct field, so it sits beside Config
+// rather than inside it.
 type AccountSpec struct {
 	ID                    string         `mapstructure:"id" validate:"required"`
+	Name                  string         `mapstructure:"name" validate:"required"`
 	AccountDefinitionName string         `mapstructure:"account_definition_name" validate:"required"`
 	Config                map[string]any `mapstructure:"config"`
 }
@@ -20,6 +25,7 @@ type AccountSpec struct {
 // secret-aware branch owns their comparison — identical to DestinationResource.
 type AccountResource struct {
 	ID                    string
+	Name                  string
 	AccountDefinitionName string
 	Config                map[string]any
 }

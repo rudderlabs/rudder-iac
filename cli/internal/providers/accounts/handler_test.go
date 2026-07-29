@@ -58,6 +58,7 @@ func bqResource(id string) *AccountResource {
 	cred := secret.New("svc-account-json")
 	return &AccountResource{
 		ID:                    id,
+		Name:                  "name-" + id, // distinct from ID to prove they map separately
 		AccountDefinitionName: "SOURCE_BIGQUERY",
 		Config: map[string]any{
 			"projectId":   "proj-123",
@@ -67,7 +68,7 @@ func bqResource(id string) *AccountResource {
 	}
 }
 
-func TestCreate_SplitsConfigAndClaimsExternalID(t *testing.T) {
+func TestCreate_SplitsConfigAndClaimsExternalIDInline(t *testing.T) {
 	m := &mockStore{createReturnID: "remote-1"}
 	h := &HandlerImpl{store: m}
 
@@ -83,9 +84,11 @@ func TestCreate_SplitsConfigAndClaimsExternalID(t *testing.T) {
 	assert.Equal(t, map[string]any{"credentials": "svc-account-json"}, sec)
 
 	assert.Equal(t, "SOURCE_BIGQUERY", m.created.AccountDefinitionName)
-	assert.Equal(t, "prod-bq", m.created.Name)
-	// external id claimed = spec id, on the returned remote id.
-	assert.Equal(t, [2]string{"remote-1", "prod-bq"}, m.externalIDSet)
+	assert.Equal(t, "name-prod-bq", m.created.Name, "display name maps from spec Name, not ID")
+	// external id is claimed in the create call itself (spec ID)...
+	assert.Equal(t, "prod-bq", m.created.ExternalID)
+	// ...so there is no separate SetExternalID round trip.
+	assert.Equal(t, [2]string{}, m.externalIDSet, "SetExternalID must not be called on create")
 }
 
 func TestUpdate_RejectsDefinitionChange(t *testing.T) {
@@ -109,12 +112,13 @@ func TestExtractResourcesFromSpec_UnsupportedDefinition(t *testing.T) {
 
 func TestMapRemoteToState_SecretIsUnknown(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
-	acc := &client.Account{ID: "remote-1", ExternalID: "prod-bq", Options: json.RawMessage(`{"projectId":"p"}`)}
+	acc := &client.Account{ID: "remote-1", ExternalID: "prod-bq", Name: "Prod BQ", Options: json.RawMessage(`{"projectId":"p"}`)}
 	acc.Definition.Name = "SOURCE_BIGQUERY"
 
 	res, state, err := h.MapRemoteToState(&RemoteAccount{Account: acc}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "prod-bq", res.ID)
+	assert.Equal(t, "Prod BQ", res.Name, "display name maps back from the remote")
 	assert.Equal(t, "remote-1", state.ID)
 	assert.Equal(t, "p", res.Config["projectId"])
 
@@ -127,6 +131,7 @@ func bqRemote(externalID string, opts string) *RemoteAccount {
 	acc := &client.Account{
 		ID:         "remote-" + externalID,
 		ExternalID: externalID,
+		Name:       "name-" + externalID,
 		Options:    json.RawMessage(opts),
 	}
 	acc.Definition.Name = "SOURCE_BIGQUERY"
@@ -148,6 +153,7 @@ func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
 	assert.Equal(t, "acme", config["project"])
 	assert.Equal(t, "US", config["location"])
 	assert.Equal(t, "prod-analytics-bq", specMap["id"])
+	assert.Equal(t, "name-prod-analytics-bq", specMap["name"])
 	assert.Equal(t, "SOURCE_BIGQUERY", specMap["account_definition_name"])
 }
 
