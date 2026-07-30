@@ -12,9 +12,16 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+// importedAccountName is the upstream name of the unmanaged account seeded for
+// the import to discover. It doubles as the needle that finds the right spec
+// among however many other accounts the target workspace happens to hold.
+const importedAccountName = "e2e-import-bigquery"
 
 // varReference matches the "{{ .VAR }}" token an exported secret is masked to,
 // capturing the variable name so the scaffolded var file can be checked for the
@@ -29,6 +36,18 @@ var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
 // write-only credential to a "{{ .VAR }}" reference, so no generated file may
 // ever contain the real secret — that masking is all that stands between a user
 // and a plaintext credential committed to version control.
+//
+// `import workspace` refuses to run while the project has changes to sync, so
+// the test starts from the same `destroy` the rest of the accounts e2e uses:
+// it needs a workspace with no managed resources. Like TestAccountsApply, this
+// therefore requires a DISPOSABLE workspace — never point it at one whose
+// contents you care about.
+//
+// After import, the generated project is pruned to the seeded account (specs and
+// manifest alike) before applying. `import workspace` necessarily scaffolds every
+// importable resource in the workspace; without the prune, apply would reconcile
+// resources the test never asked for, and any one of them failing validation
+// upstream would fail this test for reasons unrelated to accounts.
 //
 // Same RUN_ACCOUNT_E2E=1 gate as TestAccountsApply: it needs a real backend with
 // the SOURCE_BIGQUERY definition deployed and a PAT.
@@ -47,8 +66,8 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	ctx := context.Background()
 	apiClient := newAccountsAPIClient(t)
 
-	// Start from a clean slate: a managed account left by a previous run would
-	// be picked up by apply below and skew the importable-set assertion.
+	// Import is refused while anything is out of sync, so clear the managed
+	// resources first — the same precondition TestAccountsApply establishes.
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 
@@ -63,15 +82,10 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	importedDir := filepath.Join(projectDir, importer.ImportedDir)
 
-	matches, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
-	require.NoError(t, err)
-	require.Len(t, matches, 1, "expected exactly one scaffolded account spec in %s", importedDir)
+	specPath, spec := findAccountSpec(t, importedDir)
+	assert.Contains(t, spec, "SOURCE_BIGQUERY", "scaffolded spec must carry the account definition")
 
-	spec, err := os.ReadFile(matches[0])
-	require.NoError(t, err)
-	assert.Contains(t, string(spec), "SOURCE_BIGQUERY", "scaffolded spec must carry the account definition")
-
-	reference := varReference.FindStringSubmatch(string(spec))
+	reference := varReference.FindStringSubmatch(spec)
 	require.NotNil(t, reference, "credentials must be exported as a {{ .VAR }} reference, got:\n%s", spec)
 	varName := reference[1]
 
@@ -85,6 +99,9 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	// the var file and the import manifest in one sweep.
 	assertNoSecretOnDisk(t, projectDir)
 
+	// Reduce the generated project to the seeded account before applying.
+	pruneToAccount(t, importedDir, specPath, seededID)
+
 	// Fill in the placeholder and adopt the account. Import only scaffolds; the
 	// remote is claimed (Update + SetExternalID) on apply.
 	require.NoError(t, os.WriteFile(varFile, []byte(varName+": "+rawAccountSecret+"\n"), 0o600))
@@ -93,20 +110,19 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	require.NoError(t, err, "apply after import failed: %s", out)
 	assert.NotContains(t, string(out), rawAccountSecret, "raw secret must never appear in CLI output")
 
-	// Adopted: the account carries an external id now, so it has left the
-	// importable set and re-importing would no longer offer it.
+	// Adopted rather than recreated: the same upstream account now carries an
+	// external id, so it has left the importable set.
+	adopted, err := apiClient.Accounts.Get(ctx, seededID)
+	require.NoError(t, err, "the seeded account must still exist after apply")
+	assert.NotEmpty(t, adopted.ExternalID, "apply must claim the account with an external id")
+	assert.NotContains(t, string(adopted.Options), rawAccountSecret,
+		"the credential is write-only — it must never come back in options")
+
 	importable, err := apiClient.Accounts.ListAll(ctx, client.WithHasExternalID(false))
 	require.NoError(t, err)
 	for _, account := range importable {
 		assert.NotEqual(t, seededID, account.ID, "imported account must no longer be importable")
 	}
-
-	managed, err := apiClient.Accounts.ListAll(ctx, client.WithHasExternalID(true))
-	require.NoError(t, err)
-	require.Len(t, managed, 1, "expected exactly one managed account after import")
-	assert.Equal(t, seededID, managed[0].ID, "apply must adopt the seeded account, not create a new one")
-	assert.NotContains(t, string(managed[0].Options), rawAccountSecret,
-		"the credential is write-only — it must never come back in options")
 
 	// Re-apply must stay clean: the always-unknown secret re-applies, nothing else.
 	out, err = executor.Execute(cliBinPath, "apply", "-l", projectDir, "--var-file", varFile, "--confirm=false")
@@ -141,7 +157,7 @@ func seedUnmanagedAccount(t *testing.T, apiClient *client.Client) string {
 
 	account, err := apiClient.Accounts.Create(context.Background(), &client.CreateAccountRequest{
 		AccountDefinitionName: "SOURCE_BIGQUERY",
-		Name:                  "e2e-import-bigquery",
+		Name:                  importedAccountName,
 		Options:               options,
 		Secret:                secretPayload,
 	})
@@ -154,6 +170,103 @@ func seedUnmanagedAccount(t *testing.T, apiClient *client.Client) string {
 	})
 
 	return account.ID
+}
+
+// findAccountSpec returns the scaffolded spec for the seeded account. The
+// workspace may hold other importable accounts, so the spec is matched by name
+// rather than by being the only one present.
+func findAccountSpec(t *testing.T, importedDir string) (string, string) {
+	t.Helper()
+
+	matches, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
+	require.NoError(t, err)
+	require.NotEmpty(t, matches, "expected a scaffolded account spec in %s", importedDir)
+
+	for _, path := range matches {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		if strings.Contains(string(content), importedAccountName) {
+			return path, string(content)
+		}
+	}
+
+	t.Fatalf("no scaffolded spec found for account %q among %v", importedAccountName, matches)
+	return "", ""
+}
+
+// pruneToAccount reduces the generated project to the seeded account: every
+// other scaffolded spec is removed, and the import manifest is filtered to the
+// matching URN. Both halves are needed — a manifest entry whose spec is gone is
+// an orphaned URN and fails validation.
+func pruneToAccount(t *testing.T, importedDir, keepSpec, remoteID string) {
+	t.Helper()
+
+	entries, err := os.ReadDir(importedDir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		path := filepath.Join(importedDir, entry.Name())
+		switch entry.Name() {
+		case "accounts", importer.SecretsVarFileName, importmanifest.FileName:
+			continue
+		default:
+			require.NoError(t, os.RemoveAll(path))
+		}
+	}
+
+	accountSpecs, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
+	require.NoError(t, err)
+	for _, path := range accountSpecs {
+		if path != keepSpec {
+			require.NoError(t, os.Remove(path))
+		}
+	}
+
+	filterManifest(t, filepath.Join(importedDir, importmanifest.FileName), remoteID)
+}
+
+// filterManifest rewrites the import manifest in place, keeping only the entry
+// whose remote id is the seeded account.
+func filterManifest(t *testing.T, path, remoteID string) {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	var manifest struct {
+		Version  string `yaml:"version"`
+		Kind     string `yaml:"kind"`
+		Metadata struct {
+			Name string `yaml:"name"`
+		} `yaml:"metadata"`
+		Spec struct {
+			Workspaces []struct {
+				WorkspaceID string `yaml:"workspace_id"`
+				Resources   []struct {
+					URN      string `yaml:"urn"`
+					RemoteID string `yaml:"remote_id"`
+				} `yaml:"resources"`
+			} `yaml:"workspaces"`
+		} `yaml:"spec"`
+	}
+	require.NoError(t, yaml.Unmarshal(raw, &manifest))
+
+	kept := 0
+	for i := range manifest.Spec.Workspaces {
+		workspace := &manifest.Spec.Workspaces[i]
+		filtered := workspace.Resources[:0]
+		for _, resource := range workspace.Resources {
+			if resource.RemoteID == remoteID {
+				filtered = append(filtered, resource)
+				kept++
+			}
+		}
+		workspace.Resources = filtered
+	}
+	require.Equal(t, 1, kept, "manifest must map the seeded account %s to a URN", remoteID)
+
+	filtered, err := yaml.Marshal(manifest)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, filtered, 0o644))
 }
 
 // assertNoSecretOnDisk walks every generated file and fails on the raw secret.
