@@ -97,3 +97,8 @@
 - Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
 - Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
 - Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.
+
+## ACT2-463 — Destination Config Pruned Response Tolerance
+<!-- ticket:ACT2-463 -->
+- Destination API DTOs keep `Destination.Config` as `json.RawMessage` in `api/client/destinations.go`, so the client can receive pruned destination config responses without requiring schema changes for removed stale fields.
+- CLI destination remote-to-local conversion in `cli/internal/providers/destination/handler.go` delegates config mapping to registered destination definitions; those converters emit only known `ConfigProperty` keys, so unrecognized stale API config fields are ignored rather than round-tripped into local specs or state.
