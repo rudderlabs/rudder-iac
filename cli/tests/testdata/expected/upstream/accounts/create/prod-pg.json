@@ -1,0 +1,20 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "externalId": "prod-pg",
+  "name": "Production Postgres",
+  "definition": {
+    "name": "SOURCE_POSTGRES",
+    "type": "postgres",
+    "category": "source"
+  },
+  "options": {
+    "host": "db.acme-analytics.internal",
+    "dbname": "analytics",
+    "user": "rudder",
+    "port": "5432",
+    "sslMode": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

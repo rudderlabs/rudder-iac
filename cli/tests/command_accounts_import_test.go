@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -78,7 +79,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	out, err = executor.Execute(cliBinPath, "import", "workspace", "-l", projectDir)
 	require.NoError(t, err, "import workspace failed: %s", out)
-	assert.NotContains(t, string(out), rawAccountSecret, "raw secret must never appear in CLI output")
+	assertNoSecretsInOutput(t, out)
 
 	importedDir := filepath.Join(projectDir, importer.ImportedDir)
 
@@ -108,7 +109,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	out, err = executor.Execute(cliBinPath, "apply", "-l", projectDir, "--var-file", varFile, "--confirm=false")
 	require.NoError(t, err, "apply after import failed: %s", out)
-	assert.NotContains(t, string(out), rawAccountSecret, "raw secret must never appear in CLI output")
+	assertNoSecretsInOutput(t, out)
 
 	// Adopted rather than recreated: the same upstream account now carries an
 	// external id, so it has left the importable set.
@@ -225,7 +226,10 @@ func pruneToAccount(t *testing.T, importedDir, keepSpec, remoteID string) {
 }
 
 // filterManifest rewrites the import manifest in place, keeping only the entry
-// whose remote id is the seeded account.
+// whose remote id is the seeded account. It decodes and re-emits through the
+// production types (specs.WorkspacesImportMetadata, importmanifest.BuildNode)
+// rather than a hand-rolled struct, so the test cannot drift from the real
+// manifest shape.
 func filterManifest(t *testing.T, path, remoteID string) {
 	t.Helper()
 
@@ -233,38 +237,27 @@ func filterManifest(t *testing.T, path, remoteID string) {
 	require.NoError(t, err)
 
 	var manifest struct {
-		Version  string `yaml:"version"`
-		Kind     string `yaml:"kind"`
-		Metadata struct {
-			Name string `yaml:"name"`
-		} `yaml:"metadata"`
-		Spec struct {
-			Workspaces []struct {
-				WorkspaceID string `yaml:"workspace_id"`
-				Resources   []struct {
-					URN      string `yaml:"urn"`
-					RemoteID string `yaml:"remote_id"`
-				} `yaml:"resources"`
-			} `yaml:"workspaces"`
-		} `yaml:"spec"`
+		Spec specs.WorkspacesImportMetadata `yaml:"spec"`
 	}
 	require.NoError(t, yaml.Unmarshal(raw, &manifest))
 
-	kept := 0
-	for i := range manifest.Spec.Workspaces {
-		workspace := &manifest.Spec.Workspaces[i]
-		filtered := workspace.Resources[:0]
+	var kept []importmanifest.ImportEntry
+	for _, workspace := range manifest.Spec.Workspaces {
 		for _, resource := range workspace.Resources {
 			if resource.RemoteID == remoteID {
-				filtered = append(filtered, resource)
-				kept++
+				kept = append(kept, importmanifest.ImportEntry{
+					WorkspaceID: workspace.WorkspaceID,
+					URN:         resource.URN,
+					RemoteID:    resource.RemoteID,
+				})
 			}
 		}
-		workspace.Resources = filtered
 	}
-	require.Equal(t, 1, kept, "manifest must map the seeded account %s to a URN", remoteID)
+	require.Len(t, kept, 1, "manifest must map the seeded account %s to a URN", remoteID)
 
-	filtered, err := yaml.Marshal(manifest)
+	node, err := importmanifest.BuildNode(kept)
+	require.NoError(t, err)
+	filtered, err := yaml.Marshal(node)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, filtered, 0o644))
 }
