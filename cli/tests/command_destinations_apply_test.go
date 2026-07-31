@@ -49,6 +49,14 @@ func TestDestinationsApply(t *testing.T) {
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 
+	// A leftover unverified destination breaks other e2e tests' destroy when
+	// UnverifiedDestinations is off. Registered after t.Setenv so the flags still
+	// hold when this cleanup runs.
+	t.Cleanup(func() {
+		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
+		require.NoError(t, err, "cleanup destroy failed: %s", out)
+	})
+
 	apply := func(dir string) {
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, dir), "--var-file", varFile, "--confirm=false")
