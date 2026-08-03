@@ -51,13 +51,14 @@ func TestDestinationsApply(t *testing.T) {
 
 	// A leftover unverified destination breaks other e2e tests' destroy when
 	// UnverifiedDestinations is off. Registered after t.Setenv so the flags still
-	// hold when this cleanup runs.
+	// hold when this cleanup runs. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
-		require.NoError(t, err, "cleanup destroy failed: %s", out)
+		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 	})
 
-	apply := func(dir string) {
+	apply := func(t *testing.T, dir string) {
+		t.Helper()
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, dir), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "%s apply failed: %s", dir, out)
@@ -67,17 +68,22 @@ func TestDestinationsApply(t *testing.T) {
 	}
 
 	t.Run("apply create", func(t *testing.T) {
-		apply("create")
+		apply(t, "create")
 		verifyDestinationState(t, "create")
 	})
 
 	t.Run("apply update", func(t *testing.T) {
-		apply("update")
+		apply(t, "update")
 		verifyDestinationState(t, "update")
 	})
 
-	t.Run("re-apply leaves upstream state unchanged", func(t *testing.T) {
-		apply("update")
+	// Re-apply cannot be a full no-op here: the key-based spec's access keys are
+	// write-only, so they map to always-unknown secrets that re-apply every run
+	// (see secret.String.Diff). A dry-run would therefore always report a diff.
+	// Snapshot the non-secret upstream fields instead to prove nothing else churns,
+	// matching the accounts e2e (TestAccountsApply's re-apply subtest).
+	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
+		apply(t, "update")
 		verifyDestinationState(t, "update")
 	})
 }

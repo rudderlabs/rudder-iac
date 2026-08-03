@@ -1,0 +1,12 @@
+{
+  "id": "<ignored>",
+  "externalId": "s3",
+  "name": "My S3",
+  "type": "S3",
+  "enabled": true,
+  "config": {
+    "bucketName": "my-bucket",
+    "roleBasedAuth": true,
+    "iamRoleARN": "arn:aws:iam::123456789012:role/S3Access"
+  }
+}
