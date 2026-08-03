@@ -121,12 +121,7 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	importProvider := example.NewProvider(b)
 	proj := project.New(importProvider)
 	require.NoError(t, proj.Load(testDir))
-	require.NoError(t, importer.WorkspaceImport(
-		context.Background(),
-		proj,
-		importProvider,
-		importer.ImportOptions{},
-	))
+	require.NoError(t, importer.WorkspaceImport(context.Background(), proj, importProvider, importer.ImportOptions{}))
 
 	// The generated spec carries an unquoted variable reference, not a mask.
 	// The handler names the variable from the resource's identity

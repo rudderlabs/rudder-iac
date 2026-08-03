@@ -46,10 +46,9 @@ func TestCheckSyncStatus(t *testing.T) {
 			merge: true,
 		},
 		{
-			name:    "merge still blocks pending deletions",
-			diff:    &differ.Diff{RemovedResources: []string{"category:legacy"}},
-			merge:   true,
-			wantErr: true,
+			name:  "merge allows pending deletions (conflicts caught later in precheck)",
+			diff:  &differ.Diff{RemovedResources: []string{"category:legacy"}},
+			merge: true,
 		},
 	}
 
@@ -137,6 +136,158 @@ func TestMarkMatchedWith(t *testing.T) {
 	})
 }
 
+func TestInitNamer(t *testing.T) {
+	t.Parallel()
+
+	graphWith := func(id, resourceType string) *resources.Graph {
+		g := resources.NewGraph()
+		g.AddResource(resources.NewResource(id, resourceType, resources.ResourceData{}, []string{}))
+		return g
+	}
+
+	t.Run("reserves IDs from both target and source graphs", func(t *testing.T) {
+		t.Parallel()
+
+		// "checkout" is only in target; "legacy" is only in source (a pending
+		// local deletion whose remote twin still holds the ID). Both must be
+		// reserved so a fresh mint of either name gets suffixed.
+		target := graphWith("checkout", "category")
+		source := graphWith("legacy", "category")
+
+		idNamer, err := initNamer(target, source)
+		require.NoError(t, err)
+
+		gotTarget, err := idNamer.Name(namer.ScopeName{Name: "checkout", Scope: "category"})
+		require.NoError(t, err)
+		assert.Equal(t, "checkout-1", gotTarget, "target ID must stay reserved")
+
+		gotSource, err := idNamer.Name(namer.ScopeName{Name: "legacy", Scope: "category"})
+		require.NoError(t, err)
+		assert.Equal(t, "legacy-1", gotSource, "source-only ID must stay reserved (pending deletion)")
+	})
+
+	t.Run("deduplicates an ID present in both graphs", func(t *testing.T) {
+		t.Parallel()
+
+		// Same URN in both graphs must load once, not error as a duplicate.
+		target := graphWith("checkout", "category")
+		source := graphWith("checkout", "category")
+
+		_, err := initNamer(target, source)
+		require.NoError(t, err)
+	})
+}
+
+func TestCheckPendingDeleteConflicts(t *testing.T) {
+	t.Parallel()
+
+	// An event importable references a category by remote ID. The lister
+	// surfaces that reference for the precheck.
+	eventLister := func(refs []importmatcher.Ref) importmatcher.RefLister {
+		return importmatcher.RefLister{
+			ResourceType: "event",
+			Refs: func(*resources.RemoteResource) []importmatcher.Ref {
+				return refs
+			},
+		}
+	}
+
+	collectionWith := func(resourceType string, rs ...*resources.RemoteResource) *resources.RemoteResources {
+		c := resources.NewRemoteResources()
+		m := make(map[string]*resources.RemoteResource, len(rs))
+		for _, r := range rs {
+			m[r.ID] = r
+		}
+		c.Set(resourceType, m)
+		return c
+	}
+
+	importableEvent := collectionWith("event", &resources.RemoteResource{ID: "evt_1", ExternalID: "signed-up"})
+
+	t.Run("references a managed resource absent from local graph -> conflict", func(t *testing.T) {
+		t.Parallel()
+
+		// cat_legacy is managed remotely (ExternalID set) but its category:legacy
+		// URN is absent from the local graph: a pending, unapplied deletion.
+		remote := collectionWith("category", &resources.RemoteResource{ID: "cat_legacy", ExternalID: "legacy"})
+		listers := []importmatcher.RefLister{eventLister([]importmatcher.Ref{{EntityType: "category", RemoteID: "cat_legacy"}})}
+
+		err := checkPendingDeleteConflicts(listers, importableEvent, remote, resources.NewGraph())
+
+		require.ErrorIs(t, err, ErrPendingDeleteConflict)
+		assert.ErrorContains(t, err, "category:legacy")
+		assert.ErrorContains(t, err, "cat_legacy")
+	})
+
+	t.Run("referenced entity is itself being imported -> no conflict", func(t *testing.T) {
+		t.Parallel()
+
+		// The category is in the importable collection (imported together), so it
+		// resolves fine at format time.
+		importable := collectionWith("event", &resources.RemoteResource{ID: "evt_1", ExternalID: "signed-up"})
+		importable.Set("category", map[string]*resources.RemoteResource{
+			"cat_new": {ID: "cat_new", ExternalID: "new-category"},
+		})
+		listers := []importmatcher.RefLister{eventLister([]importmatcher.Ref{{EntityType: "category", RemoteID: "cat_new"}})}
+
+		err := checkPendingDeleteConflicts(listers, importable, resources.NewRemoteResources(), resources.NewGraph())
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("references an unknown remote id -> no conflict (surfaced later)", func(t *testing.T) {
+		t.Parallel()
+
+		// Not in importable, not in managed remote: an unknown ID. The precheck
+		// stays silent; formatting surfaces it as it does today.
+		listers := []importmatcher.RefLister{eventLister([]importmatcher.Ref{{EntityType: "category", RemoteID: "cat_ghost"}})}
+
+		err := checkPendingDeleteConflicts(listers, importableEvent, resources.NewRemoteResources(), resources.NewGraph())
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("references a managed resource present in local graph -> no conflict", func(t *testing.T) {
+		t.Parallel()
+
+		remote := collectionWith("category", &resources.RemoteResource{ID: "cat_ok", ExternalID: "checkout"})
+		graph := resources.NewGraph()
+		graph.AddResource(resources.NewResource("checkout", "category", resources.ResourceData{"name": "Checkout"}, []string{}))
+		listers := []importmatcher.RefLister{eventLister([]importmatcher.Ref{{EntityType: "category", RemoteID: "cat_ok"}})}
+
+		err := checkPendingDeleteConflicts(listers, importableEvent, remote, graph)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("all conflicts are reported together", func(t *testing.T) {
+		t.Parallel()
+
+		remote := collectionWith("category",
+			&resources.RemoteResource{ID: "cat_a", ExternalID: "legacy-a"},
+			&resources.RemoteResource{ID: "cat_b", ExternalID: "legacy-b"},
+		)
+		listers := []importmatcher.RefLister{eventLister([]importmatcher.Ref{
+			{EntityType: "category", RemoteID: "cat_a"},
+			{EntityType: "category", RemoteID: "cat_b"},
+		})}
+
+		err := checkPendingDeleteConflicts(listers, importableEvent, remote, resources.NewGraph())
+
+		require.ErrorIs(t, err, ErrPendingDeleteConflict)
+		assert.ErrorContains(t, err, "category:legacy-a")
+		assert.ErrorContains(t, err, "category:legacy-b")
+	})
+
+	t.Run("no listers -> no conflict", func(t *testing.T) {
+		t.Parallel()
+
+		err := checkPendingDeleteConflicts(nil, importableEvent, resources.NewRemoteResources(), resources.NewGraph())
+
+		assert.NoError(t, err)
+	})
+}
+
 func enableImportMerge(t *testing.T) {
 	t.Helper()
 	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
@@ -188,6 +339,10 @@ func (p *stubImportProvider) FormatForExport(
 }
 
 func (p *stubImportProvider) ResourceMatchers() []importmatcher.Matcher {
+	return nil
+}
+
+func (p *stubImportProvider) ImportableRefs() []importmatcher.RefLister {
 	return nil
 }
 

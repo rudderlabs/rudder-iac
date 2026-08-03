@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
@@ -28,6 +29,11 @@ const (
 var (
 	ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 	ErrAmbiguousMatch   = errors.New("merge import matched multiple remote resources to one local resource")
+	// ErrPendingDeleteConflict marks a merge import where an importable
+	// references a resource that is managed remotely but deleted locally with
+	// the deletion not yet applied. Detected up front, before matching or file
+	// generation, so every conflict is reported in one pass.
+	ErrPendingDeleteConflict = errors.New("importable references a resource pending deletion")
 )
 
 type ImportProvider interface {
@@ -35,6 +41,7 @@ type ImportProvider interface {
 	provider.StateLoader
 	provider.Exporter
 	provider.ResourceMatcherProvider
+	provider.ImportRefListerProvider
 }
 
 type Project interface {
@@ -76,7 +83,7 @@ func WorkspaceImport(
 		return err
 	}
 
-	idNamer, err := initNamer(targetGraph)
+	idNamer, err := initNamer(targetGraph, sourceGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -92,6 +99,9 @@ func WorkspaceImport(
 	}
 
 	if opts.Merge {
+		if err := checkPendingDeleteConflicts(p.ImportableRefs(), importable, remoteCollection, targetGraph); err != nil {
+			return err
+		}
 		if err := markMatchedWith(p, sourceGraph, targetGraph, importable); err != nil {
 			return err
 		}
@@ -149,19 +159,16 @@ func WorkspaceImport(
 // checkSyncStatus guards the import against a diverged project. Without merge,
 // any pending change blocks — HasNonSecretDiff (not HasDiff) so resources that
 // only re-apply an unknown secret, which is expected on every run, do not
-// permanently block imports. With merge, divergence is the point; only pending
-// deletions block, as importing over them could resurrect deleted resources.
+// permanently block imports. With merge, divergence is the point — including
+// pending deletions: only deletions an importable actually references error,
+// caught by checkPendingDeleteConflicts before any file is written.
 func checkSyncStatus(diff *differ.Diff, merge bool) error {
-	if !merge {
-		if diff.HasNonSecretDiff() {
-			return fmt.Errorf("%w", ErrProjectNotSynced)
-		}
+	if merge {
 		return nil
 	}
 
-	if len(diff.RemovedResources) > 0 {
-		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
-			ErrProjectNotSynced, diff.RemovedResources)
+	if diff.HasNonSecretDiff() {
+		return fmt.Errorf("%w", ErrProjectNotSynced)
 	}
 	return nil
 }
@@ -196,16 +203,79 @@ func markMatchedWith(
 	return nil
 }
 
-func initNamer(graph *resources.Graph) (namer.Namer, error) {
+// checkPendingDeleteConflicts fails the merge import when an importable
+// references a resource that is managed remotely but deleted locally with the
+// deletion not yet applied. References come from the providers' ImportableRefs
+// listers. All conflicts are collected and reported together, before matching
+// or file generation, so the user resolves every conflict in one pass.
+func checkPendingDeleteConflicts(
+	listers []importmatcher.RefLister,
+	importable *resources.RemoteResources,
+	remote *resources.RemoteResources,
+	targetGraph *resources.Graph,
+) error {
+	var conflicts []string
+	for _, lister := range listers {
+		remotes := importable.GetAll(lister.ResourceType)
+		for _, id := range sortedKeys(remotes) {
+			r := remotes[id]
+			for _, ref := range lister.Refs(r) {
+				// Referenced entity is itself being imported now — it resolves fine.
+				if _, ok := importable.GetByID(ref.EntityType, ref.RemoteID); ok {
+					continue
+				}
+				// Not a managed remote — an unknown ID; formatting surfaces it as today.
+				managed, ok := remote.GetByID(ref.EntityType, ref.RemoteID)
+				if !ok {
+					continue
+				}
+				// Managed remote but absent from the local graph ⇒ pending-delete conflict.
+				urn := resources.URN(managed.ExternalID, ref.EntityType)
+				if _, inGraph := targetGraph.GetResource(urn); !inGraph {
+					conflicts = append(conflicts, fmt.Sprintf(
+						"%s %q references %s (remote %s), which is deleted locally but not yet applied",
+						lister.ResourceType, r.ExternalID, urn, ref.RemoteID))
+				}
+			}
+		}
+	}
+
+	if len(conflicts) > 0 {
+		return fmt.Errorf("%w: apply the pending deletions or restore their specs before importing with --merge:\n  %s",
+			ErrPendingDeleteConflict, strings.Join(conflicts, "\n  "))
+	}
+	return nil
+}
+
+func sortedKeys(m map[string]*resources.RemoteResource) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// initNamer preloads the union of target (local project) and source (managed
+// remote) IDs. The union matters under merge with pending deletions: a
+// locally-deleted resource is absent from target but its remote twin still
+// holds the ID upstream, so it must stay reserved until the deletion applies.
+func initNamer(targetGraph, sourceGraph *resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 
-	resourcesMap := graph.Resources()
-	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
-	for _, r := range resourcesMap {
-		externalIDs = append(externalIDs, namer.ScopeName{
-			Name:  r.ID(),
-			Scope: r.Type(),
-		})
+	seen := make(map[string]bool)
+	externalIDs := make([]namer.ScopeName, 0)
+	for _, graph := range []*resources.Graph{targetGraph, sourceGraph} {
+		for urn, r := range graph.Resources() {
+			if seen[urn] {
+				continue
+			}
+			seen[urn] = true
+			externalIDs = append(externalIDs, namer.ScopeName{
+				Name:  r.ID(),
+				Scope: r.Type(),
+			})
+		}
 	}
 
 	if err := idNamer.Load(externalIDs); err != nil {
