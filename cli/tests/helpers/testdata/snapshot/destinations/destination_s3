@@ -1,5 +1,9 @@
 {
   "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>",
   "externalId": "s3",
   "name": "My S3",
   "type": "S3",

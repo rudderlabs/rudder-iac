@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/stretchr/testify/assert"
@@ -19,15 +20,27 @@ func (m *mockDestinationLister) GetAll(context.Context) ([]client.Destination, e
 	return m.destinations, nil
 }
 
-// s3Destination mirrors the destination_s3 snapshot fixture, plus overridable
-// volatile fields (id/workspaceId) that the ignore list must drop.
+// s3Destination mirrors the destination_s3 snapshot fixture, including the
+// volatile fields the live API always returns (id/workspaceId/version/timestamps)
+// that the ignore list must drop by value. Setting them here means a regression
+// where one goes missing (e.g. omitempty drops version:0) is caught without a
+// live stack.
 func s3Destination() client.Destination {
+	var (
+		created = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		updated = time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	)
+
 	return client.Destination{
-		ID:         "srv-generated-id",
-		ExternalID: "s3",
-		Name:       "My S3",
-		Type:       "S3",
-		IsEnabled:  true,
+		ID:          "srv-generated-id",
+		WorkspaceID: "ws-123",
+		Version:     3,
+		CreatedAt:   &created,
+		UpdatedAt:   &updated,
+		ExternalID:  "s3",
+		Name:        "My S3",
+		Type:        "S3",
+		IsEnabled:   true,
 		Config: json.RawMessage(`{
 			"bucketName": "my-bucket",
 			"roleBasedAuth": true,
