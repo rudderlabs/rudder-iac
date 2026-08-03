@@ -17,6 +17,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -249,8 +250,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 
 // newDestinationRegistry builds the destination definition registry.
 // DestinationSupport must be on before any definitions are registered.
-// Unverified destinations (currently S3) additionally require
-// UnverifiedDestinations.
+// Unverified destinations currently additionally require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
 	if !cfg.ExperimentalFlags.DestinationSupport {
@@ -260,6 +260,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	// Verified/native destination definitions register here when available.
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
+		if err := registry.Register(httpdest.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering http destination definition: %w", err)
+		}
 		if err := registry.Register(s3.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering s3 destination definition: %w", err)
 		}
