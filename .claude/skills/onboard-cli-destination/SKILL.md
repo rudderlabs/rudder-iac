@@ -1,6 +1,6 @@
 ---
 name: onboard-cli-destination
-description: Onboard a new destination type into the rudder-iac CLI destination registry. Use when asked to add/onboard/register a destination (e.g. webhook, ga4, digital_ocean_spaces) in the CLI. Takes the destination's localType (its directory name under rudder-integrations-config destinations) as input, derives the upstream APIType from that directory's db-config.json, ports property mappings from terraform-provider-rudderstack, derives validations from rudder-integrations-config schema.json, and produces definition.go, definition_test.go, registry wiring, and a valid example YAML.
+description: Onboard a new destination type into the rudder-iac CLI destination registry. Use when asked to add/onboard/register a destination (e.g. webhook, ga4, digital_ocean_spaces) in the CLI. Takes the destination's localType (its directory name under rudder-integrations-config destinations) as input, derives the upstream APIType from that directory's db-config.json, ports property mappings from terraform-provider-rudderstack, derives validations from rudder-integrations-config schema.json, and produces definition.go, definition_test.go, registry wiring, destination e2e fixtures/snapshots, and a valid example YAML.
 ---
 
 # Onboard CLI Destination
@@ -14,14 +14,17 @@ Add a new destination type to the rudder-iac CLI destination registry
 automatically from that directory's `db-config.json` — do not ask the user
 for it.
 
-**Outputs** (exactly these, nothing more):
+**Outputs**:
 
 1. `cli/internal/providers/destination/definitions/<type>/definition.go`
 2. `cli/internal/providers/destination/definitions/<type>/definition_test.go`
 3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`)
-4. A valid example YAML spec, printed in the final response (not committed as a file)
+4. Destination e2e fixtures and expected snapshots for each meaningful config
+   variation, or a documented deferral reason when a live snapshot cannot be
+   captured safely
+5. A valid example YAML spec, printed in the final response (not committed as a file)
 
-Out of scope: rule-doc updates, E2E test wiring, project fixtures.
+Out of scope: rule-doc updates.
 
 ## Source-of-truth split (fixed roles — do not deviate)
 
@@ -187,23 +190,43 @@ case using the exact example config, or run a temp-project
 `rudder-cli project validate` with the experimental flag on. The example must
 pass before it ships in the response.
 
-### Step 8: Verify
+### Step 8: Add destination e2e fixtures
+
+Read [reference/e2e-tests.md](reference/e2e-tests.md). Add catalog-layout
+fixtures for each meaningful config variation the destination supports, plus
+matching expected upstream snapshots when a live destination-enabled stack is
+available.
+
+E2E complements, not duplicates, `definition_test.go`: unit tests remain
+exhaustive for config validation and conversion surfaces, while
+`TestDestinationsApply` covers the live apply → update → re-apply lifecycle for
+meaningful backend-facing variations.
+
+### Step 9: Verify
 
 ```bash
 go build ./...
 go test ./cli/internal/providers/destination/... ./cli/internal/app/...
+go test ./cli/tests -run TestDestinationsApply -count=1
+go test ./cli/tests/helpers -run TestDestinationSnapshotTester -count=1
 make lint
 ```
 
 All must pass. `cli/internal/app` is included because `dependencies_test.go`
-and `ruledoc_test.go` exercise the registry with the new definition.
+and `ruledoc_test.go` exercise the registry with the new definition. The
+ungated `TestDestinationsApply` run must compile and skip cleanly; run the gated
+live e2e with `RUN_DESTINATION_E2E=1` when the required live stack is available.
 
-### Step 9: Report
+### Step 10: Report
 
 Final response must include:
 
 - Files created/modified
 - The validated example YAML
+- Destination e2e coverage added: each meaningful variation covered by fixtures
+  and snapshots, or the documented deferral reason
+- E2E verification status: skip/compile result and whether the gated live run was
+  performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
   source types, upstream fields intentionally omitted)
 - Gated keys: which properties were gated and to which source types; gates

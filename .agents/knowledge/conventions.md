@@ -30,3 +30,8 @@
 ## DEX-456 — SDK ID Initialism Style
 <!-- ticket:DEX-456 -->
 - The Go SDK uses fully capitalized `ID` initialisms in identifiers and JSON field helpers. New account-related SDK fields and helpers should follow that existing `ID` spelling rather than mixed-case variants.
+
+## DEX-591 — Destination Onboarding E2E Guidance
+<!-- ticket:DEX-591 -->
+- Destination onboarding E2E guidance should require live snapshot capture when a destination-enabled stack is available, but may document an explicit deferral reason when live stack credentials are unavailable.
+- Destination E2E coverage should focus on each destination's meaningful config variations and complement, not duplicate, exhaustive `definition_test.go` validation/unit coverage.
