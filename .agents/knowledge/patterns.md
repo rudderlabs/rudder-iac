@@ -55,6 +55,11 @@
 - Re-registering a pattern without a reject intentionally clears any stale reject entry for that name, preserving allow-only behavior for existing callers.
 - `RegisterWithReject` defensively initializes nil registry maps before writes, so package-local fixtures or future literal registries do not panic when they omit optional maps such as `rejects`.
 
+## DEX-510 — HTTP Destination Definition Conversion
+<!-- ticket:DEX-510 -->
+- Destination definitions declare `SecretKeys` in local YAML config shape, not upstream API config shape, because `HandlerImpl.ExtractResourcesFromSpec` wraps secrets before API conversion and `MapRemoteToState` wraps after API-to-local conversion; HTTP secrets are `password`, `bearer_token`, and `api_key_value`.
+- HTTP event filtering keeps a nested local YAML object (`event_filtering.whitelist` / `event_filtering.blacklist`) and maps it to API `whitelistedEvents` / `blacklistedEvents` plus the `eventFilteringOption` discriminator via `converter.ArrayWithStrings` and `converter.Discriminator`.
+
 ## DEX-591 — Destination Apply E2E Catalog Fixtures
 <!-- ticket:DEX-591 -->
 - Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.

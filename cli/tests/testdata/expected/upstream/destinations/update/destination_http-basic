@@ -1,0 +1,19 @@
+{
+  "config": {
+    "apiUrl": "https://webhooks.example.com/rudder/events/v2",
+    "auth": "basicAuth",
+    "format": "JSON",
+    "method": "POST",
+    "username": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-basic",
+  "id": "<ignored>",
+  "name": "E2E HTTP Basic Auth Updated",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
+

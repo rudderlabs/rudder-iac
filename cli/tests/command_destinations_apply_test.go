@@ -28,6 +28,9 @@ var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "create
 var destinationRawSecrets = []string{
 	"AKIAXXXXXXXXXXXXXXXX",
 	"wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+	"httpBasicPasswordXXXXXXXXXXXX",
+	"httpBearerTokenXXXXXXXXXXXXXXX",
+	"httpApiKeyValueXXXXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

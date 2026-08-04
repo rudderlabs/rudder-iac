@@ -54,10 +54,10 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 			wantTypes:              []string{},
 		},
 		{
-			name:                   "both flags enabled registers s3",
+			name:                   "both flags enabled registers unverified destinations",
 			destinationSupport:     true,
 			unverifiedDestinations: true,
-			wantTypes:              []string{"s3"},
+			wantTypes:              []string{"http", "s3"},
 		},
 	}
 
