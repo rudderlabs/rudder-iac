@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: s3
+spec:
+  id: s3
+  display_name: E2E S3 Updated
+  type: s3
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: rudder-cli-e2e
+    prefix: rudder/updated/
+    role_based_auth: false
+    access_key_id: "{{ .S3_ACCESS_KEY_ID }}"
+    access_key: "{{ .S3_ACCESS_KEY }}"
+    enable_sse: true
