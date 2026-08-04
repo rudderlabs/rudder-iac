@@ -56,7 +56,7 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // before the destroy.
 func TestDestinationsApply(t *testing.T) {
 	if os.Getenv("RUN_DESTINATION_E2E") != "1" {
-		t.Skip("set RUN_DESTINATION_E2E=1 with a live stack that has unverified destinations (S3) enabled")
+		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified S3")
 	}
 
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
@@ -67,8 +67,8 @@ func TestDestinationsApply(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
-	projectDir := filepath.Join("testdata", "destinations", "s3")
-	varFile := filepath.Join(projectDir, "s3.vars.yaml")
+	projectDir := filepath.Join("testdata", "destinations")
+	varFile := filepath.Join(projectDir, "destinations.vars.yaml")
 
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
