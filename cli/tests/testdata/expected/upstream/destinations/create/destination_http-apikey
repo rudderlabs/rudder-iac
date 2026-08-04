@@ -1,0 +1,22 @@
+{
+  "config": {
+    "apiKeyName": "X-Api-Key",
+    "apiUrl": "https://webhooks.example.com/rudder/events",
+    "auth": "apiKeyAuth",
+    "eventFilteringOption": "disable",
+    "format": "JSON",
+    "isBatchingEnabled": false,
+    "isDefaultMapping": true,
+    "method": "POST"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-apikey",
+  "id": "<ignored>",
+  "name": "E2E HTTP API Key Auth",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
+

@@ -1,0 +1,20 @@
+{
+  "config": {
+    "apiUrl": "https://webhooks.example.com/rudder/events",
+    "auth": "noAuth",
+    "format": "JSON",
+    "isBatchingEnabled": true,
+    "maxBatchSize": "50",
+    "method": "PUT"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-noauth",
+  "id": "<ignored>",
+  "name": "E2E HTTP No Auth Updated",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
+

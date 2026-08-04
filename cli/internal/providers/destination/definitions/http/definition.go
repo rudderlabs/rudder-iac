@@ -113,7 +113,7 @@ type httpConfig struct {
 	APIURL            string                   `mapstructure:"api_url" validate:"required,pattern=http_api_url"`
 	Auth              string                   `mapstructure:"auth" validate:"required,dynamic_or_oneof=noAuth basicAuth bearerTokenAuth apiKeyAuth"`
 	Username          string                   `mapstructure:"username" validate:"required_if=Auth basicAuth,omitempty,min=1,max=100"`
-	Password          string                   `mapstructure:"password" validate:"required_if=Auth basicAuth,max=100"`
+	Password          string                   `mapstructure:"password" validate:"required_if=Auth basicAuth,omitempty,max=100"`
 	BearerToken       string                   `mapstructure:"bearer_token" validate:"required_if=Auth bearerTokenAuth,omitempty,min=1,max=255"`
 	APIKeyName        string                   `mapstructure:"api_key_name" validate:"required_if=Auth apiKeyAuth,omitempty,pattern=http_api_key_name"`
 	APIKeyValue       string                   `mapstructure:"api_key_value" validate:"required_if=Auth apiKeyAuth,omitempty,min=1,max=100"`
