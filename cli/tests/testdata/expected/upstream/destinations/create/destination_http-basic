@@ -1,0 +1,22 @@
+{
+  "config": {
+    "apiUrl": "https://webhooks.example.com/rudder/events",
+    "auth": "basicAuth",
+    "eventFilteringOption": "disable",
+    "format": "JSON",
+    "isBatchingEnabled": false,
+    "isDefaultMapping": true,
+    "method": "POST",
+    "username": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-basic",
+  "id": "<ignored>",
+  "name": "E2E HTTP Basic Auth",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
+

@@ -53,6 +53,38 @@ func TestPatternRegistry(t *testing.T) {
 			reg.Register("bad_pattern", "^[A-Z", "error message")
 		})
 	})
+
+	t.Run("match applies allow and reject patterns", func(t *testing.T) {
+		t.Parallel()
+		reg := &patternRegistry{
+			patterns: make(map[string]*regexp.Regexp),
+			rejects:  make(map[string]*regexp.Regexp),
+			errors:   make(map[string]string),
+		}
+
+		reg.RegisterWithReject("test_url_with_reject", "^https?://", "^http://localhost", "must be public http url")
+
+		assert.True(t, reg.match("test_url_with_reject", "https://example.com"))
+		assert.False(t, reg.match("test_url_with_reject", "http://localhost:8080"))
+		assert.False(t, reg.match("test_url_with_reject", "ftp://example.com"))
+		assert.False(t, reg.match("test_unknown_url_pattern", "https://example.com"))
+	})
+
+	t.Run("register without reject clears previous reject", func(t *testing.T) {
+		t.Parallel()
+		reg := &patternRegistry{
+			patterns: make(map[string]*regexp.Regexp),
+			rejects:  make(map[string]*regexp.Regexp),
+			errors:   make(map[string]string),
+		}
+
+		reg.RegisterWithReject("test_clear_reject", "^[a-z]+$", "^blocked$", "must be lowercase")
+		assert.False(t, reg.match("test_clear_reject", "blocked"))
+
+		reg.Register("test_clear_reject", "^[a-z]+$", "must be lowercase")
+
+		assert.True(t, reg.match("test_clear_reject", "blocked"))
+	})
 }
 
 func TestNewPattern(t *testing.T) {
@@ -71,36 +103,17 @@ func TestNewPattern(t *testing.T) {
 }
 
 func TestNewPatternWithReject(t *testing.T) {
-	NewPatternWithReject(
-		"test_url_with_reject",
-		`^(?:https?://)?[\w.-]+\.[\w.-]+.*$`,
-		`.*\.ngrok\.io.*`,
-		"must be a valid URL and must not use an ngrok host",
-	)
+	t.Parallel()
 
-	type TestStruct struct {
-		URL string `validate:"pattern=test_url_with_reject"`
-	}
+	NewPatternWithReject("test_new_pattern_with_reject_id", "^https?://", "^http://localhost", "must be public http url")
 
-	t.Run("valid url", func(t *testing.T) {
-		errs, err := rules.ValidateStruct(TestStruct{URL: "https://www.googletagmanager.com"}, "", GetPatternValidator())
-		require.NoError(t, err)
-		assert.Nil(t, errs)
-	})
-
-	t.Run("rejects ngrok host", func(t *testing.T) {
-		errs, err := rules.ValidateStruct(TestStruct{URL: "https://abc.ngrok.io/path"}, "", GetPatternValidator())
-		require.NoError(t, err)
-		require.NotNil(t, errs)
-		assert.Len(t, errs, 1)
-	})
-
-	t.Run("rejects non url", func(t *testing.T) {
-		errs, err := rules.ValidateStruct(TestStruct{URL: "not a url"}, "", GetPatternValidator())
-		require.NoError(t, err)
-		require.NotNil(t, errs)
-		assert.Len(t, errs, 1)
-	})
+	regex, errMsg, ok := registry.Get("test_new_pattern_with_reject_id")
+	assert.True(t, ok)
+	assert.NotNil(t, regex)
+	assert.Equal(t, "must be public http url", errMsg)
+	assert.True(t, registry.match("test_new_pattern_with_reject_id", "https://example.com"))
+	assert.False(t, registry.match("test_new_pattern_with_reject_id", "http://localhost:8080"))
+	assert.False(t, registry.match("test_new_pattern_with_reject_id", "ftp://example.com"))
 }
 
 func TestGetPatternErrorMessage(t *testing.T) {
@@ -154,6 +167,20 @@ func TestGetPatternValidator(t *testing.T) {
 		}
 
 		data := TestStruct{Name: "anything"}
+		errs, err := rules.ValidateStruct(data, "", GetPatternValidator())
+		require.NoError(t, err)
+		assert.NotNil(t, errs)
+		assert.Len(t, errs, 1)
+	})
+
+	t.Run("Pattern validator rejects matching reject pattern", func(t *testing.T) {
+		NewPatternWithReject("test_validator_reject_url", "^https?://", "^http://localhost", "must be public http url")
+
+		type TestStruct struct {
+			URL string `validate:"pattern=test_validator_reject_url"`
+		}
+
+		data := TestStruct{URL: "http://localhost:8080"}
 		errs, err := rules.ValidateStruct(data, "", GetPatternValidator())
 		require.NoError(t, err)
 		assert.NotNil(t, errs)

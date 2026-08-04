@@ -47,3 +47,21 @@
 <!-- ticket:RUD-2963 -->
 - `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the `Flag is not enabled for your account` prefix or the `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
 - Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
+
+## DEX-545 — Named Pattern Allow/Reject Registry
+<!-- ticket:DEX-545 -->
+- Named pattern validation is centralized in `cli/internal/provider/rules/funcs/regex.go`; `validate:"pattern=<name>"` consumers should rely on the registry match path rather than calling stored allow regexes directly.
+- Pattern registration now supports an optional reject regex: `NewPattern`/`Register` remain allow-only wrappers, while `NewPatternWithReject`/`RegisterWithReject` store the allow regex plus optional reject and make matching fail when the reject regex matches.
+- Re-registering a pattern without a reject intentionally clears any stale reject entry for that name, preserving allow-only behavior for existing callers.
+- `RegisterWithReject` defensively initializes nil registry maps before writes, so package-local fixtures or future literal registries do not panic when they omit optional maps such as `rejects`.
+
+## DEX-510 — HTTP Destination Definition Conversion
+<!-- ticket:DEX-510 -->
+- Destination definitions declare `SecretKeys` in local YAML config shape, not upstream API config shape, because `HandlerImpl.ExtractResourcesFromSpec` wraps secrets before API conversion and `MapRemoteToState` wraps after API-to-local conversion; HTTP secrets are `password`, `bearer_token`, and `api_key_value`.
+- HTTP event filtering keeps a nested local YAML object (`event_filtering.whitelist` / `event_filtering.blacklist`) and maps it to API `whitelistedEvents` / `blacklistedEvents` plus the `eventFilteringOption` discriminator via `converter.ArrayWithStrings` and `converter.Discriminator`.
+
+## DEX-591 — Destination Apply E2E Catalog Fixtures
+<!-- ticket:DEX-591 -->
+- Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.
+- `TestDestinationsApply` applies the destination create/update directories directly, relying on recursive spec loading so future destination variations can be added without changing test code.
+- Expected upstream destination snapshots remain under `cli/tests/testdata/expected/upstream/destinations/{create,update}/destination_<spec.id>` for whole-managed-set comparison.

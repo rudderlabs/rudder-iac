@@ -75,6 +75,11 @@ func NewCmdWorkspaceImport() *cobra.Command {
 
 			spinner.Stop()
 			if err == nil {
+				// Continuation lines are indented to align under the text after "Warning: ".
+				ui.PrintWarning(`Secrets are not imported from the remote workspace.
+         Add any required secret fields to the exported specs using
+         variable substitution ({{ .VAR }}) and pass them to apply
+         with --var-file.`)
 				ui.PrintSuccess("Done")
 			}
 

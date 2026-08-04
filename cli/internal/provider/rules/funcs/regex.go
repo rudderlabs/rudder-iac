@@ -8,8 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// patternRegistry holds pre-compiled regex patterns and their error messages.
-// Optional reject patterns fail validation when matched (e.g. ngrok hosts).
+// patternRegistry holds pre-compiled regex patterns and their error messages
 type patternRegistry struct {
 	patterns map[string]*regexp.Regexp
 	rejects  map[string]*regexp.Regexp
@@ -24,24 +23,41 @@ var registry = &patternRegistry{
 	errors:   make(map[string]string),
 }
 
-// Register adds a named allow pattern to the registry.
+// Register adds a named pattern to the registry
 func (r *patternRegistry) Register(name, pattern, errorMsg string) {
 	r.RegisterWithReject(name, pattern, "", errorMsg)
 }
 
-// RegisterWithReject adds a named allow pattern and optional reject pattern.
-// When rejectPattern is non-empty, values matching it fail even if they match pattern.
+// RegisterWithReject adds a named pattern and optional reject pattern to the registry.
 func (r *patternRegistry) RegisterWithReject(name, pattern, rejectPattern, errorMsg string) {
+	compiled := regexp.MustCompile(pattern)
+
+	var reject *regexp.Regexp
+	if rejectPattern != "" {
+		reject = regexp.MustCompile(rejectPattern)
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.patterns[name] = regexp.MustCompile(pattern)
+	if r.patterns == nil {
+		r.patterns = make(map[string]*regexp.Regexp)
+	}
+	if r.rejects == nil {
+		r.rejects = make(map[string]*regexp.Regexp)
+	}
+	if r.errors == nil {
+		r.errors = make(map[string]string)
+	}
+
+	r.patterns[name] = compiled
 	r.errors[name] = errorMsg
-	if rejectPattern == "" {
+
+	if reject == nil {
 		delete(r.rejects, name)
 		return
 	}
-	r.rejects[name] = regexp.MustCompile(rejectPattern)
+	r.rejects[name] = reject
 }
 
 // Get retrieves a pattern and its error message from the registry
@@ -64,9 +80,11 @@ func (r *patternRegistry) match(name, value string) bool {
 	if !ok {
 		return false
 	}
-	if reject, hasReject := r.rejects[name]; hasReject && reject.MatchString(value) {
+
+	if reject, ok := r.rejects[name]; ok && reject.MatchString(value) {
 		return false
 	}
+
 	return pattern.MatchString(value)
 }
 
@@ -84,9 +102,9 @@ func NewPattern(name string, pattern string, errorMessage string) {
 	registry.Register(name, pattern, errorMessage)
 }
 
-// NewPatternWithReject registers an allow pattern plus a reject pattern.
-// Values matching rejectPattern fail validation even when they match pattern.
-// Usage: validate:"pattern=name"
+// NewPatternWithReject registers a named pattern with an optional reject pattern in the global pattern registry.
+// Usage: NewPatternWithReject("url", "^https?://", "localhost", "must be a valid public URL")
+// Then use in struct tags: validate:"pattern=url"
 func NewPatternWithReject(name, pattern, rejectPattern, errorMessage string) {
 	registry.RegisterWithReject(name, pattern, rejectPattern, errorMessage)
 }
@@ -95,7 +113,9 @@ func NewPatternWithReject(name, pattern, rejectPattern, errorMessage string) {
 // in ValidateStruct. This validator handles all validate:"pattern=name" tags.
 func GetPatternValidator() rules.CustomValidateFunc {
 	fn := validator.Func(func(fl validator.FieldLevel) bool {
-		return registry.match(fl.Param(), fl.Field().String())
+		patternName := fl.Param()
+
+		return registry.match(patternName, fl.Field().String())
 	})
 
 	return rules.CustomValidateFunc{

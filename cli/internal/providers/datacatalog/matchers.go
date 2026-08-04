@@ -80,44 +80,143 @@ func matchEvent(scope importmatcher.Scope, r *resources.RemoteResource) *resourc
 
 func matchProperty(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
 	remote := r.Data.(*catalog.Property)
-	// DefinitionId links the remote property to a custom type; those are
-	// imported normally via the namer, never smart-linked.
-	if remote.Name == "" || remote.DefinitionId != "" {
-		return nil
-	}
 
-	// Remote config uses camelCase keys; local config is snake_case.
-	remoteItems, ok := stringItemTypes(remote.Config, "itemTypes")
+	in, ok := preparePropertyMatch(scope, remote)
 	if !ok {
 		return nil
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, types.PropertyResourceType, func(data resources.ResourceData) bool {
-		if data["name"].(string) != remote.Name {
-			return false
-		}
-
-		// A non-string local type is a resources.PropertyRef — a custom-type
-		// reference — which never smart-links. Multi-types compare as the
-		// sorted comma-joined string both sides already normalize to.
-		localType, ok := data["type"].(string)
-		if !ok || localType != remote.Type {
-			return false
-		}
-
-		localConfig, _ := data["config"].(map[string]any)
-		localItems, ok := stringItemTypes(localConfig, "item_types")
-		if !ok {
-			return false
-		}
-		return itemTypesEqual(localItems, remoteItems)
+		return propertyDataMatches(data, in)
 	})
 	return local
 }
 
+// propertyMatchInputs is the remote property distilled into what a local
+// candidate must match: its name, its type (with any custom-type ref already
+// resolved to a local URN), and its item types (likewise). The *URN fields hold
+// resolved local custom-type URNs, not remote IDs.
+type propertyMatchInputs struct {
+	name        string
+	remoteType  string
+	typeRefURN  string
+	remoteItems []string
+	itemRefURN  string
+}
+
+// preparePropertyMatch resolves the remote property's references up front. ok
+// is false when the property cannot match at all: it has no name, or one of its
+// custom-type refs resolves to nothing (the custom type is neither imported now
+// nor already managed), or its item types are unreadable.
+func preparePropertyMatch(scope importmatcher.Scope, remote *catalog.Property) (propertyMatchInputs, bool) {
+	if remote.Name == "" {
+		return propertyMatchInputs{}, false
+	}
+
+	// A remote property whose type (or array item type) is a custom type
+	// references it by DefinitionId/ItemDefinitionId; resolve each to the local
+	// custom-type URN so it can be compared against the local PropertyRef.
+	typeRefURN, ok := resolveTypeRef(scope, remote.DefinitionId)
+	if !ok {
+		return propertyMatchInputs{}, false
+	}
+	itemRefURN, ok := resolveTypeRef(scope, remote.ItemDefinitionId)
+	if !ok {
+		return propertyMatchInputs{}, false
+	}
+
+	// Remote config uses camelCase keys; local config is snake_case.
+	remoteItems, ok := stringItemTypes(remote.Config, "itemTypes")
+	if !ok {
+		return propertyMatchInputs{}, false
+	}
+
+	return propertyMatchInputs{
+		name:        remote.Name,
+		remoteType:  remote.Type,
+		typeRefURN:  typeRefURN,
+		remoteItems: remoteItems,
+		itemRefURN:  itemRefURN,
+	}, true
+}
+
+// propertyDataMatches reports whether a local property (name, type, itemTypes)
+// equals the prepared remote inputs. Order matters only for short-circuiting.
+func propertyDataMatches(data resources.ResourceData, in propertyMatchInputs) bool {
+	return data["name"].(string) == in.name &&
+		typeMatches(data["type"], in.remoteType, in.typeRefURN) &&
+		itemTypesMatch(data["config"], in.remoteItems, in.itemRefURN)
+}
+
+// resolveTypeRef maps a remote custom-type ID to the local custom-type URN it
+// corresponds to: either the URN of the custom type matched in this import, or
+// of one already managed locally (found by its import metadata's remote ID).
+// An empty definitionID means the property has no custom-type ref at that slot,
+// which resolves to the empty URN. ok is false only when a non-empty ID cannot
+// be resolved — the property then stays unmatched (namer fallback).
+func resolveTypeRef(scope importmatcher.Scope, definitionID string) (urn string, ok bool) {
+	if definitionID == "" {
+		return "", true
+	}
+
+	if scope.Importable != nil {
+		if ct, found := scope.Importable.GetByID(types.CustomTypeResourceType, definitionID); found {
+			if ct.MatchedWith != nil {
+				return ct.MatchedWith.URN(), true
+			}
+			return "", false
+		}
+	}
+
+	for _, ct := range scope.LocalGraph.ResourcesByType(types.CustomTypeResourceType) {
+		if meta := ct.ImportMetadata(); meta != nil && meta.RemoteId == definitionID {
+			return ct.URN(), true
+		}
+	}
+	return "", false
+}
+
+// typeMatches compares a local property's type against the remote's. When the
+// remote type is a custom type (typeRefURN non-empty), the local type must be
+// the PropertyRef pointing at the same custom-type URN. Otherwise both are
+// plain strings, compared as the sorted comma-joined form they normalize to.
+func typeMatches(localType any, remoteType, typeRefURN string) bool {
+	if typeRefURN != "" {
+		ref, ok := localType.(resources.PropertyRef)
+		return ok && ref.URN == typeRefURN
+	}
+
+	s, ok := localType.(string)
+	return ok && s == remoteType
+}
+
+// itemTypesMatch compares array item types. When the remote item type is a
+// custom type (itemRefURN non-empty), the local item_types must be a single
+// PropertyRef pointing at the same custom-type URN. Otherwise both are string
+// lists compared order-insensitively.
+func itemTypesMatch(localConfig any, remoteItems []string, itemRefURN string) bool {
+	config, _ := localConfig.(map[string]any)
+
+	if itemRefURN != "" {
+		items, _ := config["item_types"].([]any)
+		if len(items) != 1 {
+			return false
+		}
+		ref, ok := items[0].(resources.PropertyRef)
+		return ok && ref.URN == itemRefURN
+	}
+
+	localItems, ok := stringItemTypes(config, "item_types")
+	if !ok {
+		return false
+	}
+	return itemTypesEqual(localItems, remoteItems)
+}
+
 // stringItemTypes extracts the item types under key as strings. ok is false
 // when the entry exists but contains non-string elements (custom-type item
-// references), which never smart-link. An absent entry is ok with nil items.
+// references) — those are matched separately in itemTypesMatch, not here. An
+// absent entry is ok with nil items.
 func stringItemTypes(config map[string]any, key string) ([]string, bool) {
 	if config == nil {
 		return nil, true

@@ -501,15 +501,8 @@ func TestClientDestinations_DisconnectTransformation(t *testing.T) {
 		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		result, err := c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
+		err = c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
 		require.NoError(t, err)
-		assert.Equal(t, &client.DestinationTransformation{
-			DestinationID:    "some-destination-id",
-			TransformationID: "some-transformation-id",
-			CreatedAt:        time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC),
-			UpdatedAt:        time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC),
-		}, result)
-
 		httpClient.AssertNumberOfCalls()
 	})
 
@@ -535,7 +528,7 @@ func TestClientDestinations_DisconnectTransformation(t *testing.T) {
 		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
 		require.NoError(t, err)
 
-		_, err = c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
+		err = c.Destinations.DisconnectTransformation(ctx, "some-destination-id")
 		require.Error(t, err)
 
 		var apiErr *client.APIError

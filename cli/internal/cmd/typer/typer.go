@@ -64,7 +64,7 @@ func newCmdGenerate() *cobra.Command {
 			}
 
 			if local && !config.GetConfig().ExperimentalFlags.LocalTyper {
-				return fmt.Errorf("--local is experimental; enable it by setting the 'localTyper' flag (e.g. RUDDERSTACK_X_LOCAL_TYPER=true)")
+				return fmt.Errorf("--local is experimental; enable it by setting both RUDDERSTACK_CLI_EXPERIMENTAL=true (the umbrella experimental flag) and RUDDERSTACK_X_LOCAL_TYPER=true (the 'localTyper' flag). The per-flag setting is ignored unless the umbrella flag is also set")
 			}
 
 			defer func() {

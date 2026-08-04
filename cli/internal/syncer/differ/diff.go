@@ -174,9 +174,15 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 			return
 		}
 
-		newV1, ok := rewriteCompatibleType(v1)
-		if ok {
+		// Rewrite both sides so a []any-of-objects from one decode path (e.g.
+		// JSON remote state) and its equal counterpart from another (e.g. YAML
+		// spec) land on the same type before the type-equality gate below.
+		if newV1, ok := rewriteCompatibleType(v1); ok {
 			v1 = newV1
+		}
+
+		if newV2, ok := rewriteCompatibleType(v2); ok {
+			v2 = newV2
 		}
 
 		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
@@ -255,7 +261,10 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 	// Iterate over properties in r1 to find differences
 	for key, value1 := range r1 {
 		if value2, exists := r2[key]; !exists {
-			record(key, PropertyDiff{Property: key, SourceValue: value1, TargetValue: nil})
+			// Presence-based secret wrapping omits keys the API strips. A secret
+			// present on only one side is still secret-driven drift (re-apply),
+			// not a real config change.
+			record(key, PropertyDiff{Property: key, SourceValue: value1, TargetValue: nil, SecretOnly: isSecretValue(value1)})
 		} else {
 			compareValues(key, value1, value2)
 		}
@@ -264,7 +273,7 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 	// Iterate over properties in r2 to find properties that are not in r1
 	for key, value2 := range r2 {
 		if _, exists := r1[key]; !exists {
-			record(key, PropertyDiff{Property: key, SourceValue: nil, TargetValue: value2})
+			record(key, PropertyDiff{Property: key, SourceValue: nil, TargetValue: value2, SecretOnly: isSecretValue(value2)})
 		}
 	}
 
@@ -304,6 +313,18 @@ func isNil(val any) bool {
 	}
 
 	return false
+}
+
+// isSecretValue reports whether v is a secret.String (value or pointer). Used
+// when one side omits a key so a presence-based secret still classifies as
+// SecretOnly rather than genuine drift.
+func isSecretValue(v any) bool {
+	switch v.(type) {
+	case secret.String, *secret.String:
+		return true
+	default:
+		return false
+	}
 }
 
 // comparePropertyRefs compares two PropertyRef objects by their comparable fields

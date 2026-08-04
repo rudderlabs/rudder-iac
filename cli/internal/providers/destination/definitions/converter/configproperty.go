@@ -191,7 +191,7 @@ func ArrayWithObjects(rootAPIKey, localKey string, fields map[string]any) Config
 				switch a := v.Value().(type) {
 				case []any:
 					contents := GetAPIValue(a, inverseFields)
-					if len(contents) > 0 {
+					if len(contents) >= 0 {
 						r, err := sjson.Set(result, rootAPIKey, contents)
 						if err != nil {
 							return result, err

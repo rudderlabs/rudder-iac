@@ -119,6 +119,10 @@ func testResultsIgnoreFields(results map[string]any) []string {
 				prefix+".id",
 				prefix+".versionId",
 				prefix+".externalId",
+				// message is a verbatim upstream error string (e.g. the Python
+				// interpreter's SyntaxError text); its wording changes upstream and
+				// is not the CLI's contract — pass/status already assert failure.
+				prefix+".message",
 			)
 		}
 	}
