@@ -17,6 +17,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -260,6 +261,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	// Verified/native destination definitions register here when available.
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
+		if err := registry.Register(ga4.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
+		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}

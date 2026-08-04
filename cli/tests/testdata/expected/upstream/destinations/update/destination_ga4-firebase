@@ -1,0 +1,16 @@
+{
+  "config": {
+    "debugMode": true,
+    "firebaseAppId": "1:1234567890:android:abcdef123456",
+    "typesOfClient": "firebase"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "ga4-firebase",
+  "id": "<ignored>",
+  "name": "E2E GA4 firebase Updated",
+  "type": "GA4",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
