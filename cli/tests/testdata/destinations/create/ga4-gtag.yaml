@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: ga4-gtag
+spec:
+  id: ga4-gtag
+  display_name: E2E GA4 gtag
+  type: ga4
+  enabled: true
+  definition_version: 1
+  config:
+    api_secret: "{{ .GA4_API_SECRET }}"
+    client_type: gtag
+    measurement_id: G-XXXXXXXXXX

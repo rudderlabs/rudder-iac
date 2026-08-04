@@ -66,9 +66,7 @@ type ga4Config struct {
 	MeasurementID         string                   `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,max=100"`
 	FirebaseAppID         string                   `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,max=100"`
 	DebugMode             *bool                    `mapstructure:"debug_mode"`
-	BlockPageViewEvent    *bool                    `mapstructure:"block_page_view_event"`
 	ExtendPageViewParams  *bool                    `mapstructure:"extend_page_view_params"`
-	SendUserID            *bool                    `mapstructure:"send_user_id"`
 	SDKBaseURL            string                   `mapstructure:"sdk_base_url" validate:"omitempty,pattern=destination_http_url"`
 	ServerContainerURL    string                   `mapstructure:"server_container_url" validate:"omitempty,pattern=destination_http_url"`
 	PIIPropertiesToIgnore []piiProperty            `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
@@ -85,17 +83,15 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("apiSecret", "api_secret"),
 		converter.Simple("typesOfClient", "client_type"),
-		converter.Simple("measurementId", "measurement_id", converter.SkipZeroValue),
-		converter.Simple("firebaseAppId", "firebase_app_id", converter.SkipZeroValue),
+		converter.Simple("measurementId", "measurement_id"),
+		converter.Simple("firebaseAppId", "firebase_app_id"),
 		converter.Simple("debugMode", "debug_mode"),
-		converter.Simple("blockPageViewEvent", "block_page_view_event", converter.SkipZeroValue),
 		converter.Gated(
-			converter.Simple("extendPageViewParams", "extend_page_view_params", converter.SkipZeroValue),
+			converter.Simple("extendPageViewParams", "extend_page_view_params"),
 			common.SourceTypeWeb,
 		),
-		converter.Simple("sendUserId", "send_user_id", converter.SkipZeroValue),
-		converter.Simple("sdkBaseUrl", "sdk_base_url", converter.SkipZeroValue),
-		converter.Simple("serverContainerUrl", "server_container_url", converter.SkipZeroValue),
+		converter.Simple("sdkBaseUrl", "sdk_base_url"),
+		converter.Simple("serverContainerUrl", "server_container_url"),
 		converter.ArrayWithObjects("piiPropertiesToIgnore", "pii_properties_to_ignore", map[string]any{
 			"piiProperty": "pii_property",
 		}),
@@ -105,9 +101,18 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
+		converter.Gated(
+			converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
+			common.SourceTypeWeb,
+		),
+		converter.Gated(
+			converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
+			common.SourceTypeAndroid,
+		),
+		converter.Gated(
+			converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
+			common.SourceTypeIOS,
+		),
 		converter.Gated(
 			converter.Simple("capturePageView.web", "capture_page_view.web"),
 			common.SourceTypeWeb,

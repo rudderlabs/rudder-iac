@@ -1,0 +1,33 @@
+{
+  "config": {
+    "debugMode": true,
+    "eventFilteringOption": "whitelistedEvents",
+    "measurementId": "G-XXXXXXXXXX",
+    "piiPropertiesToIgnore": [
+      {
+        "piiProperty": "email"
+      },
+      {
+        "piiProperty": "phone"
+      }
+    ],
+    "typesOfClient": "gtag",
+    "whitelistedEvents": [
+      {
+        "eventName": "Product Viewed"
+      },
+      {
+        "eventName": "Order Completed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "ga4-gtag",
+  "id": "<ignored>",
+  "name": "E2E GA4 gtag Updated",
+  "type": "GA4",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}

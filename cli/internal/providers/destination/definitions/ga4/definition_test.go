@@ -55,6 +55,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	assert.Equal(t, map[string][]string{
 		"extend_page_view_params":             {"web"},
+		"use_native_sdk/web":                  {"web"},
+		"use_native_sdk/android":              {"android"},
+		"use_native_sdk/ios":                  {"ios"},
 		"capture_page_view/web":               {"web"},
 		"debug_view/web":                      {"web"},
 		"override_client_and_session_ids/web": {"web"},
@@ -308,9 +311,7 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"measurement_id": "G-XXXXXXXXXX",
 				"firebase_app_id": "1:123:android:abc",
 				"debug_mode": true,
-				"block_page_view_event": true,
 				"extend_page_view_params": true,
-				"send_user_id": true,
 				"sdk_base_url": "https://www.googletagmanager.com",
 				"server_container_url": "https://gtm.example.com",
 				"pii_properties_to_ignore": [
@@ -335,9 +336,7 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"measurementId": "G-XXXXXXXXXX",
 				"firebaseAppId": "1:123:android:abc",
 				"debugMode": true,
-				"blockPageViewEvent": true,
 				"extendPageViewParams": true,
-				"sendUserId": true,
 				"sdkBaseUrl": "https://www.googletagmanager.com",
 				"serverContainerUrl": "https://gtm.example.com",
 				"piiPropertiesToIgnore": [
