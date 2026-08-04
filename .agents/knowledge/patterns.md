@@ -65,3 +65,8 @@
 - Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.
 - `TestDestinationsApply` applies the destination create/update directories directly, relying on recursive spec loading so future destination variations can be added without changing test code.
 - Expected upstream destination snapshots remain under `cli/tests/testdata/expected/upstream/destinations/{create,update}/destination_<spec.id>` for whole-managed-set comparison.
+
+## DEX-608 — Destination E2E Unverified Fixture Gate
+<!-- ticket:DEX-608 -->
+- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include HTTP variations, because HTTP is the remaining unverified destination even after S3 is verified/native.
+- Destination apply E2E comments and skip messaging should describe the unverified gate in terms of HTTP fixtures, not S3 fixtures.

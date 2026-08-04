@@ -34,7 +34,7 @@ type ExperimentalConfig struct {
 	// destination kind matching for validate/apply/import flows.
 	DestinationSupport bool `mapstructure:"destinationSupport"`
 	// UnverifiedDestinations enables registration of unverified destination
-	// definitions (e.g. S3) when DestinationSupport is also enabled.
+	// definitions (e.g. HTTP) when DestinationSupport is also enabled.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
 	// AccountSupport enables account provider registration and account kind
 	// matching for validate/apply/import flows.

@@ -103,3 +103,10 @@
 - HTTP destination support is implemented as a destination-provider definition under `cli/internal/providers/destination/definitions/http`, with registry wiring in `cli/internal/app/dependencies.go`.
 - HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, matching the S3 destination gate.
 - HTTP destination identity is `Type: http`, API type `HTTP`, and version `1`; allowed source types are intentionally restricted to the CLI-owned event-stream set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) while upstream `amp`, `warehouse`, and `shopify` are excluded.
+
+## DEX-608 — S3 Destination Verified Registry Promotion
+<!-- ticket:DEX-608 -->
+- S3 is a verified/native destination definition: `cli/internal/app/newDestinationRegistry` should register `s3.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- HTTP remains an unverified destination definition and still requires both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` before `http.NewDefinition()` is registered.
+- Destination registry flag-matrix expectations should reflect S3 as available with destination support alone, while enabling unverified destinations adds HTTP alongside S3.
+- This supersedes earlier destination-registry guidance that used S3 as an unverified peer example for HTTP; HTTP remains gated, but S3 no longer shares that gate.
