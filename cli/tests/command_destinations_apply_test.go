@@ -31,6 +31,9 @@ var destinationRawSecrets = []string{
 	"httpBasicPasswordXXXXXXXXXXXX",
 	"httpBearerTokenXXXXXXXXXXXXXXX",
 	"httpApiKeyValueXXXXXXXXXXXXXXX",
+	"rsPasswordXXXXXXXXXXXXXXXXXXXX",
+	"AKIARSXXXXXXXXXXXXXX",
+	"rsSecretAccessKeyXXXXXXXXXXXXXXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

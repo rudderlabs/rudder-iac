@@ -1,0 +1,24 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: rs-own-storage
+spec:
+  id: rs-own-storage
+  display_name: E2E Redshift Own Storage
+  type: rs
+  enabled: true
+  definition_version: 1
+  config:
+    host: rudder-cli-e2e-own.redshift.amazonaws.com
+    port: "5439"
+    database: analytics
+    user: rudder
+    password: "{{ .RS_PASSWORD }}"
+    namespace: rudder_events
+    use_rudder_storage: false
+    bucket_name: rudder-cli-e2e
+    access_key_id: "{{ .RS_ACCESS_KEY_ID }}"
+    access_key: "{{ .RS_ACCESS_KEY }}"
+    sync:
+      frequency: "30"
+      start_at: "10:00"

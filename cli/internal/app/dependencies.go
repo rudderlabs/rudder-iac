@@ -18,6 +18,7 @@ import (
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -262,6 +263,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)
+		}
+		if err := registry.Register(rs.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering rs destination definition: %w", err)
 		}
 		if err := registry.Register(s3.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering s3 destination definition: %w", err)
