@@ -368,6 +368,15 @@ func (p *Provider) FormatForExport(
 	var result []writer.FormattableEntity
 	var entries []importmanifest.ImportEntry
 	for _, dgResource := range sortedDGs {
+		// A matched data graph (import --merge) adopts the existing local
+		// composite YAML as the source of truth: manifest entries only for the
+		// graph and its matched children, no spec file. Upstream-only children
+		// stay unlinked — never entering managed state, apply leaves them alone.
+		if dgResource.MatchedWith != nil {
+			entries = append(entries, p.matchedDataGraphEntries(dgResource, lookups)...)
+			continue
+		}
+
 		entity, dgEntries, err := p.formatDataGraphSpec(dgResource, lookups)
 		if err != nil {
 			return nil, nil, err
@@ -377,6 +386,51 @@ func (p *Provider) FormatForExport(
 	}
 
 	return result, entries, nil
+}
+
+// matchedDataGraphEntries builds the manifest entries for a matched data graph
+// and its matched children, all under the graph's workspace (relationships
+// carry no workspace ID of their own).
+func (p *Provider) matchedDataGraphEntries(
+	dgResource *resources.RemoteResource,
+	lookups *exportLookups,
+) []importmanifest.ImportEntry {
+	remoteDG := dgResource.Data.(*dgModel.RemoteDataGraph)
+
+	entries := []importmanifest.ImportEntry{{
+		WorkspaceID: remoteDG.WorkspaceID,
+		URN:         resources.URN(dgResource.ExternalID, datagraph.HandlerMetadata.ResourceType),
+		RemoteID:    remoteDG.ID,
+	}}
+
+	for _, modelResource := range lookups.modelsByDG[remoteDG.ID] {
+		if modelResource.MatchedWith == nil {
+			continue
+		}
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: remoteDG.WorkspaceID,
+			URN:         resources.URN(modelResource.ExternalID, model.HandlerMetadata.ResourceType),
+			RemoteID:    modelResource.ID,
+		})
+	}
+
+	for key, rels := range lookups.relsByKey {
+		if key.dataGraphID != remoteDG.ID {
+			continue
+		}
+		for _, relResource := range rels {
+			if relResource.MatchedWith == nil {
+				continue
+			}
+			entries = append(entries, importmanifest.ImportEntry{
+				WorkspaceID: remoteDG.WorkspaceID,
+				URN:         resources.URN(relResource.ExternalID, relationship.HandlerMetadata.ResourceType),
+				RemoteID:    relResource.ID,
+			})
+		}
+	}
+
+	return entries
 }
 
 // groupResourcesByDataGraph builds lookup indexes from the importable collection,

@@ -115,22 +115,23 @@ func New(data []byte) (*Spec, error) {
 }
 
 type SpecReference struct {
-	Kind  string
-	Group string
-	ID    string
-	URN   string
+	Kind string
+	ID   string
+	URN  string
 }
 
 // ParseSpecReference parses a spec reference string and returns a SpecReference
 // which includes the kind, group, id, and URN. URNs are constructed using the provided kindMap.
 // to associate kinds with the corresponding resource types.
 func ParseSpecReference(ref string, kindMap map[string]string) (SpecReference, error) {
-	parts := strings.Split(strings.TrimPrefix(ref, "#/"), "/")
-	if len(parts) != 3 {
-		return SpecReference{}, fmt.Errorf("reference must have format #/{kind}/{group}/{id}, got: %s", ref)
+	fmt.Printf("ref: %s\n kindMap: %v\n", ref, kindMap)
+
+	parts := strings.Split(strings.TrimPrefix(ref, "#"), ":")
+	if len(parts) != 2 {
+		return SpecReference{}, fmt.Errorf("reference must have format #{kind}:{id}, got: %s", ref)
 	}
 
-	kind, group, id := parts[0], parts[1], parts[2]
+	kind, id := parts[0], parts[1]
 
 	if _, ok := kindMap[kind]; !ok {
 		// TODO: this error could be ErrUnsupportedKind from composite provider, check for a better place.
@@ -140,9 +141,8 @@ func ParseSpecReference(ref string, kindMap map[string]string) (SpecReference, e
 	urn := fmt.Sprintf("%s:%s", kindMap[kind], id)
 
 	return SpecReference{
-		Kind:  kind,
-		Group: group,
-		ID:    id,
-		URN:   urn,
+		Kind: kind,
+		ID:   id,
+		URN:  urn,
 	}, nil
 }

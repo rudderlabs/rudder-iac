@@ -1,0 +1,17 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "s3",
+  "name": "E2E S3",
+  "type": "S3",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e",
+    "prefix": "rudder/",
+    "roleBasedAuth": false,
+    "enableSSE": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

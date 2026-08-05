@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -14,6 +15,12 @@ import (
 type EmptyProvider struct{}
 
 var errNotImplemented = fmt.Errorf("not implemented")
+
+// ResourceMatchers returns nil: by default a provider does not support
+// import --merge smart linking. Providers opt in by overriding.
+func (p *EmptyProvider) ResourceMatchers() []importmatcher.Matcher {
+	return nil
+}
 
 // CRUD Operations
 func (p *EmptyProvider) Create(_ context.Context, _ string, _ string, _ resources.ResourceData) (*resources.ResourceData, error) {

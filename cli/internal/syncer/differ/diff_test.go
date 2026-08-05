@@ -43,6 +43,52 @@ func TestCompareData(t *testing.T) {
 	assert.Equal(t, diffs["key4"].TargetValue, "value4")
 }
 
+// TestCompareData_ArrayOfObjects guards against the phantom diff where
+// rewriteCompatibleType rewrote only the source side ([]any of objects →
+// []map[string]any), so two equal arrays always failed the type-equality gate.
+// Seen in the wild with destination consent_management blocks (remote state
+// decoded from JSON vs local spec decoded from YAML).
+func TestCompareData_ArrayOfObjects(t *testing.T) {
+	block := func(strategy string) map[string]any {
+		return map[string]any{
+			"web": []any{
+				map[string]any{
+					"provider":            "custom",
+					"resolution_strategy": strategy,
+					"consents":            []any{"test"},
+				},
+			},
+		}
+	}
+
+	t.Run("equal []any-of-objects on both sides do not diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"consent_management": block("and")},
+			resources.ResourceData{"consent_management": block("and")},
+		)
+		assert.Empty(t, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("equal mixed shapes ([]map vs []any of maps) do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []map[string]any{{"k": "v"}}},
+			resources.ResourceData{"items": []any{map[string]any{"k": "v"}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("genuinely different arrays still diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"consent_management": block("and")},
+			resources.ResourceData{"consent_management": block("or")},
+		)
+		assert.Len(t, diffs, 1)
+		assert.Contains(t, diffs, "consent_management")
+		assert.False(t, secretOnly)
+	})
+}
+
 func TestComputeDiff(t *testing.T) {
 	g1 := resources.NewGraph()
 	g2 := resources.NewGraph()
@@ -180,6 +226,66 @@ func TestCompareData_Secret(t *testing.T) {
 			resources.ResourceData{"token": &same},
 		)
 		assert.Empty(t, equal)
+		assert.False(t, secretOnly)
+	})
+
+	// Presence-based secret wrapping omits remote keys the API strips; a local
+	// secret with no remote counterpart must stay SecretOnly so it re-applies
+	// without looking like genuine drift.
+	t.Run("known secret vs missing key is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs known secret is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"token": secret.New("hunter2")},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: nil, TargetValue: secret.New("hunter2"), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("pointer secret vs missing key is secret-only", func(t *testing.T) {
+		tok := secret.New("hunter2")
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": &tok},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: &tok, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret vs missing key with real sibling is not secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2"), "name": "a"},
+			resources.ResourceData{"name": "b"},
+		)
+		require.Contains(t, diffs, "token")
+		require.Contains(t, diffs, "name")
+		assert.True(t, diffs["token"].SecretOnly)
+		assert.False(t, diffs["name"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("non-secret missing key stays real drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"name": "a"},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"name": {Property: "name", SourceValue: "a", TargetValue: nil, SecretOnly: false},
+		}, diffs)
 		assert.False(t, secretOnly)
 	})
 }

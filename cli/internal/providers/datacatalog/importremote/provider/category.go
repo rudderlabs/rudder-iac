@@ -124,6 +124,7 @@ func (p *CategoryImportProvider) FormatForExport(
 	version := specs.SpecVersionV1
 
 	formattedCategories := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, category := range categories {
 		p.log.Debug("formatting category", "remoteID", category.ID, "externalID", category.ExternalID)
 
@@ -132,8 +133,21 @@ func (p *CategoryImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog category")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
 		urn := resources.URN(category.ExternalID, types.CategoryResourceType)
+
+		// Matched categories (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if category.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceID,
+				URN:         urn,
+				RemoteID:    category.ID,
+			})
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: category.ID,
@@ -145,6 +159,10 @@ func (p *CategoryImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("formatting category: %w", err)
 		}
 		formattedCategories = append(formattedCategories, formatted)
+	}
+
+	if len(formattedCategories) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -164,5 +182,5 @@ func (p *CategoryImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, importEntriesFromWorkspace(workspaceMetadata), nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

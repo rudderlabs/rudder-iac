@@ -1,10 +1,34 @@
 package rs
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
+
+const (
+	rsNamespacePattern = `^.{0,64}$`
+	// Redshift reserves the pg_ prefix for system schemas.
+	rsNamespaceReject = `^(?i:pg_)`
+	rsSyncTimePattern = `^([01][0-9]|2[0-3]):[0-5][0-9]$`
+)
+
+func init() {
+	// Go's regexp lacks lookahead, so the pg_ exclusion is expressed as a
+	// reject pattern rather than inline in the match pattern.
+	funcs.NewPatternWithReject(
+		"rs_namespace",
+		rsNamespacePattern,
+		rsNamespaceReject,
+		"must be at most 64 characters and must not start with the reserved pg_ prefix",
+	)
+	funcs.NewPattern(
+		"rs_sync_time",
+		rsSyncTimePattern,
+		"must be a UTC time of day in HH:MM format",
+	)
+}
 
 // Source types from integrations-config destinations/rs/db-config.json
 // supportedSourceTypes, restricted to types the CLI event-stream provider owns
@@ -36,11 +60,13 @@ var connectionModes = map[string][]string{
 }
 
 // rsSyncConfig is the local YAML sync block (terraform sync { ... }).
+// The exclude window is all-or-nothing: schema.json requires both bounds
+// whenever the excludeWindow object is present.
 type rsSyncConfig struct {
 	Frequency              string `mapstructure:"frequency" validate:"required,dynamic_or_oneof=5 15 30 60 180 360 720 1440"`
-	StartAt                string `mapstructure:"start_at" validate:"omitempty"`
-	ExcludeWindowStartTime string `mapstructure:"exclude_window_start_time" validate:"omitempty"`
-	ExcludeWindowEndTime   string `mapstructure:"exclude_window_end_time" validate:"omitempty"`
+	StartAt                string `mapstructure:"start_at" validate:"omitempty,pattern=rs_sync_time"`
+	ExcludeWindowStartTime string `mapstructure:"exclude_window_start_time" validate:"required_with=ExcludeWindowEndTime,omitempty,pattern=rs_sync_time"`
+	ExcludeWindowEndTime   string `mapstructure:"exclude_window_end_time" validate:"required_with=ExcludeWindowStartTime,omitempty,pattern=rs_sync_time"`
 }
 
 // rsConfig is the local YAML config model. Field set mirrors the terraform
@@ -51,18 +77,21 @@ type rsSyncConfig struct {
 // terraform's s3 {} block so SecretKeys can wrap access_key_id / access_key —
 // the CLI secret machinery only supports top-level keys.
 type rsConfig struct {
-	Host              string                   `mapstructure:"host" validate:"required,min=1,max=255"`
-	Port              string                   `mapstructure:"port" validate:"required,min=1,max=100"`
-	Database          string                   `mapstructure:"database" validate:"required,min=1,max=100"`
-	User              string                   `mapstructure:"user" validate:"required,min=1,max=100"`
-	Password          string                   `mapstructure:"password" validate:"required,min=1"`
-	Namespace         string                   `mapstructure:"namespace" validate:"omitempty,max=64"`
-	EnableSSE         *bool                    `mapstructure:"enable_sse"`
-	UseRudderStorage  *bool                    `mapstructure:"use_rudder_storage" validate:"required"`
-	Sync              rsSyncConfig             `mapstructure:"sync" validate:"required"`
+	Host             string       `mapstructure:"host" validate:"required,min=1,max=255"`
+	Port             string       `mapstructure:"port" validate:"required,min=1,max=100"`
+	Database         string       `mapstructure:"database" validate:"required,min=1,max=100"`
+	User             string       `mapstructure:"user" validate:"required,min=1,max=100"`
+	Password         string       `mapstructure:"password" validate:"required,min=1"`
+	Namespace        string       `mapstructure:"namespace" validate:"omitempty,pattern=rs_namespace"`
+	EnableSSE        *bool        `mapstructure:"enable_sse"`
+	UseRudderStorage *bool        `mapstructure:"use_rudder_storage" validate:"required"`
+	Sync             rsSyncConfig `mapstructure:"sync" validate:"required"`
+	// Own-storage fields: required when RudderStack-hosted storage is off.
+	// Import/export never invents these secrets — users must supply them
+	// (e.g. via {{ .VAR }} + a var file) when use_rudder_storage is false.
 	BucketName        string                   `mapstructure:"bucket_name" validate:"required_if=UseRudderStorage false,omitempty,max=100"`
-	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"omitempty,max=100"`
-	AccessKey         string                   `mapstructure:"access_key" validate:"omitempty,max=100"`
+	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false,omitempty,max=100"`
+	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=UseRudderStorage false,omitempty,max=100"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -74,16 +103,16 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("database", "database"),
 		converter.Simple("user", "user"),
 		converter.Simple("password", "password"),
-		converter.Simple("namespace", "namespace", converter.SkipZeroValue),
-		converter.Simple("enableSSE", "enable_sse", converter.SkipZeroValue),
+		converter.Simple("namespace", "namespace"),
+		converter.Simple("enableSSE", "enable_sse"),
 		converter.Simple("useRudderStorage", "use_rudder_storage"),
 		converter.Simple("syncFrequency", "sync.frequency"),
-		converter.Simple("syncStartAt", "sync.start_at", converter.SkipZeroValue),
-		converter.Simple("excludeWindow.excludeWindowStartTime", "sync.exclude_window_start_time", converter.SkipZeroValue),
-		converter.Simple("excludeWindow.excludeWindowEndTime", "sync.exclude_window_end_time", converter.SkipZeroValue),
-		converter.Simple("bucketName", "bucket_name", converter.SkipZeroValue),
-		converter.Simple("accessKeyID", "access_key_id", converter.SkipZeroValue),
-		converter.Simple("accessKey", "access_key", converter.SkipZeroValue),
+		converter.Simple("syncStartAt", "sync.start_at"),
+		converter.Simple("excludeWindow.excludeWindowStartTime", "sync.exclude_window_start_time"),
+		converter.Simple("excludeWindow.excludeWindowEndTime", "sync.exclude_window_end_time"),
+		converter.Simple("bucketName", "bucket_name"),
+		converter.Simple("accessKeyID", "access_key_id"),
+		converter.Simple("accessKey", "access_key"),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 

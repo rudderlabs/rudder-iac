@@ -96,8 +96,11 @@ func (fm *FileManager) ensureParentDir(fullPath string) error {
 func (fm *FileManager) writeFileAtomically(path, content string) error {
 	name := filepath.Base(path)
 
-	// Create temporary file in system temp directory to avoid leaving temp files in output dir
-	tmpFile, err := os.CreateTemp("", name+".tmp.*")
+	// Create the temporary file in the destination directory (not the system temp
+	// dir) so the os.Rename below stays on the same filesystem. Renaming across
+	// devices fails with EXDEV ("cross-device link") when the output lives on a
+	// different volume than $TMPDIR (e.g. a repo under /Volumes/...).
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), name+".tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating temporary file: %w", err)
 	}

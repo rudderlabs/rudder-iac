@@ -50,7 +50,7 @@ func TestExamplesSync(t *testing.T) {
 	t.Run("Sync Example Provider Resources", func(t *testing.T) {
 		// Load specs from testdata directory
 		err := runSync(t, map[string]string{
-			"books/books.yaml": `version: rudder/v0.1
+			"books/books.yaml": `version: rudder/v1
 kind: books
 metadata:
   name: my_books
@@ -58,15 +58,15 @@ spec:
   books:
     - id: "lotr"
       name: The Lord of the Rings
-      author: "#/writer/common/tolkien"
+      author: "#writer:tolkien"
     - id: "hobbit"
       name: "The Hobbit (with wrong author)"
-      author: "#/writer/common/orwell"
+      author: "#writer:orwell"
     - id: "1984"
       name: "1984"
-      author: "#/writer/common/orwell"
+      author: "#writer:orwell"
 `,
-			"writer/tolkien.yaml": `version: rudder/v0.1
+			"writer/tolkien.yaml": `version: rudder/v1
 kind: writer
 metadata:
   name: common
@@ -74,7 +74,7 @@ spec:
   id: tolkien
   name: J.R.R. Tolkien
 `,
-			"writer/orwell.yaml": `version: rudder/v0.1
+			"writer/orwell.yaml": `version: rudder/v1
 kind: writer
 metadata:
   name: common
@@ -100,7 +100,7 @@ spec:
 	t.Run("Update Example Provider Resources", func(t *testing.T) {
 		// Load specs from testdata directory
 		err := runSync(t, map[string]string{
-			"books/books.yaml": `version: rudder/v0.1
+			"books/books.yaml": `version: rudder/v1
 kind: books
 metadata:
   name: my_books
@@ -108,12 +108,12 @@ spec:
   books:
     - id: "lotr"
       name: The Lord of the Rings
-      author: "#/writer/common/tolkien"
+      author: "#writer:tolkien"
     - id: "hobbit"
       name: "The Hobbit"
-      author: "#/writer/common/tolkien"
+      author: "#writer:tolkien"
 `,
-			"writer/tolkien.yaml": `version: rudder/v0.1
+			"writer/tolkien.yaml": `version: rudder/v1
 kind: writer
 metadata:
   name: common
@@ -138,7 +138,7 @@ spec:
 		// Starting state: lotr and hobbit books, tolkien writer
 		// Delete hobbit book by removing it from the spec
 		err := runSync(t, map[string]string{
-			"books/books.yaml": `version: rudder/v0.1
+			"books/books.yaml": `version: rudder/v1
 kind: books
 metadata:
   name: my_books
@@ -146,9 +146,9 @@ spec:
   books:
     - id: "lotr"
       name: The Lord of the Rings
-      author: "#/writer/common/tolkien"
+      author: "#writer:tolkien"
 `,
-			"writer/tolkien.yaml": `version: rudder/v0.1
+			"writer/tolkien.yaml": `version: rudder/v1
 kind: writer
 metadata:
   name: common

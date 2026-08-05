@@ -26,11 +26,19 @@ type ExperimentalConfig struct {
 	LocalTyper bool `mapstructure:"localTyper"`
 	// ImportMerge enables import-manifest.yaml generation during `import workspace`
 	// and treats the import-manifest kind as a recognized spec kind during
-	// validation. The feature is incomplete, so it stays off by default.
+	// validation. This feature `import workspace --merge` links matching
+	// remote resources to existing local project resources instead of
+	// generating duplicate specs
 	ImportMerge bool `mapstructure:"importMerge"`
 	// DestinationSupport enables destination definition registration and
 	// destination kind matching for validate/apply/import flows.
 	DestinationSupport bool `mapstructure:"destinationSupport"`
+	// UnverifiedDestinations enables registration of unverified destination
+	// definitions (e.g. S3) when DestinationSupport is also enabled.
+	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
+	// AccountSupport enables account provider registration and account kind
+	// matching for validate/apply/import flows.
+	AccountSupport bool `mapstructure:"accountSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

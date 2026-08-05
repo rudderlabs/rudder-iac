@@ -35,8 +35,9 @@ type RemoteLibrary struct {
 // Metadata implements the RemoteResource interface
 func (r RemoteLibrary) Metadata() handler.RemoteResourceMetadata {
 	return handler.RemoteResourceMetadata{
-		ID:         r.ID,
-		ExternalID: r.ExternalID,
-		Name:       r.Name,
+		ID:          r.ID,
+		ExternalID:  r.ExternalID,
+		Name:        r.Name,
+		WorkspaceID: r.WorkspaceID,
 	}
 }

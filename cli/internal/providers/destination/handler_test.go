@@ -177,7 +177,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		assert.Equal(t, "secret", apiSecret.Reveal())
 	})
 
-	t.Run("wraps absent secret keys as empty known secrets", func(t *testing.T) {
+	t.Run("does not invent absent secret keys", func(t *testing.T) {
 		t.Parallel()
 
 		h := destination.NewHandler(nil, testRegistry(t))
@@ -192,9 +192,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		require.NoError(t, err)
 
 		resource := extracted["ga4-no-secret"]
-		apiSecret := requireSecret(t, resource.Config, "api_secret")
-		assert.False(t, apiSecret.IsUnknown())
-		assert.True(t, apiSecret.IsZero())
+		assert.NotContains(t, resource.Config, "api_secret", "absent secrets are not invented")
 		assert.Equal(t, "G-1", resource.Config["measurement_id"])
 	})
 
@@ -712,10 +710,10 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		assert.Equal(t, "GA4", resource.Type)
 		assert.True(t, resource.Enabled)
 		assert.Equal(t, int64(1), resource.DefinitionVersion)
-		assert.Equal(t, &resources.PropertyRef{
-			URN:      resources.URN("my-transform", ttypes.TransformationResourceType),
-			Property: "id",
-		}, resource.Transformation)
+		require.NotNil(t, resource.Transformation)
+		assert.Equal(t, resources.URN("my-transform", ttypes.TransformationResourceType), resource.Transformation.URN)
+		assert.Equal(t, "id", resource.Transformation.Property)
+		assert.NotNil(t, resource.Transformation.Resolve)
 		assert.Equal(t, "G-123", resource.Config["measurement_id"])
 		apiSecret := requireSecret(t, resource.Config, "api_secret")
 		assert.True(t, apiSecret.IsUnknown(), "remote secrets must be unknown — API never returns them")
@@ -1270,6 +1268,35 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
+	t.Run("does not invent secret keys omitted by the API", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				// API strips secrets; export must not scaffold placeholders for them.
+				Config: []byte(`{"measurementId":"G-123"}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, config, "api_secret")
+		assert.Equal(t, "G-123", config["measurement_id"])
+	})
+
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 
@@ -1420,10 +1447,8 @@ func TestHandlerImpl_MapRemoteToState_EmitsLocalType(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "s3", resource.Type)
 	assert.Equal(t, "my-bucket", resource.Config["bucket_name"])
-	accessKey := requireSecret(t, resource.Config, "access_key")
-	assert.True(t, accessKey.IsUnknown())
-	accessKeyID := requireSecret(t, resource.Config, "access_key_id")
-	assert.True(t, accessKeyID.IsUnknown())
+	assert.NotContains(t, resource.Config, "access_key", "absent secrets are not invented")
+	assert.NotContains(t, resource.Config, "access_key_id", "absent secrets are not invented")
 }
 
 func TestHandlerImpl_Import_TranslatesAPITypeToLocal(t *testing.T) {

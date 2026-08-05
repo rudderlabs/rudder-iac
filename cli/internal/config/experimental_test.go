@@ -41,6 +41,11 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			flagName: "destinationSupport",
 			want:     "RUDDERSTACK_X_DESTINATION_SUPPORT",
 		},
+		{
+			name:     "unverifiedDestinations",
+			flagName: "unverifiedDestinations",
+			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +87,18 @@ func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
 	t.Parallel()
 
 	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
+}
+
+func TestIsValidExperimentalFlag_ImportMerge(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("importMerge"))
+}
+
+func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("unverifiedDestinations"))
 }
 
 func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {

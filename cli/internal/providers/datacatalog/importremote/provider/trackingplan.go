@@ -125,6 +125,18 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		}
 
 		urn := resources.URN(trackingPlan.ExternalID, types.TrackingPlanResourceType)
+
+		// Matched tracking plans (import --merge) adopt an existing local
+		// spec: manifest entry only — no spec file is written for them.
+		if trackingPlan.MatchedWith != nil {
+			entries = append(entries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceID,
+				URN:         urn,
+				RemoteID:    trackingPlan.ID,
+			})
+			continue
+		}
+
 		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: data.WorkspaceID,
 			Resources: []specs.ImportIds{

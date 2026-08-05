@@ -1,6 +1,7 @@
 package rs_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -219,6 +220,73 @@ func TestRSConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("access keys required when use_rudder_storage false", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["use_rudder_storage"] = false
+		cfg["bucket_name"] = "my-redshift-bucket"
+		errors := registered.ValidateConfig(cfg)
+		require.NotEmpty(t, errors)
+		paths := make([]string, 0, len(errors))
+		for _, e := range errors {
+			paths = append(paths, e.Path)
+		}
+		assert.Contains(t, paths, "/access_key_id")
+		assert.Contains(t, paths, "/access_key")
+	})
+
+	t.Run("namespace with reserved pg_ prefix rejected", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["namespace"] = "pg_internal"
+		errors := registered.ValidateConfig(cfg)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/namespace", errors[0].Path)
+	})
+
+	t.Run("namespace longer than 64 chars rejected", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["namespace"] = strings.Repeat("a", 65)
+		errors := registered.ValidateConfig(cfg)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/namespace", errors[0].Path)
+	})
+
+	t.Run("invalid sync start_at rejected", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["sync"] = map[string]any{"frequency": "180", "start_at": "25:00"}
+		errors := registered.ValidateConfig(cfg)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sync/start_at", errors[0].Path)
+	})
+
+	t.Run("exclude window requires both bounds", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["sync"] = map[string]any{
+			"frequency":                 "180",
+			"exclude_window_start_time": "01:00",
+		}
+		errors := registered.ValidateConfig(cfg)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sync/exclude_window_end_time", errors[0].Path)
+	})
+
+	t.Run("invalid exclude window time rejected", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalValid)
+		cfg["sync"] = map[string]any{
+			"frequency":                 "180",
+			"exclude_window_start_time": "1:00",
+			"exclude_window_end_time":   "02:00",
+		}
+		errors := registered.ValidateConfig(cfg)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sync/exclude_window_start_time", errors[0].Path)
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {

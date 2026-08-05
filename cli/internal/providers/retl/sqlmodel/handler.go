@@ -498,19 +498,26 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 		if err != nil {
 			return nil, nil, fmt.Errorf("decoding SQL model config for source %s: %w", sourceData.ID, err)
 		}
-		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: sourceData.WorkspaceID,
+			URN:         urn,
+			RemoteID:    source.ID,
+		})
+
+		// Matched models (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec file is written for them.
+		if source.MatchedWith != nil {
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = sourceData.WorkspaceID
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				URN:      urn,
 				RemoteID: source.ID,
 			},
 		}
-		entries = append(entries, importmanifest.ImportEntry{
-			WorkspaceID: sourceData.WorkspaceID,
-			URN:         urn,
-			RemoteID:    source.ID,
-		})
 
 		metadata := specs.Metadata{
 			Name: source.ExternalID,

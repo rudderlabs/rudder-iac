@@ -118,6 +118,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 	version := specs.SpecVersionV1
 
 	formattedTypes := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, customType := range customTypes {
 		p.log.Debug("formatting custom type", "remoteID", customType.ID, "externalID", customType.ExternalID)
 
@@ -126,8 +127,21 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog custom type")
 		}
 
-		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the custom types
 		urn := resources.URN(customType.ExternalID, types.CustomTypeResourceType)
+
+		// Matched custom types (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if customType.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceId,
+				URN:         urn,
+				RemoteID:    customType.ID,
+			})
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the custom types
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: customType.ID,
@@ -139,6 +153,10 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			return nil, nil, fmt.Errorf("formatting custom type: %w", err)
 		}
 		formattedTypes = append(formattedTypes, formatted)
+	}
+
+	if len(formattedTypes) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -158,5 +176,5 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, importEntriesFromWorkspace(workspaceMetadata), nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

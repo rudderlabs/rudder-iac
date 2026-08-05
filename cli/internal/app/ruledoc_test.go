@@ -23,12 +23,16 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	prevExp, prevDestSupport := viper.Get("experimental"), viper.Get("flags.destinationSupport")
+	prevExp := viper.Get("experimental")
+	prevDestSupport := viper.Get("flags.destinationSupport")
+	prevAccountSupport := viper.Get("flags.accountSupport")
 	viper.Set("experimental", true)
 	viper.Set("flags.destinationSupport", true)
+	viper.Set("flags.accountSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
 		viper.Set("flags.destinationSupport", prevDestSupport)
+		viper.Set("flags.accountSupport", prevAccountSupport)
 	})
 
 	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")

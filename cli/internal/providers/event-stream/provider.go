@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
@@ -101,6 +102,12 @@ func (p *Provider) SupportedTypes() []string {
 		types = append(types, t)
 	}
 	return types
+}
+
+// ResourceMatchers overrides the EmptyProvider default to opt into import
+// --merge smart linking for event stream sources.
+func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
+	return []importmatcher.Matcher{sourceHandler.Matcher()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {

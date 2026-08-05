@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -12,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -23,12 +25,16 @@ const (
 	ImportedDir = "imported"
 )
 
-var ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
+var (
+	ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
+	ErrAmbiguousMatch   = errors.New("merge import matched multiple remote resources to one local resource")
+)
 
 type ImportProvider interface {
 	provider.RemoteResourceLoader
 	provider.StateLoader
 	provider.Exporter
+	provider.ResourceMatcherProvider
 }
 
 type Project interface {
@@ -36,10 +42,18 @@ type Project interface {
 	Location() string
 }
 
+// ImportOptions configures a workspace import. Merge enables smart-import
+// conflict detection (link matching remote resources to existing local
+// resources instead of writing duplicate specs).
+type ImportOptions struct {
+	Merge bool
+}
+
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
-	p ImportProvider) error {
+	p ImportProvider,
+	opts ImportOptions) error {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -58,10 +72,8 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
-	// HasNonSecretDiff (not HasDiff) so resources that only re-apply an unknown
-	// secret — which is expected on every run — do not permanently block imports.
-	if diff.HasNonSecretDiff() {
-		return fmt.Errorf("%w", ErrProjectNotSynced)
+	if err := checkSyncStatus(diff, opts.Merge); err != nil {
+		return err
 	}
 
 	idNamer, err := initNamer(targetGraph)
@@ -77,6 +89,12 @@ func WorkspaceImport(
 	if importable.Len() == 0 {
 		fmt.Println("No resources to import")
 		return nil
+	}
+
+	if opts.Merge {
+		if err := markMatchedWith(p, sourceGraph, targetGraph, importable); err != nil {
+			return err
+		}
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
@@ -125,6 +143,56 @@ func WorkspaceImport(
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
+	return nil
+}
+
+// checkSyncStatus guards the import against a diverged project. Without merge,
+// any pending change blocks — HasNonSecretDiff (not HasDiff) so resources that
+// only re-apply an unknown secret, which is expected on every run, do not
+// permanently block imports. With merge, divergence is the point; only pending
+// deletions block, as importing over them could resurrect deleted resources.
+func checkSyncStatus(diff *differ.Diff, merge bool) error {
+	if !merge {
+		if diff.HasNonSecretDiff() {
+			return fmt.Errorf("%w", ErrProjectNotSynced)
+		}
+		return nil
+	}
+
+	if len(diff.RemovedResources) > 0 {
+		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
+			ErrProjectNotSynced, diff.RemovedResources)
+	}
+	return nil
+}
+
+// markMatchedWith runs merge conflict detection against the local project
+// graph, marking matched importable resources in place. Providers without
+// matchers contribute nothing, leaving their resources on namer identities.
+//
+// A claim collision — two remote resources matching one local resource — means
+// a matcher predicate does not mirror upstream uniqueness or the upstream data
+// is dirty. Either way the merge result would be wrong, so fail fast rather
+// than silently importing an ambiguous mapping.
+func markMatchedWith(
+	matchers provider.ResourceMatcherProvider,
+	sourceGraph *resources.Graph,
+	targetGraph *resources.Graph,
+	importable *resources.RemoteResources,
+) error {
+	claimed := importmatcher.Mark(importmatcher.Scope{
+		LocalGraph:  targetGraph,
+		RemoteGraph: sourceGraph,
+		Importable:  importable,
+	}, matchers.ResourceMatchers())
+
+	if len(claimed) > 0 {
+		details := make([]string, len(claimed))
+		for i, c := range claimed {
+			details[i] = c.String()
+		}
+		return fmt.Errorf("%w: %s", ErrAmbiguousMatch, strings.Join(details, "; "))
+	}
 	return nil
 }
 

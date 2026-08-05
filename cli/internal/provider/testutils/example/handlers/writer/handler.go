@@ -144,7 +144,12 @@ func (h *HandlerImpl) MapRemoteToSpec(externalID string, remote *model.RemoteWri
 }
 
 func ParseWriterReference(ref string) (string, error) {
-	specRef, err := specs.ParseSpecReference(ref, map[string]string{HandlerMetadata.SpecKind: HandlerMetadata.ResourceType})
+	specRef, err := specs.ParseSpecReference(
+		ref,
+		map[string]string{
+			HandlerMetadata.SpecKind: HandlerMetadata.ResourceType,
+		},
+	)
 	if err != nil {
 		return "", err
 	}
