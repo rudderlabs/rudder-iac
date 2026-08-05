@@ -46,23 +46,23 @@ func TestBuildVariantGroup_StringDiscriminator(t *testing.T) {
 				Name:    "TestTypeCaseAlpha",
 				Comment: "The alpha case",
 				Properties: []TSInterfaceProperty{
-					{Name: "kind", Type: `"alpha"`},
-					{Name: "score", Type: "number"},
+					{Name: "kind", Type: `"alpha"`, SerialName: "kind"},
+					{Name: "score", Type: "number", SerialName: "score"},
 				},
 			},
 			{
 				Name:    "TestTypeCaseBeta",
 				Comment: "The beta case",
 				Properties: []TSInterfaceProperty{
-					{Name: "kind", Type: `"beta"`},
+					{Name: "kind", Type: `"beta"`, SerialName: "kind"},
 				},
 			},
 			{
 				Name:    "TestTypeDefault",
 				Comment: "Default case",
 				Properties: []TSInterfaceProperty{
-					{Name: "fallback", Type: "boolean", Optional: true},
-					{Name: "kind", Type: `Exclude<string, "alpha" | "beta">`},
+					{Name: "fallback", Type: "boolean", Optional: true, SerialName: "fallback"},
+					{Name: "kind", Type: `Exclude<string, "alpha" | "beta">`, SerialName: "kind"},
 				},
 			},
 		},
@@ -113,8 +113,8 @@ func TestBuildVariantGroup_BooleanDiscriminator(t *testing.T) {
 		Name:    "UserAccessCaseTrue",
 		Comment: "Active user",
 		Properties: []TSInterfaceProperty{
-			{Name: "active", Type: "true"},
-			{Name: "email", Type: "string"},
+			{Name: "active", Type: "true", SerialName: "active"},
+			{Name: "email", Type: "string", SerialName: "email"},
 		},
 	}, ifaceByName["UserAccessCaseTrue"])
 
@@ -122,8 +122,8 @@ func TestBuildVariantGroup_BooleanDiscriminator(t *testing.T) {
 		Name:    "UserAccessCaseFalse",
 		Comment: "Inactive user",
 		Properties: []TSInterfaceProperty{
-			{Name: "active", Type: "false"},
-			{Name: "reason", Type: "string", Optional: true},
+			{Name: "active", Type: "false", SerialName: "active"},
+			{Name: "reason", Type: "string", Optional: true, SerialName: "reason"},
 		},
 	}, ifaceByName["UserAccessCaseFalse"])
 
@@ -131,7 +131,7 @@ func TestBuildVariantGroup_BooleanDiscriminator(t *testing.T) {
 		Name:    "UserAccessDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "active", Type: "Exclude<boolean, true | false>"},
+			{Name: "active", Type: "Exclude<boolean, true | false>", SerialName: "active"},
 		},
 	}, ifaceByName["UserAccessDefault"], "default discriminator excludes covered values — both cases cover boolean exhaustively, so this resolves to never")
 
@@ -171,7 +171,7 @@ func TestBuildVariantGroup_MultipleMatchValues(t *testing.T) {
 		Name:    "ConfigCaseFast",
 		Comment: "Fast modes",
 		Properties: []TSInterfaceProperty{
-			{Name: "mode", Type: `"fast"`},
+			{Name: "mode", Type: `"fast"`, SerialName: "mode"},
 		},
 	}, ifaceByName["ConfigCaseFast"])
 
@@ -179,7 +179,7 @@ func TestBuildVariantGroup_MultipleMatchValues(t *testing.T) {
 		Name:    "ConfigCaseTurbo",
 		Comment: "Fast modes",
 		Properties: []TSInterfaceProperty{
-			{Name: "mode", Type: `"turbo"`},
+			{Name: "mode", Type: `"turbo"`, SerialName: "mode"},
 		},
 	}, ifaceByName["ConfigCaseTurbo"])
 
@@ -213,7 +213,7 @@ func TestBuildVariantGroup_NoDefaultSchema(t *testing.T) {
 		Name:    "FooDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "kind", Type: `Exclude<string, "a">`},
+			{Name: "kind", Type: `Exclude<string, "a">`, SerialName: "kind"},
 		},
 	}, ifaceByName["FooDefault"])
 }
@@ -246,8 +246,8 @@ func TestBuildVariantGroup_CasePropertyOverridesRequired(t *testing.T) {
 	assert.Equal(t, TSInterface{
 		Name: "ItemCaseSpecial",
 		Properties: []TSInterfaceProperty{
-			{Name: "kind", Type: `"special"`},
-			{Name: "label", Type: "string", Optional: false},
+			{Name: "kind", Type: `"special"`, SerialName: "kind"},
+			{Name: "label", Type: "string", Optional: false, SerialName: "label"},
 		},
 	}, ifaceByName["ItemCaseSpecial"], "case upgrades base optional → required via OR")
 }
@@ -289,14 +289,14 @@ func TestBuildVariantGroup_EnumDiscriminatorInDefault(t *testing.T) {
 		Name:    "EventDefault",
 		Comment: "Default case",
 		Properties: []TSInterfaceProperty{
-			{Name: "deviceType", Type: `Exclude<PropertyDeviceType, "mobile">`},
+			{Name: "deviceType", Type: `Exclude<PropertyDeviceType, "mobile">`, SerialName: "device_type"},
 		},
 	}, ifaceByName["EventDefault"], "default narrows the enum alias to values no named case covers")
 
 	assert.Equal(t, TSInterface{
 		Name: "EventCaseMobile",
 		Properties: []TSInterfaceProperty{
-			{Name: "deviceType", Type: `"mobile"`},
+			{Name: "deviceType", Type: `"mobile"`, SerialName: "device_type"},
 		},
 	}, ifaceByName["EventCaseMobile"], "named case uses literal")
 }

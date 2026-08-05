@@ -67,6 +67,65 @@ import type {
 {{ end }}{{ template "interface.tmpl" $a -}}
 {{ end -}}
 {{ end }}
+{{- if .UsesApplyKeyMap }}
+
+// ===== Key Maps =====
+//
+// Interface fields are camelCased for ergonomics, but the tracking plan expects
+// the original keys on the wire. Each map below rebinds a camelCase field name
+// back to its original plan key; applyKeyMap applies them (recursively for
+// nested objects) just before the SDK call. See DAW-3732.
+
+type KeyMapValue = string | { key: string; map: KeyMap };
+type KeyMap = Record<string, KeyMapValue>;
+
+function applyKeyMap(input: unknown, map: KeyMap): unknown {
+    if (Array.isArray(input)) {
+        return input.map((item) => applyKeyMap(item, map));
+    }
+    if (input === null || typeof input !== "object") {
+        return input;
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+        const entry = map[key];
+        if (entry === undefined) {
+            out[key] = value;
+        } else if (typeof entry === "string") {
+            out[key] = value;
+            // Rename after copying so an identity map is a no-op.
+            if (entry !== key) {
+                delete out[key];
+                out[entry] = value;
+            }
+        } else {
+            out[entry.key] = applyKeyMapNested(value, entry.map);
+        }
+    }
+    return out;
+}
+
+// applyKeyMapNested descends into a nested value (object or array of objects),
+// remapping each contained object's keys with the nested map.
+function applyKeyMapNested(value: unknown, map: KeyMap): unknown {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    return applyKeyMap(value, map);
+}
+{{- range .KeyMaps }}
+
+const {{ .Name }}: KeyMap = {
+{{- range .Entries }}
+{{- if .NestedMapName }}
+    {{ .FieldName }}: { key: {{ printf "%q" .SerialName }}, map: {{ .NestedMapName }} },
+{{- else }}
+    {{ .FieldName }}: {{ printf "%q" .SerialName }},
+{{- end }}
+{{- end }}
+};
+{{- end }}
+{{- end }}
 
 // ===== RudderTyper =====
 

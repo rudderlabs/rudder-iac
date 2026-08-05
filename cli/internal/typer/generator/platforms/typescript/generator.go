@@ -74,6 +74,12 @@ func (g *Generator) Generate(p *plan.TrackingPlan, opts core.GenerateOptions, pl
 		return nil, err
 	}
 
+	// Key maps are built once all interfaces exist so nested references can be
+	// resolved to a fixed point. wireTrackKeyMaps then points each track method
+	// at its map (mirrors Swift carrying SerialName through toProperties).
+	needsMap := collectKeyMaps(ctx)
+	wireTrackKeyMaps(ctx, needsMap)
+
 	file, err := GenerateFile(outputFileName, ctx)
 	if err != nil {
 		return nil, err
@@ -749,6 +755,7 @@ func buildInterfaceWithNested(name, comment string, schema *plan.ObjectSchema, c
 			Comment:    propSchema.Property.Description,
 			Optional:   !propSchema.Required,
 			QuotedName: quoted,
+			SerialName: propName,
 		})
 	}
 
@@ -829,6 +836,7 @@ func buildInterfaceFromSchema(name, comment string, schema *plan.ObjectSchema, n
 			Comment:    propSchema.Property.Description,
 			Optional:   !propSchema.Required,
 			QuotedName: quoted,
+			SerialName: propName,
 		})
 	}
 
