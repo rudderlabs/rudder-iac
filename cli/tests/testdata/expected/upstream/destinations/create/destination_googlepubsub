@@ -1,0 +1,20 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googlepubsub",
+  "name": "E2E Google PubSub",
+  "type": "GOOGLEPUBSUB",
+  "enabled": true,
+  "config": {
+    "projectId": "rudder-cli-e2e",
+    "eventToTopicMap": [
+      {
+        "from": "Product Viewed",
+        "to": "product-events"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
