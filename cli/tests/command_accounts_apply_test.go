@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -41,14 +40,8 @@ var accountSnapshotIgnore = []string{"id", "workspaceId", "createdAt", "updatedA
 // TestAccountsApply drives the accounts provider end-to-end against a live stack:
 // apply create → apply update → re-apply is a no-op. It needs a real backend with
 // the SOURCE_BIGQUERY, SOURCE_POSTGRES and SOURCE_SNOWFLAKE account definitions
-// deployed and a PAT, so it is skipped unless RUN_ACCOUNT_E2E=1 (mirrors how the
-// other e2e tests assume a backend, but gated because accounts create real,
-// credential-bearing resources).
+// deployed and a PAT.
 func TestAccountsApply(t *testing.T) {
-	if os.Getenv("RUN_ACCOUNT_E2E") != "1" {
-		t.Skip("set RUN_ACCOUNT_E2E=1 with a live stack (SOURCE_{BIGQUERY,POSTGRES,SNOWFLAKE} definitions + PAT) to run")
-	}
-
 	// Accounts are gated behind an experimental flag, and the specs reference
 	// secrets via {{ .VAR }} placeholders resolved at apply time.
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
