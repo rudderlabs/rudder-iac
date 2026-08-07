@@ -34,6 +34,7 @@ var destinationRawSecrets = []string{
 	"rsPasswordXXXXXXXXXXXXXXXXXXXX",
 	"AKIARSXXXXXXXXXXXXXX",
 	"rsSecretAccessKeyXXXXXXXXXXXXXXXXXXXXXXXXX",
+	"googlePubSubCredentialsXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

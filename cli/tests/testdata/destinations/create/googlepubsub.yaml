@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: googlepubsub
+spec:
+  id: googlepubsub
+  display_name: E2E Google PubSub
+  type: googlepubsub
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudder-cli-e2e
+    credentials: "{{ .GOOGLE_PUBSUB_CREDENTIALS }}"
+    event_to_topic_map:
+      - from: Product Viewed
+        to: product-events
