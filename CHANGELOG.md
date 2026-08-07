@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.1](https://github.com/rudderlabs/rudder-iac/compare/v0.23.0...v0.23.1) (2026-08-07)
+
+
+### Miscellaneous
+
+* **accounts:** run accounts e2e in normal CI flow ([#729](https://github.com/rudderlabs/rudder-iac/issues/729)) ([f6a6551](https://github.com/rudderlabs/rudder-iac/commit/f6a65518977cff11cd4c57e96ed868e423077883))
+
 ## [0.23.0](https://github.com/rudderlabs/rudder-iac/compare/v0.22.0...v0.23.0) (2026-08-07)
 
 
