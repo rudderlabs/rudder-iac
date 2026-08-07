@@ -49,7 +49,14 @@ var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
 // importable resource in the workspace; without the prune, apply would reconcile
 // resources the test never asked for, and any one of them failing validation
 // upstream would fail this test for reasons unrelated to accounts.
+//
+// The import workspace path remains opt-in until it has a CI-proven run. The
+// accounts apply e2e covers normal CI account enforcement.
 func TestAccountsImportWorkspace(t *testing.T) {
+	if os.Getenv("RUN_ACCOUNT_E2E") != "1" {
+		t.Skip("set RUN_ACCOUNT_E2E=1 with a disposable live stack to run accounts import workspace e2e")
+	}
+
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
