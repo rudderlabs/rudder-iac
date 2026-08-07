@@ -49,3 +49,11 @@ Read this first when working on destination external IDs or destination ownershi
 Read these first when working on named `validate:"pattern=<name>"` behavior:
 - `cli/internal/provider/rules/funcs/regex.go`: shared pattern registry and validator function, including allow/reject matching.
 - `cli/internal/provider/rules/funcs/regex_test.go`: co-located coverage for `NewPattern`, `NewPatternWithReject`, and validator behavior.
+
+## DEX-510 — HTTP Destination Onboarding Entry
+<!-- ticket:DEX-510 -->
+Read these first when working on HTTP destination onboarding or destination definition conversion:
+- `cli/internal/providers/destination/definitions/http`: HTTP destination definition, metadata, supported source types, config mapping, and destination-specific tests.
+- `cli/internal/providers/destination/definitions`: shared destination definition and converter surface used by HTTP event filtering mappings.
+- `cli/internal/providers/destination/handler.go`: local spec extraction, secret wrapping, API conversion, and remote-to-state conversion boundary for destination definitions.
+- `cli/internal/app/dependencies.go`: destination definition registry wiring and experimental-flag gating for unverified destinations such as HTTP.

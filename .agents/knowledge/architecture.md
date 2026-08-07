@@ -97,3 +97,9 @@
 - Destination external IDs are part of the shared API client destination DTO/read contract (`Destination.ExternalID` with `json:"externalId,omitempty"`), so create/read/list/get transport can carry the field through `api/client/destinations.go`.
 - Ownership metadata mutation is intentionally isolated from ordinary destination update: destination external IDs are set through `Destinations.SetExternalID(ctx, id, externalID)`, which PUTs `{"externalId": externalID}` to `/v2/destinations/:id/external-id`.
 - Destination update should not be treated as the external-ID ownership-metadata mutation path; update requests clear `ExternalID` before marshaling even when the caller's `Destination` struct has it populated.
+
+## DEX-510 — HTTP Destination Registration Boundary
+<!-- ticket:DEX-510 -->
+- HTTP destination support is implemented as a destination-provider definition under `cli/internal/providers/destination/definitions/http`, with registry wiring in `cli/internal/app/dependencies.go`.
+- HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, matching the S3 destination gate.
+- HTTP destination identity is `Type: http`, API type `HTTP`, and version `1`; allowed source types are intentionally restricted to the CLI-owned event-stream set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) while upstream `amp`, `warehouse`, and `shopify` are excluded.

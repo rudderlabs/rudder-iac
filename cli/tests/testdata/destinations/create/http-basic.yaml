@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: http-basic
+spec:
+  id: http-basic
+  display_name: E2E HTTP Basic Auth
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/events
+    auth: basicAuth
+    username: rudder
+    password: "{{ .HTTP_BASIC_PASSWORD }}"
+    method: POST
+    format: JSON

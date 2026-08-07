@@ -1,0 +1,18 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "s3-role",
+  "name": "E2E S3 Role Auth",
+  "type": "S3",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e",
+    "prefix": "rudder/",
+    "roleBasedAuth": true,
+    "iamRoleARN": "arn:aws:iam::123456789012:role/S3Access",
+    "enableSSE": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: rs
+spec:
+  id: rs
+  display_name: E2E Redshift
+  type: rs
+  enabled: true
+  definition_version: 1
+  config:
+    host: rudder-cli-e2e.redshift.amazonaws.com
+    port: "5439"
+    database: analytics
+    user: rudder
+    password: "{{ .RS_PASSWORD }}"
+    namespace: rudder_events
+    use_rudder_storage: true
+    sync:
+      frequency: "180"
