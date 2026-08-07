@@ -35,3 +35,10 @@
 <!-- ticket:DEX-591 -->
 - Destination onboarding E2E guidance should require live snapshot capture when a destination-enabled stack is available, but may document an explicit deferral reason when live stack credentials are unavailable.
 - Destination E2E coverage should focus on each destination's meaningful config variations and complement, not duplicate, exhaustive `definition_test.go` validation/unit coverage.
+
+## DEX-623 — Accounts E2E CI Isolation
+<!-- ticket:DEX-623 -->
+- Accounts E2E coverage should run in its own workflow job against dedicated `ACCOUNTS_E2E_*` repository config, not by setting `RUN_ACCOUNT_E2E` on the existing `make test-all` job that uses the shared E2E workspace.
+- The accounts E2E job is allowed on trusted events only: pushes, workflow dispatch, and same-repository pull requests; fork pull requests should be excluded so missing secrets fail by gating rather than by silent test skips.
+- Keep accounts E2E destructive-run serialization in GitHub workflow concurrency instead of relying on local Makefile behavior; the selected per-PR disposable-workspace mode does not require broadening the whole workflow with a schedule.
+- Prefer keeping the accounts E2E shell block in `.github/workflows/test-with-coverage.yml` because it depends on CI-only credential preflight, artifact upload, trusted-event gating, and skip detection; do not add a local `Makefile` target unless those CI-specific responsibilities have a clear local contract.
