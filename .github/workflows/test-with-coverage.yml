@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -65,3 +66,67 @@ jobs:
           files: |
             coverage-unit.out
             coverage-e2e.out
+
+  accounts-e2e:
+    name: "accounts e2e"
+    runs-on: "ubuntu-24.04"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: accounts-e2e
+      cancel-in-progress: false
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: setup go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          check-latest: true
+          cache: true
+          go-version: "~1.25"
+
+      - name: checking go version
+        run: go version
+
+      - name: checking accounts e2e configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RUDDERSTACK_API_URL}" ]]; then
+            echo "ACCOUNTS_E2E_API_URL repo variable is required for accounts e2e"
+            exit 1
+          fi
+          if [[ -z "${RUDDERSTACK_ACCESS_TOKEN}" ]]; then
+            echo "ACCOUNTS_E2E_ACCESS_TOKEN secret is required for accounts e2e"
+            exit 1
+          fi
+        env:
+          RUDDERSTACK_API_URL: ${{ vars.ACCOUNTS_E2E_API_URL }}
+          RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.ACCOUNTS_E2E_ACCESS_TOKEN }}
+
+      - name: running accounts e2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./cli/tests/ -run 'TestAccounts' -timeout 20m -v 2>&1 | tee /tmp/accounts-e2e.log
+          if grep -q -- '--- SKIP: TestAccounts' /tmp/accounts-e2e.log; then
+            echo 'accounts e2e skipped — gate or credentials missing'
+            exit 1
+          fi
+        env:
+          RUN_ACCOUNT_E2E: '1'
+          RUDDERSTACK_API_URL: ${{ vars.ACCOUNTS_E2E_API_URL }}
+          RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.ACCOUNTS_E2E_ACCESS_TOKEN }}
+          RUDDERSTACK_CLI_TELEMETRY_DISABLED: 'true'
+
+      - name: upload accounts e2e cli logs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: accounts-e2e-cli.log
+          path: ~/.rudder/cli.log
