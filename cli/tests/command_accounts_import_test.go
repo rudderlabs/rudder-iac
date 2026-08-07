@@ -49,14 +49,7 @@ var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
 // importable resource in the workspace; without the prune, apply would reconcile
 // resources the test never asked for, and any one of them failing validation
 // upstream would fail this test for reasons unrelated to accounts.
-//
-// Same RUN_ACCOUNT_E2E=1 gate as TestAccountsApply: it needs a real backend with
-// the SOURCE_BIGQUERY definition deployed and a PAT.
 func TestAccountsImportWorkspace(t *testing.T) {
-	if os.Getenv("RUN_ACCOUNT_E2E") != "1" {
-		t.Skip("set RUN_ACCOUNT_E2E=1 with a live stack (SOURCE_BIGQUERY definition + PAT) to run")
-	}
-
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
