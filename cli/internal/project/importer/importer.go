@@ -76,7 +76,7 @@ func WorkspaceImport(
 		return err
 	}
 
-	idNamer, err := initNamer(targetGraph)
+	idNamer, err := initNamer(targetGraph, sourceGraph)
 	if err != nil {
 		return fmt.Errorf("initializing namer: %w", err)
 	}
@@ -149,8 +149,9 @@ func WorkspaceImport(
 // checkSyncStatus guards the import against a diverged project. Without merge,
 // any pending change blocks — HasNonSecretDiff (not HasDiff) so resources that
 // only re-apply an unknown secret, which is expected on every run, do not
-// permanently block imports. With merge, divergence is the point; only pending
-// deletions block, as importing over them could resurrect deleted resources.
+// permanently block imports. With merge, divergence is the point; reference
+// conflicts against pending local deletions are detected while formatting import
+// specs, before any files are written.
 func checkSyncStatus(diff *differ.Diff, merge bool) error {
 	if !merge {
 		if diff.HasNonSecretDiff() {
@@ -159,10 +160,6 @@ func checkSyncStatus(diff *differ.Diff, merge bool) error {
 		return nil
 	}
 
-	if len(diff.RemovedResources) > 0 {
-		return fmt.Errorf("%w: pending deletions must be applied before importing with --merge: %v",
-			ErrProjectNotSynced, diff.RemovedResources)
-	}
 	return nil
 }
 
@@ -196,16 +193,25 @@ func markMatchedWith(
 	return nil
 }
 
-func initNamer(graph *resources.Graph) (namer.Namer, error) {
+func initNamer(graphs ...*resources.Graph) (namer.Namer, error) {
 	idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 
-	resourcesMap := graph.Resources()
-	externalIDs := make([]namer.ScopeName, 0, len(resourcesMap))
-	for _, r := range resourcesMap {
-		externalIDs = append(externalIDs, namer.ScopeName{
-			Name:  r.ID(),
-			Scope: r.Type(),
-		})
+	externalIDSet := make(map[namer.ScopeName]struct{})
+	for _, graph := range graphs {
+		if graph == nil {
+			continue
+		}
+		for _, r := range graph.Resources() {
+			externalIDSet[namer.ScopeName{
+				Name:  r.ID(),
+				Scope: r.Type(),
+			}] = struct{}{}
+		}
+	}
+
+	externalIDs := make([]namer.ScopeName, 0, len(externalIDSet))
+	for externalID := range externalIDSet {
+		externalIDs = append(externalIDs, externalID)
 	}
 
 	if err := idNamer.Load(externalIDs); err != nil {

@@ -158,7 +158,7 @@ func (p *EventImportProvider) FormatForExport(
 		importableEvent := &model.ImportableEventV1{}
 		formatted, err := importableEvent.ForExport(event.ExternalID, data, resolver)
 		if err != nil {
-			return nil, nil, fmt.Errorf("formatting event: %w", err)
+			return nil, nil, fmt.Errorf("formatting event %s: %w", urn, err)
 		}
 		formattedEvents = append(formattedEvents, formatted)
 	}

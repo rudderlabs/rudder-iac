@@ -47,3 +47,9 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## DEX-625 — Baseline Validation Blockers
+<!-- ticket:DEX-625 -->
+- Full `go vet ./...` currently fails outside DEX-625 changes on `cli/internal/providers/transformations/parser/python_import_grammar.go` because participle grammar struct tags trigger multiple `reflect.StructTag.Get` syntax warnings.
+- Full `make test` currently fails on unrelated baseline issues: `cli/internal/typer/generator/core` atomic-write failure expectations return nil instead of an error, and `cli/pkg/exp/project` requires `RUDDERSTACK_ACCESS_TOKEN`.
+- For DEX-625-scoped validation, affected-package vet and focused package tests passed even though repo-wide vet/test are not clean baseline signals.

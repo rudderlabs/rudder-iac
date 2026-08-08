@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,10 +47,9 @@ func TestCheckSyncStatus(t *testing.T) {
 			merge: true,
 		},
 		{
-			name:    "merge still blocks pending deletions",
-			diff:    &differ.Diff{RemovedResources: []string{"category:legacy"}},
-			merge:   true,
-			wantErr: true,
+			name:  "merge allows pending deletions",
+			diff:  &differ.Diff{RemovedResources: []string{"category:legacy"}},
+			merge: true,
 		},
 	}
 
@@ -162,16 +162,25 @@ func (p *stubProject) Location() string {
 }
 
 type stubImportProvider struct {
-	importable *resources.RemoteResources
-	entities   []writer.FormattableEntity
-	entries    []importmanifest.ImportEntry
+	remote      *resources.RemoteResources
+	remoteState *state.State
+	importable  *resources.RemoteResources
+	entities    []writer.FormattableEntity
+	entries     []importmanifest.ImportEntry
+	format      func(*resources.RemoteResources, namer.Namer, resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 func (p *stubImportProvider) LoadResourcesFromRemote(context.Context) (*resources.RemoteResources, error) {
+	if p.remote != nil {
+		return p.remote, nil
+	}
 	return resources.NewRemoteResources(), nil
 }
 
 func (p *stubImportProvider) MapRemoteToState(*resources.RemoteResources) (*state.State, error) {
+	if p.remoteState != nil {
+		return p.remoteState, nil
+	}
 	return state.EmptyState(), nil
 }
 
@@ -180,10 +189,13 @@ func (p *stubImportProvider) LoadImportable(context.Context, namer.Namer) (*reso
 }
 
 func (p *stubImportProvider) FormatForExport(
-	*resources.RemoteResources,
-	namer.Namer,
-	resolver.ReferenceResolver,
+	collection *resources.RemoteResources,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	if p.format != nil {
+		return p.format(collection, idNamer, inputResolver)
+	}
 	return p.entities, p.entries, nil
 }
 
@@ -253,4 +265,114 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))
 	assert.NoError(t, err, "import-manifest.yaml must be written when importMerge is on")
+}
+
+func TestInitNamer_ReservesTargetAndSourceGraphIDs(t *testing.T) {
+	targetGraph := resources.NewGraph()
+	targetGraph.AddResource(resources.NewResource("existing", "category", resources.ResourceData{}, nil))
+
+	sourceGraph := resources.NewGraph()
+	sourceGraph.AddResource(resources.NewResource("existing", "category", resources.ResourceData{}, nil))
+	sourceGraph.AddResource(resources.NewResource("pending-delete", "category", resources.ResourceData{}, nil))
+
+	idNamer, err := initNamer(targetGraph, sourceGraph)
+	require.NoError(t, err)
+
+	existingName, err := idNamer.Name(namer.ScopeName{Name: "Existing", Scope: "category"})
+	require.NoError(t, err)
+	pendingDeleteName, err := idNamer.Name(namer.ScopeName{Name: "Pending Delete", Scope: "category"})
+	require.NoError(t, err)
+	freshName, err := idNamer.Name(namer.ScopeName{Name: "Fresh", Scope: "category"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "existing-1", existingName)
+	assert.Equal(t, "pending-delete-1", pendingDeleteName)
+	assert.Equal(t, "fresh", freshName)
+}
+
+func TestWorkspaceImport_MergePendingDeleteReferenceConflictWritesNoFiles(t *testing.T) {
+	dir := t.TempDir()
+	remote := pendingDeleteRemoteCollection()
+	importable := resources.NewRemoteResources()
+	importable.Set("source", map[string]*resources.RemoteResource{
+		"src_remote": {ID: "src_remote", ExternalID: "checkout"},
+	})
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		remote:      remote,
+		remoteState: pendingDeleteRemoteState(),
+		importable:  importable,
+		format: func(collection *resources.RemoteResources, _ namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+			importing, ok := collection.GetByID("source", "src_remote")
+			require.True(t, ok)
+
+			_, err := inputResolver.ResolveToReference("category", "cat_deleted")
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot import %s: %w", resources.URN(importing.ExternalID, "source"), err)
+			}
+			return nil, nil, nil
+		},
+	}, ImportOptions{Merge: true})
+
+	require.ErrorIs(t, err, resolver.ErrPendingDeleteConflict)
+	assert.Contains(t, err.Error(), "source:checkout")
+	assert.Contains(t, err.Error(), "category:legacy-category")
+	assert.Contains(t, err.Error(), "cat_deleted")
+	assertNoImportedFiles(t, dir)
+}
+
+func TestWorkspaceImport_MergeAllowsUnrelatedPendingDeletions(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		remote:      pendingDeleteRemoteCollection(),
+		remoteState: pendingDeleteRemoteState(),
+		importable:  importableCollection(),
+		entities:    entities,
+		entries:     entries,
+	}, ImportOptions{Merge: true})
+
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(dir, ImportedDir, "sources", "my-src.yaml"))
+	assert.NoError(t, err)
+}
+
+func pendingDeleteRemoteCollection() *resources.RemoteResources {
+	remote := resources.NewRemoteResources()
+	remote.Set("category", map[string]*resources.RemoteResource{
+		"cat_deleted": {
+			ID:         "cat_deleted",
+			ExternalID: "legacy-category",
+		},
+	})
+	return remote
+}
+
+func pendingDeleteRemoteState() *state.State {
+	remoteState := state.EmptyState()
+	remoteState.AddResource(&state.ResourceState{
+		ID:     "legacy-category",
+		Type:   "category",
+		Input:  map[string]any{},
+		Output: map[string]any{},
+	})
+	return remoteState
+}
+
+func assertNoImportedFiles(t *testing.T, dir string) {
+	t.Helper()
+
+	entries, err := os.ReadDir(filepath.Join(dir, ImportedDir))
+	if os.IsNotExist(err) {
+		return
+	}
+	require.NoError(t, err)
+	assert.Empty(t, entries)
 }

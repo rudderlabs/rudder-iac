@@ -1,10 +1,13 @@
 package resolver
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
+
+var ErrPendingDeleteConflict = errors.New("pending delete conflict")
 
 type ReferenceResolver interface {
 	ResolveToReference(entityType string, remoteID string) (string, error)
@@ -34,14 +37,10 @@ func (i *ImportRefResolver) ResolveToReference(entityType string, remoteID strin
 		return "", fmt.Errorf("resource not present in resources collection")
 	}
 
-	graphResource, ok := i.Graph.GetResource(
-		resources.URN(
-			resource.ExternalID,
-			entityType,
-		),
-	)
+	deletedURN := resources.URN(resource.ExternalID, entityType)
+	graphResource, ok := i.Graph.GetResource(deletedURN)
 	if !ok {
-		return "", fmt.Errorf("resource not present in resources graph")
+		return "", fmt.Errorf("%w: resource %s (remote id %s) is deleted locally but not yet applied; run apply first, or restore the resource", ErrPendingDeleteConflict, deletedURN, resource.ID)
 	}
 
 	if graphResource.FileMetadata() == nil || graphResource.FileMetadata().MetadataRef == "" {

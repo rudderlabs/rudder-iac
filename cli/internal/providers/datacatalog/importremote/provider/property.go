@@ -151,7 +151,7 @@ func (p *PropertyImportProvider) FormatForExport(
 		importableProp := &model.ImportablePropertyV1{}
 		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
-			return nil, nil, fmt.Errorf("formatting property: %w", err)
+			return nil, nil, fmt.Errorf("formatting property %s: %w", urn, err)
 		}
 		formattedProps = append(formattedProps, formatted)
 	}
