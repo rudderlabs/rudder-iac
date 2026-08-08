@@ -392,7 +392,7 @@ func (h *HandlerImpl) FormatForExport(
 	for externalID, remote := range collection {
 		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("creating spec for destination %s: %w", resources.URN(externalID, DestinationResourceType), err)
 		}
 
 		workspaceMetadata := specs.WorkspaceImportMetadata{

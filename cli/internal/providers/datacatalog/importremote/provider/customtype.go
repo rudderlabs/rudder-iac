@@ -150,7 +150,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 		importableCustomType := &model.ImportableCustomTypeV1{}
 		formatted, err := importableCustomType.ForExport(customType.ExternalID, data, resolver)
 		if err != nil {
-			return nil, nil, fmt.Errorf("formatting custom type: %w", err)
+			return nil, nil, fmt.Errorf("formatting custom type %s: %w", urn, err)
 		}
 		formattedTypes = append(formattedTypes, formatted)
 	}

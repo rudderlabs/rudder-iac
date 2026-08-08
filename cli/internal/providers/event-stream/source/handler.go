@@ -643,7 +643,7 @@ func (h *Handler) FormatForExport(
 			inputResolver,
 		)
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating spec: %w", err)
+			return nil, nil, fmt.Errorf("creating spec for source %s: %w", urn, err)
 		}
 		result = append(result, writer.FormattableEntity{
 			Content:      spec,

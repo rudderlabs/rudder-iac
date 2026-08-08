@@ -65,3 +65,9 @@
 - Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.
 - `TestDestinationsApply` applies the destination create/update directories directly, relying on recursive spec loading so future destination variations can be added without changing test code.
 - Expected upstream destination snapshots remain under `cli/tests/testdata/expected/upstream/destinations/{create,update}/destination_<spec.id>` for whole-managed-set comparison.
+
+## DEX-625 — Import Merge Conflict Signaling
+<!-- ticket:DEX-625 -->
+- `resolver.ErrPendingDeleteConflict` is the `errors.Is`-matchable sentinel for import-merge reference conflicts where a referenced remote resource exists in `ImportRefResolver.Remote` but is absent from the local managed `Graph`.
+- Resolver callers should wrap `ErrPendingDeleteConflict` with the importing/referencing resource context so final user-facing errors identify both the resource being imported and the locally deleted referenced URN/remote ID.
+- Importer-level tests can use purpose-built provider stubs that call `resolver.ResolveToReference` during `FormatForExport`, which verifies import ordering and no-write safety without coupling the test to a concrete provider or live backend.

@@ -151,7 +151,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 		importableTrackingPlan := &model.ImportableTrackingPlanV1{}
 		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
 		if err != nil {
-			return nil, nil, fmt.Errorf("formatting tracking plan %s for export: %w", trackingPlan.ID, err)
+			return nil, nil, fmt.Errorf("formatting tracking plan %s for export: %w", urn, err)
 		}
 
 		kind := localcatalog.KindTrackingPlansV1
