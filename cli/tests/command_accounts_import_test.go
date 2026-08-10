@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -25,11 +24,6 @@ const (
 	accountImportSecret = rawAccountSecret
 )
 
-// varReference matches the "{{ .VAR }}" token an exported secret is masked to,
-// capturing the variable name so the scaffolded var file can be checked for the
-// matching placeholder.
-var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
-
 // TestAccountsImportWorkspace drives reusable import scenarios against a live
 // disposable stack. Each scenario seeds unmanaged upstream resources directly via
 // the API, runs through the real `import workspace` path, and asserts only on the
@@ -41,6 +35,7 @@ var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
 // and a plaintext credential committed to version control.
 func TestAccountsImportWorkspace(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
+	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 

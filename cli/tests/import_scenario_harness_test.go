@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+// varReference matches the "{{ .VAR }}" token an exported secret is masked to,
+// capturing the variable name so the scaffolded var file can be checked for the
+// matching placeholder.
+var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
 
 type Scenario struct {
 	Name      string
@@ -187,7 +194,7 @@ func findSpecByName(t *testing.T, dir, name string) importedSpec {
 		require.NoError(t, err)
 
 		var spec specs.Spec
-		if err := yaml.Unmarshal(content, &spec); err != nil {
+		if err := yaml.Unmarshal(quoteVarTokensForYAML(content), &spec); err != nil {
 			continue
 		}
 		if specName, ok := spec.Spec["name"].(string); ok && specName == name {
@@ -197,6 +204,12 @@ func findSpecByName(t *testing.T, dir, name string) importedSpec {
 
 	t.Fatalf("no scaffolded spec found for name %q among %v", name, matches)
 	return importedSpec{}
+}
+
+func quoteVarTokensForYAML(data []byte) []byte {
+	return varReference.ReplaceAllFunc(data, func(match []byte) []byte {
+		return []byte(strconv.Quote(string(match)))
+	})
 }
 
 func filterManifest(t *testing.T, path string, remoteIDs ...string) {
