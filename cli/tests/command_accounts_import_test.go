@@ -128,7 +128,7 @@ func seedUnmanagedTransformation(t *testing.T, apiClient *client.Client) []Seede
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
-	resp, err := apiClient.Do(context.Background(), "POST", "/transformations?publish=false", bytes.NewReader(body))
+	resp, err := apiClient.Do(context.Background(), "POST", "/transformations?publish=true", bytes.NewReader(body))
 	require.NoError(t, err, "seeding an unmanaged transformation")
 
 	var transformation transformationsapi.Transformation
