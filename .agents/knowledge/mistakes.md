@@ -15,3 +15,10 @@
 <!-- ticket:DEX-623 -->
 - CI proved `TestAccountsApply` can run ungated, but `TestAccountsImportWorkspace` failed on its first completion attempt at `cli/tests/command_accounts_import_test.go:230` because `/tmp/.../imported/import-manifest.yaml` was missing.
 - Durable mitigation for account E2E enforcement is to keep `TestAccountsApply` in the normal CI path while leaving `TestAccountsImportWorkspace` gated by `RUN_ACCOUNT_E2E` until a follow-up fixes the missing manifest path with CI proof.
+
+## DEX-624 — Accounts Import Manifest Failure Resolution
+<!-- ticket:DEX-624 -->
+- The earlier missing `imported/import-manifest.yaml` account import E2E failure was tied to import merge being disabled; after import merge became unconditional, `TestAccountsImportWorkspace` is expected to run ungated rather than remain behind `RUN_ACCOUNT_E2E`.
+- CI later failed because the import scenario helper parsed generated specs with raw YAML unmarshalling; imported account specs can contain unquoted `{{ .VAR }}` placeholders after formatter post-processing, so test-only parsing must quote those generated var tokens before unmarshalling.
+- Import scenarios that seed transformations must enable `RUDDERSTACK_X_TRANSFORMATIONS=true`, because the transformations provider remains feature-flagged even though import merge is unconditional.
+- Direct transformation seeders for import E2E should create unpublished-unmanaged resources with `publish=true`; `POST /transformations?publish=false` can create a draft that is invisible to the real import path's `GET /transformations` importable-resource load, so no transformation spec is scaffolded.

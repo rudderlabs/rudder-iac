@@ -13,32 +13,21 @@ so on), the next `apply` fails on the collision.
 
 `--merge` (Smart Import) solves that.
 
-> **Status: experimental.** `--merge` is behind an experimental flag and is **off
-> by default**. Without the flag, `import workspace` behaves exactly as before and
-> `--merge` is rejected. See [Enabling `--merge`](#enabling---merge).
-
 ---
 
 ## Quick start
 
-1. **Enable the feature** (one-time setup):
-
-   ```bash
-   export RUDDERSTACK_CLI_EXPERIMENTAL=true      # turn on experimental mode
-   export RUDDERSTACK_X_IMPORT_MERGE=true        # turn on Smart Import
-   ```
-
-2. **Run import with `--merge`:**
+1. **Run import with `--merge`:**
 
    ```bash
    rudder-cli import workspace --merge --location ./my-project
    ```
 
-3. **Review the result.** Import writes an `imported/` directory inside your
-   project containing the new specs and, when merging, an
-   `imported/import-manifest.yaml` linking file.
+2. **Review the result.** Import writes an `imported/` directory inside your
+   project containing the new specs and an `imported/import-manifest.yaml`
+   linking file.
 
-4. **Apply:**
+3. **Apply:**
 
    ```bash
    rudder-cli apply --location ./my-project
@@ -97,9 +86,9 @@ linked.
 
 ## The import manifest
 
-When `--merge` links resources, it records them in
-`imported/import-manifest.yaml`. Each entry maps one of your local resources to
-the workspace resource it now owns, grouped by workspace:
+Import records ownership metadata in `imported/import-manifest.yaml`. Each entry
+maps one of your local resources to the workspace resource it now owns, grouped
+by workspace:
 
 ```yaml
 version: "rudder/v1"
@@ -120,28 +109,11 @@ This file is what `apply` uses to know that these resources should be **adopted*
 rather than created. You can keep it in version control alongside the rest of
 your project — it becomes a permanent record of what is linked.
 
-The `importMerge` flag gates the manifest on **both** sides:
-
-- **Generation** — the manifest is written by `import` only while the flag is
-  enabled.
-- **Recognition** — the `import-manifest` kind is a recognized spec kind (parsed,
-  validated, and honored by `apply`) only while the flag is enabled.
-
-With the flag **off**, `import-manifest` is an unrecognized kind, and any command
-that loads your project — `apply`, `validate`, and `import workspace` itself —
-**fails validation** with an error like `'kind' must be one of [...]` as long as
-a manifest file is present in the project.
-
-The practical consequence: once you've generated a manifest, keep `importMerge`
-enabled. Turning it off doesn't quietly ignore the manifest — it makes your
-project fail to load until you either re-enable the flag or remove the manifest
-file (which drops all the links it recorded).
-
 ---
 
 ## Effect on `apply`
 
-After a merge import, `apply` uses the manifest:
+After import, `apply` uses the manifest:
 
 - **Linked resources** are adopted — `apply` takes ownership of the existing
   workspace resource instead of creating a new one, so there is no duplicate and
@@ -151,11 +123,8 @@ After a merge import, `apply` uses the manifest:
 - **Everything else** (resources with no workspace counterpart, or imported as
   new) applies exactly as it normally would.
 
-`validate` and the other commands read the manifest the same way — with the
-`importMerge` flag enabled, they treat it as ordinary import metadata, so no
-extra steps are needed on your part. (With the flag off, the manifest kind is
-unrecognized and every command that loads the project fails validation — see
-[The import manifest](#the-import-manifest).)
+`validate` and the other commands read the manifest the same way — they treat it
+as ordinary import metadata, so no extra steps are needed on your part.
 
 ---
 
@@ -179,55 +148,6 @@ graph spec.
 
 ---
 
-## Enabling `--merge`
-
-`--merge` requires the experimental flag named `importMerge`. Two things must be
-true: experimental mode must be on **and** the flag must be enabled. Pick
-whichever method fits your workflow.
-
-The same flag also gates the import manifest — both its generation during import
-and its recognition by `apply`/`validate` (see [The import manifest](#the-import-manifest)).
-So keep it enabled not just to run `--merge`, but for as long as `apply` needs to
-honor a manifest you've already generated.
-
-### Option A — Environment variables (great for CI)
-
-```bash
-export RUDDERSTACK_CLI_EXPERIMENTAL=true      # turn on experimental mode
-export RUDDERSTACK_X_IMPORT_MERGE=true        # turn on Smart Import
-```
-
-### Option B — Config file (persistent, `~/.rudder/config.json`)
-
-```json
-{
-  "experimental": true,
-  "flags": {
-    "importMerge": true
-  }
-}
-```
-
-The top-level `"experimental": true` is required — without it, all experimental
-flags are ignored.
-
-### Option C — CLI command
-
-Once experimental mode is on (Option A or B sets `experimental`), toggle the flag
-with:
-
-```bash
-rudder-cli experimental enable importMerge
-```
-
-Running `--merge` without the flag fails fast:
-
-```
---merge requires the "importMerge" experimental flag to be enabled
-```
-
----
-
 ## Command reference
 
 ```
@@ -237,7 +157,7 @@ rudder-cli import workspace [flags]
 | Flag               | Description                                                                                                                                                                       |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--location`, `-l` | Path to the project directory (default `.`).                                                                                                                                      |
-| `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
+| `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. |
 
 Import writes into an `imported/` subdirectory of the project and **fails if that
 directory already exists** — move or remove a previous `imported/` before

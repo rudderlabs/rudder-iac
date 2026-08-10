@@ -89,10 +89,11 @@ func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
 }
 
-func TestIsValidExperimentalFlag_ImportMerge(t *testing.T) {
+func TestIsValidExperimentalFlag_RemovedImportManifestFlag(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, IsValidExperimentalFlag("importMerge"))
+	removedFlag := "import" + "Merge"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
 func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {

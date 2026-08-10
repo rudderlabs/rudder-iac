@@ -14,7 +14,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,16 +56,6 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 // cover each other exactly and the catalog validates with zero errors. This is the
 // assembly seam that package app exercises end-to-end against the real providers.
 func TestBuild_GatekeeperOnly(t *testing.T) {
-	prevExp, prevFlag, prevDestSupport := viper.Get("experimental"), viper.Get("flags.importMerge"), viper.Get("flags.destinationSupport")
-	viper.Set("experimental", true)
-	viper.Set("flags.importMerge", true)
-	viper.Set("flags.destinationSupport", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.importMerge", prevFlag)
-		viper.Set("flags.destinationSupport", prevDestSupport)
-	})
-
 	cp := &testutils.MockProvider{
 		MatchPatterns: gatekeeperScopedPatterns(),
 	}

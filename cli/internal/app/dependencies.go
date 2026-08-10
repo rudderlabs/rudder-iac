@@ -298,7 +298,7 @@ func (d *deps) CompositeProvider() provider.Provider {
 // sharing the same construction as project validation so the docs generator
 // observes an identical rule set.
 func (d *deps) Registry() (rules.Registry, error) {
-	return project.BuildRegistry(d.CompositeProvider(), importmanifest.New(), config.GetConfig().ExperimentalFlags.ImportMerge)
+	return project.BuildRegistry(d.CompositeProvider(), importmanifest.New())
 }
 
 // NewProject creates a project with composite provider.

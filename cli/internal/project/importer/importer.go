@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -115,22 +114,18 @@ func WorkspaceImport(
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
-	// Only emit the import-manifest when the importMerge experimental flag is
-	// enabled — the feature is incomplete and the artifact would confuse users.
-	if config.GetConfig().ExperimentalFlags.ImportMerge {
-		manifestNode, err := importmanifest.BuildNode(importEntries)
-		if err != nil {
-			return fmt.Errorf("building import manifest: %w", err)
-		}
+	manifestNode, err := importmanifest.BuildNode(importEntries)
+	if err != nil {
+		return fmt.Errorf("building import manifest: %w", err)
+	}
 
-		if manifestNode != nil {
-			manifestEntity := writer.FormattableEntity{
-				Content:      manifestNode,
-				RelativePath: importmanifest.FileName,
-			}
-			if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
-				return fmt.Errorf("writing import manifest: %w", err)
-			}
+	if manifestNode != nil {
+		manifestEntity := writer.FormattableEntity{
+			Content:      manifestNode,
+			RelativePath: importmanifest.FileName,
+		}
+		if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
+			return fmt.Errorf("writing import manifest: %w", err)
 		}
 	}
 
