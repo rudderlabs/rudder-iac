@@ -19,3 +19,5 @@
 ## DEX-624 — Accounts Import Manifest Failure Resolution
 <!-- ticket:DEX-624 -->
 - The earlier missing `imported/import-manifest.yaml` account import E2E failure was tied to import merge being disabled; after import merge became unconditional, `TestAccountsImportWorkspace` is expected to run ungated rather than remain behind `RUN_ACCOUNT_E2E`.
+- CI later failed because the import scenario helper parsed generated specs with raw YAML unmarshalling; imported account specs can contain unquoted `{{ .VAR }}` placeholders after formatter post-processing, so test-only parsing must quote those generated var tokens before unmarshalling.
+- Import scenarios that seed transformations must enable `RUDDERSTACK_X_TRANSFORMATIONS=true`, because the transformations provider remains feature-flagged even though import merge is unconditional.
