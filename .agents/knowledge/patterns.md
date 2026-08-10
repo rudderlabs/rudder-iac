@@ -65,3 +65,11 @@
 - Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.
 - `TestDestinationsApply` applies the destination create/update directories directly, relying on recursive spec loading so future destination variations can be added without changing test code.
 - Expected upstream destination snapshots remain under `cli/tests/testdata/expected/upstream/destinations/{create,update}/destination_<spec.id>` for whole-managed-set comparison.
+
+## DEX-624 — Import Scenario Harness Shape
+<!-- ticket:DEX-624 -->
+- Import E2E scenarios are organized around seeding workspace state, running `import workspace`, and asserting imported output; shared scenarios can seed together and assert against one import run, while exclusive scenarios get their own destroy/seed/import cycle.
+- Shared import scenarios must scope assertions to their own seeded fixtures, typically by resource name or returned remote ID; whole-tree/count assertions belong in exclusive scenarios because workspace import is global.
+- The import scenario harness passes each scenario's `[]Seeded` metadata into its assertion so fixture-specific checks do not rely on side-channel closure state.
+- Import E2E seeders should create unmanaged remote resources directly through the API client, not through the CLI provider path, because CLI-created resources receive external IDs and become managed rather than importable.
+- Secret masking assertions for import output should scan all generated files for raw secret values while expecting scaffolded specs to reference variables and the generated var file to hold placeholders.

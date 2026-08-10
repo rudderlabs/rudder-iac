@@ -103,3 +103,8 @@
 - HTTP destination support is implemented as a destination-provider definition under `cli/internal/providers/destination/definitions/http`, with registry wiring in `cli/internal/app/dependencies.go`.
 - HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, matching the S3 destination gate.
 - HTTP destination identity is `Type: http`, API type `HTTP`, and version `1`; allowed source types are intentionally restricted to the CLI-owned event-stream set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) while upstream `amp`, `warehouse`, and `shopify` are excluded.
+
+## DEX-624 — Import Merge Default Path
+<!-- ticket:DEX-624 -->
+- Workspace import merge is a default code path rather than an experimental capability; registry construction and importer flow should include import-manifest rules/metadata unconditionally instead of threading an `importMergeEnabled` flag.
+- The `import workspace --merge` command path should not be guarded by `ExperimentalFlags.ImportMerge` or `RUDDERSTACK_X_IMPORT_MERGE`; deleting that experimental flag is the deregistration mechanism because available flags are reflection-derived from the experimental config struct.

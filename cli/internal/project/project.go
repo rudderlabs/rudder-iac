@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
@@ -328,9 +327,8 @@ func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*sp
 // operates on already-parsed specs.
 func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
 	var (
-		diags              = make(validation.Diagnostics, 0)
-		parsedRawSpecs     = make(map[string]*specs.RawSpec)
-		importMergeEnabled = config.GetConfig().ExperimentalFlags.ImportMerge
+		diags          = make(validation.Diagnostics, 0)
+		parsedRawSpecs = make(map[string]*specs.RawSpec)
 	)
 
 	for path, rawSpec := range raw {
@@ -352,7 +350,7 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 		// Dropped before validation so the gatekeeper rules never see the spec at
 		// all: the kind belongs to a provider this caller did not register, so
 		// every rule keyed off it would be a false error.
-		if p.ignoreUnknownKinds && !p.isKnownKind(parsed.Kind, importMergeEnabled) {
+		if p.ignoreUnknownKinds && !p.isKnownKind(parsed.Kind) {
 			log.Debug("skipping spec of unregistered kind", "path", path, "kind", parsed.Kind)
 			continue
 		}
@@ -367,13 +365,12 @@ func (p *project) parseSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.R
 	return parsedRawSpecs, diags
 }
 
-// isKnownKind reports whether the kind is in the active pattern set given the
-// current import-merge state. Sharing activePatterns with BuildRegistry is what
-// keeps the skip decision and the gatekeeper's notion of "known" from drifting:
-// a kind is skipped only where BuildRegistry would otherwise reject it as
-// unknown. Notably import-manifest is known only when import-merge is enabled.
-func (p *project) isKnownKind(kind string, importMergeEnabled bool) bool {
-	for _, pattern := range activePatterns(p.provider, p.importManifestProvider, importMergeEnabled) {
+// isKnownKind reports whether the kind is in the active pattern set. Sharing
+// activePatterns with BuildRegistry is what keeps the skip decision and the
+// gatekeeper's notion of "known" from drifting: a kind is skipped only where
+// BuildRegistry would otherwise reject it as unknown.
+func (p *project) isKnownKind(kind string) bool {
+	for _, pattern := range activePatterns(p.provider, p.importManifestProvider) {
 		if pattern.Kind == "*" || pattern.Kind == kind {
 			return true
 		}
@@ -383,20 +380,17 @@ func (p *project) isKnownKind(kind string, importMergeEnabled bool) bool {
 }
 
 func (p *project) registry() (rules.Registry, error) {
-	return BuildRegistry(p.provider, p.importManifestProvider, config.GetConfig().ExperimentalFlags.ImportMerge)
+	return BuildRegistry(p.provider, p.importManifestProvider)
 }
 
 // activePatterns is the set of kind/version patterns the validation pipeline
-// treats as known: the resource provider's patterns, plus the import-manifest
-// provider's only when import-merge is enabled. Shared by BuildRegistry (which
-// rules fire) and isKnownKind (which specs the local typer may skip) so the two
-// never disagree about which kinds are known.
-func activePatterns(provider, manifestProvider ProjectProvider, importMergeEnabled bool) []rules.MatchPattern {
+// treats as known: the resource provider's patterns plus the import-manifest
+// provider's patterns. Shared by BuildRegistry (which rules fire) and
+// isKnownKind (which specs the local typer may skip) so the two never disagree
+// about which kinds are known.
+func activePatterns(provider, manifestProvider ProjectProvider) []rules.MatchPattern {
 	patterns := append([]rules.MatchPattern{}, provider.SupportedMatchPatterns()...)
-	if importMergeEnabled {
-		patterns = append(patterns, manifestProvider.SupportedMatchPatterns()...)
-	}
-
+	patterns = append(patterns, manifestProvider.SupportedMatchPatterns()...)
 	return patterns
 }
 
@@ -408,15 +402,9 @@ func activePatterns(provider, manifestProvider ProjectProvider, importMergeEnabl
 // gatekeeper rules treat both resource kinds and import-manifest as known. The
 // resource-scoped gatekeepers (metadata-syntax-valid, duplicate-urn) are scoped
 // to resourcePatterns alone so the engine never hands them a manifest spec.
-//
-// Import-manifest patterns and dedicated rules are only included when
-// importMergeEnabled is set — otherwise the kind is unknown and
-// leftover/hand-written manifest files fail syntax validation. The flag is
-// resolved by callers and passed in so this stays a pure function of its
-// arguments, testable without touching global config.
-func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnabled bool) (rules.Registry, error) {
+func BuildRegistry(provider, manifestProvider ProjectProvider) (rules.Registry, error) {
 	resourcePatterns := provider.SupportedMatchPatterns()
-	active := activePatterns(provider, manifestProvider, importMergeEnabled)
+	active := activePatterns(provider, manifestProvider)
 
 	baseRegistry := rules.NewRegistry(active)
 
@@ -434,14 +422,10 @@ func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnable
 		prules.NewDuplicateURNRule(provider.ParseSpec, resourcePatterns),
 	}
 	// Cross-source conflict between import-manifest and inline metadata.import
-	// only applies when the import-manifest kind is recognized.
-	if importMergeEnabled {
-		syntactic = append(syntactic, prules.NewManifestInlineConflictRule(provider.ParseSpec, active))
-	}
+	// applies because the import-manifest kind is always recognized.
+	syntactic = append(syntactic, prules.NewManifestInlineConflictRule(provider.ParseSpec, active))
 	syntactic = append(syntactic, provider.SyntacticRules()...)
-	if importMergeEnabled {
-		syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
-	}
+	syntactic = append(syntactic, manifestProvider.SyntacticRules()...)
 
 	for _, rule := range syntactic {
 		if err := baseRegistry.RegisterSyntactic(rule); err != nil {
@@ -450,9 +434,7 @@ func BuildRegistry(provider, manifestProvider ProjectProvider, importMergeEnable
 	}
 
 	semantic := provider.SemanticRules()
-	if importMergeEnabled {
-		semantic = append(semantic, manifestProvider.SemanticRules()...)
-	}
+	semantic = append(semantic, manifestProvider.SemanticRules()...)
 	for _, rule := range semantic {
 		if err := baseRegistry.RegisterSemantic(rule); err != nil {
 			return nil, fmt.Errorf("registering semantic rule %s: %w", rule.ID(), err)

@@ -42,3 +42,8 @@
 - `TestAccountsImportWorkspace` remains behind `RUN_ACCOUNT_E2E` until the missing `imported/import-manifest.yaml` failure is fixed by a CI-proven follow-up; do not treat accounts apply gating and import-workspace gating as the same policy.
 - The accounts E2E tests set their required account feature flags inside the tests via `t.Setenv`, so local CLI subprocesses inherit account support without workflow-level environment gates.
 - Outside the intended disposable CI workspace, prefer compile-only E2E validation such as `go test ./cli/tests -run '^$'` for accounts test changes because the live tests call `destroy` against the configured RudderStack workspace.
+
+## DEX-624 — Accounts Import E2E Ungated
+<!-- ticket:DEX-624 -->
+- `TestAccountsImportWorkspace` is now intentionally part of the normal accounts E2E path, with the `RUN_ACCOUNT_E2E` guard removed after unconditional import-merge enablement fixed the missing `imported/import-manifest.yaml` failure mode.
+- Accounts import E2E changes should no longer reintroduce `RUN_ACCOUNT_E2E`; the import scenario harness is expected to exercise real `import workspace` output in the standard test flow.

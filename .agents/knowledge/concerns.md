@@ -47,3 +47,8 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## DEX-624 — Baseline Validation Blockers
+<!-- ticket:DEX-624 -->
+- `go vet ./...` can fail in unchanged `cli/internal/providers/transformations/parser/python_import_grammar.go` because participle grammar tags such as `( @@`, `"from" @Dot*`, and `@Ident` are reported as invalid reflect struct tags; treat this as a repository baseline vet issue unless working on that parser.
+- `make test` may still hit unrelated baseline failures in `cli/internal/typer/generator/core` atomic-write expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN`, even after changed import harness packages compile.

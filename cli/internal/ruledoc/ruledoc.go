@@ -16,7 +16,6 @@ package ruledoc
 import (
 	"fmt"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	projectdocs "github.com/rudderlabs/rudder-iac/cli/internal/project/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -34,13 +33,8 @@ import (
 // the real clock in the command, a fixed value in tests.
 func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.DocumentedRules, []error, error) {
 	manifestProvider := importmanifest.New()
-	importMergeEnabled := config.GetConfig().ExperimentalFlags.ImportMerge
 
-	reg, err := project.BuildRegistry(
-		cp,
-		manifestProvider,
-		importMergeEnabled,
-	)
+	reg, err := project.BuildRegistry(cp, manifestProvider)
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("building rule registry: %w", err)
 	}
@@ -49,14 +43,10 @@ func Build(cp provider.Provider, cliVersion, generatedAt string) (docs.Documente
 	// their authored fragments are embedded here and appended to the
 	// provider-contributed entries. The import-manifest provider contributes both
 	// its rules (via BuildRegistry) and their fragments (here) — collect from the
-	// same instance so the two stay in sync. Only include them when importMerge
-	// is on, matching BuildRegistry's gate. The manifest-inline-conflict fragment
-	// rides with the manifest provider's fragments (not projectEntries) so the
-	// rule and its doc share one gate.
+	// same instance so the two stay in sync. The manifest-inline-conflict fragment
+	// rides with the manifest provider's fragments (not projectEntries).
 	entries := cp.RuleDocEntries()
-	if importMergeEnabled {
-		entries = append(entries, manifestProvider.RuleDocEntries()...)
-	}
+	entries = append(entries, manifestProvider.RuleDocEntries()...)
 	projectEntries, err := docs.LoadRuleDocEntries(projectdocs.FragmentsFS, ".")
 	if err != nil {
 		return docs.DocumentedRules{}, nil, fmt.Errorf("loading project rule docs: %w", err)
