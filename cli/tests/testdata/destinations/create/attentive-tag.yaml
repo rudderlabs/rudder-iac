@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: attentive-tag
+spec:
+  id: attentive-tag
+  display_name: E2E Attentive Tag
+  type: attentive_tag
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: "{{ .ATTENTIVE_TAG_API_KEY }}"
+    sign_up_source_id: "123456"
