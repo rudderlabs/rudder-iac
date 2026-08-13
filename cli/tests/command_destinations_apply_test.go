@@ -52,18 +52,19 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // together (like the catalog e2e applies events, properties, etc. in one shot),
 // then the managed destinations are snapshot-compared upstream via
 // DestinationSnapshotTester — the same file-manager + count-guard +
-// per-resource-compare structure verifyState uses. Destinations are double-gated —
-// DestinationSupport enables the kind, UnverifiedDestinations registers the
-// unverified ones (e.g. S3) — and key-auth specs reference secrets via {{ .VAR }}
-// placeholders resolved at apply time.
+// per-resource-compare structure verifyState uses. DestinationSupport enables
+// the kind, while UnverifiedDestinations remains enabled here because these
+// fixtures include unverified destination types such as attentive_tag, http, and
+// rs. Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at
+// apply time.
 //
-// Gated behind RUN_DESTINATION_E2E because it needs a live stack with unverified
-// destinations enabled, and the destroy below would otherwise wipe the workspace
-// before the (failing) apply on a stack without that support. The skip must come
-// before the destroy.
+// Gated behind RUN_DESTINATION_E2E because it needs a live stack with support for
+// the unverified fixture set, and the destroy below would otherwise wipe the
+// workspace before the (failing) apply on a stack without that support. The skip
+// must come before the destroy.
 func TestDestinationsApply(t *testing.T) {
 	if os.Getenv("RUN_DESTINATION_E2E") != "1" {
-		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified S3")
+		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
 	}
 
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
