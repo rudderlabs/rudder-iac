@@ -1297,6 +1297,36 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
+	t.Run("prunes empty non-required fields the backend echoes", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				// Backend echoes the full schema: required apiSecret plus an empty
+				// optional measurementId.
+				Config: []byte(`{"apiSecret":"super-secret","measurementId":""}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"], "required secret kept and masked")
+		assert.NotContains(t, config, "measurement_id", "empty optional field pruned from imported YAML")
+	})
+
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 

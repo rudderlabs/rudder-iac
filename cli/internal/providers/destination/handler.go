@@ -441,6 +441,11 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
 
+	// Drop empty fields the backend echoes but that aren't required for this
+	// destination's actual config (e.g. auth secrets on a noAuth destination),
+	// before masking so absent secrets don't become phantom {{ .VAR }} refs.
+	localConfig = registered.PruneEmptyOptional(localConfig)
+
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
 	}
