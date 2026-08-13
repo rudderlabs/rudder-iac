@@ -75,3 +75,4 @@
 <!-- ticket:DEX-661 -->
 - Destination export pruning treats nil pointers/interfaces as empty, but treats non-nil pointers and scalar zero values as populated; do not generalize emptiness to scalar zero semantics because `false` and numeric `0` can be meaningful destination config values.
 - The destination empty-value helper evaluates concrete values and containers rather than dereferencing all pointers, avoiding accidental pruning of valid non-container settings while matching JSON/config-converter output shapes.
+- Destination export must prune empty local config values before calling `secret.MaskSecrets`, so API-returned null or empty-string secret keys are dropped before they can become generated variable placeholders in imported YAML.
