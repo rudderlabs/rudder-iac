@@ -1,0 +1,15 @@
+{
+  "config": {
+    "region": "US",
+    "siteId": "rudderCliE2eSiteId"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "customerio-audience",
+  "id": "<ignored>",
+  "name": "E2E Customer.io Audience",
+  "type": "CUSTOMERIO_AUDIENCE",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
