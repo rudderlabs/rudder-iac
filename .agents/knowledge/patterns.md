@@ -70,3 +70,8 @@
 <!-- ticket:DEX-608 -->
 - `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `attentive_tag`, `http`, and `rs`; S3 is verified/native and does not need that gate.
 - Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.
+
+## DEX-661 — Destination Export Empty-Value Pruning
+<!-- ticket:DEX-661 -->
+- Destination export pruning treats nil pointers/interfaces as empty, but treats non-nil pointers and scalar zero values as populated; do not generalize emptiness to scalar zero semantics because `false` and numeric `0` can be meaningful destination config values.
+- The destination empty-value helper evaluates concrete values and containers rather than dereferencing all pointers, avoiding accidental pruning of valid non-container settings while matching JSON/config-converter output shapes.

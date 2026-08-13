@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -429,7 +430,8 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 // toExportSpecMap builds the "spec" section of an importable destination's
-// YAML: local config with secrets masked, plus an optional transformation ref.
+// YAML: local config with empty values pruned and secrets masked, plus an
+// optional transformation ref.
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
 	registered, err := h.registry.GetByAPIType(remote.Type, remote.Version)
 	if err != nil {
@@ -440,6 +442,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
+	pruneEmptyValues(localConfig)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
@@ -466,6 +469,56 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	}
 
 	return specMap, nil
+}
+
+func pruneEmptyValues(config map[string]any) {
+	for key, value := range config {
+		if isEmptyConfigValue(value) {
+			delete(config, key)
+		}
+	}
+}
+
+func isEmptyConfigValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	if s, ok := value.(string); ok {
+		return s == ""
+	}
+
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return true
+	}
+
+	switch v.Kind() {
+	case reflect.Pointer:
+		return v.IsNil()
+	case reflect.Slice, reflect.Array:
+		if v.Len() == 0 {
+			return true
+		}
+		for i := range v.Len() {
+			if !isEmptyConfigValue(v.Index(i).Interface()) {
+				return false
+			}
+		}
+		return true
+	case reflect.Map:
+		if v.Len() == 0 {
+			return true
+		}
+		iter := v.MapRange()
+		for iter.Next() {
+			if !isEmptyConfigValue(iter.Value().Interface()) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case

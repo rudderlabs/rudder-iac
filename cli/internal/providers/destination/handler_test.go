@@ -74,12 +74,18 @@ func ga4TestDefinition() *definitions.DestinationDefinition {
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("measurementId", "measurement_id"),
+			converter.Simple("debugMode", "debug_mode"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "blacklisted_events"),
+			converter.Simple("advancedOptions", "advanced_options"),
 		},
 		SecretKeys: []string{"api_secret"},
 		NewConfig: func() any {
 			return &struct {
-				APISecret     string `mapstructure:"api_secret" validate:"required"`
-				MeasurementID string `mapstructure:"measurement_id"`
+				APISecret         string         `mapstructure:"api_secret" validate:"required"`
+				MeasurementID     string         `mapstructure:"measurement_id"`
+				DebugMode         bool           `mapstructure:"debug_mode"`
+				BlacklistedEvents []string       `mapstructure:"blacklisted_events"`
+				AdvancedOptions   map[string]any `mapstructure:"advanced_options"`
 			}{}
 		},
 		SourceTypes: []string{"web", "android"},
@@ -1156,6 +1162,31 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	// Not parallel: subtests toggle enableVarSubstitution via global viper.
 
 	registry := testRegistry(t)
+	exportedGA4Config := func(t *testing.T, externalID string, apiConfig string) map[string]any {
+		t.Helper()
+
+		h := destination.NewHandler(nil, registry)
+		collection := map[string]*destination.RemoteDestination{
+			externalID: {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(apiConfig),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		return config
+	}
 
 	t.Run("empty collection", func(t *testing.T) {
 
@@ -1295,6 +1326,63 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.NotContains(t, config, "api_secret")
 		assert.Equal(t, "G-123", config["measurement_id"])
+	})
+
+	t.Run("prunes direct empty values before masking secrets", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		config := exportedGA4Config(t, "ga4-production", `{
+			"apiSecret": "",
+			"measurementId": null,
+			"blacklistedEvents": [],
+			"advancedOptions": {}
+		}`)
+
+		assert.NotContains(t, config, "api_secret", "empty secret values must not become variable placeholders")
+		assert.NotContains(t, config, "measurement_id")
+		assert.NotContains(t, config, "blacklisted_events")
+		assert.NotContains(t, config, "advanced_options")
+	})
+
+	t.Run("prunes objects holding only empty values", func(t *testing.T) {
+		config := exportedGA4Config(t, "ga4-production", `{
+			"advancedOptions": {
+				"provider": "",
+				"categories": [],
+				"overrides": {"enabledFor": null}
+			}
+		}`)
+
+		assert.NotContains(t, config, "advanced_options")
+	})
+
+	t.Run("prunes arrays holding only empty members", func(t *testing.T) {
+		config := exportedGA4Config(t, "ga4-production", `{
+			"blacklistedEvents": [
+				{"eventName": ""},
+				{"eventName": null}
+			]
+		}`)
+
+		assert.NotContains(t, config, "blacklisted_events")
+	})
+
+	t.Run("keeps arrays holding any populated member", func(t *testing.T) {
+		config := exportedGA4Config(t, "ga4-production", `{
+			"blacklistedEvents": [
+				{"eventName": ""},
+				{"eventName": "Order Completed"}
+			]
+		}`)
+
+		assert.Equal(t, []any{"", "Order Completed"}, config["blacklisted_events"])
+	})
+
+	t.Run("keeps false values", func(t *testing.T) {
+		config := exportedGA4Config(t, "ga4-production", `{"debugMode": false}`)
+
+		assert.Contains(t, config, "debug_mode")
+		assert.Equal(t, false, config["debug_mode"])
 	})
 
 	t.Run("resolves transformation reference", func(t *testing.T) {
