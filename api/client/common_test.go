@@ -107,19 +107,20 @@ func TestAPIError_Error(t *testing.T) {
 	}
 }
 
-func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
+func TestAPIError_ForbiddenPredicates(t *testing.T) {
 	tests := []struct {
-		name     string
-		apiError *client.APIError
-		want     bool
+		name                 string
+		apiError             *client.APIError
+		wantFeatureDisabled  bool
+		wantPermissionDenied bool
 	}{
 		{
-			name: "returns true for 403 with feature flag message",
+			name: "returns feature disabled for 403 with feature flag message",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Flag is not enabled for your account",
 			},
-			want: true,
+			wantFeatureDisabled: true,
 		},
 		{
 			name: "checks ErrorMessage when Message is empty",
@@ -127,23 +128,30 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 				HTTPStatusCode: 403,
 				ErrorMessage:   "Flag is not enabled for your account",
 			},
-			want: true,
+			wantFeatureDisabled: true,
 		},
 		{
-			name: "returns true for 403 with feature message",
+			name: "returns feature disabled for 403 with feature message",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Feature is not enabled for your account: DATA_GRAPH",
 			},
-			want: true,
+			wantFeatureDisabled: true,
 		},
 		{
-			name: "returns false for 403 with different message",
+			name: "returns permission denied for insufficient permissions",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Insufficient permissions",
 			},
-			want: false,
+			wantPermissionDenied: true,
+		},
+		{
+			name: "returns permission denied for empty 403 message",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+			},
+			wantPermissionDenied: true,
 		},
 		{
 			name: "returns false when flag-disabled status is not 403",
@@ -151,7 +159,6 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 				HTTPStatusCode: 400,
 				Message:        "Flag is not enabled for your account",
 			},
-			want: false,
 		},
 		{
 			name: "returns false when feature-disabled status is not 403",
@@ -159,13 +166,24 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 				HTTPStatusCode: 500,
 				Message:        "Feature is not enabled for your account: DATA_GRAPH",
 			},
-			want: false,
+		},
+		{
+			name: "returns false when permission text status is not 403",
+			apiError: &client.APIError{
+				HTTPStatusCode: 401,
+				Message:        "Insufficient permissions",
+			},
+		},
+		{
+			name: "returns false for nil API error",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.apiError.FeatureFlagNotEnabled())
+			assert.Equal(t, tt.wantFeatureDisabled, tt.apiError.IsFeatureDisabled())
+			assert.Equal(t, tt.wantFeatureDisabled, tt.apiError.FeatureFlagNotEnabled())
+			assert.Equal(t, tt.wantPermissionDenied, tt.apiError.IsPermissionDenied())
 		})
 	}
 }
