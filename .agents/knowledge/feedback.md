@@ -17,3 +17,9 @@
 ## DEX-661 — Destination Empty Secret Export
 <!-- ticket:DEX-661 -->
 - Destination export should drop secret config keys before masking when the API returns the secret key with either null or an empty string value, so those keys do not become generated variable placeholders in imported YAML.
+
+## DEX-499 — GCS Destination Gate Correction
+<!-- ticket:DEX-499 -->
+- Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available with `ExperimentalFlags.DestinationSupport` alone.
+- Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
+- Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.

@@ -266,9 +266,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
-		if err := registry.Register(gcs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
-		}
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
 		}
