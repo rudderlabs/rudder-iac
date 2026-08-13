@@ -37,6 +37,9 @@ var destinationRawSecrets = []string{
 	"attentiveTagApiKeyXXXXXXXXXXXX",
 	"customerioAudienceApiKeyXXXXXX",
 	"customerioAudienceAppApiKeyXXX",
+	"not-a-real-key",
+	"rudder-cli-e2e@example.iam.gserviceaccount.com",
+	"000000000000000000000",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

@@ -110,3 +110,9 @@
 - HTTP remains an unverified destination definition and still requires both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` before `http.NewDefinition()` is registered.
 - Destination registry flag-matrix expectations should reflect S3 as available with destination support alone, while enabling unverified destinations adds HTTP alongside S3.
 - This supersedes earlier destination-registry guidance that used S3 as an unverified peer example for HTTP; HTTP remains gated, but S3 no longer shares that gate.
+
+## DEX-499 — GCS Destination Registry Placement
+<!-- ticket:DEX-499 -->
+- Newly onboarded destination definitions always register as unverified: they go inside the `ExperimentalFlags.UnverifiedDestinations` block in `cli/internal/app/dependencies.go`, so they require both `DestinationSupport` and `UnverifiedDestinations`.
+- GCS follows that rule, alongside Attentive Tag, Customer.io Audience, HTTP, and RS.
+- Promotion to the verified/native block (registered on `DestinationSupport` alone, as S3 is per DEX-608) is a separate, deliberate step once the definition has been verified against a live stack — never part of the onboarding change itself.
