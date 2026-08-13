@@ -40,6 +40,7 @@ var destinationRawSecrets = []string{
 	"not-a-real-key",
 	"rudder-cli-e2e@example.iam.gserviceaccount.com",
 	"000000000000000000000",
+	"facebookConversionsAccessTokenXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

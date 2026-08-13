@@ -1,0 +1,28 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: facebook-conversions
+spec:
+  id: facebook-conversions
+  display_name: E2E Facebook Conversions
+  type: facebook_conversions
+  enabled: true
+  definition_version: 1
+  config:
+    dataset_id: "123456789012345"
+    access_token: "{{ .FACEBOOK_CONVERSIONS_ACCESS_TOKEN }}"
+    action_source: website
+    limited_data_usage: false
+    test_destination: true
+    test_event_code: TEST12345
+    remove_external_id: false
+    events_to_events:
+      - from: Product Viewed
+        to: ViewContent
+      - from: Order Completed
+        to: Purchase
+    blacklist_pii_properties:
+      - property: email
+        hash: true
+    whitelist_pii_properties:
+      - property: phone

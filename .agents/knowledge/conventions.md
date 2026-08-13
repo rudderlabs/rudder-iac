@@ -53,3 +53,6 @@
 - GCS destination definitions should retain only the CLI-owned event-stream source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, and `cloud`.
 - Upstream GCS source types `amp`, `warehouse`, and `shopify` are intentionally excluded from the CLI definition until ownership/mapping is explicit.
 - Supported GCS connection modes are cloud-only for all retained source types.
+## DEX-498 — Facebook Conversions Destination Validation
+<!-- ticket:DEX-498 -->
+- For `facebook_conversions`, keep config validation aligned with upstream `schema.json` rather than Terraform-only prose; for example, `test_event_code` should keep schema-derived max-length/pattern validation but not add a `required_if` rule solely because `test_destination` is true.
