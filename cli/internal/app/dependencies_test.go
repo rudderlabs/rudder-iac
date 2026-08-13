@@ -57,7 +57,7 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 			name:                   "both flags enabled registers verified and unverified destinations",
 			destinationSupport:     true,
 			unverifiedDestinations: true,
-			wantTypes:              []string{"http", "s3"},
+			wantTypes:              []string{"attentive_tag", "http", "rs", "s3"},
 		},
 	}
 

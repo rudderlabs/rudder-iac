@@ -29,14 +29,18 @@ var HandlerMetadata = handler.HandlerMetadata{
 }
 
 // registeredAccountSecretKeys maps an account definition to its secret field set — the
-// account-side analogue of a destination definition's SecretKeys().
+// account-side analogue of a destination definition's SecretKeys(). All other config
+// keys are treated as (non-secret) options by splitConfig. For Snowflake, only the auth
+// mode in play supplies one of the secrets; the others are simply absent from the user's
+// config and the split handles that generically.
 //
-// ponytail: BigQuery-only, hardcoded. The real registry fetches secretFields
-// from the control-plane account-definitions API (unversioned, name-keyed).
-// Add a lookup when a second definition lands; the split logic below is already
-// definition-driven, so only this map changes.
+// ponytail: hardcoded. The real registry fetches secretFields from the control-plane
+// account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
+// here stays a one-line map entry because the split logic below is definition-driven.
 var registeredAccountSecretKeys = map[string][]string{
-	"SOURCE_BIGQUERY": {"credentials"},
+	"SOURCE_BIGQUERY":  {"credentials"},
+	"SOURCE_POSTGRES":  {"password"},
+	"SOURCE_SNOWFLAKE": {"password", "privateKey", "privateKeyPassphrase"},
 }
 
 // AccountStore is the subset of the accounts API client the handler needs;

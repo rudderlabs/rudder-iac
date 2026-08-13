@@ -91,6 +91,77 @@ func TestCreate_SplitsConfigAndClaimsExternalIDInline(t *testing.T) {
 	assert.Equal(t, [2]string{}, m.externalIDSet, "SetExternalID must not be called on create")
 }
 
+func pgResource(id string) *AccountResource {
+	pw := secret.New("s3cr3t")
+	return &AccountResource{
+		ID:                    id,
+		Name:                  "name-" + id,
+		AccountDefinitionName: "SOURCE_POSTGRES",
+		Config: map[string]any{
+			"host":     "db.example.com",
+			"dbname":   "analytics",
+			"user":     "rudder",
+			"port":     "5432",
+			"sslMode":  "require",
+			"password": &pw,
+		},
+	}
+}
+
+func TestCreate_SplitsPostgresConfig(t *testing.T) {
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), pgResource("prod-pg"))
+	require.NoError(t, err)
+
+	var opts, sec map[string]any
+	require.NoError(t, json.Unmarshal(m.created.Options, &opts))
+	require.NoError(t, json.Unmarshal(m.created.Secret, &sec))
+	// Only password is a secret; everything else is a (non-secret) option. user is an option.
+	assert.Equal(t, map[string]any{
+		"host": "db.example.com", "dbname": "analytics", "user": "rudder", "port": "5432", "sslMode": "require",
+	}, opts)
+	assert.Equal(t, map[string]any{"password": "s3cr3t"}, sec)
+	assert.Equal(t, "SOURCE_POSTGRES", m.created.AccountDefinitionName)
+}
+
+func sfKeyPairResource(id string) *AccountResource {
+	pk := secret.New("dummy-snowflake-private-key")
+	return &AccountResource{
+		ID:                    id,
+		Name:                  "name-" + id,
+		AccountDefinitionName: "SOURCE_SNOWFLAKE",
+		Config: map[string]any{
+			"account":            "xy12345.eu-west-1",
+			"dbname":             "ANALYTICS",
+			"warehouse":          "COMPUTE_WH",
+			"user":               "RUDDER",
+			"authenticationType": "keyPair",
+			"privateKey":         &pk,
+		},
+	}
+}
+
+func TestCreate_SplitsSnowflakeKeyPairConfig(t *testing.T) {
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), sfKeyPairResource("prod-sf"))
+	require.NoError(t, err)
+
+	var opts, sec map[string]any
+	require.NoError(t, json.Unmarshal(m.created.Options, &opts))
+	require.NoError(t, json.Unmarshal(m.created.Secret, &sec))
+	// user and authenticationType are options; only privateKey is present in the secret
+	// (password / privateKeyPassphrase are absent under keyPair auth).
+	assert.Equal(t, map[string]any{
+		"account": "xy12345.eu-west-1", "dbname": "ANALYTICS", "warehouse": "COMPUTE_WH", "user": "RUDDER", "authenticationType": "keyPair",
+	}, opts)
+	assert.Equal(t, map[string]any{"privateKey": "dummy-snowflake-private-key"}, sec)
+	assert.Equal(t, "SOURCE_SNOWFLAKE", m.created.AccountDefinitionName)
+}
+
 func TestUpdate_RejectsDefinitionChange(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
 	newData := bqResource("prod-bq")
@@ -183,7 +254,8 @@ func TestFormatForExport_NeverLeaksSecret(t *testing.T) {
 func TestToExportSpecMap_UnsupportedDefinition(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
 	acc := &client.Account{ID: "remote-x", ExternalID: "x"}
-	acc.Definition.Name = "SOURCE_SNOWFLAKE"
+	// A non-warehouse-source definition the accounts provider does not manage.
+	acc.Definition.Name = "DESTINATION_SALESFORCE_OAUTH"
 
 	_, err := h.toExportSpecMap("x", &RemoteAccount{Account: acc})
 	require.Error(t, err)

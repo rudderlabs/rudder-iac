@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.23.0](https://github.com/rudderlabs/rudder-iac/compare/v0.22.0...v0.23.0) (2026-08-07)
+
+
+### Features
+
+* add support for onboarding redshift destination ([#687](https://github.com/rudderlabs/rudder-iac/issues/687)) ([bfdb895](https://github.com/rudderlabs/rudder-iac/commit/bfdb895fe4c50d99e9c19b8c845efef94c3fd714))
+* **cli:** add accounts provider (map-config, shared secret helpers) ([#710](https://github.com/rudderlabs/rudder-iac/issues/710)) ([6c1cb85](https://github.com/rudderlabs/rudder-iac/commit/6c1cb85a67296a429e9e99dcf3b03a5848f16116))
+* **destination:** onboard HTTP destination definition ([#723](https://github.com/rudderlabs/rudder-iac/issues/723)) ([9bbf189](https://github.com/rudderlabs/rudder-iac/commit/9bbf1894136fc72fb9bdb5bab90a0d9dfafb8318))
+* support Postgres and Snowflake accounts in the CLI provider ([#720](https://github.com/rudderlabs/rudder-iac/issues/720)) ([ab3f259](https://github.com/rudderlabs/rudder-iac/commit/ab3f259ae05b5f6603d9055be6c68bc26bb5d9f1))
+
+
+### Miscellaneous
+
+* add onboard-cli-destination skill aligned with merged S3 ([#709](https://github.com/rudderlabs/rudder-iac/issues/709)) ([#717](https://github.com/rudderlabs/rudder-iac/issues/717)) ([f64f786](https://github.com/rudderlabs/rudder-iac/commit/f64f786cd831503919b81aeb678638ce1724a45c))
+* **cli:** add S3 destination apply e2e test ([#718](https://github.com/rudderlabs/rudder-iac/issues/718)) ([052ccaf](https://github.com/rudderlabs/rudder-iac/commit/052ccaf0ccd0c0f4cef980a12a52edd125c2ff6c))
+* **destinations:** generalize apply e2e fixture layout ([#724](https://github.com/rudderlabs/rudder-iac/issues/724)) ([e459229](https://github.com/rudderlabs/rudder-iac/commit/e45922930ae3179cf088d6548ba10693a96f3003))
+
 ## [0.22.0](https://github.com/rudderlabs/rudder-iac/compare/v0.21.0...v0.22.0) (2026-07-24)
 
 

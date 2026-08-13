@@ -1,0 +1,15 @@
+{
+  "config": {
+    "enableNewIdentifyFlow": false,
+    "signUpSourceId": "123456"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "attentive-tag",
+  "id": "<ignored>",
+  "name": "E2E Attentive Tag",
+  "type": "ATTENTIVE_TAG",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}

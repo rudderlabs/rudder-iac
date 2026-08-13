@@ -1,0 +1,22 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs-own-storage",
+  "name": "E2E Redshift Own Storage",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "host": "rudder-cli-e2e-own.redshift.amazonaws.com",
+    "port": "5439",
+    "database": "analytics",
+    "user": "rudder",
+    "namespace": "rudder_events",
+    "useRudderStorage": false,
+    "bucketName": "rudder-cli-e2e",
+    "syncFrequency": "30",
+    "syncStartAt": "10:00"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
