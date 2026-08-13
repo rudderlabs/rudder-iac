@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -371,11 +370,11 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 }
 
 // FormatForExport converts unmanaged remote destinations into importable YAML
-// specs: config is converted to local snake_case, registered secret keys that
-// are present are masked with per-resource placeholders (absent secrets are
-// not invented), and a linked transformation resolves to a
-// "#transformation:<id>" reference (failing the export if the link can't be
-// resolved — mirrors the source handler, no silent fallback to a raw ID).
+// specs: config is converted to local snake_case, empty values are pruned,
+// registered secret keys that are present are masked with per-resource
+// placeholders (absent secrets are not invented), and a linked transformation
+// resolves to a "#transformation:<id>" reference (failing the export if the link
+// can't be resolved — mirrors the source handler, no silent fallback to a raw ID).
 func (h *HandlerImpl) FormatForExport(
 	collection map[string]*RemoteDestination,
 	_ namer.Namer,
@@ -442,6 +441,8 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
+	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
+	// reference, asking the user to supply a credential the destination does not use.
 	pruneEmptyValues(localConfig)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
@@ -471,6 +472,9 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	return specMap, nil
 }
 
+// pruneEmptyValues drops keys carrying no value. The webapp persists cleared
+// fields rather than unsetting them, so they reach export as noise the user has
+// to read past.
 func pruneEmptyValues(config map[string]any) {
 	for key, value := range config {
 		if isEmptyConfigValue(value) {
@@ -479,39 +483,27 @@ func pruneEmptyValues(config map[string]any) {
 	}
 }
 
+// isEmptyConfigValue reports whether a config value carries nothing: nil, an
+// empty string, or a container holding only empty values. Booleans and numbers
+// are never empty — false and 0 are meaningful settings, not absence. The
+// concrete types are those json.Unmarshal produces, since local config is
+// decoded from the API response.
 func isEmptyConfigValue(value any) bool {
-	if value == nil {
+	switch v := value.(type) {
+	case nil:
 		return true
-	}
-	if s, ok := value.(string); ok {
-		return s == ""
-	}
-
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return true
-	}
-
-	switch v.Kind() {
-	case reflect.Pointer:
-		return v.IsNil()
-	case reflect.Slice, reflect.Array:
-		if v.Len() == 0 {
-			return true
-		}
-		for i := range v.Len() {
-			if !isEmptyConfigValue(v.Index(i).Interface()) {
+	case string:
+		return v == ""
+	case []any:
+		for _, item := range v {
+			if !isEmptyConfigValue(item) {
 				return false
 			}
 		}
 		return true
-	case reflect.Map:
-		if v.Len() == 0 {
-			return true
-		}
-		iter := v.MapRange()
-		for iter.Next() {
-			if !isEmptyConfigValue(iter.Value().Interface()) {
+	case map[string]any:
+		for _, item := range v {
+			if !isEmptyConfigValue(item) {
 				return false
 			}
 		}
