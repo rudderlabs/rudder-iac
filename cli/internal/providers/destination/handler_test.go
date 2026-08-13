@@ -1328,6 +1328,20 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
+	t.Run("prunes empty and null secret keys before masking secrets", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		for _, apiConfig := range []string{
+			`{"apiSecret":"","measurementId":"G-123"}`,
+			`{"apiSecret":null,"measurementId":"G-123"}`,
+		} {
+			config := exportedGA4Config(t, "ga4-production", apiConfig)
+
+			assert.NotContains(t, config, "api_secret", "empty secret values must not become variable placeholders")
+			assert.Equal(t, "G-123", config["measurement_id"])
+		}
+	})
+
 	t.Run("prunes direct empty values before masking secrets", func(t *testing.T) {
 		enableVarSubstitution(t)
 
