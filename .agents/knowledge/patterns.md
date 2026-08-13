@@ -68,5 +68,5 @@
 
 ## DEX-608 — Destination E2E Unverified Fixture Gate
 <!-- ticket:DEX-608 -->
-- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include HTTP variations, because HTTP is the remaining unverified destination even after S3 is verified/native.
-- Destination apply E2E comments and skip messaging should describe the unverified gate in terms of HTTP fixtures, not S3 fixtures.
+- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `attentive_tag`, `http`, and `rs`; S3 is verified/native and does not need that gate.
+- Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.

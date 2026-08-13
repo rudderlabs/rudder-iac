@@ -54,16 +54,17 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // DestinationSnapshotTester — the same file-manager + count-guard +
 // per-resource-compare structure verifyState uses. DestinationSupport enables
 // the kind, while UnverifiedDestinations remains enabled here because these
-// fixtures include unverified HTTP destinations. Key-auth specs reference secrets
-// via {{ .VAR }} placeholders resolved at apply time.
+// fixtures include unverified destination types such as attentive_tag, http, and
+// rs. Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at
+// apply time.
 //
-// Gated behind RUN_DESTINATION_E2E because it needs a live stack with HTTP
-// destination support, and the destroy below would otherwise wipe the workspace
-// before the (failing) apply on a stack without that support. The skip must come
-// before the destroy.
+// Gated behind RUN_DESTINATION_E2E because it needs a live stack with support for
+// the unverified fixture set, and the destroy below would otherwise wipe the
+// workspace before the (failing) apply on a stack without that support. The skip
+// must come before the destroy.
 func TestDestinationsApply(t *testing.T) {
 	if os.Getenv("RUN_DESTINATION_E2E") != "1" {
-		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified HTTP")
+		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
 	}
 
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
@@ -81,7 +82,7 @@ func TestDestinationsApply(t *testing.T) {
 	require.NoError(t, err, "destroy failed: %s", out)
 	assertNoRawSecrets(t, out)
 
-	// A leftover unverified HTTP destination breaks other e2e tests' destroy when
+	// A leftover unverified destination breaks other e2e tests' destroy when
 	// UnverifiedDestinations is off. Registered after t.Setenv so the flags still
 	// hold when this cleanup runs. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
