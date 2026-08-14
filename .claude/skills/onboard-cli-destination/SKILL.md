@@ -18,7 +18,9 @@ for it.
 
 1. `cli/internal/providers/destination/definitions/<type>/definition.go`
 2. `cli/internal/providers/destination/definitions/<type>/definition_test.go`
-3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`)
+3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`),
+   always inside the `UnverifiedDestinations` block, plus the matching
+   `dependencies_test.go` flag-matrix expectation
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
@@ -132,13 +134,31 @@ Mechanical rules:
 
 ### Step 5: Register in dependencies.go
 
-Add the import and one line inside `newDestinationRegistry`:
+**Every newly onboarded destination registers as unverified.** Add the import
+and one block inside `newDestinationRegistry`, within the
+`cfg.ExperimentalFlags.UnverifiedDestinations` branch — never the verified
+section above it:
 
 ```go
-if err := registry.Register(<pkg>.NewDefinition()); err != nil {
-    return nil, fmt.Errorf("registering <type> destination definition: %w", err)
+if cfg.ExperimentalFlags.UnverifiedDestinations {
+    // ... existing unverified registrations, kept alphabetical by type ...
+    if err := registry.Register(<pkg>.NewDefinition()); err != nil {
+        return nil, fmt.Errorf("registering <type> destination definition: %w", err)
+    }
 }
 ```
+
+The verified section (registered on `DestinationSupport` alone) is reserved for
+definitions already proven against a live stack — S3 today. Promotion into it is
+a separate, deliberate change after that verification; it is never part of the
+onboarding PR, no matter how simple the destination looks.
+
+Then update the flag-matrix expectation in
+`cli/internal/app/dependencies_test.go`: add the new type to the
+`wantTypes` list of the both-flags-enabled case only (`SupportedTypes()` is
+sorted, so insert alphabetically). The verified-only case must stay unchanged —
+if adding the type there makes a test pass, the registration landed in the wrong
+block.
 
 Registration itself validates the definition (source types mapped, connection
 modes complete for every source type, consent field type). A broken definition
@@ -232,7 +252,8 @@ Final response must include:
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
 - Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`
-  in the CLI config
+  + `flags.unverifiedDestinations: true` in the CLI config — newly onboarded
+  destinations are always behind the unverified gate (Step 5)
 
 ## Guardrails
 
