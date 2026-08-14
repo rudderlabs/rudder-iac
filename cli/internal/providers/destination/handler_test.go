@@ -74,12 +74,18 @@ func ga4TestDefinition() *definitions.DestinationDefinition {
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("measurementId", "measurement_id"),
+			converter.Simple("debugMode", "debug_mode"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "blacklisted_events"),
+			converter.Simple("advancedOptions", "advanced_options"),
 		},
 		SecretKeys: []string{"api_secret"},
 		NewConfig: func() any {
 			return &struct {
-				APISecret     string `mapstructure:"api_secret" validate:"required"`
-				MeasurementID string `mapstructure:"measurement_id"`
+				APISecret         string         `mapstructure:"api_secret" validate:"required"`
+				MeasurementID     string         `mapstructure:"measurement_id"`
+				DebugMode         bool           `mapstructure:"debug_mode"`
+				BlacklistedEvents []string       `mapstructure:"blacklisted_events"`
+				AdvancedOptions   map[string]any `mapstructure:"advanced_options"`
 			}{}
 		},
 		SourceTypes: []string{"web", "android"},
@@ -1295,6 +1301,157 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.NotContains(t, config, "api_secret")
 		assert.Equal(t, "G-123", config["measurement_id"])
+	})
+
+	t.Run("prunes empty secret keys instead of masking them", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				// An unset secret is stored as "" rather than pruned by the API,
+				// so it reaches export and must not become a var placeholder.
+				Config: []byte(`{"apiSecret":"","measurementId":"G-123"}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"measurement_id": "G-123",
+		}, config, "an empty secret gives the user nothing to fill in")
+	})
+
+	t.Run("prunes null secret keys instead of masking them", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(`{"apiSecret":null,"measurementId":"G-123"}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"measurement_id": "G-123",
+		}, config)
+	})
+
+	t.Run("prunes empty strings, nulls, arrays and objects", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(`{"apiSecret":"","measurementId":null,"debugMode":false,"blacklistedEvents":[],"advancedOptions":{}}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"debug_mode": false,
+		}, config, "false is a meaningful setting, not absence")
+	})
+
+	t.Run("prunes containers holding only empty members", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config: []byte(`{
+					"measurementId": "G-123",
+					"blacklistedEvents": [{"eventName": ""}, {"eventName": null}],
+					"advancedOptions": {"provider": "", "categories": [], "overrides": {"enabledFor": null}}
+				}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"measurement_id": "G-123",
+		}, config, "a container whose every member is empty is itself empty")
+	})
+
+	t.Run("keeps containers holding any populated member", func(t *testing.T) {
+		enableVarSubstitution(t)
+
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"ga4-production": {Destination: &client.Destination{
+				ID:        "dst-2",
+				Name:      "GA4",
+				Type:      "GA4",
+				Version:   1,
+				IsEnabled: true,
+				Config:    []byte(`{"blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		config, ok := spec.Spec["config"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"blacklisted_events": []any{"", "Order Completed"},
+		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 
 	t.Run("resolves transformation reference", func(t *testing.T) {

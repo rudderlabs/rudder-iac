@@ -13,3 +13,7 @@
 ## DEX-608 — Destination Unverified Gate Documentation
 <!-- ticket:DEX-608 -->
 - When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `attentive_tag`, `http`, and `rs`, while S3 is verified/native.
+
+## DEX-661 — Destination Empty Secret Export
+<!-- ticket:DEX-661 -->
+- Destination export should drop secret config keys before masking when the API returns the secret key with either null or an empty string value, so those keys do not become generated variable placeholders in imported YAML.

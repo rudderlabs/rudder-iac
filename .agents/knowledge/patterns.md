@@ -70,3 +70,9 @@
 <!-- ticket:DEX-608 -->
 - `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `attentive_tag`, `http`, and `rs`; S3 is verified/native and does not need that gate.
 - Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.
+
+## DEX-661 — Destination Export Empty-Value Pruning
+<!-- ticket:DEX-661 -->
+- Destination export pruning treats nil, empty strings, and containers holding only empty values as empty, but treats scalar zero values as populated; do not generalize emptiness to scalar zero semantics because `false` and numeric `0` can be meaningful destination config values.
+- The destination empty-value helper switches on the concrete types `json.Unmarshal` produces (`nil`, `string`, `[]any`, `map[string]any`) rather than reflecting over arbitrary kinds: local config is always decoded from the API response, so typed slices, maps, and pointers cannot reach it and handling them would be dead code.
+- Destination export must prune empty local config values before calling `secret.MaskSecrets`, so API-returned null or empty-string secret keys are dropped before they can become generated variable placeholders in imported YAML.
