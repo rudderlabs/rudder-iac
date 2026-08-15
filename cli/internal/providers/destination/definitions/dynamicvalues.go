@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -30,13 +31,52 @@ func IsDynamicConfigValue(value string) bool {
 		varValueRegex.MatchString(value)
 }
 
+// IsTemplateConfigValue reports whether value uses the RudderStack UI template
+// syntax `{{ path || fallback }}` — the only dynamic form schema.json patterns
+// declare, and the one rudder-transformer resolves on the event path.
+//
+// Deliberately narrower than IsDynamicConfigValue. `env.VAR` is excluded because
+// it is deprecated and resolves only in rudder-server, behind an enterprise
+// handler and a flag that may be off, so an accepted value could reach the
+// destination unsubstituted. `{{ .VAR }}` is excluded because CLI var
+// substitution resolves it before validation runs; one still present is a
+// mistake, and lacking `||` upstream would reject it too.
+func IsTemplateConfigValue(value string) bool {
+	return uiTemplateValueRegex.MatchString(value)
+}
+
 func configValidateFuncs() []rules.CustomValidateFunc {
 	return []rules.CustomValidateFunc{
 		{
 			Tag:  "dynamic_or_oneof",
 			Func: dynamicOrOneOf,
 		},
+		{
+			Tag:  "dynamic_or_pattern",
+			Func: dynamicOrPattern,
+		},
 	}
+}
+
+// dynamicOrPattern accepts a UI template value, otherwise defers to the named
+// pattern. It is a strict superset of `pattern=<name>`: an absent optional field
+// passes, and every other value must be a template or match the pattern — empty
+// strings included, so the pattern stays the authority on whether "" is legal.
+func dynamicOrPattern(fl validator.FieldLevel) bool {
+	if field := fl.Field(); field.Kind() == reflect.Pointer && field.IsNil() {
+		return true
+	}
+
+	value, ok := stringFieldValue(fl)
+	if !ok {
+		return false
+	}
+
+	if IsTemplateConfigValue(value) {
+		return true
+	}
+
+	return funcs.MatchPattern(fl.Param(), value)
 }
 
 func dynamicOrOneOf(fl validator.FieldLevel) bool {

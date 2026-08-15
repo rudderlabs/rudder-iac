@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: gcs-template
+spec:
+  id: gcs-template
+  display_name: E2E GCS Template Config
+  type: gcs
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: '{{ config.bucketName || rudder-cli-e2e-gcs }}'
+    prefix: '{{ config.prefix || rudder/gcs/ }}'
+    credentials: '{{ .GCS_CREDENTIALS }}'

@@ -110,6 +110,49 @@ func TestGCSConfigValidation(t *testing.T) {
 		assert.Equal(t, "/prefix", errors[0].Path)
 	})
 
+	// `^(.{0,100})$` forbids line breaks as well as bounding length; a plain
+	// max=100 would let these through.
+	t.Run("rejects values containing line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for field, config := range map[string]map[string]any{
+			"/bucket_name": {"bucket_name": "my\ngcs-bucket"},
+			"/prefix":      {"bucket_name": "my-gcs-bucket", "prefix": "rudder\n/"},
+		} {
+			errors := registered.ValidateConfig(config)
+			require.Len(t, errors, 1, "config %v must be rejected", config)
+			assert.Equal(t, field, errors[0].Path)
+		}
+	})
+
+	// Upstream's template branch carries no length cap, so a template longer than
+	// the literal limit is still valid.
+	t.Run("accepts ui templates regardless of length", func(t *testing.T) {
+		t.Parallel()
+
+		long := "{{ config.bucketName || " + strings.Repeat("x", 90) + " }}"
+		require.Greater(t, len(long), 100)
+
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": long,
+			"prefix":      "{{ config.prefix || rudder/ }}",
+		})
+		assert.Empty(t, errors)
+	})
+
+	// env.VAR gets no escape hatch: it is judged as an ordinary literal, so a
+	// short one passes on length alone while an over-long one is rejected —
+	// unlike a template, which bypasses the pattern entirely.
+	t.Run("deprecated env references get no template exemption", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": "env." + strings.Repeat("A", 101),
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/bucket_name", errors[0].Path)
+	})
+
 	t.Run("valid example config with var credentials", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

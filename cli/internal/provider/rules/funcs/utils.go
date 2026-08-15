@@ -122,6 +122,19 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 			err.Param(),
 		)
 
+	case "dynamic_or_pattern":
+		if msg, ok := getPatternErrorMessage(err.Param()); ok {
+			return fmt.Sprintf(
+				"'%s' is not valid: %s, or must be a template value ({{ path || fallback }})",
+				fieldName,
+				msg,
+			)
+		}
+		return fmt.Sprintf(
+			"'%s' does not match the required pattern and is not a template value ({{ path || fallback }})",
+			fieldName,
+		)
+
 	case "gte":
 		if err.Kind() == reflect.String || err.Kind() == reflect.Slice {
 			// For string and slice, the gte tag is used to validate the length

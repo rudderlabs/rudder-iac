@@ -38,8 +38,8 @@ var connectionModes = map[string][]string{
 // destinations/gcs defaultConfig; validation constraints mirror schema.json for
 // overlapping terraform-mapped fields.
 type gcsConfig struct {
-	BucketName        string                   `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
-	Prefix            string                   `mapstructure:"prefix" validate:"omitempty,max=100"`
+	BucketName        string                   `mapstructure:"bucket_name" validate:"required,dynamic_or_pattern=single_line_100"`
+	Prefix            string                   `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Credentials       string                   `mapstructure:"credentials"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
