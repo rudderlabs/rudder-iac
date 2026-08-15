@@ -108,10 +108,13 @@ Mechanical rules:
 - `Version` = terraform's registered `Version` (currently 1 everywhere).
 - `schema.json` constraints → `validate` struct tags (see source-extraction.md
   for the constraint translation table). Real regex patterns →
-  `pattern=<name>`: reuse an existing `NewPattern` registration, or register
-  a minimal new one. Strip upstream `env.` / `{{ … }}` alternations; never
-  bake those into the CLI regex (see source-extraction.md "Enforcing regex
-  patterns").
+  `dynamic_or_pattern=<name>`: reuse an existing `NewPattern` registration, or
+  register a minimal new one. Strip upstream `env.` / `{{ … }}` alternations;
+  never bake those into the CLI regex — the tag accepts `{{ path || fallback }}`
+  templates, the pattern holds only the real constraint. Note `^(.{0,100})$` is
+  a pattern, not a length limit (it forbids newlines) — reuse the shared
+  `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
+  reject templates too (see source-extraction.md "Enforcing regex patterns").
 - `db-config.json` `secretKeys` → `SecretKeys` field, translated to snake_case
   local keys.
 - `db-config.json` `supportedSourceTypes` / `supportedConnectionModes` →
@@ -176,7 +179,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
    `map[string][]string{"/mobile_api_key_android": {"android"}}`).
 2. `Test<Type>ConfigValidation` — subtests via `registered.ValidateConfig`:
    each required field missing, each conditional/exclusion rule, each
-   `pattern=` field with an invalid literal rejected, valid minimal config,
+   pattern-validated field with an invalid literal rejected and a
+   `{{ path || fallback }}` template accepted, valid minimal config,
    valid full config, unknown key rejected, and (when consent is supported)
    unsupported consent source + invalid provider.
 3. `Test<Type>ConversionRoundTrip` — `testutil.AssertConversion` with paired
@@ -268,5 +272,8 @@ Final response must include:
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced
-  when a named `pattern=` can express them. Do not create dynamic-supporting
-  regexes (`env.` / `{{ … }}` branches) for destination config fields.
+  when a named pattern can express them — including `^(.{0,100})$`-style
+  constraints, which are patterns rather than length limits. Template support
+  belongs in the tag (`dynamic_or_pattern=<name>`), never in the regex: do not
+  register patterns carrying `env.` / `{{ … }}` branches, and never give the
+  deprecated `env.VAR` form an escape hatch.
