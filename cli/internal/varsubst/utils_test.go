@@ -67,11 +67,17 @@ func TestUnquoteTokens(t *testing.T) {
 			want: `region: {{ .REGION | us-east-1 }}`,
 		},
 		{
-			// Validity is not checked: substitution rejects a malformed token
-			// loudly whether quoted or not.
-			name: "malformed token also unquoted",
+			// Not a variable reference, so it keeps its quotes — unquoting a
+			// non-variable token would emit a scalar starting with '{', which
+			// YAML reads as a flow mapping.
+			name: "non variable token keeps quotes",
 			in:   `a: "{{ NO_DOT }}"`,
-			want: `a: {{ NO_DOT }}`,
+			want: `a: "{{ NO_DOT }}"`,
+		},
+		{
+			name: "ui template keeps quotes",
+			in:   `a: "{{ config.bucketName || my-bucket }}"`,
+			want: `a: "{{ config.bucketName || my-bucket }}"`,
 		},
 		{
 			name: "token embedded in longer string keeps quotes",

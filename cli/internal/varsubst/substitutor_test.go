@@ -158,12 +158,35 @@ func TestSubstituteBytes(t *testing.T) {
 			},
 		},
 		{
-			name:      "missing dot prefix reports error",
+			// Only dot-prefixed tokens belong to substitution. Anything else is
+			// another dialect's syntax (e.g. the RudderStack UI's
+			// `{{ path || fallback }}`) and passes through untouched.
+			name:      "missing dot prefix passes through untouched",
 			resolvers: []Resolver{mapResolver{"VAR": "value"}},
 			input:     "key: {{ VAR }}",
 			wantData:  "key: {{ VAR }}",
+		},
+		{
+			name:      "ui template passes through untouched",
+			resolvers: []Resolver{mapResolver{"BUCKET": "value"}},
+			input:     "bucket_name: {{ config.bucketName || my-bucket }}",
+			wantData:  "bucket_name: {{ config.bucketName || my-bucket }}",
+		},
+		{
+			name:      "ui template alongside a variable reference",
+			resolvers: []Resolver{mapResolver{"PREFIX": "rudder/"}},
+			input:     "a: {{ config.bucketName || my-bucket }}\nb: {{ .PREFIX }}",
+			wantData:  "a: {{ config.bucketName || my-bucket }}\nb: rudder/",
+		},
+		{
+			// A malformed *dotted* token is still claimed and still reported: the
+			// narrower match must not silence genuine typos in variable names.
+			name:      "malformed dotted token still reports error",
+			resolvers: []Resolver{mapResolver{"VAR": "value"}},
+			input:     "key: {{ .9BAD }}",
+			wantData:  "key: {{ .9BAD }}",
 			wantErrs: []SubstitutionError{
-				{Name: "VAR", Line: 1, Column: 6, LineText: "key: {{ VAR }}", Err: ErrInvalidVarSyntax},
+				{Name: "9BAD", Line: 1, Column: 6, LineText: "key: {{ .9BAD }}", Err: ErrInvalidVarSyntax},
 			},
 		},
 	}

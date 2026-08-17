@@ -10,13 +10,16 @@ type Resolver interface {
 	Resolve(name string) (value string, found bool)
 }
 
-// Matches any {{ content }} token. Group 1 captures the token (anything that
-// isn't whitespace, pipe, or closing brace). Group 2 (optional) captures the
+// Matches a {{ .VAR }} token. Group 1 captures the dot-prefixed token; the dot
+// is required so substitution claims only its own syntax and leaves other
+// `{{ … }}` dialects — notably the RudderStack UI's `{{ path || fallback }}`
+// destination config templates — untouched. Group 2 (optional) captures the
 // default value after pipe — a single `}` is allowed (so defaults can contain
 // regex like `[a-z]{3}`), but `}}` always terminates the token. Surrounding
-// whitespace is stripped by the enclosing \s* groups. Validation of the token
-// (dot prefix, variable name pattern) happens in code after matching.
-var varRegex = regexp.MustCompile(`\{\{\s*([^}\s|]+)(?:\s*\|\s*((?:[^}]|}[^}])*?))?\s*\}\}`)
+// whitespace is stripped by the enclosing \s* groups. The variable name pattern
+// is still validated in code after matching, so a malformed dotted token like
+// `{{ .9BAD }}` is reported rather than silently passed through.
+var varRegex = regexp.MustCompile(`\{\{\s*(\.[^}\s|]+)(?:\s*\|\s*((?:[^}]|}[^}])*?))?\s*\}\}`)
 
 var validVarName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 

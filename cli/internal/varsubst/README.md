@@ -104,7 +104,9 @@ rudder-cli experimental enable enableVarSubstitution
 host: "{{ .DB_HOST }}"
 ```
 
-- The token is `{{ .NAME }}` — the **leading dot is required** (`{{ DB_HOST }}` is invalid).
+- The token is `{{ .NAME }}` — the **leading dot is required**. Substitution claims only
+  dot-prefixed tokens, so `{{ DB_HOST }}` is not a variable reference and is passed through
+  as a literal rather than reported as an error.
 - Whitespace inside the braces is flexible: `{{.DB_HOST}}`, `{{ .DB_HOST }}`, and
   `{{  .DB_HOST  }}` are all equivalent.
 - Variable names may contain only **letters, digits, and underscores**, and must **start
@@ -261,7 +263,7 @@ error[project/var-substitution]: undefined variable "DB_PASSWORD"
 | Error | Cause |
 | ----- | ----- |
 | `undefined variable` | `{{ .VAR }}` not found in env vars or var files, and no default given. |
-| `invalid variable syntax` | Malformed token, e.g. missing dot (`{{ VAR }}`) or an invalid name (`{{ .1A }}`). |
+| `invalid variable syntax` | Dot-prefixed token with an invalid name, e.g. `{{ .1A }}`. A token without the dot (`{{ VAR }}`) is not claimed at all and passes through. |
 | `variable file not found` | A `--var-file` path does not exist. |
 | `variable file must use the .vars.yaml or .vars.yml suffix` | A `--var-file` path does not end in `.vars.yaml`/`.vars.yml`. |
 | `failed to parse variable file` | The file is invalid YAML, has nested values, or has a null/empty value. |
@@ -290,17 +292,31 @@ The command fails with an `undefined variable` error pointing at the line and co
 variable a value (env var or var file) or add an inline default: `{{ .VAR | fallback }}`.
 
 **Q: How do I write a literal `{{ .X }}` that should *not* be substituted?**
-There is currently **no escape syntax**. Any `{{ .NAME }}`-shaped token outside a comment is
-treated as a variable. The only built-in exception is YAML comments — a token after an
-unquoted `#` is left untouched:
+There is currently **no escape syntax** for a dot-prefixed token. Any `{{ .NAME }}`-shaped
+token outside a comment is treated as a variable. The only built-in exception is YAML
+comments — a token after an unquoted `#` is left untouched:
 
 ```yaml
 # TODO: wire up {{ .DB_HOST }} later   <- not substituted (it's in a comment)
 host: "{{ .DB_HOST }}"                 <- substituted
 ```
 
-If you genuinely need a literal `{{ .X }}` in a value, avoid the dot-prefixed pattern, or
-restructure so the token sits in a comment.
+If you genuinely need a literal dot-prefixed token in a value, restructure so it sits in a
+comment.
+
+**Q: What about `{{ … }}` tokens that aren't variables?**
+Substitution claims only the dot-prefixed form, so other `{{ … }}` dialects pass through
+untouched. That is what lets destination configs carry RudderStack UI templates, which use
+a path rather than a dot:
+
+```yaml
+bucket_name: '{{ config.bucketName || my-bucket }}'   <- left alone, sent upstream as written
+credentials: '{{ .GCS_CREDENTIALS }}'                 <- substituted from the var file
+```
+
+The trade-off is that a mistyped variable missing its dot — `{{ VAR }}` — is no longer
+reported; it is indistinguishable from another dialect's token and passes through as a
+literal. A malformed *dotted* token such as `{{ .9BAD }}` is still claimed and still errors.
 
 **Q: Is a `#` inside a quoted string treated as a comment?**
 No. A `#` only starts a comment when it is unquoted. These tokens are still substituted:
