@@ -10,3 +10,4 @@ ATTENTIVE_TAG_API_KEY: attentiveTagApiKeyXXXXXXXXXXXX
 CUSTOMERIO_AUDIENCE_API_KEY: customerioAudienceApiKeyXXXXXX
 CUSTOMERIO_AUDIENCE_APP_API_KEY: customerioAudienceAppApiKeyXXX
 GCS_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy","private_key":"-----BEGIN PRIVATE KEY-----\\nnot-a-real-key\\n-----END PRIVATE KEY-----\\n","client_email":"rudder-cli-e2e@example.iam.gserviceaccount.com","client_id":"000000000000000000000"}'
+FACEBOOK_CONVERSIONS_ACCESS_TOKEN: facebookConversionsAccessTokenXXX

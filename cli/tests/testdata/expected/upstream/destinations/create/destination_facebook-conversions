@@ -1,0 +1,40 @@
+{
+  "config": {
+    "actionSource": "website",
+    "blacklistPiiProperties": [
+      {
+        "blacklistPiiHash": true,
+        "blacklistPiiProperties": "email"
+      }
+    ],
+    "datasetId": "123456789012345",
+    "eventsToEvents": [
+      {
+        "from": "Product Viewed",
+        "to": "ViewContent"
+      },
+      {
+        "from": "Order Completed",
+        "to": "Purchase"
+      }
+    ],
+    "limitedDataUSage": false,
+    "removeExternalId": false,
+    "testDestination": true,
+    "testEventCode": "TEST12345",
+    "whitelistPiiProperties": [
+      {
+        "whitelistPiiProperties": "phone"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "facebook-conversions",
+  "id": "<ignored>",
+  "name": "E2E Facebook Conversions",
+  "type": "FACEBOOK_CONVERSIONS",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}

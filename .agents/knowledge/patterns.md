@@ -76,3 +76,7 @@
 - Destination export pruning treats nil, empty strings, and containers holding only empty values as empty, but treats scalar zero values as populated; do not generalize emptiness to scalar zero semantics because `false` and numeric `0` can be meaningful destination config values.
 - The destination empty-value helper switches on the concrete types `json.Unmarshal` produces (`nil`, `string`, `[]any`, `map[string]any`) rather than reflecting over arbitrary kinds: local config is always decoded from the API response, so typed slices, maps, and pointers cannot reach it and handling them would be dead code.
 - Destination export must prune empty local config values before calling `secret.MaskSecrets`, so API-returned null or empty-string secret keys are dropped before they can become generated variable placeholders in imported YAML.
+## DEX-498 — Facebook Conversions E2E Fixture Scope
+<!-- ticket:DEX-498 -->
+- `facebook_conversions` destination E2E fixtures may document live snapshot capture deferral when live credentials or a disposable destination-enabled workspace are unavailable, but committed fixtures should still make the intended coverage shape visible.
+- The initial `facebook_conversions` fixture shape covers a standard cloud-mode variation with dataset/access token, event mappings, PII allow/deny lists, and update mutations for display name, `action_source`, booleans, `test_event_code`, and mappings.

@@ -1,0 +1,18 @@
+[
+  {
+    "userId": "setup_user_123",
+    "type": "identify",
+    "context": {
+      "traits": {
+        "name": "Setup User"
+      }
+    },
+    "properties": {
+      "name": "Setup User",
+      "source": "rudder"
+    },
+    "channel": "web",
+    "messageId": "setup-py-transform-identify",
+    "anonymousId": "setup_anonymous_id"
+  }
+]

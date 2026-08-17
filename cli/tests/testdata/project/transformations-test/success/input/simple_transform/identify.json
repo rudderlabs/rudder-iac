@@ -1,0 +1,15 @@
+{
+  "userId": "success_user_456",
+  "type": "identify",
+  "context": {
+    "traits": {
+      "name": "Success User"
+    }
+  },
+  "properties": {
+    "name": "Success User"
+  },
+  "channel": "web",
+  "messageId": "success-simple-transform-identify",
+  "anonymousId": "success_anonymous_id"
+}

@@ -117,3 +117,8 @@
 - GCS is treated as an unverified destination definition on that rule, alongside Attentive Tag, Customer.io Audience, HTTP, and RS.
 - S3 remains the verified/native cloud-storage destination registered with `ExperimentalFlags.DestinationSupport` alone; do not use S3's gate as the GCS registry precedent.
 - Promotion to the verified block is a separate, deliberate step once a definition has been verified against a live stack — never part of the onboarding change itself.
+
+## DEX-498 — Facebook Conversions Destination Onboarding
+<!-- ticket:DEX-498 -->
+- `facebook_conversions` is treated as an unverified destination definition for registry wiring: register it only when destination support and unverified destinations are enabled, not with verified/native S3-style destination support alone.
+- `facebook_conversions` source-type support intentionally includes every db-config source type that has a destination common mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
