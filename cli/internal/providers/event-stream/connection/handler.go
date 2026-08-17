@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
+	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -28,10 +29,10 @@ var ErrNotImplemented = errors.New("event stream connection support is not imple
 
 type Handler struct {
 	resources map[string]*connectionResource
-	client    ConnectionStore
+	client    esClient.EventStreamStore
 }
 
-func NewHandler(client ConnectionStore) *Handler {
+func NewHandler(client esClient.EventStreamStore) *Handler {
 	return &Handler{
 		resources: make(map[string]*connectionResource),
 		client:    client,
@@ -212,22 +213,34 @@ func (h *Handler) LoadImportMetadata(_ *specs.WorkspacesImportMetadata) error {
 
 // LoadResourcesFromRemote lists the remote connections that carry an
 // externalId — the CLI-managed ones. The generic connections list also
-// returns rETL rows; those are filtered out in MapRemoteToState, where the
-// merged collection can tell whether a row's source is an event stream source.
+// returns rETL rows; only connections whose source is an event stream source
+// are kept.
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	resourceMap := make(map[string]*resources.RemoteResource)
 
-	page, err := h.client.List(ctx, client.WithConnectionsHasExternalID(true))
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+	eventStreamSourceIDs := make(map[string]struct{}, len(sources))
+	for _, s := range sources {
+		eventStreamSourceIDs[s.ID] = struct{}{}
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource)
+	page, err := h.client.ListConnections(ctx, client.WithConnectionsHasExternalID(true))
 	for page != nil && err == nil {
 		for _, conn := range page.Connections {
+			if _, ok := eventStreamSourceIDs[conn.SourceID]; !ok {
+				continue
+			}
 			resourceMap[conn.ID] = &resources.RemoteResource{
 				ID:         conn.ID,
 				ExternalID: conn.ExternalID,
 				Data:       conn,
 			}
 		}
-		page, err = h.client.Next(ctx, page.Paging)
+		page, err = h.client.NextConnections(ctx, page.Paging)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("listing event stream connections: %w", err)
@@ -238,12 +251,12 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 }
 
 // MapRemoteToState turns CLI-managed remote connections into state keyed on
-// externalId. Endpoints resolve through the merged cross-provider collection
-// into PropertyRefs shaped exactly like the spec side, so the differ compares
-// cleanly. A row whose source is not in the event stream source collection is
-// an rETL connection and is skipped; a row whose endpoint cannot be resolved
-// to a CLI-managed resource cannot be expressed as spec refs and is skipped
-// too (mirroring the source handler's leniency on tracking-plan lookups).
+// externalId (rETL rows were already filtered out in LoadResourcesFromRemote).
+// Endpoints resolve through the merged cross-provider collection into
+// PropertyRefs shaped exactly like the spec side, so the differ compares
+// cleanly. A row whose endpoint cannot be resolved to a CLI-managed resource
+// cannot be expressed as spec refs and is skipped (mirroring the source
+// handler's leniency on tracking-plan lookups).
 func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for _, remote := range collection.GetAll(EventStreamConnectionResourceType) {
@@ -259,22 +272,24 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if err != nil {
 			continue
 		}
-		s.AddResource(&state.ResourceState{
-			ID:   conn.ExternalID,
-			Type: EventStreamConnectionResourceType,
-			Input: map[string]any{
-				SourceKey:      &resources.PropertyRef{URN: sourceURN, Property: "id"},
-				DestinationKey: &resources.PropertyRef{URN: destinationURN, Property: "id"},
-				EnabledKey:     conn.IsEnabled,
-			},
-			Output: map[string]any{
-				IDKey:            conn.ID,
-				SourceIDKey:      conn.SourceID,
-				DestinationIDKey: conn.DestinationID,
-			},
-		})
+		s.AddResource(mapRemoteToState(&conn, sourceURN, destinationURN))
 	}
 	return s, nil
+}
+
+// mapRemoteToState builds one connection's resource state: the spec-shaped
+// endpoint refs plus enabled as Input, the remote identifiers as Output.
+func mapRemoteToState(conn *client.Connection, sourceURN, destinationURN string) *state.ResourceState {
+	return &state.ResourceState{
+		ID:   conn.ExternalID,
+		Type: EventStreamConnectionResourceType,
+		Input: map[string]any{
+			SourceKey:      &resources.PropertyRef{URN: sourceURN, Property: "id"},
+			DestinationKey: &resources.PropertyRef{URN: destinationURN, Property: "id"},
+			EnabledKey:     conn.IsEnabled,
+		},
+		Output: *toResourceData(conn),
+	}
 }
 
 func (h *Handler) LoadImportable(_ context.Context, _ namer.Namer) (*resources.RemoteResources, error) {
@@ -295,37 +310,16 @@ func (h *Handler) FormatForExport(
 // it to the row it returns — which may be a revived soft-deleted row for the
 // same source–destination pair, so the output always records the returned id.
 func (h *Handler) Create(ctx context.Context, id string, data resources.ResourceData) (*resources.ResourceData, error) {
-	conn, err := toConnection(id, data)
-	if err != nil {
-		return nil, fmt.Errorf("connection %q: %w", id, err)
-	}
-	created, err := h.client.Create(ctx, conn)
+	created, err := h.client.CreateConnection(ctx, &client.Connection{
+		ExternalID:    id,
+		SourceID:      data[SourceKey].(string),
+		DestinationID: data[DestinationKey].(string),
+		IsEnabled:     data[EnabledKey].(bool),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("creating event stream connection %q: %w", id, err)
 	}
 	return toResourceData(created), nil
-}
-
-// toConnection builds the API payload from dereferenced resource data.
-func toConnection(externalID string, data resources.ResourceData) (*client.Connection, error) {
-	sourceID, ok := data[SourceKey].(string)
-	if !ok || sourceID == "" {
-		return nil, fmt.Errorf("missing source remote id in resource data")
-	}
-	destinationID, ok := data[DestinationKey].(string)
-	if !ok || destinationID == "" {
-		return nil, fmt.Errorf("missing destination remote id in resource data")
-	}
-	enabled, ok := data[EnabledKey].(bool)
-	if !ok {
-		return nil, fmt.Errorf("missing enabled in resource data")
-	}
-	return &client.Connection{
-		ExternalID:    externalID,
-		SourceID:      sourceID,
-		DestinationID: destinationID,
-		IsEnabled:     enabled,
-	}, nil
 }
 
 func toResourceData(conn *client.Connection) *resources.ResourceData {
@@ -342,29 +336,29 @@ func toResourceData(conn *client.Connection) *resources.ResourceData {
 // soft-deleted row (same remote id), so the create response, not a
 // presumed-fresh id, is what lands back in state.
 func (h *Handler) Update(ctx context.Context, id string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	desired, err := toConnection(id, data)
-	if err != nil {
-		return nil, fmt.Errorf("connection %q: %w", id, err)
-	}
 	remoteID, ok := state[IDKey].(string)
 	if !ok || remoteID == "" {
 		return nil, fmt.Errorf("connection %q: missing id in state", id)
 	}
 
-	if desired.SourceID != state[SourceIDKey] || desired.DestinationID != state[DestinationIDKey] {
+	if data[SourceKey] != state[SourceIDKey] || data[DestinationKey] != state[DestinationIDKey] {
 		if err := h.Delete(ctx, id, state); err != nil {
 			return nil, err
 		}
 		return h.Create(ctx, id, data)
 	}
 
-	if enabled, ok := state[EnabledKey].(bool); ok && enabled == desired.IsEnabled {
-		desired.ID = remoteID
+	desired := &client.Connection{
+		ID:            remoteID,
+		SourceID:      data[SourceKey].(string),
+		DestinationID: data[DestinationKey].(string),
+		IsEnabled:     data[EnabledKey].(bool),
+	}
+	if state[EnabledKey] == data[EnabledKey] {
 		return toResourceData(desired), nil
 	}
 
-	desired.ID = remoteID
-	updated, err := h.client.Update(ctx, desired)
+	updated, err := h.client.UpdateConnection(ctx, desired)
 	if err != nil {
 		return nil, fmt.Errorf("updating event stream connection %q: %w", id, err)
 	}
@@ -378,7 +372,7 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	if !ok || remoteID == "" {
 		return fmt.Errorf("connection %q: missing id in state", id)
 	}
-	if err := h.client.Delete(ctx, remoteID); err != nil {
+	if err := h.client.DeleteConnection(ctx, remoteID); err != nil {
 		return fmt.Errorf("deleting event stream connection %q: %w", id, err)
 	}
 	return nil

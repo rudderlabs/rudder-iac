@@ -227,7 +227,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 
 	var esOpts []esProvider.Option
 	if cfg.ExperimentalFlags.ConnectionSupport {
-		esOpts = append(esOpts, esProvider.WithConnectionSupport(c.Connections))
+		esOpts = append(esOpts, esProvider.WithConnectionSupport())
 	}
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esOpts...)
 	trp := transformations.NewProvider(c)
