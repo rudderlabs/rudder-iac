@@ -1,19 +1,10 @@
 package linkedinads
 
 import (
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
-
-func init() {
-	funcs.NewPattern(
-		"linkedin_ads_single_line_1_100",
-		`^(.{1,100})$`,
-		"must be between 1 and 100 characters and must not contain line breaks",
-	)
-}
 
 // Source types from integrations-config destinations/linkedIn_ads/db-config.json.
 var sourceTypes = []string{
@@ -60,9 +51,11 @@ type linkedinAdsConfig struct {
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
+// Upstream constrains both ends to `^(.{1,100})$`; `required` supplies the
+// non-empty half so the shared single-line pattern covers the rest.
 type conversionMapping struct {
-	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=linkedin_ads_single_line_1_100"`
-	To   string `mapstructure:"to" validate:"required,dynamic_or_pattern=linkedin_ads_single_line_1_100"`
+	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"required,dynamic_or_pattern=single_line_100"`
 }
 
 // NewDefinition returns the LinkedIn Ads destination definition.
