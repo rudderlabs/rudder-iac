@@ -168,28 +168,47 @@ func verifyConnectionsState(t *testing.T, dir string) {
 		connDestinationSnapshotIgnore,
 	), "upstream destination snapshot mismatch for %s", dir)
 
-	var conns []client.Connection
-	page, err := apiClient.Connections.List(ctx, client.WithConnectionsHasExternalID(true))
-	require.NoError(t, err, "listing connections")
-	for page != nil {
-		conns = append(conns, page.Connections...)
-		page, err = apiClient.Connections.Next(ctx, page.Paging)
-		require.NoError(t, err, "paging connections")
-	}
+	conns := listConnections(t, ctx, apiClient, client.WithConnectionsHasExternalID(true))
 
 	// The snapshot files are the expectation: a connection snapshot present
 	// means exactly that managed connection must exist; absent means none may.
 	connSnapshot := filepath.Join(expectedDir, "connection_e2e-android-to-s3.json")
-	if _, err := os.Stat(connSnapshot); err == nil {
+	if _, statErr := os.Stat(connSnapshot); statErr == nil {
 		require.Len(t, conns, 1, "expected exactly one managed connection upstream")
+		// The snapshot ignores the server-assigned endpoint ids, so the wiring
+		// is asserted directly: the connection must link exactly these endpoints.
+		assert.Equal(t, source.ID, conns[0].SourceID, "connection must link the managed source")
+		assert.Equal(t, destination.ID, conns[0].DestinationID, "connection must link the managed destination")
 		assert.NoError(t, helpers.CompareStates(
 			toJSONMap(t, conns[0]),
 			readJSONFile(t, connSnapshot),
 			connectionSnapshotIgnore,
 		), "upstream connection snapshot mismatch for %s", dir)
 	} else {
-		assert.Empty(t, conns, "no connection snapshot for %q: the endpoints must be disconnected", dir)
+		require.ErrorIs(t, statErr, os.ErrNotExist,
+			"unexpected error probing connection snapshot %s", connSnapshot)
+		assert.Empty(t, conns, "no connection snapshot for %q: no managed connection may remain", dir)
+		// Disconnected must hold for the endpoints themselves, not just for
+		// externalId-carrying rows: no connection at all may link this pair.
+		for _, conn := range listConnections(t, ctx, apiClient) {
+			assert.False(t, conn.SourceID == source.ID && conn.DestinationID == destination.ID,
+				"source and destination must be disconnected, but connection %s links them", conn.ID)
+		}
 	}
+}
+
+// listConnections pages through the connections list with the given options.
+func listConnections(t *testing.T, ctx context.Context, apiClient *client.Client, opts ...client.ListConnectionsOption) []client.Connection {
+	t.Helper()
+	var conns []client.Connection
+	page, err := apiClient.Connections.List(ctx, opts...)
+	require.NoError(t, err, "listing connections")
+	for page != nil {
+		conns = append(conns, page.Connections...)
+		page, err = apiClient.Connections.Next(ctx, page.Paging)
+		require.NoError(t, err, "paging connections")
+	}
+	return conns
 }
 
 // toJSONMap round-trips a value through JSON so the actual values are maps with
