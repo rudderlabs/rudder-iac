@@ -5,6 +5,10 @@ import (
 )
 
 const (
+	SourceKey      = "source"
+	DestinationKey = "destination"
+	EnabledKey     = "enabled"
+
 	EventStreamConnectionResourceType = "event-stream-connection"
 	EventStreamConnectionResourceKind = "event-stream-connections"
 )

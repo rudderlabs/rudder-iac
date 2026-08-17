@@ -62,27 +62,13 @@ func TestProvider(t *testing.T) {
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
-	// The syncer routes RawData resources through the raw lifecycle: until
-	// DEX-650 dispatches these to the connection handler, connection resources
-	// must fail with the kind-specific sentinel.
-	t.Run("RawLifecycleNotImplementedForConnections", func(t *testing.T) {
+	// Connections travel the normal (map-based) lifecycle path, so the
+	// provider routes them to the handler's Create, which is a clear
+	// not-implemented sentinel until DEX-650.
+	t.Run("ConnectionLifecycleNotImplemented", func(t *testing.T) {
 		p := eventstream.New(source.NewMockSourceClient(), true)
-		r := resources.NewResource("android-to-s3", connection.EventStreamConnectionResourceType, resources.ResourceData{}, []string{})
-
-		_, err := p.CreateRaw(context.Background(), r)
+		_, err := p.Create(context.Background(), "android-to-s3", connection.EventStreamConnectionResourceType, resources.ResourceData{})
 		assert.ErrorIs(t, err, connection.ErrNotImplemented)
-		_, err = p.UpdateRaw(context.Background(), r, nil, nil)
-		assert.ErrorIs(t, err, connection.ErrNotImplemented)
-		err = p.DeleteRaw(context.Background(), "android-to-s3", connection.EventStreamConnectionResourceType, nil, nil)
-		assert.ErrorIs(t, err, connection.ErrNotImplemented)
-		_, err = p.ImportRaw(context.Background(), r, "remote-id")
-		assert.ErrorIs(t, err, connection.ErrNotImplemented)
-
-		// Other resource types keep the EmptyProvider default.
-		other := resources.NewResource("src", source.ResourceType, resources.ResourceData{}, []string{})
-		_, err = p.CreateRaw(context.Background(), other)
-		require.Error(t, err)
-		assert.NotErrorIs(t, err, connection.ErrNotImplemented)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
