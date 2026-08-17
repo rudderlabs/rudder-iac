@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -26,24 +27,27 @@ func TestProvider(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
 		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "event-stream-source")
-		assert.Len(t, kinds, 1)
+		assert.Contains(t, kinds, "event-stream-connections")
+		assert.Len(t, kinds, 2)
 	})
 
 	t.Run("SupportedTypes", func(t *testing.T) {
 		provider := eventstream.New(source.NewMockSourceClient())
 		types := provider.SupportedTypes()
 		assert.Contains(t, types, source.ResourceType)
-		assert.Len(t, types, 1)
+		assert.Contains(t, types, connection.ResourceType)
+		assert.Len(t, types, 2)
 	})
 
 	t.Run("SupportedMatchPatterns", func(t *testing.T) {
 		t.Parallel()
 
 		p := eventstream.New(source.NewMockSourceClient())
-		kind := "event-stream-source"
 		var want []vrules.MatchPattern
-		want = append(want, prules.LegacyVersionPatterns(kind)...)
-		want = append(want, prules.V1VersionPatterns(kind)...)
+		want = append(want, prules.LegacyVersionPatterns("event-stream-source")...)
+		want = append(want, prules.V1VersionPatterns("event-stream-source")...)
+		// event-stream-connections is a new kind: v1 only, no legacy versions
+		want = append(want, prules.V1VersionPatterns(connection.ResourceKind)...)
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 

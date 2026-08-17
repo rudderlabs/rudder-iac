@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	dgHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/datagraph"
 	dtypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	esconnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
@@ -41,6 +42,7 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 	p = append(p, providerrules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
 	p = append(p, providerrules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
 	// v1-only kinds.
+	p = append(p, providerrules.V1VersionPatterns(esconnection.ResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dgHandler.HandlerMetadata.SpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)
