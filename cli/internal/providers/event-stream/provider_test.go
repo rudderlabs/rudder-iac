@@ -51,6 +51,29 @@ func TestProvider(t *testing.T) {
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
+	// The syncer routes RawData resources through the raw lifecycle: until
+	// DEX-650 dispatches these to the connection handler, connection resources
+	// must fail with the kind-specific sentinel.
+	t.Run("RawLifecycleNotImplementedForConnections", func(t *testing.T) {
+		p := eventstream.New(source.NewMockSourceClient())
+		r := resources.NewResource("android-to-s3", connection.ResourceType, resources.ResourceData{}, []string{})
+
+		_, err := p.CreateRaw(context.Background(), r)
+		assert.ErrorIs(t, err, connection.ErrNotImplemented)
+		_, err = p.UpdateRaw(context.Background(), r, nil, nil)
+		assert.ErrorIs(t, err, connection.ErrNotImplemented)
+		err = p.DeleteRaw(context.Background(), "android-to-s3", connection.ResourceType, nil, nil)
+		assert.ErrorIs(t, err, connection.ErrNotImplemented)
+		_, err = p.ImportRaw(context.Background(), r, "remote-id")
+		assert.ErrorIs(t, err, connection.ErrNotImplemented)
+
+		// Other resource types keep the EmptyProvider default.
+		other := resources.NewResource("src", source.ResourceType, resources.ResourceData{}, []string{})
+		_, err = p.CreateRaw(context.Background(), other)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, connection.ErrNotImplemented)
+	})
+
 	t.Run("LoadSpec", func(t *testing.T) {
 		t.Run("UnsupportedKind", func(t *testing.T) {
 			provider := eventstream.New(source.NewMockSourceClient())
