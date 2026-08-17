@@ -80,3 +80,8 @@
 <!-- ticket:DEX-498 -->
 - `facebook_conversions` destination E2E fixtures may document live snapshot capture deferral when live credentials or a disposable destination-enabled workspace are unavailable, but committed fixtures should still make the intended coverage shape visible.
 - The initial `facebook_conversions` fixture shape covers a standard cloud-mode variation with dataset/access token, event mappings, PII allow/deny lists, and update mutations for display name, `action_source`, booleans, `test_event_code`, and mappings.
+
+## DEX-505 — Google Pub/Sub E2E Snapshot Deferral
+<!-- ticket:DEX-505 -->
+- Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
+- Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.

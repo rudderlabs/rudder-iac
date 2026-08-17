@@ -21,6 +21,7 @@ import (
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -278,6 +279,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
+		}
+		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
 		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)

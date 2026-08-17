@@ -1,0 +1,46 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "google-pubsub",
+  "name": "E2E Google PubSub Updated",
+  "type": "GOOGLEPUBSUB",
+  "enabled": true,
+  "config": {
+    "projectId": "rudder-cli-e2e",
+    "eventToTopicMap": [
+      {
+        "from": "Product Viewed",
+        "to": "product-events-updated"
+      },
+      {
+        "from": "Order Completed",
+        "to": "order-events-updated"
+      }
+    ],
+    "eventToAttributesMap": [
+      {
+        "from": "context.traits.plan",
+        "to": "plan_tier"
+      },
+      {
+        "from": "properties.currency",
+        "to": "currency_code"
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

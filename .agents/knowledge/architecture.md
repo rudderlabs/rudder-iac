@@ -122,3 +122,9 @@
 <!-- ticket:DEX-498 -->
 - `facebook_conversions` is treated as an unverified destination definition for registry wiring: register it only when destination support and unverified destinations are enabled, not with verified/native S3-style destination support alone.
 - `facebook_conversions` source-type support intentionally includes every db-config source type that has a destination common mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+
+## DEX-505 — Google Pub/Sub Destination Onboarding
+<!-- ticket:DEX-505 -->
+- `googlepubsub` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Google Pub/Sub uses CLI type `googlepubsub` for API type `GOOGLEPUBSUB`. Three names are in play — the integrations-config directory (`googlepubsub`), the terraform registration (`google_pubsub`), and the API type (`GOOGLEPUBSUB`) — and CLI resource identity resolves to `lowercase(APIType)`, keeping every definition's `Type` consistent with its `APIType`.
+- Google Pub/Sub follows the cloud-storage-style source-type boundary used by GCS/S3: retain the CLI-owned event-stream source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) with cloud connection mode, and exclude upstream `amp`, `warehouse`, and `shopify` until ownership/mapping is explicit.

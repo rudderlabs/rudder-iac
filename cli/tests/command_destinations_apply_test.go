@@ -40,6 +40,9 @@ var destinationRawSecrets = []string{
 	"not-a-real-key",
 	"rudder-cli-e2e@example.iam.gserviceaccount.com",
 	"000000000000000000000",
+	"not-a-real-google-pubsub-key",
+	"rudder-cli-google-pubsub-e2e@example.iam.gserviceaccount.com",
+	"111111111111111111111",
 	"facebookConversionsAccessTokenXXX",
 }
 

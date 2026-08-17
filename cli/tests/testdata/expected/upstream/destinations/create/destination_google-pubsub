@@ -1,0 +1,34 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "google-pubsub",
+  "name": "E2E Google PubSub",
+  "type": "GOOGLEPUBSUB",
+  "enabled": true,
+  "config": {
+    "projectId": "rudder-cli-e2e",
+    "eventToTopicMap": [
+      {
+        "from": "Product Viewed",
+        "to": "product-events"
+      },
+      {
+        "from": "Order Completed",
+        "to": "order-events"
+      }
+    ],
+    "eventToAttributesMap": [
+      {
+        "from": "context.traits.plan",
+        "to": "plan"
+      },
+      {
+        "from": "properties.currency",
+        "to": "currency"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
