@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -57,11 +58,13 @@ type Provider struct {
 func New(client esClient.EventStreamStore) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
+			"event-stream-source":          sourceHandler.ResourceType,
+			connectionHandler.ResourceKind: connectionHandler.ResourceType,
 		},
 		handlers: make(map[string]handler),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	p.handlers[connectionHandler.ResourceType] = connectionHandler.NewHandler()
 	return p
 }
 
@@ -90,7 +93,10 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		// event-stream-connections is a new kind with no legacy spec versions
+		if kind != connectionHandler.ResourceKind {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
