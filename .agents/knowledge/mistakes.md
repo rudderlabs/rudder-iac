@@ -15,3 +15,9 @@
 <!-- ticket:DEX-623 -->
 - CI proved `TestAccountsApply` can run ungated, but `TestAccountsImportWorkspace` failed on its first completion attempt at `cli/tests/command_accounts_import_test.go:230` because `/tmp/.../imported/import-manifest.yaml` was missing.
 - Durable mitigation for account E2E enforcement is to keep `TestAccountsApply` in the normal CI path while leaving `TestAccountsImportWorkspace` gated by `RUN_ACCOUNT_E2E` until a follow-up fixes the missing manifest path with CI proof.
+
+## DEX-498 — Transformation Fixture Default-Events CI Failure
+<!-- ticket:DEX-498 -->
+- CI failed when `cli/tests/testdata/project/transformations-test/setup/py_transform.yaml` omitted an explicit `tests` block, causing `apply` batch publish validation to fall back to the built-in `default-events` suite.
+- The failure surfaced in `TestTransformationsTest` as `Py Transform` / `default-events` returning `Internal server error` and `batch publish validation failed`.
+- Durable mitigation: transformation setup fixtures should define deterministic input/output test suites so publish validation does not depend on broad default-event payloads.
