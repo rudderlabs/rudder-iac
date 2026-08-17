@@ -67,7 +67,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "google_pubsub",
+		Type:       "googlepubsub",
 		APIType:    "GOOGLEPUBSUB",
 		Version:    1,
 		Properties: properties,

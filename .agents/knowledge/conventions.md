@@ -59,5 +59,5 @@
 
 ## DEX-505 — Google Pub/Sub Destination Naming And Validation
 <!-- ticket:DEX-505 -->
-- For Google Pub/Sub destination onboarding, keep the CLI type and destination definition directory as `google_pubsub`, while the Go package name may use `googlepubsub` to satisfy Go package naming rules.
+- Google Pub/Sub uses CLI type and definition directory `googlepubsub`, matching `lowercase(APIType)` and the integrations-config directory. Terraform registers the destination under `google_pubsub`, but the CLI's resource identity follows the API type — as it does for every other definition — so the terraform name is not carried over.
 - For Google Pub/Sub `project_id`, prefer `required,dynamic_or_pattern=single_line_100` over adding a near-duplicate single-line 1–100 pattern; `required` supplies the non-empty constraint while the shared named pattern rejects line breaks and over-100-character values.

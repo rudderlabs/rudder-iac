@@ -125,6 +125,6 @@
 
 ## DEX-505 — Google Pub/Sub Destination Onboarding
 <!-- ticket:DEX-505 -->
-- `google_pubsub` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
-- Google Pub/Sub intentionally uses CLI type `google_pubsub` and API type `GOOGLEPUBSUB`, even though the upstream integrations-config directory/package convention is `googlepubsub`; preserve the Terraform/user-facing underscore form for CLI resource identity.
+- `googlepubsub` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Google Pub/Sub uses CLI type `googlepubsub` for API type `GOOGLEPUBSUB`. Three names are in play — the integrations-config directory (`googlepubsub`), the terraform registration (`google_pubsub`), and the API type (`GOOGLEPUBSUB`) — and CLI resource identity resolves to `lowercase(APIType)`, keeping every definition's `Type` consistent with its `APIType`.
 - Google Pub/Sub follows the cloud-storage-style source-type boundary used by GCS/S3: retain the CLI-owned event-stream source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) with cloud connection mode, and exclude upstream `amp`, `warehouse`, and `shopify` until ownership/mapping is explicit.

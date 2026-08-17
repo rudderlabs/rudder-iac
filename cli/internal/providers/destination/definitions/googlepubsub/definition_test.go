@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_pubsub"
+	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 )
 
@@ -18,10 +18,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(googlepubsub.NewDefinition()))
 
-	registered, err := registry.Get("google_pubsub", 1)
+	registered, err := registry.Get("googlepubsub", 1)
 	require.NoError(t, err)
 
-	assert.Equal(t, "google_pubsub", registered.Type)
+	assert.Equal(t, "googlepubsub", registered.Type)
 	assert.Equal(t, "GOOGLEPUBSUB", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"credentials"}, registered.SecretKeys())
@@ -53,7 +53,7 @@ func TestGooglePubSubConfigValidation(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(googlepubsub.NewDefinition()))
-	registered, err := registry.Get("google_pubsub", 1)
+	registered, err := registry.Get("googlepubsub", 1)
 	require.NoError(t, err)
 
 	minimalConfig := func() map[string]any {

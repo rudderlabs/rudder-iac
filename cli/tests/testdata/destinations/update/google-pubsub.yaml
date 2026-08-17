@@ -4,8 +4,8 @@ metadata:
   name: google-pubsub
 spec:
   id: google-pubsub
-  display_name: E2E Google Pub/Sub Updated
-  type: google_pubsub
+  display_name: E2E Google PubSub Updated
+  type: googlepubsub
   enabled: true
   definition_version: 1
   config:
