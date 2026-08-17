@@ -1,0 +1,28 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: google-pubsub
+spec:
+  id: google-pubsub
+  display_name: E2E Google Pub/Sub Updated
+  type: google_pubsub
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudder-cli-e2e
+    credentials: '{{ .GOOGLE_PUBSUB_CREDENTIALS }}'
+    event_to_topic_map:
+      - from: Product Viewed
+        to: product-events-updated
+      - from: Order Completed
+        to: order-events-updated
+    event_to_attribute_map:
+      - from: context.traits.plan
+        to: plan_tier
+      - from: properties.currency
+        to: currency_code
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

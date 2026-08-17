@@ -56,3 +56,8 @@
 ## DEX-498 — Facebook Conversions Destination Validation
 <!-- ticket:DEX-498 -->
 - For `facebook_conversions`, keep config validation aligned with upstream `schema.json` rather than Terraform-only prose; for example, `test_event_code` should keep schema-derived max-length/pattern validation but not add a `required_if` rule solely because `test_destination` is true.
+
+## DEX-505 — Google Pub/Sub Destination Naming And Validation
+<!-- ticket:DEX-505 -->
+- For Google Pub/Sub destination onboarding, keep the CLI type and destination definition directory as `google_pubsub`, while the Go package name may use `googlepubsub` to satisfy Go package naming rules.
+- For Google Pub/Sub `project_id`, prefer `required,dynamic_or_pattern=single_line_100` over adding a near-duplicate single-line 1–100 pattern; `required` supplies the non-empty constraint while the shared named pattern rejects line breaks and over-100-character values.
