@@ -61,3 +61,10 @@
 <!-- ticket:DEX-505 -->
 - Google Pub/Sub uses CLI type and definition directory `googlepubsub`, matching `lowercase(APIType)` and the integrations-config directory. Terraform registers the destination under `google_pubsub`, but the CLI's resource identity follows the API type — as it does for every other definition — so the terraform name is not carried over.
 - For Google Pub/Sub `project_id`, prefer `required,dynamic_or_pattern=single_line_100` over adding a near-duplicate single-line 1–100 pattern; `required` supplies the non-empty constraint while the shared named pattern rejects line breaks and over-100-character values.
+
+## DEX-512 — LinkedIn Ads Destination Naming And Validation
+<!-- ticket:DEX-512 -->
+- LinkedIn Ads uses canonical CLI type `linkedin_ads`, derived by lowercasing API type `LINKEDIN_ADS`, even though the integrations-config source directory is named `linkedIn_ads`.
+- The LinkedIn Ads Go definition package uses `linkedinads`, keeping the package name idiomatic while preserving `linkedin_ads` as the CLI resource identity.
+- For LinkedIn Ads, model `hash_data` as a required pointer boolean: upstream schema requires `hashData`, and pointer optionality preserves absent versus explicit `false` so validation can reject omission while accepting explicit false.
+- Destination onboarding validation should follow upstream `schema.json` over Terraform-provider defaults; for `hash_data`, do not make the field optional solely because Terraform marks it optional with default `true`.

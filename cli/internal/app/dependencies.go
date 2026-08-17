@@ -23,6 +23,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
+	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -285,6 +286,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)
+		}
+		if err := registry.Register(linkedinads.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering linkedin_ads destination definition: %w", err)
 		}
 		if err := registry.Register(rs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering rs destination definition: %w", err)

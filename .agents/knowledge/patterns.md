@@ -85,3 +85,8 @@
 <!-- ticket:DEX-505 -->
 - Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
 - Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.
+
+## DEX-512 — LinkedIn Ads E2E Snapshot Deferral
+<!-- ticket:DEX-512 -->
+- LinkedIn Ads destination E2E coverage may add create/update YAML fixtures that show the intended meaningful variation even when no explicitly disposable live destination-enabled stack is available.
+- Do not hand-write LINKEDIN_ADS upstream snapshots from converter mappings; defer authoritative snapshot capture to `RUN_DESTINATION_E2E=1 TestDestinationsApply` against a safe destination-enabled stack.
