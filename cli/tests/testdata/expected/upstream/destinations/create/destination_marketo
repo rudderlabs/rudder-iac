@@ -1,0 +1,45 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "marketo",
+  "name": "E2E Marketo",
+  "type": "MARKETO",
+  "enabled": true,
+  "config": {
+    "accountId": "123-ABC-456",
+    "clientId": "marketo-client-id",
+    "trackAnonymousEvents": false,
+    "createIfNotExist": true,
+    "rudderEventsMapping": [
+      {
+        "event": "Product Viewed",
+        "marketoPrimarykey": "email",
+        "marketoActivityId": "100001"
+      },
+      {
+        "event": "Order Completed",
+        "marketoPrimarykey": "email",
+        "marketoActivityId": "100002"
+      }
+    ],
+    "leadTraitMapping": [
+      {
+        "from": "email",
+        "to": "Email"
+      },
+      {
+        "from": "firstName",
+        "to": "First Name"
+      }
+    ],
+    "customActivityPropertyMap": [
+      {
+        "from": "properties.product_id",
+        "to": "Product ID"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

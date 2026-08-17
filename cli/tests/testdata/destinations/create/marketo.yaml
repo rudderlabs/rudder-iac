@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: marketo
+spec:
+  id: marketo
+  display_name: E2E Marketo
+  type: marketo
+  enabled: true
+  definition_version: 1
+  config:
+    account_id: 123-ABC-456
+    client_id: marketo-client-id
+    client_secret: '{{ .MARKETO_CLIENT_SECRET }}'
+    track_anonymous_events: false
+    create_if_not_exist: true
+    rudder_events_mapping:
+      - event: Product Viewed
+        marketo_primarykey: email
+        marketo_activity_id: "100001"
+      - event: Order Completed
+        marketo_primarykey: email
+        marketo_activity_id: "100002"
+    lead_trait_mapping:
+      - from: email
+        to: Email
+      - from: firstName
+        to: First Name
+    custom_activity_property_map:
+      - from: properties.product_id
+        to: Product ID

@@ -46,6 +46,7 @@ var destinationRawSecrets = []string{
 	"facebookConversionsAccessTokenXXX",
 	"AKIAKINESISXXXXXXXXX",
 	"kinesisSecretAccessKeyXXXXXXXXXXXXXXXXXXXX",
+	"marketoClientSecretXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

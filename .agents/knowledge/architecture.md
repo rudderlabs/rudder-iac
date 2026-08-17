@@ -135,3 +135,9 @@
 - Kinesis destination identity is CLI type `kinesis`, API type `KINESIS`, and version `1`.
 - Kinesis follows the cloud-storage-style source-type boundary used by GCS/S3/Google Pub/Sub: retain the CLI-owned event-stream source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) with cloud-only connection mode.
 - Kinesis secrets are local YAML config keys `access_key_id` and `access_key`.
+## DEX-521 — Marketo Destination Onboarding
+<!-- ticket:DEX-521 -->
+- `marketo` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Marketo source-type support intentionally includes every integrations-config/db-config supported source type that has a CLI local mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Marketo supports cloud connection mode for all retained source types.
+- Marketo does not need destination-specific gated key paths when all mapped API keys are already present in db-config `defaultConfig`.

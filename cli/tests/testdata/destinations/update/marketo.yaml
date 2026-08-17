@@ -1,0 +1,36 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: marketo
+spec:
+  id: marketo
+  display_name: E2E Marketo Updated
+  type: marketo
+  enabled: true
+  definition_version: 1
+  config:
+    account_id: 123-ABC-456
+    client_id: marketo-client-id
+    client_secret: '{{ .MARKETO_CLIENT_SECRET }}'
+    track_anonymous_events: true
+    create_if_not_exist: false
+    rudder_events_mapping:
+      - event: Product Added
+        marketo_primarykey: email
+        marketo_activity_id: "100003"
+      - event: Checkout Started
+        marketo_primarykey: email
+        marketo_activity_id: "100004"
+    lead_trait_mapping:
+      - from: email
+        to: Email
+      - from: lastName
+        to: Last Name
+    custom_activity_property_map:
+      - from: properties.sku
+        to: SKU
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

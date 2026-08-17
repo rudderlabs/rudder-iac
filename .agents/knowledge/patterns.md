@@ -91,3 +91,8 @@
 - Never add destination apply fixture YAML under `cli/tests/testdata/destinations/{create,update}` without matching upstream snapshots: `DestinationSnapshotTester` count-checks fetched destinations against the expected file set, so a fixture with no snapshot fails the whole suite before any payload is compared — taking every other destination's coverage down with it.
 - Kinesis ships both meaningful auth variations, mirroring the S3 pair: `kinesis` (key-based, `role_based_auth: false`, access keys via `{{ .VAR }}`) and `kinesis-role` (role-based, `role_based_auth: true`, `iam_role_arn`). Both are live-confirmed.
 - Snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly on the first gated run, including `useMessageId: false` where the fixture omits it.
+## DEX-521 — Marketo E2E Coverage
+<!-- ticket:DEX-521 -->
+- Never add create/update fixture YAML without matching upstream snapshots. `DestinationSnapshotTester` count-checks fetched destinations against the expected file set before comparing any payload, so a fixture with no snapshot fails the whole suite and takes every other destination's coverage down with it.
+- Marketo snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly, covering all three `ArrayWithObjects` reshapes and the three-key `rudderEventsMapping` row shape.
+- A gated run can fail for reasons unrelated to the change: a backend 500 on the datacatalog endpoints aborts the opening `destroy` before any destination work happens. Retry before investigating the destination under test.

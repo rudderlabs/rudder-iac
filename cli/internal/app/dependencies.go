@@ -24,6 +24,7 @@ import (
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -289,6 +290,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(kinesis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kinesis destination definition: %w", err)
+		}
+		if err := registry.Register(marketo.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
 		}
 		if err := registry.Register(rs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering rs destination definition: %w", err)
