@@ -18,7 +18,9 @@ for it.
 
 1. `cli/internal/providers/destination/definitions/<type>/definition.go`
 2. `cli/internal/providers/destination/definitions/<type>/definition_test.go`
-3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`)
+3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`),
+   always inside the `UnverifiedDestinations` block, plus the matching
+   `dependencies_test.go` flag-matrix expectation
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
@@ -106,10 +108,13 @@ Mechanical rules:
 - `Version` = terraform's registered `Version` (currently 1 everywhere).
 - `schema.json` constraints → `validate` struct tags (see source-extraction.md
   for the constraint translation table). Real regex patterns →
-  `pattern=<name>`: reuse an existing `NewPattern` registration, or register
-  a minimal new one. Strip upstream `env.` / `{{ … }}` alternations; never
-  bake those into the CLI regex (see source-extraction.md "Enforcing regex
-  patterns").
+  `dynamic_or_pattern=<name>`: reuse an existing `NewPattern` registration, or
+  register a minimal new one. Strip upstream `env.` / `{{ … }}` alternations;
+  never bake those into the CLI regex — the tag accepts `{{ path || fallback }}`
+  templates, the pattern holds only the real constraint. Note `^(.{0,100})$` is
+  a pattern, not a length limit (it forbids newlines) — reuse the shared
+  `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
+  reject templates too (see source-extraction.md "Enforcing regex patterns").
 - `db-config.json` `secretKeys` → `SecretKeys` field, translated to snake_case
   local keys.
 - `db-config.json` `supportedSourceTypes` / `supportedConnectionModes` →
@@ -132,13 +137,31 @@ Mechanical rules:
 
 ### Step 5: Register in dependencies.go
 
-Add the import and one line inside `newDestinationRegistry`:
+**Every newly onboarded destination registers as unverified.** Add the import
+and one block inside `newDestinationRegistry`, within the
+`cfg.ExperimentalFlags.UnverifiedDestinations` branch — never the verified
+section above it:
 
 ```go
-if err := registry.Register(<pkg>.NewDefinition()); err != nil {
-    return nil, fmt.Errorf("registering <type> destination definition: %w", err)
+if cfg.ExperimentalFlags.UnverifiedDestinations {
+    // ... existing unverified registrations, kept alphabetical by type ...
+    if err := registry.Register(<pkg>.NewDefinition()); err != nil {
+        return nil, fmt.Errorf("registering <type> destination definition: %w", err)
+    }
 }
 ```
+
+The verified section (registered on `DestinationSupport` alone) is reserved for
+definitions already proven against a live stack — S3 today. Promotion into it is
+a separate, deliberate change after that verification; it is never part of the
+onboarding PR, no matter how simple the destination looks.
+
+Then update the flag-matrix expectation in
+`cli/internal/app/dependencies_test.go`: add the new type to the
+`wantTypes` list of the both-flags-enabled case only (`SupportedTypes()` is
+sorted, so insert alphabetically). The verified-only case must stay unchanged —
+if adding the type there makes a test pass, the registration landed in the wrong
+block.
 
 Registration itself validates the definition (source types mapped, connection
 modes complete for every source type, consent field type). A broken definition
@@ -156,7 +179,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
    `map[string][]string{"/mobile_api_key_android": {"android"}}`).
 2. `Test<Type>ConfigValidation` — subtests via `registered.ValidateConfig`:
    each required field missing, each conditional/exclusion rule, each
-   `pattern=` field with an invalid literal rejected, valid minimal config,
+   pattern-validated field with an invalid literal rejected and a
+   `{{ path || fallback }}` template accepted, valid minimal config,
    valid full config, unknown key rejected, and (when consent is supported)
    unsupported consent source + invalid provider.
 3. `Test<Type>ConversionRoundTrip` — `testutil.AssertConversion` with paired
@@ -232,7 +256,8 @@ Final response must include:
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
 - Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`
-  in the CLI config
+  + `flags.unverifiedDestinations: true` in the CLI config — newly onboarded
+  destinations are always behind the unverified gate (Step 5)
 
 ## Guardrails
 
@@ -247,5 +272,8 @@ Final response must include:
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced
-  when a named `pattern=` can express them. Do not create dynamic-supporting
-  regexes (`env.` / `{{ … }}` branches) for destination config fields.
+  when a named pattern can express them — including `^(.{0,100})$`-style
+  constraints, which are patterns rather than length limits. Template support
+  belongs in the tag (`dynamic_or_pattern=<name>`), never in the regex: do not
+  register patterns carrying `env.` / `{{ … }}` branches, and never give the
+  deprecated `env.VAR` form an escape hatch.

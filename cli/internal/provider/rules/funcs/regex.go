@@ -109,6 +109,15 @@ func NewPatternWithReject(name, pattern, rejectPattern, errorMessage string) {
 	registry.RegisterWithReject(name, pattern, rejectPattern, errorMessage)
 }
 
+// MatchPattern reports whether value satisfies the named pattern and avoids its
+// reject pattern. Unregistered names never match. Exposed so validators that
+// layer extra acceptance on top of a named pattern — such as the destination
+// config `dynamic_or_pattern` tag — reuse this registry rather than compiling
+// their own copy of the regex.
+func MatchPattern(name, value string) bool {
+	return registry.match(name, value)
+}
+
 // GetPatternValidator returns the global pattern validator that should be registered
 // in ValidateStruct. This validator handles all validate:"pattern=name" tags.
 func GetPatternValidator() rules.CustomValidateFunc {

@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: gcs
+spec:
+  id: gcs
+  display_name: E2E GCS Updated
+  type: gcs
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: rudder-cli-e2e-gcs
+    prefix: rudder/gcs/updated/
+    credentials: '{{ .GCS_CREDENTIALS }}'
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

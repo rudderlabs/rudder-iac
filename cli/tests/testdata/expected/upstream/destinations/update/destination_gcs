@@ -1,0 +1,27 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "gcs",
+  "name": "E2E GCS Updated",
+  "type": "GCS",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-gcs",
+    "prefix": "rudder/gcs/updated/",
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

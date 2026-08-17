@@ -1,6 +1,7 @@
 package definitions
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
@@ -57,6 +58,32 @@ func WebhookTestDefinition(destType string, version int64) *DestinationDefinitio
 		},
 		NewConfig: func() any {
 			return &testWebhookConfig{}
+		},
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+	}
+}
+
+// testDynamicPatternConfig exercises the dynamic_or_pattern tag.
+type testDynamicPatternConfig struct {
+	AccountID      string  `json:"account_id" mapstructure:"account_id" validate:"required,dynamic_or_pattern=test_digits"`
+	SignUpSourceID string  `json:"sign_up_source_id" mapstructure:"sign_up_source_id" validate:"omitempty,dynamic_or_pattern=test_digits"`
+	OptionalID     *string `json:"optional_id" mapstructure:"optional_id" validate:"omitempty,dynamic_or_pattern=test_digits"`
+}
+
+// DynamicPatternTestDefinition returns a definition whose config uses
+// dynamic_or_pattern. Pattern registration is idempotent, so it happens here to
+// keep the fixture self-contained.
+func DynamicPatternTestDefinition() *DestinationDefinition {
+	funcs.NewPattern("test_digits", `^[0-9]+$`, "must contain only digits")
+
+	return &DestinationDefinition{
+		Type:    "DYNAMICPATTERN",
+		Version: 1,
+		NewConfig: func() any {
+			return &testDynamicPatternConfig{}
 		},
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{

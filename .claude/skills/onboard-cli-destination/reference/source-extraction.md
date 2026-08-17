@@ -32,23 +32,33 @@ Translate constraints to `validate` struct tags on the config struct:
 | schema.json | validate tag |
 | --- | --- |
 | key in `required` | `required` |
-| optional string with max | `omitempty,max=N` (schema patterns like `^(.{0,100})$` → `max=100`) |
+| `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
 | `enum: ["a","b"]` | `dynamic_or_oneof=a b` (custom tag in `definitions/dynamicvalues.go`: passes `env.VAR` / `{{ ... }}` dynamic values, otherwise enforces the enum). Use plain `oneof=a b` only when the field can never hold a dynamic value |
-| `pattern` (real regex, not just length) | `pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below). Length-only patterns stay as `max=N` / `min=N` — do not register a regex for those |
+| any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern) |
 
 Notes:
 
 - Strip the template/env prefix from upstream patterns before deciding what to
-  enforce. Upstream often wraps the real constraint as
-  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>` so terraform accepts UI/env
-  references. **CLI destination config must enforce only `<real>`** — never
-  re-encode the `env.` / `{{ ... }}` branches into the named pattern, and never
-  invent a `dynamic_or_pattern` (or similar) escape hatch for regex fields.
-  Example: schema
+  enforce. Upstream almost always wraps the real constraint as
+  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`. **The named pattern must contain
+  only `<real>`** — never re-encode either branch into the regex. The template
+  branch is handled by the tag: `dynamic_or_pattern=<name>` accepts
+  `{{ path || fallback }}` and otherwise enforces `<real>`. Example: schema
   `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|^AW-(.{0,100})$` → register / reuse
-  `^AW-(.{0,100})$` and tag `validate:"required,pattern=<name>"`.
+  `^AW-(.{0,100})$` and tag `validate:"required,dynamic_or_pattern=<name>"`.
+- **`<real>` is a regex even when it looks like a length limit.** `^(.{0,100})$`
+  bounds length *and* forbids line breaks, so `max=100` is not equivalent — it
+  lets newlines through. Register the pattern (the shared `single_line_100`
+  already covers this very common shape) instead of translating to `max=N`. Only
+  a genuine `minLength`/`maxLength` keyword becomes `min`/`max`.
+- Routing a field through `dynamic_or_pattern` also lifts the length cap for
+  templates, matching upstream: the template branch carries no cap, so
+  `{{ config.x || … }}` longer than the literal limit stays valid.
+- **`env.VAR` is deprecated — never give it an escape hatch.** It is judged as an
+  ordinary literal, so it passes only when it happens to satisfy the pattern.
+  Do not add it to a pattern or a tag.
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
@@ -81,24 +91,35 @@ in the report when a minimal named pattern can express them.
      env/template alternations. Keep it minimal — no `(env.…)|` /
      `(\{\{…\}\})|` branches.
    - Error message: short, user-facing (what the value must look like).
-3. Only if the constraint cannot be expressed as a regex (or is length-only
-   / enum-only) fall back to `min`/`max` / `dynamic_or_oneof` / report note.
+3. Only if the constraint is a genuine `minLength`/`maxLength` keyword or an
+   enum fall back to `min`/`max` / `dynamic_or_oneof` / report note.
 
 ### Tag usage
 
 ```go
-// required literal shape
-ConversionID string `mapstructure:"conversion_id" validate:"required,pattern=googleads_conversion_id"`
+// required shape, templates allowed (the default)
+ConversionID string `mapstructure:"conversion_id" validate:"required,dynamic_or_pattern=googleads_conversion_id"`
 
-// optional literal shape
-ServerURL string `mapstructure:"server_url" validate:"omitempty,pattern=url"`
+// optional shape, templates allowed
+ServerURL string `mapstructure:"server_url" validate:"omitempty,dynamic_or_pattern=url"`
+
+// templates must be rejected too — justify this in the report
+StrictID string `mapstructure:"strict_id" validate:"omitempty,pattern=some_strict_id"`
 ```
+
+`dynamic_or_pattern` is a strict superset of `pattern`: a nil optional pointer
+passes, a `{{ path || fallback }}` template passes, and everything else — empty
+strings and `env.VAR` included — is decided by the named pattern. Both tags share
+one registry, so a name registered with `funcs.NewPattern` /
+`NewPatternWithReject` works with either, reject patterns included.
 
 ### Tests
 
-For every `pattern=` field: add a `ValidateConfig` subtest that a clearly
-invalid literal is rejected (path + message fragment), and keep the valid
-example YAML using a literal that satisfies the pattern.
+For every pattern-validated field: add `ValidateConfig` subtests that a clearly
+invalid literal is rejected (path + message fragment) and that a
+`{{ path || fallback }}` template is accepted (or rejected, for plain
+`pattern=`). Keep the valid example YAML using a literal that satisfies the
+pattern.
 
 ## 3. db-config.json — capabilities
 

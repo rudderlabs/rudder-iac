@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: gcs
+spec:
+  id: gcs
+  display_name: E2E GCS
+  type: gcs
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: rudder-cli-e2e-gcs
+    prefix: rudder/gcs/
+    credentials: '{{ .GCS_CREDENTIALS }}'

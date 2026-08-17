@@ -1,0 +1,15 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "gcs",
+  "name": "E2E GCS",
+  "type": "GCS",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-gcs",
+    "prefix": "rudder/gcs/"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

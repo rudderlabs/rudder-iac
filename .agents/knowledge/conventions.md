@@ -47,3 +47,9 @@
 <!-- ticket:DEX-661 -->
 - For destination export/import changes, avoid running full `make test-e2e` in non-disposable autonomous environments because destination/account E2E flows can mutate or destroy the configured RudderStack workspace when live credentials are present.
 - Prefer focused unit tests, snapshot fixture inspection, and compile-only E2E validation such as `go test ./cli/tests -run '^$'` unless an explicitly disposable live workspace is available.
+
+## DEX-499 — GCS Destination Source-Type Ownership
+<!-- ticket:DEX-499 -->
+- GCS destination definitions should retain only the CLI-owned event-stream source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, and `cloud`.
+- Upstream GCS source types `amp`, `warehouse`, and `shopify` are intentionally excluded from the CLI definition until ownership/mapping is explicit.
+- Supported GCS connection modes are cloud-only for all retained source types.
