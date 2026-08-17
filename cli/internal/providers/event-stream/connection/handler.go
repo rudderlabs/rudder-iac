@@ -20,9 +20,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-// errNotImplemented guards the lifecycle surface until DEX-650 wires the
-// connections API client; spec parsing and graph construction work today.
-var errNotImplemented = errors.New("event stream connection apply support is not implemented yet")
+// ErrNotImplemented guards the lifecycle surface until DEX-650 wires the
+// connections API client; spec parsing and graph construction work today. The
+// event-stream provider returns it from the raw lifecycle methods the syncer
+// routes RawData resources through.
+var ErrNotImplemented = errors.New("event stream connection apply support is not implemented yet")
 
 type Handler struct {
 	resources map[string]*connectionResource
@@ -74,6 +76,15 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	}
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding event stream connections spec: %w", err)
+	}
+	// Import support lands with DEX-654: reject inline import metadata now so
+	// it is never silently treated as a plain create.
+	metadata, err := s.CommonMetadata()
+	if err != nil {
+		return fmt.Errorf("getting common metadata: %w", err)
+	}
+	if metadata.Import != nil {
+		return fmt.Errorf("import metadata is not supported for %s yet", ResourceKind)
 	}
 	// A nil slice means the connections key was absent: fail loudly instead of
 	// letting the file silently contribute nothing. An explicit empty list
@@ -144,7 +155,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			ResourceType,
 			resources.ResourceData{},
 			[]string{},
-			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", ResourceType, c.LocalID)),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", ResourceKind, c.LocalID)),
 			resources.WithRawData(c),
 		)
 		result = append(result, r)
@@ -202,9 +213,22 @@ func refID(ref string, kind string) (string, error) {
 	return parts[1], nil
 }
 
-// LoadImportMetadata is a no-op: import support for connections lands with
-// DEX-654.
-func (h *Handler) LoadImportMetadata(_ *specs.WorkspacesImportMetadata) error {
+// LoadImportMetadata rejects central import-manifest entries that target this
+// kind — import support lands with DEX-654. Entries for other kinds pass
+// through untouched: the provider broadcasts the full manifest to every
+// handler.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	prefix := ResourceType + ":"
+	for _, workspace := range m.Workspaces {
+		for _, resource := range workspace.Resources {
+			if strings.HasPrefix(resource.URN, prefix) {
+				return fmt.Errorf("import is not supported for %s yet (manifest entry %s)", ResourceKind, resource.URN)
+			}
+		}
+	}
 	return nil
 }
 
@@ -232,21 +256,21 @@ func (h *Handler) FormatForExport(
 }
 
 func (h *Handler) Create(_ context.Context, _ string, _ resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }
 
 func (h *Handler) Update(_ context.Context, _ string, _ resources.ResourceData, _ resources.ResourceData) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }
 
 func (h *Handler) Delete(_ context.Context, _ string, _ resources.ResourceData) error {
-	return errNotImplemented
+	return ErrNotImplemented
 }
 
 func (h *Handler) List(_ context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }
 
 func (h *Handler) Import(_ context.Context, _ string, _ resources.ResourceData, _ string) (*resources.ResourceData, error) {
-	return nil, errNotImplemented
+	return nil, ErrNotImplemented
 }

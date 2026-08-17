@@ -296,25 +296,67 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 	assert.Same(t, spec, migrated)
 }
 
-func TestLoadImportMetadataIsNoOp(t *testing.T) {
+func TestLoadSpecRejectsInlineImportMetadata(t *testing.T) {
+	h := NewHandler()
+	spec := connectionsSpec(ticketExampleSpec())
+	spec.Metadata = map[string]any{
+		"name": "app-connections",
+		"import": map[string]any{
+			"workspaces": []any{map[string]any{
+				"workspace_id": "ws-1",
+				"resources": []any{map[string]any{
+					"urn":       "event-stream-connection:android-to-s3",
+					"remote_id": "remote-1",
+				}},
+			}},
+		},
+	}
+	err := h.LoadSpec("", spec)
+	assert.ErrorContains(t, err, "import metadata is not supported for event-stream-connections yet")
+}
+
+func TestLoadImportMetadata(t *testing.T) {
 	h := NewHandler()
 	assert.NoError(t, h.LoadImportMetadata(nil))
 	assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{}))
+
+	t.Run("entries for other kinds pass through", func(t *testing.T) {
+		assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-1",
+				Resources: []specs.ImportIds{
+					{URN: "event-stream-source:my-source", RemoteID: "remote-1"},
+				},
+			}},
+		}))
+	})
+
+	t.Run("entries targeting connections are rejected", func(t *testing.T) {
+		err := h.LoadImportMetadata(&specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-1",
+				Resources: []specs.ImportIds{
+					{URN: "event-stream-connection:android-to-s3", RemoteID: "remote-1"},
+				},
+			}},
+		})
+		assert.ErrorContains(t, err, "import is not supported for event-stream-connections yet")
+	})
 }
 
 func TestLifecycleNotImplemented(t *testing.T) {
 	h := NewHandler()
 
 	_, err := h.Create(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, errNotImplemented)
+	assert.ErrorIs(t, err, ErrNotImplemented)
 	_, err = h.Update(t.Context(), "id", resources.ResourceData{}, resources.ResourceData{})
-	assert.ErrorIs(t, err, errNotImplemented)
+	assert.ErrorIs(t, err, ErrNotImplemented)
 	err = h.Delete(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, errNotImplemented)
+	assert.ErrorIs(t, err, ErrNotImplemented)
 	_, err = h.List(t.Context(), nil)
-	assert.ErrorIs(t, err, errNotImplemented)
+	assert.ErrorIs(t, err, ErrNotImplemented)
 	_, err = h.Import(t.Context(), "id", resources.ResourceData{}, "remote-id")
-	assert.ErrorIs(t, err, errNotImplemented)
+	assert.ErrorIs(t, err, ErrNotImplemented)
 }
 
 func TestRemoteLoadsAreEmptyUntilImplemented(t *testing.T) {
