@@ -140,33 +140,29 @@ func TestKinesisConfigValidation(t *testing.T) {
 		assert.Equal(t, "'access_key' is required when 'role_based_auth' is false", byPath["/access_key"])
 	})
 
-	t.Run("access keys forbidden when role_based_auth true", func(t *testing.T) {
+	// schema.json's allOf branches only add requirements — neither forbids the
+	// other mode's keys — so the CLI does not either. This also keeps a remote
+	// config carrying a stale iam_role_arn importable, and matches S3, which has
+	// the same four auth keys.
+	t.Run("other mode keys are tolerated, matching schema.json and s3", func(t *testing.T) {
 		t.Parallel()
-		config := minimalRoleConfig()
-		config["access_key_id"] = "AKIAEXAMPLE"
-		config["access_key"] = "secret-value"
 
-		errors := registered.ValidateConfig(config)
+		t.Run("access keys alongside role based auth", func(t *testing.T) {
+			t.Parallel()
+			config := minimalRoleConfig()
+			config["access_key_id"] = "AKIAEXAMPLE"
+			config["access_key"] = "secret-value"
 
-		require.Len(t, errors, 2)
-		byPath := map[string]string{}
-		for _, err := range errors {
-			byPath[err.Path] = err.Message
-		}
-		assert.Equal(t, "'access_key_id' is not allowed when 'role_based_auth' is true", byPath["/access_key_id"])
-		assert.Equal(t, "'access_key' is not allowed when 'role_based_auth' is true", byPath["/access_key"])
-	})
+			assert.Empty(t, registered.ValidateConfig(config))
+		})
 
-	t.Run("iam_role_arn forbidden when role_based_auth false", func(t *testing.T) {
-		t.Parallel()
-		config := minimalKeyConfig()
-		config["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderKinesisAccess"
+		t.Run("iam_role_arn alongside key based auth", func(t *testing.T) {
+			t.Parallel()
+			config := minimalKeyConfig()
+			config["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderKinesisAccess"
 
-		errors := registered.ValidateConfig(config)
-
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/iam_role_arn", errors[0].Path)
-		assert.Equal(t, "'iam_role_arn' is not allowed when 'role_based_auth' is false", errors[0].Message)
+			assert.Empty(t, registered.ValidateConfig(config))
+		})
 	})
 
 	t.Run("valid role based auth with use_message_id", func(t *testing.T) {
