@@ -1,0 +1,17 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "kinesis",
+  "name": "E2E Kinesis Key Auth Updated",
+  "type": "KINESIS",
+  "enabled": true,
+  "config": {
+    "region": "us-east-2",
+    "stream": "rudder-cli-e2e-updated",
+    "roleBasedAuth": false,
+    "useMessageId": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

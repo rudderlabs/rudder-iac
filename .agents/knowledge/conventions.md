@@ -61,3 +61,10 @@
 <!-- ticket:DEX-505 -->
 - Google Pub/Sub uses CLI type and definition directory `googlepubsub`, matching `lowercase(APIType)` and the integrations-config directory. Terraform registers the destination under `google_pubsub`, but the CLI's resource identity follows the API type — as it does for every other definition — so the terraform name is not carried over.
 - For Google Pub/Sub `project_id`, prefer `required,dynamic_or_pattern=single_line_100` over adding a near-duplicate single-line 1–100 pattern; `required` supplies the non-empty constraint while the shared named pattern rejects line breaks and over-100-character values.
+
+## DEX-516 — Kinesis Auth Validation Shape
+<!-- ticket:DEX-516 -->
+- Kinesis uses flat local YAML auth fields instead of Terraform's nested `role_based_authentication` / `key_based_authentication` lists: `role_based_auth` is the required mode selector.
+- For Kinesis role-based auth, require `iam_role_arn`; for key-based auth, require `access_key_id` / `access_key`. Both come straight from the `schema.json` `allOf` branches.
+- Do **not** reject the other mode's keys. The `allOf` branches only ever *add* requirements — neither schema forbids the opposite mode's fields — so an `excluded_if` pair would be stricter than the source of truth. S3 has the same four auth keys and does not exclude either, so adding it to one destination and not the other makes identical configs validate differently.
+- The concrete cost of excluding: `iam_role_arn` is not a secret, so it survives an import round trip. A remote destination holding key-based auth plus a stale `iam_role_arn` would import to a spec the CLI immediately rejects.

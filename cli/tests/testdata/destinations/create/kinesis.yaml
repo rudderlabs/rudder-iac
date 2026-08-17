@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: kinesis
+spec:
+  id: kinesis
+  display_name: E2E Kinesis Key Auth
+  type: kinesis
+  enabled: true
+  definition_version: 1
+  config:
+    region: us-east-1
+    stream: rudder-cli-e2e
+    role_based_auth: false
+    access_key_id: "{{ .KINESIS_ACCESS_KEY_ID }}"
+    access_key: "{{ .KINESIS_ACCESS_KEY }}"

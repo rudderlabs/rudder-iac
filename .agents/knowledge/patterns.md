@@ -85,3 +85,9 @@
 <!-- ticket:DEX-505 -->
 - Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
 - Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.
+
+## DEX-516 — Kinesis E2E Coverage
+<!-- ticket:DEX-516 -->
+- Never add destination apply fixture YAML under `cli/tests/testdata/destinations/{create,update}` without matching upstream snapshots: `DestinationSnapshotTester` count-checks fetched destinations against the expected file set, so a fixture with no snapshot fails the whole suite before any payload is compared — taking every other destination's coverage down with it.
+- Kinesis ships both meaningful auth variations, mirroring the S3 pair: `kinesis` (key-based, `role_based_auth: false`, access keys via `{{ .VAR }}`) and `kinesis-role` (role-based, `role_based_auth: true`, `iam_role_arn`). Both are live-confirmed.
+- Snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly on the first gated run, including `useMessageId: false` where the fixture omits it.
