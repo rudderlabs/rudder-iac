@@ -1,0 +1,15 @@
+{
+  "userId": "failure_user_456",
+  "type": "identify",
+  "context": {
+    "traits": {
+      "name": "Failure User"
+    }
+  },
+  "properties": {
+    "name": "Failure User"
+  },
+  "channel": "web",
+  "messageId": "failure-simple-transform-identify",
+  "anonymousId": "failure_anonymous_id"
+}

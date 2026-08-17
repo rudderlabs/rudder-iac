@@ -13,3 +13,7 @@ spec:
       event.properties.source = "rudder";
       return event;
     }
+  tests:
+    - name: simple_transform_setup
+      input: ./input/simple_transform
+      output: ./output/simple_transform
