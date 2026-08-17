@@ -25,7 +25,7 @@ match_behavior:
               sql: SELECT id, name FROM orders
     invalid:
       - example_id: "sqlmodel-legacy-missing-display-name"
-        title: "Legacy SQL model missing the required display_name field"
+        title: "Legacy SQL model missing required display_name"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -44,7 +44,7 @@ match_behavior:
             severity: "error"
             message_contains: "'display_name' is required"
       - example_id: "sqlmodel-legacy-invalid-source-definition"
-        title: "Legacy SQL model with unsupported source_definition value"
+        title: "Legacy SQL model with unsupported source_definition"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -69,7 +69,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "sqlmodel-v1-valid"
-        title: "Valid v1 SQL model spec with inline SQL"
+        title: "Valid SQL model spec with inline SQL"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -85,7 +85,7 @@ match_behavior:
               sql: SELECT id, name FROM orders
     invalid:
       - example_id: "sqlmodel-v1-missing-account-id"
-        title: "v1 SQL model missing the required account_id field"
+        title: "v1 SQL model missing required account_id"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -104,7 +104,7 @@ match_behavior:
             severity: "error"
             message_contains: "'account_id' is required"
       - example_id: "sqlmodel-v1-both-sql-and-file"
-        title: "v1 SQL model specifying both sql and file (mutually exclusive)"
+        title: "v1 SQL model specifies both sql and file"
         files:
           spec.yaml: |
             version: rudder/v1
