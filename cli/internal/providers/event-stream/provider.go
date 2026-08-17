@@ -58,13 +58,14 @@ type Provider struct {
 // Option configures the provider at construction.
 type Option func(*Provider)
 
-// WithConnectionSupport registers the event-stream-connections kind. Without
-// it the kind is simply not a supported spec, so callers gate this behind the
-// connectionSupport experimental flag.
-func WithConnectionSupport() Option {
+// WithConnectionSupport registers the event-stream-connections kind and wires
+// its handler to the connections store. Without it the kind is simply not a
+// supported spec, so callers gate this behind the connectionSupport
+// experimental flag.
+func WithConnectionSupport(connections connectionHandler.ConnectionStore) Option {
 	return func(p *Provider) {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(connections)
 	}
 }
 
