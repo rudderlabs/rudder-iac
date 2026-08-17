@@ -24,6 +24,12 @@ var varFilePath = filepath.Join("testdata", "project", "substitution.vars.yaml")
 
 func TestProjectApply(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
+	// The project also carries an event stream source, a destination, and the
+	// connection linking them (both kinds are flag-gated). The create project
+	// connects the endpoints; the update project drops the connection spec,
+	// which must disconnect them without touching either endpoint.
+	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
+	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 
 	// The api_tracking event keeps its name and description as {{ .VAR }}
 	// placeholders resolved at apply time. The feature is gated, so both
@@ -74,6 +80,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
 		verifyState(t, "create")
+		verifyConnectionsState(t, 1)
 	})
 
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
@@ -82,6 +89,11 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
+		// The update project has no connection spec: the endpoints must be
+		// disconnected. That they are otherwise untouched is covered by the
+		// no-diff check that follows — both endpoints are part of the update
+		// project, so touching them would surface as a diff.
+		verifyConnectionsState(t, 0)
 	})
 
 	t.Run("applying on already applied project should not create any diff", func(t *testing.T) {
@@ -90,6 +102,31 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		// should report no changes to apply.
 		verifyNoChangesToApply(t, executor, updateDir)
 	})
+}
+
+// verifyConnectionsState asserts how many CLI-managed (externalId-carrying)
+// connections exist upstream.
+func verifyConnectionsState(t *testing.T, expectedCount int) {
+	t.Helper()
+
+	config.InitConfig(config.DefaultConfigFile())
+	apiClient, err := client.New(
+		config.GetConfig().Auth.AccessToken,
+		client.WithBaseURL(config.GetConfig().APIURL),
+		client.WithUserAgent("rudder-cli-test"),
+	)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	var conns []client.Connection
+	page, err := apiClient.Connections.List(ctx, client.WithConnectionsHasExternalID(true))
+	require.NoError(t, err, "listing connections")
+	for page != nil {
+		conns = append(conns, page.Connections...)
+		page, err = apiClient.Connections.Next(ctx, page.Paging)
+		require.NoError(t, err, "paging connections")
+	}
+	assert.Len(t, conns, expectedCount, "unexpected number of managed connections upstream")
 }
 
 func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {

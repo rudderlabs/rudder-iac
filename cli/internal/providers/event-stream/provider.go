@@ -55,7 +55,7 @@ type Provider struct {
 	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore, connections connectionHandler.ConnectionStore, connectionSupport bool) *Provider {
+func New(client esClient.EventStreamStore, connectionSupport bool) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
@@ -67,7 +67,7 @@ func New(client esClient.EventStreamStore, connections connectionHandler.Connect
 	// experimental flag: without it the kind is simply not a supported spec.
 	if connectionSupport {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(connections)
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(client)
 	}
 	return p
 }

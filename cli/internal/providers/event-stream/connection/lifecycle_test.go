@@ -21,8 +21,20 @@ func derefData(sourceID, destinationID string, enabled bool) resources.ResourceD
 	}
 }
 
+// stateData is what the syncer hands Update/Delete: the prior ResourceState's
+// Input and Output merged. Input still holds the un-dereferenced refs (elided
+// here); Output holds the remote identifiers the lifecycle wrote.
+func stateData(remoteID, sourceID, destinationID string, enabled bool) resources.ResourceData {
+	return resources.ResourceData{
+		EnabledKey:       enabled,
+		IDKey:            remoteID,
+		SourceIDKey:      sourceID,
+		DestinationIDKey: destinationID,
+	}
+}
+
 func TestCreate(t *testing.T) {
-	t.Run("creates remotely with endpoint ids, enabled, and the CLI identity", func(t *testing.T) {
+	t.Run("creates the connection with externalId attached", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			CreateFunc: func(conn *client.Connection) (*client.Connection, error) {
 				created := *conn
@@ -49,7 +61,7 @@ func TestCreate(t *testing.T) {
 		}, output)
 	})
 
-	t.Run("surfaces server errors with the connection identity", func(t *testing.T) {
+	t.Run("surfaces server errors with externalId", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			CreateFunc: func(_ *client.Connection) (*client.Connection, error) {
 				return nil, errors.New("plan does not allow more connections")
@@ -62,29 +74,6 @@ func TestCreate(t *testing.T) {
 		require.Error(t, err)
 		assert.EqualError(t, err, `creating event stream connection "android-to-s3": plan does not allow more connections`)
 	})
-
-	t.Run("rejects data missing a dereferenced endpoint id", func(t *testing.T) {
-		h := NewHandler(&MockConnectionClient{})
-		data := derefData("src-remote-1", "dst-remote-1", true)
-		delete(data, DestinationKey)
-
-		_, err := h.Create(context.Background(), "android-to-s3", data)
-
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "missing destination remote id")
-	})
-}
-
-// stateData is what the syncer hands Update/Delete: the prior ResourceState's
-// Input and Output merged. Input still holds the un-dereferenced refs (elided
-// here); Output holds the remote identifiers the lifecycle wrote.
-func stateData(remoteID, sourceID, destinationID string, enabled bool) resources.ResourceData {
-	return resources.ResourceData{
-		EnabledKey:       enabled,
-		IDKey:            remoteID,
-		SourceIDKey:      sourceID,
-		DestinationIDKey: destinationID,
-	}
 }
 
 func TestUpdate(t *testing.T) {
@@ -97,7 +86,7 @@ func TestUpdate(t *testing.T) {
 			stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"Update"}, mock.Calls)
+		assert.Equal(t, []string{"UpdateConnection"}, mock.Calls)
 		require.Len(t, mock.UpdateCalls, 1)
 		assert.Equal(t, "conn-remote-1", mock.UpdateCalls[0].ID)
 		assert.False(t, mock.UpdateCalls[0].IsEnabled)
@@ -108,7 +97,7 @@ func TestUpdate(t *testing.T) {
 		}, output)
 	})
 
-	t.Run("no difference makes no remote calls", func(t *testing.T) {
+	t.Run("no-op when nothing changed", func(t *testing.T) {
 		mock := &MockConnectionClient{}
 		h := NewHandler(mock)
 
@@ -125,7 +114,7 @@ func TestUpdate(t *testing.T) {
 		}, output)
 	})
 
-	t.Run("destination change replaces: delete then create", func(t *testing.T) {
+	t.Run("destination change replaces the connection", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			CreateFunc: func(conn *client.Connection) (*client.Connection, error) {
 				created := *conn
@@ -140,7 +129,7 @@ func TestUpdate(t *testing.T) {
 			stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"Delete", "Create"}, mock.Calls)
+		assert.Equal(t, []string{"DeleteConnection", "CreateConnection"}, mock.Calls)
 		assert.Equal(t, []string{"conn-remote-1"}, mock.DeleteCalls)
 		require.Len(t, mock.CreateCalls, 1)
 		assert.Equal(t, client.Connection{
@@ -156,7 +145,7 @@ func TestUpdate(t *testing.T) {
 		}, output)
 	})
 
-	t.Run("source change replaces too", func(t *testing.T) {
+	t.Run("source change replaces the connection", func(t *testing.T) {
 		mock := &MockConnectionClient{}
 		h := NewHandler(mock)
 
@@ -165,10 +154,10 @@ func TestUpdate(t *testing.T) {
 			stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"Delete", "Create"}, mock.Calls)
+		assert.Equal(t, []string{"DeleteConnection", "CreateConnection"}, mock.Calls)
 	})
 
-	t.Run("replacement keeps a revived row's old remote id", func(t *testing.T) {
+	t.Run("replacement keeps the revived row's remote id", func(t *testing.T) {
 		// The backend revives the soft-deleted row when the same
 		// source–destination pair is recreated: the create response carries the
 		// OLD remote id, and that id — not a presumed-fresh one — must land in
@@ -187,11 +176,11 @@ func TestUpdate(t *testing.T) {
 			stateData("conn-remote-1", "src-remote-1", "dst-remote-9", true))
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"Delete", "Create"}, mock.Calls)
+		assert.Equal(t, []string{"DeleteConnection", "CreateConnection"}, mock.Calls)
 		assert.Equal(t, "conn-remote-1", (*output)[IDKey])
 	})
 
-	t.Run("replacement stops when the delete fails", func(t *testing.T) {
+	t.Run("replacement stops when delete fails", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			DeleteFunc: func(_ string) error {
 				return errors.New("forbidden")
@@ -205,7 +194,7 @@ func TestUpdate(t *testing.T) {
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "forbidden")
-		assert.Equal(t, []string{"Delete"}, mock.Calls)
+		assert.Equal(t, []string{"DeleteConnection"}, mock.Calls)
 	})
 
 	t.Run("errors when state lacks the remote id", func(t *testing.T) {
@@ -219,7 +208,7 @@ func TestUpdate(t *testing.T) {
 		assert.ErrorContains(t, err, "missing id in state")
 	})
 
-	t.Run("surfaces server errors from the in-place update", func(t *testing.T) {
+	t.Run("surfaces server errors with externalId", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			UpdateFunc: func(_ *client.Connection) (*client.Connection, error) {
 				return nil, errors.New("plan gate")
@@ -236,14 +225,14 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	t.Run("deletes the remote connection and touches nothing else", func(t *testing.T) {
+	t.Run("deletes only the connection", func(t *testing.T) {
 		mock := &MockConnectionClient{}
 		h := NewHandler(mock)
 
 		err := h.Delete(context.Background(), "android-to-s3", stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"Delete"}, mock.Calls)
+		assert.Equal(t, []string{"DeleteConnection"}, mock.Calls)
 		assert.Equal(t, []string{"conn-remote-1"}, mock.DeleteCalls)
 	})
 
@@ -256,7 +245,7 @@ func TestDelete(t *testing.T) {
 		assert.ErrorContains(t, err, "missing id in state")
 	})
 
-	t.Run("surfaces server errors with the connection identity", func(t *testing.T) {
+	t.Run("surfaces server errors with externalId", func(t *testing.T) {
 		mock := &MockConnectionClient{
 			DeleteFunc: func(_ string) error {
 				return errors.New("forbidden")

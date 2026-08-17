@@ -4,13 +4,17 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 )
 
-// MockConnectionClient is a hand-rolled ConnectionStore double (mirroring
-// source.MockSourceClient). Each method records its call — Calls keeps the
+// MockConnectionClient is a hand-rolled EventStreamStore double for connection
+// tests. The embedded source mock supplies the source and tracking-plan
+// surfaces; the connection methods here record each call — Calls keeps the
 // cross-method order so tests can assert sequences like delete-then-create —
-// and delegates to an optional per-test func for canned responses.
+// and delegate to an optional per-test func for canned responses.
 type MockConnectionClient struct {
+	source.MockSourceClient
+
 	Calls []string
 
 	ListCalls   []client.ListConnectionsOptions
@@ -26,12 +30,12 @@ type MockConnectionClient struct {
 	DeleteFunc func(id string) error
 }
 
-func (m *MockConnectionClient) List(_ context.Context, opts ...client.ListConnectionsOption) (*client.ConnectionsPage, error) {
+func (m *MockConnectionClient) ListConnections(_ context.Context, opts ...client.ListConnectionsOption) (*client.ConnectionsPage, error) {
 	options := client.ListConnectionsOptions{}
 	for _, opt := range opts {
 		opt(&options)
 	}
-	m.Calls = append(m.Calls, "List")
+	m.Calls = append(m.Calls, "ListConnections")
 	m.ListCalls = append(m.ListCalls, options)
 	if m.ListFunc != nil {
 		return m.ListFunc(options)
@@ -39,8 +43,8 @@ func (m *MockConnectionClient) List(_ context.Context, opts ...client.ListConnec
 	return &client.ConnectionsPage{}, nil
 }
 
-func (m *MockConnectionClient) Next(_ context.Context, paging client.Paging) (*client.ConnectionsPage, error) {
-	m.Calls = append(m.Calls, "Next")
+func (m *MockConnectionClient) NextConnections(_ context.Context, paging client.Paging) (*client.ConnectionsPage, error) {
+	m.Calls = append(m.Calls, "NextConnections")
 	m.NextCalls = append(m.NextCalls, paging)
 	if m.NextFunc != nil {
 		return m.NextFunc(paging)
@@ -48,8 +52,8 @@ func (m *MockConnectionClient) Next(_ context.Context, paging client.Paging) (*c
 	return nil, nil
 }
 
-func (m *MockConnectionClient) Create(_ context.Context, connection *client.Connection) (*client.Connection, error) {
-	m.Calls = append(m.Calls, "Create")
+func (m *MockConnectionClient) CreateConnection(_ context.Context, connection *client.Connection) (*client.Connection, error) {
+	m.Calls = append(m.Calls, "CreateConnection")
 	m.CreateCalls = append(m.CreateCalls, *connection)
 	if m.CreateFunc != nil {
 		return m.CreateFunc(connection)
@@ -59,8 +63,8 @@ func (m *MockConnectionClient) Create(_ context.Context, connection *client.Conn
 	return &created, nil
 }
 
-func (m *MockConnectionClient) Update(_ context.Context, connection *client.Connection) (*client.Connection, error) {
-	m.Calls = append(m.Calls, "Update")
+func (m *MockConnectionClient) UpdateConnection(_ context.Context, connection *client.Connection) (*client.Connection, error) {
+	m.Calls = append(m.Calls, "UpdateConnection")
 	m.UpdateCalls = append(m.UpdateCalls, *connection)
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(connection)
@@ -69,8 +73,8 @@ func (m *MockConnectionClient) Update(_ context.Context, connection *client.Conn
 	return &updated, nil
 }
 
-func (m *MockConnectionClient) Delete(_ context.Context, id string) error {
-	m.Calls = append(m.Calls, "Delete")
+func (m *MockConnectionClient) DeleteConnection(_ context.Context, id string) error {
+	m.Calls = append(m.Calls, "DeleteConnection")
 	m.DeleteCalls = append(m.DeleteCalls, id)
 	if m.DeleteFunc != nil {
 		return m.DeleteFunc(id)
