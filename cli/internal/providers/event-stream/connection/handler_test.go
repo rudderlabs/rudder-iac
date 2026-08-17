@@ -37,7 +37,7 @@ func ticketExampleSpec() map[string]any {
 
 func loadTicketExample(t *testing.T) *connectionResource {
 	t.Helper()
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	require.Len(t, h.resources, 1)
 	return h.resources["android-to-s3"]
@@ -45,7 +45,7 @@ func loadTicketExample(t *testing.T) *connectionResource {
 
 func TestParseSpec(t *testing.T) {
 	t.Run("one URN per connection entry", func(t *testing.T) {
-		h := NewHandler()
+		h := NewHandler(nil)
 		parsed, err := h.ParseSpec("", connectionsSpec(map[string]any{
 			"connections": []any{
 				map[string]any{"id": "one"},
@@ -70,7 +70,7 @@ func TestParseSpec(t *testing.T) {
 	}
 	for _, tt := range errorTests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler()
+			h := NewHandler(nil)
 			parsed, err := h.ParseSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -93,7 +93,7 @@ func TestLoadSpec(t *testing.T) {
 }
 
 func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{
 		"connections": []any{
 			map[string]any{
@@ -116,7 +116,7 @@ func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
 func TestLoadSpecEmptyListIsValid(t *testing.T) {
 	// An explicit empty list stays valid so removing the last connection does
 	// not invalidate the spec.
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{"connections": []any{}})))
 	assert.Empty(t, h.resources)
 }
@@ -192,7 +192,7 @@ func TestLoadSpecErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler()
+			h := NewHandler(nil)
 			err := h.LoadSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -227,7 +227,7 @@ func TestDestinationRefResolve(t *testing.T) {
 // both endpoints (created after them) and shows up as their dependent
 // (deleted before them).
 func TestGetResourcesGraphDependencies(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestGetResourcesGraphDependencies(t *testing.T) {
 // dereference the syncer applies before lifecycle calls: the source via the
 // legacy output map, the destination via its typed state's Resolve func.
 func TestConnectionRefResolution(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestConnectionRefResolution(t *testing.T) {
 }
 
 func TestMigrateSpecIsIdentity(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	spec := connectionsSpec(ticketExampleSpec())
 	migrated, err := h.MigrateSpec(spec)
 	require.NoError(t, err)
@@ -293,36 +293,22 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 }
 
 func TestLoadImportMetadataIsNoOp(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	assert.NoError(t, h.LoadImportMetadata(nil))
 	assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{}))
 }
 
-func TestLifecycleNotImplemented(t *testing.T) {
-	h := NewHandler()
+func TestListAndImportNotImplemented(t *testing.T) {
+	h := NewHandler(nil)
 
-	_, err := h.Create(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	_, err = h.Update(t.Context(), "id", resources.ResourceData{}, resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	err = h.Delete(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	_, err = h.List(t.Context(), nil)
+	_, err := h.List(t.Context(), nil)
 	assert.ErrorIs(t, err, ErrNotImplemented)
 	_, err = h.Import(t.Context(), "id", resources.ResourceData{}, "remote-id")
 	assert.ErrorIs(t, err, ErrNotImplemented)
 }
 
-func TestRemoteLoadsAreEmptyUntilImplemented(t *testing.T) {
-	h := NewHandler()
-
-	remote, err := h.LoadResourcesFromRemote(t.Context())
-	require.NoError(t, err)
-	assert.Empty(t, remote.GetAll(EventStreamConnectionResourceType))
-
-	mapped, err := h.MapRemoteToState(resources.NewRemoteResources())
-	require.NoError(t, err)
-	assert.Empty(t, mapped.Resources)
+func TestImportLoadsAreEmptyUntilImplemented(t *testing.T) {
+	h := NewHandler(nil)
 
 	importable, err := h.LoadImportable(t.Context(), nil)
 	require.NoError(t, err)
