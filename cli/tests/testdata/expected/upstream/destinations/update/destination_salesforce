@@ -1,0 +1,17 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "salesforce",
+  "name": "E2E Salesforce Updated",
+  "type": "SALESFORCE",
+  "enabled": true,
+  "config": {
+    "userName": "rudder-cli-e2e@example.com",
+    "mapProperties": false,
+    "sandbox": true,
+    "useContactId": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

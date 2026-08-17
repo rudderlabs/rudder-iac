@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: salesforce
+spec:
+  id: salesforce
+  display_name: E2E Salesforce
+  type: salesforce
+  enabled: true
+  definition_version: 1
+  config:
+    user_name: rudder-cli-e2e@example.com
+    password: "{{ .SALESFORCE_PASSWORD }}"
+    initial_access_token: "{{ .SALESFORCE_INITIAL_ACCESS_TOKEN }}"
+    map_properties: true
+    sandbox: false
+    use_contact_id: false

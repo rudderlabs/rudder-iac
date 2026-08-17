@@ -47,6 +47,8 @@ var destinationRawSecrets = []string{
 	"AKIAKINESISXXXXXXXXX",
 	"kinesisSecretAccessKeyXXXXXXXXXXXXXXXXXXXX",
 	"marketoClientSecretXXXXXXXXXXX",
+	"salesforcePasswordXXXXXXXXXXXX",
+	"salesforceInitialAccessTokenXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both
@@ -66,8 +68,8 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // DestinationSnapshotTester — the same file-manager + count-guard +
 // per-resource-compare structure verifyState uses. DestinationSupport enables
 // the kind, while UnverifiedDestinations remains enabled here because these
-// fixtures include unverified destination types such as attentive_tag, http, and
-// rs. Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at
+// fixtures include unverified destination types such as attentive_tag, http, rs,
+// and salesforce. Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at
 // apply time.
 //
 // Gated behind RUN_DESTINATION_E2E because it needs a live stack with support for

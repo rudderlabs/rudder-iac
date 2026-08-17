@@ -141,3 +141,8 @@
 - Marketo source-type support intentionally includes every integrations-config/db-config supported source type that has a CLI local mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Marketo supports cloud connection mode for all retained source types.
 - Marketo does not need destination-specific gated key paths when all mapped API keys are already present in db-config `defaultConfig`.
+## DEX-523 — Salesforce Destination Onboarding
+<!-- ticket:DEX-523 -->
+- `salesforce` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Salesforce uses CLI type `salesforce`, API type `SALESFORCE`, and destination version `1`, even though upstream integrations metadata marks the classic Salesforce destination as deprecated in favor of Salesforce V2.
+- Salesforce source-type support intentionally preserves every upstream/catalog and Terraform-supported source type that the common destination mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`, all with cloud-only connection mode.

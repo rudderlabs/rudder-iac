@@ -27,6 +27,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/salesforce"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -296,6 +297,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(rs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering rs destination definition: %w", err)
+		}
+		if err := registry.Register(salesforce.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering salesforce destination definition: %w", err)
 		}
 	}
 	return registry, nil

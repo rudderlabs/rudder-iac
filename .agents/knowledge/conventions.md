@@ -68,3 +68,7 @@
 - For Kinesis role-based auth, require `iam_role_arn`; for key-based auth, require `access_key_id` / `access_key`. Both come straight from the `schema.json` `allOf` branches.
 - Do **not** reject the other mode's keys. The `allOf` branches only ever *add* requirements — neither schema forbids the opposite mode's fields — so an `excluded_if` pair would be stricter than the source of truth. S3 has the same four auth keys and does not exclude either, so adding it to one destination and not the other makes identical configs validate differently.
 - The concrete cost of excluding: `iam_role_arn` is not a secret, so it survives an import round trip. A remote destination holding key-based auth plus a stale `iam_role_arn` would import to a spec the CLI immediately rejects.
+## DEX-523 — Salesforce Destination Validation And Sources
+<!-- ticket:DEX-523 -->
+- Salesforce reuses the shared `single_line_100` pattern for its `^(.{1,100})$` fields rather than registering a destination-scoped near-duplicate: `required` supplies the non-empty half, so `required,dynamic_or_pattern=single_line_100` is exactly equivalent. This is the same call already recorded for Google Pub/Sub's `project_id` and LinkedIn Ads' conversion mappings.
+- Salesforce destination definitions should keep the broad source-type set when no concrete CLI mapper limitation is present: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`, with cloud-only connection mode.
