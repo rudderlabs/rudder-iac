@@ -98,11 +98,12 @@ func TestClientConnectionsGet(t *testing.T) {
 			ResponseBody: `{
 				"connection": {
 					"id": "some-id",
+					"externalId": "external-id-1",
 					"sourceId": "source-id",
 					"destinationId": "destination-id",
 					"enabled": true,
 					"createdAt": "2020-01-01T01:01:01Z",
-					"updatedAt": "2020-01-02T01:01:01Z"	
+					"updatedAt": "2020-01-02T01:01:01Z"
 				}
 			}`,
 		},
@@ -117,6 +118,7 @@ func TestClientConnectionsGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, connection)
 	assert.Equal(t, "some-id", connection.ID)
+	assert.Equal(t, "external-id-1", connection.ExternalID)
 	assert.Equal(t, "source-id", connection.SourceID)
 	assert.Equal(t, "destination-id", connection.DestinationID)
 	assert.Equal(t, true, connection.IsEnabled)
@@ -171,6 +173,49 @@ func TestClientConnectionsCreate(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestClientConnectionsCreateWithExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/connections", `{
+					"externalId": "external-id-1",
+					"sourceId": "source-id",
+					"destinationId": "destination-id",
+					"enabled": false
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"connection": {
+					"id": "some-id",
+					"externalId": "external-id-1",
+					"sourceId": "source-id",
+					"destinationId": "destination-id"
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	connection, err := c.Connections.Create(ctx, &client.Connection{
+		ExternalID:    "external-id-1",
+		SourceID:      "source-id",
+		DestinationID: "destination-id",
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, connection)
+	assert.Equal(t, "some-id", connection.ID)
+	assert.Equal(t, "external-id-1", connection.ExternalID)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestClientConnectionsUpdate(t *testing.T) {
 	ctx := context.Background()
 
@@ -214,6 +259,158 @@ func TestClientConnectionsUpdate(t *testing.T) {
 	assert.Equal(t, "destination-id", connection.DestinationID)
 	assert.Equal(t, time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC), *connection.CreatedAt)
 	assert.Equal(t, time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC), *connection.UpdatedAt)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientConnectionsUpdateStripsExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			// externalId can only be set through the external-id endpoint; the
+			// generic update rejects bodies carrying it, so it must be absent here.
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/connections/some-id", `{
+					"sourceId": "source-id",
+					"destinationId": "destination-id",
+					"enabled": true
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"connection": {
+					"id": "some-id",
+					"externalId": "external-id-1",
+					"sourceId": "source-id",
+					"destinationId": "destination-id",
+					"enabled": true
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	connection, err := c.Connections.Update(ctx, &client.Connection{
+		ID:            "some-id",
+		ExternalID:    "external-id-1",
+		SourceID:      "source-id",
+		DestinationID: "destination-id",
+		IsEnabled:     true,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, connection)
+	assert.Equal(t, "external-id-1", connection.ExternalID)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientConnectionsListWithHasExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t,
+		testutils.Call{
+			Validate: func(req *http.Request) bool {
+				// testutils.ValidateRequest does not compare URLs, and the query
+				// string is the behaviour under test here
+				return assert.Equal(t, "https://api.rudderstack.com/v2/connections?hasExternalId=true", req.URL.String()) &&
+					testutils.ValidateRequest(t, req, "GET", "", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"connections": [{
+					"id": "id-1",
+					"externalId": "external-id-1",
+					"sourceId": "source-1",
+					"destinationId": "destination-1",
+					"enabled": true
+				}],
+				"paging": {
+					"total": 1
+				}
+			}`,
+		},
+		testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return assert.Equal(t, "https://api.rudderstack.com/v2/connections?hasExternalId=false", req.URL.String()) &&
+					testutils.ValidateRequest(t, req, "GET", "", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"connections": [{
+					"id": "id-2",
+					"sourceId": "source-2",
+					"destinationId": "destination-2",
+					"enabled": true
+				}],
+				"paging": {
+					"total": 1
+				}
+			}`,
+		},
+	)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	page, err := c.Connections.List(ctx, client.WithConnectionsHasExternalID(true))
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	require.Len(t, page.Connections, 1)
+	assert.Equal(t, "external-id-1", page.Connections[0].ExternalID)
+
+	page, err = c.Connections.List(ctx, client.WithConnectionsHasExternalID(false))
+	require.NoError(t, err)
+	require.NotNil(t, page)
+	require.Len(t, page.Connections, 1)
+	assert.Equal(t, "", page.Connections[0].ExternalID)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientConnectionsSetExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			// testutils.ValidateRequest does not compare URLs, and the path is
+			// part of the behaviour under test here
+			return assert.Equal(t, "https://api.rudderstack.com/v2/connections/some-id/external-id", req.URL.String()) &&
+				testutils.ValidateRequest(t, req, "PUT", "", `{
+					"externalId": "external-id-1"
+				}`)
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"id": "some-id", "externalId": "external-id-1"}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Connections.SetExternalID(ctx, "some-id", "external-id-1")
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientConnectionsSetExternalIDConflict(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		ResponseStatus: 409,
+		ResponseBody:   `{"error": "externalId is already in use by another connection"}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	err = c.Connections.SetExternalID(ctx, "some-id", "external-id-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, client.ErrExternalIDAlreadyInUse)
 
 	httpClient.AssertNumberOfCalls()
 }
