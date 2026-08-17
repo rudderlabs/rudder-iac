@@ -85,3 +85,8 @@
 <!-- ticket:DEX-505 -->
 - Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
 - Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.
+
+## DEX-516 — Kinesis E2E Snapshot Deferral
+<!-- ticket:DEX-516 -->
+- Kinesis onboarding should not add discoverable destination apply fixture YAML under `cli/tests/testdata/destinations/create` or `update` unless matching live upstream snapshots can be captured in the same change.
+- In autonomous or non-disposable environments, rely on destination definition/unit tests, registry tests, build checks, and ungated `TestDestinationsApply` compile/skip behavior until a disposable destination-enabled stack is available.
