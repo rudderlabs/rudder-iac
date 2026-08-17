@@ -26,13 +26,16 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	prevExp := viper.Get("experimental")
 	prevDestSupport := viper.Get("flags.destinationSupport")
 	prevAccountSupport := viper.Get("flags.accountSupport")
+	prevConnectionSupport := viper.Get("flags.connectionSupport")
 	viper.Set("experimental", true)
 	viper.Set("flags.destinationSupport", true)
 	viper.Set("flags.accountSupport", true)
+	viper.Set("flags.connectionSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
 		viper.Set("flags.destinationSupport", prevDestSupport)
 		viper.Set("flags.accountSupport", prevAccountSupport)
+		viper.Set("flags.connectionSupport", prevConnectionSupport)
 	})
 
 	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")

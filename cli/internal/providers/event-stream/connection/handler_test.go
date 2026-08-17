@@ -16,7 +16,7 @@ import (
 func connectionsSpec(body map[string]any) *specs.Spec {
 	return &specs.Spec{
 		Version: specs.SpecVersionV1,
-		Kind:    ResourceKind,
+		Kind:    EventStreamConnectionResourceKind,
 		Spec:    body,
 	}
 }
@@ -159,24 +159,14 @@ func TestLoadSpecErrors(t *testing.T) {
 			wantErr: "invalid keys: links",
 		},
 		{
-			name:    "missing connections key",
-			body:    map[string]any{},
-			wantErr: "connections not found in event stream connections spec",
-		},
-		{
-			name:    "missing id",
-			body:    map[string]any{"connections": []any{entry(map[string]any{"id": nil})}},
-			wantErr: "id is required for connection at index 0",
-		},
-		{
 			name:    "missing source",
 			body:    map[string]any{"connections": []any{entry(map[string]any{"source": nil})}},
-			wantErr: `source is required for connection "one"`,
+			wantErr: `connection "one": parsing source reference: invalid reference ""`,
 		},
 		{
 			name:    "missing destination",
 			body:    map[string]any{"connections": []any{entry(map[string]any{"destination": nil})}},
-			wantErr: `destination is required for connection "one"`,
+			wantErr: `connection "one": parsing destination reference: invalid reference ""`,
 		},
 		{
 			name:    "source ref with wrong kind",
@@ -296,52 +286,10 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 	assert.Same(t, spec, migrated)
 }
 
-func TestLoadSpecRejectsInlineImportMetadata(t *testing.T) {
-	h := NewHandler()
-	spec := connectionsSpec(ticketExampleSpec())
-	spec.Metadata = map[string]any{
-		"name": "app-connections",
-		"import": map[string]any{
-			"workspaces": []any{map[string]any{
-				"workspace_id": "ws-1",
-				"resources": []any{map[string]any{
-					"urn":       "event-stream-connection:android-to-s3",
-					"remote_id": "remote-1",
-				}},
-			}},
-		},
-	}
-	err := h.LoadSpec("", spec)
-	assert.ErrorContains(t, err, "import metadata is not supported for event-stream-connections yet")
-}
-
-func TestLoadImportMetadata(t *testing.T) {
+func TestLoadImportMetadataIsNoOp(t *testing.T) {
 	h := NewHandler()
 	assert.NoError(t, h.LoadImportMetadata(nil))
 	assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{}))
-
-	t.Run("entries for other kinds pass through", func(t *testing.T) {
-		assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{{
-				WorkspaceID: "ws-1",
-				Resources: []specs.ImportIds{
-					{URN: "event-stream-source:my-source", RemoteID: "remote-1"},
-				},
-			}},
-		}))
-	})
-
-	t.Run("entries targeting connections are rejected", func(t *testing.T) {
-		err := h.LoadImportMetadata(&specs.WorkspacesImportMetadata{
-			Workspaces: []specs.WorkspaceImportMetadata{{
-				WorkspaceID: "ws-1",
-				Resources: []specs.ImportIds{
-					{URN: "event-stream-connection:android-to-s3", RemoteID: "remote-1"},
-				},
-			}},
-		})
-		assert.ErrorContains(t, err, "import is not supported for event-stream-connections yet")
-	})
 }
 
 func TestLifecycleNotImplemented(t *testing.T) {
@@ -364,7 +312,7 @@ func TestRemoteLoadsAreEmptyUntilImplemented(t *testing.T) {
 
 	remote, err := h.LoadResourcesFromRemote(t.Context())
 	require.NoError(t, err)
-	assert.Empty(t, remote.GetAll(ResourceType))
+	assert.Empty(t, remote.GetAll(EventStreamConnectionResourceType))
 
 	mapped, err := h.MapRemoteToState(resources.NewRemoteResources())
 	require.NoError(t, err)
@@ -372,7 +320,7 @@ func TestRemoteLoadsAreEmptyUntilImplemented(t *testing.T) {
 
 	importable, err := h.LoadImportable(t.Context(), nil)
 	require.NoError(t, err)
-	assert.Empty(t, importable.GetAll(ResourceType))
+	assert.Empty(t, importable.GetAll(EventStreamConnectionResourceType))
 
 	entities, entries, err := h.FormatForExport(resources.NewRemoteResources(), nil, nil)
 	require.NoError(t, err)

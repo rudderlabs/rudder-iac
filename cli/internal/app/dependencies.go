@@ -224,7 +224,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 
 	dcp := datacatalog.New(catalogClient)
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
-	esp := esProvider.New(esClient.NewRudderEventStreamStore(c))
+	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), cfg.ExperimentalFlags.ConnectionSupport)
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)

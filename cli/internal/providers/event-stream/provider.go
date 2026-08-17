@@ -55,16 +55,20 @@ type Provider struct {
 	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore) *Provider {
+func New(client esClient.EventStreamStore, connectionSupport bool) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
-			"event-stream-source":          sourceHandler.ResourceType,
-			connectionHandler.ResourceKind: connectionHandler.ResourceType,
+			"event-stream-source": sourceHandler.ResourceType,
 		},
 		handlers: make(map[string]handler),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
-	p.handlers[connectionHandler.ResourceType] = connectionHandler.NewHandler()
+	// The event-stream-connections kind is gated behind the connectionSupport
+	// experimental flag: without it the kind is simply not a supported spec.
+	if connectionSupport {
+		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+	}
 	return p
 }
 
@@ -94,7 +98,7 @@ func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
 		// event-stream-connections is a new kind with no legacy spec versions
-		if kind != connectionHandler.ResourceKind {
+		if kind != connectionHandler.EventStreamConnectionResourceKind {
 			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
 		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
@@ -230,28 +234,28 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 // connection handler; until then they fail with a clear, kind-specific error
 // instead of EmptyProvider's generic one.
 func (p *Provider) CreateRaw(ctx context.Context, r *resources.Resource) (any, error) {
-	if r.Type() == connectionHandler.ResourceType {
+	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
 		return nil, connectionHandler.ErrNotImplemented
 	}
 	return p.EmptyProvider.CreateRaw(ctx, r)
 }
 
 func (p *Provider) UpdateRaw(ctx context.Context, r *resources.Resource, oldData any, oldState any) (any, error) {
-	if r.Type() == connectionHandler.ResourceType {
+	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
 		return nil, connectionHandler.ErrNotImplemented
 	}
 	return p.EmptyProvider.UpdateRaw(ctx, r, oldData, oldState)
 }
 
 func (p *Provider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
-	if resourceType == connectionHandler.ResourceType {
+	if resourceType == connectionHandler.EventStreamConnectionResourceType {
 		return connectionHandler.ErrNotImplemented
 	}
 	return p.EmptyProvider.DeleteRaw(ctx, ID, resourceType, oldData, oldState)
 }
 
 func (p *Provider) ImportRaw(ctx context.Context, r *resources.Resource, remoteId string) (any, error) {
-	if r.Type() == connectionHandler.ResourceType {
+	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
 		return nil, connectionHandler.ErrNotImplemented
 	}
 	return p.EmptyProvider.ImportRaw(ctx, r, remoteId)
