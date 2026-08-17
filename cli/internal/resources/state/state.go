@@ -71,6 +71,17 @@ func dereferenceValue(v any, state *State) (any, error) {
 			return nil, fmt.Errorf("referred resource '%s' does not exist", val.URN)
 		}
 
+		// Refs to typed-state resources (modern framework) carry a Resolve
+		// func because their remote id lives in OutputRaw, not in the
+		// Input/Output maps. Mirrors resolvePropertyRef in reflection.go.
+		if val.Resolve != nil {
+			value, err := val.Resolve(resource.OutputRaw)
+			if err != nil {
+				return nil, fmt.Errorf("resolving property ref for %s: %w", val.URN, err)
+			}
+			return value, nil
+		}
+
 		resourceData := resource.Data()
 		if resourceData == nil {
 			return nil, nil

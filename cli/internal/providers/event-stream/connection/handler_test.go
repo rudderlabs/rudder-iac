@@ -253,10 +253,15 @@ func TestGetResourcesGraphDependencies(t *testing.T) {
 }
 
 // TestConnectionRefResolution proves both endpoint references resolve to the
-// referenced resource's remote id from state: the source via the legacy output
-// map, the destination via its typed state.
+// referenced resource's remote id from state through the same map-based
+// dereference the syncer applies before lifecycle calls: the source via the
+// legacy output map, the destination via its typed state's Resolve func.
 func TestConnectionRefResolution(t *testing.T) {
-	resource := loadTicketExample(t)
+	h := NewHandler()
+	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
+	connectionResources, err := h.GetResources()
+	require.NoError(t, err)
+	require.Len(t, connectionResources, 1)
 
 	st := state.EmptyState()
 	st.AddResource(&state.ResourceState{
@@ -270,12 +275,13 @@ func TestConnectionRefResolution(t *testing.T) {
 		OutputRaw: &destination.DestinationState{ID: "dst-remote-id"},
 	})
 
-	require.NoError(t, state.DereferenceByReflection(resource, st))
-
-	assert.True(t, resource.Source.IsResolved)
-	assert.Equal(t, "src-remote-id", resource.Source.Value)
-	assert.True(t, resource.Destination.IsResolved)
-	assert.Equal(t, "dst-remote-id", resource.Destination.Value)
+	dereferenced, err := state.Dereference(connectionResources[0].Data(), st)
+	require.NoError(t, err)
+	assert.Equal(t, resources.ResourceData{
+		SourceKey:      "src-remote-id",
+		DestinationKey: "dst-remote-id",
+		EnabledKey:     true,
+	}, dereferenced)
 }
 
 func TestMigrateSpecIsIdentity(t *testing.T) {

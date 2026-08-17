@@ -21,9 +21,7 @@ import (
 )
 
 // ErrNotImplemented guards the lifecycle surface until DEX-650 wires the
-// connections API client; spec parsing and graph construction work today. The
-// event-stream provider returns it from the raw lifecycle methods the syncer
-// routes RawData resources through.
+// connections API client; spec parsing and graph construction work today.
 var ErrNotImplemented = errors.New("event stream connection apply support is not implemented yet")
 
 type Handler struct {
@@ -121,19 +119,23 @@ func (h *Handler) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
-// GetResources attaches each connection as raw data so the syncer's
-// reflection-based dereference resolves the typed destination ref and the
-// graph derives dependency edges on both endpoints.
+// GetResources emits each connection as a plain data-map resource; the graph
+// derives dependency edges from the two endpoint refs in the map, and the
+// syncer dereferences them to remote ids before the lifecycle calls.
 func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for _, c := range h.resources {
+		data := resources.ResourceData{
+			SourceKey:      c.Source,
+			DestinationKey: c.Destination,
+			EnabledKey:     c.Enabled,
+		}
 		r := resources.NewResource(
 			c.LocalID,
 			EventStreamConnectionResourceType,
-			resources.ResourceData{},
+			data,
 			[]string{},
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, c.LocalID)),
-			resources.WithRawData(c),
 		)
 		result = append(result, r)
 	}

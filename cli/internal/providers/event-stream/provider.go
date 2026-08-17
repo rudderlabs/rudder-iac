@@ -229,38 +229,6 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 	return handler.Delete(ctx, ID, state)
 }
 
-// Raw lifecycle: the syncer routes resources carrying RawData through these —
-// today only event stream connections. DEX-650 dispatches them to the
-// connection handler; until then they fail with a clear, kind-specific error
-// instead of EmptyProvider's generic one.
-func (p *Provider) CreateRaw(ctx context.Context, r *resources.Resource) (any, error) {
-	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
-		return nil, connectionHandler.ErrNotImplemented
-	}
-	return p.EmptyProvider.CreateRaw(ctx, r)
-}
-
-func (p *Provider) UpdateRaw(ctx context.Context, r *resources.Resource, oldData any, oldState any) (any, error) {
-	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
-		return nil, connectionHandler.ErrNotImplemented
-	}
-	return p.EmptyProvider.UpdateRaw(ctx, r, oldData, oldState)
-}
-
-func (p *Provider) DeleteRaw(ctx context.Context, ID string, resourceType string, oldData any, oldState any) error {
-	if resourceType == connectionHandler.EventStreamConnectionResourceType {
-		return connectionHandler.ErrNotImplemented
-	}
-	return p.EmptyProvider.DeleteRaw(ctx, ID, resourceType, oldData, oldState)
-}
-
-func (p *Provider) ImportRaw(ctx context.Context, r *resources.Resource, remoteId string) (any, error) {
-	if r.Type() == connectionHandler.EventStreamConnectionResourceType {
-		return nil, connectionHandler.ErrNotImplemented
-	}
-	return p.EmptyProvider.ImportRaw(ctx, r, remoteId)
-}
-
 func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
