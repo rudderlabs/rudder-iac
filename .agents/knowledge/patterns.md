@@ -179,3 +179,7 @@
 - For GCS connection-mode re-onboarding, update existing GCS destination fixture and expected upstream snapshot pairs in lockstep instead of adding new fixture files.
 - GCS destination E2E fixtures that include `connection_mode` should use literal `cloud` values, not templates, because connection mode is enum-like and template values are rejected by validation.
 - Preserve `TestDestinationsApply` fixture/snapshot parity: no fixture-only additions, because the snapshot tester count-checks expected upstream destinations before payload comparison.
+## DEX-512 — LinkedIn Ads E2E Snapshot Deferral
+<!-- ticket:DEX-512 -->
+- LinkedIn Ads destination E2E coverage may add create/update YAML fixtures that show the intended meaningful variation even when no explicitly disposable live destination-enabled stack is available.
+- Do not hand-write LINKEDIN_ADS upstream snapshots from converter mappings; defer authoritative snapshot capture to `RUN_DESTINATION_E2E=1 TestDestinationsApply` against a safe destination-enabled stack.

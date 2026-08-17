@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: linkedin-ads
+spec:
+  id: linkedin-ads
+  display_name: E2E LinkedIn Ads
+  type: linkedin_ads
+  enabled: true
+  definition_version: 1
+  config:
+    rudder_account_id: "1234567890"
+    hash_data: true
+    ad_account_id: "urn:li:sponsoredAccount:123456789"
+    deduplication_key: messageId
+    conversion_mapping:
+      - from: Product Viewed
+        to: "111111"
+      - from: Order Completed
+        to: "222222"
