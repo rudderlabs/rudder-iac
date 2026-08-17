@@ -54,7 +54,7 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 			return nil, fmt.Errorf("id not found in connection at index %d", i)
 		}
 		entries = append(entries, specs.URNEntry{
-			URN:             resources.URN(id, ResourceType),
+			URN:             resources.URN(id, EventStreamConnectionResourceType),
 			JSONPointerPath: fmt.Sprintf("/spec/connections/%d/id", i),
 		})
 	}
@@ -63,9 +63,8 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	spec := &ConnectionsSpec{}
-	// Use strict decoding to reject unknown fields — a config key on a
-	// connection must fail at parse time: connections are pure links and
-	// connection settings live on the destination spec.
+
+	// Use strict decoding to reject unknown fields.
 	decoderConfig := &mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      spec,
@@ -77,23 +76,8 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding event stream connections spec: %w", err)
 	}
-	// Import support lands with DEX-654: reject inline import metadata now so
-	// it is never silently treated as a plain create.
-	metadata, err := s.CommonMetadata()
-	if err != nil {
-		return fmt.Errorf("getting common metadata: %w", err)
-	}
-	if metadata.Import != nil {
-		return fmt.Errorf("import metadata is not supported for %s yet", ResourceKind)
-	}
-	// A nil slice means the connections key was absent: fail loudly instead of
-	// letting the file silently contribute nothing. An explicit empty list
-	// stays valid so removing the last connection does not invalidate the spec.
-	if spec.Connections == nil {
-		return fmt.Errorf("connections not found in event stream connections spec")
-	}
-	for i := range spec.Connections {
-		resource, err := h.loadConnection(&spec.Connections[i], i)
+	for _, c := range spec.Connections {
+		resource, err := h.loadConnection(c)
 		if err != nil {
 			return err
 		}
@@ -104,17 +88,10 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	return nil
 }
 
-func (h *Handler) loadConnection(c *ConnectionSpec, index int) (*connectionResource, error) {
-	if c.LocalID == "" {
-		return nil, fmt.Errorf("id is required for connection at index %d", index)
-	}
-	if c.Source == "" {
-		return nil, fmt.Errorf("source is required for connection %q", c.LocalID)
-	}
-	if c.Destination == "" {
-		return nil, fmt.Errorf("destination is required for connection %q", c.LocalID)
-	}
-
+// loadConnection builds the graph-side resource for one entry. Required-field
+// checks are owned by the validation rules driven by the spec's validate tags
+// (DEX-652); only reference parsing can fail here.
+func (h *Handler) loadConnection(c ConnectionSpec) (*connectionResource, error) {
 	sourceRef, err := parseSourceRef(c.Source)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: parsing source reference: %w", c.LocalID, err)
@@ -152,10 +129,10 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	for _, c := range h.resources {
 		r := resources.NewResource(
 			c.LocalID,
-			ResourceType,
+			EventStreamConnectionResourceType,
 			resources.ResourceData{},
 			[]string{},
-			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", ResourceKind, c.LocalID)),
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, c.LocalID)),
 			resources.WithRawData(c),
 		)
 		result = append(result, r)
@@ -163,9 +140,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	return result, nil
 }
 
-// parseSourceRef parses a scalar "#event-stream-source:<id>" reference. The
-// ref resolves via the source's legacy state output map, which carries the
-// remote id under "id".
+// parseSourceRef parses a scalar "#event-stream-source:<id>" reference.
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	id, err := refID(ref, source.ResourceKind)
 	if err != nil {
@@ -213,22 +188,9 @@ func refID(ref string, kind string) (string, error) {
 	return parts[1], nil
 }
 
-// LoadImportMetadata rejects central import-manifest entries that target this
-// kind — import support lands with DEX-654. Entries for other kinds pass
-// through untouched: the provider broadcasts the full manifest to every
-// handler.
-func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
-	if m == nil {
-		return nil
-	}
-	prefix := ResourceType + ":"
-	for _, workspace := range m.Workspaces {
-		for _, resource := range workspace.Resources {
-			if strings.HasPrefix(resource.URN, prefix) {
-				return fmt.Errorf("import is not supported for %s yet (manifest entry %s)", ResourceKind, resource.URN)
-			}
-		}
-	}
+// LoadImportMetadata is a no-op: import support for connections lands with
+// DEX-654.
+func (h *Handler) LoadImportMetadata(_ *specs.WorkspacesImportMetadata) error {
 	return nil
 }
 

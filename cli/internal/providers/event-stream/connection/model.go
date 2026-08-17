@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	ResourceType = "event-stream-connection"
-	ResourceKind = "event-stream-connections"
+	EventStreamConnectionResourceType = "event-stream-connection"
+	EventStreamConnectionResourceKind = "event-stream-connections"
 )
 
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of
@@ -14,11 +14,11 @@ const (
 // json.Marshal/Unmarshal round-trip; validate tags drive
 // go-playground/validator checks.
 type ConnectionsSpec struct {
-	Connections []ConnectionSpec `json:"connections" mapstructure:"connections"`
+	Connections []ConnectionSpec `json:"connections" mapstructure:"connections" validate:"required"`
 }
 
 // ConnectionSpec is a single connection entry. There is intentionally no
-// config field — connections are pure links; connection settings live on the
+// config field — event stream connections are pure links; connection settings live on the
 // destination spec. Unknown keys (config included) fail at decode time via
 // strict decoding.
 type ConnectionSpec struct {

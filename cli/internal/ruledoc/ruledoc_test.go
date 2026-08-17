@@ -42,7 +42,7 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 	p = append(p, providerrules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
 	p = append(p, providerrules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
 	// v1-only kinds.
-	p = append(p, providerrules.V1VersionPatterns(esconnection.ResourceKind)...)
+	p = append(p, providerrules.V1VersionPatterns(esconnection.EventStreamConnectionResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dgHandler.HandlerMetadata.SpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)
