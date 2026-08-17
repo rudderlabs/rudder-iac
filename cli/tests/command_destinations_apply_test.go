@@ -44,6 +44,8 @@ var destinationRawSecrets = []string{
 	"rudder-cli-google-pubsub-e2e@example.iam.gserviceaccount.com",
 	"111111111111111111111",
 	"facebookConversionsAccessTokenXXX",
+	"AKIAKINESISXXXXXXXXX",
+	"kinesisSecretAccessKeyXXXXXXXXXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

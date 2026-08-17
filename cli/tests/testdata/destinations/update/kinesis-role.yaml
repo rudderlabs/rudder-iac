@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: kinesis-role
+spec:
+  id: kinesis-role
+  display_name: E2E Kinesis Role Auth Updated
+  type: kinesis
+  enabled: true
+  definition_version: 1
+  config:
+    region: us-west-2
+    stream: rudder-cli-e2e-role-updated
+    role_based_auth: true
+    iam_role_arn: "arn:aws:iam::123456789012:role/KinesisAccessUpdated"
+    use_message_id: true
