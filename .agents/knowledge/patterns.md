@@ -86,7 +86,8 @@
 - Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
 - Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.
 
-## DEX-512 — LinkedIn Ads E2E Snapshot Deferral
+## DEX-512 — LinkedIn Ads Cannot Have Destination E2E Fixtures
 <!-- ticket:DEX-512 -->
-- LinkedIn Ads destination E2E coverage may add create/update YAML fixtures that show the intended meaningful variation even when no explicitly disposable live destination-enabled stack is available.
-- Do not hand-write LINKEDIN_ADS upstream snapshots from converter mappings; defer authoritative snapshot capture to `RUN_DESTINATION_E2E=1 TestDestinationsApply` against a safe destination-enabled stack.
+- `rudderAccountId` is a foreign key to an account that must already exist in the target workspace, not a free-form string. A fixture with a dummy value fails at create with `400 ... 'Account not found with given id in the workspace'`, so LinkedIn Ads cannot participate in `TestDestinationsApply` as it stands — this is a missing prerequisite, not a missing stack, and no amount of snapshot capture fixes it.
+- Do not add create/update fixtures for account-framework destinations until the destination e2e can provision (or reference) a real account. Fixtures without runnable configs break the whole suite for every other destination, because a failed apply aborts before snapshot verification.
+- The same shape applies to any destination whose config references another resource by ID; check for such keys in `destConfig.defaultConfig` before writing e2e fixtures.
