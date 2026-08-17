@@ -11,5 +11,6 @@ spec:
   config:
     bucket_name: rudder-cli-e2e
     prefix: rudder/
-    role_based_auth: true
-    iam_role_arn: "arn:aws:iam::123456789012:role/S3Access"
+    role_based_auth: false
+    access_key_id: "{{ .S3_ACCESS_KEY_ID }}"
+    access_key: "{{ .S3_ACCESS_KEY }}"

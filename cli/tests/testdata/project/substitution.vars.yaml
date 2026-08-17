@@ -8,3 +8,9 @@
 #                            below is intentionally wrong and must lose to the env var.
 API_TRACKING_DESCRIPTION: "This event is triggered every time a user views a product."
 API_TRACKING_NAME: "Name from var file that must lose to the env var"
+
+# Write-only S3 credentials for the destination spec, matching the fixture
+# placeholders the destinations e2e uses. These are fixture placeholders, not
+# credentials.
+S3_ACCESS_KEY_ID: AKIAXXXXXXXXXXXXXXXX
+S3_ACCESS_KEY: wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
