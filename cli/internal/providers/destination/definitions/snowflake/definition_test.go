@@ -122,10 +122,35 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 	t.Run("invalid sync frequency", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{"frequency": "10"}
+		cfg["sync"] = map[string]any{"frequency": "45"}
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/sync/frequency", errors[0].Path)
+	})
+
+	// The full schema.json enum, including "10" which the definition originally omitted.
+	t.Run("every schema sync frequency accepted", func(t *testing.T) {
+		t.Parallel()
+		for _, freq := range []string{"5", "10", "15", "30", "60", "180", "360", "720", "1440"} {
+			cfg := copyConfig(minimalValid)
+			cfg["sync"] = map[string]any{"frequency": freq}
+			assert.Empty(t, registered.ValidateConfig(cfg), freq)
+		}
+	})
+
+	t.Run("namespace rejects reserved pg_ prefix", func(t *testing.T) {
+		t.Parallel()
+		for _, ns := range []string{"pg_catalog", "PG_x", "pG_x", "Pg_x"} {
+			cfg := copyConfig(minimalValid)
+			cfg["namespace"] = ns
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, ns)
+			assert.Equal(t, "/namespace", errors[0].Path)
+		}
+
+		cfg := copyConfig(minimalValid)
+		cfg["namespace"] = "analytics_pg_data"
+		assert.Empty(t, registered.ValidateConfig(cfg), "pg_ is only reserved as a prefix")
 	})
 
 	t.Run("use_rudder_storage required", func(t *testing.T) {

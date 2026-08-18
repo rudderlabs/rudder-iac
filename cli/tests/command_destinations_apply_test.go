@@ -55,6 +55,9 @@ var destinationRawSecrets = []string{
 	"zendeskApiTokenXXXXXXXXXXXXXXX",
 	"redisPasswordXXXXXXXXXXXXXXXXX",
 	"redisCaCertificateXXXXXXXXXXXX",
+	"snowflakePasswordXXXXXXXXXXXXX",
+	"snowflakePrivateKeyXXXXXXXXXXX",
+	"snowflakeKeyPassphraseXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both
