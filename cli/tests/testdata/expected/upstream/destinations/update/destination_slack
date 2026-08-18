@@ -1,0 +1,60 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "slack",
+  "name": "E2E Slack Updated",
+  "type": "SLACK",
+  "enabled": true,
+  "config": {
+    "incomingWebhooksType": "legacy",
+    "webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+    "identifyTemplate": "Identify user",
+    "eventChannelSettings": [
+      {
+        "eventName": "Order Completed",
+        "eventChannel": "orders",
+        "eventRegex": false
+      },
+      {
+        "eventName": "^Cart",
+        "eventChannel": "commerce",
+        "eventRegex": true
+      }
+    ],
+    "eventTemplateSettings": [
+      {
+        "eventName": "Product Viewed",
+        "eventTemplate": "Viewed a product",
+        "eventRegex": false
+      },
+      {
+        "eventName": "^Checkout",
+        "eventTemplate": "Checkout update",
+        "eventRegex": true
+      }
+    ],
+    "whitelistedTraitsSettings": [
+      {
+        "trait": "email"
+      },
+      {
+        "trait": "first_name"
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,0 +1,35 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: slack
+spec:
+  id: slack
+  display_name: E2E Slack Updated
+  type: slack
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://hooks.slack.com/services/T000/B000/example
+    identify_template: Identify user
+    event_channel_settings:
+      - name: Order Completed
+        channel: orders
+        regex: false
+      - name: ^Cart
+        channel: commerce
+        regex: true
+    event_template_settings:
+      - name: Product Viewed
+        template: Viewed a product
+        regex: false
+      - name: ^Checkout
+        template: Checkout update
+        regex: true
+    whitelisted_trait_settings:
+      - email
+      - first_name
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

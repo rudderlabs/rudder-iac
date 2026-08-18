@@ -146,3 +146,9 @@
 - `salesforce` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Salesforce uses CLI type `salesforce`, API type `SALESFORCE`, and destination version `1`, even though upstream integrations metadata marks the classic Salesforce destination as deprecated in favor of Salesforce V2.
 - Salesforce source-type support intentionally preserves every upstream/catalog and Terraform-supported source type that the common destination mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`, all with cloud-only connection mode.
+
+## DEX-525 — Slack Destination Onboarding
+<!-- ticket:DEX-525 -->
+- Slack destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/slack`.
+- Slack local config intentionally includes only Terraform-mapped fields: `webhook_url`, `identify_template`, `event_channel_settings` (`name`, `channel`, `regex`), `event_template_settings` (`name`, `template`, `regex`), `whitelisted_trait_settings`, and `consent_management`.
+- Upstream schema/db-config fields `incomingWebhooksType`, `eventChannelWebhook`, and `denyListOfEvents` are intentionally omitted from the CLI Slack config surface until they have Terraform/common mapping support; the destination onboarding workflow treats Terraform mappings as the property source of truth.

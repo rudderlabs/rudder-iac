@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: slack
+spec:
+  id: slack
+  display_name: E2E Slack
+  type: slack
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://hooks.slack.com/services/T000/B000/example

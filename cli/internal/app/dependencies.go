@@ -28,6 +28,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/salesforce"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/slack"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -300,6 +301,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(salesforce.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering salesforce destination definition: %w", err)
+		}
+		if err := registry.Register(slack.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering slack destination definition: %w", err)
 		}
 	}
 	return registry, nil
