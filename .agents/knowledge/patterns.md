@@ -107,3 +107,9 @@
 - `schema.json` is the source of truth for which keys exist. Terraform supplies the mapping shape (reshapes, nested key names, local spelling) but does not bound the surface. Derive local keys mechanically (camelCase → snake_case) for anything terraform misses.
 - Slack is the worked example: `incomingWebhooksType`, `denyListOfEvents`, and the nested `eventChannelWebhook` have no terraform mapping. With them omitted, the gated e2e showed `incomingWebhooksType` present in the create snapshot (backend applies its `schema.json` default) and gone from the update snapshot. Modelling all three fixed it.
 - A create/update snapshot mismatch on a key the definition does not model is the signature of this bug — check for it before assuming the snapshot is simply wrong.
+
+## DEX-531 — Webhook Dotted Secret Paths
+<!-- ticket:DEX-531 -->
+- Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
+- Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
+- Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
