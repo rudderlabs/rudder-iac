@@ -3,6 +3,7 @@ package eventstream_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -14,7 +15,7 @@ import (
 // docs generator together with its live rules, asserting every rule resolves
 // and passes the DocumentedRules validation invariants.
 func TestProviderRuleDocs(t *testing.T) {
-	p := eventstream.New(source.NewMockSourceClient(), true)
+	p := eventstream.New(source.NewMockSourceClient(), true, definitions.NewRegistry())
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()

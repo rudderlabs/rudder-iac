@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
@@ -54,14 +55,18 @@ type Provider struct {
 	provider.EmptyProvider
 	kindToType map[string]string
 	handlers   map[string]handler
+	// destinationRegistry backs the connection semantic rules' source-type
+	// compatibility checks against destination definitions.
+	destinationRegistry *definitions.Registry
 }
 
-func New(client esClient.EventStreamStore, connectionSupport bool) *Provider {
+func New(client esClient.EventStreamStore, connectionSupport bool, destinationRegistry *definitions.Registry) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
 		},
-		handlers: make(map[string]handler),
+		handlers:            make(map[string]handler),
+		destinationRegistry: destinationRegistry,
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
 	// The event-stream-connections kind is gated behind the connectionSupport
@@ -308,7 +313,17 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	r := []rules.Rule{
 		sourceRules.NewSourceSemanticValidRule(),
 	}
+	// Connection rules ride the same gate as the kind itself: when
+	// connectionSupport is off the kind is not a supported match pattern and
+	// registering a rule scoped to it would fail registry validation.
+	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
+		r = append(r,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
+	}
+	return r
 }

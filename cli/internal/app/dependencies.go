@@ -205,9 +205,16 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		return nil, nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
 	}
 
+	// Built ahead of the event-stream provider, whose connection semantic
+	// rules read destination definitions; empty when DestinationSupport is off.
+	destRegistry, err := newDestinationRegistry(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
+	}
+
 	dcp := datacatalog.New(catalogClient)
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
-	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), cfg.ExperimentalFlags.ConnectionSupport)
+	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), cfg.ExperimentalFlags.ConnectionSupport, destRegistry)
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
@@ -230,10 +237,6 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	if cfg.ExperimentalFlags.DestinationSupport {
-		destRegistry, err := newDestinationRegistry(cfg)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
-		}
 		dp := destProvider.NewProvider(c, destRegistry)
 
 		providerMap["destination"] = dp
