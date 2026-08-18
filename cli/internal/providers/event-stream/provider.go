@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
@@ -55,6 +56,9 @@ type Provider struct {
 	client     esClient.EventStreamStore
 	kindToType map[string]string
 	handlers   map[string]handler
+	// destinationRegistry backs the connection semantic rules' source-type
+	// compatibility checks against destination definitions.
+	destinationRegistry *definitions.Registry
 }
 
 // Option configures the provider at construction.
@@ -67,6 +71,14 @@ func WithConnectionSupport() Option {
 	return func(p *Provider) {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
 		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client)
+	}
+}
+
+// WithDestinationRegistry supplies the destination definitions that back the
+// connection semantic rules' source-type compatibility checks.
+func WithDestinationRegistry(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		p.destinationRegistry = registry
 	}
 }
 
@@ -325,7 +337,17 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	r := []rules.Rule{
 		sourceRules.NewSourceSemanticValidRule(),
 	}
+	// Connection rules ride the same gate as the kind itself: when
+	// connectionSupport is off the kind is not a supported match pattern and
+	// registering a rule scoped to it would fail registry validation.
+	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
+		r = append(r,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
+	}
+	return r
 }
