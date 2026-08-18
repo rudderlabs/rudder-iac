@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -16,8 +17,16 @@ const (
 	SourceIDKey      = "sourceId"
 	DestinationIDKey = "destinationId"
 
+	// ExternalIDKey marks CLI-managed rows in List output.
+	ExternalIDKey = "externalId"
+
 	EventStreamConnectionResourceType = "event-stream-connection"
 	EventStreamConnectionResourceKind = "event-stream-connections"
+	MetadataName                      = "event-stream-connections"
+
+	// ImportPath is the spec file all importable connections are written to —
+	// export emits one spec of the event-stream-connections kind per run.
+	ImportPath = "event-stream/connections.yaml"
 )
 
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of
@@ -43,8 +52,23 @@ type ConnectionSpec struct {
 // two endpoint references plus the resolved enabled flag. The PropertyRefs
 // give the resource graph its dependency edges on both endpoints.
 type connectionResource struct {
-	LocalID     string
-	Source      *resources.PropertyRef
-	Destination *resources.PropertyRef
-	Enabled     bool
+	LocalID        string
+	Source         *resources.PropertyRef
+	Destination    *resources.PropertyRef
+	Enabled        bool
+	ImportMetadata map[string]*WorkspaceRemoteIDMapping
+}
+
+type WorkspaceRemoteIDMapping struct {
+	WorkspaceId string
+	RemoteId    string
+}
+
+// RemoteConnection carries an unmanaged remote connection through import
+// together with the workspace it belongs to — the generic connections API row
+// does not include workspaceId, so it is taken from the connection's event
+// stream source.
+type RemoteConnection struct {
+	client.Connection
+	WorkspaceID string
 }

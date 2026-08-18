@@ -332,10 +332,60 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 	assert.Same(t, spec, migrated)
 }
 
-func TestLoadImportMetadataIsNoOp(t *testing.T) {
+// TestLoadImportMetadata proves the central import-manifest broadcast reaches
+// loaded connections: each one reads its own URN at graph time, so the
+// resource carries import metadata instead of file metadata.
+func TestLoadImportMetadata(t *testing.T) {
 	h := NewHandler(nil)
+	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
+
 	assert.NoError(t, h.LoadImportMetadata(nil))
-	assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{}))
+
+	require.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{
+		Workspaces: []specs.WorkspaceImportMetadata{{
+			WorkspaceID: "workspace-123",
+			Resources: []specs.ImportIds{
+				{URN: "event-stream-connection:android-to-s3", RemoteID: "conn-remote-1"},
+			},
+		}},
+	}))
+
+	connectionResources, err := h.GetResources()
+	require.NoError(t, err)
+	require.Len(t, connectionResources, 1)
+	meta := connectionResources[0].ImportMetadata()
+	require.NotNil(t, meta)
+	assert.Equal(t, "conn-remote-1", meta.RemoteId)
+	assert.Equal(t, "workspace-123", meta.WorkspaceId)
+}
+
+// TestLoadSpecInlineImportMetadata proves the inline metadata.import path fills
+// the same per-connection metadata the manifest broadcast does.
+func TestLoadSpecInlineImportMetadata(t *testing.T) {
+	h := NewHandler(nil)
+	s := connectionsSpec(ticketExampleSpec())
+	s.Metadata = map[string]any{
+		"name": MetadataName,
+		"import": map[string]any{
+			"workspaces": []any{
+				map[string]any{
+					"workspace_id": "workspace-123",
+					"resources": []any{
+						map[string]any{"urn": "event-stream-connection:android-to-s3", "remote_id": "conn-remote-1"},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(t, h.LoadSpec("", s))
+
+	connectionResources, err := h.GetResources()
+	require.NoError(t, err)
+	require.Len(t, connectionResources, 1)
+	meta := connectionResources[0].ImportMetadata()
+	require.NotNil(t, meta)
+	assert.Equal(t, "conn-remote-1", meta.RemoteId)
+	assert.Equal(t, "workspace-123", meta.WorkspaceId)
 }
 
 // eventStreamSources canns GetSources with the sources the rETL filter in
@@ -545,26 +595,4 @@ func TestMapRemoteToState(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unable to cast resource to event stream connection")
 	})
-}
-
-func TestListAndImportNotImplemented(t *testing.T) {
-	h := NewHandler(nil)
-
-	_, err := h.List(t.Context(), nil)
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	_, err = h.Import(t.Context(), "id", resources.ResourceData{}, "remote-id")
-	assert.ErrorIs(t, err, ErrNotImplemented)
-}
-
-func TestImportLoadsAreEmptyUntilImplemented(t *testing.T) {
-	h := NewHandler(nil)
-
-	importable, err := h.LoadImportable(t.Context(), nil)
-	require.NoError(t, err)
-	assert.Empty(t, importable.GetAll(EventStreamConnectionResourceType))
-
-	entities, entries, err := h.FormatForExport(resources.NewRemoteResources(), nil, nil)
-	require.NoError(t, err)
-	assert.Nil(t, entities)
-	assert.Nil(t, entries)
 }
