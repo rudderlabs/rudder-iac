@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: zendesk
+spec:
+  id: zendesk
+  display_name: E2E Zendesk
+  type: zendesk
+  enabled: true
+  definition_version: 1
+  config:
+    email: rudder-cli-e2e@example.com
+    api_token: "{{ .ZENDESK_API_TOKEN }}"
+    domain: rudder-cli-e2e
+    source_name: rudder
+    create_users_as_verified: false
+    send_group_calls_without_user_id: false
+    remove_users_from_organization: false
+    search_by_external_id: false

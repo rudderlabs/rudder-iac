@@ -1,0 +1,24 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: zendesk
+spec:
+  id: zendesk
+  display_name: E2E Zendesk Updated
+  type: zendesk
+  enabled: true
+  definition_version: 1
+  config:
+    email: rudder-cli-e2e@example.com
+    api_token: "{{ .ZENDESK_API_TOKEN }}"
+    domain: rudder-cli-e2e-updated
+    source_name: rudder-updated
+    create_users_as_verified: true
+    send_group_calls_without_user_id: true
+    remove_users_from_organization: true
+    search_by_external_id: true
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics
