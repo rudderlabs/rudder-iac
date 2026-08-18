@@ -16,6 +16,7 @@ func init() {
 	// `^(.{0,100})$`, which bounds length *and* forbids line breaks — a plain
 	// max=100 would let newlines through.
 	NewPattern("single_line_100", `^(.{0,100})$`, "must be at most 100 characters and must not contain line breaks")
+	NewPattern("single_line_200", `^(.{0,200})$`, "must be at most 200 characters and must not contain line breaks")
 	NewPattern("single_line_500", `^(.{0,500})$`, "must be at most 500 characters and must not contain line breaks")
 	NewPattern("single_line_1000", `^(.{0,1000})$`, "must be at most 1000 characters and must not contain line breaks")
 }

@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: statsig
+spec:
+  id: statsig
+  display_name: E2E Statsig
+  type: statsig
+  enabled: true
+  definition_version: 1
+  config:
+    secret_key: "{{ .STATSIG_SECRET_KEY }}"

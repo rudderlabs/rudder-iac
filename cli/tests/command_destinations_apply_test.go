@@ -49,6 +49,7 @@ var destinationRawSecrets = []string{
 	"marketoClientSecretXXXXXXXXXXX",
 	"salesforcePasswordXXXXXXXXXXXX",
 	"salesforceInitialAccessTokenXX",
+	"statsigSecretKeyXXXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both
