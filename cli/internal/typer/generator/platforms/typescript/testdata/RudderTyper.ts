@@ -464,39 +464,15 @@ const CustomTypeAddressDetailsKeyMap: KeyMap = {
     postalCode: "postal_code",
 };
 
-const CustomTypeFeatureConfigCaseBetaKeyMap: KeyMap = {
-    featureFlag: "feature_flag",
-};
-
-const CustomTypeFeatureConfigCaseFalseKeyMap: KeyMap = {
+const CustomTypeFeatureConfigKeyMap: KeyMap = {
     featureFlag: "feature_flag",
     firstName: "first_name",
 };
 
-const CustomTypeFeatureConfigCaseTrueKeyMap: KeyMap = {
-    featureFlag: "feature_flag",
-};
-
-const CustomTypeFeatureConfigDefaultKeyMap: KeyMap = {
-    featureFlag: "feature_flag",
-};
-
-const CustomTypePageContextCaseHomeKeyMap: KeyMap = {
-    pageType: "page_type",
-};
-
-const CustomTypePageContextCaseProductKeyMap: KeyMap = {
-    pageType: "page_type",
-    productId: "product_id",
-};
-
-const CustomTypePageContextCaseSearchKeyMap: KeyMap = {
-    pageType: "page_type",
-};
-
-const CustomTypePageContextDefaultKeyMap: KeyMap = {
+const CustomTypePageContextKeyMap: KeyMap = {
     pageData: "page_data",
     pageType: "page_type",
+    productId: "product_id",
 };
 
 const CustomTypeUserProfileKeyMap: KeyMap = {
@@ -504,23 +480,11 @@ const CustomTypeUserProfileKeyMap: KeyMap = {
     lastName: "last_name",
 };
 
-const EventWithVariantsCaseDesktopKeyMap: KeyMap = {
+const EventWithVariantsKeyMap: KeyMap = {
     deviceType: "device_type",
     firstName: "first_name",
     lastName: "last_name",
-    pageContext: "page_context",
-    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
-};
-
-const EventWithVariantsCaseMobileKeyMap: KeyMap = {
-    deviceType: "device_type",
-    pageContext: "page_context",
-    profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
-};
-
-const EventWithVariantsDefaultKeyMap: KeyMap = {
-    deviceType: "device_type",
-    pageContext: "page_context",
+    pageContext: { key: "page_context", map: CustomTypePageContextKeyMap },
     profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
     untypedField: "untyped_field",
 };
@@ -545,6 +509,7 @@ const UserSignedUpContextKeyMap: KeyMap = {
 };
 
 const UserSignedUpKeyMap: KeyMap = {
+    addresses: { key: "addresses", map: CustomTypeAddressDetailsKeyMap },
     arrayOfAny: "array_of_any",
     arrayWithNullItems: "array_with_null_items",
     context: { key: "context", map: UserSignedUpContextKeyMap },
@@ -553,7 +518,7 @@ const UserSignedUpKeyMap: KeyMap = {
     emailList: "email_list",
     emptyObjectNoAdditionalProps: "empty_object_no_additional_props",
     emptyObjectWithAdditionalProps: "empty_object_with_additional_props",
-    featureConfig: "feature_config",
+    featureConfig: { key: "feature_config", map: CustomTypeFeatureConfigKeyMap },
     mixedUnicode: "mixed_unicode",
     mixedValue: "mixed_value",
     multiTypeArray: "multi_type_array",
@@ -566,7 +531,7 @@ const UserSignedUpKeyMap: KeyMap = {
     objectProperty: "object_property",
     phoneNumbers: "phone_numbers",
     profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
-    profileList: "profile_list",
+    profileList: { key: "profile_list", map: CustomTypeUserProfileKeyMap },
     propertyOfAny: "property_of_any",
     stringOrNull: "string_or_null",
     unicodeCustomType: "unicode_custom_type",
@@ -733,20 +698,20 @@ export class RudderTyper {
             this.analytics.page(
                 arg0,
                 arg1,
-                arg2 as unknown as SDKApiObject,
+                applyKeyMap(arg2, PagePropertiesKeyMap) as unknown as SDKApiObject,
                 this.withRudderTyperContext(arg3 as ApiOptions | undefined),
                 arg4,
             );
         } else if (typeof arg0 === "string") {
             this.analytics.page(
                 arg0,
-                arg1 as unknown as SDKApiObject,
+                applyKeyMap(arg1, PagePropertiesKeyMap) as unknown as SDKApiObject,
                 this.withRudderTyperContext(arg2 as ApiOptions | undefined),
                 arg3 as ApiCallback | undefined,
             );
         } else {
             this.analytics.page(
-                arg0 as unknown as SDKApiObject,
+                applyKeyMap(arg0, PagePropertiesKeyMap) as unknown as SDKApiObject,
                 this.withRudderTyperContext(arg1 as ApiOptions | undefined),
                 arg2 as ApiCallback | undefined,
             );
@@ -845,7 +810,7 @@ export class RudderTyper {
     ): void {
         this.analytics.track(
             "Event With Variants",
-            props as unknown as SDKApiObject,
+            applyKeyMap(props, EventWithVariantsKeyMap) as unknown as SDKApiObject,
             this.withRudderTyperContext(options),
             callback,
         );

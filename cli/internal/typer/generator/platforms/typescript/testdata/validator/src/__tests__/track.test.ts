@@ -73,11 +73,11 @@ describe("RudderTyper.track", () => {
       active: true,
       profile: {
         email: "newuser@example.com",
-        firstName: "Bob",
-        lastName: "Williams",
+        first_name: "Bob",
+        last_name: "Williams",
       },
       age: 28.5,
-      arrayOfAny: [
+      array_of_any: [
         "string item",
         42,
         true,
@@ -88,20 +88,20 @@ describe("RudderTyper.track", () => {
         "contact2@example.com",
         "support@company.org",
       ],
-      deviceType: "mobile",
-      propertyOfAny: {
+      device_type: "mobile",
+      property_of_any: {
         custom_field_1: "value1",
         custom_field_2: 999,
         nested_object: { deep_field: "deep_value" },
       },
       tags: ["premium", "early-adopter", "beta-tester", "verified"],
-      untypedArray: [
+      untyped_array: [
         3.14159,
         "mixed",
         false,
         { id: 123, name: "test" },
       ],
-      untypedField: {
+      untyped_field: {
         arbitrary_key: "arbitrary_value",
         number: 42.5,
       },
@@ -122,7 +122,7 @@ describe("RudderTyper.track", () => {
     expect(event.event).toBe("User Signed Up");
     expect(event.properties).toEqual({
       active: false,
-      profile: { email: "minimal@example.com", firstName: "Charlie" },
+      profile: { email: "minimal@example.com", first_name: "Charlie" },
     });
   });
 
@@ -164,31 +164,31 @@ describe("RudderTyper.track", () => {
         active: true,
         profile: {
           email: "tablet.user@example.com",
-          firstName: "Diana",
-          lastName: "Martinez",
+          first_name: "Diana",
+          last_name: "Martinez",
         },
-        deviceType: "tablet",
+        device_type: "tablet",
       },
       {
         active: true,
-        profile: { email: "desktop.user@example.com", firstName: "Edward" },
-        deviceType: "desktop",
+        profile: { email: "desktop.user@example.com", first_name: "Edward" },
+        device_type: "desktop",
       },
       {
         active: true,
         profile: {
           email: "tv.user@example.com",
-          firstName: "Fiona",
-          lastName: "Chen",
+          first_name: "Fiona",
+          last_name: "Chen",
         },
         age: 45.0,
-        deviceType: "smartTV",
+        device_type: "smartTV",
         tags: ["smart-home", "entertainment"],
       },
       {
         active: true,
-        profile: { email: "iot@example.com", firstName: "George" },
-        deviceType: "IoT-Device",
+        profile: { email: "iot@example.com", first_name: "George" },
+        device_type: "IoT-Device",
       },
     ]);
   });
@@ -232,28 +232,28 @@ describe("RudderTyper.track", () => {
     expect(event.event).toBe("User Signed Up");
     expect(event.properties).toEqual({
       active: true,
-      profile: { email: "nest@example.com", firstName: "Nina" },
+      profile: { email: "nest@example.com", first_name: "Nina" },
       addresses: [
-        { street: "1 Main St", city: "Springfield", postalCode: "12345" },
+        { street: "1 Main St", city: "Springfield", postal_code: "12345" },
         { street: "2 Elm Rd", city: "Shelbyville" },
       ],
-      profileList: [
-        { email: "a@example.com", firstName: "Alice" },
-        { email: "b@example.com", firstName: "Bob", lastName: "Brown" },
+      profile_list: [
+        { email: "a@example.com", first_name: "Alice" },
+        { email: "b@example.com", first_name: "Bob", last_name: "Brown" },
       ],
       context: {
-        ipAddress: "203.0.113.42",
-        nestedContext: {
-          favoriteColors: ["red", "blue", "green"],
+        ip_address: "203.0.113.42",
+        nested_context: {
+          favorite_colors: ["red", "blue", "green"],
           profile: {
             email: "deep@example.com",
-            firstName: "Deep",
-            lastName: "Stack",
+            first_name: "Deep",
+            last_name: "Stack",
           },
         },
       },
-      featureConfig: { featureFlag: "beta" },
-      userAccess: { active: true, email: "access@example.com" },
+      feature_config: { feature_flag: "beta" },
+      user_access: { active: true, email: "access@example.com" },
       status: "active",
       priority: 3,
       rating: 4.5,
@@ -274,8 +274,8 @@ describe("RudderTyper.track", () => {
     expect(event.type).toBe("track");
     expect(event.event).toBe('Product "Premium" Clicked');
     expect(event.properties).toEqual({
-      specialField: "value with \"quotes\" and \\path",
-      statusCode: "404: Not Found",
+      special_field: "value with \"quotes\" and \\path",
+      status_code: "404: Not Found",
     });
   });
 
@@ -288,7 +288,7 @@ describe("RudderTyper.track", () => {
 
     expect(event.type).toBe("track");
     expect(event.event).toBe("$Variable$String");
-    expect(event.properties).toEqual({ dollarField: "$variable_name" });
+    expect(event.properties).toEqual({ dollar_field: "$variable_name" });
   });
 
   // ---- trackEventWithNameCamelCase ($eventWithNameCamelCase$!) ----

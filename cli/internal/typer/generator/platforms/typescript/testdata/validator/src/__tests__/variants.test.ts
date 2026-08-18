@@ -42,11 +42,11 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     expect(event.type).toBe("track");
     expect(event.event).toBe("Event With Variants");
     expect(event.properties).toEqual({
-      deviceType: "mobile",
+      device_type: "mobile",
       profile: {
         email: "mobile.user@example.com",
-        firstName: "Hannah",
-        lastName: "Smith",
+        first_name: "Hannah",
+        last_name: "Smith",
       },
       tags: ["mobile", "app-user"],
     });
@@ -68,12 +68,12 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     expect(event.type).toBe("track");
     expect(event.event).toBe("Event With Variants");
     expect(event.properties).toEqual({
-      deviceType: "desktop",
-      firstName: "Ian",
-      lastName: "Walker",
+      device_type: "desktop",
+      first_name: "Ian",
+      last_name: "Walker",
       profile: {
         email: "desktop.user@example.com",
-        firstName: "Ian",
+        first_name: "Ian",
       },
     });
   });
@@ -93,12 +93,12 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     expect(event.type).toBe("track");
     expect(event.event).toBe("Event With Variants");
     expect(event.properties).toEqual({
-      deviceType: "tablet",
+      device_type: "tablet",
       profile: {
         email: "tablet.user@example.com",
-        firstName: "Janet",
+        first_name: "Janet",
       },
-      untypedField: { custom: "data", count: 42 },
+      untyped_field: { custom: "data", count: 42 },
     });
   });
 
@@ -162,29 +162,29 @@ describe("RudderTyper.track — variant discriminated unions", () => {
         active: true,
         profile: {
           email: "feature.enabled@example.com",
-          firstName: "Premium",
-          lastName: "User",
+          first_name: "Premium",
+          last_name: "User",
         },
-        featureConfig: { featureFlag: true, age: 30 },
+        feature_config: { feature_flag: true, age: 30 },
       },
       {
         active: true,
         profile: {
           email: "feature.disabled@example.com",
-          firstName: "Free",
-          lastName: "User",
+          first_name: "Free",
+          last_name: "User",
         },
-        featureConfig: { featureFlag: false, firstName: "some-name" },
+        feature_config: { feature_flag: false, first_name: "some-name" },
       },
       {
         active: true,
         profile: {
           email: "feature.beta@example.com",
-          firstName: "Beta",
-          lastName: "Tester",
+          first_name: "Beta",
+          last_name: "Tester",
         },
-        featureConfig: {
-          featureFlag: "beta",
+        feature_config: {
+          feature_flag: "beta",
           tags: ["beta-user", "early-access", "experimental"],
         },
       },
@@ -192,10 +192,10 @@ describe("RudderTyper.track — variant discriminated unions", () => {
         active: true,
         profile: {
           email: "feature.alpha@example.com",
-          firstName: "Alpha",
-          lastName: "User",
+          first_name: "Alpha",
+          last_name: "User",
         },
-        featureConfig: { featureFlag: "alpha" },
+        feature_config: { feature_flag: "alpha" },
       },
     ]);
   });
@@ -239,19 +239,19 @@ describe("RudderTyper.track — variant discriminated unions", () => {
         active: true,
         profile: {
           email: "access.active@example.com",
-          firstName: "Active",
-          lastName: "User",
+          first_name: "Active",
+          last_name: "User",
         },
-        userAccess: { active: true, email: "active@example.com" },
+        user_access: { active: true, email: "active@example.com" },
       },
       {
         active: true,
         profile: {
           email: "access.inactive@example.com",
-          firstName: "Inactive",
-          lastName: "User",
+          first_name: "Inactive",
+          last_name: "User",
         },
-        userAccess: { active: false, status: "suspended" },
+        user_access: { active: false, status: "suspended" },
       },
     ]);
   });
@@ -310,40 +310,40 @@ describe("RudderTyper.track — variant discriminated unions", () => {
     ]);
     expect(events.map((e) => e.properties)).toEqual([
       {
-        deviceType: "desktop",
-        firstName: "Nested",
+        device_type: "desktop",
+        first_name: "Nested",
         profile: {
           email: "nested.search@example.com",
-          firstName: "Nested",
+          first_name: "Nested",
         },
-        pageContext: { pageType: "search", query: "discriminated unions" },
+        page_context: { page_type: "search", query: "discriminated unions" },
       },
       {
-        deviceType: "mobile",
+        device_type: "mobile",
         profile: {
           email: "nested.product@example.com",
-          firstName: "Shopper",
+          first_name: "Shopper",
         },
-        pageContext: { pageType: "product", productId: "prod-456" },
+        page_context: { page_type: "product", product_id: "prod-456" },
       },
       {
-        deviceType: "tablet",
+        device_type: "tablet",
         profile: {
           email: "nested.default@example.com",
-          firstName: "Fallback",
+          first_name: "Fallback",
         },
-        pageContext: {
-          pageType: "settings",
-          pageData: { theme: "dark", language: "en" },
+        page_context: {
+          page_type: "settings",
+          page_data: { theme: "dark", language: "en" },
         },
       },
       {
-        deviceType: "mobile",
+        device_type: "mobile",
         profile: {
           email: "nested.home@example.com",
-          firstName: "HomeUser",
+          first_name: "HomeUser",
         },
-        pageContext: { pageType: "home" },
+        page_context: { page_type: "home" },
       },
     ]);
   });

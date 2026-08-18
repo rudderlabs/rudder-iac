@@ -71,6 +71,16 @@ type TSMethodArgument struct {
 // RudderAnalytics call. Value is a pre-computed TS expression.
 type TSSDKArgument struct {
 	Value string
+	// PropsExpr is the plan-typed props/traits expression carried by this
+	// argument (e.g. "props", "arg2"), empty for every other argument. It marks
+	// the argument the key-map wiring rewrites, so no call site has to be found
+	// by inspecting Value — a rename or an extra space would silently stop the
+	// remap and put camelCased keys back on the wire.
+	PropsExpr string
+	// ValueFmt is Value with a single %s where PropsExpr sits, so the wiring can
+	// re-render the argument with the expression wrapped in applyKeyMap. Set
+	// together with PropsExpr; use propsArg rather than setting either by hand.
+	ValueFmt string
 }
 
 // TSOverloadSignature is one typed signature for an overloaded method.
@@ -107,11 +117,14 @@ type TSAnalyticsMethod struct {
 	SDKArguments    []TSSDKArgument
 	Overloads       []TSOverloadSignature
 	DispatcherBranches []TSDispatcherBranch
+	// PropsTypeName is the generated type of the plan-defined props/traits this
+	// method accepts (an interface name, a union alias, or an open Record).
+	// Empty when the method carries no plan-typed payload. The key-map wiring
+	// resolves it to the map that must be applied before the SDK call.
+	PropsTypeName string
 	// PropsKeyMapName is the name of the key map applied to the props/traits
 	// object before the SDK call (e.g. "UserSignedUpKeyMap"). Empty when the
-	// event's interface needs no remapping — in that case props are forwarded
-	// verbatim. Currently wired for track methods (the canonical case); see the
-	// nested-object note in the PR body for the limitation on identify/group/page.
+	// type needs no remapping — in that case props are forwarded verbatim.
 	PropsKeyMapName string
 }
 

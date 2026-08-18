@@ -75,10 +75,16 @@ func (g *Generator) Generate(p *plan.TrackingPlan, opts core.GenerateOptions, pl
 	}
 
 	// Key maps are built once all interfaces exist so nested references can be
-	// resolved to a fixed point. wireTrackKeyMaps then points each track method
-	// at its map (mirrors Swift carrying SerialName through toProperties).
-	needsMap := collectKeyMaps(ctx)
-	wireTrackKeyMaps(ctx, needsMap)
+	// resolved to a fixed point. wireKeyMaps then points every method carrying
+	// plan-typed props or traits at its map (mirrors Swift carrying SerialName
+	// through toProperties).
+	resolver, err := collectKeyMaps(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := wireKeyMaps(ctx, resolver); err != nil {
+		return nil, err
+	}
 
 	file, err := GenerateFile(outputFileName, ctx)
 	if err != nil {
@@ -941,7 +947,8 @@ func buildTrackMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 			Type:    interfaceName,
 			Comment: "The properties to include with this event",
 		})
-		method.SDKArguments = append(method.SDKArguments, TSSDKArgument{Value: "props as unknown as " + sdkApiObjectAlias})
+		method.PropsTypeName = interfaceName
+		method.SDKArguments = append(method.SDKArguments, propsArg("%s as unknown as "+sdkApiObjectAlias, "props"))
 		ctx.UsesSDKApiObject = true
 
 	case rule.Schema.AdditionalProperties:
@@ -1067,6 +1074,7 @@ func buildIdentityCallMethod(spec identityCallSpec) *TSAnalyticsMethod {
 		SDKMethodName:      spec.SDKMethodName,
 		Overloads:          overloads,
 		MethodArguments:    impl,
+		PropsTypeName:      spec.TraitsType,
 		DispatcherBranches: buildIdentityCallBranches(spec),
 	}
 }
@@ -1116,15 +1124,15 @@ func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 		return buildIdentityCallBranchesContextTraits(spec)
 	}
 
-	traitsCast := func(argName string) string {
-		return argName + " as unknown as " + spec.SDKTraitsType
+	traitsCast := func(argName string) TSSDKArgument {
+		return propsArg("%s as unknown as "+spec.SDKTraitsType, argName)
 	}
 
 	withID := TSDispatcherBranch{
 		Condition: fmt.Sprintf(`typeof %s === "string"`, spec.IDArgName),
 		SDKArguments: []TSSDKArgument{
 			{Value: spec.IDArgName},
-			{Value: traitsCast("traitsOrOptions")},
+			traitsCast("traitsOrOptions"),
 			{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 			{Value: "callback"},
 		},
@@ -1134,7 +1142,7 @@ func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 	if spec.AllowAnonymous {
 		branches = append(branches, TSDispatcherBranch{
 			SDKArguments: []TSSDKArgument{
-				{Value: traitsCast(spec.IDArgName)},
+				traitsCast(spec.IDArgName),
 				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
@@ -1144,8 +1152,13 @@ func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 }
 
 func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatcherBranch {
-	contextTraitsCast := func(argName string) string {
-		return argName + " as unknown as SDKApiObject"
+	// The options argument differs per branch, so it is concatenated literally;
+	// only the traits expression is a format slot, since that is what the
+	// key-map wiring rewraps.
+	contextTraitsArg := func(optionsExpr, traitsExpr string) TSSDKArgument {
+		return propsArg(
+			"this.withRudderTyperContext("+optionsExpr+" as ApiOptions | undefined, %s as unknown as SDKApiObject)",
+			traitsExpr)
 	}
 
 	withID := TSDispatcherBranch{
@@ -1153,7 +1166,7 @@ func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatche
 		SDKArguments: []TSSDKArgument{
 			{Value: spec.IDArgName},
 			{Value: "undefined"},
-			{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, " + contextTraitsCast("traitsOrOptions") + ")"},
+			contextTraitsArg("optionsOrCallback", "traitsOrOptions"),
 			{Value: "callback"},
 		},
 	}
@@ -1163,7 +1176,7 @@ func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatche
 		branches = append(branches, TSDispatcherBranch{
 			SDKArguments: []TSSDKArgument{
 				{Value: "null"},
-				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, " + contextTraitsCast(spec.IDArgName) + ")"},
+				contextTraitsArg("traitsOrOptions", spec.IDArgName),
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		})
@@ -1293,6 +1306,7 @@ func buildPageCallMethod(spec pageCallSpec) *TSAnalyticsMethod {
 		SDKMethodName:      spec.SDKMethodName,
 		Overloads:          []TSOverloadSignature{{Arguments: o1}, {Arguments: o2}, {Arguments: o3}},
 		MethodArguments:    impl,
+		PropsTypeName:      spec.PropertiesTy,
 		DispatcherBranches: buildPageCallBranches(spec),
 	}
 }
@@ -1361,15 +1375,15 @@ func buildPageCallMethodNoProps(spec pageCallSpec) *TSAnalyticsMethod {
 }
 
 func buildPageCallBranches(spec pageCallSpec) []TSDispatcherBranch {
-	cast := func(argName string) string {
-		return argName + " " + spec.PropsSDKCast
+	cast := func(argName string) TSSDKArgument {
+		return propsArg("%s "+spec.PropsSDKCast, argName)
 	}
 
 	return []TSDispatcherBranch{
 		{
 			Condition: `typeof arg0 === "string" && typeof arg1 === "string"`,
 			SDKArguments: []TSSDKArgument{
-				{Value: "arg0"}, {Value: "arg1"}, {Value: cast("arg2")},
+				{Value: "arg0"}, {Value: "arg1"}, cast("arg2"),
 				{Value: "this.withRudderTyperContext(arg3 as ApiOptions | undefined)"},
 				{Value: "arg4"},
 			},
@@ -1377,14 +1391,14 @@ func buildPageCallBranches(spec pageCallSpec) []TSDispatcherBranch {
 		{
 			Condition: `typeof arg0 === "string"`,
 			SDKArguments: []TSSDKArgument{
-				{Value: "arg0"}, {Value: cast("arg1")},
+				{Value: "arg0"}, cast("arg1"),
 				{Value: "this.withRudderTyperContext(arg2 as ApiOptions | undefined)"},
 				{Value: "arg3 as ApiCallback | undefined"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				{Value: cast("arg0")},
+				cast("arg0"),
 				{Value: "this.withRudderTyperContext(arg1 as ApiOptions | undefined)"},
 				{Value: "arg2 as ApiCallback | undefined"},
 			},

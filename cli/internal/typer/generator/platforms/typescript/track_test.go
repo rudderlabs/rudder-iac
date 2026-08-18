@@ -37,13 +37,14 @@ func TestBuildTrackMethod_NonEmptySchema(t *testing.T) {
 		Name:          "trackUserSignedUp",
 		Comment:       "Triggered on signup",
 		EventName:     "User Signed Up",
+		PropsTypeName: "UserSignedUp",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
 			{Name: "props", Type: "UserSignedUp", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"User Signed Up"`},
-			{Value: "props as unknown as SDKApiObject"},
+			propsArg("%s as unknown as SDKApiObject", "props"),
 		},
 	}, method)
 	assert.True(t, ctx.UsesSDKApiObject)
@@ -111,13 +112,14 @@ func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
 	assert.Equal(t, &TSAnalyticsMethod{
 		Name:          "trackProductPremiumClicked",
 		EventName:     `Product "Premium" Clicked`,
+		PropsTypeName: "ProductPremiumClicked",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
 			{Name: "props", Type: "ProductPremiumClicked", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"Product \"Premium\" Clicked"`},
-			{Value: "props as unknown as SDKApiObject"},
+			propsArg("%s as unknown as SDKApiObject", "props"),
 		},
 	}, method)
 }
@@ -495,4 +497,3 @@ func TestResolveArrayType_WrapsItemErrors(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Array<string | unknown>", got)
 }
-
