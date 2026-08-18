@@ -251,3 +251,9 @@
 <!-- ticket:DEX-730 -->
 - `amp`, `shopify`, `warehouse` and `cloud_source` are never declared in a definition's `SourceTypes`, even when db-config lists them: an event stream source's `type` is constrained to the SDK definitions, and `SourceTypeToken` reaches `warehouse`/`cloud_source` only through a source category the sole call site never sets. A definition declaring them advertises support no connection could match.
 - `customerio_audience` is the one exception, since `warehouse` is its only source type; it stays in the unverified registry until warehouse sources are supported.
+
+## DEX-531 — Webhook Destination Onboarding
+<!-- ticket:DEX-531 -->
+- Webhook destination source-type support intentionally keeps the full integrations-config/db-config set that the common source-type mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Webhook supports cloud-only connection mode for all retained source types.
+- Do not narrow webhook to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
