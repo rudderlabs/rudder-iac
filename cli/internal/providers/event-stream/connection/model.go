@@ -25,7 +25,7 @@ const (
 // json.Marshal/Unmarshal round-trip; validate tags drive
 // go-playground/validator checks.
 type ConnectionsSpec struct {
-	Connections []ConnectionSpec `json:"connections" mapstructure:"connections" validate:"required"`
+	Connections []ConnectionSpec `json:"connections" mapstructure:"connections" validate:"required,dive"`
 }
 
 // ConnectionSpec is a single connection entry. There is intentionally no
