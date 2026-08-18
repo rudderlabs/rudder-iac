@@ -117,6 +117,12 @@ Mechanical rules:
   [reference/source-type-mapping.md](reference/source-type-mapping.md).
   Unmapped upstream types (e.g. `amp`, `shopify`, `warehouse` when not
   CLI-owned): drop and flag in the final report — never guess.
+- `db-config.json` `supportedSourcesValidation` (when present and non-empty) →
+  `SupportedSourcesValidation`: keys translated to CLI-local source types via
+  the same mapping, values translated from API camelCase field names to
+  snake_case local keys. Drop entries whose source type was dropped from
+  `SourceTypes` and flag them in the final report. Most destinations have no
+  `supportedSourcesValidation` — omit the field then; never invent entries.
 - Source-type-gated keys: if a terraform-mapped property's API key is absent
   from `db-config.json` `destConfig.defaultConfig` but present under specific
   `destConfig.<sourceType>` lists, wrap the ported property in
@@ -151,6 +157,9 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 1. `TestNewDefinitionMetadata` — register in fresh registry, assert `Type`,
    `APIType`, `Version`, `SecretKeys()`, `SupportedSourceTypes()`,
    `ConnectionModes()` per source type, and `GetByAPIType` lookup. When the
+   definition carries `SupportedSourcesValidation`, also assert
+   `SupportedSourcesValidation(sourceType)` per configured source type and
+   `Nil` for one source type without an entry. When the
    definition has gated properties, also assert the full `GatedKeyPaths()`
    map with `assert.Equal` (JSON-pointer keypaths, e.g.
    `map[string][]string{"/mobile_api_key_android": {"android"}}`).
@@ -228,7 +237,8 @@ Final response must include:
 - E2E verification status: skip/compile result and whether the gated live run was
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
-  source types, upstream fields intentionally omitted)
+  source types, dropped `supportedSourcesValidation` entries, upstream fields
+  intentionally omitted)
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
 - Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`

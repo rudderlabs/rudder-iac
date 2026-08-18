@@ -43,5 +43,11 @@ Current mapping (local → API):
   entry in `SourceTypes` — registration errors otherwise. Copy the modes per
   source type from db-config `supportedConnectionModes` (values are `cloud`,
   `device`, `hybrid`).
+- `SupportedSourcesValidation` (from db-config `supportedSourcesValidation`,
+  when present) must be keyed by the same local types, each a member of
+  `SourceTypes`, with non-empty snake_case local config keys that exist on the
+  config struct or are source-type block keys (`connection_mode`,
+  `use_native_sdk`) — registration errors otherwise. Entries are optional per
+  source type; drop entries whose source type was dropped and flag them.
 - Consent management uses the same mapping automatically via
   `common.Properties(sourceTypes)` — no extra work per source type.

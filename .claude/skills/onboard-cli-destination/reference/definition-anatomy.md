@@ -64,6 +64,12 @@ func NewDefinition() *definitions.DestinationDefinition {
         NewConfig:  func() any { return &s3Config{} },
         SourceTypes:     append([]string(nil), sourceTypes...),
         ConnectionModes: connectionModes,
+        // Only when db-config has supportedSourcesValidation: per local source
+        // type, the snake_case local config keys required at connect time.
+        // Omit the field when upstream has none (the common case).
+        SupportedSourcesValidation: map[string][]string{
+            common.SourceTypeWeb: {"use_native_sdk"},
+        },
     }
 }
 ```
@@ -96,6 +102,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - `NewConfig` must return a pointer to struct.
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
+- `SupportedSourcesValidation` keys ⊆ `SourceTypes`, each entry non-empty, and
+  every required key must exist on the config struct or be a source-type block
+  key (`connection_mode`, `use_native_sdk`). Entries are optional per source
+  type.
 - A `consent_management` config field must be `common.ConsentManagement`.
 - `(Type, Version)` and `(APIType, Version)` must be unique.
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
