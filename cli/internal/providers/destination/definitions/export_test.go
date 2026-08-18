@@ -44,6 +44,9 @@ func GA4TestDefinition() *DestinationDefinition {
 			"web":     {"cloud", "device", "hybrid"},
 			"android": {"cloud", "device"},
 		},
+		SupportedSourcesValidation: map[string][]string{
+			"web": {"use_native_sdk"},
+		},
 	}
 }
 
