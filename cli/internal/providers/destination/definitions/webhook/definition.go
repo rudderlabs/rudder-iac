@@ -8,8 +8,12 @@ import (
 )
 
 const (
-	webhookURLPattern       = `^(https?://)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5]\d{4}|[1-9]\d{1,3}))?(/.*)?$`
-	webhookURLRejectPattern = `^https?://([^/]*\.ngrok\.io|localhost[^/:]*|[^/]*\.localhost[^/:]*)(?:[:/].*)?$`
+	webhookURLPattern = `^(https?://)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5]\d{4}|[1-9]\d{1,3}))?(/.*)?$`
+	// RE2 has no lookahead, so schema.json's two negative lookaheads become a
+	// reject pattern. Both are anchored to the position just after the scheme,
+	// which is what makes this equivalent rather than merely similar: ngrok is
+	// rejected only as the first label, while `.localhost` is rejected anywhere.
+	webhookURLRejectPattern = `^https?://([a-zA-Z0-9-]*\.ngrok\.io|localhost|.*\.localhost)`
 )
 
 func init() {
