@@ -55,8 +55,9 @@ type syncConfig struct {
 }
 
 type roleBasedAuthConfig struct {
-	// Terraform local key is i_am_role_arn (not iam_role_arn).
-	IAMRoleARN string `mapstructure:"i_am_role_arn" validate:"required,dynamic_or_pattern=single_line_100"`
+	// Local key derives from the API key iamRoleARN, matching s3 and kinesis;
+	// terraform spells its own local key i_am_role_arn.
+	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"required,dynamic_or_pattern=single_line_100"`
 }
 
 type s3StorageConfig struct {
@@ -157,7 +158,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("accessKeyID", "s3.access_key_id"),
 		converter.Simple("accessKey", "s3.access_key"),
 		converter.Simple("enableSSE", "s3.enable_sse"),
-		converter.Simple("iamRoleARN", "s3.role_based_authentication.i_am_role_arn"),
+		converter.Simple("iamRoleARN", "s3.role_based_authentication.iam_role_arn"),
 		converter.Discriminator("roleBasedAuth", converter.DiscriminatorValues{
 			"s3.access_key":                false,
 			"s3.access_key_id":             false,

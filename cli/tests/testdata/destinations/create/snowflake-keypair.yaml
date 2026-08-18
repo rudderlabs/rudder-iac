@@ -33,4 +33,4 @@ spec:
       storage_integration: RUDDER_S3_INTEGRATION
       enable_sse: false
       role_based_authentication:
-        i_am_role_arn: arn:aws:iam::000000000000:role/rudder-cli-e2e
+        iam_role_arn: arn:aws:iam::000000000000:role/rudder-cli-e2e

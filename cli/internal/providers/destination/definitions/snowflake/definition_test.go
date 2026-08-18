@@ -218,7 +218,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["s3"] = map[string]any{
 			"bucket_name": "my-snowflake-bucket",
 			"role_based_authentication": map[string]any{
-				"i_am_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
+				"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
 			},
 		}
 		errors := registered.ValidateConfig(cfg)
@@ -248,7 +248,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			"access_key_id": "AKIAEXAMPLE",
 			"access_key":    "secret-value",
 			"role_based_authentication": map[string]any{
-				"i_am_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
+				"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
 			},
 		}
 		errors := registered.ValidateConfig(cfg)
@@ -490,7 +490,7 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				"s3": {
 					"bucket_name": "example-bucket",
 					"role_based_authentication": {
-						"i_am_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess"
+						"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess"
 					},
 					"storage_integration": "s3_int"
 				}

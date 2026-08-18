@@ -1,0 +1,32 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: snowflake-gcp
+spec:
+  id: snowflake-gcp
+  display_name: E2E Snowflake GCP Updated
+  type: snowflake
+  enabled: true
+  definition_version: 1
+  config:
+    account: rudder-cli-e2e.us-east-1
+    database: RUDDER_E2E_GCP_UPD
+    warehouse: RUDDER_WH
+    user: RUDDER_CLI_E2E
+    use_key_pair_auth: false
+    password: "{{ .SNOWFLAKE_PASSWORD }}"
+    namespace: rudder_cli_e2e_gcp
+    sync:
+      frequency: "360"
+    skip_tracks_table: false
+    skip_users_table: true
+    prefer_append: true
+    manual_sync: false
+    underscore_divide_numbers: false
+    allow_users_context_traits: false
+    use_rudder_storage: false
+    cleanup_object_storage_files: false
+    gcp:
+      bucket_name: rudder-cli-e2e-gcs-updated
+      storage_integration: RUDDER_GCS_INTEGRATION
+      credentials: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy"}'
