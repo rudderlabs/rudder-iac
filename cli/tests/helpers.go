@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"testing"
 	"time"
 )
 
@@ -71,15 +70,4 @@ func (c *CmdExecutor) Execute(cmd string, args ...string) ([]byte, error) {
 
 	output, err := command.CombinedOutput()
 	return output, err
-}
-
-func allowUnverifiedDestinationsFromSharedWorkspace(t *testing.T) {
-	t.Helper()
-
-	// The coverage workflow can enable destination support for every e2e test,
-	// while the shared disposable workspace may still contain managed
-	// destinations from destination e2e runs. Any global destroy/apply/dry-run
-	// must be able to decode those unverified destination definitions while
-	// loading remote state.
-	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 }

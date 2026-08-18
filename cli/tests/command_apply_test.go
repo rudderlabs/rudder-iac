@@ -38,7 +38,6 @@ func TestProjectApply(t *testing.T) {
 	// regression — env losing to the file — would fail the snapshot comparison.
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
-	allowUnverifiedDestinationsFromSharedWorkspace(t)
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 
 	executor, err := NewCmdExecutor("")
