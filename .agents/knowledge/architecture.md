@@ -152,3 +152,9 @@
 - Slack destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/slack`.
 - Slack local config intentionally includes only Terraform-mapped fields: `webhook_url`, `identify_template`, `event_channel_settings` (`name`, `channel`, `regex`), `event_template_settings` (`name`, `template`, `regex`), `whitelisted_trait_settings`, and `consent_management`.
 - Upstream schema/db-config fields `incomingWebhooksType`, `eventChannelWebhook`, and `denyListOfEvents` are intentionally omitted from the CLI Slack config surface until they have Terraform/common mapping support; the destination onboarding workflow treats Terraform mappings as the property source of truth.
+
+## DEX-531 — Webhook Destination Onboarding
+<!-- ticket:DEX-531 -->
+- Webhook destination source-type support intentionally keeps the full integrations-config/db-config set that the common source-type mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Webhook supports cloud-only connection mode for all retained source types.
+- Do not narrow webhook to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
