@@ -112,4 +112,4 @@
 <!-- ticket:DEX-531 -->
 - Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
 - Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
-- Export masking uses one deterministic variable placeholder per dotted secret key, such as `{{ .MY_WEBHOOK_HEADERS_TO }}`, for all values matched by that path; do not generate per-array-index placeholders unless the shared secret helper naming policy changes.
+- Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
