@@ -53,6 +53,8 @@ var destinationRawSecrets = []string{
 	"salesforceInitialAccessTokenXX",
 	"statsigSecretKeyXXXXXXXXXXXXXX",
 	"zendeskApiTokenXXXXXXXXXXXXXXX",
+	"redisPasswordXXXXXXXXXXXXXXXXX",
+	"redisCaCertificateXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

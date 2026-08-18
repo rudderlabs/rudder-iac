@@ -1,0 +1,19 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "redis-tls",
+  "name": "E2E Redis TLS Updated",
+  "type": "REDIS",
+  "enabled": true,
+  "config": {
+    "address": "redis-tls-updated.example.com:6380",
+    "prefix": "rudder-cli-e2e-tls-updated",
+    "clusterMode": true,
+    "secure": true,
+    "skipVerify": false,
+    "useJSONModule": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

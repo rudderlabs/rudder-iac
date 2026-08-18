@@ -91,7 +91,44 @@ func TestRedisConfigValidation(t *testing.T) {
 		})
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/prefix", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "less than or equal to 100")
+		assert.Contains(t, errors[0].Message, "must be at most 100 characters")
+	})
+
+	// schema.json guards prefix and database with `^(.{0,100})$`, a pattern rather
+	// than a length limit — max=100 would let line breaks through.
+	t.Run("single line fields reject line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"prefix", "database"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"address": "redis.example.com:6379",
+				field:     "bad\nvalue",
+			})
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+		}
+	})
+
+	// Every pattern-guarded key here carries the `(^\{\{.*\|\|(.*)\}\}$)` branch
+	// upstream, so templates must pass regardless of the literal limit.
+	t.Run("pattern fields accept ui templates", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"address":  "{{ config.address || " + strings.Repeat("a", 150) + " }}",
+			"prefix":   "{{ config.prefix || rudder }}",
+			"database": "{{ config.database || 0 }}",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("use_json_module is a supported key", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"address":         "redis.example.com:6379",
+			"use_json_module": true,
+		})
+		assert.Empty(t, errors)
 	})
 
 	t.Run("valid minimal config", func(t *testing.T) {
@@ -204,7 +241,8 @@ func TestRedisConversionRoundTrip(t *testing.T) {
 				"prefix": "rudder",
 				"database": "1",
 				"ca_certificate": "cert-data",
-				"skip_verify": true
+				"skip_verify": true,
+				"use_json_module": true
 			}`,
 			APIJSON: `{
 				"address": "redis.example.com:6379",
@@ -214,22 +252,36 @@ func TestRedisConversionRoundTrip(t *testing.T) {
 				"prefix": "rudder",
 				"database": "1",
 				"caCertificate": "cert-data",
-				"skipVerify": true
+				"skipVerify": true,
+				"useJSONModule": true
 			}`,
 		},
 		{
-			Name: "booleans false written without SkipZeroValue",
+			// Terraform passes SkipZeroValue on password, prefix, database and
+			// caCertificate; porting it would drop these keys from the payload and
+			// surface as a phantom diff on every plan.
+			Name: "zero values survive without SkipZeroValue",
 			LocalJSON: `{
 				"address": "redis.example.com:6379",
+				"password": "",
 				"cluster_mode": false,
 				"secure": false,
-				"skip_verify": false
+				"prefix": "",
+				"database": "",
+				"ca_certificate": "",
+				"skip_verify": false,
+				"use_json_module": false
 			}`,
 			APIJSON: `{
 				"address": "redis.example.com:6379",
+				"password": "",
 				"clusterMode": false,
 				"secure": false,
-				"skipVerify": false
+				"prefix": "",
+				"database": "",
+				"caCertificate": "",
+				"skipVerify": false,
+				"useJSONModule": false
 			}`,
 		},
 		{

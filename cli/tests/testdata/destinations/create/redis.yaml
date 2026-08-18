@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: redis
+spec:
+  id: redis
+  display_name: E2E Redis
+  type: redis
+  enabled: true
+  definition_version: 1
+  config:
+    address: redis.example.com:6379
+    password: "{{ .REDIS_PASSWORD }}"
+    prefix: rudder-cli-e2e
+    database: "0"
+    cluster_mode: false
+    secure: false
+    skip_verify: false
+    use_json_module: false
