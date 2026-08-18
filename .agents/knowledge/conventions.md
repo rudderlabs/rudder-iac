@@ -78,3 +78,10 @@
 - Slack destination definitions should keep the full mapped db-config/Terraform common source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Slack supports cloud connection mode for all retained source types.
 - Do not use S3/GCS/Kinesis source-type restrictions as the precedent for Slack; Slack is not a cloud-storage destination and follows broad-source precedents such as Marketo and Salesforce.
+
+## DEX-677 — Confluent Cloud Destination Sources
+<!-- ticket:DEX-677 -->
+- Confluent Cloud should keep the broad upstream/db-config destination source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Confluent Cloud supports cloud-only connection mode for all retained source types.
+- Do not use S3/GCS/Kinesis/Google Pub/Sub source-type restrictions as the precedent for Confluent Cloud; although streaming/cloud-like, it follows broad non-storage precedents such as Marketo, Salesforce, Slack, and Facebook Conversions.
+- Confluent Cloud's schema-backed consent category/purpose blocks are source-type-scoped only to the schema keys `android`, `ios`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; exclude `android_kotlin` and `ios_swift` from those blocks even though they remain supported for the main destination and `consent_management`.

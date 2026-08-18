@@ -37,6 +37,8 @@ var destinationRawSecrets = []string{
 	"attentiveTagApiKeyXXXXXXXXXXXX",
 	"customerioAudienceApiKeyXXXXXX",
 	"customerioAudienceAppApiKeyXXX",
+	"confluentCloudApiKeyXXXXXXXXXX",
+	"confluentCloudApiSecretXXXXXXX",
 	"not-a-real-key",
 	"rudder-cli-e2e@example.iam.gserviceaccount.com",
 	"000000000000000000000",

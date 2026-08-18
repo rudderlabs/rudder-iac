@@ -26,3 +26,15 @@
 <!-- ticket:DEX-525 -->
 - CI live CLI tests failed after read-only Public API requests returned transient transport errors (`read: connection reset by peer`) for catalog categories and workspace GET calls, leaving live state half-applied and causing later assertions such as missing `test-results.json` and missing `No changes to apply`.
 - Durable mitigation: retry known transient transport errors only for idempotent API methods (`GET`, `HEAD`, `OPTIONS`) in `api/client.Client.Do`; do not retry mutating methods because the request may already have reached the server.
+
+## DEX-677 — Destination Handler Test HTTP Transport Isolation
+<!-- ticket:DEX-677 -->
+- CI/race coverage exposed that `cli/internal/providers/destination/handler_test.go` test clients built with `client.New` but without `WithHTTPClient` can fall back to the process-global default HTTP transport, causing parallel httptest-backed destination handler tests to interfere with each other.
+- The observed failure was `TestHandlerImpl_Import_TranslatesAPITypeToLocal` intermittently failing on the final `/external-id` PUT with `http: CloseIdleConnections called`.
+- Durable mitigation: give each destination handler test client its own `http.Transport` through `client.WithHTTPClient(&http.Client{Transport: transport})` and close that transport from the same test cleanup.
+- CI E2E exposed live catalog read-after-write lag in `TestProjectApply`: immediately after a successful migrated update apply, upstream verification saw only 25 of 40 resources and the following dry-run still reported properties/tracking plans as new.
+- Durable mitigation: poll catalog-backed snapshot and no-diff dry-run assertions for a short consistency window after apply, preserving the original drift signal if eventual consistency does not settle.
+- CI E2E dry-runs can fail when shared disposable workspaces contain managed unverified destinations but the global apply/destroy/dry-run path only enables destination support; the observed error was an unregistered `ATTENTIVE_TAG` destination type during destination remote loading.
+- Durable mitigation: e2e tests that may run with destination support against a shared workspace should also enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` so remote state loading can decode unverified managed destinations left by destination e2e.
+- In the test-with-coverage workflow, `RUDDERSTACK_X_DESTINATION_SUPPORT` is passed to every `cli/tests` E2E command; the unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, and opt-in `AccountsImportWorkspace`, not only destination-specific tests.
+- Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors.

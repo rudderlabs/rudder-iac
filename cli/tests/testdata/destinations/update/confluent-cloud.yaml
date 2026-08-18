@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: confluent-cloud
+spec:
+  id: confluent-cloud
+  display_name: E2E Confluent Cloud Updated
+  type: confluent_cloud
+  enabled: true
+  definition_version: 1
+  config:
+    bootstrap_server: pkc-11111.us-east1.gcp.confluent.cloud:9092
+    topic: rudder-cli-e2e-updated
+    api_key: "{{ .CONFLUENT_CLOUD_API_KEY }}"
+    api_secret: "{{ .CONFLUENT_CLOUD_API_SECRET }}"
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

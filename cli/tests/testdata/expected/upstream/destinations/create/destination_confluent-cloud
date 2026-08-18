@@ -1,0 +1,15 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "confluent-cloud",
+  "name": "E2E Confluent Cloud",
+  "type": "CONFLUENT_CLOUD",
+  "enabled": true,
+  "config": {
+    "bootstrapServer": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
+    "topic": "rudder-cli-e2e"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
