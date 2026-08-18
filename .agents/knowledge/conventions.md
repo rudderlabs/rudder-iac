@@ -72,3 +72,9 @@
 <!-- ticket:DEX-523 -->
 - Salesforce reuses the shared `single_line_100` pattern for its `^(.{1,100})$` fields rather than registering a destination-scoped near-duplicate: `required` supplies the non-empty half, so `required,dynamic_or_pattern=single_line_100` is exactly equivalent. This is the same call already recorded for Google Pub/Sub's `project_id` and LinkedIn Ads' conversion mappings.
 - Salesforce destination definitions should keep the broad source-type set when no concrete CLI mapper limitation is present: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`, with cloud-only connection mode.
+
+## DEX-525 — Slack Destination Sources
+<!-- ticket:DEX-525 -->
+- Slack destination definitions should keep the full mapped db-config/Terraform common source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Slack supports cloud connection mode for all retained source types.
+- Do not use S3/GCS/Kinesis source-type restrictions as the precedent for Slack; Slack is not a cloud-storage destination and follows broad-source precedents such as Marketo and Salesforce.

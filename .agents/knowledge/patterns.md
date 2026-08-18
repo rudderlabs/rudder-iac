@@ -100,3 +100,10 @@
 <!-- ticket:DEX-523 -->
 - Never add create/update fixture YAML without matching upstream snapshots, with or without a comment explaining the gap. `DestinationSnapshotTester` count-checks fetched destinations against the expected file set before comparing payloads, so a fixture with no snapshot fails the entire suite and takes every other destination's coverage down with it.
 - Salesforce snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly. Both `password` and `initialAccessToken` are write-only and correctly absent.
+
+## DEX-525 — Model Every schema.json Key, Even Without A Terraform Mapping
+<!-- ticket:DEX-525 -->
+- Destination update replaces the whole config object, so any key the definition does not model is absent from the payload and **erased upstream on the first apply** — including values a user set in the UI. Omitting a key does not make it "unsupported"; it makes it destroyable.
+- `schema.json` is the source of truth for which keys exist. Terraform supplies the mapping shape (reshapes, nested key names, local spelling) but does not bound the surface. Derive local keys mechanically (camelCase → snake_case) for anything terraform misses.
+- Slack is the worked example: `incomingWebhooksType`, `denyListOfEvents`, and the nested `eventChannelWebhook` have no terraform mapping. With them omitted, the gated e2e showed `incomingWebhooksType` present in the create snapshot (backend applies its `schema.json` default) and gone from the update snapshot. Modelling all three fixed it.
+- A create/update snapshot mismatch on a key the definition does not model is the signature of this bug — check for it before assuming the snapshot is simply wrong.
