@@ -85,6 +85,21 @@ func TestConnectionSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 			},
 		},
 		{
+			// Endpoint local ids carry no charset restriction and the handler
+			// accepts any non-empty id — even one spanning a newline — so the
+			// ref check must be equally lenient.
+			name: "ref id with unusual characters",
+			spec: esConnection.ConnectionsSpec{
+				Connections: []esConnection.ConnectionSpec{
+					{
+						LocalID:     "conn-1",
+						Source:      "#event-stream-source:src.1",
+						Destination: "#destination:dest\n1",
+					},
+				},
+			},
+		},
+		{
 			// An empty (but present) connections list is a valid no-op spec.
 			name: "empty connections list",
 			spec: esConnection.ConnectionsSpec{
