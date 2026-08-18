@@ -21,3 +21,8 @@
 - CI failed when `cli/tests/testdata/project/transformations-test/setup/py_transform.yaml` omitted an explicit `tests` block, causing `apply` batch publish validation to fall back to the built-in `default-events` suite.
 - The failure surfaced in `TestTransformationsTest` as `Py Transform` / `default-events` returning `Internal server error` and `batch publish validation failed`.
 - Durable mitigation: transformation setup fixtures should define deterministic input/output test suites so publish validation does not depend on broad default-event payloads.
+
+## DEX-525 — Idempotent API Transport Retry Boundary
+<!-- ticket:DEX-525 -->
+- CI live CLI tests failed after read-only Public API requests returned transient transport errors (`read: connection reset by peer`) for catalog categories and workspace GET calls, leaving live state half-applied and causing later assertions such as missing `test-results.json` and missing `No changes to apply`.
+- Durable mitigation: retry known transient transport errors only for idempotent API methods (`GET`, `HEAD`, `OPTIONS`) in `api/client.Client.Do`; do not retry mutating methods because the request may already have reached the server.
