@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: webhook
+spec:
+  id: webhook
+  display_name: E2E Webhook Updated
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://webhooks.example.com/rudder/updated
+    webhook_method: PATCH
+    headers:
+      - from: X-Rudder-Token
+        to: "{{ .WEBHOOK_HEADER_TOKEN }}"
+      - from: X-Rudder-Trace
+        to: rudder-cli-e2e
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

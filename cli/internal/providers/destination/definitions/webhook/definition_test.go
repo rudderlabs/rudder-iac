@@ -89,6 +89,23 @@ func TestWebhookConfigValidation(t *testing.T) {
 		}
 	})
 
+	// schema.json rejects ngrok only as the first label, so a host that merely
+	// ends in .ngrok.io stays valid. Pinned because a reject pattern that let the
+	// host match across dots would be stricter than the backend.
+	t.Run("webhook_url accepts hosts schema.json allows", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []string{
+			"https://a.b.ngrok.io/rudder",
+			"https://webhooks.example.com:8080/rudder",
+			"http://api.example.co.uk/rudder",
+		} {
+			config := validMinimalConfig()
+			config["webhook_url"] = value
+			assert.Empty(t, registered.ValidateConfig(config), value)
+		}
+	})
+
 	t.Run("webhook_url accepts UI template", func(t *testing.T) {
 		t.Parallel()
 

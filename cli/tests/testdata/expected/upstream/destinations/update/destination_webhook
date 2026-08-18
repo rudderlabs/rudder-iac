@@ -1,0 +1,37 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "webhook",
+  "name": "E2E Webhook Updated",
+  "type": "WEBHOOK",
+  "enabled": true,
+  "config": {
+    "webhookUrl": "https://webhooks.example.com/rudder/updated",
+    "webhookMethod": "PATCH",
+    "headers": [
+      {
+        "from": "X-Rudder-Token",
+        "to": ""
+      },
+      {
+        "from": "X-Rudder-Trace",
+        "to": ""
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
