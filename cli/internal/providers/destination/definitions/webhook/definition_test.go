@@ -304,7 +304,7 @@ func TestWebhookHeaderSecretsAreWrappedRevealedAndMasked(t *testing.T) {
 
 	payload, err := json.Marshal(entities[0].Content)
 	require.NoError(t, err)
-	assert.Contains(t, string(payload), "{{ .WEBHOOK_PRODUCTION_HEADERS_TO }}")
+	assert.Contains(t, string(payload), "{{ .WEBHOOK_PRODUCTION_HEADERS_0_TO }}")
 	assert.NotContains(t, string(payload), "safe-dummy-secret-value")
 }
 
