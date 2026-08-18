@@ -2,13 +2,14 @@ package connection
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
+	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -17,14 +18,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
-
-// ErrNotImplemented guards the list and import surfaces until DEX-654; the
-// apply lifecycle (create/update/delete + remote state) is implemented.
-var ErrNotImplemented = errors.New("event stream connection support is not implemented yet")
 
 type Handler struct {
 	resources map[string]*connectionResource
@@ -83,6 +81,9 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		if err != nil {
 			return err
 		}
+		if err := resource.addImportMetadata(s); err != nil {
+			return fmt.Errorf("loading import metadata: %w", err)
+		}
 		// When we are at this point, we expect the spec along with the
 		// localID to be valid and unique (see project/duplicate-urn rule)
 		h.resources[resource.LocalID] = resource
@@ -110,10 +111,11 @@ func (h *Handler) loadConnection(c ConnectionSpec) (*connectionResource, error) 
 	}
 
 	return &connectionResource{
-		LocalID:     c.LocalID,
-		Source:      sourceRef,
-		Destination: destinationRef,
-		Enabled:     enabled,
+		LocalID:        c.LocalID,
+		Source:         sourceRef,
+		Destination:    destinationRef,
+		Enabled:        enabled,
+		ImportMetadata: make(map[string]*WorkspaceRemoteIDMapping),
 	}, nil
 }
 
@@ -134,12 +136,21 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			DestinationKey: c.Destination,
 			EnabledKey:     c.Enabled,
 		}
+		opts := []resources.ResourceOpts{
+			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, c.LocalID)),
+		}
+		urn := resources.URN(c.LocalID, EventStreamConnectionResourceType)
+		if importMetadata, ok := c.ImportMetadata[urn]; ok {
+			opts = []resources.ResourceOpts{
+				resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId),
+			}
+		}
 		r := resources.NewResource(
 			c.LocalID,
 			EventStreamConnectionResourceType,
 			data,
 			[]string{},
-			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, c.LocalID)),
+			opts...,
 		)
 		result = append(result, r)
 	}
@@ -194,45 +205,105 @@ func refID(ref string, kind string) (string, error) {
 	return parts[1], nil
 }
 
-// LoadImportMetadata is a no-op: import support for connections lands with
-// DEX-654.
-func (h *Handler) LoadImportMetadata(_ *specs.WorkspacesImportMetadata) error {
+// addImportMetadata copies the spec's inline metadata.import entries into this
+// connection's ImportMetadata map.
+func (c *connectionResource) addImportMetadata(s *specs.Spec) error {
+	metadata, err := s.CommonMetadata()
+	if err != nil {
+		return err
+	}
+	if metadata.Import == nil {
+		return nil
+	}
+	return c.applyImportManifest(metadata.Import)
+}
+
+// applyImportManifest writes manifest entries into this connection's
+// ImportMetadata map. Shared by the inline metadata.import path
+// (addImportMetadata) and the central import-manifest broadcast
+// (Handler.LoadImportMetadata).
+func (c *connectionResource) applyImportManifest(m *specs.WorkspacesImportMetadata) error {
+	for _, workspace := range m.Workspaces {
+		for _, resource := range workspace.Resources {
+			// Support both URN field (new) and LocalID field (legacy)
+			urn := resource.URN
+			if urn == "" {
+				urn = resources.URN(resource.LocalID, EventStreamConnectionResourceType)
+			}
+			c.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
+		}
+	}
 	return nil
 }
 
-// LoadResourcesFromRemote lists the remote connections that carry an
-// externalId — the CLI-managed ones. The generic connections list also
-// returns rETL rows; only connections whose source is an event stream source
-// are kept.
-func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
-	collection := resources.NewRemoteResources()
+// LoadImportMetadata replicates the aggregated manifest into every loaded
+// connection. Each connection reads only its own URN from ImportMetadata at
+// graph time (see GetResources), so replicating the full manifest into every
+// connection is safe. Nil-safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, c := range h.resources {
+		if err := c.applyImportManifest(m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
+// eventStreamConnections pages through the connections list with the given
+// options. The generic connections list also returns rETL rows; only
+// connections whose source is an event stream source are kept. The sources
+// consulted for the filter are returned too, keyed by remote id, so callers
+// can read names and workspace ids without refetching.
+func (h *Handler) eventStreamConnections(ctx context.Context, opts ...client.ListConnectionsOption) ([]client.Connection, map[string]sourceClient.EventStreamSource, error) {
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting event stream sources: %w", err)
+		return nil, nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
-	eventStreamSourceIDs := make(map[string]struct{}, len(sources))
+	sourcesByID := make(map[string]sourceClient.EventStreamSource, len(sources))
 	for _, s := range sources {
-		eventStreamSourceIDs[s.ID] = struct{}{}
+		sourcesByID[s.ID] = s
 	}
 
-	resourceMap := make(map[string]*resources.RemoteResource)
-	page, err := h.client.ListConnections(ctx, client.WithConnectionsHasExternalID(true))
+	var conns []client.Connection
+	page, err := h.client.ListConnections(ctx, opts...)
 	for page != nil && err == nil {
 		for _, conn := range page.Connections {
-			if _, ok := eventStreamSourceIDs[conn.SourceID]; !ok {
+			if _, ok := sourcesByID[conn.SourceID]; !ok {
 				continue
 			}
-			resourceMap[conn.ID] = &resources.RemoteResource{
-				ID:         conn.ID,
-				ExternalID: conn.ExternalID,
-				Data:       conn,
-			}
+			conns = append(conns, conn)
 		}
 		page, err = h.client.NextConnections(ctx, page.Paging)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("listing event stream connections: %w", err)
+		return nil, nil, fmt.Errorf("listing event stream connections: %w", err)
+	}
+	return conns, sourcesByID, nil
+}
+
+// LoadResourcesFromRemote lists the remote connections that carry an
+// externalId — the CLI-managed ones.
+func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
+
+	conns, _, err := h.eventStreamConnections(ctx, client.WithConnectionsHasExternalID(true))
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource, len(conns))
+	for _, conn := range conns {
+		resourceMap[conn.ID] = &resources.RemoteResource{
+			ID:         conn.ID,
+			ExternalID: conn.ExternalID,
+			Data:       conn,
+		}
 	}
 
 	collection.Set(EventStreamConnectionResourceType, resourceMap)
@@ -281,16 +352,154 @@ func mapRemoteToState(conn *client.Connection, sourceURN, destinationURN string)
 	}
 }
 
-func (h *Handler) LoadImportable(_ context.Context, _ namer.Namer) (*resources.RemoteResources, error) {
-	return resources.NewRemoteResources(), nil
+// LoadImportable lists the remote event stream connections not yet managed by
+// the CLI (no externalId) and assigns each an identity derived from its
+// endpoints' names, e.g. "android-source-to-s3".
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
+
+	conns, sourcesByID, err := h.eventStreamConnections(ctx, client.WithConnectionsHasExternalID(false))
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource, len(conns))
+	if len(conns) > 0 {
+		destinations, err := h.client.GetDestinations(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting destinations: %w", err)
+		}
+		destinationNames := make(map[string]string, len(destinations))
+		for _, d := range destinations {
+			destinationNames[d.ID] = d.Name
+		}
+
+		for _, conn := range conns {
+			src := sourcesByID[conn.SourceID]
+			destinationName, ok := destinationNames[conn.DestinationID]
+			if !ok {
+				// The name only seeds the identity; a destination missing from
+				// the list falls back to its remote id.
+				destinationName = conn.DestinationID
+			}
+			externalID, err := idNamer.Name(namer.ScopeName{
+				Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
+				Scope: EventStreamConnectionResourceType,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
+			}
+			resourceMap[conn.ID] = &resources.RemoteResource{
+				ID:         conn.ID,
+				ExternalID: externalID,
+				Reference:  fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, externalID),
+				Data:       &RemoteConnection{Connection: conn, WorkspaceID: src.WorkspaceID},
+			}
+		}
+	}
+
+	collection.Set(EventStreamConnectionResourceType, resourceMap)
+	return collection, nil
 }
 
+// FormatForExport writes the importable connections as one spec of the
+// event-stream-connections kind per run. Endpoint refs resolve through the
+// merged collection — imported in the same run or already CLI-managed. A
+// connection whose endpoint resolves to neither (e.g. a destination type the
+// CLI has not onboarded) cannot be expressed as spec refs and is skipped,
+// mirroring MapRemoteToState's leniency. Matched connections (import --merge)
+// adopt an existing local spec: manifest entry only — no spec entry.
 func (h *Handler) FormatForExport(
-	_ *resources.RemoteResources,
+	collection *resources.RemoteResources,
 	_ namer.Namer,
-	_ resolver.ReferenceResolver,
+	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
-	return nil, nil, nil
+	remotes := collection.GetAll(EventStreamConnectionResourceType)
+	if len(remotes) == 0 {
+		return nil, nil, nil
+	}
+
+	// One spec file holds every connection: iterate sorted by assigned id so
+	// the emitted list is stable across runs.
+	ids := make([]string, 0, len(remotes))
+	for id := range remotes {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return remotes[ids[i]].ExternalID < remotes[ids[j]].ExternalID
+	})
+
+	workspaceMetadata := specs.WorkspaceImportMetadata{
+		Resources: make([]specs.ImportIds, 0, len(remotes)),
+	}
+	var entries []importmanifest.ImportEntry
+	items := make([]map[string]any, 0, len(remotes))
+	for _, id := range ids {
+		remote := remotes[id]
+		data, ok := remote.Data.(*RemoteConnection)
+		if !ok {
+			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream connection")
+		}
+		if workspaceMetadata.WorkspaceID != "" && workspaceMetadata.WorkspaceID != data.WorkspaceID {
+			return nil, nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
+		}
+		urn := resources.URN(remote.ExternalID, EventStreamConnectionResourceType)
+
+		if remote.MatchedWith != nil {
+			workspaceMetadata.WorkspaceID = data.WorkspaceID
+			entries = append(entries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceID,
+				URN:         urn,
+				RemoteID:    remote.ID,
+			})
+			continue
+		}
+
+		sourceRef, err := inputResolver.ResolveToReference(source.ResourceType, data.SourceID)
+		if err != nil {
+			continue
+		}
+		destinationRef, err := inputResolver.ResolveToReference(destination.DestinationResourceType, data.DestinationID)
+		if err != nil {
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceID
+		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
+			URN:      urn,
+			RemoteID: remote.ID,
+		})
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         urn,
+			RemoteID:    remote.ID,
+		})
+		items = append(items, map[string]any{
+			IDKey:          remote.ExternalID,
+			SourceKey:      sourceRef,
+			DestinationKey: destinationRef,
+			EnabledKey:     data.IsEnabled,
+		})
+	}
+
+	if len(items) == 0 {
+		return nil, entries, nil
+	}
+
+	spec, err := handlers.ToImportSpec(
+		EventStreamConnectionResourceKind,
+		MetadataName,
+		workspaceMetadata,
+		map[string]any{"connections": items},
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
+	}
+
+	return []writer.FormattableEntity{{
+		Content:      spec,
+		RelativePath: ImportPath,
+	}}, entries, nil
 }
 
 // Create creates the connection remotely. By the time it runs the syncer has
@@ -367,10 +576,78 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	return nil
 }
 
-func (h *Handler) List(_ context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
-	return nil, ErrNotImplemented
+// List reports every event stream connection in the workspace — managed or
+// not; rows carrying an externalId are the CLI-managed ones.
+func (h *Handler) List(ctx context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
+	conns, _, err := h.eventStreamConnections(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]resources.ResourceData, 0, len(conns))
+	for _, conn := range conns {
+		resourceData := resources.ResourceData{
+			IDKey:            conn.ID,
+			SourceIDKey:      conn.SourceID,
+			DestinationIDKey: conn.DestinationID,
+			EnabledKey:       conn.IsEnabled,
+		}
+		if conn.ExternalID != "" {
+			resourceData[ExternalIDKey] = conn.ExternalID
+		}
+		result = append(result, resourceData)
+	}
+
+	return result, nil
 }
 
-func (h *Handler) Import(_ context.Context, _ string, _ resources.ResourceData, _ string) (*resources.ResourceData, error) {
-	return nil, ErrNotImplemented
+// Import adopts an existing remote connection into CLI management: it pushes
+// the spec's enabled flag and endpoints via Update (same reconciliation path
+// as a regular apply), then sets the external ID last so a failed Update
+// never leaves a partially-adopted resource behind.
+func (h *Handler) Import(ctx context.Context, id string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
+	remote, err := h.client.GetConnection(ctx, remoteId)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream connection during import: %w", err)
+	}
+
+	// The generic /v2/connections API serves rETL rows too; refuse to adopt a
+	// row whose source is not an event stream source (e.g. a stale or
+	// hand-edited import manifest) before Update mutates it.
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+	isEventStream := false
+	for _, s := range sources {
+		if s.ID == remote.SourceID {
+			isEventStream = true
+			break
+		}
+	}
+	if !isEventStream {
+		return nil, fmt.Errorf("connection %q is not an event stream connection", remoteId)
+	}
+
+	existingState := resources.ResourceData{
+		IDKey:            remote.ID,
+		SourceIDKey:      remote.SourceID,
+		DestinationIDKey: remote.DestinationID,
+		EnabledKey:       remote.IsEnabled,
+	}
+
+	result, err := h.Update(ctx, id, data, existingState)
+	if err != nil {
+		return nil, fmt.Errorf("updating event stream connection during import: %w", err)
+	}
+
+	// An endpoint change during import is a replacement: Update deleted the
+	// remote row and created a new one whose create body already carried the
+	// externalId, so there is nothing left to stamp it on.
+	if (*result)[IDKey] == remoteId {
+		if err := h.client.SetConnectionExternalID(ctx, remoteId, id); err != nil {
+			return nil, fmt.Errorf("setting external ID for event stream connection during import: %w", err)
+		}
+	}
+	return result, nil
 }
