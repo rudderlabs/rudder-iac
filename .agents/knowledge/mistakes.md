@@ -32,3 +32,5 @@
 - CI/race coverage exposed that `cli/internal/providers/destination/handler_test.go` test clients built with `client.New` but without `WithHTTPClient` can fall back to the process-global default HTTP transport, causing parallel httptest-backed destination handler tests to interfere with each other.
 - The observed failure was `TestHandlerImpl_Import_TranslatesAPITypeToLocal` intermittently failing on the final `/external-id` PUT with `http: CloseIdleConnections called`.
 - Durable mitigation: give each destination handler test client its own `http.Transport` through `client.WithHTTPClient(&http.Client{Transport: transport})` and close that transport from the same test cleanup.
+- CI E2E exposed live catalog read-after-write lag in `TestProjectApply`: immediately after a successful migrated update apply, upstream verification saw only 25 of 40 resources and the following dry-run still reported properties/tracking plans as new.
+- Durable mitigation: poll catalog-backed snapshot and no-diff dry-run assertions for a short consistency window after apply, preserving the original drift signal if eventual consistency does not settle.
