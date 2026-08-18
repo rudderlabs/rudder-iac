@@ -15,11 +15,10 @@ import (
 
 // scalarRefRegex matches any well-formed scalar reference "#<kind>:<id>" so a
 // ref pointing at the wrong kind can be told apart from a malformed one. The
-// id side deliberately accepts anything non-empty ((?s) lets it span newlines)
-// — endpoint local ids carry no charset restriction and the handler's parser
-// is equally lenient, so a stricter pattern here could reject a spec that
-// would apply cleanly.
-var scalarRefRegex = regexp.MustCompile(`(?s)^#([a-zA-Z0-9_-]+):(.+)$`)
+// id side deliberately accepts any non-empty single-line value — endpoint
+// local ids carry no charset restriction, but neither the kind nor the id may
+// span multiple lines.
+var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
 
 var validateConnectionsSpec = func(
 	_ string,

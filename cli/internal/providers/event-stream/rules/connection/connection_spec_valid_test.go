@@ -85,16 +85,15 @@ func TestConnectionSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 			},
 		},
 		{
-			// Endpoint local ids carry no charset restriction and the handler
-			// accepts any non-empty id — even one spanning a newline — so the
-			// ref check must be equally lenient.
+			// Endpoint local ids carry no charset restriction, so the ref
+			// check accepts any non-empty single-line id.
 			name: "ref id with unusual characters",
 			spec: esConnection.ConnectionsSpec{
 				Connections: []esConnection.ConnectionSpec{
 					{
 						LocalID:     "conn-1",
 						Source:      "#event-stream-source:src.1",
-						Destination: "#destination:dest\n1",
+						Destination: "#destination:dest.1",
 					},
 				},
 			},
@@ -210,6 +209,25 @@ func TestConnectionSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 					{
 						LocalID:     "conn-1",
 						Source:      "#event-stream-source:",
+						Destination: "#destination:dest-1",
+					},
+				},
+			},
+			wantResults: []rules.ValidationResult{
+				{
+					Reference: "/connections/0/source",
+					Message:   "'source' is invalid: must be of pattern #event-stream-source:<id>",
+				},
+			},
+		},
+		{
+			// Neither the kind nor the id may span multiple lines.
+			name: "source ref id spanning multiple lines",
+			spec: esConnection.ConnectionsSpec{
+				Connections: []esConnection.ConnectionSpec{
+					{
+						LocalID:     "conn-1",
+						Source:      "#event-stream-source:src\n1",
 						Destination: "#destination:dest-1",
 					},
 				},
