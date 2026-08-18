@@ -8,7 +8,19 @@
   "enabled": true,
   "config": {
     "bootstrapServer": "pkc-11111.us-east1.gcp.confluent.cloud:9092",
-    "topic": "rudder-cli-e2e-updated"
+    "topic": "rudder-cli-e2e-updated",
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

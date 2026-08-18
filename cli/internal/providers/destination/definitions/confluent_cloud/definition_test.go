@@ -107,17 +107,18 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("single line fields accept ui templates", func(t *testing.T) {
+	// Unlike most destinations, confluent_cloud's schema.json patterns are bare
+	// `^(.{0,100})$` with no `(^\{\{.*\|\|(.*)\}\}$)` branch, so the backend
+	// rejects UI templates here. Hence plain `pattern=`, not `dynamic_or_pattern=`.
+	t.Run("ui templates rejected past the literal limit", func(t *testing.T) {
 		t.Parallel()
+		config := minimalConfig()
+		config["topic"] = "{{ config.topic || " + strings.Repeat("a", 101) + " }}"
 
-		errors := registered.ValidateConfig(map[string]any{
-			"bootstrap_server": "{{ config.bootstrapServer || pkc-00000.us-central1.gcp.confluent.cloud:9092 }}",
-			"topic":            "{{ config.topic || rudder-cli-e2e }}",
-			"api_key":          "{{ config.apiKey || fallback-key }}",
-			"api_secret":       "{{ config.apiSecret || fallback-secret }}",
-		})
+		errors := registered.ValidateConfig(config)
 
-		assert.Empty(t, errors)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/topic", errors[0].Path)
 	})
 
 	t.Run("deprecated env references get no template exemption", func(t *testing.T) {
@@ -176,7 +177,7 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	t.Run("valid full config with consent category and purpose blocks", func(t *testing.T) {
+	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
 		config["consent_management"] = map[string]any{
@@ -187,12 +188,6 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 					"consents":            []any{"analytics", "marketing"},
 				},
 			},
-		}
-		config["one_trust_cookie_categories"] = map[string]any{
-			"react_native": []any{map[string]any{"one_trust_cookie_category": "C0002"}},
-		}
-		config["ketch_consent_purposes"] = map[string]any{
-			"ios": []any{map[string]any{"purpose": "analytics"}},
 		}
 
 		errors := registered.ValidateConfig(config)
@@ -214,18 +209,23 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "source type 'cloud_source' is not supported")
 	})
 
-	t.Run("unsupported consent category source rejected", func(t *testing.T) {
+	// schema.json declares oneTrustCookieCategories and ketchConsentPurposes, but
+	// they are deliberately not modelled: when a payload carries them without
+	// consentManagement the backend migrates them into consentManagement and drops
+	// the legacy keys, so the CLI would re-send them on every apply forever.
+	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
-		config := minimalConfig()
-		config["one_trust_cookie_categories"] = map[string]any{
-			"android_kotlin": []any{map[string]any{"one_trust_cookie_category": "C0002"}},
+
+		for _, key := range []string{"one_trust_cookie_categories", "ketch_consent_purposes"} {
+			config := minimalConfig()
+			config[key] = map[string]any{"web": []any{}}
+
+			errors := registered.ValidateConfig(config)
+
+			require.Len(t, errors, 1, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "unknown config field")
 		}
-
-		errors := registered.ValidateConfig(config)
-
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/one_trust_cookie_categories/android_kotlin", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
@@ -261,50 +261,6 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "only one consent entry")
 	})
 
-	t.Run("purpose and cookie category values reject invalid literals", func(t *testing.T) {
-		t.Parallel()
-
-		cases := []struct {
-			name   string
-			config map[string]any
-			path   string
-		}{
-			{
-				name: "one trust category over 100 characters",
-				config: map[string]any{
-					"one_trust_cookie_categories": map[string]any{
-						"web": []any{map[string]any{"one_trust_cookie_category": strings.Repeat("a", 101)}},
-					},
-				},
-				path: "/one_trust_cookie_categories/web/0/one_trust_cookie_category",
-			},
-			{
-				name: "ketch purpose with line break",
-				config: map[string]any{
-					"ketch_consent_purposes": map[string]any{
-						"web": []any{map[string]any{"purpose": "bad\npurpose"}},
-					},
-				},
-				path: "/ketch_consent_purposes/web/0/purpose",
-			},
-		}
-
-		for _, tc := range cases {
-			tc := tc
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-				config := minimalConfig()
-				for key, value := range tc.config {
-					config[key] = value
-				}
-
-				errors := registered.ValidateConfig(config)
-
-				require.Len(t, errors, 1)
-				assert.Equal(t, tc.path, errors[0].Path)
-			})
-		}
-	})
 }
 
 func TestConfluentCloudConversionRoundTrip(t *testing.T) {
@@ -349,37 +305,6 @@ func TestConfluentCloudConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}]
-				}
-			}`,
-		},
-		{
-			Name: "consent category and purpose blocks",
-			LocalJSON: `{
-				"bootstrap_server": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
-				"topic": "rudder-cli-e2e",
-				"api_key": "confluent-cloud-api-key",
-				"api_secret": "confluent-cloud-api-secret",
-				"one_trust_cookie_categories": {
-					"android": [{"one_trust_cookie_category": "C0002"}],
-					"react_native": [{"one_trust_cookie_category": "C0003"}]
-				},
-				"ketch_consent_purposes": {
-					"ios": [{"purpose": "analytics"}],
-					"web": [{"purpose": "marketing"}]
-				}
-			}`,
-			APIJSON: `{
-				"bootstrapServer": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
-				"topic": "rudder-cli-e2e",
-				"apiKey": "confluent-cloud-api-key",
-				"apiSecret": "confluent-cloud-api-secret",
-				"oneTrustCookieCategories": {
-					"android": [{"oneTrustCookieCategory": "C0002"}],
-					"reactnative": [{"oneTrustCookieCategory": "C0003"}]
-				},
-				"ketchConsentPurposes": {
-					"ios": [{"purpose": "analytics"}],
-					"web": [{"purpose": "marketing"}]
 				}
 			}`,
 		},

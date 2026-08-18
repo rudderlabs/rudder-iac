@@ -262,7 +262,7 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"cloud", "device", "hybrid"}, modes)
 
-	assert.Equal(t, []string{"connection_mode", "ketch_consent_purposes", "one_trust_cookie_categories", "use_native_sdk"}, registered.SourceTypeConfigKeys())
+	assert.Equal(t, []string{"connection_mode", "use_native_sdk"}, registered.SourceTypeConfigKeys())
 
 	local := map[string]any{
 		"api_secret":     "secret",

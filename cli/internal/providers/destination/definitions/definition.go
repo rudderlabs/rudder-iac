@@ -10,8 +10,6 @@ import (
 
 var sourceTypeConfigKeys = []string{
 	"connection_mode",
-	"ketch_consent_purposes",
-	"one_trust_cookie_categories",
 	"use_native_sdk",
 }
 

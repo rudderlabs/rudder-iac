@@ -13,3 +13,8 @@ spec:
     topic: rudder-cli-e2e-updated
     api_key: "{{ .CONFLUENT_CLOUD_API_KEY }}"
     api_secret: "{{ .CONFLUENT_CLOUD_API_SECRET }}"
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics
