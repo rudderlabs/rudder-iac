@@ -3,10 +3,13 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var ErrResourceNotFound = fmt.Errorf("resource not found")
@@ -72,19 +75,11 @@ func (c *Client) URL(path string) string {
 }
 
 func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.URL(path), body)
+	res, err := c.doRequest(ctx, method, path, body)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("User-Agent", c.userAgent)
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.accessToken))
-
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
 	defer res.Body.Close()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -105,6 +100,73 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 	}
 
 	return data, nil
+}
+
+func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	attempts := 1
+	if isRetryableMethod(method) {
+		attempts = 3
+	}
+
+	var err error
+	for attempt := range attempts {
+		req, reqErr := http.NewRequestWithContext(ctx, method, c.URL(path), body)
+		if reqErr != nil {
+			return nil, reqErr
+		}
+
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("User-Agent", c.userAgent)
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.accessToken))
+
+		var res *http.Response
+		res, err = c.httpClient.Do(req)
+		if err == nil {
+			return res, nil
+		}
+		if attempt == attempts-1 || ctx.Err() != nil || !isRetryableTransportError(err) {
+			return nil, err
+		}
+
+		timer := time.NewTimer(time.Duration(attempt+1) * 100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	return nil, err
+}
+
+func isRetryableMethod(method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+func isRetryableTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary()) {
+		return true
+	}
+
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "unexpected eof")
 }
 
 func (c *Client) service(basePath string) *service {
