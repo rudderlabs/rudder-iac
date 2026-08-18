@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: redis-tls
+spec:
+  id: redis-tls
+  display_name: E2E Redis TLS Updated
+  type: redis
+  enabled: true
+  definition_version: 1
+  config:
+    address: redis-tls-updated.example.com:6380
+    password: "{{ .REDIS_PASSWORD }}"
+    prefix: rudder-cli-e2e-tls-updated
+    cluster_mode: true
+    secure: true
+    ca_certificate: "{{ .REDIS_CA_CERTIFICATE }}"
+    skip_verify: false
+    use_json_module: false

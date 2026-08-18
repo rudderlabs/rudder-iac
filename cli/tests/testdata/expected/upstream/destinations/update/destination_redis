@@ -1,0 +1,32 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "redis",
+  "name": "E2E Redis Updated",
+  "type": "REDIS",
+  "enabled": true,
+  "config": {
+    "address": "redis-updated.example.com:6379",
+    "prefix": "rudder-cli-e2e-updated",
+    "database": "1",
+    "clusterMode": false,
+    "secure": false,
+    "skipVerify": false,
+    "useJSONModule": true,
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
