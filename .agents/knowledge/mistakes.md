@@ -26,3 +26,9 @@
 <!-- ticket:DEX-525 -->
 - CI live CLI tests failed after read-only Public API requests returned transient transport errors (`read: connection reset by peer`) for catalog categories and workspace GET calls, leaving live state half-applied and causing later assertions such as missing `test-results.json` and missing `No changes to apply`.
 - Durable mitigation: retry known transient transport errors only for idempotent API methods (`GET`, `HEAD`, `OPTIONS`) in `api/client.Client.Do`; do not retry mutating methods because the request may already have reached the server.
+
+## DEX-677 — Destination Handler Test HTTP Transport Isolation
+<!-- ticket:DEX-677 -->
+- CI/race coverage exposed that `cli/internal/providers/destination/handler_test.go` test clients built with `client.New` but without `WithHTTPClient` can fall back to the process-global default HTTP transport, causing parallel httptest-backed destination handler tests to interfere with each other.
+- The observed failure was `TestHandlerImpl_Import_TranslatesAPITypeToLocal` intermittently failing on the final `/external-id` PUT with `http: CloseIdleConnections called`.
+- Durable mitigation: give each destination handler test client its own `http.Transport` through `client.WithHTTPClient(&http.Client{Transport: transport})` and close that transport from the same test cleanup.
