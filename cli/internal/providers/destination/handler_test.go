@@ -31,7 +31,14 @@ import (
 // newTestClient builds a *client.Client pointed at the httptest server.
 func newTestClient(t *testing.T, baseURL string) *client.Client {
 	t.Helper()
-	c, err := client.New("test-token", client.WithBaseURL(baseURL))
+	transport := &http.Transport{}
+	t.Cleanup(transport.CloseIdleConnections)
+
+	c, err := client.New(
+		"test-token",
+		client.WithBaseURL(baseURL),
+		client.WithHTTPClient(&http.Client{Transport: transport}),
+	)
 	require.NoError(t, err)
 	return c
 }
