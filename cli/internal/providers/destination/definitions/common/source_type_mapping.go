@@ -5,9 +5,13 @@ import (
 	"strings"
 )
 
-// Source definition categories, mirroring the backend's SOURCE_CATEGORIES
-// (rudder-config-backend src/utils/constants.ts). SDK event-stream sources
-// carry no category.
+// Source definition categories that affect source-type resolution, mirroring
+// the backend's SOURCE_CATEGORIES (rudder-config-backend
+// src/utils/constants.ts). Only rETL-side source definitions (cloud-extract,
+// singer, warehouse-action) carry these categories; the SDK source
+// definitions the CLI event-stream provider manages (javascript, android,
+// ...) have a null category upstream, so callers pass an empty category for
+// them and resolution falls through to the type switch.
 const (
 	SourceCategoryCloud     = "cloud"
 	SourceCategorySinger    = "singer-protocol"
