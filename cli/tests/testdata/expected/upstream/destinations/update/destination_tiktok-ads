@@ -1,0 +1,48 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "tiktok-ads",
+  "name": "E2E TikTok Ads Updated",
+  "type": "TIKTOK_ADS",
+  "enabled": true,
+  "config": {
+    "pixelCode": "C0000000000000000011",
+    "version": "v2",
+    "hashUserProperties": false,
+    "sendCustomEvents": true,
+    "eventsToStandard": [
+      {
+        "from": "Order Completed",
+        "to": "Purchase"
+      },
+      {
+        "from": "Product Added",
+        "to": "AddToCart"
+      }
+    ],
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "web": false
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

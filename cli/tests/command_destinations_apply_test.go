@@ -26,6 +26,7 @@ var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "create
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
+	"tiktokAdsAccessTokenXXXXXXXXXX",
 	"brazeRestApiKeyXXXXXXXXXXXXXX",
 	"activeCampaignApiKeyXXXXXXXXXX",
 	"activeCampaignEventKeyXXXXXXXX",

@@ -1,0 +1,35 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "tiktok-ads",
+  "name": "E2E TikTok Ads",
+  "type": "TIKTOK_ADS",
+  "enabled": true,
+  "config": {
+    "pixelCode": "C0000000000000000001",
+    "version": "v2",
+    "hashUserProperties": true,
+    "sendCustomEvents": false,
+    "eventsToStandard": [
+      {
+        "from": "Order Completed",
+        "to": "CompletePayment"
+      }
+    ],
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Added"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "web": true
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

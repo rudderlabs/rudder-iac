@@ -1,0 +1,26 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "tiktok-ads-blacklist",
+  "name": "E2E TikTok Ads Blacklist",
+  "type": "TIKTOK_ADS",
+  "enabled": true,
+  "config": {
+    "pixelCode": "C0000000000000000002",
+    "version": "v1",
+    "hashUserProperties": false,
+    "sendCustomEvents": true,
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "useNativeSDK": {
+      "web": false
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -101,17 +101,20 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("invalid connection_mode.web rejected", func(t *testing.T) {
+	// connection_mode is not destination config: no other definition models it,
+	// and per-source connection modes belong to the connections work. The
+	// definition still advertises them via ConnectionModes() metadata.
+	t.Run("connection_mode is not a supported key", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"pixel_code": "C12345",
 			"connection_mode": map[string]any{
-				"web": "hybrid",
+				"web": "device",
 			},
 		})
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode/web", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "must be one of")
+		assert.Equal(t, "/connection_mode", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
 	t.Run("valid minimal config", func(t *testing.T) {
@@ -138,10 +141,6 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
-			"connection_mode": map[string]any{
-				"web":   "device",
-				"cloud": "cloud",
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -166,16 +165,6 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 				map[string]any{"from": "Signed Up", "to": "CompleteRegistration"},
 			},
 			"event_filtering_blacklist": []any{"Page Viewed"},
-			"connection_mode": map[string]any{
-				"android":        "cloud",
-				"android_kotlin": "cloud",
-				"ios":            "cloud",
-				"ios_swift":      "cloud",
-				"react_native":   "cloud",
-				"flutter":        "cloud",
-				"cordova":        "cloud",
-				"unity":          "cloud",
-			},
 		})
 		assert.Empty(t, errors)
 	})
@@ -246,8 +235,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 					{"from": "Order Completed", "to": "CompletePayment"}
 				],
 				"event_filtering_whitelist": ["Order Completed", "Product Added"],
-				"use_native_sdk": {"web": true},
-				"connection_mode": {"web": "device", "cloud": "cloud"}
+				"use_native_sdk": {"web": true}
 			}`,
 			APIJSON: `{
 				"pixelCode": "C12345",
@@ -263,8 +251,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Added"}
 				],
 				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {"web": true},
-				"connectionMode": {"web": "device", "cloud": "cloud"}
+				"useNativeSDK": {"web": true}
 			}`,
 		},
 		{

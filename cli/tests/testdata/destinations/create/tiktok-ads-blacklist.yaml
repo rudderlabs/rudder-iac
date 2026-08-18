@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: tiktok-ads-blacklist
+spec:
+  id: tiktok-ads-blacklist
+  display_name: E2E TikTok Ads Blacklist
+  type: tiktok_ads
+  enabled: true
+  definition_version: 1
+  config:
+    pixel_code: C0000000000000000002
+    access_token: "{{ .TIKTOK_ADS_ACCESS_TOKEN }}"
+    version: v1
+    hash_user_properties: false
+    send_custom_events: true
+    event_filtering_blacklist:
+      - Page Viewed
+    use_native_sdk:
+      web: false
