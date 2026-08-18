@@ -107,3 +107,9 @@
 - `schema.json` is the source of truth for which keys exist. Terraform supplies the mapping shape (reshapes, nested key names, local spelling) but does not bound the surface. Derive local keys mechanically (camelCase → snake_case) for anything terraform misses.
 - Slack is the worked example: `incomingWebhooksType`, `denyListOfEvents`, and the nested `eventChannelWebhook` have no terraform mapping. With them omitted, the gated e2e showed `incomingWebhooksType` present in the create snapshot (backend applies its `schema.json` default) and gone from the update snapshot. Modelling all three fixed it.
 - A create/update snapshot mismatch on a key the definition does not model is the signature of this bug — check for it before assuming the snapshot is simply wrong.
+
+## DEX-677 — Confluent Cloud Snapshot Coverage
+<!-- ticket:DEX-677 -->
+- Confluent Cloud destination apply E2E fixtures should include matching expected upstream snapshots when fixture YAML is added, keeping the destination snapshot count guard safe.
+- For Confluent Cloud snapshots, write-only `api_key` and `api_secret` are expected to be absent from upstream payloads, while non-secret `bootstrapServer` and `topic` remain.
+- If a gated live destination run shows extra backend defaults for API type `CONFLUENT_CLOUD`, adjust the expected upstream destination snapshots rather than removing the count-guard-safe fixture coverage.

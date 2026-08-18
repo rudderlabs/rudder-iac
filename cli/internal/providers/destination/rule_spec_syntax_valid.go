@@ -143,7 +143,7 @@ func (r *specSyntaxValidRule) unsupportedTypeMessage(destType string) string {
 }
 
 // sourceTypeKeyResults flags platform keys under source-type-scoped config
-// blocks (connection_mode, use_native_sdk, consent_management) that the
+// blocks (connection_mode, consent/purpose blocks, use_native_sdk) that the
 // definition does not support — invalid regardless of project connections.
 func sourceTypeKeyResults(def *definitions.RegisteredDefinition, spec *DestinationSpec) []vrules.ValidationResult {
 	localKeys := def.LocalSourceTypeKeys()

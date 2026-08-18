@@ -17,10 +17,12 @@ import (
 // model accepts arbitrary platform keys — the source-type key check is then
 // the only guard, which is exactly what these tests exercise.
 type ruleTestConfig struct {
-	WebhookURL        string                   `mapstructure:"webhook_url" validate:"required"`
-	ConnectionMode    map[string]string        `mapstructure:"connection_mode"`
-	UseNativeSDK      map[string]bool          `mapstructure:"use_native_sdk"`
-	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+	WebhookURL               string                         `mapstructure:"webhook_url" validate:"required"`
+	ConnectionMode           map[string]string              `mapstructure:"connection_mode"`
+	KetchConsentPurposes     map[string][]map[string]string `mapstructure:"ketch_consent_purposes"`
+	OneTrustCookieCategories map[string][]map[string]string `mapstructure:"one_trust_cookie_categories"`
+	UseNativeSDK             map[string]bool                `mapstructure:"use_native_sdk"`
+	ConsentManagement        common.ConsentManagement       `mapstructure:"consent_management"`
 }
 
 func ruleTestRegistry(t *testing.T) *definitions.Registry {
@@ -345,6 +347,36 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			expected: []vrules.ValidationResult{
 				{
 					Reference: "/spec/config/use_native_sdk/ios",
+					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
+				},
+			},
+		},
+		{
+			name: "unsupported source type under one_trust_cookie_categories",
+			config: map[string]any{
+				"webhook_url": "https://example.com/hook",
+				"one_trust_cookie_categories": map[string]any{
+					"ios": []any{map[string]any{"one_trust_cookie_category": "analytics"}},
+				},
+			},
+			expected: []vrules.ValidationResult{
+				{
+					Reference: "/spec/config/one_trust_cookie_categories/ios",
+					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
+				},
+			},
+		},
+		{
+			name: "unsupported source type under ketch_consent_purposes",
+			config: map[string]any{
+				"webhook_url": "https://example.com/hook",
+				"ketch_consent_purposes": map[string]any{
+					"ios": []any{map[string]any{"purpose": "analytics"}},
+				},
+			},
+			expected: []vrules.ValidationResult{
+				{
+					Reference: "/spec/config/ketch_consent_purposes/ios",
 					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
 				},
 			},

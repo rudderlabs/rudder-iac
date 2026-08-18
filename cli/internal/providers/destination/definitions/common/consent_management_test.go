@@ -111,6 +111,62 @@ func TestPropertiesMapsEveryKnownSourceTypeBothWays(t *testing.T) {
 	assert.Equal(t, local, back)
 }
 
+func TestOneTrustCookieCategoryProperties(t *testing.T) {
+	t.Parallel()
+
+	props := common.OneTrustCookieCategoryProperties([]string{"android_kotlin", "react_native"})
+	require.Len(t, props, 2)
+
+	local := map[string]any{
+		"one_trust_cookie_categories": map[string]any{
+			"android_kotlin": []any{map[string]any{"one_trust_cookie_category": "analytics"}},
+			"react_native":   []any{map[string]any{"one_trust_cookie_category": "marketing"}},
+		},
+	}
+	expectedAPI := map[string]any{
+		"oneTrustCookieCategories": map[string]any{
+			"androidKotlin": []any{map[string]any{"oneTrustCookieCategory": "analytics"}},
+			"reactnative":   []any{map[string]any{"oneTrustCookieCategory": "marketing"}},
+		},
+	}
+
+	api, err := converter.LocalToAPI(props, local)
+	require.NoError(t, err)
+	assert.Equal(t, expectedAPI, api)
+
+	back, err := converter.APIToLocal(props, expectedAPI)
+	require.NoError(t, err)
+	assert.Equal(t, local, back)
+}
+
+func TestKetchConsentPurposeProperties(t *testing.T) {
+	t.Parallel()
+
+	props := common.KetchConsentPurposeProperties([]string{"ios_swift", "web"})
+	require.Len(t, props, 2)
+
+	local := map[string]any{
+		"ketch_consent_purposes": map[string]any{
+			"ios_swift": []any{map[string]any{"purpose": "essential"}},
+			"web":       []any{map[string]any{"purpose": "analytics"}},
+		},
+	}
+	expectedAPI := map[string]any{
+		"ketchConsentPurposes": map[string]any{
+			"iosSwift": []any{map[string]any{"purpose": "essential"}},
+			"web":      []any{map[string]any{"purpose": "analytics"}},
+		},
+	}
+
+	api, err := converter.LocalToAPI(props, local)
+	require.NoError(t, err)
+	assert.Equal(t, expectedAPI, api)
+
+	back, err := converter.APIToLocal(props, expectedAPI)
+	require.NoError(t, err)
+	assert.Equal(t, local, back)
+}
+
 func TestAssertConversionHarness(t *testing.T) {
 	t.Parallel()
 

@@ -152,3 +152,9 @@
 - Slack destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/slack`.
 - Slack local config intentionally includes only Terraform-mapped fields: `webhook_url`, `identify_template`, `event_channel_settings` (`name`, `channel`, `regex`), `event_template_settings` (`name`, `template`, `regex`), `whitelisted_trait_settings`, and `consent_management`.
 - Upstream schema/db-config fields `incomingWebhooksType`, `eventChannelWebhook`, and `denyListOfEvents` are intentionally omitted from the CLI Slack config surface until they have Terraform/common mapping support; the destination onboarding workflow treats Terraform mappings as the property source of truth.
+
+## DEX-677 — Confluent Cloud Destination Onboarding
+<!-- ticket:DEX-677 -->
+- `confluent_cloud` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Confluent Cloud destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/confluent_cloud`, with integrations-config left read-only for onboarding changes.
+- Confluent Cloud models schema-only common consent category/purpose surfaces as destination-specific local config blocks `one_trust_cookie_categories` and `ketch_consent_purposes`, using mechanical camelCase-to-snake_case naming and direct API-key mappings so update does not erase UI-set values.
