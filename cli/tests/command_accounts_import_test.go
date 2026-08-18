@@ -60,6 +60,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
+	allowUnverifiedDestinationsFromSharedWorkspace(t)
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

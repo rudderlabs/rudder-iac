@@ -19,6 +19,8 @@ import (
 )
 
 func TestTransformationsTest(t *testing.T) {
+	allowUnverifiedDestinationsFromSharedWorkspace(t)
+
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
