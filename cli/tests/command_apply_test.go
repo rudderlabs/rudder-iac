@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 )
 
 const concurrencyForTest = 1
+const applyConsistencyTimeout = 45 * time.Second
+const applyConsistencyPollInterval = 3 * time.Second
 
 // varFilePath supplies values for the {{ .VAR }} placeholders in the create/update
 // specs. It lives outside create/ and update/ (and uses the .vars.yaml suffix the
@@ -98,18 +101,32 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	// we only verify no diff after migration for the update directory, as the last apply was run on it.
 	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
 	// applied; otherwise the file-only variable would be undefined and the dry run would error.
-	output, err := executor.Execute(
-		cliBinPath,
-		"apply",
-		"-l",
-		path,
-		"--var-file",
-		varFilePath,
-		"--dry-run",
-		"--confirm=false",
+	var (
+		output []byte
+		err    error
 	)
-	require.NoError(t, err, "Dry run failed for update: %s", string(output))
-	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	deadline := time.Now().Add(applyConsistencyTimeout)
+	for {
+		output, err = executor.Execute(
+			cliBinPath,
+			"apply",
+			"-l",
+			path,
+			"--var-file",
+			varFilePath,
+			"--dry-run",
+			"--confirm=false",
+		)
+		if err == nil && strings.Contains(string(output), "No changes to apply") {
+			return
+		}
+		if time.Now().After(deadline) {
+			require.NoError(t, err, "Dry run failed for update: %s", string(output))
+			assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+			return
+		}
+		time.Sleep(applyConsistencyPollInterval)
+	}
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
@@ -243,6 +260,17 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].categoryId",
 		},
 	)
-	err = upstreamTester.SnapshotTest(context.Background())
-	assert.NoError(t, err, "Upstream state verification failed")
+	ctx := context.Background()
+	deadline := time.Now().Add(applyConsistencyTimeout)
+	for {
+		err = upstreamTester.SnapshotTest(ctx)
+		if err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			assert.NoError(t, err, "Upstream state verification failed")
+			return
+		}
+		time.Sleep(applyConsistencyPollInterval)
+	}
 }
