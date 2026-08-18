@@ -252,7 +252,8 @@ Final response must include:
 - E2E verification status: skip/compile result and whether the gated live run was
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
-  source types, upstream fields intentionally omitted)
+  source types, and every `schema.json` key modelled without a terraform
+  mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
 - Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`
@@ -263,12 +264,21 @@ Final response must include:
 
 - Never register two definitions with the same `(Type, Version)` or
   `(APIType, Version)` — the registry errors, but check before writing code.
-- When terraform mappings and `schema.json` disagree (field present in one,
-  absent in the other; different optionality), follow terraform for the
-  mapping and schema.json for the validation, and flag the discrepancy in the
-  report. Do not silently invent a resolution.
-- Do not add fields that exist upstream but have no terraform mapping — they
-  are out of the supported surface. List them as omitted in the report.
+- **`schema.json` is the source of truth for the config surface.** Terraform
+  supplies the mapping shape (reshapes, nested key names, local key spelling),
+  but it does not bound which keys exist. When the two disagree on optionality
+  or constraints, follow schema.json and flag the discrepancy in the report.
+- **A key in `schema.json` with no terraform mapping must still be modelled.**
+  Derive the local key mechanically (camelCase → snake_case) and validate it
+  from schema.json. Omitting it does not make it "unsupported" — destination
+  update replaces the whole config object, so any key the definition does not
+  model is dropped from the payload and **erased upstream on the first apply**,
+  including values a user set in the UI. This applies to nested keys inside
+  array reshapes too.
+  Slack is the worked example: `incomingWebhooksType`, `denyListOfEvents`, and
+  the nested `eventChannelWebhook` are absent from terraform, and leaving them
+  out made the backend drop `incomingWebhooksType` between create and update —
+  visible as a create/update snapshot mismatch in the gated e2e.
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced

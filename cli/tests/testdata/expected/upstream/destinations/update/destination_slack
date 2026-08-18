@@ -7,13 +7,14 @@
   "type": "SLACK",
   "enabled": true,
   "config": {
-    "incomingWebhooksType": "legacy",
     "webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+    "incomingWebhooksType": "modern",
     "identifyTemplate": "Identify user",
     "eventChannelSettings": [
       {
         "eventName": "Order Completed",
         "eventChannel": "orders",
+        "eventChannelWebhook": "https://hooks.slack.com/services/T000/B111/orders",
         "eventRegex": false
       },
       {
@@ -40,6 +41,14 @@
       },
       {
         "trait": "first_name"
+      }
+    ],
+    "denyListOfEvents": [
+      {
+        "eventName": "Heartbeat"
+      },
+      {
+        "eventName": "Debug Ping"
       }
     ],
     "consentManagement": {

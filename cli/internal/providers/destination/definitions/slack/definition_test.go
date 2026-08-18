@@ -211,6 +211,42 @@ func TestSlackConfigValidation(t *testing.T) {
 		})))
 	})
 
+	// These three keys exist in schema.json but have no terraform mapping. They
+	// are modelled anyway so a CLI apply does not erase values set elsewhere.
+	t.Run("keys absent from terraform are still validated", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("incoming_webhooks_type rejects values outside the enum", func(t *testing.T) {
+			t.Parallel()
+			errors := registered.ValidateConfig(withConfig(validMinimalConfig(), "incoming_webhooks_type", "classic"))
+			require.Len(t, errors, 1)
+			assert.Equal(t, "/incoming_webhooks_type", errors[0].Path)
+		})
+
+		t.Run("incoming_webhooks_type accepts both enum values", func(t *testing.T) {
+			t.Parallel()
+			for _, v := range []string{"legacy", "modern"} {
+				assert.Empty(t, registered.ValidateConfig(withConfig(validMinimalConfig(), "incoming_webhooks_type", v)))
+			}
+		})
+
+		t.Run("event channel webhook rejects ngrok", func(t *testing.T) {
+			t.Parallel()
+			errors := registered.ValidateConfig(withConfig(validMinimalConfig(), "event_channel_settings", []any{
+				map[string]any{"name": "Order Completed", "webhook": "https://evil.ngrok.io/hook"},
+			}))
+			require.Len(t, errors, 1)
+			assert.Equal(t, "/event_channel_settings/0/webhook", errors[0].Path)
+		})
+
+		t.Run("deny_list_of_events rejects over-long entries", func(t *testing.T) {
+			t.Parallel()
+			errors := registered.ValidateConfig(withConfig(validMinimalConfig(), "deny_list_of_events", []any{strings.Repeat("e", 101)}))
+			require.Len(t, errors, 1)
+			assert.Equal(t, "/deny_list_of_events/0", errors[0].Path)
+		})
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		config := validMinimalConfig()
@@ -266,6 +302,30 @@ func TestSlackConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"webhookUrl": "https://hooks.slack.com/services/T000/B000/example"
+			}`,
+		},
+		{
+			// Covers the three keys schema.json declares but terraform omits:
+			// incomingWebhooksType, eventChannelWebhook, and denyListOfEvents.
+			Name: "keys absent from terraform round trip",
+			LocalJSON: `{
+				"webhook_url": "https://hooks.slack.com/services/T000/B000/example",
+				"incoming_webhooks_type": "modern",
+				"event_channel_settings": [
+					{"name": "Order Completed", "channel": "orders", "webhook": "https://hooks.slack.com/services/T000/B111/orders", "regex": false}
+				],
+				"deny_list_of_events": ["Heartbeat", "Debug Ping"]
+			}`,
+			APIJSON: `{
+				"webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+				"incomingWebhooksType": "modern",
+				"eventChannelSettings": [
+					{"eventName": "Order Completed", "eventChannel": "orders", "eventChannelWebhook": "https://hooks.slack.com/services/T000/B111/orders", "eventRegex": false}
+				],
+				"denyListOfEvents": [
+					{"eventName": "Heartbeat"},
+					{"eventName": "Debug Ping"}
+				]
 			}`,
 		},
 		{
@@ -330,10 +390,11 @@ func validMinimalConfig() map[string]any {
 
 func validFullConfig() map[string]any {
 	return map[string]any{
-		"webhook_url":       "https://hooks.slack.com/services/T000/B000/example",
-		"identify_template": "Identify user",
+		"webhook_url":            "https://hooks.slack.com/services/T000/B000/example",
+		"incoming_webhooks_type": "modern",
+		"identify_template":      "Identify user",
 		"event_channel_settings": []any{
-			map[string]any{"name": "Order Completed", "channel": "orders", "regex": false},
+			map[string]any{"name": "Order Completed", "channel": "orders", "webhook": "https://hooks.slack.com/services/T000/B111/orders", "regex": false},
 			map[string]any{"name": "^Cart", "channel": "commerce", "regex": true},
 		},
 		"event_template_settings": []any{
@@ -341,6 +402,7 @@ func validFullConfig() map[string]any {
 			map[string]any{"name": "^Checkout", "template": "Checkout update", "regex": true},
 		},
 		"whitelisted_trait_settings": []any{"email", "first_name"},
+		"deny_list_of_events":        []any{"Heartbeat", "Debug Ping"},
 		"consent_management": map[string]any{
 			"web": []any{
 				map[string]any{

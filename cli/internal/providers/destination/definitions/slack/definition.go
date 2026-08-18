@@ -59,16 +59,19 @@ var connectionModes = map[string][]string{
 // mapped fields.
 type slackConfig struct {
 	WebhookURL               string                   `mapstructure:"webhook_url" validate:"required,dynamic_or_pattern=slack_webhook_url"`
+	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,dynamic_or_oneof=legacy modern"`
 	IdentifyTemplate         string                   `mapstructure:"identify_template" validate:"omitempty,dynamic_or_pattern=single_line_1000"`
 	EventChannelSettings     []eventChannelSetting    `mapstructure:"event_channel_settings" validate:"omitempty,dive"`
 	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
 	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	ConsentManagement        common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 type eventChannelSetting struct {
 	Name    string `mapstructure:"name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Channel string `mapstructure:"channel" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	Webhook string `mapstructure:"webhook" validate:"omitempty,dynamic_or_pattern=slack_webhook_url"`
 	Regex   *bool  `mapstructure:"regex"`
 }
 
@@ -82,11 +85,13 @@ type eventTemplateSetting struct {
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("webhookUrl", "webhook_url"),
+		converter.Simple("incomingWebhooksType", "incoming_webhooks_type"),
 		converter.Simple("identifyTemplate", "identify_template"),
 		converter.ArrayWithObjects("eventChannelSettings", "event_channel_settings", map[string]any{
-			"eventName":    "name",
-			"eventChannel": "channel",
-			"eventRegex":   "regex",
+			"eventName":           "name",
+			"eventChannel":        "channel",
+			"eventChannelWebhook": "webhook",
+			"eventRegex":          "regex",
 		}),
 		converter.ArrayWithObjects("eventTemplateSettings", "event_template_settings", map[string]any{
 			"eventName":     "name",
@@ -94,6 +99,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"eventRegex":    "regex",
 		}),
 		converter.ArrayWithStrings("whitelistedTraitsSettings", "trait", "whitelisted_trait_settings"),
+		converter.ArrayWithStrings("denyListOfEvents", "eventName", "deny_list_of_events"),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 

@@ -10,10 +10,12 @@ spec:
   definition_version: 1
   config:
     webhook_url: https://hooks.slack.com/services/T000/B000/example
+    incoming_webhooks_type: modern
     identify_template: Identify user
     event_channel_settings:
       - name: Order Completed
         channel: orders
+        webhook: https://hooks.slack.com/services/T000/B111/orders
         regex: false
       - name: ^Cart
         channel: commerce
@@ -28,6 +30,9 @@ spec:
     whitelisted_trait_settings:
       - email
       - first_name
+    deny_list_of_events:
+      - Heartbeat
+      - Debug Ping
     consent_management:
       web:
         - provider: oneTrust
