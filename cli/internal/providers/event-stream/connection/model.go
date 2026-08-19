@@ -66,11 +66,16 @@ type WorkspaceRemoteIDMapping struct {
 	RemoteId    string
 }
 
-// RemoteConnection carries an unmanaged remote connection through import
-// together with the workspace it belongs to — the generic connections API row
-// does not include workspaceId, so it is taken from the connection's event
-// stream source.
+// RemoteConnection carries an unmanaged remote connection through import,
+// together with identity the generic connections API row does not include:
+// the workspace id comes from the connection's event stream source, and the
+// endpoints' externalIds (empty when the endpoint is not CLI-managed) are the
+// endpoints' local resource ids — the matcher and export use them to identify
+// already-managed endpoints, whose graph entries the import ref resolver
+// cannot always serve.
 type RemoteConnection struct {
 	client.Connection
-	WorkspaceID string
+	WorkspaceID           string
+	SourceExternalID      string
+	DestinationExternalID string
 }

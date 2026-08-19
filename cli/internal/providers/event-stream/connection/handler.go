@@ -427,16 +427,17 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	if err != nil {
 		return nil, fmt.Errorf("getting destinations: %w", err)
 	}
-	destinationNames := make(map[string]string, len(destinations))
+	destinationsByID := make(map[string]client.Destination, len(destinations))
 	for _, d := range destinations {
-		destinationNames[d.ID] = d.Name
+		destinationsByID[d.ID] = d
 	}
 
 	for _, conn := range conns {
 		// The source is always present: eventStreamConnections only returns
 		// connections whose source is in the map.
 		src := sourcesByID[conn.SourceID]
-		destinationName, ok := destinationNames[conn.DestinationID]
+		dst, ok := destinationsByID[conn.DestinationID]
+		destinationName := dst.Name
 		if !ok {
 			// The name only seeds the identity; a destination missing from
 			// the list falls back to its remote id.
@@ -453,7 +454,12 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 			ID:         conn.ID,
 			ExternalID: externalID,
 			Reference:  fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, externalID),
-			Data:       &RemoteConnection{Connection: conn, WorkspaceID: src.WorkspaceID},
+			Data: &RemoteConnection{
+				Connection:            conn,
+				WorkspaceID:           src.WorkspaceID,
+				SourceExternalID:      src.ExternalID,
+				DestinationExternalID: dst.ExternalID,
+			},
 		}
 	}
 
@@ -551,11 +557,11 @@ func (h *Handler) FormatForExport(
 // through the merged collection — imported in the same run or already
 // CLI-managed.
 func toImportItem(externalID string, data *RemoteConnection, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
-	sourceRef, err := inputResolver.ResolveToReference(source.ResourceType, data.SourceID)
+	sourceRef, err := endpointRef(inputResolver, source.ResourceType, source.ResourceKind, data.SourceID, data.SourceExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving source reference: %w", err)
 	}
-	destinationRef, err := inputResolver.ResolveToReference(destination.DestinationResourceType, data.DestinationID)
+	destinationRef, err := endpointRef(inputResolver, destination.DestinationResourceType, destination.DestinationSpecKind, data.DestinationID, data.DestinationExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving destination reference: %w", err)
 	}
@@ -565,6 +571,23 @@ func toImportItem(externalID string, data *RemoteConnection, inputResolver resol
 		DestinationKey: destinationRef,
 		EnabledKey:     data.IsEnabled,
 	}, nil
+}
+
+// endpointRef resolves an endpoint's remote id into a spec reference: through
+// the import resolver — the endpoint imported in the same run, or managed with
+// file metadata on its graph entry — or, for an already-managed endpoint the
+// resolver cannot serve (BaseHandler-backed destinations carry no file
+// metadata), built from its externalId, which is the endpoint's local resource
+// id. The ref shape mirrors what parseSourceRef/parseDestinationRef accept.
+func endpointRef(inputResolver resolver.ReferenceResolver, resourceType string, kind string, remoteID string, externalID string) (string, error) {
+	ref, err := inputResolver.ResolveToReference(resourceType, remoteID)
+	if err == nil {
+		return ref, nil
+	}
+	if externalID == "" {
+		return "", err
+	}
+	return fmt.Sprintf("#%s:%s", kind, externalID), nil
 }
 
 // Create creates the connection remotely. By the time it runs the syncer has

@@ -55,12 +55,12 @@ func TestLoadImportable(t *testing.T) {
 				}}, nil
 			},
 			GetDestinationsFunc: func() ([]client.Destination, error) {
-				return []client.Destination{{ID: "dst-remote-1", Name: "S3 Bucket"}}, nil
+				return []client.Destination{{ID: "dst-remote-1", Name: "S3 Bucket", ExternalID: "s3"}}, nil
 			},
 		}
 		mock.SetGetSourcesFunc(func(_ context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
-				{ID: "src-remote-1", Name: "Android App", WorkspaceID: "workspace-123"},
+				{ID: "src-remote-1", Name: "Android App", WorkspaceID: "workspace-123", ExternalID: "android"},
 			}, nil
 		})
 		h := NewHandler(mock, "event-stream")
@@ -78,7 +78,12 @@ func TestLoadImportable(t *testing.T) {
 			ID:         "conn-remote-1",
 			ExternalID: "android-app-to-s3-bucket",
 			Reference:  "#event-stream-connections:android-app-to-s3-bucket",
-			Data:       &RemoteConnection{Connection: conn, WorkspaceID: "workspace-123"},
+			Data: &RemoteConnection{
+				Connection:            conn,
+				WorkspaceID:           "workspace-123",
+				SourceExternalID:      "android",
+				DestinationExternalID: "s3",
+			},
 		}, remotes["conn-remote-1"])
 	})
 
@@ -272,6 +277,28 @@ func TestFormatForExport(t *testing.T) {
 		assert.Equal(t, []importmanifest.ImportEntry{
 			{WorkspaceID: "workspace-123", URN: "event-stream-connection:android-to-s3", RemoteID: "conn-1"},
 		}, entries)
+	})
+
+	t.Run("builds refs from managed endpoint ids when the resolver cannot", func(t *testing.T) {
+		// A managed destination's graph entry carries no file metadata, so the
+		// resolver cannot serve it; the ref is built from the endpoint's
+		// externalId instead.
+		h := NewHandler(nil, "event-stream")
+		managed := importableConnection("conn-1", "android-to-s3", "src-9", "dst-9", true)
+		remote := managed.Data.(*RemoteConnection)
+		remote.SourceExternalID = "android"
+		remote.DestinationExternalID = "s3"
+
+		entities, entries, err := h.FormatForExport(connectionCollection(managed), &mockNamer{}, &mockResolver{refs: refs})
+
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+		spec := entities[0].Content.(*specs.Spec)
+		connections := spec.Spec["connections"].([]map[string]any)
+		require.Len(t, connections, 1)
+		assert.Equal(t, "#event-stream-source:android", connections[0]["source"])
+		assert.Equal(t, "#destination:s3", connections[0]["destination"])
+		require.Len(t, entries, 1)
 	})
 
 	t.Run("empty collection writes nothing", func(t *testing.T) {

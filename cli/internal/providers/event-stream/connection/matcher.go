@@ -26,11 +26,11 @@ func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *re
 	// Destination rows carry no marks today (the destination provider has no
 	// matcher), so resolving them does not depend on cross-provider matcher
 	// order.
-	sourceURN, ok := importmatcher.ResolveLocalURN(scope, source.ResourceType, remote.SourceID)
+	sourceURN, ok := endpointURN(scope, source.ResourceType, remote.SourceID, remote.SourceExternalID)
 	if !ok {
 		return nil
 	}
-	destinationURN, ok := importmatcher.ResolveLocalURN(scope, destination.DestinationResourceType, remote.DestinationID)
+	destinationURN, ok := endpointURN(scope, destination.DestinationResourceType, remote.DestinationID, remote.DestinationExternalID)
 	if !ok {
 		return nil
 	}
@@ -47,4 +47,21 @@ func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *re
 		return sourceRef.URN == sourceURN && destinationRef.URN == destinationURN
 	})
 	return local
+}
+
+// endpointURN maps an endpoint to the local resource URN it corresponds to:
+// through the shared resolution — matched earlier in this import, or linked by
+// local import metadata — or, for an already-managed endpoint, straight from
+// its externalId, which is the endpoint's local resource id. ok is false when
+// the endpoint has no local counterpart — the connection then stays unmatched.
+func endpointURN(scope importmatcher.Scope, resourceType string, remoteID string, externalID string) (string, bool) {
+	if urn, ok := importmatcher.ResolveLocalURN(scope, resourceType, remoteID); ok {
+		return urn, true
+	}
+	if externalID == "" {
+		return "", false
+	}
+	urn := resources.URN(externalID, resourceType)
+	_, ok := scope.LocalGraph.GetResource(urn)
+	return urn, ok
 }
