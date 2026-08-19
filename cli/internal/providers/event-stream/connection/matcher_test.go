@@ -87,4 +87,26 @@ func TestMatcher(t *testing.T) {
 
 		assert.Nil(t, m.Match(scope, remoteConnection("conn-1", "src-1", "dst-1")))
 	})
+
+	t.Run("matches endpoints managed without import metadata", func(t *testing.T) {
+		t.Parallel()
+		// Endpoints created through a regular apply carry no import metadata;
+		// their externalIds (captured at LoadImportable time) are the local
+		// resource ids.
+		g := resources.NewGraph()
+		g.AddResource(resources.NewResource("android", source.ResourceType, resources.ResourceData{}, []string{}))
+		g.AddResource(resources.NewResource("s3", destination.DestinationResourceType, resources.ResourceData{}, []string{}))
+		g.AddResource(localConnection("android-to-s3", "event-stream-source:android", "destination:s3"))
+		scope := importmatcher.Scope{LocalGraph: g, Importable: resources.NewRemoteResources()}
+
+		remote := remoteConnection("conn-1", "src-1", "dst-1")
+		data := remote.Data.(*RemoteConnection)
+		data.SourceExternalID = "android"
+		data.DestinationExternalID = "s3"
+
+		local := m.Match(scope, remote)
+
+		require.NotNil(t, local)
+		assert.Equal(t, "android-to-s3", local.ID())
+	})
 }
