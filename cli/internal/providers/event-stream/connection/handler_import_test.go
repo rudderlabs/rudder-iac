@@ -30,14 +30,14 @@ func (m *mockNamer) Load(names []namer.ScopeName) error {
 	return nil
 }
 
-// stubResolver resolves entityType/remoteID pairs from a canned map and errors
+// mockResolver resolves entityType/remoteID pairs from a canned map and errors
 // on anything else, like the real ImportRefResolver does for resources that
 // are neither importable nor CLI-managed.
-type stubResolver struct {
+type mockResolver struct {
 	refs map[string]string
 }
 
-func (s *stubResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
+func (s *mockResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
 	if ref, ok := s.refs[entityType+"/"+remoteID]; ok {
 		return ref, nil
 	}
@@ -63,7 +63,7 @@ func TestLoadImportable(t *testing.T) {
 				{ID: "src-remote-1", Name: "Android App", WorkspaceID: "workspace-123"},
 			}, nil
 		})
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		collection, err := h.LoadImportable(t.Context(), &mockNamer{})
 
@@ -93,7 +93,7 @@ func TestLoadImportable(t *testing.T) {
 		mock.SetGetSourcesFunc(func(_ context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{{ID: "src-remote-1", Name: "Android App"}}, nil
 		})
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		collection, err := h.LoadImportable(t.Context(), &mockNamer{})
 
@@ -105,7 +105,7 @@ func TestLoadImportable(t *testing.T) {
 
 	t.Run("no unmanaged connections skips the destination lookup", func(t *testing.T) {
 		mock := &MockConnectionClient{}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		collection, err := h.LoadImportable(t.Context(), &mockNamer{})
 
@@ -120,7 +120,7 @@ func TestLoadImportable(t *testing.T) {
 				return nil, errors.New("boom")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.LoadImportable(t.Context(), &mockNamer{})
 
@@ -161,17 +161,17 @@ func TestFormatForExport(t *testing.T) {
 	}
 
 	t.Run("writes one spec per run sorted by id", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := connectionCollection(
 			importableConnection("conn-2", "web-to-s3", "src-2", "dst-1", false),
 			importableConnection("conn-1", "android-to-s3", "src-1", "dst-1", true),
 		)
 
-		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &stubResolver{refs: refs})
+		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &mockResolver{refs: refs})
 
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
-		assert.Equal(t, ImportPath, entities[0].RelativePath)
+		assert.Equal(t, "event-stream/connections.yaml", entities[0].RelativePath)
 
 		spec, ok := entities[0].Content.(*specs.Spec)
 		require.True(t, ok)
@@ -215,7 +215,7 @@ func TestFormatForExport(t *testing.T) {
 	})
 
 	t.Run("matched connections write manifest entries only", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		matched := importableConnection("conn-2", "existing-conn", "src-2", "dst-1", true)
 		matched.MatchedWith = resources.NewResource("existing-conn", EventStreamConnectionResourceType, resources.ResourceData{}, []string{})
 		collection := connectionCollection(
@@ -223,7 +223,7 @@ func TestFormatForExport(t *testing.T) {
 			matched,
 		)
 
-		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &stubResolver{refs: refs})
+		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &mockResolver{refs: refs})
 
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
@@ -239,11 +239,11 @@ func TestFormatForExport(t *testing.T) {
 	})
 
 	t.Run("only matched connections write no spec file", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		matched := importableConnection("conn-1", "existing-conn", "src-1", "dst-1", true)
 		matched.MatchedWith = resources.NewResource("existing-conn", EventStreamConnectionResourceType, resources.ResourceData{}, []string{})
 
-		entities, entries, err := h.FormatForExport(connectionCollection(matched), &mockNamer{}, &stubResolver{refs: refs})
+		entities, entries, err := h.FormatForExport(connectionCollection(matched), &mockNamer{}, &mockResolver{refs: refs})
 
 		require.NoError(t, err)
 		assert.Nil(t, entities)
@@ -255,13 +255,13 @@ func TestFormatForExport(t *testing.T) {
 		// (e.g. its type is not onboarded); the connection cannot be expressed
 		// as spec refs and is left out entirely — no spec entry, no manifest
 		// entry.
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := connectionCollection(
 			importableConnection("conn-1", "android-to-s3", "src-1", "dst-1", true),
 			importableConnection("conn-2", "web-to-unmanaged", "src-2", "dst-9", true),
 		)
 
-		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &stubResolver{refs: refs})
+		entities, entries, err := h.FormatForExport(collection, &mockNamer{}, &mockResolver{refs: refs})
 
 		require.NoError(t, err)
 		require.Len(t, entities, 1)
@@ -275,13 +275,41 @@ func TestFormatForExport(t *testing.T) {
 	})
 
 	t.Run("empty collection writes nothing", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 
-		entities, entries, err := h.FormatForExport(resources.NewRemoteResources(), &mockNamer{}, &stubResolver{})
+		entities, entries, err := h.FormatForExport(resources.NewRemoteResources(), &mockNamer{}, &mockResolver{})
 
 		require.NoError(t, err)
 		assert.Nil(t, entities)
 		assert.Nil(t, entries)
+	})
+
+	t.Run("errors on foreign data in the collection", func(t *testing.T) {
+		h := NewHandler(nil, "event-stream")
+		collection := resources.NewRemoteResources()
+		collection.Set(EventStreamConnectionResourceType, map[string]*resources.RemoteResource{
+			"x": {ID: "x", ExternalID: "x", Data: "not a connection"},
+		})
+
+		_, _, err := h.FormatForExport(collection, &mockNamer{}, &mockResolver{refs: refs})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unable to cast remote resource to event stream connection")
+	})
+
+	t.Run("errors on connections from multiple workspaces", func(t *testing.T) {
+		h := NewHandler(nil, "event-stream")
+		other := importableConnection("conn-2", "web-to-s3", "src-2", "dst-1", true)
+		other.Data.(*RemoteConnection).WorkspaceID = "workspace-456"
+		collection := connectionCollection(
+			importableConnection("conn-1", "android-to-s3", "src-1", "dst-1", true),
+			other,
+		)
+
+		_, _, err := h.FormatForExport(collection, &mockNamer{}, &mockResolver{refs: refs})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "cannot export resources from multiple workspaces into a single spec file")
 	})
 }
 
@@ -299,7 +327,7 @@ func TestImport(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-1")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		result, err := h.Import(t.Context(), "android-to-s3", data, "conn-remote-1")
 
@@ -320,7 +348,7 @@ func TestImport(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-1")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Import(t.Context(), "android-to-s3", data, "conn-remote-1")
 
@@ -339,7 +367,7 @@ func TestImport(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-old")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		result, err := h.Import(t.Context(), "android-to-s3", data, "conn-remote-1")
 
@@ -359,12 +387,12 @@ func TestImport(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-1")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Import(t.Context(), "android-to-s3", data, "conn-remote-1")
 
 		require.Error(t, err)
-		assert.ErrorContains(t, err, `connection "conn-remote-1" is not an event stream connection`)
+		assert.ErrorContains(t, err, `connection "conn-remote-1": source "retl-src-1" is not an event stream source`)
 		assert.Equal(t, []string{"GetConnection"}, mock.Calls)
 	})
 
@@ -374,7 +402,7 @@ func TestImport(t *testing.T) {
 				return nil, errors.New("boom")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Import(t.Context(), "android-to-s3", data, "conn-remote-1")
 
@@ -394,7 +422,7 @@ func TestList(t *testing.T) {
 		},
 	}
 	eventStreamSources(mock, "src-remote-1")
-	h := NewHandler(mock)
+	h := NewHandler(mock, "event-stream")
 
 	result, err := h.List(t.Context(), nil)
 

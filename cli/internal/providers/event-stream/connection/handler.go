@@ -1,9 +1,11 @@
 package connection
 
 import (
+	"cmp"
 	"context"
 	"fmt"
-	"sort"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -25,21 +27,23 @@ import (
 )
 
 type Handler struct {
-	resources map[string]*connectionResource
-	client    esClient.EventStreamStore
+	resources  map[string]*connectionResource
+	client     esClient.EventStreamStore
+	importFile string
 }
 
-func NewHandler(client esClient.EventStreamStore) *Handler {
+func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 	return &Handler{
-		resources: make(map[string]*connectionResource),
-		client:    client,
+		resources:  make(map[string]*connectionResource),
+		client:     client,
+		importFile: filepath.Join(importDir, ImportPath),
 	}
 }
 
 // ParseSpec collects one URN per connection entry — the spec body is a list,
 // unlike the single-resource event stream source spec.
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	raw, ok := s.Spec["connections"].([]any)
+	raw, ok := s.Spec[ConnectionsKey].([]any)
 	if !ok {
 		return nil, fmt.Errorf("connections not found in event stream connections spec")
 	}
@@ -255,19 +259,29 @@ func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 	return nil
 }
 
+// sourcesByID indexes the workspace's event stream sources by remote id — the
+// membership set that separates event stream connections from rETL rows.
+func (h *Handler) sourcesByID(ctx context.Context) (map[string]sourceClient.EventStreamSource, error) {
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+	byID := make(map[string]sourceClient.EventStreamSource, len(sources))
+	for _, s := range sources {
+		byID[s.ID] = s
+	}
+	return byID, nil
+}
+
 // eventStreamConnections pages through the connections list with the given
 // options. The generic connections list also returns rETL rows; only
 // connections whose source is an event stream source are kept. The sources
 // consulted for the filter are returned too, keyed by remote id, so callers
 // can read names and workspace ids without refetching.
 func (h *Handler) eventStreamConnections(ctx context.Context, opts ...client.ListConnectionsOption) ([]client.Connection, map[string]sourceClient.EventStreamSource, error) {
-	sources, err := h.client.GetSources(ctx)
+	sourcesByID, err := h.sourcesByID(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting event stream sources: %w", err)
-	}
-	sourcesByID := make(map[string]sourceClient.EventStreamSource, len(sources))
-	for _, s := range sources {
-		sourcesByID[s.ID] = s
+		return nil, nil, err
 	}
 
 	var conns []client.Connection
@@ -364,69 +378,68 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource, len(conns))
-	if len(conns) > 0 {
-		destinations, err := h.client.GetDestinations(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting destinations: %w", err)
-		}
-		destinationNames := make(map[string]string, len(destinations))
-		for _, d := range destinations {
-			destinationNames[d.ID] = d.Name
-		}
+	collection.Set(EventStreamConnectionResourceType, resourceMap)
+	if len(conns) == 0 {
+		return collection, nil
+	}
 
-		for _, conn := range conns {
-			src := sourcesByID[conn.SourceID]
-			destinationName, ok := destinationNames[conn.DestinationID]
-			if !ok {
-				// The name only seeds the identity; a destination missing from
-				// the list falls back to its remote id.
-				destinationName = conn.DestinationID
-			}
-			externalID, err := idNamer.Name(namer.ScopeName{
-				Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
-				Scope: EventStreamConnectionResourceType,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
-			}
-			resourceMap[conn.ID] = &resources.RemoteResource{
-				ID:         conn.ID,
-				ExternalID: externalID,
-				Reference:  fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, externalID),
-				Data:       &RemoteConnection{Connection: conn, WorkspaceID: src.WorkspaceID},
-			}
+	destinations, err := h.client.GetDestinations(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting destinations: %w", err)
+	}
+	destinationNames := make(map[string]string, len(destinations))
+	for _, d := range destinations {
+		destinationNames[d.ID] = d.Name
+	}
+
+	for _, conn := range conns {
+		// The source is always present: eventStreamConnections only returns
+		// connections whose source is in the map.
+		src := sourcesByID[conn.SourceID]
+		destinationName, ok := destinationNames[conn.DestinationID]
+		if !ok {
+			// The name only seeds the identity; a destination missing from
+			// the list falls back to its remote id.
+			destinationName = conn.DestinationID
+		}
+		externalID, err := idNamer.Name(namer.ScopeName{
+			Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
+			Scope: EventStreamConnectionResourceType,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
+		}
+		resourceMap[conn.ID] = &resources.RemoteResource{
+			ID:         conn.ID,
+			ExternalID: externalID,
+			Reference:  fmt.Sprintf("#%s:%s", EventStreamConnectionResourceKind, externalID),
+			Data:       &RemoteConnection{Connection: conn, WorkspaceID: src.WorkspaceID},
 		}
 	}
 
-	collection.Set(EventStreamConnectionResourceType, resourceMap)
 	return collection, nil
 }
 
 // FormatForExport writes the importable connections as one spec of the
-// event-stream-connections kind per run. Endpoint refs resolve through the
-// merged collection — imported in the same run or already CLI-managed. A
-// connection whose endpoint resolves to neither (e.g. a destination type the
-// CLI has not onboarded) cannot be expressed as spec refs and is skipped,
-// mirroring MapRemoteToState's leniency. Matched connections (import --merge)
-// adopt an existing local spec: manifest entry only — no spec entry.
+// event-stream-connections kind per run.
 func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	_ namer.Namer,
 	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
-	remotes := collection.GetAll(EventStreamConnectionResourceType)
-	if len(remotes) == 0 {
+	remotesByID := collection.GetAll(EventStreamConnectionResourceType)
+	if len(remotesByID) == 0 {
 		return nil, nil, nil
 	}
 
-	// One spec file holds every connection: iterate sorted by assigned id so
-	// the emitted list is stable across runs.
-	ids := make([]string, 0, len(remotes))
-	for id := range remotes {
-		ids = append(ids, id)
+	// One spec file holds every connection: order by assigned id so the
+	// emitted list is stable across runs.
+	remotes := make([]*resources.RemoteResource, 0, len(remotesByID))
+	for _, remote := range remotesByID {
+		remotes = append(remotes, remote)
 	}
-	sort.Slice(ids, func(i, j int) bool {
-		return remotes[ids[i]].ExternalID < remotes[ids[j]].ExternalID
+	slices.SortFunc(remotes, func(a, b *resources.RemoteResource) int {
+		return cmp.Compare(a.ExternalID, b.ExternalID)
 	})
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
@@ -434,8 +447,7 @@ func (h *Handler) FormatForExport(
 	}
 	var entries []importmanifest.ImportEntry
 	items := make([]map[string]any, 0, len(remotes))
-	for _, id := range ids {
-		remote := remotes[id]
+	for _, remote := range remotes {
 		data, ok := remote.Data.(*RemoteConnection)
 		if !ok {
 			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream connection")
@@ -443,43 +455,36 @@ func (h *Handler) FormatForExport(
 		if workspaceMetadata.WorkspaceID != "" && workspaceMetadata.WorkspaceID != data.WorkspaceID {
 			return nil, nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
 		}
-		urn := resources.URN(remote.ExternalID, EventStreamConnectionResourceType)
-
-		if remote.MatchedWith != nil {
-			workspaceMetadata.WorkspaceID = data.WorkspaceID
-			entries = append(entries, importmanifest.ImportEntry{
-				WorkspaceID: data.WorkspaceID,
-				URN:         urn,
-				RemoteID:    remote.ID,
-			})
-			continue
-		}
-
-		sourceRef, err := inputResolver.ResolveToReference(source.ResourceType, data.SourceID)
-		if err != nil {
-			continue
-		}
-		destinationRef, err := inputResolver.ResolveToReference(destination.DestinationResourceType, data.DestinationID)
-		if err != nil {
-			continue
-		}
-
 		workspaceMetadata.WorkspaceID = data.WorkspaceID
+
+		urn := resources.URN(remote.ExternalID, EventStreamConnectionResourceType)
+		entry := importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         urn,
+			RemoteID:    remote.ID,
+		}
+
+		// Matched connections (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec entry is written for them.
+		if remote.MatchedWith != nil {
+			entries = append(entries, entry)
+			continue
+		}
+
+		item, err := toImportItem(remote.ExternalID, data, inputResolver)
+		if err != nil {
+			// An endpoint resolving to neither an importable nor a CLI-managed
+			// resource (e.g. a destination type the CLI has not onboarded)
+			// cannot be expressed as spec refs; the connection is left out
+			// entirely, mirroring MapRemoteToState's leniency.
+			continue
+		}
+		entries = append(entries, entry)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: remote.ID,
 		})
-		entries = append(entries, importmanifest.ImportEntry{
-			WorkspaceID: data.WorkspaceID,
-			URN:         urn,
-			RemoteID:    remote.ID,
-		})
-		items = append(items, map[string]any{
-			IDKey:          remote.ExternalID,
-			SourceKey:      sourceRef,
-			DestinationKey: destinationRef,
-			EnabledKey:     data.IsEnabled,
-		})
+		items = append(items, item)
 	}
 
 	if len(items) == 0 {
@@ -490,7 +495,7 @@ func (h *Handler) FormatForExport(
 		EventStreamConnectionResourceKind,
 		MetadataName,
 		workspaceMetadata,
-		map[string]any{"connections": items},
+		map[string]any{ConnectionsKey: items},
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating spec: %w", err)
@@ -498,8 +503,28 @@ func (h *Handler) FormatForExport(
 
 	return []writer.FormattableEntity{{
 		Content:      spec,
-		RelativePath: ImportPath,
+		RelativePath: h.importFile,
 	}}, entries, nil
+}
+
+// toImportItem builds one connection's spec entry, resolving both endpoints
+// through the merged collection — imported in the same run or already
+// CLI-managed.
+func toImportItem(externalID string, data *RemoteConnection, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
+	sourceRef, err := inputResolver.ResolveToReference(source.ResourceType, data.SourceID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving source reference: %w", err)
+	}
+	destinationRef, err := inputResolver.ResolveToReference(destination.DestinationResourceType, data.DestinationID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving destination reference: %w", err)
+	}
+	return map[string]any{
+		IDKey:          externalID,
+		SourceKey:      sourceRef,
+		DestinationKey: destinationRef,
+		EnabledKey:     data.IsEnabled,
+	}, nil
 }
 
 // Create creates the connection remotely. By the time it runs the syncer has
@@ -577,7 +602,9 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 }
 
 // List reports every event stream connection in the workspace — managed or
-// not; rows carrying an externalId are the CLI-managed ones.
+// not; rows carrying an externalId are the CLI-managed ones. No workspace
+// list command is wired to it yet; it completes the handler surface the
+// provider dispatches to.
 func (h *Handler) List(ctx context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
 	conns, _, err := h.eventStreamConnections(ctx)
 	if err != nil {
@@ -614,19 +641,12 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	// The generic /v2/connections API serves rETL rows too; refuse to adopt a
 	// row whose source is not an event stream source (e.g. a stale or
 	// hand-edited import manifest) before Update mutates it.
-	sources, err := h.client.GetSources(ctx)
+	sources, err := h.sourcesByID(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting event stream sources: %w", err)
+		return nil, err
 	}
-	isEventStream := false
-	for _, s := range sources {
-		if s.ID == remote.SourceID {
-			isEventStream = true
-			break
-		}
-	}
-	if !isEventStream {
-		return nil, fmt.Errorf("connection %q is not an event stream connection", remoteId)
+	if _, ok := sources[remote.SourceID]; !ok {
+		return nil, fmt.Errorf("connection %q: source %q is not an event stream source", remoteId, remote.SourceID)
 	}
 
 	existingState := resources.ResourceData{

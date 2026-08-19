@@ -73,7 +73,7 @@ func New(client esClient.EventStreamStore, connectionSupport bool, destinationRe
 	// experimental flag: without it the kind is simply not a supported spec.
 	if connectionSupport {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(client)
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(client, importDir)
 	}
 	return p
 }

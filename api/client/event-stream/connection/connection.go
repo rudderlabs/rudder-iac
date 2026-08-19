@@ -7,8 +7,9 @@ import (
 )
 
 // ConnectionStore is the event stream slice of the generic /v2/connections
-// API. Method names carry the Connection token so the interface can be
-// embedded in EventStreamStore alongside SourceStore without clashing.
+// API, plus the narrow destinations read connection import needs. Method
+// names carry the Connection token so the interface can be embedded in
+// EventStreamStore alongside SourceStore without clashing.
 type ConnectionStore interface {
 	ListConnections(ctx context.Context, opts ...client.ListConnectionsOption) (*client.ConnectionsPage, error)
 	NextConnections(ctx context.Context, paging client.Paging) (*client.ConnectionsPage, error)
