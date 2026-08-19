@@ -5,8 +5,10 @@ match_behavior:
   # connected once (V-C3), the destination definition must support the
   # source's mapped type (V-C4) and its config must carry the fields that type
   # requires to connect (V-C5), and a destination cannot receive from both
-  # event stream and rETL sources (V-E1 — becomes observable once the
-  # retl-connections kind lands). Known limitation: these checks see only
+  # event stream and rETL sources (V-E1 — cannot fire today: the edge scan
+  # covers only event stream connections, so it starts firing once the
+  # retl-connections kind lands and its connections are folded into
+  # projectConnectionEdges). Known limitation: these checks see only
   # project-managed connections; a connection that exists remotely but is not
   # in the project is invisible at validate time.
   - applies_to:
