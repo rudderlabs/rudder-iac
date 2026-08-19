@@ -58,6 +58,11 @@ var destinationRawSecrets = []string{
 	"snowflakePasswordXXXXXXXXXXXXX",
 	"snowflakePrivateKeyXXXXXXXXXXX",
 	"snowflakeKeyPassphraseXXXXXXXX",
+	"AKIASNOWFLAKEXXXXXXX",
+	"snowflakeSecretAccessKeyXXXXXXXXXXXXXXXXXX",
+	"snowflake-dummy",
+	"snowflakeAzureAccountKeyXXXXXX",
+	"snowflakeAzureSasTokenXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

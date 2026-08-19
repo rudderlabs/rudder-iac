@@ -13,11 +13,11 @@ spec:
     database: RUDDER_E2E_GCP_UPD
     warehouse: RUDDER_WH
     user: RUDDER_CLI_E2E
+    role: RUDDER_ROLE
+    namespace: rudder_cli_e2e_gcp
     use_key_pair_auth: false
     password: "{{ .SNOWFLAKE_PASSWORD }}"
-    namespace: rudder_cli_e2e_gcp
-    sync:
-      frequency: "360"
+    sync_frequency: "360"
     skip_tracks_table: false
     skip_users_table: true
     prefer_append: true
@@ -25,8 +25,8 @@ spec:
     underscore_divide_numbers: false
     allow_users_context_traits: false
     use_rudder_storage: false
+    cloud_provider: GCP
     cleanup_object_storage_files: false
-    gcp:
-      bucket_name: rudder-cli-e2e-gcs-updated
-      storage_integration: RUDDER_GCS_INTEGRATION
-      credentials: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy"}'
+    bucket_name: rudder-cli-e2e-gcs-updated
+    storage_integration: RUDDER_GCS_INTEGRATION
+    credentials: "{{ .SNOWFLAKE_GCP_CREDENTIALS }}"

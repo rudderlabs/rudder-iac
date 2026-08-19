@@ -11,8 +11,9 @@
     "database": "RUDDER_E2E_GCP",
     "warehouse": "RUDDER_WH",
     "user": "RUDDER_CLI_E2E",
-    "useKeyPairAuth": false,
+    "role": "RUDDER_ROLE",
     "namespace": "rudder_cli_e2e_gcp",
+    "useKeyPairAuth": false,
     "syncFrequency": "180",
     "skipTracksTable": false,
     "skipUsersTable": true,
@@ -21,11 +22,10 @@
     "underscoreDivideNumbers": false,
     "allowUsersContextTraits": false,
     "useRudderStorage": false,
-    "cleanupObjectStorageFiles": false,
     "cloudProvider": "GCP",
+    "cleanupObjectStorageFiles": false,
     "bucketName": "rudder-cli-e2e-gcs",
-    "storageIntegration": "RUDDER_GCS_INTEGRATION",
-    "credentials": "{\"type\":\"service_account\",\"project_id\":\"rudder-cli-e2e\",\"private_key_id\":\"dummy\"}"
+    "storageIntegration": "RUDDER_GCS_INTEGRATION"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

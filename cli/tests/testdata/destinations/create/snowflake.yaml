@@ -13,12 +13,11 @@ spec:
     database: RUDDER_E2E
     warehouse: RUDDER_WH
     user: RUDDER_CLI_E2E
-    use_key_pair_auth: false
-    password: "{{ .SNOWFLAKE_PASSWORD }}"
     role: RUDDER_ROLE
     namespace: rudder_cli_e2e
-    sync:
-      frequency: "180"
+    use_key_pair_auth: false
+    password: "{{ .SNOWFLAKE_PASSWORD }}"
+    sync_frequency: "180"
     skip_tracks_table: false
     skip_users_table: true
     prefer_append: true

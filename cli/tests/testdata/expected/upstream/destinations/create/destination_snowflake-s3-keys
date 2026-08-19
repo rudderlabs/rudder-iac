@@ -11,8 +11,9 @@
     "database": "RUDDER_E2E_S3K",
     "warehouse": "RUDDER_WH",
     "user": "RUDDER_CLI_E2E",
-    "useKeyPairAuth": false,
+    "role": "RUDDER_ROLE",
     "namespace": "rudder_cli_e2e_s3k",
+    "useKeyPairAuth": false,
     "syncFrequency": "180",
     "skipTracksTable": false,
     "skipUsersTable": true,
@@ -21,14 +22,12 @@
     "underscoreDivideNumbers": false,
     "allowUsersContextTraits": false,
     "useRudderStorage": false,
-    "cleanupObjectStorageFiles": false,
     "cloudProvider": "AWS",
+    "cleanupObjectStorageFiles": false,
     "bucketName": "rudder-cli-e2e-s3keys",
     "storageIntegration": "RUDDER_S3_KEYS_INTEGRATION",
     "enableSSE": false,
-    "roleBasedAuth": false,
-    "accessKeyID": "AKIASNOWFLAKEXXXXXXX",
-    "accessKey": "notARealSnowflakeSecretKey"
+    "roleBasedAuth": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

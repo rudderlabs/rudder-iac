@@ -1,6 +1,7 @@
 package snowflake_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,37 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowflake"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 )
+
+func registeredDefinition(t *testing.T) *definitions.RegisteredDefinition {
+	t.Helper()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(snowflake.NewDefinition()))
+	registered, err := registry.Get("snowflake", 1)
+	require.NoError(t, err)
+	return registered
+}
+
+func minimalConfig() map[string]any {
+	return map[string]any{
+		"account":            "rudder-cli-e2e.us-east-1",
+		"database":           "RUDDER_E2E",
+		"warehouse":          "RUDDER_WH",
+		"user":               "RUDDER_CLI_E2E",
+		"use_key_pair_auth":  false,
+		"password":           "s3cret",
+		"sync_frequency":     "180",
+		"use_rudder_storage": true,
+	}
+}
+
+func copyConfig(src map[string]any) map[string]any {
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
 
 func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
@@ -23,7 +55,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "snowflake", registered.Type)
 	assert.Equal(t, "SNOWFLAKE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "private_key", "private_key_passphrase"}, registered.SecretKeys())
+	assert.Empty(t, registered.GatedKeyPaths())
+
+	// The full db-config secretKeys set. All eight are top-level, so none depend
+	// on nested secret-path support.
+	assert.Equal(t, []string{
+		"password", "private_key", "private_key_passphrase",
+		"access_key_id", "access_key", "account_key", "sas_token", "credentials",
+	}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -40,8 +79,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "cloud_source")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
-	assert.Empty(t, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("SNOWFLAKE", 1)
 	require.NoError(t, err)
@@ -51,308 +88,148 @@ func TestNewDefinitionMetadata(t *testing.T) {
 func TestSnowflakeConfigValidation(t *testing.T) {
 	t.Parallel()
 
-	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(snowflake.NewDefinition()))
-	registered, err := registry.Get("snowflake", 1)
-	require.NoError(t, err)
+	registered := registeredDefinition(t)
 
-	minimalValid := map[string]any{
-		"account":            "xy12345.us-east-1",
-		"database":           "ANALYTICS",
-		"warehouse":          "COMPUTE_WH",
-		"user":               "rudder_user",
-		"use_key_pair_auth":  false,
-		"password":           "secret-password",
-		"use_rudder_storage": true,
-		"sync": map[string]any{
-			"frequency": "180",
-		},
-	}
-
-	t.Run("missing account", func(t *testing.T) {
+	t.Run("required fields missing", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "account")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/account", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+
+		for _, field := range []string{"account", "database", "warehouse", "user", "sync_frequency"} {
+			cfg := copyConfig(minimalConfig())
+			delete(cfg, field)
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "required")
+		}
 	})
 
-	t.Run("missing database", func(t *testing.T) {
+	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "database")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/database", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		assert.Empty(t, registered.ValidateConfig(minimalConfig()))
 	})
 
-	t.Run("missing warehouse", func(t *testing.T) {
+	t.Run("password required when key pair auth is off", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "warehouse")
+		cfg := copyConfig(minimalConfig())
+		delete(cfg, "password")
+
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/warehouse", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		assert.Equal(t, "/password", errors[0].Path)
 	})
 
-	t.Run("missing user", func(t *testing.T) {
+	t.Run("private key required when key pair auth is on", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "user")
+		cfg := copyConfig(minimalConfig())
+		cfg["use_key_pair_auth"] = true
+		delete(cfg, "password")
+
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/user", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		assert.Equal(t, "/private_key", errors[0].Path)
 	})
 
-	t.Run("missing sync frequency", func(t *testing.T) {
+	t.Run("cloud provider required when rudder storage is off", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{}
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/sync/frequency", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		assert.Equal(t, "/cloud_provider", errors[0].Path)
 	})
 
-	t.Run("invalid sync frequency", func(t *testing.T) {
+	t.Run("cloud provider enum enforced", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{"frequency": "45"}
+
+		for _, provider := range []string{"AWS", "GCP", "AZURE"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["cloud_provider"] = provider
+			assert.Empty(t, registered.ValidateConfig(cfg), provider)
+		}
+
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "ORACLE"
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/sync/frequency", errors[0].Path)
+		assert.Equal(t, "/cloud_provider", errors[0].Path)
 	})
 
 	// The full schema.json enum, including "10" which the definition originally omitted.
 	t.Run("every schema sync frequency accepted", func(t *testing.T) {
 		t.Parallel()
 		for _, freq := range []string{"5", "10", "15", "30", "60", "180", "360", "720", "1440"} {
-			cfg := copyConfig(minimalValid)
-			cfg["sync"] = map[string]any{"frequency": freq}
+			cfg := copyConfig(minimalConfig())
+			cfg["sync_frequency"] = freq
 			assert.Empty(t, registered.ValidateConfig(cfg), freq)
 		}
+
+		cfg := copyConfig(minimalConfig())
+		cfg["sync_frequency"] = "45"
+		errors := registered.ValidateConfig(cfg)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/sync_frequency", errors[0].Path)
 	})
 
 	t.Run("namespace rejects reserved pg_ prefix", func(t *testing.T) {
 		t.Parallel()
 		for _, ns := range []string{"pg_catalog", "PG_x", "pG_x", "Pg_x"} {
-			cfg := copyConfig(minimalValid)
+			cfg := copyConfig(minimalConfig())
 			cfg["namespace"] = ns
 			errors := registered.ValidateConfig(cfg)
 			require.NotEmpty(t, errors, ns)
 			assert.Equal(t, "/namespace", errors[0].Path)
 		}
 
-		cfg := copyConfig(minimalValid)
+		cfg := copyConfig(minimalConfig())
 		cfg["namespace"] = "analytics_pg_data"
 		assert.Empty(t, registered.ValidateConfig(cfg), "pg_ is only reserved as a prefix")
 	})
 
-	t.Run("use_rudder_storage required", func(t *testing.T) {
+	t.Run("single line fields reject line breaks", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "use_rudder_storage")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_rudder_storage", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		for _, field := range []string{"account", "database", "warehouse", "user", "role", "prefix", "bucket_name"} {
+			cfg := copyConfig(minimalConfig())
+			cfg[field] = "bad\nvalue"
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+		}
 	})
 
-	t.Run("use_key_pair_auth required", func(t *testing.T) {
+	t.Run("pattern fields accept ui templates", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "use_key_pair_auth")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_key_pair_auth", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		cfg := copyConfig(minimalConfig())
+		cfg["account"] = "{{ config.account || " + strings.Repeat("a", 150) + " }}"
+		cfg["namespace"] = "{{ config.namespace || rudder_events }}"
+		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
-	t.Run("password required when use_key_pair_auth false", func(t *testing.T) {
+	// Upstream keeps every provider's keys in one flat object, so a config may
+	// legitimately carry another provider's keys alongside the selected one.
+	t.Run("cross provider keys accepted", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "password")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/password", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("private_key required when use_key_pair_auth true", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_key_pair_auth"] = true
-		delete(cfg, "password")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/private_key", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("valid minimal rudder storage password auth", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(copyConfig(minimalValid))
-		assert.Empty(t, errors)
-	})
-
-	t.Run("valid key pair auth", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_key_pair_auth"] = true
-		delete(cfg, "password")
-		cfg["private_key"] = "-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
-		cfg["private_key_passphrase"] = "pass"
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
-
-	t.Run("valid s3 role based auth", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
+		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
-		cfg["s3"] = map[string]any{
-			"bucket_name": "my-snowflake-bucket",
-			"role_based_authentication": map[string]any{
-				"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
-			},
-		}
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
+		cfg["cloud_provider"] = "AZURE"
+		cfg["bucket_name"] = "gcs"
+		cfg["container_name"] = "azure-logs"
+		cfg["account_name"] = "accountname"
+		cfg["account_key"] = "key"
+		cfg["role_based_auth"] = true
+		cfg["iam_role_arn"] = ""
 
-	t.Run("valid s3 access key auth", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["s3"] = map[string]any{
-			"bucket_name":   "my-snowflake-bucket",
-			"access_key_id": "AKIAEXAMPLE",
-			"access_key":    "secret-value",
-			"enable_sse":    true,
-		}
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
-
-	t.Run("s3 access keys excluded with role based auth", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["s3"] = map[string]any{
-			"bucket_name":   "my-snowflake-bucket",
-			"access_key_id": "AKIAEXAMPLE",
-			"access_key":    "secret-value",
-			"role_based_authentication": map[string]any{
-				"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess",
-			},
-		}
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		paths := map[string]bool{}
-		for _, err := range errors {
-			paths[err.Path] = true
-		}
-		assert.True(t, paths["/s3/access_key_id"] || paths["/s3/access_key"] || paths["/s3/role_based_authentication"])
-	})
-
-	t.Run("valid gcp storage", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["gcp"] = map[string]any{
-			"bucket_name":         "my-gcs-bucket",
-			"credentials":         `{"type":"service_account"}`,
-			"storage_integration": "gcs_int",
-		}
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
-
-	t.Run("gcp missing credentials", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["gcp"] = map[string]any{
-			"bucket_name":         "my-gcs-bucket",
-			"storage_integration": "gcs_int",
-		}
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/gcp/credentials", errors[0].Path)
-	})
-
-	t.Run("valid azure storage", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["azure"] = map[string]any{
-			"container_name":      "my-container",
-			"account_name":        "mystorageaccount",
-			"account_key":         "account-key",
-			"storage_integration": "azure_int",
-		}
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
-
-	t.Run("valid full config with consent", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["role"] = "RUDDER_ROLE"
-		cfg["namespace"] = "RUDDER"
-		cfg["prefix"] = "rudder/"
-		cfg["skip_tracks_table"] = true
-		cfg["skip_users_table"] = false
-		cfg["prefer_append"] = true
-		cfg["manual_sync"] = false
-		cfg["json_paths"] = "properties.cart"
-		cfg["sync"] = map[string]any{
-			"frequency":                 "60",
-			"start_at":                  "10:00",
-			"exclude_window_start_time": "11:00",
-			"exclude_window_end_time":   "12:00",
-		}
-		cfg["consent_management"] = map[string]any{
-			"web": []any{
-				map[string]any{
-					"provider": "oneTrust",
-					"consents": []any{"analytics"},
-				},
-			},
-		}
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
-	})
-
-	t.Run("example yaml config", func(t *testing.T) {
-		t.Parallel()
-		// Exact config from the onboarding example YAML.
-		errors := registered.ValidateConfig(map[string]any{
-			"account":            "xy12345.us-east-1",
-			"database":           "ANALYTICS",
-			"warehouse":          "COMPUTE_WH",
-			"user":               "rudder_user",
-			"use_key_pair_auth":  false,
-			"password":           "secret-password",
-			"role":               "RUDDER_ROLE",
-			"namespace":          "RUDDER",
-			"use_rudder_storage": true,
-			"sync": map[string]any{
-				"frequency": "180",
-			},
-		})
-		assert.Empty(t, errors)
+		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
+		cfg := copyConfig(minimalConfig())
 		cfg["not_a_field"] = true
+
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/not_a_field", errors[0].Path)
@@ -361,10 +238,9 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["consent_management"] = map[string]any{
-			"warehouse": []any{},
-		}
+		cfg := copyConfig(minimalConfig())
+		cfg["consent_management"] = map[string]any{"warehouse": []any{}}
+
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
 		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
@@ -373,12 +249,11 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
+		cfg := copyConfig(minimalConfig())
 		cfg["consent_management"] = map[string]any{
-			"ios_swift": []any{
-				map[string]any{"provider": "unknown"},
-			},
+			"ios_swift": []any{map[string]any{"provider": "unknown"}},
 		}
+
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
 		assert.Equal(t, "/consent_management/ios_swift/0/provider", errors[0].Path)
@@ -394,233 +269,228 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 		{
 			Name: "minimal rudder storage",
 			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
 				"use_key_pair_auth": false,
-				"password": "secret-password",
-				"use_rudder_storage": true,
-				"sync": {"frequency": "180"}
+				"password": "s3cret",
+				"sync_frequency": "180",
+				"use_rudder_storage": true
 			}`,
 			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
 				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": true,
-				"syncFrequency": "180"
+				"password": "s3cret",
+				"syncFrequency": "180",
+				"useRudderStorage": true
 			}`,
 		},
 		{
-			Name: "key pair auth",
+			// Modelled on a real submitted payload: cloudProvider and roleBasedAuth
+			// are first-class keys, every provider's keys travel together, and
+			// unused ones are explicit empty strings rather than omitted.
+			Name: "real world azure payload with cross provider keys",
 			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"use_key_pair_auth": true,
-				"private_key": "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----",
-				"private_key_passphrase": "pass",
-				"use_rudder_storage": true,
-				"sync": {"frequency": "30"}
-			}`,
-			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"useKeyPairAuth": true,
-				"privateKey": "-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----",
-				"privateKeyPassphrase": "pass",
-				"useRudderStorage": true,
-				"syncFrequency": "30"
-			}`,
-		},
-		{
-			Name: "s3 access key auth",
-			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "qua-xxx-1",
+				"database": "rudder",
+				"warehouse": "rudder",
+				"user": "rudder",
+				"role": "",
 				"use_key_pair_auth": false,
-				"password": "secret-password",
+				"namespace": "",
+				"sync_frequency": "180",
 				"use_rudder_storage": false,
-				"sync": {"frequency": "60"},
-				"prefix": "rudder/",
-				"s3": {
-					"bucket_name": "example-bucket",
-					"access_key_id": "AKIAEXAMPLE",
-					"access_key": "secret-value",
-					"enable_sse": true
-				}
+				"prefer_append": true,
+				"skip_users_table": true,
+				"skip_tracks_table": false,
+				"json_paths": "",
+				"password": "pass",
+				"cloud_provider": "AZURE",
+				"prefix": "",
+				"cleanup_object_storage_files": false,
+				"bucket_name": "gcs",
+				"storage_integration": "azure_int",
+				"role_based_auth": true,
+				"enable_sse": false,
+				"iam_role_arn": "",
+				"private_key": "",
+				"private_key_passphrase": "",
+				"credentials": "",
+				"container_name": "azure-logs",
+				"account_name": "accountname",
+				"use_sas_tokens": false,
+				"account_key": "key"
 			}`,
 			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "qua-xxx-1",
+				"database": "rudder",
+				"warehouse": "rudder",
+				"user": "rudder",
+				"role": "",
 				"useKeyPairAuth": false,
-				"password": "secret-password",
+				"namespace": "",
+				"syncFrequency": "180",
 				"useRudderStorage": false,
-				"syncFrequency": "60",
-				"prefix": "rudder/",
-				"cloudProvider": "AWS",
-				"roleBasedAuth": false,
-				"bucketName": "example-bucket",
-				"accessKeyID": "AKIAEXAMPLE",
-				"accessKey": "secret-value",
-				"enableSSE": true
-			}`,
-		},
-		{
-			Name: "s3 role based auth",
-			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"use_key_pair_auth": false,
-				"password": "secret-password",
-				"use_rudder_storage": false,
-				"sync": {"frequency": "60"},
-				"s3": {
-					"bucket_name": "example-bucket",
-					"role_based_authentication": {
-						"iam_role_arn": "arn:aws:iam::123456789012:role/SnowflakeAccess"
-					},
-					"storage_integration": "s3_int"
-				}
-			}`,
-			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": false,
-				"syncFrequency": "60",
-				"cloudProvider": "AWS",
-				"roleBasedAuth": true,
-				"bucketName": "example-bucket",
-				"iamRoleARN": "arn:aws:iam::123456789012:role/SnowflakeAccess",
-				"storageIntegration": "s3_int"
-			}`,
-		},
-		{
-			Name: "gcp storage",
-			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"use_key_pair_auth": false,
-				"password": "secret-password",
-				"use_rudder_storage": false,
-				"sync": {"frequency": "60"},
-				"gcp": {
-					"bucket_name": "example-gcs-bucket",
-					"credentials": "{\"type\":\"service_account\"}",
-					"storage_integration": "gcs_int"
-				}
-			}`,
-			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": false,
-				"syncFrequency": "60",
-				"cloudProvider": "GCP",
-				"bucketName": "example-gcs-bucket",
-				"credentials": "{\"type\":\"service_account\"}",
-				"storageIntegration": "gcs_int"
-			}`,
-		},
-		{
-			Name: "azure storage",
-			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"use_key_pair_auth": false,
-				"password": "secret-password",
-				"use_rudder_storage": false,
-				"sync": {"frequency": "60"},
-				"azure": {
-					"container_name": "example-container",
-					"account_name": "mystorageaccount",
-					"account_key": "account-key",
-					"storage_integration": "azure_int"
-				}
-			}`,
-			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": false,
-				"syncFrequency": "60",
+				"preferAppend": true,
+				"skipUsersTable": true,
+				"skipTracksTable": false,
+				"jsonPaths": "",
+				"password": "pass",
 				"cloudProvider": "AZURE",
-				"containerName": "example-container",
-				"accountName": "mystorageaccount",
-				"accountKey": "account-key",
-				"storageIntegration": "azure_int"
+				"prefix": "",
+				"cleanupObjectStorageFiles": false,
+				"bucketName": "gcs",
+				"storageIntegration": "azure_int",
+				"roleBasedAuth": true,
+				"enableSSE": false,
+				"iamRoleARN": "",
+				"privateKey": "",
+				"privateKeyPassphrase": "",
+				"credentials": "",
+				"containerName": "azure-logs",
+				"accountName": "accountname",
+				"useSASTokens": false,
+				"accountKey": "key"
 			}`,
 		},
 		{
-			Name: "sync exclude window reshape",
+			Name: "key pair auth with s3 role based auth",
 			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
-				"use_key_pair_auth": false,
-				"password": "secret-password",
-				"use_rudder_storage": true,
-				"sync": {
-					"frequency": "60",
-					"start_at": "10:00",
-					"exclude_window_start_time": "11:00",
-					"exclude_window_end_time": "12:00"
-				}
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
+				"use_key_pair_auth": true,
+				"private_key": "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+				"private_key_passphrase": "phrase",
+				"sync_frequency": "1440",
+				"use_rudder_storage": false,
+				"cloud_provider": "AWS",
+				"bucket_name": "rudder-bucket",
+				"storage_integration": "RUDDER_S3",
+				"role_based_auth": true,
+				"iam_role_arn": "arn:aws:iam::000000000000:role/rudder"
 			}`,
 			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
+				"useKeyPairAuth": true,
+				"privateKey": "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+				"privateKeyPassphrase": "phrase",
+				"syncFrequency": "1440",
+				"useRudderStorage": false,
+				"cloudProvider": "AWS",
+				"bucketName": "rudder-bucket",
+				"storageIntegration": "RUDDER_S3",
+				"roleBasedAuth": true,
+				"iamRoleARN": "arn:aws:iam::000000000000:role/rudder"
+			}`,
+		},
+		{
+			Name: "gcp storage and exclude window reshape",
+			LocalJSON: `{
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
+				"use_key_pair_auth": false,
+				"password": "s3cret",
+				"sync_frequency": "360",
+				"sync_start_at": "02:00",
+				"exclude_window": {
+					"start_time": "05:00",
+					"end_time": "06:00"
+				},
+				"use_rudder_storage": false,
+				"cloud_provider": "GCP",
+				"bucket_name": "rudder-gcs",
+				"storage_integration": "RUDDER_GCS",
+				"credentials": "{\"type\":\"service_account\"}"
+			}`,
+			APIJSON: `{
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
 				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": true,
-				"syncFrequency": "60",
-				"syncStartAt": "10:00",
+				"password": "s3cret",
+				"syncFrequency": "360",
+				"syncStartAt": "02:00",
 				"excludeWindow": {
-					"excludeWindowStartTime": "11:00",
-					"excludeWindowEndTime": "12:00"
-				}
+					"excludeWindowStartTime": "05:00",
+					"excludeWindowEndTime": "06:00"
+				},
+				"useRudderStorage": false,
+				"cloudProvider": "GCP",
+				"bucketName": "rudder-gcs",
+				"storageIntegration": "RUDDER_GCS",
+				"credentials": "{\"type\":\"service_account\"}"
+			}`,
+		},
+		{
+			// Terraform passes SkipZeroValue on 21 mappings; porting it would drop
+			// these keys from the payload and surface as a phantom diff every plan.
+			Name: "zero values survive without SkipZeroValue",
+			LocalJSON: `{
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
+				"use_key_pair_auth": false,
+				"password": "",
+				"role": "",
+				"namespace": "",
+				"json_paths": "",
+				"prefix": "",
+				"sync_frequency": "180",
+				"use_rudder_storage": false,
+				"cloud_provider": "AWS",
+				"skip_tracks_table": false,
+				"prefer_append": false,
+				"enable_sse": false,
+				"use_sas_tokens": false,
+				"underscore_divide_numbers": false,
+				"allow_users_context_traits": false
+			}`,
+			APIJSON: `{
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
+				"useKeyPairAuth": false,
+				"password": "",
+				"role": "",
+				"namespace": "",
+				"jsonPaths": "",
+				"prefix": "",
+				"syncFrequency": "180",
+				"useRudderStorage": false,
+				"cloudProvider": "AWS",
+				"skipTracksTable": false,
+				"preferAppend": false,
+				"enableSSE": false,
+				"useSASTokens": false,
+				"underscoreDivideNumbers": false,
+				"allowUsersContextTraits": false
 			}`,
 		},
 		{
 			Name: "consent source boundary mappings",
 			LocalJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
 				"use_key_pair_auth": false,
-				"password": "secret-password",
+				"password": "s3cret",
+				"sync_frequency": "180",
 				"use_rudder_storage": true,
-				"sync": {"frequency": "180"},
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
@@ -628,14 +498,14 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 			APIJSON: `{
-				"account": "xy12345.us-east-1",
-				"database": "ANALYTICS",
-				"warehouse": "COMPUTE_WH",
-				"user": "rudder_user",
+				"account": "rudder-cli-e2e.us-east-1",
+				"database": "RUDDER_E2E",
+				"warehouse": "RUDDER_WH",
+				"user": "RUDDER_CLI_E2E",
 				"useKeyPairAuth": false,
-				"password": "secret-password",
-				"useRudderStorage": true,
+				"password": "s3cret",
 				"syncFrequency": "180",
+				"useRudderStorage": true,
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
@@ -644,16 +514,4 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 	})
-}
-
-func copyConfig(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in))
-	for k, v := range in {
-		if nested, ok := v.(map[string]any); ok {
-			out[k] = copyConfig(nested)
-			continue
-		}
-		out[k] = v
-	}
-	return out
 }

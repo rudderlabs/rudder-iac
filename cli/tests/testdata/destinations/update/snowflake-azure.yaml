@@ -13,11 +13,11 @@ spec:
     database: RUDDER_E2E_AZ_UPD
     warehouse: RUDDER_WH
     user: RUDDER_CLI_E2E
+    role: RUDDER_ROLE
+    namespace: rudder_cli_e2e_az
     use_key_pair_auth: false
     password: "{{ .SNOWFLAKE_PASSWORD }}"
-    namespace: rudder_cli_e2e_az
-    sync:
-      frequency: "360"
+    sync_frequency: "360"
     skip_tracks_table: false
     skip_users_table: true
     prefer_append: true
@@ -25,11 +25,11 @@ spec:
     underscore_divide_numbers: false
     allow_users_context_traits: false
     use_rudder_storage: false
+    cloud_provider: AZURE
     cleanup_object_storage_files: false
-    azure:
-      container_name: ruddercliE2e-updated
-      account_name: ruddercliE2e
-      account_key: notARealAzureAccountKey-updated
-      storage_integration: RUDDER_AZURE_INTEGRATION
-      use_sas_tokens: false
-      sas_token: notARealSasToken-updated
+    container_name: ruddercliE2eupdated
+    storage_integration: RUDDER_AZURE_INTEGRATION
+    account_name: ruddercliE2e
+    account_key: "{{ .SNOWFLAKE_AZURE_ACCOUNT_KEY }}"
+    use_sas_tokens: false
+    sas_token: "{{ .SNOWFLAKE_AZURE_SAS_TOKEN }}"
