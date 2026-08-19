@@ -24,7 +24,7 @@
     "useRudderStorage": false,
     "cloudProvider": "AZURE",
     "cleanupObjectStorageFiles": false,
-    "containerName": "ruddercliE2e",
+    "containerName": "rudder-cli-e2e",
     "storageIntegration": "RUDDER_AZURE_INTEGRATION",
     "accountName": "ruddercliE2e",
     "useSASTokens": false
