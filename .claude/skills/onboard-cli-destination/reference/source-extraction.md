@@ -127,11 +127,22 @@ File: `rudder-integrations-config/src/configurations/destinations/<dir>/db-confi
 
 | Extract | From | Use as |
 | --- | --- | --- |
-| Secrets | `config.secretKeys` (camelCase) | `SecretKeys` — translate to snake_case local keys. **Flat top-level keys only**: the CLI secret machinery (`wrapKnownSecrets`/`maskSecrets` in `handler.go`) replaces top-level string values. Nested paths like `headers.to` cannot be modeled — leave them out of `SecretKeys` and flag in the report |
+| Secrets | `config.secretKeys` (camelCase) | `SecretKeys` — **every entry**, translated to snake_case local keys. db-config is authoritative for which values are write-only; terraform's `Sensitive: true` is only a cross-check and is often incomplete |
 | Source types | `config.supportedSourceTypes` | `SourceTypes` — translate via source-type-mapping.md; drop unmapped, flag in report |
 | Connection modes | `config.supportedConnectionModes` (map per source type) | `ConnectionModes` keyed by **local** source type. Every entry in `SourceTypes` must have modes — the registry rejects gaps |
 | Field allowlist | `config.destConfig.defaultConfig` | Sanity check: every mapped property's API key should appear here OR in a per-source-type list (then it is gated, see below); in neither → flag |
 | Source-type-gated keys | `config.destConfig.<sourceType>` lists | API keys that appear only under specific source types (not in `defaultConfig`) are gated: wrap the ported property in `converter.Gated(prop, localSourceTypes...)` |
+
+**A secret you cannot express is a signal the local shape is wrong, not a
+licence to drop it.** `SecretKeys` holds local key paths, so every entry in
+`config.secretKeys` must correspond to a modelled local key. If one does not,
+re-check the shape before excluding it — the usual cause is a local model that
+nests keys the upstream config keeps flat. Snowflake is the worked example: its
+eight secrets looked unreachable under terraform-shaped `s3`/`gcp`/`azure`
+blocks, and all eight became ordinary top-level keys once the model matched the
+flat upstream payload. Genuinely nested secrets (an array element such as
+`headers.to`) are addressable by dotted path; excluding a declared secret is a
+last resort that must be flagged prominently in the report.
 
 ## Detecting gated keys in destConfig
 

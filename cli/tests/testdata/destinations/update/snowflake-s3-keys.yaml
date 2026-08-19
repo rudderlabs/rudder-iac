@@ -1,0 +1,35 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: snowflake-s3-keys
+spec:
+  id: snowflake-s3-keys
+  display_name: E2E Snowflake S3 Keys Updated
+  type: snowflake
+  enabled: true
+  definition_version: 1
+  config:
+    account: rudder-cli-e2e.us-east-1
+    database: RUDDER_E2E_S3K_UPD
+    warehouse: RUDDER_WH
+    user: RUDDER_CLI_E2E
+    role: RUDDER_ROLE
+    namespace: rudder_cli_e2e_s3k
+    use_key_pair_auth: false
+    password: "{{ .SNOWFLAKE_PASSWORD }}"
+    sync_frequency: "360"
+    skip_tracks_table: false
+    skip_users_table: true
+    prefer_append: true
+    manual_sync: false
+    underscore_divide_numbers: false
+    allow_users_context_traits: false
+    use_rudder_storage: false
+    cloud_provider: AWS
+    cleanup_object_storage_files: false
+    bucket_name: rudder-cli-e2e-s3keys-updated
+    storage_integration: RUDDER_S3_KEYS_INTEGRATION
+    enable_sse: false
+    role_based_auth: false
+    access_key_id: "{{ .SNOWFLAKE_ACCESS_KEY_ID }}"
+    access_key: "{{ .SNOWFLAKE_ACCESS_KEY }}"

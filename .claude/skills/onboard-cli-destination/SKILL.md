@@ -33,8 +33,9 @@ Out of scope: rule-doc updates.
 | Concern | Source | Location |
 | --- | --- | --- |
 | Property mappings (local ↔ API config keys, reshapes) | terraform-provider-rudderstack | `../terraform-provider-rudderstack/rudderstack/integrations/destinations/destination_<name>.go` |
-| Config validations (required, patterns, enums, conditionals) | integrations-config `schema.json` | `../rudder-integrations-config/src/configurations/destinations/<dir>/schema.json` |
-| Source types, connection modes, secrets | integrations-config `db-config.json` | `../rudder-integrations-config/src/configurations/destinations/<dir>/db-config.json` |
+| Config surface (which keys exist) and validations (required, patterns, enums, conditionals) | integrations-config `schema.json` | `../rudder-integrations-config/src/configurations/destinations/<dir>/schema.json` |
+| Source types, connection modes, secrets, field allowlist | integrations-config `db-config.json` | `../rudder-integrations-config/src/configurations/destinations/<dir>/db-config.json` |
+| Intent of a key terraform does not map (grouping, labels) | integrations-config `ui-config.json` | `../rudder-integrations-config/src/configurations/destinations/<dir>/ui-config.json` |
 | Structural template | S3 definition in this repo | `cli/internal/providers/destination/definitions/s3/definition.go` |
 
 `<dir>` in the table above is the input `localType`.
@@ -78,9 +79,22 @@ The integrations-config directory is already known (`localType`, the input)
 - Terraform file: grep `APIType: "<APITYPE>"` under
   `terraform-provider-rudderstack/rudderstack/integrations/destinations/`.
 
-If the destination is missing from terraform, stop and tell the user — the
-skill requires terraform as mapping source (per team decision). Do not derive
-mappings from ui-config on your own.
+If the destination is missing from terraform **entirely**, stop and tell the
+user — the skill requires terraform as mapping source (per team decision).
+
+That is not the same as terraform missing individual keys, which is common.
+Port everything terraform does map, then reconcile against `db-config.json`
+`defaultConfig`: any key listed there (or in `schema.json`) with no terraform
+mapping is filled in from integrations-config rather than dropped —
+
+- **local key**: the API key, camelCase → snake_case (`useSASTokens` → `use_sas_tokens`);
+- **shape**: flat unless `schema.json` declares the key as an object;
+- **validation**: the `schema.json` pattern/enum/default for that key;
+- **`ui-config.json`**: consult it to disambiguate intent — how the key is
+  grouped, labelled, and which other keys it is shown with. Use it to interpret
+  an unclear key, not as a mapping source of its own.
+
+List every such key in the final report.
 
 Read [reference/source-extraction.md](reference/source-extraction.md) for what
 to extract from each file.
@@ -264,10 +278,27 @@ Final response must include:
 
 - Never register two definitions with the same `(Type, Version)` or
   `(APIType, Version)` — the registry errors, but check before writing code.
-- **`schema.json` is the source of truth for the config surface.** Terraform
-  supplies the mapping shape (reshapes, nested key names, local key spelling),
-  but it does not bound which keys exist. When the two disagree on optionality
-  or constraints, follow schema.json and flag the discrepancy in the report.
+- **`schema.json` is the source of truth for the config surface**, with
+  `db-config.json` for capabilities and secrets and `ui-config.json` for intent.
+  Terraform supplies the mapping shape (reshapes, nested key names), but it
+  bounds neither which keys exist nor how they are shaped. When the two
+  disagree on optionality or constraints, follow schema.json and flag it.
+- **Port every terraform mapping, then fill the gaps from db-config.** The two
+  are additive: terraform's mappings stand as-is, and keys it does not map are
+  derived from `db-config.json` `defaultConfig` plus `schema.json` (Step 2)
+  rather than dropped. A key missing from terraform is an omission there, not
+  evidence the key is unsupported. Secrets work the same way: take the whole of
+  `db-config` `secretKeys`, using terraform's `Sensitive: true` only as a
+  cross-check, since it routinely misses entries.
+- **Terraform's shape only holds where it matches the upstream payload.**
+  The upstream config is flat unless `schema.json` declares an object, so a flat
+  local model is the default. Terraform's TF-list nesting (`s3.0.access_key_id`)
+  is a provider artefact — mirroring it produces a model that cannot represent
+  real payloads. Snowflake is the worked example: it sends `cloudProvider` and
+  `roleBasedAuth` as first-class keys and carries every provider's keys at once
+  (an `AZURE` destination still sends `bucketName`), so terraform-shaped
+  `s3`/`gcp`/`azure` blocks plus a `Conditional` on `cloudProvider` silently
+  dropped keys. Nest only where upstream genuinely nests (`excludeWindow`).
 - **A key in `schema.json` with no terraform mapping must still be modelled.**
   Derive the local key mechanically (camelCase → snake_case) and validate it
   from schema.json. Omitting it does not make it "unsupported" — destination

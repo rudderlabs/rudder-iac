@@ -1,0 +1,36 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: snowflake-keypair
+spec:
+  id: snowflake-keypair
+  display_name: E2E Snowflake Key Pair
+  type: snowflake
+  enabled: true
+  definition_version: 1
+  config:
+    account: rudder-cli-e2e.us-east-1
+    database: RUDDER_E2E_KP
+    warehouse: RUDDER_WH
+    user: RUDDER_CLI_E2E
+    role: RUDDER_ROLE
+    namespace: rudder_cli_e2e_kp
+    use_key_pair_auth: true
+    private_key: "{{ .SNOWFLAKE_PRIVATE_KEY }}"
+    private_key_passphrase: "{{ .SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}"
+    sync_frequency: "180"
+    skip_tracks_table: false
+    skip_users_table: true
+    prefer_append: true
+    manual_sync: false
+    underscore_divide_numbers: false
+    allow_users_context_traits: false
+    use_rudder_storage: false
+    cloud_provider: AWS
+    prefix: rudder-cli-e2e
+    cleanup_object_storage_files: false
+    bucket_name: rudder-cli-e2e-bucket
+    storage_integration: RUDDER_S3_INTEGRATION
+    enable_sse: false
+    role_based_auth: true
+    iam_role_arn: arn:aws:iam::000000000000:role/rudder-cli-e2e
