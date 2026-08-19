@@ -27,7 +27,7 @@ spec:
     use_rudder_storage: false
     cloud_provider: AZURE
     cleanup_object_storage_files: false
-    container_name: ruddercliE2e
+    container_name: rudder-cli-e2e
     storage_integration: RUDDER_AZURE_INTEGRATION
     account_name: ruddercliE2e
     account_key: "{{ .SNOWFLAKE_AZURE_ACCOUNT_KEY }}"

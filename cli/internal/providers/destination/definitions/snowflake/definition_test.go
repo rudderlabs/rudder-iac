@@ -189,6 +189,24 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(cfg), "pg_ is only reserved as a prefix")
 	})
 
+	// The backend rejects a bad container name with a 400, so this must fail at
+	// validate rather than at apply.
+	t.Run("azure container name rules enforced", func(t *testing.T) {
+		t.Parallel()
+
+		for _, name := range []string{"ruddercliE2e", "ab", strings.Repeat("a", 64), "a--b", "-abc", "abc-"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["container_name"] = name
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, name)
+			assert.Equal(t, "/container_name", errors[0].Path)
+		}
+
+		cfg := copyConfig(minimalConfig())
+		cfg["container_name"] = "rudder-cli-e2e"
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
 	t.Run("single line fields reject line breaks", func(t *testing.T) {
 		t.Parallel()
 		for _, field := range []string{"account", "database", "warehouse", "user", "role", "prefix", "bucket_name"} {

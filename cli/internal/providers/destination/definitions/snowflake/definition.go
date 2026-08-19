@@ -16,6 +16,18 @@ func init() {
 		`^(pg_|PG_|pG_|Pg_)`,
 		"must be at most 64 characters, must not contain line breaks, and must not start with a pg_ prefix",
 	)
+
+	// Azure container naming: schema.json is ^(?=.{3,63}$)[a-z0-9]+(-[a-z0-9]+)*$.
+	// RE2 has no lookahead, so the length bound moves into the reject pattern
+	// while the accept pattern carries the character rule. The backend rejects
+	// violations with a 400, so leaving this unenforced fails at apply instead of
+	// at validate.
+	funcs.NewPatternWithReject(
+		"azure_container_name",
+		`^[a-z0-9]+(-[a-z0-9]+)*$`,
+		`^(.{0,2}|.{64,})$`,
+		"must be 3-63 characters of lowercase letters, digits and single hyphens",
+	)
 }
 
 // Source types from integrations-config destinations/snowflake/db-config.json
@@ -107,7 +119,7 @@ type snowflakeConfig struct {
 	Credentials string `mapstructure:"credentials" validate:"omitempty"`
 
 	// Azure
-	ContainerName string `mapstructure:"container_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	ContainerName string `mapstructure:"container_name" validate:"omitempty,dynamic_or_pattern=azure_container_name"`
 	AccountName   string `mapstructure:"account_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	AccountKey    string `mapstructure:"account_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
