@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	ConnectionsKey = "connections"
 	SourceKey      = "source"
 	DestinationKey = "destination"
 	EnabledKey     = "enabled"
@@ -24,9 +25,10 @@ const (
 	EventStreamConnectionResourceKind = "event-stream-connections"
 	MetadataName                      = "event-stream-connections"
 
-	// ImportPath is the spec file all importable connections are written to —
-	// export emits one spec of the event-stream-connections kind per run.
-	ImportPath = "event-stream/connections.yaml"
+	// ImportPath is the spec file all importable connections are written to,
+	// relative to the provider's import directory — export emits one spec of
+	// the event-stream-connections kind per run.
+	ImportPath = "connections.yaml"
 )
 
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of

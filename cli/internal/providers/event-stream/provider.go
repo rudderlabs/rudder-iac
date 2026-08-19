@@ -70,7 +70,7 @@ type Option func(*Provider)
 func WithConnectionSupport() Option {
 	return func(p *Provider) {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client)
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client, importDir)
 	}
 }
 

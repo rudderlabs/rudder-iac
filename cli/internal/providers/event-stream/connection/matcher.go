@@ -23,11 +23,14 @@ func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *re
 	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
 	remote := r.Data.(*RemoteConnection)
 
-	sourceURN, ok := resolveEndpoint(scope, source.ResourceType, remote.SourceID)
+	// Destination rows carry no marks today (the destination provider has no
+	// matcher), so resolving them does not depend on cross-provider matcher
+	// order.
+	sourceURN, ok := importmatcher.ResolveLocalURN(scope, source.ResourceType, remote.SourceID)
 	if !ok {
 		return nil
 	}
-	destinationURN, ok := resolveEndpoint(scope, destination.DestinationResourceType, remote.DestinationID)
+	destinationURN, ok := importmatcher.ResolveLocalURN(scope, destination.DestinationResourceType, remote.DestinationID)
 	if !ok {
 		return nil
 	}
@@ -44,29 +47,4 @@ func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *re
 		return sourceRef.URN == sourceURN && destinationRef.URN == destinationURN
 	})
 	return local
-}
-
-// resolveEndpoint maps a remote endpoint ID to the local resource URN it
-// corresponds to: either the URN of the endpoint matched in this import, or of
-// one already managed locally (found by its import metadata's remote ID),
-// mirroring the datacatalog matchers' resolveTypeRef. ok is false when the
-// endpoint has no local counterpart — the connection then stays unmatched.
-// Destination rows carry no marks today (the destination provider has no
-// matcher), so consulting them does not depend on cross-provider matcher
-// order.
-func resolveEndpoint(scope importmatcher.Scope, resourceType string, remoteID string) (urn string, ok bool) {
-	if scope.Importable != nil {
-		if endpoint, found := scope.Importable.GetByID(resourceType, remoteID); found {
-			if endpoint.MatchedWith != nil {
-				return endpoint.MatchedWith.URN(), true
-			}
-			return "", false
-		}
-	}
-	for _, endpoint := range scope.LocalGraph.ResourcesByType(resourceType) {
-		if meta := endpoint.ImportMetadata(); meta != nil && meta.RemoteId == remoteID {
-			return endpoint.URN(), true
-		}
-	}
-	return "", false
 }

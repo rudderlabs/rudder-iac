@@ -148,6 +148,30 @@ func bySorted(g *resources.Graph, resourceType string, matches func(*resources.R
 	return nil, false
 }
 
+// ResolveLocalURN maps a remote resource ID of the given type to the local
+// resource URN it corresponds to: either the URN of the resource matched
+// earlier in this import, or of one already managed locally (found by its
+// import metadata's remote ID). ok is false when the ID has no local
+// counterpart — an importable-but-unmatched remote, or an ID the project does
+// not know. For matchers whose remote resources reference other resources by
+// remote ID (datacatalog custom types, event stream connection endpoints).
+func ResolveLocalURN(scope Scope, resourceType string, remoteID string) (urn string, ok bool) {
+	if scope.Importable != nil {
+		if remote, found := scope.Importable.GetByID(resourceType, remoteID); found {
+			if remote.MatchedWith != nil {
+				return remote.MatchedWith.URN(), true
+			}
+			return "", false
+		}
+	}
+	for _, local := range scope.LocalGraph.ResourcesByType(resourceType) {
+		if meta := local.ImportMetadata(); meta != nil && meta.RemoteId == remoteID {
+			return local.URN(), true
+		}
+	}
+	return "", false
+}
+
 // rewriteTrailingID swaps the trailing ID segment of a reference with the
 // local ID. Every provider reference shape ends with the external ID as the
 // final ':' or '/' delimited segment (e.g. "#category:id",

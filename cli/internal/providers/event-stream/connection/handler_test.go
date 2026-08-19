@@ -41,7 +41,7 @@ func ticketExampleSpec() map[string]any {
 
 func loadTicketExample(t *testing.T) *connectionResource {
 	t.Helper()
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	require.Len(t, h.resources, 1)
 	return h.resources["android-to-s3"]
@@ -49,7 +49,7 @@ func loadTicketExample(t *testing.T) *connectionResource {
 
 func TestParseSpec(t *testing.T) {
 	t.Run("one URN per connection entry", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		parsed, err := h.ParseSpec("", connectionsSpec(map[string]any{
 			"connections": []any{
 				map[string]any{"id": "one"},
@@ -74,7 +74,7 @@ func TestParseSpec(t *testing.T) {
 	}
 	for _, tt := range errorTests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(nil)
+			h := NewHandler(nil, "event-stream")
 			parsed, err := h.ParseSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -97,7 +97,7 @@ func TestLoadSpec(t *testing.T) {
 }
 
 func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{
 		"connections": []any{
 			map[string]any{
@@ -120,7 +120,7 @@ func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
 func TestLoadSpecEmptyListIsValid(t *testing.T) {
 	// An explicit empty list stays valid so removing the last connection does
 	// not invalidate the spec.
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{"connections": []any{}})))
 	assert.Empty(t, h.resources)
 }
@@ -201,7 +201,7 @@ func TestLoadSpecErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(nil)
+			h := NewHandler(nil, "event-stream")
 			err := h.LoadSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -267,7 +267,7 @@ func TestDestinationRefResolve(t *testing.T) {
 // both endpoints (created after them) and shows up as their dependent
 // (deleted before them).
 func TestGetResourcesGraphDependencies(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -297,7 +297,7 @@ func TestGetResourcesGraphDependencies(t *testing.T) {
 // dereference the syncer applies before lifecycle calls: the source via the
 // legacy output map, the destination via its typed state's Resolve func.
 func TestConnectionRefResolution(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -325,7 +325,7 @@ func TestConnectionRefResolution(t *testing.T) {
 }
 
 func TestMigrateSpecIsIdentity(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	spec := connectionsSpec(ticketExampleSpec())
 	migrated, err := h.MigrateSpec(spec)
 	require.NoError(t, err)
@@ -336,7 +336,7 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 // loaded connections: each one reads its own URN at graph time, so the
 // resource carries import metadata instead of file metadata.
 func TestLoadImportMetadata(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 
 	assert.NoError(t, h.LoadImportMetadata(nil))
@@ -362,7 +362,7 @@ func TestLoadImportMetadata(t *testing.T) {
 // TestLoadSpecInlineImportMetadata proves the inline metadata.import path fills
 // the same per-connection metadata the manifest broadcast does.
 func TestLoadSpecInlineImportMetadata(t *testing.T) {
-	h := NewHandler(nil)
+	h := NewHandler(nil, "event-stream")
 	s := connectionsSpec(ticketExampleSpec())
 	s.Metadata = map[string]any{
 		"name": MetadataName,
@@ -423,7 +423,7 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-remote-1", "src-remote-2")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		collection, err := h.LoadResourcesFromRemote(t.Context())
 
@@ -460,7 +460,7 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 			},
 		}
 		eventStreamSources(mock, "src-remote-1")
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		collection, err := h.LoadResourcesFromRemote(t.Context())
 
@@ -476,7 +476,7 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 				return nil, errors.New("boom")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.LoadResourcesFromRemote(t.Context())
 
@@ -508,7 +508,7 @@ func remoteCollection(t *testing.T, conns ...client.Connection) *resources.Remot
 
 func TestMapRemoteToState(t *testing.T) {
 	t.Run("keys state on externalId with spec-shaped endpoint refs", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := remoteCollection(t, client.Connection{
 			ID: "conn-remote-1", ExternalID: "android-to-s3",
 			SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true,
@@ -538,7 +538,7 @@ func TestMapRemoteToState(t *testing.T) {
 	// and destination handlers both drop rows without an externalId while
 	// loading, so an unmanaged endpoint never reaches the collection at all.
 	t.Run("skips rows whose source is absent from the collection", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := remoteCollection(t, client.Connection{
 			ID: "conn-remote-1", ExternalID: "unmanaged-to-s3",
 			SourceID: "src-remote-9", DestinationID: "dst-remote-1", IsEnabled: true,
@@ -551,7 +551,7 @@ func TestMapRemoteToState(t *testing.T) {
 	})
 
 	t.Run("skips rows whose destination carries no externalId", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := remoteCollection(t, client.Connection{
 			ID: "conn-remote-1", ExternalID: "android-to-unmanaged",
 			SourceID: "src-remote-1", DestinationID: "dst-remote-2", IsEnabled: true,
@@ -564,7 +564,7 @@ func TestMapRemoteToState(t *testing.T) {
 	})
 
 	t.Run("keeps rows whose endpoints are both CLI-managed alongside skipped ones", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := remoteCollection(t,
 			client.Connection{
 				ID: "conn-remote-1", ExternalID: "android-to-s3",
@@ -584,7 +584,7 @@ func TestMapRemoteToState(t *testing.T) {
 	})
 
 	t.Run("errors on foreign data in the collection", func(t *testing.T) {
-		h := NewHandler(nil)
+		h := NewHandler(nil, "event-stream")
 		collection := resources.NewRemoteResources()
 		collection.Set(EventStreamConnectionResourceType, map[string]*resources.RemoteResource{
 			"x": {ID: "x", ExternalID: "x", Data: "not a connection"},
