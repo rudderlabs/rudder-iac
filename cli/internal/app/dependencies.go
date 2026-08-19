@@ -223,7 +223,10 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	// Built ahead of the event-stream provider, whose connection semantic
-	// rules read destination definitions; empty when DestinationSupport is off.
+	// rules read destination definitions. newDestinationRegistry registers no
+	// definitions unless DestinationSupport is on, so with the flag off both
+	// providers share an empty registry and the definition-backed connection
+	// checks quietly find nothing to validate against.
 	destRegistry, err := newDestinationRegistry(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)

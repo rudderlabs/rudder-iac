@@ -15,40 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// connectionEdgeReaders maps each resource type whose graph entries are
-// project connections to the reader that reduces one such resource to its
-// endpoint URNs, feeding the topology checks (V-C3, V-E1). Only event stream
-// connections exist as project resources today; the retl-connections kind
-// registers its own type and reader here when it lands, so its field layout
-// stays its own concern. Known limitation: these checks see only
-// project-managed connections — a connection that exists remotely but is not
-// in the project is invisible at validate time.
-var connectionEdgeReaders = map[string]func(*resources.Resource) (connectionEdge, bool){
-	esConnection.EventStreamConnectionResourceType: eventStreamConnectionEdge,
-}
-
-// connectionEdge is one project connection reduced to its endpoint URNs.
-type connectionEdge struct {
-	sourceURN      string
-	destinationURN string
-}
-
-// eventStreamConnectionEdge reads the endpoint URNs off an
-// event-stream-connection graph resource, whose data map carries both
-// endpoints as PropertyRefs.
-func eventStreamConnectionEdge(res *resources.Resource) (connectionEdge, bool) {
-	data := res.Data()
-	src, ok := data[esConnection.SourceKey].(*resources.PropertyRef)
-	if !ok {
-		return connectionEdge{}, false
-	}
-	dst, ok := data[esConnection.DestinationKey].(*resources.PropertyRef)
-	if !ok {
-		return connectionEdge{}, false
-	}
-	return connectionEdge{sourceURN: src.URN, destinationURN: dst.URN}, true
-}
-
 // NewConnectionSemanticValidRule validates cross-resource concerns for event
 // stream connections: both endpoints exist in the project (V-C1), a
 // source–destination pair is connected only once (V-C3), the destination
@@ -94,57 +60,115 @@ func validateConnectionsSemantic(
 	edges := projectConnectionEdges(graph)
 
 	var results []rules.ValidationResult
-	for i, c := range spec.Connections {
-		results = append(results, validateConnectionSemantic(registry, graph, edges, i, c)...)
+	for index, c := range spec.Connections {
+		endpoints := resolveEndpoints(graph, c)
+
+		results = append(results, validateEndpointsExist(index, endpoints)...)
+		if endpoints.sourceRefOK && endpoints.destinationRefOK {
+			results = append(results, validatePairUniqueness(edges, index, endpoints)...)
+		}
+		// Sharing a destination is only meaningful for a destination that
+		// exists; a dangling ref already carries the V-C1 error above.
+		if endpoints.destination != nil {
+			results = append(results, validateDestinationHasOnlyEventStreamSources(edges, index, endpoints.destinationID)...)
+		}
+		if endpoints.source != nil && endpoints.destination != nil {
+			results = append(results, validateSourceTypeCompatibility(registry, index, endpoints)...)
+		}
 	}
 	return results
 }
 
-func validateConnectionSemantic(
-	registry *definitions.Registry,
+// validateEnabledEndpoints (V-C7): a connection marked enabled should have
+// both its source and destination enabled — otherwise it will not deliver
+// anything. Endpoints that are missing from the graph are the semantic-valid
+// rule's concern and are skipped here.
+var validateEnabledEndpoints = func(
+	_ string,
+	_ string,
+	_ map[string]any,
+	spec esConnection.ConnectionsSpec,
 	graph *resources.Graph,
-	edges []connectionEdge,
-	index int,
-	c esConnection.ConnectionSpec,
 ) []rules.ValidationResult {
 	var results []rules.ValidationResult
+	for index, c := range spec.Connections {
+		// enabled defaults to true when omitted, mirroring the handler.
+		if c.Enabled != nil && !*c.Enabled {
+			continue
+		}
 
-	sourceID, sourceRefOK := endpointID(c.Source, esSource.ResourceKind)
-	destinationID, destinationRefOK := endpointID(c.Destination, destination.DestinationSpecKind)
-
-	// V-C1: both endpoints must resolve to project resources.
-	var sourceRes, destinationRes *resources.Resource
-	if sourceRefOK {
-		var found bool
-		if sourceRes, found = graph.GetResource(resources.URN(sourceID, esSource.ResourceType)); !found {
+		endpoints := resolveEndpoints(graph, c)
+		if endpoints.source != nil && sourceDisabled(endpoints.source) {
 			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/connections/%d/source", index),
-				Message:   fmt.Sprintf("event stream source '%s' not found in the project", sourceID),
+				Reference: sourceRef(index),
+				Message: fmt.Sprintf(
+					"connection '%s' is enabled but its source '%s' is disabled; the connection will not deliver events",
+					c.LocalID, endpoints.sourceID,
+				),
+			})
+		}
+		if endpoints.destination != nil && destinationDisabled(endpoints.destination) {
+			results = append(results, rules.ValidationResult{
+				Reference: destinationRef(index),
+				Message: fmt.Sprintf(
+					"connection '%s' is enabled but its destination '%s' is disabled; the connection will not deliver events",
+					c.LocalID, endpoints.destinationID,
+				),
 			})
 		}
 	}
-	if destinationRefOK {
-		var found bool
-		if destinationRes, found = graph.GetResource(resources.URN(destinationID, destination.DestinationResourceType)); !found {
-			results = append(results, rules.ValidationResult{
-				Reference: fmt.Sprintf("/connections/%d/destination", index),
-				Message:   fmt.Sprintf("destination '%s' not found in the project", destinationID),
-			})
-		}
-	}
+	return results
+}
 
-	if sourceRefOK && destinationRefOK {
-		results = append(results, validatePairUniqueness(edges, index, sourceID, destinationID)...)
-	}
-	// Sharing a destination is only meaningful for a destination that exists;
-	// a dangling ref already carries the V-C1 error above.
-	if destinationRes != nil {
-		results = append(results, validateDestinationFamily(edges, index, destinationID)...)
-	}
-	if sourceRes != nil && destinationRes != nil {
-		results = append(results, validateSourceTypeCompatibility(registry, index, sourceID, sourceRes, destinationID, destinationRes)...)
-	}
+// connectionEndpoints is one connection entry's endpoint resolution, shared
+// by every per-entry check: the parsed local ids, whether each ref parsed as
+// the right kind, and the graph resources (nil when absent from the project).
+type connectionEndpoints struct {
+	sourceID    string
+	sourceRefOK bool
+	source      *resources.Resource
 
+	destinationID    string
+	destinationRefOK bool
+	destination      *resources.Resource
+}
+
+// resolveEndpoints parses both endpoint refs of a connection entry and looks
+// the endpoints up in the graph. Malformed or wrong-kind refs stay unresolved
+// — the spec-syntax rule already reports those, so semantic checks skip them
+// quietly.
+func resolveEndpoints(graph *resources.Graph, c esConnection.ConnectionSpec) connectionEndpoints {
+	var endpoints connectionEndpoints
+
+	if id, ok := endpointID(c.Source, esSource.ResourceKind); ok {
+		endpoints.sourceID = id
+		endpoints.sourceRefOK = true
+		endpoints.source, _ = graph.GetResource(resources.URN(id, esSource.ResourceType))
+	}
+	if id, ok := endpointID(c.Destination, destination.DestinationSpecKind); ok {
+		endpoints.destinationID = id
+		endpoints.destinationRefOK = true
+		endpoints.destination, _ = graph.GetResource(resources.URN(id, destination.DestinationResourceType))
+	}
+	return endpoints
+}
+
+// validateEndpointsExist (V-C1): both endpoint refs must resolve to resources
+// that exist in the project.
+func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.ValidationResult {
+	var results []rules.ValidationResult
+	if endpoints.sourceRefOK && endpoints.source == nil {
+		results = append(results, rules.ValidationResult{
+			Reference: sourceRef(index),
+			Message:   fmt.Sprintf("event stream source '%s' not found in the project", endpoints.sourceID),
+		})
+	}
+	if endpoints.destinationRefOK && endpoints.destination == nil {
+		results = append(results, rules.ValidationResult{
+			Reference: destinationRef(index),
+			Message:   fmt.Sprintf("destination '%s' not found in the project", endpoints.destinationID),
+		})
+	}
 	return results
 }
 
@@ -152,10 +176,10 @@ func validateConnectionSemantic(
 // connected once in the project. The count runs over every project
 // connection, so duplicates are flagged whether they sit in this spec or in
 // another one.
-func validatePairUniqueness(edges []connectionEdge, index int, sourceID, destinationID string) []rules.ValidationResult {
+func validatePairUniqueness(edges []connectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
 	pair := connectionEdge{
-		sourceURN:      resources.URN(sourceID, esSource.ResourceType),
-		destinationURN: resources.URN(destinationID, destination.DestinationResourceType),
+		sourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
+		destinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
 	}
 
 	count := 0
@@ -169,19 +193,19 @@ func validatePairUniqueness(edges []connectionEdge, index int, sourceID, destina
 	}
 
 	return []rules.ValidationResult{{
-		Reference: fmt.Sprintf("/connections/%d", index),
+		Reference: connectionRef(index),
 		Message: fmt.Sprintf(
 			"source '%s' and destination '%s' are connected more than once in the project; a source-destination pair can only be connected once",
-			sourceID, destinationID,
+			endpoints.sourceID, endpoints.destinationID,
 		),
 	}}
 }
 
-// validateDestinationFamily (V-E1): an event stream source cannot share a
-// destination with a rETL source — every project connection to this
-// destination must come from an event stream source. This is enforced only in
-// the webapp today, so the CLI is the last line of defense.
-func validateDestinationFamily(edges []connectionEdge, index int, destinationID string) []rules.ValidationResult {
+// validateDestinationHasOnlyEventStreamSources (V-E1): an event stream source
+// cannot share a destination with a rETL source — every project connection to
+// this destination must come from an event stream source. This is enforced
+// only in the webapp today, so the CLI is the last line of defense.
+func validateDestinationHasOnlyEventStreamSources(edges []connectionEdge, index int, destinationID string) []rules.ValidationResult {
 	destinationURN := resources.URN(destinationID, destination.DestinationResourceType)
 	sourcePrefix := esSource.ResourceType + ":"
 
@@ -192,7 +216,7 @@ func validateDestinationFamily(edges []connectionEdge, index int, destinationID 
 		}
 		_, foreignID, _ := strings.Cut(e.sourceURN, ":")
 		results = append(results, rules.ValidationResult{
-			Reference: fmt.Sprintf("/connections/%d/destination", index),
+			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
 				"destination '%s' is also connected to rETL source '%s' in this project; a destination cannot receive from both event stream and rETL sources",
 				destinationID, foreignID,
@@ -209,14 +233,21 @@ func validateDestinationFamily(edges []connectionEdge, index int, destinationID 
 func validateSourceTypeCompatibility(
 	registry *definitions.Registry,
 	index int,
-	sourceID string,
-	sourceRes *resources.Resource,
-	destinationID string,
-	destinationRes *resources.Resource,
+	endpoints connectionEndpoints,
 ) []rules.ValidationResult {
-	sourceType, _ := sourceRes.Data()[esSource.SourceDefinitionKey].(string)
-	destinationData, ok := destinationRes.RawData().(*destination.DestinationResource)
-	if sourceType == "" || !ok {
+	// A source resource without a type cannot reach a built graph — the
+	// source's own spec rules require one — so there is nothing to report
+	// here without it.
+	sourceType, _ := endpoints.source.Data()[esSource.SourceDefinitionKey].(string)
+	if sourceType == "" {
+		return nil
+	}
+
+	// Destination resources always carry *destination.DestinationResource;
+	// anything else is the destination provider's corruption, not this
+	// rule's to report.
+	destinationData, ok := endpoints.destination.RawData().(*destination.DestinationResource)
+	if !ok {
 		return nil
 	}
 
@@ -233,10 +264,10 @@ func validateSourceTypeCompatibility(
 	supported := registered.SupportedSourceTypes()
 	if !slices.Contains(supported, token) {
 		return []rules.ValidationResult{{
-			Reference: fmt.Sprintf("/connections/%d/destination", index),
+			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
 				"destination '%s' (type '%s') does not support source '%s': source type '%s' is not among supported source types: %s",
-				destinationID, destinationData.Type, sourceID, token, strings.Join(supported, ", "),
+				endpoints.destinationID, destinationData.Type, endpoints.sourceID, token, strings.Join(supported, ", "),
 			),
 		}}
 	}
@@ -244,10 +275,10 @@ func validateSourceTypeCompatibility(
 	missing := missingRequiredConfigKeys(registered, token, destinationData.Config)
 	if len(missing) > 0 {
 		return []rules.ValidationResult{{
-			Reference: fmt.Sprintf("/connections/%d/destination", index),
+			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
 				"destination '%s' config is missing fields required to connect a '%s' source: %s",
-				destinationID, token, strings.Join(missing, ", "),
+				endpoints.destinationID, token, strings.Join(missing, ", "),
 			),
 		}}
 	}
@@ -257,8 +288,6 @@ func validateSourceTypeCompatibility(
 
 // missingRequiredConfigKeys returns the definition-required config keys for
 // the given source type that the destination's config does not carry.
-// Source-type-scoped keys (connection_mode, use_native_sdk) live under
-// config.<key>.<source type> and are reported with that path.
 func missingRequiredConfigKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -266,6 +295,11 @@ func missingRequiredConfigKeys(
 ) []string {
 	var missing []string
 	for _, key := range registered.SupportedSourcesValidation(sourceType) {
+		// Source-type-scoped keys (connection_mode, use_native_sdk) are not
+		// flat config fields: the destination spec carries them as maps keyed
+		// by source type (e.g. config.use_native_sdk.web). For those,
+		// "present" means the map has an entry for the connecting source's
+		// type, and a miss is reported as <key>.<source type>.
 		if slices.Contains(registered.SourceTypeConfigKeys(), key) {
 			block, _ := config[key].(map[string]any)
 			if _, present := block[sourceType]; !present {
@@ -280,67 +314,60 @@ func missingRequiredConfigKeys(
 	return missing
 }
 
-// validateEnabledEndpoints (V-C7): a connection marked enabled should have
-// both its source and destination enabled — otherwise it will not deliver
-// anything. Endpoints that are missing from the graph are the semantic-valid
-// rule's concern and are skipped here.
-var validateEnabledEndpoints = func(
-	_ string,
-	_ string,
-	_ map[string]any,
-	spec esConnection.ConnectionsSpec,
-	graph *resources.Graph,
-) []rules.ValidationResult {
-	var results []rules.ValidationResult
-	for i, c := range spec.Connections {
-		// enabled defaults to true when omitted, mirroring the handler.
-		if c.Enabled != nil && !*c.Enabled {
-			continue
-		}
-
-		if sourceID, ok := endpointID(c.Source, esSource.ResourceKind); ok {
-			if res, found := graph.GetResource(resources.URN(sourceID, esSource.ResourceType)); found {
-				if enabled, ok := res.Data()[esSource.EnabledKey].(bool); ok && !enabled {
-					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/connections/%d/source", i),
-						Message: fmt.Sprintf(
-							"connection '%s' is enabled but its source '%s' is disabled; the connection will not deliver events",
-							c.LocalID, sourceID,
-						),
-					})
-				}
-			}
-		}
-
-		if destinationID, ok := endpointID(c.Destination, destination.DestinationSpecKind); ok {
-			if res, found := graph.GetResource(resources.URN(destinationID, destination.DestinationResourceType)); found {
-				if destinationData, ok := res.RawData().(*destination.DestinationResource); ok && !destinationData.Enabled {
-					results = append(results, rules.ValidationResult{
-						Reference: fmt.Sprintf("/connections/%d/destination", i),
-						Message: fmt.Sprintf(
-							"connection '%s' is enabled but its destination '%s' is disabled; the connection will not deliver events",
-							c.LocalID, destinationID,
-						),
-					})
-				}
-			}
-		}
-	}
-	return results
+// connectionEdge is one project connection reduced to its endpoint URNs.
+type connectionEdge struct {
+	sourceURN      string
+	destinationURN string
 }
 
-// projectConnectionEdges reduces every project connection in the graph to its
-// endpoint URN pair for the topology checks.
+// projectConnectionEdges reduces every event stream connection in the graph
+// to its endpoint URN pair for the topology checks (V-C3, V-E1). Event
+// stream connections are the only project-managed connections today; when
+// the retl-connections kind lands, its validations must fold its connections
+// into these checks. Known limitation: only project-managed connections are
+// visible — a connection that exists remotely but is not in the project is
+// invisible at validate time.
 func projectConnectionEdges(graph *resources.Graph) []connectionEdge {
 	var edges []connectionEdge
-	for resourceType, edgeOf := range connectionEdgeReaders {
-		for _, res := range graph.ResourcesByType(resourceType) {
-			if edge, ok := edgeOf(res); ok {
-				edges = append(edges, edge)
-			}
+	for _, res := range graph.ResourcesByType(esConnection.EventStreamConnectionResourceType) {
+		data := res.Data()
+		src, srcOK := data[esConnection.SourceKey].(*resources.PropertyRef)
+		dst, dstOK := data[esConnection.DestinationKey].(*resources.PropertyRef)
+		if !srcOK || !dstOK {
+			continue
 		}
+		edges = append(edges, connectionEdge{sourceURN: src.URN, destinationURN: dst.URN})
 	}
 	return edges
+}
+
+// sourceDisabled reports whether a source graph resource is explicitly
+// disabled; the handler resolves the spec's default before the graph is
+// built, so the flag is always present.
+func sourceDisabled(res *resources.Resource) bool {
+	enabled, ok := res.Data()[esSource.EnabledKey].(bool)
+	return ok && !enabled
+}
+
+// destinationDisabled reports whether a destination graph resource is
+// disabled.
+func destinationDisabled(res *resources.Resource) bool {
+	destinationData, ok := res.RawData().(*destination.DestinationResource)
+	return ok && !destinationData.Enabled
+}
+
+// connectionRef, sourceRef, and destinationRef build the JSON-pointer
+// references for the connection entry at index and its endpoint fields.
+func connectionRef(index int) string {
+	return fmt.Sprintf("/connections/%d", index)
+}
+
+func sourceRef(index int) string {
+	return connectionRef(index) + "/source"
+}
+
+func destinationRef(index int) string {
+	return connectionRef(index) + "/destination"
 }
 
 // endpointID extracts the local id from a "#<kind>:<id>" endpoint reference.
