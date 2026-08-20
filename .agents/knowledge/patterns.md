@@ -141,3 +141,9 @@
 <!-- ticket:DEX-504 -->
 - Google Sheets destination E2E fixture YAML was intentionally not added without matching live-confirmed upstream snapshots; `TestDestinationsApply` count-checks destination fixtures against expected snapshots, so fixture-only coverage would break unrelated destination E2E runs.
 - Defer Google Sheets destination apply fixture and snapshot coverage until an explicitly disposable live destination-enabled workspace is available; prefer unit/registry coverage and compile-only E2E validation in autonomous environments.
+
+## DEX-527 — Snowpipe Streaming E2E Is Deferred Behind a Feature Gate
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming is gated by the `SNOWFLAKE_STREAMING` flag (`options.hidden.gate.flags` in its db-config). On a workspace without that entitlement the API rejects create with `403 destination "SNOWPIPE_STREAMING" is not available for your account`.
+- That failure happens at apply, before any snapshot comparison, so shipping Snowpipe fixtures fails the entire `TestDestinationsApply` suite and takes every other destination's coverage down with it. Converter-derived snapshots do not help, because the apply itself never succeeds.
+- E2E for this destination is therefore deferred until the flag is enabled on a disposable workspace; capture the snapshots live at that point rather than deriving them, so backend-applied defaults are included.
