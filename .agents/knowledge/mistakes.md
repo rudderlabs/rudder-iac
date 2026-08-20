@@ -38,3 +38,9 @@
 - Durable mitigation: e2e tests that may run with destination support against a shared workspace should also enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` so remote state loading can decode unverified managed destinations left by destination e2e.
 - In the test-with-coverage workflow, `RUDDERSTACK_X_DESTINATION_SUPPORT` is passed to every `cli/tests` E2E command; the unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, and opt-in `AccountsImportWorkspace`, not only destination-specific tests.
 - Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors.
+
+## DEX-493 — Transformation API Concurrency Boundary
+<!-- ticket:DEX-493 -->
+- CI failed under the test-with-coverage workflow because `make test-all` ran with `RUDDERSTACK_X_CONCURRENT_SYNCS=true` and `RUDDERSTACK_X_TRANSFORMATIONS=true`, allowing transformation and transformation-library operations to execute in parallel.
+- The live `ProjectApply` E2E then failed while creating Python transformations such as `simple_python_transform` and `python_with_imports` with HTTP 400 `Internal server error` responses.
+- Durable mitigation: serialize transformation and transformation-library operations in the syncer scheduler while leaving unrelated resource types concurrent; do not assume transformation API writes are safe to run concurrently just because the resource graph has no explicit dependency.
