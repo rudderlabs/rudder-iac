@@ -241,17 +241,99 @@ func TestPostgresConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(validMINIOConfig()))
 	})
 
-	// Upstream keeps every provider's keys in one flat object, so a per-provider
-	// key stays optional whichever provider is selected — matching snowflake.
-	// Enforcing the matrix locally would reject configs the backend accepts.
-	t.Run("per provider keys are not gated on the selected provider", func(t *testing.T) {
+	t.Run("per provider keys required for the selected provider", func(t *testing.T) {
 		t.Parallel()
 
-		for _, key := range []string{"bucket_name", "role_based_auth", "access_key", "credentials", "use_sas_tokens", "account_key", "use_ssl"} {
+		cases := map[string][]string{
+			"S3":         {"/bucket_name"},
+			"GCS":        {"/bucket_name", "/credentials"},
+			"AZURE_BLOB": {"/container_name", "/account_name"},
+			"MINIO":      {"/bucket_name", "/end_point", "/access_key_id", "/secret_access_key", "/use_ssl"},
+		}
+
+		for provider, want := range cases {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["bucket_provider"] = provider
+
+			paths := make([]string, 0)
+			for _, e := range registered.ValidateConfig(cfg) {
+				paths = append(paths, e.Path)
+			}
+			assert.ElementsMatch(t, want, paths, "provider %q", provider)
+		}
+	})
+
+	// Upstream keeps every provider's keys in one flat object, so carrying another
+	// provider's keys alongside the selected one stays valid.
+	t.Run("keys belonging to other providers stay optional", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{"role_based_auth", "access_key", "credentials", "use_sas_tokens", "account_key"} {
 			cfg := validS3KeyConfig()
 			delete(cfg, key)
-			assert.Empty(t, registered.ValidateConfig(cfg), "%q must stay optional", key)
+			assert.Empty(t, registered.ValidateConfig(cfg), "%q is not required for S3", key)
 		}
+	})
+
+	// bucket_name is the only key required for a subset of providers, so it is
+	// tagged required_unless rather than required_if. This pins the exemption that
+	// inversion encodes: schema.json's AZURE_BLOB branch does not list bucketName.
+	t.Run("azure blob is exempt from bucket_name", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validAzureKeyConfig()
+		delete(cfg, "bucket_name")
+		assert.Empty(t, registered.ValidateConfig(cfg))
+
+		// The same config under any other provider does require it.
+		for _, provider := range []string{"S3", "GCS", "MINIO"} {
+			cfg := validAzureKeyConfig()
+			delete(cfg, "bucket_name")
+			cfg["bucket_provider"] = provider
+			assertHasPath(t, registered.ValidateConfig(cfg), "/bucket_name")
+		}
+	})
+
+	// required_unless states the rule as an exemption, so a config with no usable
+	// provider falls outside every exemption and reports bucket_name too. That is
+	// extra detail on a config already rejected for its provider, never a
+	// rejection of a config the API would accept.
+	t.Run("missing or invalid provider also reports bucket_name", func(t *testing.T) {
+		t.Parallel()
+
+		for _, provider := range []any{nil, "R2"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			if provider != nil {
+				cfg["bucket_provider"] = provider
+			}
+
+			errors := registered.ValidateConfig(cfg)
+			assertHasPath(t, errors, "/bucket_provider")
+			assertHasPath(t, errors, "/bucket_name")
+		}
+	})
+
+	t.Run("minio accepts use_ssl set to false", func(t *testing.T) {
+		t.Parallel()
+
+		// schema.json requires the key to be present, not to be true.
+		cfg := validMINIOConfig()
+		cfg["use_ssl"] = false
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("stale bucket provider does not require keys when rudder storage is on", func(t *testing.T) {
+		t.Parallel()
+
+		// Cleared config keys persist upstream, so a leftover bucket_provider must
+		// not resurrect per-provider requirements once rudder storage is back on.
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = true
+		cfg["bucket_provider"] = "MINIO"
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
 	t.Run("pattern constraints reject invalid literals", func(t *testing.T) {

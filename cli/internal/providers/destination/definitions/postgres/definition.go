@@ -107,32 +107,38 @@ type postgresConfig struct {
 	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
 	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
 
-	// Object-storage staging. bucketProvider selects the provider, but upstream
-	// keeps every provider's keys in the same flat object, so none of them are
-	// gated on it — matching the snowflake definition.
+	// Object-storage staging. Upstream keeps every provider's keys in the same
+	// flat object, so a key is required only for the providers schema.json names
+	// it under — and only while rudder-managed storage is off, so a stale
+	// bucketProvider left in config cannot resurrect the requirement.
+	//
+	// bucket_name is the one key required for more than one provider (S3, GCS and
+	// MINIO but not AZURE_BLOB). required_if cannot express that, so it is stated
+	// as its inverse with required_unless: exempt when storage is rudder-managed
+	// or the provider is AZURE_BLOB, required otherwise.
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	BucketProvider            string `mapstructure:"bucket_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=S3 GCS AZURE_BLOB MINIO"`
-	BucketName                string `mapstructure:"bucket_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	BucketName                string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true BucketProvider AZURE_BLOB,omitempty,dynamic_or_pattern=single_line_100"`
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
 
 	// S3
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
 	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	AccessKeyID   string `mapstructure:"access_key_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKey     string `mapstructure:"access_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 
 	// Azure Blob
-	AccountName   string `mapstructure:"account_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	AccountName   string `mapstructure:"account_name" validate:"required_if=UseRudderStorage false BucketProvider AZURE_BLOB,omitempty,dynamic_or_pattern=single_line_100"`
 	AccountKey    string `mapstructure:"account_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	SASToken      string `mapstructure:"sas_token"`
 	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
-	ContainerName string `mapstructure:"container_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	ContainerName string `mapstructure:"container_name" validate:"required_if=UseRudderStorage false BucketProvider AZURE_BLOB,omitempty,dynamic_or_pattern=single_line_100"`
 
 	// GCS / MinIO
-	Credentials     string `mapstructure:"credentials"`
-	EndPoint        string `mapstructure:"end_point" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	SecretAccessKey string `mapstructure:"secret_access_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	UseSSL          *bool  `mapstructure:"use_ssl"`
+	Credentials     string `mapstructure:"credentials" validate:"required_if=UseRudderStorage false BucketProvider GCS"`
+	EndPoint        string `mapstructure:"end_point" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,dynamic_or_pattern=single_line_100"`
+	SecretAccessKey string `mapstructure:"secret_access_key" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,dynamic_or_pattern=single_line_100"`
+	UseSSL          *bool  `mapstructure:"use_ssl" validate:"required_if=UseRudderStorage false BucketProvider MINIO"`
 
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
