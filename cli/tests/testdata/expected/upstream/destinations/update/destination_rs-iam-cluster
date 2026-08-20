@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs-iam-cluster",
+  "name": "E2E Redshift IAM Cluster Updated",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "clusterId": "rudder-cli-e2e-cluster",
+    "clusterRegion": "us-west-2",
+    "database": "analytics",
+    "iamRoleARNForAuth": "arn:aws:iam::123456789012:role/rudder-cli-e2e-rs",
+    "namespace": "rudder_events_cluster",
+    "syncFrequency": "360",
+    "underscoreDivideNumbers": false,
+    "useIAMForAuth": true,
+    "useRudderStorage": true,
+    "useServerless": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

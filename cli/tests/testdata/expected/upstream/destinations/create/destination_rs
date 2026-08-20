@@ -1,0 +1,27 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs",
+  "name": "E2E Redshift",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "database": "analytics",
+    "host": "rudder-cli-e2e.redshift.amazonaws.com",
+    "namespace": "rudder_events",
+    "port": "5439",
+    "preferAppend": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useIAMForAuth": false,
+    "useRudderStorage": true,
+    "useSSH": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

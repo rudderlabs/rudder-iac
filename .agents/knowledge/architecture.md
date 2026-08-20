@@ -174,3 +174,9 @@
 - S3 Datalake destination identity is CLI type `s3_datalake`, API type `S3_DATALAKE`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/s3_datalake` using Go package name `s3datalake`.
 - S3 Datalake config is intentionally modeled as flat local YAML, including auth/storage/sync/table-layout flags and consent management, so it maps directly to flat API keys and preserves schema/db-config keys that would otherwise be erased by whole-config destination updates.
 - Model schema/db-config keys without Terraform mappings for S3 Datalake instead of omitting them: `skip_tracks_table`, `skip_users_table`, `time_window_layout`, `underscore_divide_numbers`, `cleanup_object_storage_files`, and `allow_users_context_traits`.
+
+## DEX-690 — Redshift Destination Re-Onboarding
+<!-- ticket:DEX-690 -->
+- Redshift destination support is implemented as local type `rs`, API type `RS`, and destination version `1`; it remains an unverified destination registered only when both destination support and unverified destinations are enabled.
+- Redshift re-onboarding should model the full current RS db-config/defaultConfig surface in `cli/internal/providers/destination/definitions/rs`, including IAM auth fields, SSH fields, flat sync fields, object-storage auth/prefix/cleanup fields, warehouse skip/prefer/json/immutable fields, and consent mapping.
+- Redshift should not rely on framework-level unknown API config preservation: destination handler conversion only emits registered definition properties, so omitted Redshift config keys can be dropped during update/import.

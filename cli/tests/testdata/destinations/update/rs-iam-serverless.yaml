@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: rs-iam-serverless
+spec:
+  id: rs-iam-serverless
+  display_name: E2E Redshift IAM Serverless Updated
+  type: rs
+  enabled: true
+  definition_version: 1
+  config:
+    use_iam_for_auth: true
+    iam_role_arn_for_auth: arn:aws:iam::123456789012:role/rudder-cli-e2e-rs
+    cluster_region: us-west-2
+    use_serverless: true
+    workgroup_name: rudder-cli-e2e-wg
+    database: analytics
+    user: rudder
+    namespace: rudder_events_serverless
+    sync_frequency: "360"
+    use_rudder_storage: true
+    underscore_divide_numbers: false
+    allow_users_context_traits: false

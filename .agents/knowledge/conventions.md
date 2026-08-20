@@ -105,3 +105,9 @@
 - S3 Datalake sync settings are flat local YAML keys `sync_frequency` and `sync_start_at` mapped directly to API keys `syncFrequency` and `syncStartAt`; do not mirror Terraform's nested local `sync` block for this CLI definition.
 - S3 Datalake should keep optional local secret key `password` in `SecretKeys` and map it directly to API `password` because db-config lists it as secret-only metadata even though schema/default config/Terraform do not expose it.
 - S3 Datalake validation should use schema/db-config as the boundary for enums and named patterns: sync frequency accepts `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, and `1440` rather than Terraform's narrower validator.
+
+## DEX-690 — Redshift Validation And Sources
+<!-- ticket:DEX-690 -->
+- Redshift should keep the broad warehouse-style mapped db-config source-type set, not the older S3-like event-stream subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud connection mode for all retained source types.
+- Redshift local sync config should use flat schema/API-aligned keys `sync_frequency`, `sync_start_at`, and `exclude_window.{start_time,end_time}`; do not add a legacy `sync.{frequency,start_at,exclude_window_start_time,exclude_window_end_time}` alias layer inside the definition.
+- Existing old-shape Redshift specs with a top-level `sync` config block should fail closed as unknown-key input rather than being silently converted, because the destination converter/validator has no per-definition alias layer.

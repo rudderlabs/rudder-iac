@@ -1,0 +1,31 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs-ssh",
+  "name": "E2E Redshift SSH",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "database": "analytics",
+    "host": "rudder-cli-e2e-ssh.redshift.amazonaws.com",
+    "namespace": "rudder_events_ssh",
+    "port": "5439",
+    "preferAppend": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "sshHost": "bastion.rudder-cli-e2e.internal",
+    "sshPort": "22",
+    "sshPublicKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABrudderE2E",
+    "sshUser": "rudder",
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useIAMForAuth": false,
+    "useRudderStorage": true,
+    "useSSH": true,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
