@@ -26,6 +26,33 @@ Both variations also participate in the create → update mutation: the update
 fixture changes `prefix`, toggles `enable_sse`, and changes display names so the
 live update path is exercised.
 
+**Never mutate an immutable key in the update fixture.** `schema.json` marks some
+keys `"rs-immutable": true`, and the backend rejects any change to one with a
+400:
+
+```
+Field "underscoreDivideNumbers" is immutable and cannot be modified
+```
+
+Warehouse destinations carry several — postgres marks `underscoreDivideNumbers`
+and `allowUsersContextTraits`; bq adds `namespace`, `partitionColumn`,
+`partitionType` and `skipViews`. List them before writing the update fixture:
+
+```bash
+python3 -c "
+import json
+s=json.load(open('<integrations-config>/src/configurations/destinations/<dir>/schema.json'))
+for k,v in s.get('configSchema',s).get('properties',{}).items():
+    if v.get('rs-immutable'): print(k)
+"
+```
+
+Every immutable key must be byte-identical between the create and update
+fixtures; pick a mutable key (a bucket name, prefix, sync frequency, display
+name) to exercise the update path instead. The CLI does not model immutability,
+so nothing catches this before the live run — a fixture that toggles one only
+fails during the gated e2e.
+
 Do not duplicate unit-test exhaustiveness here. Keep edge cases and invalid
 configs in `definition_test.go`; keep e2e focused on successful lifecycle paths.
 

@@ -64,6 +64,10 @@ Notes:
 - Optional booleans → `*bool` without `required`.
 - `consentManagement` and `connectionMode` subtrees in schema.json are
   handled by `common` — do not model them as ad-hoc fields.
+- A property marked `"rs-immutable": true` is still modelled and validated
+  normally — immutability constrains *updates*, not the config surface. Record
+  which keys carry it: the backend 400s on any change to one, and the e2e update
+  fixture must leave them untouched (see e2e-tests.md).
 
 ## Conditional requiredness
 
