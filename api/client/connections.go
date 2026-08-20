@@ -11,9 +11,19 @@ import (
 	"time"
 )
 
-// ErrExternalIDAlreadyInUse signals a 409 from the set external ID endpoint:
-// the external ID is already claimed by another connection in the workspace.
+// ErrExternalIDAlreadyInUse signals a 409 from the set external ID endpoint.
+// The backend uses 409 for two distinct conditions and distinguishes them only
+// by message: the external ID is already claimed by another connection, or this
+// connection already has one (externalId is set-once and cannot be changed).
+// Callers that need to tell them apart must inspect the wrapped error.
 var ErrExternalIDAlreadyInUse = fmt.Errorf("external ID already in use")
+
+// ErrConnectionPairExists signals a 409 from create: a connection for this
+// source/destination pair already exists, so the externalId claim was refused.
+// The existing connection typically carries no externalId, so the remedy is to
+// adopt it rather than to retry the create. As with the set endpoint, the
+// backend's message is the only detail beyond the status, so it is wrapped.
+var ErrConnectionPairExists = fmt.Errorf("connection already exists for this source and destination pair")
 
 type Connection struct {
 	ID            string     `json:"id,omitempty"`
@@ -99,6 +109,13 @@ func (s *connections) Create(ctx context.Context, connection *Connection) (*Conn
 
 	response := struct{ Connection *Connection }{}
 	if err := s.create(ctx, &conn, &response); err != nil {
+		// A create body carrying an externalId is refused with 409 when a live
+		// connection already exists for the pair; map it so callers can offer
+		// adoption instead of surfacing the backend's set-external-id advice.
+		var apiError *APIError
+		if errors.As(err, &apiError) && apiError.HTTPStatusCode == 409 {
+			return nil, fmt.Errorf("%w: %w", ErrConnectionPairExists, err)
+		}
 		return nil, err
 	}
 
@@ -135,7 +152,7 @@ func (s *connections) SetExternalID(ctx context.Context, id, externalID string) 
 	if _, err := s.client.Do(ctx, "PUT", path, bytes.NewReader(body)); err != nil {
 		var apiError *APIError
 		if errors.As(err, &apiError) && apiError.HTTPStatusCode == 409 {
-			return ErrExternalIDAlreadyInUse
+			return fmt.Errorf("%w: %w", ErrExternalIDAlreadyInUse, err)
 		}
 		return fmt.Errorf("setting external ID: %w", err)
 	}
