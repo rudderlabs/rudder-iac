@@ -10,6 +10,12 @@ type TSInterfaceProperty struct {
 	// JSON key has characters like spaces or `-` that aren't valid in
 	// identifier syntax). The template emits `"name"?: T` in that case.
 	QuotedName bool
+	// SerialName is the ORIGINAL tracking-plan key (e.g. "product_id") that this
+	// property maps to on the wire. Name may be camelCased (e.g. "productId")
+	// for an ergonomic interface, but the payload sent to the SDK must use
+	// SerialName so it matches the tracking plan. Mirrors Swift's SerialName
+	// field and Kotlin's put("first_name", ...) — see DAW-3732.
+	SerialName string
 }
 
 // TSInterface → export interface X { ... }
@@ -17,6 +23,33 @@ type TSInterface struct {
 	Name       string
 	Comment    string
 	Properties []TSInterfaceProperty
+}
+
+// TSKeyMapEntry is one camelCase→serial mapping inside a per-interface key map.
+//
+// When the wire key equals the interface field name (no camelCasing happened),
+// no entry is emitted — the runtime remap leaves such keys untouched.
+type TSKeyMapEntry struct {
+	// FieldName is the camelCase interface property name used as the object key
+	// at runtime (the left-hand side of the generated map literal).
+	FieldName string
+	// SerialName is the original tracking-plan key emitted on the wire.
+	SerialName string
+	// NestedMapName, when non-empty, is the name of another generated key map
+	// (e.g. "UserSignedUpContextKeyMap") whose value must be remapped
+	// recursively. This carries nested-object remapping the same way Swift's
+	// nested toProperties() does.
+	NestedMapName string
+}
+
+// TSKeyMap is a per-interface map from camelCase field names back to the
+// original tracking-plan keys, emitted as
+// `const <Name>: Record<string, KeyMapValue> = { ... }`. Only interfaces with
+// at least one renamed key (or a nested object that itself needs remapping)
+// produce a map — see collectKeyMaps.
+type TSKeyMap struct {
+	Name    string // e.g. "UserSignedUpKeyMap"
+	Entries []TSKeyMapEntry
 }
 
 // TSTypeAlias → export type Alias = Type;
@@ -38,6 +71,16 @@ type TSMethodArgument struct {
 // RudderAnalytics call. Value is a pre-computed TS expression.
 type TSSDKArgument struct {
 	Value string
+	// PropsExpr is the plan-typed props/traits expression carried by this
+	// argument (e.g. "props", "arg2"), empty for every other argument. It marks
+	// the argument the key-map wiring rewrites, so no call site has to be found
+	// by inspecting Value — a rename or an extra space would silently stop the
+	// remap and put camelCased keys back on the wire.
+	PropsExpr string
+	// ValueFmt is Value with a single %s where PropsExpr sits, so the wiring can
+	// re-render the argument with the expression wrapped in applyKeyMap. Set
+	// together with PropsExpr; use propsArg rather than setting either by hand.
+	ValueFmt string
 }
 
 // TSOverloadSignature is one typed signature for an overloaded method.
@@ -74,6 +117,15 @@ type TSAnalyticsMethod struct {
 	SDKArguments    []TSSDKArgument
 	Overloads       []TSOverloadSignature
 	DispatcherBranches []TSDispatcherBranch
+	// PropsTypeName is the generated type of the plan-defined props/traits this
+	// method accepts (an interface name, a union alias, or an open Record).
+	// Empty when the method carries no plan-typed payload. The key-map wiring
+	// resolves it to the map that must be applied before the SDK call.
+	PropsTypeName string
+	// PropsKeyMapName is the name of the key map applied to the props/traits
+	// object before the SDK call (e.g. "UserSignedUpKeyMap"). Empty when the
+	// type needs no remapping — in that case props are forwarded verbatim.
+	PropsKeyMapName string
 }
 
 // TSVariantGroup groups the case interfaces and union type alias for one
@@ -103,6 +155,13 @@ type TSContext struct {
 	// Interfaces holds top-level event interfaces (track props, identify traits).
 	Interfaces       []TSInterface
 	AnalyticsMethods []TSAnalyticsMethod
+	// KeyMaps holds the per-interface camelCase→serial-name maps emitted as
+	// `const <Interface>KeyMap` constants. Populated by collectKeyMaps after all
+	// interfaces are built. Only interfaces needing remap appear here.
+	KeyMaps []TSKeyMap
+	// UsesApplyKeyMap is true when at least one method remaps its props, so the
+	// generated file needs the shared applyKeyMap runtime helper.
+	UsesApplyKeyMap bool
 	// EventContext is the ruddertyper provenance map injected into every event's
 	// options.context. Values are pre-formatted TS literal expressions.
 	EventContext        map[string]string

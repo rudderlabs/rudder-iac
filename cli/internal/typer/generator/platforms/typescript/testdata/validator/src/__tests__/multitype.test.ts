@@ -48,18 +48,18 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
-        profile: { email: "string@example.com", firstName: "String" },
-        multiTypeField: "hello world",
+        profile: { email: "string@example.com", first_name: "String" },
+        multi_type_field: "hello world",
       },
       {
         active: true,
-        profile: { email: "number@example.com", firstName: "Number" },
-        multiTypeField: 42,
+        profile: { email: "number@example.com", first_name: "Number" },
+        multi_type_field: 42,
       },
       {
         active: true,
-        profile: { email: "bool@example.com", firstName: "Bool" },
-        multiTypeField: false,
+        profile: { email: "bool@example.com", first_name: "Bool" },
+        multi_type_field: false,
       },
     ]);
   });
@@ -78,8 +78,8 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(event.type).toBe("track");
     expect(event.properties).toEqual({
       active: true,
-      profile: { email: "array@example.com", firstName: "Array" },
-      multiTypeArray: ["alpha", 1, "beta", 2, "gamma", 3],
+      profile: { email: "array@example.com", first_name: "Array" },
+      multi_type_array: ["alpha", 1, "beta", 2, "gamma", 3],
     });
   });
 
@@ -109,17 +109,17 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
-        profile: { email: "mtn@example.com", firstName: "MTN" },
-        multiTypeWithNull: "not-null",
+        profile: { email: "mtn@example.com", first_name: "MTN" },
+        multi_type_with_null: "not-null",
       },
       {
         active: true,
-        profile: { email: "mtn@example.com", firstName: "MTN" },
-        multiTypeWithNull: 99,
+        profile: { email: "mtn@example.com", first_name: "MTN" },
+        multi_type_with_null: 99,
       },
       {
         active: true,
-        profile: { email: "mtn@example.com", firstName: "MTN" },
+        profile: { email: "mtn@example.com", first_name: "MTN" },
       },
     ]);
   });
@@ -146,13 +146,13 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(events.map((e) => e.properties)).toEqual([
       {
         active: true,
-        profile: { email: "sn@example.com", firstName: "SN" },
-        stringOrNull: "present",
-        numberOrNull: 3.14,
+        profile: { email: "sn@example.com", first_name: "SN" },
+        string_or_null: "present",
+        number_or_null: 3.14,
       },
       {
         active: true,
-        profile: { email: "sn@example.com", firstName: "SN" },
+        profile: { email: "sn@example.com", first_name: "SN" },
       },
     ]);
   });
@@ -171,8 +171,8 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(event.type).toBe("track");
     expect(event.properties).toEqual({
       active: true,
-      profile: { email: "arr@example.com", firstName: "Arr" },
-      arrayWithNullItems: ["one", null, "three", null],
+      profile: { email: "arr@example.com", first_name: "Arr" },
+      array_with_null_items: ["one", null, "three", null],
     });
   });
 
@@ -198,14 +198,14 @@ describe("RudderTyper.track (multi-type properties)", () => {
     expect(event.type).toBe("track");
     expect(event.properties).toEqual({
       active: true,
-      profile: { email: "combo@example.com", firstName: "Combo" },
-      multiTypeField: "text",
-      multiTypeArray: [100, "mixed"],
-      numberOrNull: 2.718,
+      profile: { email: "combo@example.com", first_name: "Combo" },
+      multi_type_field: "text",
+      multi_type_array: [100, "mixed"],
+      number_or_null: 2.718,
       context: {
-        ipAddress: "10.0.0.1",
-        nestedContext: {
-          profile: { email: "nested@example.com", firstName: "Nested" },
+        ip_address: "10.0.0.1",
+        nested_context: {
+          profile: { email: "nested@example.com", first_name: "Nested" },
         },
       },
     });

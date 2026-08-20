@@ -37,13 +37,14 @@ func TestBuildTrackMethod_NonEmptySchema(t *testing.T) {
 		Name:          "trackUserSignedUp",
 		Comment:       "Triggered on signup",
 		EventName:     "User Signed Up",
+		PropsTypeName: "UserSignedUp",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
 			{Name: "props", Type: "UserSignedUp", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"User Signed Up"`},
-			{Value: "props as unknown as SDKApiObject"},
+			propsArg("%s as unknown as SDKApiObject", "props"),
 		},
 	}, method)
 	assert.True(t, ctx.UsesSDKApiObject)
@@ -111,13 +112,14 @@ func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
 	assert.Equal(t, &TSAnalyticsMethod{
 		Name:          "trackProductPremiumClicked",
 		EventName:     `Product "Premium" Clicked`,
+		PropsTypeName: "ProductPremiumClicked",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
 			{Name: "props", Type: "ProductPremiumClicked", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"Product \"Premium\" Clicked"`},
-			{Value: "props as unknown as SDKApiObject"},
+			propsArg("%s as unknown as SDKApiObject", "props"),
 		},
 	}, method)
 }
@@ -292,13 +294,13 @@ func TestProcessCustomTypesIntoContext_VariantsEmitDiscriminatedUnion(t *testing
 	// Case interface has discriminator as literal + case-specific property
 	searchIface := group.CaseInterfaces[0]
 	require.Len(t, searchIface.Properties, 2)
-	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: `"search"`, Comment: "", Optional: false}, searchIface.Properties[0])
-	assert.Equal(t, TSInterfaceProperty{Name: "query", Type: "string", Comment: "", Optional: false}, searchIface.Properties[1])
+	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: `"search"`, Comment: "", Optional: false, SerialName: "page_type"}, searchIface.Properties[0])
+	assert.Equal(t, TSInterfaceProperty{Name: "query", Type: "string", Comment: "", Optional: false, SerialName: "query"}, searchIface.Properties[1])
 
 	// Default interface narrows the discriminator to values no named case covers
 	defaultIface := group.CaseInterfaces[1]
 	require.Len(t, defaultIface.Properties, 1)
-	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: `Exclude<string, "search">`, Comment: "", Optional: false}, defaultIface.Properties[0])
+	assert.Equal(t, TSInterfaceProperty{Name: "pageType", Type: `Exclude<string, "search">`, Comment: "", Optional: false, SerialName: "page_type"}, defaultIface.Properties[0])
 }
 
 func TestProcessPropertyEnumsIntoContext(t *testing.T) {
@@ -495,4 +497,3 @@ func TestResolveArrayType_WrapsItemErrors(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Array<string | unknown>", got)
 }
-

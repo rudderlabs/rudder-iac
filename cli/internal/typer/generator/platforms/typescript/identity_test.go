@@ -42,6 +42,7 @@ func TestBuildIdentifyMethod_StrictCast(t *testing.T) {
 	assert.Equal(t, &TSAnalyticsMethod{
 		Name:          "identify",
 		Comment:       "User identification",
+		PropsTypeName: "IdentifyTraits",
 		SDKMethodName: "identify",
 		Overloads: []TSOverloadSignature{
 			{Arguments: []TSMethodArgument{
@@ -67,14 +68,14 @@ func TestBuildIdentifyMethod_StrictCast(t *testing.T) {
 				Condition: `typeof userIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "userIdOrTraits"},
-					{Value: "traitsOrOptions as unknown as SDKIdentifyTraits"},
+					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					{Value: "userIdOrTraits as unknown as SDKIdentifyTraits"},
+					propsArg("%s as unknown as SDKIdentifyTraits", "userIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -143,14 +144,14 @@ func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			SDKArguments: []TSSDKArgument{
 				{Value: "userIdOrTraits"},
 				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject)"},
+				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
 				{Value: "null"},
-				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, userIdOrTraits as unknown as SDKApiObject)"},
+				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "userIdOrTraits"),
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
@@ -175,6 +176,7 @@ func TestBuildGroupMethod_EmitsOverloads(t *testing.T) {
 	assert.Equal(t, &TSAnalyticsMethod{
 		Name:          "group",
 		Comment:       "Group assoc",
+		PropsTypeName: "GroupTraits",
 		SDKMethodName: "group",
 		Overloads: []TSOverloadSignature{
 			{Arguments: []TSMethodArgument{
@@ -200,14 +202,14 @@ func TestBuildGroupMethod_EmitsOverloads(t *testing.T) {
 				Condition: `typeof groupIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "groupIdOrTraits"},
-					{Value: "traitsOrOptions as unknown as SDKIdentifyTraits"},
+					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					{Value: "groupIdOrTraits as unknown as SDKIdentifyTraits"},
+					propsArg("%s as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -270,14 +272,14 @@ func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			SDKArguments: []TSSDKArgument{
 				{Value: "groupIdOrTraits"},
 				{Value: "undefined"},
-				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject)"},
+				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
 				{Value: "null"},
-				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject)"},
+				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "groupIdOrTraits"),
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
@@ -302,6 +304,7 @@ func TestBuildPageMethod_EmitsThreeOverloads(t *testing.T) {
 	assert.Equal(t, &TSAnalyticsMethod{
 		Name:          "page",
 		Comment:       "Page view event",
+		PropsTypeName: "PageProperties",
 		SDKMethodName: "page",
 		Overloads: []TSOverloadSignature{
 			{Arguments: []TSMethodArgument{
@@ -334,20 +337,20 @@ func TestBuildPageMethod_EmitsThreeOverloads(t *testing.T) {
 			{
 				Condition: `typeof arg0 === "string" && typeof arg1 === "string"`,
 				SDKArguments: []TSSDKArgument{
-					{Value: "arg0"}, {Value: "arg1"}, {Value: "arg2 as unknown as SDKApiObject"},
+					{Value: "arg0"}, {Value: "arg1"}, propsArg("%s as unknown as SDKApiObject", "arg2"),
 					{Value: "this.withRudderTyperContext(arg3 as ApiOptions | undefined)"}, {Value: "arg4"},
 				},
 			},
 			{
 				Condition: `typeof arg0 === "string"`,
 				SDKArguments: []TSSDKArgument{
-					{Value: "arg0"}, {Value: "arg1 as unknown as SDKApiObject"},
+					{Value: "arg0"}, propsArg("%s as unknown as SDKApiObject", "arg1"),
 					{Value: "this.withRudderTyperContext(arg2 as ApiOptions | undefined)"}, {Value: "arg3 as ApiCallback | undefined"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					{Value: "arg0 as unknown as SDKApiObject"},
+					propsArg("%s as unknown as SDKApiObject", "arg0"),
 					{Value: "this.withRudderTyperContext(arg1 as ApiOptions | undefined)"}, {Value: "arg2 as ApiCallback | undefined"},
 				},
 			},

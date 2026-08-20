@@ -245,7 +245,7 @@ func TestBuildInterfaceWithNested_OptionalMultiType(t *testing.T) {
 	assert.Equal(t, &TSInterface{
 		Name: "Parent",
 		Properties: []TSInterfaceProperty{
-			{Name: "value", Type: "string | number", Optional: true},
+			{Name: "value", Type: "string | number", Optional: true, SerialName: "value"},
 		},
 	}, iface)
 }
@@ -284,7 +284,7 @@ func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
 	assert.Equal(t, &TSInterface{
 		Name: "Parent",
 		Properties: []TSInterfaceProperty{
-			{Name: "details", Type: "ParentDetails"},
+			{Name: "details", Type: "ParentDetails", SerialName: "details"},
 		},
 	}, iface)
 
@@ -292,7 +292,7 @@ func TestBuildInterfaceWithNested_MultiTypeInsideNestedObject(t *testing.T) {
 		{
 			Name: "ParentDetails",
 			Properties: []TSInterfaceProperty{
-				{Name: "value", Type: "string | number"},
+				{Name: "value", Type: "string | number", SerialName: "value"},
 			},
 		},
 	}, ctx.NestedInterfaces)

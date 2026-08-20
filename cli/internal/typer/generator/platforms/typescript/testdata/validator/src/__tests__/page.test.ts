@@ -40,8 +40,8 @@ describe("RudderTyper.page", () => {
     expect(event.properties).toMatchObject({
       profile: {
         email: "user@example.com",
-        firstName: "Alice",
-        lastName: "Johnson",
+        first_name: "Alice",
+        last_name: "Johnson",
       },
       name: "Dashboard",
     });
@@ -64,8 +64,8 @@ describe("RudderTyper.page", () => {
     expect(event.properties).toMatchObject({
       profile: {
         email: "user@example.com",
-        firstName: "Alice",
-        lastName: "Johnson",
+        first_name: "Alice",
+        last_name: "Johnson",
       },
       name: "Dashboard",
       category: "Main Navigation",
@@ -86,7 +86,7 @@ describe("RudderTyper.page", () => {
     expect(event.properties).toMatchObject({
       profile: {
         email: "anon@example.com",
-        firstName: "Anonymous",
+        first_name: "Anonymous",
       },
     });
   });
