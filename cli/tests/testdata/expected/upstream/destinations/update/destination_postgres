@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres",
+  "name": "E2E Postgres Updated",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "database": "analytics_updated",
+    "host": "postgres.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e_updated",
+    "port": "5432",
+    "preferAppend": true,
+    "skipTracksTable": true,
+    "skipUsersTable": true,
+    "sslMode": "require",
+    "syncFrequency": "360",
+    "useRudderStorage": true,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

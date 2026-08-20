@@ -1,0 +1,27 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres",
+  "name": "E2E Postgres",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "database": "analytics",
+    "host": "postgres.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e",
+    "port": "5432",
+    "preferAppend": false,
+    "skipTracksTable": false,
+    "skipUsersTable": false,
+    "sslMode": "disable",
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useRudderStorage": true,
+    "useSSH": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

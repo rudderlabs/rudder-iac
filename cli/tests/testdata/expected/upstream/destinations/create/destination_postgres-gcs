@@ -1,0 +1,30 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres-gcs",
+  "name": "E2E Postgres GCS",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e",
+    "bucketProvider": "GCS",
+    "cleanupObjectStorageFiles": false,
+    "database": "analytics",
+    "host": "postgres-gcs.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e_gcs",
+    "port": "5432",
+    "preferAppend": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "sslMode": "disable",
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useRudderStorage": false,
+    "useSSH": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

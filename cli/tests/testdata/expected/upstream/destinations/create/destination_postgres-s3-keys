@@ -1,0 +1,31 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres-s3-keys",
+  "name": "E2E Postgres S3 Keys",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e",
+    "bucketProvider": "S3",
+    "cleanupObjectStorageFiles": false,
+    "database": "analytics",
+    "host": "postgres-s3.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e_s3",
+    "port": "5432",
+    "preferAppend": true,
+    "roleBasedAuth": false,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "sslMode": "disable",
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useRudderStorage": false,
+    "useSSH": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

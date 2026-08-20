@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres-s3-role",
+  "name": "E2E Postgres S3 Role Updated",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e",
+    "bucketProvider": "S3",
+    "database": "analytics",
+    "host": "postgres-s3-role.rudder-cli-e2e.internal",
+    "iamRoleARN": "arn:aws:iam::123456789012:role/rudder-cli-e2e-updated",
+    "namespace": "rudder_e2e_s3_role_updated",
+    "port": "5432",
+    "roleBasedAuth": true,
+    "sslMode": "disable",
+    "syncFrequency": "360",
+    "useRudderStorage": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

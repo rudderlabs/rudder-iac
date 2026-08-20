@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres-minio",
+  "name": "E2E Postgres MinIO Updated",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-updated",
+    "bucketProvider": "MINIO",
+    "database": "analytics",
+    "endPoint": "minio-updated.rudder-cli-e2e.internal:9000",
+    "host": "postgres-minio.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e_minio_updated",
+    "port": "5432",
+    "sslMode": "disable",
+    "syncFrequency": "360",
+    "useRudderStorage": false,
+    "useSSL": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
