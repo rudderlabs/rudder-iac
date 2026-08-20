@@ -7,11 +7,13 @@
   "type": "RS",
   "enabled": true,
   "config": {
+    "allowUsersContextTraits": false,
     "clusterRegion": "us-west-2",
     "database": "analytics",
     "iamRoleARNForAuth": "arn:aws:iam::123456789012:role/rudder-cli-e2e-rs",
     "namespace": "rudder_events_serverless",
     "syncFrequency": "360",
+    "underscoreDivideNumbers": false,
     "useIAMForAuth": true,
     "useRudderStorage": true,
     "useServerless": true,

@@ -1,28 +1,27 @@
 version: rudder/v1
 kind: destination
 metadata:
-  name: rs-own-storage
+  name: rs-own-storage-role
 spec:
-  id: rs-own-storage
-  display_name: E2E Redshift Own Storage Updated
+  id: rs-own-storage-role
+  display_name: E2E Redshift Own Storage Role Updated
   type: rs
   enabled: true
   definition_version: 1
   config:
     use_iam_for_auth: false
-    host: rudder-cli-e2e-storage.redshift.amazonaws.com
+    host: rudder-cli-e2e-role.redshift.amazonaws.com
     port: "5439"
     database: analytics
     user: rudder
     password: "{{ .RS_PASSWORD }}"
-    namespace: rudder_events_storage
+    namespace: rudder_events_role
     sync_frequency: "360"
     use_rudder_storage: false
-    bucket_name: rudder-cli-e2e-rs
-    prefix: rudder/rs/updated/
-    role_based_auth: false
-    access_key_id: "{{ .RS_ACCESS_KEY_ID }}"
-    access_key: "{{ .RS_ACCESS_KEY }}"
+    bucket_name: rudder-cli-e2e-rs-role
+    prefix: rudder/rs-role/updated/
+    role_based_auth: true
+    iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e-rs-storage
     enable_sse: true
     underscore_divide_numbers: false
     allow_users_context_traits: false

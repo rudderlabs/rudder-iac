@@ -19,3 +19,5 @@ spec:
     namespace: rudder_events_cluster
     sync_frequency: "180"
     use_rudder_storage: true
+    underscore_divide_numbers: false
+    allow_users_context_traits: false

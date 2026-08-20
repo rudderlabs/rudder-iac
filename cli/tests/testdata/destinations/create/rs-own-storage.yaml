@@ -24,3 +24,5 @@ spec:
     access_key_id: "{{ .RS_ACCESS_KEY_ID }}"
     access_key: "{{ .RS_ACCESS_KEY }}"
     enable_sse: false
+    underscore_divide_numbers: false
+    allow_users_context_traits: false

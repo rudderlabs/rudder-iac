@@ -1,24 +1,27 @@
 version: rudder/v1
 kind: destination
 metadata:
-  name: rs
+  name: rs-ssh
 spec:
-  id: rs
-  display_name: E2E Redshift
+  id: rs-ssh
+  display_name: E2E Redshift SSH
   type: rs
   enabled: true
   definition_version: 1
   config:
     use_iam_for_auth: false
-    host: rudder-cli-e2e.redshift.amazonaws.com
+    host: rudder-cli-e2e-ssh.redshift.amazonaws.com
     port: "5439"
     database: analytics
     user: rudder
     password: "{{ .RS_PASSWORD }}"
-    namespace: rudder_events
+    namespace: rudder_events_ssh
+    use_ssh: true
+    ssh_host: bastion.rudder-cli-e2e.internal
+    ssh_port: "22"
+    ssh_user: rudder
+    ssh_public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABrudderE2E
     sync_frequency: "180"
     use_rudder_storage: true
-    skip_tracks_table: false
-    skip_users_table: true
     underscore_divide_numbers: false
     allow_users_context_traits: false

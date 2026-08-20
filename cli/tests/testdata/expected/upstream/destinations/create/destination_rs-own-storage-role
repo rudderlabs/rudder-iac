@@ -1,0 +1,33 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs-own-storage-role",
+  "name": "E2E Redshift Own Storage Role",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e-rs-role",
+    "cleanupObjectStorageFiles": false,
+    "database": "analytics",
+    "enableSSE": true,
+    "host": "rudder-cli-e2e-role.redshift.amazonaws.com",
+    "iamRoleARN": "arn:aws:iam::123456789012:role/rudder-cli-e2e-rs-storage",
+    "namespace": "rudder_events_role",
+    "port": "5439",
+    "preferAppend": true,
+    "prefix": "rudder/rs-role/",
+    "roleBasedAuth": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useIAMForAuth": false,
+    "useRudderStorage": false,
+    "useSSH": false,
+    "user": "rudder"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
