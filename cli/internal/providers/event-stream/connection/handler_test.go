@@ -474,6 +474,26 @@ func TestMapRemoteToState(t *testing.T) {
 		assert.Empty(t, s.Resources)
 	})
 
+	t.Run("keeps rows whose endpoints are both CLI-managed alongside skipped ones", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := remoteCollection(t,
+			client.Connection{
+				ID: "conn-remote-1", ExternalID: "android-to-s3",
+				SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true,
+			},
+			client.Connection{
+				ID: "conn-remote-2", ExternalID: "unmanaged-to-s3",
+				SourceID: "src-remote-9", DestinationID: "dst-remote-1", IsEnabled: true,
+			},
+		)
+
+		s, err := h.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		require.Len(t, s.Resources, 1)
+		assert.NotNil(t, s.Resources["event-stream-connection:android-to-s3"])
+	})
+
 	t.Run("errors on foreign data in the collection", func(t *testing.T) {
 		h := NewHandler(nil)
 		collection := resources.NewRemoteResources()
@@ -485,6 +505,40 @@ func TestMapRemoteToState(t *testing.T) {
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unable to cast resource to event stream connection")
+	})
+}
+
+// TestEndpointURN pins the two "not CLI-managed" sentinels the endpoint lookup
+// has to tolerate. Missing-from-collection is the common one: the event stream
+// source and destination handlers both drop rows without an externalId while
+// loading, so an unmanaged endpoint never reaches the collection at all.
+func TestEndpointURN(t *testing.T) {
+	collection := resources.NewRemoteResources()
+	collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		"src-remote-1": {ID: "src-remote-1", ExternalID: "my-android-source"},
+		"src-remote-2": {ID: "src-remote-2", ExternalID: ""},
+	})
+
+	t.Run("resolves a CLI-managed endpoint to its URN", func(t *testing.T) {
+		urn, managed, err := endpointURN(collection, source.ResourceType, "src-remote-1")
+
+		require.NoError(t, err)
+		assert.True(t, managed)
+		assert.Equal(t, "event-stream-source:my-android-source", urn)
+	})
+
+	t.Run("reports unmanaged when the endpoint is absent from the collection", func(t *testing.T) {
+		_, managed, err := endpointURN(collection, source.ResourceType, "src-remote-9")
+
+		require.NoError(t, err)
+		assert.False(t, managed)
+	})
+
+	t.Run("reports unmanaged when the endpoint carries no externalId", func(t *testing.T) {
+		_, managed, err := endpointURN(collection, source.ResourceType, "src-remote-2")
+
+		require.NoError(t, err)
+		assert.False(t, managed)
 	})
 }
 

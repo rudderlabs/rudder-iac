@@ -197,6 +197,24 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, []string{"DeleteConnection"}, mock.Calls)
 	})
 
+	t.Run("says the old connection is gone when the recreate fails", func(t *testing.T) {
+		mock := &MockConnectionClient{
+			CreateFunc: func(_ *client.Connection) (*client.Connection, error) {
+				return nil, errors.New("plan gate")
+			},
+		}
+		h := NewHandler(mock)
+
+		_, err := h.Update(context.Background(), "android-to-s3",
+			derefData("src-remote-1", "dst-remote-9", true),
+			stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
+
+		require.Error(t, err)
+		assert.Equal(t, []string{"DeleteConnection", "CreateConnection"}, mock.Calls)
+		assert.ErrorContains(t, err, "the previous connection was deleted")
+		assert.ErrorContains(t, err, "plan gate")
+	})
+
 	t.Run("errors when state lacks the remote id", func(t *testing.T) {
 		h := NewHandler(&MockConnectionClient{})
 

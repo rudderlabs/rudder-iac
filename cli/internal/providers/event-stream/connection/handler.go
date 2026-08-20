@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -25,6 +26,8 @@ import (
 // ErrNotImplemented guards the list and import surfaces until DEX-654; the
 // apply lifecycle (create/update/delete + remote state) is implemented.
 var ErrNotImplemented = errors.New("event stream connection support is not implemented yet")
+
+var log = logger.New("event-stream-connection")
 
 type Handler struct {
 	resources map[string]*connectionResource
@@ -243,9 +246,13 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 // externalId (rETL rows were already filtered out in LoadResourcesFromRemote).
 // Endpoints resolve through the merged cross-provider collection into
 // PropertyRefs shaped exactly like the spec side, so the differ compares
-// cleanly. A row whose endpoint cannot be resolved to a CLI-managed resource
-// cannot be expressed as spec refs and is skipped (mirroring the source
-// handler's leniency on tracking-plan lookups).
+// cleanly. A row whose endpoint is not CLI-managed cannot be expressed as spec
+// refs, so it is dropped from state — unlike the source handler, which
+// degrades an unmanaged tracking plan link to nil and keeps the resource.
+// Dropping is logged because it is not free: the connection is then absent
+// from state, the differ plans a create, and the backend rejects it with a 409
+// for the already-connected pair on every apply. Any other lookup failure is
+// fatal rather than a silent skip.
 func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for _, remote := range collection.GetAll(EventStreamConnectionResourceType) {
@@ -253,17 +260,46 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream connection")
 		}
-		sourceURN, err := collection.GetURNByID(source.ResourceType, conn.SourceID)
+		sourceURN, managed, err := endpointURN(collection, source.ResourceType, conn.SourceID)
 		if err != nil {
+			return nil, fmt.Errorf("resolving source urn for connection %q: %w", conn.ExternalID, err)
+		}
+		if !managed {
+			log.Warn("skipping connection whose source is not managed by the CLI",
+				"connection", conn.ExternalID, "sourceId", conn.SourceID)
 			continue
 		}
-		destinationURN, err := collection.GetURNByID(destination.DestinationResourceType, conn.DestinationID)
+		destinationURN, managed, err := endpointURN(collection, destination.DestinationResourceType, conn.DestinationID)
 		if err != nil {
+			return nil, fmt.Errorf("resolving destination urn for connection %q: %w", conn.ExternalID, err)
+		}
+		if !managed {
+			log.Warn("skipping connection whose destination is not managed by the CLI",
+				"connection", conn.ExternalID, "destinationId", conn.DestinationID)
 			continue
 		}
 		s.AddResource(mapRemoteToState(&conn, sourceURN, destinationURN))
 	}
 	return s, nil
+}
+
+// endpointURN resolves a connection endpoint to the URN of its CLI-managed
+// resource, reporting managed=false when the endpoint is not CLI-managed.
+// Both sentinels mean that: the event stream source and destination handlers
+// drop rows without an externalId while loading, so an unmanaged endpoint is
+// usually missing from the collection outright (ErrRemoteResourceNotFound)
+// rather than present with an empty externalId
+// (ErrRemoteResourceExternalIdNotFound).
+func endpointURN(collection *resources.RemoteResources, resourceType string, id string) (string, bool, error) {
+	urn, err := collection.GetURNByID(resourceType, id)
+	switch {
+	case errors.Is(err, resources.ErrRemoteResourceNotFound),
+		errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound):
+		return "", false, nil
+	case err != nil:
+		return "", false, err
+	}
+	return urn, true, nil
 }
 
 // mapRemoteToState builds one connection's resource state: the spec-shaped
@@ -334,7 +370,14 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		if err := h.Delete(ctx, id, state); err != nil {
 			return nil, err
 		}
-		return h.Create(ctx, id, data)
+		// The delete already happened, so a failure here leaves the connection
+		// gone while state still carries its remote id; say so in the error
+		// rather than reporting a bare create failure.
+		created, err := h.Create(ctx, id, data)
+		if err != nil {
+			return nil, fmt.Errorf("recreating connection %q after endpoint change (the previous connection was deleted): %w", id, err)
+		}
+		return created, nil
 	}
 
 	desired := &client.Connection{
