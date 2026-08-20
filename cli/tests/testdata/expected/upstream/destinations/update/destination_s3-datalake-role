@@ -1,0 +1,22 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "s3-datalake-role",
+  "name": "E2E S3 Datalake Role Updated",
+  "type": "S3_DATALAKE",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-datalake-role-updated",
+    "enableSSE": false,
+    "iamRoleARN": "arn:aws:iam::123456789012:role/rudder-cli-e2e-datalake-updated",
+    "namespace": "rudder_e2e_datalake_role",
+    "prefix": "rudder/datalake-role/updated/",
+    "region": "us-west-2",
+    "roleBasedAuth": true,
+    "syncFrequency": "360",
+    "useGlue": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,0 +1,22 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: s3-datalake-keys
+spec:
+  id: s3-datalake-keys
+  display_name: E2E S3 Datalake Keys Updated
+  type: s3_datalake
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: rudder-cli-e2e-datalake-updated
+    prefix: rudder/datalake/updated/
+    namespace: rudder_e2e_datalake
+    use_glue: false
+    role_based_auth: false
+    access_key_id: "{{ .S3_DATALAKE_ACCESS_KEY_ID }}"
+    access_key: "{{ .S3_DATALAKE_ACCESS_KEY }}"
+    sync_frequency: "360"
+    enable_sse: true
+    skip_tracks_table: true
+    skip_users_table: true
