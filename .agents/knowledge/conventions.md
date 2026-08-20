@@ -85,3 +85,11 @@
 - Confluent Cloud supports cloud-only connection mode for all retained source types.
 - Do not use S3/GCS/Kinesis/Google Pub/Sub source-type restrictions as the precedent for Confluent Cloud; although streaming/cloud-like, it follows broad non-storage precedents such as Marketo, Salesforce, Slack, and Facebook Conversions.
 - Confluent Cloud's schema-backed consent category/purpose blocks are source-type-scoped only to the schema keys `android`, `ios`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; exclude `android_kotlin` and `ios_swift` from those blocks even though they remain supported for the main destination and `consent_management`.
+
+## DEX-515 — Postgres Destination Validation And Sources
+<!-- ticket:DEX-515 -->
+- Postgres should keep the broad mapped db-config source-type set, not the Snowflake/S3-style restricted subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`.
+- For Postgres object-storage auth validation, use explicit local selector booleans instead of exclusion tags when schema `anyOf` branches do not forbid stale opposite-mode fields.
+- For Postgres S3 object storage, require `role_based_auth` when `bucket_provider` is `S3` and `use_rudder_storage` is false; require `iam_role_arn` when role-based auth is true, and require `access_key_id` / `access_key` when role-based auth is false.
+- For Postgres Azure object storage, require `use_sas_tokens` when `bucket_provider` is `AZURE_BLOB` and `use_rudder_storage` is false; require `sas_token` when SAS-token auth is true, and require `account_key` when SAS-token auth is false.
+- Do not reject stale opposite-mode S3/Azure auth fields for Postgres imports; preserving them matches existing S3/Kinesis import-compatibility precedent.
