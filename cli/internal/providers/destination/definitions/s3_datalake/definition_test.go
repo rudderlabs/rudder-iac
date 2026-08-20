@@ -241,6 +241,28 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 		}
 	})
 
+	// schema.json constrains these inside the roleBasedAuth:false branch, so a
+	// multiline literal must be rejected locally rather than at apply.
+	t.Run("access keys reject line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"access_key_id", "access_key"} {
+			cfg := copyConfig(validKeyConfig())
+			cfg[field] = "AKIA\nBROKEN"
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+field)
+		}
+	})
+
+	t.Run("iam role arn rejects invalid literals", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []string{"arn:aws:iam::123456789012:role/" + strings.Repeat("a", 120), "arn\nbroken"} {
+			cfg := copyConfig(minimalRoleConfig())
+			cfg["iam_role_arn"] = value
+			assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")
+		}
+	})
+
 	t.Run("pattern fields accept ui templates", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalRoleConfig())

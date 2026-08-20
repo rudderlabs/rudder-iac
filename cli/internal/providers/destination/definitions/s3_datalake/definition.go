@@ -17,6 +17,15 @@ func init() {
 		"must be a valid S3 bucket name: 3-63 lowercase letters, digits, dots, or hyphens; must not start with xn--, contain consecutive dots, or look like an IPv4 address",
 	)
 
+	// schema.json constrains accessKeyID/accessKey to ^(.{1,})$ inside the
+	// roleBasedAuth:false branch — non-empty and no line breaks, with no upper
+	// bound, so none of the shared single_line_N patterns fit.
+	funcs.NewPattern(
+		"s3_datalake_access_key",
+		`^(.{1,})$`,
+		"must not be empty and must not contain line breaks",
+	)
+
 	// schema.json guards namespace with ^((?!pg_|PG_|pG_|Pg_).{0,64})$. RE2 has no
 	// lookahead, so the reserved-prefix half becomes a reject pattern.
 	funcs.NewPatternWithReject(
@@ -72,8 +81,8 @@ type s3DatalakeConfig struct {
 
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
 	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
-	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false"`
-	AccessKey     string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false"`
+	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=s3_datalake_access_key"`
+	AccessKey     string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=s3_datalake_access_key"`
 	// db-config secretKeys lists password even though schema/defaultConfig/Terraform
 	// do not expose it; keep it modelled so imports/specs can preserve and wrap it.
 	Password string `mapstructure:"password"`
