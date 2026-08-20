@@ -80,7 +80,9 @@ type s3DatalakeConfig struct {
 
 	EnableSSE *bool `mapstructure:"enable_sse"`
 
-	SyncFrequency string `mapstructure:"sync_frequency" validate:"required,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
+	// schema.json requires only bucketName, so sync_frequency is optional here
+	// even though sibling warehouse destinations mark it required.
+	SyncFrequency string `mapstructure:"sync_frequency" validate:"omitempty,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string `mapstructure:"sync_start_at"`
 
 	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table"`

@@ -102,12 +102,22 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 	t.Run("required fields missing", func(t *testing.T) {
 		t.Parallel()
 
-		for _, field := range []string{"bucket_name", "use_glue", "role_based_auth", "sync_frequency"} {
+		// schema.json requires only bucketName; use_glue and role_based_auth are
+		// required because they gate conditionals, so absent must differ from false.
+		for _, field := range []string{"bucket_name", "use_glue", "role_based_auth"} {
 			cfg := copyConfig(minimalRoleConfig())
 			delete(cfg, field)
 
 			assertHasPath(t, registered.ValidateConfig(cfg), "/"+field)
 		}
+	})
+
+	t.Run("sync frequency is optional", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalRoleConfig())
+		delete(cfg, "sync_frequency")
+		assert.Empty(t, registered.ValidateConfig(cfg), "schema.json does not require syncFrequency")
 	})
 
 	t.Run("valid minimal role based auth", func(t *testing.T) {
