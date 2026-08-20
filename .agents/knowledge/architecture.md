@@ -168,3 +168,9 @@
 <!-- ticket:DEX-493 -->
 - BigQuery destination support is implemented as CLI destination type `bq` for API type `BQ` under `cli/internal/providers/destination/definitions/bq`.
 - BigQuery follows the broad warehouse source-type set from integrations-config `db-config.json`, not the narrowed cloud-storage/event-stream-owned source set: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, all cloud-only.
+## DEX-520 — S3 Datalake Destination Onboarding
+<!-- ticket:DEX-520 -->
+- `s3_datalake` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- S3 Datalake destination identity is CLI type `s3_datalake`, API type `S3_DATALAKE`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/s3_datalake` using Go package name `s3datalake`.
+- S3 Datalake config is intentionally modeled as flat local YAML, including auth/storage/sync/table-layout flags and consent management, so it maps directly to flat API keys and preserves schema/db-config keys that would otherwise be erased by whole-config destination updates.
+- Model schema/db-config keys without Terraform mappings for S3 Datalake instead of omitting them: `skip_tracks_table`, `skip_users_table`, `time_window_layout`, `underscore_divide_numbers`, `cleanup_object_storage_files`, and `allow_users_context_traits`.
