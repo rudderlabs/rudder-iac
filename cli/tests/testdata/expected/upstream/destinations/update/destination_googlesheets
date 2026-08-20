@@ -1,0 +1,41 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googlesheets",
+  "name": "E2E Google Sheets Updated",
+  "type": "GOOGLESHEETS",
+  "enabled": true,
+  "config": {
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust"
+        }
+      ]
+    },
+    "eventKeyMap": [
+      {
+        "from": "userId",
+        "to": "User ID"
+      },
+      {
+        "from": "event",
+        "to": "Event Name"
+      },
+      {
+        "from": "timestamp",
+        "to": "Occurred At"
+      }
+    ],
+    "sheetId": "1RudderCliE2eSheetIdXXXXXXXXXXXXXXXXXXXXXXXX",
+    "sheetName": "rudder-cli-e2e-updated"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

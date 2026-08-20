@@ -25,6 +25,7 @@ import (
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
+	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
@@ -304,6 +305,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
+		}
+		if err := registry.Register(googlesheets.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering googlesheets destination definition: %w", err)
 		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)

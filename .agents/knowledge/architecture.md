@@ -180,3 +180,7 @@
 - Redshift destination support is implemented as local type `rs`, API type `RS`, and destination version `1`; it remains an unverified destination registered only when both destination support and unverified destinations are enabled.
 - Redshift re-onboarding should model the full current RS db-config/defaultConfig surface in `cli/internal/providers/destination/definitions/rs`, including IAM auth fields, SSH fields, flat sync fields, object-storage auth/prefix/cleanup fields, warehouse skip/prefer/json/immutable fields, and consent mapping.
 - Redshift should not rely on framework-level unknown API config preservation: destination handler conversion only emits registered definition properties, so omitted Redshift config keys can be dropped during update/import.
+## DEX-504 — Google Sheets Destination Onboarding
+<!-- ticket:DEX-504 -->
+- Google Sheets destination support is implemented as CLI destination type `googlesheets` for API type `GOOGLESHEETS` under `cli/internal/providers/destination/definitions/googlesheets`; Terraform's `google_sheets` registration name is not used for CLI resource identity.
+- `googlesheets` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.

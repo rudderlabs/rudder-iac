@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googlesheets",
+  "name": "E2E Google Sheets",
+  "type": "GOOGLESHEETS",
+  "enabled": true,
+  "config": {
+    "eventKeyMap": [
+      {
+        "from": "userId",
+        "to": "User ID"
+      },
+      {
+        "from": "event",
+        "to": "Event Name"
+      }
+    ],
+    "sheetId": "1RudderCliE2eSheetIdXXXXXXXXXXXXXXXXXXXXXXXX",
+    "sheetName": "rudder-cli-e2e"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
