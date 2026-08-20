@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: bqstream
+spec:
+  id: bqstream
+  display_name: E2E BQStream
+  type: bqstream
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudder-cli-e2e
+    dataset_id: rudder_e2e
+    table_id: events
+    insert_id: messageId
+    credentials: '{{ .BQSTREAM_CREDENTIALS }}'

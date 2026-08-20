@@ -63,6 +63,7 @@ var destinationRawSecrets = []string{
 	"snowflake-dummy",
 	"snowflakeAzureAccountKeyXXXXXX",
 	"snowflakeAzureSasTokenXXXXXXXX",
+	"bqstream-dummy",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both
