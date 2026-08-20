@@ -406,7 +406,7 @@ func (h *HandlerImpl) FormatForExport(
 		}
 		entries = append(entries, handlers.ImportEntriesFromWorkspace(workspaceMetadata)...)
 
-		spec, err := handlers.ToImportSpec(
+		spec, err := specs.ToImportSpec(
 			DestinationSpecKind,
 			DestinationMetadataName,
 			workspaceMetadata,
