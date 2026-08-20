@@ -23,7 +23,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -537,7 +536,7 @@ func (h *Handler) FormatForExport(
 		return nil, entries, nil
 	}
 
-	spec, err := handlers.ToImportSpec(
+	spec, err := specs.ToImportSpec(
 		EventStreamConnectionResourceKind,
 		MetadataName,
 		workspaceMetadata,

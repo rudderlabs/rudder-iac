@@ -1,20 +1,17 @@
-package handlers_test
+package specs
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 )
 
 func TestToImportSpec(t *testing.T) {
 	t.Run("creates valid spec with import metadata", func(t *testing.T) {
 		kind := "transformation"
 		metadataName := "my-transformation"
-		workspaceMetadata := specs.WorkspaceImportMetadata{
+		workspaceMetadata := WorkspaceImportMetadata{
 			WorkspaceID: "workspace-123",
 		}
 		specData := map[string]any{
@@ -24,12 +21,12 @@ func TestToImportSpec(t *testing.T) {
 			"code":     "export function transformEvent(event) { return event; }",
 		}
 
-		result, err := handlers.ToImportSpec(kind, metadataName, workspaceMetadata, specData)
+		result, err := ToImportSpec(kind, metadataName, workspaceMetadata, specData)
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.Equal(t, specs.SpecVersionV1, result.Version)
+		assert.Equal(t, SpecVersionV1, result.Version)
 		assert.Equal(t, "transformation", result.Kind)
 		assert.Equal(t, specData, result.Spec)
 		assert.Equal(t, "my-transformation", result.Metadata["name"])
