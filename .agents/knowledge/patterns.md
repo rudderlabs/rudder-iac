@@ -184,3 +184,8 @@
 - `rudderAccountId` is a foreign key to an account that must already exist in the target workspace, not a free-form string. A fixture with a dummy value fails at create with `400 ... 'Account not found with given id in the workspace'`, so LinkedIn Ads cannot participate in `TestDestinationsApply` as it stands — this is a missing prerequisite, not a missing stack, and no amount of snapshot capture fixes it.
 - Do not add create/update fixtures for account-framework destinations until the destination e2e can provision (or reference) a real account. Fixtures without runnable configs break the whole suite for every other destination, because a failed apply aborts before snapshot verification.
 - The same shape applies to any destination whose config references another resource by ID; check for such keys in `destConfig.defaultConfig` before writing e2e fixtures.
+## DEX-527 — Snowpipe Streaming E2E Is Deferred Behind a Feature Gate
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming is gated by the `SNOWFLAKE_STREAMING` flag (`options.hidden.gate.flags` in its db-config). On a workspace without that entitlement the API rejects create with `403 destination "SNOWPIPE_STREAMING" is not available for your account`.
+- That failure happens at apply, before any snapshot comparison, so shipping Snowpipe fixtures fails the entire `TestDestinationsApply` suite and takes every other destination's coverage down with it. Converter-derived snapshots do not help, because the apply itself never succeeds.
+- E2E for this destination is therefore deferred until the flag is enabled on a disposable workspace; capture the snapshots live at that point rather than deriving them, so backend-applied defaults are included.

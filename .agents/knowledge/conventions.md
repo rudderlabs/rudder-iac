@@ -184,3 +184,8 @@
 - The LinkedIn Ads Go definition package uses `linkedinads`, keeping the package name idiomatic while preserving `linkedin_ads` as the CLI resource identity.
 - For LinkedIn Ads, model `hash_data` as a required pointer boolean: upstream schema requires `hashData`, and pointer optionality preserves absent versus explicit `false` so validation can reject omission while accepting explicit false.
 - Destination onboarding validation should follow upstream `schema.json` over Terraform-provider defaults; for `hash_data`, do not make the field optional solely because Terraform marks it optional with default `true`.
+## DEX-527 — Snowpipe Streaming Key Handling
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming `private_key` accepts Terraform-compatible raw key bodies in local YAML; local-to-API conversion should wrap non-PEM values as `-----BEGIN PRIVATE KEY-----\n<raw>\n-----END PRIVATE KEY-----`.
+- API-to-local conversion for Snowpipe Streaming `private_key` should return the API value unchanged so PEM payloads round-trip stably.
+- Keep this behavior in a Snowpipe Streaming destination-local converter property rather than changing generic secret conversion or validation behavior.

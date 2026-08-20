@@ -235,3 +235,7 @@
 <!-- ticket:DEX-512 -->
 - `linkedin_ads` follows ads-destination source-type precedent, closer to Facebook Conversions than cloud-storage destinations: include every upstream db-config source type with a destination common mapping (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) instead of trimming to the CLI-owned event-stream subset.
 - LinkedIn Ads supported source connection modes are cloud-only for all retained source types, matching the linkedIn_ads db-config contract.
+## DEX-527 — Snowpipe Streaming Models Its Whole Config Surface
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming models all 14 `destConfig.defaultConfig` keys, so nothing it owns is dropped when destination update replaces the whole config object; it needs no destination-specific preservation of unmodelled API keys.
+- The keys that are genuinely unmodelled by every destination are the legacy consent blocks `oneTrustCookieCategories` and `ketchConsentPurposes`: `common.Properties` maps consent management but not those two, so any destination carrying them upstream loses them on update. That is a cross-destination gap, not a Snowpipe one, and belongs in its own change rather than an opt-in flag on a single definition.
