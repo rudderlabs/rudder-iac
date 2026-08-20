@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: googlesheets
+spec:
+  id: googlesheets
+  display_name: E2E Google Sheets
+  type: googlesheets
+  enabled: true
+  definition_version: 1
+  config:
+    credentials: '{{ .GOOGLESHEETS_CREDENTIALS }}'
+    sheet_id: 1RudderCliE2eSheetIdXXXXXXXXXXXXXXXXXXXXXXXX
+    sheet_name: rudder-cli-e2e
+    event_key_map:
+      - from: userId
+        to: User ID
+      - from: event
+        to: Event Name

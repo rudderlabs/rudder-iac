@@ -73,6 +73,7 @@ var destinationRawSecrets = []string{
 	"postgresAzureSasTokenXXXXXXXXX",
 	"postgresMinioAccessKeyIdXXXXXX",
 	"postgresMinioSecretAccessKeyXX",
+	"googlesheets-dummy",
 	"AKIADATALAKEXXXXXXXX",
 	"s3DatalakeSecretAccessKeyXXXXXXXXXXXXXXXXX",
 }
