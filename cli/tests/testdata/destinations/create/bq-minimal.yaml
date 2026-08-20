@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: bq-minimal
+spec:
+  id: bq-minimal
+  display_name: E2E BigQuery Minimal
+  type: bq
+  enabled: true
+  definition_version: 1
+  config:
+    project: rudder-cli-e2e
+    bucket_name: rudder-cli-e2e-bq-minimal
+    credentials: '{{ .BQ_CREDENTIALS }}'
+    sync_frequency: "180"
