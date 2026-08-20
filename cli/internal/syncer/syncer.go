@@ -241,12 +241,8 @@ func (s *ProjectSyncer) executePlanSequentially(ctx context.Context, state *stat
 }
 
 func (s *ProjectSyncer) executePlanConcurrently(ctx context.Context, state *state.State, plan *planner.Plan, target *resources.Graph, continueOnFail bool) []error {
-	tasks := make([]tasker.Task, 0, len(plan.Operations))
-
 	sourceGraph := StateToGraph(state)
-	for _, o := range plan.Operations {
-		tasks = append(tasks, newOperationTask(o, sourceGraph, target))
-	}
+	tasks := newOperationTasks(plan, sourceGraph, target)
 
 	s.reporter.SyncStarted(len(tasks))
 	defer s.reporter.SyncCompleted()
