@@ -163,3 +163,8 @@
 <!-- ticket:DEX-515 -->
 - Postgres destination source-type support intentionally follows the mapped db-config/common destination surface rather than Snowflake/S3-style narrowing.
 - Postgres should include the local source types `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify` when no explicit unmapped registry/product constraint requires narrowing.
+
+## DEX-493 — BigQuery Destination Onboarding
+<!-- ticket:DEX-493 -->
+- BigQuery destination support is implemented as CLI destination type `bq` for API type `BQ` under `cli/internal/providers/destination/definitions/bq`.
+- BigQuery follows the broad warehouse source-type set from integrations-config `db-config.json`, not the narrowed cloud-storage/event-stream-owned source set: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, all cloud-only.

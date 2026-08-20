@@ -64,6 +64,7 @@ var destinationRawSecrets = []string{
 	"snowflakeAzureAccountKeyXXXXXX",
 	"snowflakeAzureSasTokenXXXXXXXX",
 	"bqstream-dummy",
+	"bq-dummy",
 	"postgresPasswordXXXXXXXXXXXXXX",
 	"AKIAPOSTGRESXXXXXXXX",
 	"postgresSecretAccessKeyXXXXXXXXXXXXXXXXXXX",

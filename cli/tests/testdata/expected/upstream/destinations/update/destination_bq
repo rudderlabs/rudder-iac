@@ -1,0 +1,45 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bq",
+  "name": "E2E BigQuery Updated",
+  "type": "BQ",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e-bq-updated",
+    "cleanupObjectStorageFiles": false,
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    },
+    "excludeWindow": {
+      "excludeWindowEndTime": "03:00",
+      "excludeWindowStartTime": "02:00"
+    },
+    "jsonPaths": "context.traits,properties.metadata",
+    "location": "US",
+    "namespace": "rudder_e2e",
+    "partitionColumn": "loaded_at",
+    "partitionType": "day",
+    "prefix": "rudder/bq/updated/",
+    "project": "rudder-cli-e2e",
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "skipViews": false,
+    "syncFrequency": "60",
+    "syncStartAt": "01:00",
+    "underscoreDivideNumbers": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -93,3 +93,9 @@
 - For Postgres S3 object storage, require `role_based_auth` when `bucket_provider` is `S3` and `use_rudder_storage` is false; require `iam_role_arn` when role-based auth is true, and require `access_key_id` / `access_key` when role-based auth is false.
 - For Postgres Azure object storage, require `use_sas_tokens` when `bucket_provider` is `AZURE_BLOB` and `use_rudder_storage` is false; require `sas_token` when SAS-token auth is true, and require `account_key` when SAS-token auth is false.
 - Do not reject stale opposite-mode S3/Azure auth fields for Postgres imports; preserving them matches existing S3/Kinesis import-compatibility precedent.
+
+## DEX-493 — BigQuery Destination Config Surface
+<!-- ticket:DEX-493 -->
+- BigQuery local config keeps `exclude_window` flat and maps it to API key `excludeWindow`, rather than modeling it as a nested or provider-specific auth block.
+- BigQuery includes db-config/defaultConfig-only keys `underscore_divide_numbers` and `allow_users_context_traits`, mapped mechanically to API keys `underscoreDivideNumbers` and `allowUsersContextTraits`.
+- BigQuery should reject legacy consent category/purpose blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config while still supporting common `consent_management`.
