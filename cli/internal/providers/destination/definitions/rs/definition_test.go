@@ -1,6 +1,7 @@
 package rs_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -11,6 +12,83 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 )
+
+func registeredDefinition(t *testing.T) *definitions.RegisteredDefinition {
+	t.Helper()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(rs.NewDefinition()))
+	registered, err := registry.Get("rs", 1)
+	require.NoError(t, err)
+	return registered
+}
+
+func minimalPasswordConfig() map[string]any {
+	return map[string]any{
+		"use_iam_for_auth":   false,
+		"host":               "redshift.example.com",
+		"port":               "5439",
+		"database":           "analytics",
+		"user":               "rudder",
+		"password":           "secret",
+		"sync_frequency":     "180",
+		"use_rudder_storage": true,
+	}
+}
+
+func exampleConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["password"] = "{{ .RS_PASSWORD }}"
+	cfg["namespace"] = "rudder_events"
+	cfg["skip_tracks_table"] = false
+	cfg["skip_users_table"] = true
+	cfg["prefer_append"] = true
+	cfg["json_paths"] = "context.traits,properties.metadata"
+	return cfg
+}
+
+func fullConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_iam_for_auth"] = true
+	cfg["iam_role_arn_for_auth"] = "arn:aws:iam::123456789012:role/RedshiftAccess"
+	cfg["cluster_region"] = "us-east-1"
+	cfg["use_serverless"] = false
+	cfg["cluster_id"] = "rudder-redshift-cluster"
+	cfg["workgroup_name"] = "rudder-redshift-workgroup"
+	cfg["namespace"] = "rudder_events"
+	cfg["use_ssh"] = true
+	cfg["ssh_host"] = "bastion.example.com"
+	cfg["ssh_port"] = "22"
+	cfg["ssh_user"] = "rudder"
+	cfg["ssh_public_key"] = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+	cfg["sync_frequency"] = "10"
+	cfg["sync_start_at"] = "01:00"
+	cfg["exclude_window"] = map[string]any{"start_time": "02:00", "end_time": "03:00"}
+	cfg["skip_tracks_table"] = false
+	cfg["skip_users_table"] = true
+	cfg["prefer_append"] = true
+	cfg["json_paths"] = "context.traits"
+	cfg["underscore_divide_numbers"] = false
+	cfg["allow_users_context_traits"] = false
+	cfg["use_rudder_storage"] = false
+	cfg["bucket_name"] = "rudder-redshift-staging"
+	cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderRedshiftStorage"
+	cfg["role_based_auth"] = true
+	cfg["access_key_id"] = "AKIAEXAMPLE"
+	cfg["access_key"] = "secret-access-key"
+	cfg["prefix"] = "rudder/redshift"
+	cfg["enable_sse"] = true
+	cfg["cleanup_object_storage_files"] = false
+	return cfg
+}
+
+func copyConfig(src map[string]any) map[string]any {
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
 
 func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
@@ -25,10 +103,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "RS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
+	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "react_native", "flutter", "cordova", "cloud",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
+		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -38,10 +117,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
 
-	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "cloud_source")
-
 	byAPI, err := registry.GetByAPIType("RS", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
@@ -50,280 +125,361 @@ func TestNewDefinitionMetadata(t *testing.T) {
 func TestRSConfigValidation(t *testing.T) {
 	t.Parallel()
 
-	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(rs.NewDefinition()))
-	registered, err := registry.Get("rs", 1)
-	require.NoError(t, err)
+	registered := registeredDefinition(t)
 
-	minimalValid := map[string]any{
-		"host":               "example.redshift.amazonaws.com",
-		"port":               "5439",
-		"database":           "analytics",
-		"user":               "rudder",
-		"password":           "secret",
-		"use_rudder_storage": true,
-		"sync": map[string]any{
-			"frequency": "180",
-		},
-	}
-
-	t.Run("missing host", func(t *testing.T) {
+	t.Run("required fields missing", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "host")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/host", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+
+		for _, field := range []string{"use_iam_for_auth", "database", "user", "sync_frequency", "use_rudder_storage"} {
+			cfg := copyConfig(minimalPasswordConfig())
+			delete(cfg, field)
+
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+field)
+		}
 	})
 
-	t.Run("missing port", func(t *testing.T) {
+	t.Run("password auth fields required when iam auth is off", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "port")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/port", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+
+		for _, field := range []string{"host", "port", "password"} {
+			cfg := copyConfig(minimalPasswordConfig())
+			delete(cfg, field)
+
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+field)
+		}
 	})
 
-	t.Run("missing database", func(t *testing.T) {
+	t.Run("valid password auth", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "database")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/database", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
+		assert.Empty(t, registered.ValidateConfig(minimalPasswordConfig()))
 	})
 
-	t.Run("missing user", func(t *testing.T) {
+	t.Run("validated example config", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "user")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/user", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("missing password", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "password")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/password", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("missing use_rudder_storage", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		delete(cfg, "use_rudder_storage")
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_rudder_storage", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("missing sync frequency", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{}
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/sync/frequency", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("invalid sync frequency", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{"frequency": "10"}
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/sync/frequency", errors[0].Path)
-	})
-
-	t.Run("bucket_name required when use_rudder_storage false", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/bucket_name", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("valid minimal rudder storage", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(copyConfig(minimalValid))
-		assert.Empty(t, errors)
-	})
-
-	t.Run("valid custom s3 storage", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["bucket_name"] = "my-redshift-bucket"
-		cfg["access_key_id"] = "AKIAEXAMPLE"
-		cfg["access_key"] = "secret-value"
-		errors := registered.ValidateConfig(cfg)
-		assert.Empty(t, errors)
+		assert.Empty(t, registered.ValidateConfig(exampleConfig()))
 	})
 
 	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"host":               "example.redshift.amazonaws.com",
-			"port":               "5439",
-			"database":           "analytics",
-			"user":               "rudder",
-			"password":           "secret",
-			"namespace":          "rudder_events",
-			"enable_sse":         true,
-			"use_rudder_storage": false,
-			"bucket_name":        "my-redshift-bucket",
-			"access_key_id":      "AKIAEXAMPLE",
-			"access_key":         "secret-value",
-			"sync": map[string]any{
-				"frequency":                 "30",
-				"start_at":                  "10:00",
-				"exclude_window_start_time": "11:00",
-				"exclude_window_end_time":   "12:00",
-			},
-			"consent_management": map[string]any{
-				"web": []any{
-					map[string]any{
-						"provider": "oneTrust",
-						"consents": []any{"analytics"},
-					},
-				},
-			},
-		})
-		assert.Empty(t, errors)
-	})
-
-	t.Run("example yaml config", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"host":               "example.redshift.amazonaws.com",
-			"port":               "5439",
-			"database":           "analytics",
-			"user":               "rudder",
-			"password":           "{{ .RS_PASSWORD }}",
-			"namespace":          "rudder_events",
-			"use_rudder_storage": true,
-			"sync": map[string]any{
-				"frequency": "180",
-			},
-		})
-		assert.Empty(t, errors)
-	})
-
-	t.Run("access keys required when use_rudder_storage false", func(t *testing.T) {
-		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["use_rudder_storage"] = false
-		cfg["bucket_name"] = "my-redshift-bucket"
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		paths := make([]string, 0, len(errors))
-		for _, e := range errors {
-			paths = append(paths, e.Path)
+		cfg := fullConfig()
+		cfg["consent_management"] = map[string]any{
+			"cloud_source": []any{map[string]any{
+				"provider":            "custom",
+				"resolution_strategy": "or",
+				"consents":            []any{"analytics", "marketing"},
+			}},
 		}
-		assert.Contains(t, paths, "/access_key_id")
-		assert.Contains(t, paths, "/access_key")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
-	t.Run("namespace with reserved pg_ prefix rejected", func(t *testing.T) {
+	t.Run("iam cluster auth requires provisioned cluster fields", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["namespace"] = "pg_internal"
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_iam_for_auth"] = true
+		cfg["use_serverless"] = false
+		delete(cfg, "host")
+		delete(cfg, "port")
+		delete(cfg, "password")
+
 		errors := registered.ValidateConfig(cfg)
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/namespace", errors[0].Path)
+		assertHasPath(t, errors, "/iam_role_arn_for_auth")
+		assertHasPath(t, errors, "/cluster_region")
+		assertHasPath(t, errors, "/cluster_id")
 	})
 
-	t.Run("namespace longer than 64 chars rejected", func(t *testing.T) {
+	t.Run("valid iam provisioned cluster auth", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["namespace"] = strings.Repeat("a", 65)
+
+		cfg := validIAMClusterConfig()
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("iam serverless auth requires workgroup", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_iam_for_auth"] = true
+		cfg["iam_role_arn_for_auth"] = "arn:aws:iam::123456789012:role/RedshiftAccess"
+		cfg["cluster_region"] = "us-east-1"
+		cfg["use_serverless"] = true
+		delete(cfg, "host")
+		delete(cfg, "port")
+		delete(cfg, "password")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/workgroup_name")
+	})
+
+	t.Run("valid iam serverless auth", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validIAMServerlessConfig()
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("rudder storage tolerates stale custom storage fields", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_rudder_storage"] = true
+		cfg["role_based_auth"] = true
+		cfg["bucket_name"] = "rudder-redshift-staging"
+		cfg["prefix"] = "stale-prefix"
+		cfg["cleanup_object_storage_files"] = false
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("custom storage role auth requires iam role", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validCustomRoleStorageConfig()
+		delete(cfg, "iam_role_arn")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")
+	})
+
+	t.Run("valid custom storage role auth", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(validCustomRoleStorageConfig()))
+	})
+
+	t.Run("valid custom storage key auth", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(validCustomKeyStorageConfig()))
+	})
+
+	t.Run("custom storage key auth tolerates missing write-only secrets on import", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validCustomKeyStorageConfig()
+		delete(cfg, "access_key_id")
+		delete(cfg, "access_key")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("custom storage key auth validates present key shapes", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validCustomKeyStorageConfig()
+		cfg["access_key_id"] = "bad\nkey"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key_id")
+	})
+
+	t.Run("ssh disabled does not require tunnel fields", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_ssh"] = false
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("ssh enabled requires tunnel fields", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_ssh"] = true
+
 		errors := registered.ValidateConfig(cfg)
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/namespace", errors[0].Path)
+		assertHasPath(t, errors, "/ssh_host")
+		assertHasPath(t, errors, "/ssh_port")
+		assertHasPath(t, errors, "/ssh_user")
+		assertHasPath(t, errors, "/ssh_public_key")
 	})
 
-	t.Run("invalid sync start_at rejected", func(t *testing.T) {
+	t.Run("valid ssh config", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{"frequency": "180", "start_at": "25:00"}
-		errors := registered.ValidateConfig(cfg)
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/sync/start_at", errors[0].Path)
+		assert.Empty(t, registered.ValidateConfig(validSSHConfig()))
 	})
 
-	t.Run("exclude window requires both bounds", func(t *testing.T) {
+	t.Run("sync frequency follows schema enum", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{
-			"frequency":                 "180",
-			"exclude_window_start_time": "01:00",
+
+		for _, freq := range []string{"5", "10", "15", "30", "60", "180", "360", "720", "1440"} {
+			cfg := copyConfig(minimalPasswordConfig())
+			cfg["sync_frequency"] = freq
+			assert.Empty(t, registered.ValidateConfig(cfg), freq)
 		}
-		errors := registered.ValidateConfig(cfg)
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/sync/exclude_window_end_time", errors[0].Path)
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["sync_frequency"] = "45"
+		assertHasPath(t, registered.ValidateConfig(cfg), "/sync_frequency")
 	})
 
-	t.Run("invalid exclude window time rejected", func(t *testing.T) {
+	t.Run("exclude window child fields required when object is present", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["sync"] = map[string]any{
-			"frequency":                 "180",
-			"exclude_window_start_time": "1:00",
-			"exclude_window_end_time":   "02:00",
-		}
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["exclude_window"] = map[string]any{"start_time": "01:00"}
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/exclude_window/end_time")
+	})
+
+	t.Run("sync and exclude window times follow schema string shape", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["sync_start_at"] = "after the hour"
+		cfg["exclude_window"] = map[string]any{"start_time": "after lunch", "end_time": "before dinner"}
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("legacy sync block is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		delete(cfg, "sync_frequency")
+		cfg["sync"] = map[string]any{"frequency": "180"}
+
 		errors := registered.ValidateConfig(cfg)
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/sync/exclude_window_start_time", errors[0].Path)
+		assertHasPath(t, errors, "/sync")
+		assertHasPath(t, errors, "/sync_frequency")
+	})
+
+	t.Run("pattern constraints reject invalid literals", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			field string
+			value any
+			cfg   map[string]any
+		}{
+			{field: "host", value: "demo.ngrok.io", cfg: minimalPasswordConfig()},
+			{field: "port", value: "bad\nport", cfg: minimalPasswordConfig()},
+			{field: "database", value: "bad\ndatabase", cfg: minimalPasswordConfig()},
+			{field: "user", value: "bad\nuser", cfg: minimalPasswordConfig()},
+			{field: "namespace", value: "pg_catalog", cfg: minimalPasswordConfig()},
+			{field: "bucket_name", value: "xn--bucket", cfg: validCustomRoleStorageConfig()},
+			{field: "bucket_name", value: "rudder..bucket", cfg: validCustomRoleStorageConfig()},
+			{field: "bucket_name", value: "192.168.0.1", cfg: validCustomRoleStorageConfig()},
+			{field: "bucket_name", value: "BadBucket", cfg: validCustomRoleStorageConfig()},
+			{field: "prefix", value: "bad prefix", cfg: validCustomRoleStorageConfig()},
+			{field: "cluster_region", value: "bad\nregion", cfg: validIAMClusterConfig()},
+			{field: "workgroup_name", value: "bad\nworkgroup", cfg: validIAMServerlessConfig()},
+			{field: "ssh_host", value: "bad\nhost", cfg: validSSHConfig()},
+		}
+
+		for _, tc := range cases {
+			cfg := copyConfig(tc.cfg)
+			cfg[tc.field] = tc.value
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+tc.field)
+		}
+	})
+
+	t.Run("near miss values are accepted", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			field string
+			value any
+			cfg   map[string]any
+		}{
+			{field: "host", value: "redshift-ngrok.example.com", cfg: minimalPasswordConfig()},
+			{field: "namespace", value: "pgx_events", cfg: minimalPasswordConfig()},
+			{field: "bucket_name", value: "rudder.bucket", cfg: validCustomRoleStorageConfig()},
+			{field: "bucket_name", value: "1.2.3.4.5", cfg: validCustomRoleStorageConfig()},
+			{field: "prefix", value: "rudder/redshift", cfg: validCustomRoleStorageConfig()},
+		}
+
+		for _, tc := range cases {
+			cfg := copyConfig(tc.cfg)
+			cfg[tc.field] = tc.value
+			assert.Empty(t, registered.ValidateConfig(cfg), "%s=%v", tc.field, tc.value)
+		}
+	})
+
+	t.Run("pattern fields accept ui templates", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["host"] = "{{ config.host || " + strings.Repeat("a", 300) + " }}"
+		cfg["database"] = "{{ config.database || " + strings.Repeat("a", 150) + " }}"
+		cfg["namespace"] = "{{ config.namespace || pg_events }}"
+		cfg["bucket_name"] = "{{ config.bucketName || Bad_Bucket_Name }}"
+		cfg["prefix"] = "{{ config.prefix || bad prefix }}"
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
+
+		cfg := copyConfig(minimalPasswordConfig())
 		cfg["not_a_field"] = true
-		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/not_a_field", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/not_a_field")
 	})
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
-		cfg["consent_management"] = map[string]any{
-			"warehouse": []any{},
-		}
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["consent_management"] = map[string]any{"warehouse": []any{}}
+
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
 		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
 	})
 
+	t.Run("retained consent source accepted", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["consent_management"] = map[string]any{
+			"amp":          []any{map[string]any{"provider": "oneTrust"}},
+			"cloud_source": []any{map[string]any{"provider": "ketch"}},
+			"shopify":      []any{map[string]any{"provider": "iubenda"}},
+		}
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalValid)
+
+		cfg := copyConfig(minimalPasswordConfig())
 		cfg["consent_management"] = map[string]any{
-			"ios_swift": []any{
-				map[string]any{"provider": "unknown"},
-			},
+			"cloud_source": []any{map[string]any{"provider": "unknown"}},
 		}
+
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/ios_swift/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+}
+
+func TestRSModelsCurrentDefaultConfigKeys(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredDefinition(t)
+	apiConfig, err := registered.LocalToAPI(fullConfig())
+	require.NoError(t, err)
+
+	expectedAPIKeys := []string{
+		"host", "port", "database", "user", "useIAMForAuth", "password",
+		"iamRoleARNForAuth", "clusterId", "clusterRegion", "useServerless", "workgroupName",
+		"bucketName", "iamRoleARN", "roleBasedAuth", "accessKeyID", "accessKey", "prefix",
+		"namespace", "useSSH", "sshHost", "sshPort", "skipTracksTable", "skipUsersTable",
+		"sshUser", "sshPublicKey", "syncFrequency", "syncStartAt", "enableSSE", "preferAppend",
+		"excludeWindow", "jsonPaths", "useRudderStorage", "underscoreDivideNumbers",
+		"cleanupObjectStorageFiles", "allowUsersContextTraits",
+	}
+	slices.Sort(expectedAPIKeys)
+
+	actualAPIKeys := make([]string, 0, len(apiConfig))
+	for key := range apiConfig {
+		actualAPIKeys = append(actualAPIKeys, key)
+	}
+	slices.Sort(actualAPIKeys)
+
+	assert.Equal(t, expectedAPIKeys, actualAPIKeys)
 }
 
 func TestRSConversionRoundTrip(t *testing.T) {
@@ -332,184 +488,270 @@ func TestRSConversionRoundTrip(t *testing.T) {
 	def := rs.NewDefinition()
 	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
 		{
-			Name: "minimal rudder storage",
+			Name: "password auth rudder storage",
 			LocalJSON: `{
-				"host": "example.com",
+				"use_iam_for_auth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"use_rudder_storage": true,
-				"sync": {"frequency": "30"}
+				"sync_frequency": "180",
+				"use_rudder_storage": true
 			}`,
 			APIJSON: `{
-				"host": "example.com",
+				"useIAMForAuth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"useRudderStorage": true,
-				"syncFrequency": "30"
+				"syncFrequency": "180",
+				"useRudderStorage": true
 			}`,
 		},
 		{
-			Name: "full sync and s3 fields",
+			Name: "iam provisioned cluster",
 			LocalJSON: `{
-				"host": "example.com",
+				"use_iam_for_auth": true,
+				"iam_role_arn_for_auth": "arn:aws:iam::123456789012:role/RedshiftAccess",
+				"cluster_region": "us-east-1",
+				"use_serverless": false,
+				"cluster_id": "rudder-redshift-cluster",
+				"database": "analytics",
+				"user": "rudder",
+				"sync_frequency": "180",
+				"use_rudder_storage": true
+			}`,
+			APIJSON: `{
+				"useIAMForAuth": true,
+				"iamRoleARNForAuth": "arn:aws:iam::123456789012:role/RedshiftAccess",
+				"clusterRegion": "us-east-1",
+				"useServerless": false,
+				"clusterId": "rudder-redshift-cluster",
+				"database": "analytics",
+				"user": "rudder",
+				"syncFrequency": "180",
+				"useRudderStorage": true
+			}`,
+		},
+		{
+			Name: "iam serverless",
+			LocalJSON: `{
+				"use_iam_for_auth": true,
+				"iam_role_arn_for_auth": "arn:aws:iam::123456789012:role/RedshiftAccess",
+				"cluster_region": "us-east-1",
+				"use_serverless": true,
+				"workgroup_name": "rudder-redshift-workgroup",
+				"database": "analytics",
+				"user": "rudder",
+				"sync_frequency": "180",
+				"use_rudder_storage": true
+			}`,
+			APIJSON: `{
+				"useIAMForAuth": true,
+				"iamRoleARNForAuth": "arn:aws:iam::123456789012:role/RedshiftAccess",
+				"clusterRegion": "us-east-1",
+				"useServerless": true,
+				"workgroupName": "rudder-redshift-workgroup",
+				"database": "analytics",
+				"user": "rudder",
+				"syncFrequency": "180",
+				"useRudderStorage": true
+			}`,
+		},
+		{
+			Name: "custom storage key auth and advanced flags",
+			LocalJSON: `{
+				"use_iam_for_auth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"namespace": "example-namespace",
-				"enable_sse": true,
+				"namespace": "rudder_events",
+				"sync_frequency": "10",
+				"sync_start_at": "01:00",
+				"exclude_window": {"start_time": "02:00", "end_time": "03:00"},
+				"skip_tracks_table": false,
+				"skip_users_table": true,
+				"prefer_append": true,
+				"json_paths": "context.traits",
+				"underscore_divide_numbers": false,
+				"allow_users_context_traits": false,
 				"use_rudder_storage": false,
-				"bucket_name": "some-bucket-name",
-				"access_key_id": "some-access-key-id",
-				"access_key": "some-access-key",
-				"sync": {
-					"frequency": "30",
-					"start_at": "10:00",
-					"exclude_window_start_time": "11:00",
-					"exclude_window_end_time": "12:00"
-				}
+				"bucket_name": "rudder-redshift-staging",
+				"role_based_auth": false,
+				"access_key_id": "AKIAEXAMPLE",
+				"access_key": "secret-access-key",
+				"prefix": "rudder/redshift",
+				"enable_sse": true,
+				"cleanup_object_storage_files": false
 			}`,
 			APIJSON: `{
-				"host": "example.com",
+				"useIAMForAuth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"namespace": "example-namespace",
-				"enableSSE": true,
+				"namespace": "rudder_events",
+				"syncFrequency": "10",
+				"syncStartAt": "01:00",
+				"excludeWindow": {"excludeWindowStartTime": "02:00", "excludeWindowEndTime": "03:00"},
+				"skipTracksTable": false,
+				"skipUsersTable": true,
+				"preferAppend": true,
+				"jsonPaths": "context.traits",
+				"underscoreDivideNumbers": false,
+				"allowUsersContextTraits": false,
 				"useRudderStorage": false,
-				"bucketName": "some-bucket-name",
-				"accessKeyID": "some-access-key-id",
-				"accessKey": "some-access-key",
-				"syncFrequency": "30",
-				"syncStartAt": "10:00",
-				"excludeWindow": {
-					"excludeWindowStartTime": "11:00",
-					"excludeWindowEndTime": "12:00"
-				}
+				"bucketName": "rudder-redshift-staging",
+				"roleBasedAuth": false,
+				"accessKeyID": "AKIAEXAMPLE",
+				"accessKey": "secret-access-key",
+				"prefix": "rudder/redshift",
+				"enableSSE": true,
+				"cleanupObjectStorageFiles": false
 			}`,
 		},
 		{
-			Name: "exclude window reshape",
+			Name: "custom storage role auth",
 			LocalJSON: `{
-				"host": "example.com",
+				"use_iam_for_auth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"use_rudder_storage": true,
-				"sync": {
-					"frequency": "180",
-					"exclude_window_start_time": "01:00",
-					"exclude_window_end_time": "02:00"
-				}
+				"sync_frequency": "180",
+				"use_rudder_storage": false,
+				"bucket_name": "rudder-redshift-staging",
+				"role_based_auth": true,
+				"iam_role_arn": "arn:aws:iam::123456789012:role/RudderRedshiftStorage"
 			}`,
 			APIJSON: `{
-				"host": "example.com",
+				"useIAMForAuth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"useRudderStorage": true,
 				"syncFrequency": "180",
-				"excludeWindow": {
-					"excludeWindowStartTime": "01:00",
-					"excludeWindowEndTime": "02:00"
-				}
+				"useRudderStorage": false,
+				"bucketName": "rudder-redshift-staging",
+				"roleBasedAuth": true,
+				"iamRoleARN": "arn:aws:iam::123456789012:role/RudderRedshiftStorage"
 			}`,
 		},
 		{
-			Name: "consent for web",
+			Name: "ssh and consent source boundary mappings",
 			LocalJSON: `{
-				"host": "example.com",
+				"use_iam_for_auth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
+				"use_ssh": true,
+				"ssh_host": "bastion.example.com",
+				"ssh_port": "22",
+				"ssh_user": "rudder",
+				"ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+				"sync_frequency": "180",
 				"use_rudder_storage": true,
-				"sync": {"frequency": "180"},
-				"consent_management": {
-					"web": [
-						{
-							"provider": "oneTrust",
-							"resolution_strategy": "and",
-							"consents": ["analytics", "marketing"]
-						}
-					]
-				}
-			}`,
-			APIJSON: `{
-				"host": "example.com",
-				"port": "5439",
-				"database": "analytics",
-				"user": "rudder",
-				"password": "secret",
-				"useRudderStorage": true,
-				"syncFrequency": "180",
-				"consentManagement": {
-					"web": [
-						{
-							"provider": "oneTrust",
-							"resolutionStrategy": "and",
-							"consents": [
-								{"consent": "analytics"},
-								{"consent": "marketing"}
-							]
-						}
-					]
-				}
-			}`,
-		},
-		{
-			Name: "consent source boundary mappings",
-			LocalJSON: `{
-				"host": "example.com",
-				"port": "5439",
-				"database": "analytics",
-				"user": "rudder",
-				"password": "secret",
-				"use_rudder_storage": true,
-				"sync": {"frequency": "180"},
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"ios_swift": [{"provider": "ketch"}],
-					"react_native": [{"provider": "iubenda"}]
+					"cloud_source": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
+					"shopify": [{"provider": "ketch"}]
 				}
 			}`,
 			APIJSON: `{
-				"host": "example.com",
+				"useIAMForAuth": false,
+				"host": "redshift.example.com",
 				"port": "5439",
 				"database": "analytics",
 				"user": "rudder",
 				"password": "secret",
-				"useRudderStorage": true,
+				"useSSH": true,
+				"sshHost": "bastion.example.com",
+				"sshPort": "22",
+				"sshUser": "rudder",
+				"sshPublicKey": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
 				"syncFrequency": "180",
+				"useRudderStorage": true,
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"iosSwift": [{"provider": "ketch"}],
-					"reactnative": [{"provider": "iubenda"}]
+					"cloudSource": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}],
+					"shopify": [{"provider": "ketch"}]
 				}
 			}`,
 		},
 	})
 }
 
-func copyConfig(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in))
-	for k, v := range in {
-		if nested, ok := v.(map[string]any); ok {
-			cloned := make(map[string]any, len(nested))
-			for nk, nv := range nested {
-				cloned[nk] = nv
-			}
-			out[k] = cloned
-			continue
+func validIAMClusterConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_iam_for_auth"] = true
+	cfg["iam_role_arn_for_auth"] = "arn:aws:iam::123456789012:role/RedshiftAccess"
+	cfg["cluster_region"] = "us-east-1"
+	cfg["use_serverless"] = false
+	cfg["cluster_id"] = "rudder-redshift-cluster"
+	delete(cfg, "host")
+	delete(cfg, "port")
+	delete(cfg, "password")
+	return cfg
+}
+
+func validIAMServerlessConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_iam_for_auth"] = true
+	cfg["iam_role_arn_for_auth"] = "arn:aws:iam::123456789012:role/RedshiftAccess"
+	cfg["cluster_region"] = "us-east-1"
+	cfg["use_serverless"] = true
+	cfg["workgroup_name"] = "rudder-redshift-workgroup"
+	delete(cfg, "host")
+	delete(cfg, "port")
+	delete(cfg, "password")
+	return cfg
+}
+
+func validCustomRoleStorageConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_rudder_storage"] = false
+	cfg["bucket_name"] = "rudder-redshift-staging"
+	cfg["role_based_auth"] = true
+	cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderRedshiftStorage"
+	return cfg
+}
+
+func validCustomKeyStorageConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_rudder_storage"] = false
+	cfg["bucket_name"] = "rudder-redshift-staging"
+	cfg["role_based_auth"] = false
+	cfg["access_key_id"] = "AKIAEXAMPLE"
+	cfg["access_key"] = "secret-access-key"
+	return cfg
+}
+
+func validSSHConfig() map[string]any {
+	cfg := copyConfig(minimalPasswordConfig())
+	cfg["use_ssh"] = true
+	cfg["ssh_host"] = "bastion.example.com"
+	cfg["ssh_port"] = "22"
+	cfg["ssh_user"] = "rudder"
+	cfg["ssh_public_key"] = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+	return cfg
+}
+
+func assertHasPath(t *testing.T, errors []definitions.ConfigError, path string) {
+	t.Helper()
+
+	for _, err := range errors {
+		if err.Path == path {
+			return
 		}
-		out[k] = v
 	}
-	return out
+	assert.Failf(t, "expected validation path", "path %s not found in %#v", path, errors)
 }
