@@ -36,16 +36,9 @@ Field "underscoreDivideNumbers" is immutable and cannot be modified
 
 Warehouse destinations carry several — postgres marks `underscoreDivideNumbers`
 and `allowUsersContextTraits`; bq adds `namespace`, `partitionColumn`,
-`partitionType` and `skipViews`. List them before writing the update fixture:
-
-```bash
-python3 -c "
-import json
-s=json.load(open('<integrations-config>/src/configurations/destinations/<dir>/schema.json'))
-for k,v in s.get('configSchema',s).get('properties',{}).items():
-    if v.get('rs-immutable'): print(k)
-"
-```
+`partitionType` and `skipViews`. Before writing the update fixture, list them
+from the destination's `schema.json`: the flag sits on each entry under
+`configSchema.properties.<key>`.
 
 Every immutable key must be byte-identical between the create and update
 fixtures; pick a mutable key (a bucket name, prefix, sync frequency, display
