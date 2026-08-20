@@ -397,20 +397,102 @@ func TestClientConnectionsSetExternalID(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+// The set external ID endpoint answers 409 for two conditions that differ only
+// in message, so the sentinel must not swallow what the backend said.
 func TestClientConnectionsSetExternalIDConflict(t *testing.T) {
 	ctx := context.Background()
 
+	testCases := []struct {
+		name         string
+		responseBody string
+		wantMessage  string
+	}{
+		{
+			name:         "claimed by another connection",
+			responseBody: `{"error": "A connection with this externalId already exists in the workspace"}`,
+			wantMessage:  "A connection with this externalId already exists in the workspace",
+		},
+		{
+			name:         "already set on this connection",
+			responseBody: `{"error": "externalId is already set for this connection and cannot be changed"}`,
+			wantMessage:  "externalId is already set for this connection and cannot be changed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+				ResponseStatus: 409,
+				ResponseBody:   tc.responseBody,
+			})
+
+			c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+			require.NoError(t, err)
+
+			err = c.Connections.SetExternalID(ctx, "some-id", "external-id-1")
+			require.Error(t, err)
+			assert.ErrorIs(t, err, client.ErrExternalIDAlreadyInUse)
+			assert.Contains(t, err.Error(), tc.wantMessage)
+
+			httpClient.AssertNumberOfCalls()
+		})
+	}
+}
+
+// Create answers 409 when the body carries an externalId and a live connection
+// already exists for the source/destination pair.
+func TestClientConnectionsCreateConflict(t *testing.T) {
+	ctx := context.Background()
+
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "POST", "https://api.rudderstack.com/v2/connections", `{
+				"externalId": "external-id-1",
+				"sourceId": "source-id",
+				"destinationId": "destination-id",
+				"enabled": false
+			}`)
+		},
 		ResponseStatus: 409,
-		ResponseBody:   `{"error": "externalId is already in use by another connection"}`,
+		ResponseBody:   `{"error": "Connection already exists for this source and destination pair. Use PUT /v2/connections/:id/external-id to set its externalId"}`,
 	})
 
 	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
 	require.NoError(t, err)
 
-	err = c.Connections.SetExternalID(ctx, "some-id", "external-id-1")
+	connection, err := c.Connections.Create(ctx, &client.Connection{
+		ExternalID:    "external-id-1",
+		SourceID:      "source-id",
+		DestinationID: "destination-id",
+	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, client.ErrExternalIDAlreadyInUse)
+	assert.Nil(t, connection)
+	assert.ErrorIs(t, err, client.ErrConnectionPairExists)
+	assert.Contains(t, err.Error(), "Connection already exists for this source and destination pair")
+
+	httpClient.AssertNumberOfCalls()
+}
+
+// A non-conflict create failure must stay unmapped.
+func TestClientConnectionsCreateNonConflictErrorIsNotMapped(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		ResponseStatus: 400,
+		ResponseBody:   `{"error": "sourceId is required"}`,
+	})
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	connection, err := c.Connections.Create(ctx, &client.Connection{
+		SourceID:      "source-id",
+		DestinationID: "destination-id",
+	})
+	require.Error(t, err)
+	assert.Nil(t, connection)
+	assert.NotErrorIs(t, err, client.ErrConnectionPairExists)
+	assert.Contains(t, err.Error(), "sourceId is required")
 
 	httpClient.AssertNumberOfCalls()
 }
