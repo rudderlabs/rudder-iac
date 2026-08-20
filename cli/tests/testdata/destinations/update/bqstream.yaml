@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: bqstream
+spec:
+  id: bqstream
+  display_name: E2E BQStream Updated
+  type: bqstream
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudder-cli-e2e-updated
+    dataset_id: rudder_e2e_updated
+    table_id: events_updated
+    insert_id: anonymousId
+    credentials: '{{ .BQSTREAM_CREDENTIALS }}'
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

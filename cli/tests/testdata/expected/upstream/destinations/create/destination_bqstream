@@ -1,0 +1,17 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bqstream",
+  "name": "E2E BQStream",
+  "type": "BQSTREAM",
+  "enabled": true,
+  "config": {
+    "projectId": "rudder-cli-e2e",
+    "datasetId": "rudder_e2e",
+    "tableId": "events",
+    "insertId": "messageId"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

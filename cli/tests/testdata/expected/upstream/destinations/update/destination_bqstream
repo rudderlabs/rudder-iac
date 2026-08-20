@@ -1,0 +1,29 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bqstream",
+  "name": "E2E BQStream Updated",
+  "type": "BQSTREAM",
+  "enabled": true,
+  "config": {
+    "projectId": "rudder-cli-e2e-updated",
+    "datasetId": "rudder_e2e_updated",
+    "tableId": "events_updated",
+    "insertId": "anonymousId",
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
