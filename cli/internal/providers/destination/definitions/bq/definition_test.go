@@ -204,6 +204,30 @@ func TestBQConfigValidation(t *testing.T) {
 		}
 	})
 
+	// A reject pattern is only correct if it is also narrow enough: these values
+	// resemble a blocked shape without being one, and would fail if a reject
+	// branch were widened (goog -> goo, \.\. -> \., a 4-octet IP -> any dotted
+	// digits, or the pg_ prefix matched anywhere rather than at the start).
+	t.Run("near miss values are accepted", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			field string
+			value any
+		}{
+			{field: "bucket_name", value: "gogle-rudder"},
+			{field: "bucket_name", value: "rudder.bucket"},
+			{field: "bucket_name", value: "1.2.3.4.5"},
+			{field: "namespace", value: "pgx_events"},
+		}
+
+		for _, tc := range cases {
+			cfg := copyConfig(minimalConfig())
+			cfg[tc.field] = tc.value
+			assert.Empty(t, registered.ValidateConfig(cfg), "%s=%v", tc.field, tc.value)
+		}
+	})
+
 	t.Run("pattern fields accept ui templates", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
