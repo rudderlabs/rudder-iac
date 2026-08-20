@@ -137,3 +137,7 @@
 - Destination handler API/local conversion for Redshift is definition-driven: `HandlerImpl.apiConfigToLocal` converts only registered definition properties, and `localConfigToAPI` sends only converted local keys.
 - Guard Redshift's modeled API key set in definition tests so future schema/defaultConfig keys are not accidentally omitted and erased on update/import.
 - Prefer full Redshift definition modeling over generic destination-handler unknown-key preservation, because generic preservation would broaden behavior for all destinations and conflict with closed schema validation.
+## DEX-504 — Google Sheets E2E Snapshot Deferral
+<!-- ticket:DEX-504 -->
+- Google Sheets destination E2E fixture YAML was intentionally not added without matching live-confirmed upstream snapshots; `TestDestinationsApply` count-checks destination fixtures against expected snapshots, so fixture-only coverage would break unrelated destination E2E runs.
+- Defer Google Sheets destination apply fixture and snapshot coverage until an explicitly disposable live destination-enabled workspace is available; prefer unit/registry coverage and compile-only E2E validation in autonomous environments.
