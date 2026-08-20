@@ -173,6 +173,13 @@ func parseDestinationRef(ref string) (*resources.PropertyRef, error) {
 	)
 	// Stamp the "id" property so the differ's comparePropertyRefs sees a
 	// stable shape on both the spec and state sides.
+	//
+	// TODO: this is the second copy of the workaround — destination's
+	// createTransformationRef (providers/destination/handler.go) stamps
+	// Property the same way for the same reason. The fix is to take property
+	// as a parameter in handler.CreatePropertyRef so callers cannot forget it;
+	// that is a signature change across its existing call sites (datagraph,
+	// destination, testutils), so it wants its own PR.
 	propertyRef.Property = "id"
 	return propertyRef, nil
 }

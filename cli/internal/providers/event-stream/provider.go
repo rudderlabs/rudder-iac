@@ -55,7 +55,20 @@ type Provider struct {
 	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore, connectionSupport bool) *Provider {
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithConnectionSupport registers the event-stream-connections kind. Without
+// it the kind is simply not a supported spec, so callers gate this behind the
+// connectionSupport experimental flag.
+func WithConnectionSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+	}
+}
+
+func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
@@ -63,11 +76,8 @@ func New(client esClient.EventStreamStore, connectionSupport bool) *Provider {
 		handlers: make(map[string]handler),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
-	// The event-stream-connections kind is gated behind the connectionSupport
-	// experimental flag: without it the kind is simply not a supported spec.
-	if connectionSupport {
-		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+	for _, opt := range opts {
+		opt(p)
 	}
 	return p
 }
@@ -94,11 +104,16 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	connectionHandler.EventStreamConnectionResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		// event-stream-connections is a new kind with no legacy spec versions
-		if kind != connectionHandler.EventStreamConnectionResourceKind {
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
 			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
 		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
