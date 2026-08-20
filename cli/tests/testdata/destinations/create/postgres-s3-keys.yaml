@@ -1,0 +1,25 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: postgres-s3-keys
+spec:
+  id: postgres-s3-keys
+  display_name: E2E Postgres S3 Keys
+  type: postgres
+  enabled: true
+  definition_version: 1
+  config:
+    host: postgres-s3.rudder-cli-e2e.internal
+    database: analytics
+    user: rudder
+    password: "{{ .POSTGRES_PASSWORD }}"
+    port: "5432"
+    namespace: rudder_e2e_s3
+    ssl_mode: disable
+    sync_frequency: "180"
+    use_rudder_storage: false
+    bucket_provider: S3
+    bucket_name: rudder-cli-e2e
+    role_based_auth: false
+    access_key_id: "{{ .POSTGRES_ACCESS_KEY_ID }}"
+    access_key: "{{ .POSTGRES_ACCESS_KEY }}"

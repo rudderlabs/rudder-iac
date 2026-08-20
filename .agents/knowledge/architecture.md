@@ -158,3 +158,8 @@
 - `confluent_cloud` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Confluent Cloud destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/confluent_cloud`, with integrations-config left read-only for onboarding changes.
 - Confluent Cloud models schema-only common consent category/purpose surfaces as destination-specific local config blocks `one_trust_cookie_categories` and `ketch_consent_purposes`, using mechanical camelCase-to-snake_case naming and direct API-key mappings so update does not erase UI-set values.
+
+## DEX-515 — Postgres Destination Onboarding
+<!-- ticket:DEX-515 -->
+- Postgres destination source-type support intentionally follows the mapped db-config/common destination surface rather than Snowflake/S3-style narrowing.
+- Postgres should include the local source types `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify` when no explicit unmapped registry/product constraint requires narrowing.

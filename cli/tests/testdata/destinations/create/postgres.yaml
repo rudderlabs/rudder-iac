@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: postgres
+spec:
+  id: postgres
+  display_name: E2E Postgres
+  type: postgres
+  enabled: true
+  definition_version: 1
+  config:
+    host: postgres.rudder-cli-e2e.internal
+    database: analytics
+    user: rudder
+    password: "{{ .POSTGRES_PASSWORD }}"
+    port: "5432"
+    namespace: rudder_e2e
+    ssl_mode: disable
+    sync_frequency: "180"
+    use_rudder_storage: true
+    skip_tracks_table: false
+    skip_users_table: false
+    prefer_append: false

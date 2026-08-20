@@ -32,3 +32,11 @@ SNOWFLAKE_GCP_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e
 SNOWFLAKE_AZURE_ACCOUNT_KEY: snowflakeAzureAccountKeyXXXXXX
 SNOWFLAKE_AZURE_SAS_TOKEN: snowflakeAzureSasTokenXXXXXXXX
 BQSTREAM_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"bqstream-dummy"}'
+POSTGRES_PASSWORD: postgresPasswordXXXXXXXXXXXXXX
+POSTGRES_ACCESS_KEY_ID: AKIAPOSTGRESXXXXXXXX
+POSTGRES_ACCESS_KEY: postgresSecretAccessKeyXXXXXXXXXXXXXXXXXXX
+POSTGRES_GCP_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"postgres-dummy"}'
+POSTGRES_AZURE_ACCOUNT_KEY: postgresAzureAccountKeyXXXXXXX
+POSTGRES_AZURE_SAS_TOKEN: postgresAzureSasTokenXXXXXXXXX
+POSTGRES_MINIO_ACCESS_KEY_ID: postgresMinioAccessKeyIdXXXXXX
+POSTGRES_MINIO_SECRET_ACCESS_KEY: postgresMinioSecretAccessKeyXX

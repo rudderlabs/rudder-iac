@@ -64,6 +64,14 @@ var destinationRawSecrets = []string{
 	"snowflakeAzureAccountKeyXXXXXX",
 	"snowflakeAzureSasTokenXXXXXXXX",
 	"bqstream-dummy",
+	"postgresPasswordXXXXXXXXXXXXXX",
+	"AKIAPOSTGRESXXXXXXXX",
+	"postgresSecretAccessKeyXXXXXXXXXXXXXXXXXXX",
+	"postgres-dummy",
+	"postgresAzureAccountKeyXXXXXXX",
+	"postgresAzureSasTokenXXXXXXXXX",
+	"postgresMinioAccessKeyIdXXXXXX",
+	"postgresMinioSecretAccessKeyXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

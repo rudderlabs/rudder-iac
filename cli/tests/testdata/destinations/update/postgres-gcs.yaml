@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: postgres-gcs
+spec:
+  id: postgres-gcs
+  display_name: E2E Postgres GCS Updated
+  type: postgres
+  enabled: true
+  definition_version: 1
+  config:
+    host: postgres-gcs.rudder-cli-e2e.internal
+    database: analytics
+    user: rudder
+    password: "{{ .POSTGRES_PASSWORD }}"
+    port: "5432"
+    namespace: rudder_e2e_gcs_updated
+    ssl_mode: disable
+    sync_frequency: "360"
+    use_rudder_storage: false
+    bucket_provider: GCS
+    bucket_name: rudder-cli-e2e-updated
+    credentials: '{{ .POSTGRES_GCP_CREDENTIALS }}'

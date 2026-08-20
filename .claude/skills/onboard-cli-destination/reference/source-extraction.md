@@ -36,7 +36,7 @@ Translate constraints to `validate` struct tags on the config struct:
 | `enum: ["a","b"]` | `dynamic_or_oneof=a b` (custom tag in `definitions/dynamicvalues.go`: passes `env.VAR` / `{{ ... }}` dynamic values, otherwise enforces the enum). Use plain `oneof=a b` only when the field can never hold a dynamic value |
 | any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
-| `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern) |
+| `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
 
 Notes:
 
@@ -64,6 +64,47 @@ Notes:
 - Optional booleans → `*bool` without `required`.
 - `consentManagement` and `connectionMode` subtrees in schema.json are
   handled by `common` — do not model them as ad-hoc fields.
+
+## Conditional requiredness
+
+`schema.json` states conditional requiredness as `allOf` branches, and
+go-playground's built-in tags cover every shape upstream uses. **Never write a
+custom validator or a `CustomValidateConfig`-style hook for this** — see the
+worked example in `definitions/postgres/definition.go`, which enforces all eight
+of its branches with built-ins alone.
+
+Three facts settle almost every branch:
+
+1. **`required_if` ANDs multiple field/value pairs.** A branch guarded by two
+   conditions is one tag, not a special case:
+   `if {useRudderStorage: false, bucketProvider: MINIO} -> require endPoint`
+   becomes `validate:"required_if=UseRudderStorage false BucketProvider MINIO"`.
+2. **`required_unless` covers "required for a subset of values".** `required_if`
+   ANDs its pairs and panics on a repeated field, so it cannot say "required for
+   S3, GCS or MINIO". State the rule as its inverse instead — `required_unless`
+   exempts when **any** pair matches:
+   `validate:"required_unless=UseRudderStorage true BucketProvider AZURE_BLOB"`.
+   Verify the inversion against the branch you are translating; write a test that
+   pins both the exemption and a provider that still requires the key, because
+   nothing else distinguishes the two tags.
+3. **Always include the guard condition.** Every per-provider branch is also
+   gated on the storage/auth selector (`useRudderStorage: false`). Omitting it
+   lets a stale selector — cleared config keys persist upstream — resurrect
+   requirements on a config that no longer uses that provider, which rejects
+   something the API accepts.
+
+`required_unless` reports the key on a config whose selector is absent or
+invalid, since that falls outside every exemption. That is extra detail on a
+config already rejected for its selector, never a false rejection — pin it with a
+test so it reads as intentional.
+
+**Pointer fields must use built-in tags.** validator dereferences a non-nil
+pointer before invoking a *custom* tag's function, and fails a nil pointer
+carrying one before the function runs at all. A `*bool` under a custom tag
+therefore reports an explicitly-set `false` as missing and an absent value as
+missing regardless of the condition. The built-ins are unaffected. This matters
+because gating booleans are `*bool` by convention (see the note above), so
+`required_if` / `required_unless` are the only correct choice for them.
 
 ## Enforcing regex patterns
 
@@ -113,6 +154,28 @@ strings and `env.VAR` included — is decided by the named pattern. Both tags sh
 one registry, so a name registered with `funcs.NewPattern` /
 `NewPatternWithReject` works with either, reject patterns included.
 
+### Reject patterns are not allow patterns
+
+`NewPatternWithReject` takes a second regex that *blocks* a value (the RE2
+translation of an upstream negative lookahead, e.g. `(?!.*.ngrok.io)`). The
+anchoring rules invert for it:
+
+- **Do not anchor a reject to the ends.** An allow pattern is safer anchored; a
+  reject is safer matching broadly, because narrowing it creates bypasses.
+  Anchoring an ngrok block as `^(.*\.)?ngrok\.io$` lets `host.ngrok.io.` (a valid
+  trailing-dot FQDN) and `host.ngrok.io:5432` straight through. Write it as
+  `^.*<constraint>.*$` — explicit for readers and for CodeQL's
+  `go/regex/missing-regexp-anchor`, identical in behaviour to leaving it bare.
+- **Reproduce upstream's regex exactly, escaping included.** Upstream lookaheads
+  are frequently written with unescaped dots (`.ngrok.io` matches any character
+  where you might expect a literal `.`). "Fixing" that to `\.ngrok\.io` narrows
+  the block and lets through hosts the API rejects, which defers the failure to
+  apply — the opposite of what this validation is for. Compare destinations
+  before assuming a form is canonical: postgres leaves its dots unescaped while
+  redis and slack escape theirs.
+- Confirm parity rather than eyeballing it: run the upstream regex and the CLI
+  pattern over the same host list and check every verdict matches.
+
 ### Tests
 
 For every pattern-validated field: add `ValidateConfig` subtests that a clearly
@@ -120,6 +183,10 @@ invalid literal is rejected (path + message fragment) and that a
 `{{ path || fallback }}` template is accepted (or rejected, for plain
 `pattern=`). Keep the valid example YAML using a literal that satisfies the
 pattern.
+
+For a reject pattern, also cover the shapes that an over-anchored version would
+miss (trailing dot, `host:port` suffix) and a value that merely resembles the
+blocked one but must pass.
 
 ## 3. db-config.json — capabilities
 

@@ -1,0 +1,25 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: postgres-azure
+spec:
+  id: postgres-azure
+  display_name: E2E Postgres Azure
+  type: postgres
+  enabled: true
+  definition_version: 1
+  config:
+    host: postgres-azure.rudder-cli-e2e.internal
+    database: analytics
+    user: rudder
+    password: "{{ .POSTGRES_PASSWORD }}"
+    port: "5432"
+    namespace: rudder_e2e_azure
+    ssl_mode: disable
+    sync_frequency: "180"
+    use_rudder_storage: false
+    bucket_provider: AZURE_BLOB
+    container_name: rudder-cli-e2e
+    account_name: ruddercliE2e
+    use_sas_tokens: false
+    account_key: "{{ .POSTGRES_AZURE_ACCOUNT_KEY }}"
