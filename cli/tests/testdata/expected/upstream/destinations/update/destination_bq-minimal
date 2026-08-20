@@ -1,0 +1,16 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bq-minimal",
+  "name": "E2E BigQuery Minimal Updated",
+  "type": "BQ",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-bq-minimal-updated",
+    "project": "rudder-cli-e2e",
+    "syncFrequency": "360"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

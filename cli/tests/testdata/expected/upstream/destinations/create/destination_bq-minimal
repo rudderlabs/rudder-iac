@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bq-minimal",
+  "name": "E2E BigQuery Minimal",
+  "type": "BQ",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e-bq-minimal",
+    "cleanupObjectStorageFiles": false,
+    "partitionColumn": "_PARTITIONTIME",
+    "partitionType": "day",
+    "project": "rudder-cli-e2e",
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "skipViews": false,
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

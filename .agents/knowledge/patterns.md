@@ -120,3 +120,9 @@
 - Enforcing the per-provider matrix locally makes the CLI stricter than the backend and rejects configs it accepts, which breaks importing an existing destination that omits an optional key.
 - Two-way boolean conditionals are expressible with struct tags and should use them (`required_if=UseSSH true`, `required_if=SSLMode verify-ca`, `required_if=UseKeyPairAuth false`); a custom validation hook is not needed and was removed rather than introduced.
 - Only register named patterns that `schema.json` actually declares. Postgres declares patterns for `host`, `database`, `user`, `port`, `namespace` and enums for `sslMode`/`syncFrequency`/`bucketProvider` — bucket, container, endpoint and TLS-material patterns do not exist upstream and inventing them rejects valid values (an invented `BEGIN RSA PRIVATE KEY` regex rejects PKCS#8 keys).
+
+## DEX-493 — BigQuery E2E Snapshot Deferral
+<!-- ticket:DEX-493 -->
+- BigQuery destination E2E fixture YAML should be paired with expected upstream snapshots because destination E2E snapshot checks are count-guarded; adding YAML without snapshots breaks the whole destination suite.
+- The initial BigQuery upstream snapshots are derived from CLI converter output plus explicit schema/default values and omit write-only credentials, rather than being live-captured.
+- Live `RUN_DESTINATION_E2E` capture remains deferred until an explicitly disposable destination-enabled BigQuery workspace and credentials are available, because destination E2E destroy/apply mutates the configured workspace.

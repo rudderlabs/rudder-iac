@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: bq
+spec:
+  id: bq
+  display_name: E2E BigQuery
+  type: bq
+  enabled: true
+  definition_version: 1
+  config:
+    project: rudder-cli-e2e
+    location: US
+    bucket_name: rudder-cli-e2e-bq
+    prefix: rudder/bq/
+    namespace: rudder_e2e
+    credentials: '{{ .BQ_CREDENTIALS }}'
+    sync_frequency: "180"
+    sync_start_at: "01:00"
+    exclude_window:
+      start_time: "02:00"
+      end_time: "03:00"
+    skip_tracks_table: false
+    skip_views: false
+    skip_users_table: true
+    partition_column: loaded_at
+    partition_type: day
+    json_paths: context.traits,properties.metadata
+    cleanup_object_storage_files: false
+    underscore_divide_numbers: false
+    allow_users_context_traits: false
