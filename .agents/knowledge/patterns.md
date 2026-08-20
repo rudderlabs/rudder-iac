@@ -126,3 +126,8 @@
 - BigQuery destination E2E fixture YAML should be paired with expected upstream snapshots because destination E2E snapshot checks are count-guarded; adding YAML without snapshots breaks the whole destination suite.
 - The initial BigQuery upstream snapshots are derived from CLI converter output plus explicit schema/default values and omit write-only credentials, rather than being live-captured.
 - Live `RUN_DESTINATION_E2E` capture remains deferred until an explicitly disposable destination-enabled BigQuery workspace and credentials are available, because destination E2E destroy/apply mutates the configured workspace.
+## DEX-520 — S3 Datalake Definition And E2E Patterns
+<!-- ticket:DEX-520 -->
+- S3 Datalake bucket names use destination-local named pattern `s3_datalake_bucket_name` with allow `^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$` and reject `(^xn--)|(^.*\.\..*$)|(^(\d+(\.|$)){4}$)` to approximate upstream negative lookaheads within RE2.
+- S3 Datalake namespace validation uses destination-local named pattern `s3_datalake_namespace` with allow `^(.{0,64})$` and reject `^(pg_|PG_|pG_|Pg_)`.
+- For S3 Datalake E2E coverage, do not add destination create/update fixture YAML without matching live-verified upstream snapshots; `TestDestinationsApply` count-checks expected snapshots, and hand-derived snapshots are unsafe for this backend because of warehouse/datalake defaults plus write-only or secret-only fields such as `password`.

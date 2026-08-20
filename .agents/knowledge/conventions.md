@@ -99,3 +99,9 @@
 - BigQuery local config keeps `exclude_window` flat and maps it to API key `excludeWindow`, rather than modeling it as a nested or provider-specific auth block.
 - BigQuery includes db-config/defaultConfig-only keys `underscore_divide_numbers` and `allow_users_context_traits`, mapped mechanically to API keys `underscoreDivideNumbers` and `allowUsersContextTraits`.
 - BigQuery should reject legacy consent category/purpose blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config while still supporting common `consent_management`.
+## DEX-520 — S3 Datalake Validation And Sources
+<!-- ticket:DEX-520 -->
+- S3 Datalake should keep the broad warehouse/datalake-style source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud-only connection mode.
+- S3 Datalake sync settings are flat local YAML keys `sync_frequency` and `sync_start_at` mapped directly to API keys `syncFrequency` and `syncStartAt`; do not mirror Terraform's nested local `sync` block for this CLI definition.
+- S3 Datalake should keep optional local secret key `password` in `SecretKeys` and map it directly to API `password` because db-config lists it as secret-only metadata even though schema/default config/Terraform do not expose it.
+- S3 Datalake validation should use schema/db-config as the boundary for enums and named patterns: sync frequency accepts `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, and `1440` rather than Terraform's narrower validator.

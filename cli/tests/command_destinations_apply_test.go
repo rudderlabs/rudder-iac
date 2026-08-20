@@ -73,6 +73,8 @@ var destinationRawSecrets = []string{
 	"postgresAzureSasTokenXXXXXXXXX",
 	"postgresMinioAccessKeyIdXXXXXX",
 	"postgresMinioSecretAccessKeyXX",
+	"AKIADATALAKEXXXXXXXX",
+	"s3DatalakeSecretAccessKeyXXXXXXXXXXXXXXXXX",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

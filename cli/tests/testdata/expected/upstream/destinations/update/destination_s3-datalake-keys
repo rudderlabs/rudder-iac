@@ -1,0 +1,22 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "s3-datalake-keys",
+  "name": "E2E S3 Datalake Keys Updated",
+  "type": "S3_DATALAKE",
+  "enabled": true,
+  "config": {
+    "bucketName": "rudder-cli-e2e-datalake-updated",
+    "enableSSE": true,
+    "namespace": "rudder_e2e_datalake",
+    "prefix": "rudder/datalake/updated/",
+    "roleBasedAuth": false,
+    "skipTracksTable": true,
+    "skipUsersTable": true,
+    "syncFrequency": "360",
+    "useGlue": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
