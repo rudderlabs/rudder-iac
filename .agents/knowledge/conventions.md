@@ -114,3 +114,9 @@
 ## DEX-504 — Google Sheets Consent Config Surface
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
+
+## DEX-527 — Snowpipe Streaming Key Handling
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming `private_key` accepts Terraform-compatible raw key bodies in local YAML; local-to-API conversion should wrap non-PEM values as `-----BEGIN PRIVATE KEY-----\n<raw>\n-----END PRIVATE KEY-----`.
+- API-to-local conversion for Snowpipe Streaming `private_key` should return the API value unchanged so PEM payloads round-trip stably.
+- Keep this behavior in a Snowpipe Streaming destination-local converter property rather than changing generic secret conversion or validation behavior.

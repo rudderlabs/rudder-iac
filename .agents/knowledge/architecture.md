@@ -184,3 +184,8 @@
 <!-- ticket:DEX-504 -->
 - Google Sheets destination support is implemented as CLI destination type `googlesheets` for API type `GOOGLESHEETS` under `cli/internal/providers/destination/definitions/googlesheets`; Terraform's `google_sheets` registration name is not used for CLI resource identity.
 - `googlesheets` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+
+## DEX-527 — Snowpipe Streaming Models Its Whole Config Surface
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming models all 14 `destConfig.defaultConfig` keys, so nothing it owns is dropped when destination update replaces the whole config object; it needs no destination-specific preservation of unmodelled API keys.
+- The keys that are genuinely unmodelled by every destination are the legacy consent blocks `oneTrustCookieCategories` and `ketchConsentPurposes`: `common.Properties` maps consent management but not those two, so any destination carrying them upstream loses them on update. That is a cross-destination gap, not a Snowpipe one, and belongs in its own change rather than an opt-in flag on a single definition.

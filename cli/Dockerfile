@@ -5,6 +5,13 @@ ARG TELEMETRY_WRITE_KEY=""
 ARG TELEMETRY_DATAPLANE_URL=""
 RUN apk add --no-cache make
 WORKDIR /build
+COPY go.mod go.sum ./
+RUN set -e; \
+    for attempt in 1 2 3; do \
+        go mod download && exit 0; \
+        if [ "$attempt" -eq 3 ]; then exit 1; fi; \
+        sleep $((attempt * 5)); \
+    done
 COPY . .
 RUN CGO_ENABLED=0 make build VERSION=$VERSION
 
