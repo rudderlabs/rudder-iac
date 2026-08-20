@@ -1,0 +1,23 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "rs-iam-serverless",
+  "name": "E2E Redshift IAM Serverless Updated",
+  "type": "RS",
+  "enabled": true,
+  "config": {
+    "clusterRegion": "us-west-2",
+    "database": "analytics",
+    "iamRoleARNForAuth": "arn:aws:iam::123456789012:role/rudder-cli-e2e-rs",
+    "namespace": "rudder_events_serverless",
+    "syncFrequency": "360",
+    "useIAMForAuth": true,
+    "useRudderStorage": true,
+    "useServerless": true,
+    "user": "rudder",
+    "workgroupName": "rudder-cli-e2e-wg"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

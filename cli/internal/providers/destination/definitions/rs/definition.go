@@ -92,6 +92,13 @@ type excludeWindow struct {
 // s3 blocks are provider-specific artifacts and cannot represent every persisted
 // config key without erasing values on whole-config updates.
 type rsConfig struct {
+	// use_iam_for_auth and use_serverless are required even though schema.json
+	// lists neither: its branches are gated on the key being present
+	// (if.required), so an absent value satisfies upstream by requiring nothing.
+	// required_if cannot express "absent or false", so relaxing them would stop
+	// host/port/password and cluster_id/workgroup_name being enforced at all and
+	// push those failures to the API. Both are checkboxes defaulted to false
+	// upstream, so a real config always carries them.
 	UseIAMForAuth *bool  `mapstructure:"use_iam_for_auth" validate:"required"`
 	Host          string `mapstructure:"host" validate:"required_if=UseIAMForAuth false,omitempty,dynamic_or_pattern=rs_host"`
 	Port          string `mapstructure:"port" validate:"required_if=UseIAMForAuth false,omitempty,dynamic_or_pattern=single_line_100"`

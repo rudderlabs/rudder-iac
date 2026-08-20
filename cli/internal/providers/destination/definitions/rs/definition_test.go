@@ -362,6 +362,17 @@ func TestRSConfigValidation(t *testing.T) {
 			{field: "cluster_region", value: "bad\nregion", cfg: validIAMClusterConfig()},
 			{field: "workgroup_name", value: "bad\nworkgroup", cfg: validIAMServerlessConfig()},
 			{field: "ssh_host", value: "bad\nhost", cfg: validSSHConfig()},
+			{field: "ssh_port", value: "bad\nport", cfg: validSSHConfig()},
+			{field: "ssh_user", value: "bad\nuser", cfg: validSSHConfig()},
+			{field: "iam_role_arn_for_auth", value: "bad\narn", cfg: validIAMClusterConfig()},
+			{field: "cluster_id", value: "bad\ncluster", cfg: validIAMClusterConfig()},
+			{field: "iam_role_arn", value: "bad\narn", cfg: validCustomRoleStorageConfig()},
+			{field: "access_key_id", value: "bad\nkey", cfg: validCustomKeyStorageConfig()},
+			{field: "access_key", value: "bad\nsecret", cfg: validCustomKeyStorageConfig()},
+			// A reject pattern must match broadly: an end-anchored version would let
+			// a trailing-dot FQDN or a host:port suffix past the ngrok block.
+			{field: "host", value: "demo.ngrok.io.", cfg: minimalPasswordConfig()},
+			{field: "host", value: "demo.ngrok.io:5439", cfg: minimalPasswordConfig()},
 		}
 
 		for _, tc := range cases {
