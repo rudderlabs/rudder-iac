@@ -87,35 +87,27 @@ func TestGoogleSheetsConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("event mapping entries require from and to", func(t *testing.T) {
+	// schema.json declares from/to as unconstrained strings, so a partially filled
+	// mapping row must validate — otherwise importing a remote config that has one
+	// produces a spec the CLI rejects. Mirrors the marketo definition.
+	t.Run("sparse event mapping rows are accepted", func(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			name   string
-			config map[string]any
-			path   string
+			name  string
+			entry map[string]any
 		}{
-			{
-				name:   "missing from",
-				config: withConfig(validMinimalConfig(), "event_key_map", []any{map[string]any{"to": "Product Name"}}),
-				path:   "/event_key_map/0/from",
-			},
-			{
-				name:   "missing to",
-				config: withConfig(validMinimalConfig(), "event_key_map", []any{map[string]any{"from": "properties.product_name"}}),
-				path:   "/event_key_map/0/to",
-			},
+			{name: "missing from", entry: map[string]any{"to": "Product Name"}},
+			{name: "missing to", entry: map[string]any{"from": "properties.product_name"}},
+			{name: "empty values", entry: map[string]any{"from": "", "to": ""}},
 		}
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				errors := registered.ValidateConfig(tc.config)
-
-				require.NotEmpty(t, errors)
-				assert.Equal(t, tc.path, errors[0].Path)
-				assert.Contains(t, errors[0].Message, "required")
+				cfg := withConfig(validMinimalConfig(), "event_key_map", []any{tc.entry})
+				assert.Empty(t, registered.ValidateConfig(cfg))
 			})
 		}
 	})

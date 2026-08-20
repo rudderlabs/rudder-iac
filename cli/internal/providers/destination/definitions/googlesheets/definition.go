@@ -51,9 +51,14 @@ type googleSheetsConfig struct {
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
+// Terraform marks both fields Required and ui-config marks the mapping form
+// required, but schema.json declares them as plain strings with no constraint.
+// Validation follows schema.json, so nothing is enforced here — otherwise a
+// remote config holding a partially filled mapping row would import to a spec
+// the CLI rejects. Mirrors the marketo definition.
 type eventKeyMapping struct {
-	From string `mapstructure:"from" validate:"required"`
-	To   string `mapstructure:"to" validate:"required"`
+	From string `mapstructure:"from"`
+	To   string `mapstructure:"to"`
 }
 
 // NewDefinition returns the Google Sheets destination definition.
