@@ -44,3 +44,9 @@
 - CI failed when Kafka expected upstream destination snapshots were added under `cli/tests/testdata/expected/upstream/destinations/{create,update}/` without matching Kafka fixture YAML under `cli/tests/testdata/destinations/{create,update}/`.
 - The live `TestDestinationsApply` snapshot tester reported `resource count mismatch: got 45 managed destinations, want 48 resources`, showing that fixture and expected snapshot counts must stay exactly matched.
 - Durable mitigation: defer live destination snapshots by omitting both Kafka fixtures and snapshots until they can be captured together in an explicitly disposable live destination-enabled workspace.
+
+## CFD-72 — Concurrent Sync Error Selection CI Failure
+<!-- ticket:CFD-72 -->
+- CI failed in `test with code coverage` because `cli/internal/syncer.ProjectSyncer.Sync` returned the first error from `tasker.RunTasks`, but the concurrent tasker error slice is ordered by goroutine completion rather than failure importance.
+- The observed symptom was `TestSyncerContinueOnFailBehavior/sync_operations_stop_on_first_failure` receiving a cancellation wrapper (`task: property:property1 cancelled: error: overall job failed`) instead of the actionable provider error (`simulated failure for event2`).
+- Durable mitigation: syncer error selection should prefer a non-generic task/provider failure over an `overall job failed` cancellation, and concurrent-sync tests should not assume raw task error slice ordering is deterministic.
