@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: event-stream-connections
+metadata:
+  name: e2e-connections
+spec:
+  connections:
+    - id: e2e-android-to-s3
+      source: "#event-stream-source:e2e-conn-android"
+      destination: "#destination:e2e-conn-s3"
+      enabled: true

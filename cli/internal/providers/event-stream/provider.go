@@ -51,6 +51,7 @@ const importDir = "event-stream"
 
 type Provider struct {
 	provider.EmptyProvider
+	client     esClient.EventStreamStore
 	kindToType map[string]string
 	handlers   map[string]handler
 }
@@ -64,12 +65,13 @@ type Option func(*Provider)
 func WithConnectionSupport() Option {
 	return func(p *Provider) {
 		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client)
 	}
 }
 
 func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
+		client: client,
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
 		},

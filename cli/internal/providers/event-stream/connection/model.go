@@ -9,6 +9,13 @@ const (
 	DestinationKey = "destination"
 	EnabledKey     = "enabled"
 
+	// Output-side keys: the remote identifiers the lifecycle stores in state.
+	// SourceIDKey/DestinationIDKey hold the resolved endpoint ids so Update can
+	// detect an endpoint change (a replacement) without re-dereferencing refs.
+	IDKey            = "id"
+	SourceIDKey      = "sourceId"
+	DestinationIDKey = "destinationId"
+
 	EventStreamConnectionResourceType = "event-stream-connection"
 	EventStreamConnectionResourceKind = "event-stream-connections"
 )

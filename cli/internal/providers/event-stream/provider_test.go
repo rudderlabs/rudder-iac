@@ -62,13 +62,19 @@ func TestProvider(t *testing.T) {
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
-	// Connections travel the normal (map-based) lifecycle path, so the
-	// provider routes them to the handler's Create, which is a clear
-	// not-implemented sentinel until DEX-650.
-	t.Run("ConnectionLifecycleNotImplemented", func(t *testing.T) {
-		p := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport())
-		_, err := p.Create(context.Background(), "android-to-s3", connection.EventStreamConnectionResourceType, resources.ResourceData{})
-		assert.ErrorIs(t, err, connection.ErrNotImplemented)
+	// Connections travel the normal (map-based) lifecycle path: the provider
+	// routes them to the connection handler, which drives the store's
+	// connection surface.
+	t.Run("ConnectionLifecycleRoutesToConnectionStore", func(t *testing.T) {
+		mockConnections := &connection.MockConnectionClient{}
+		p := eventstream.New(mockConnections, eventstream.WithConnectionSupport())
+		_, err := p.Create(context.Background(), "android-to-s3", connection.EventStreamConnectionResourceType, resources.ResourceData{
+			connection.SourceKey:      "src-remote-1",
+			connection.DestinationKey: "dst-remote-1",
+			connection.EnabledKey:     true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"CreateConnection"}, mockConnections.Calls)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {

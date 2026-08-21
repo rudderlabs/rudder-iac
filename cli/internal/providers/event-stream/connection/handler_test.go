@@ -1,8 +1,12 @@
 package connection
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
+	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -37,7 +41,7 @@ func ticketExampleSpec() map[string]any {
 
 func loadTicketExample(t *testing.T) *connectionResource {
 	t.Helper()
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	require.Len(t, h.resources, 1)
 	return h.resources["android-to-s3"]
@@ -45,7 +49,7 @@ func loadTicketExample(t *testing.T) *connectionResource {
 
 func TestParseSpec(t *testing.T) {
 	t.Run("one URN per connection entry", func(t *testing.T) {
-		h := NewHandler()
+		h := NewHandler(nil)
 		parsed, err := h.ParseSpec("", connectionsSpec(map[string]any{
 			"connections": []any{
 				map[string]any{"id": "one"},
@@ -70,7 +74,7 @@ func TestParseSpec(t *testing.T) {
 	}
 	for _, tt := range errorTests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler()
+			h := NewHandler(nil)
 			parsed, err := h.ParseSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -93,7 +97,7 @@ func TestLoadSpec(t *testing.T) {
 }
 
 func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{
 		"connections": []any{
 			map[string]any{
@@ -116,7 +120,7 @@ func TestLoadSpecEnabledDefaultsToTrue(t *testing.T) {
 func TestLoadSpecEmptyListIsValid(t *testing.T) {
 	// An explicit empty list stays valid so removing the last connection does
 	// not invalidate the spec.
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(map[string]any{"connections": []any{}})))
 	assert.Empty(t, h.resources)
 }
@@ -197,7 +201,7 @@ func TestLoadSpecErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler()
+			h := NewHandler(nil)
 			err := h.LoadSpec("", connectionsSpec(tt.body))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -263,7 +267,7 @@ func TestDestinationRefResolve(t *testing.T) {
 // both endpoints (created after them) and shows up as their dependent
 // (deleted before them).
 func TestGetResourcesGraphDependencies(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -293,7 +297,7 @@ func TestGetResourcesGraphDependencies(t *testing.T) {
 // dereference the syncer applies before lifecycle calls: the source via the
 // legacy output map, the destination via its typed state's Resolve func.
 func TestConnectionRefResolution(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	require.NoError(t, h.LoadSpec("", connectionsSpec(ticketExampleSpec())))
 	connectionResources, err := h.GetResources()
 	require.NoError(t, err)
@@ -321,7 +325,7 @@ func TestConnectionRefResolution(t *testing.T) {
 }
 
 func TestMigrateSpecIsIdentity(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	spec := connectionsSpec(ticketExampleSpec())
 	migrated, err := h.MigrateSpec(spec)
 	require.NoError(t, err)
@@ -329,36 +333,231 @@ func TestMigrateSpecIsIdentity(t *testing.T) {
 }
 
 func TestLoadImportMetadataIsNoOp(t *testing.T) {
-	h := NewHandler()
+	h := NewHandler(nil)
 	assert.NoError(t, h.LoadImportMetadata(nil))
 	assert.NoError(t, h.LoadImportMetadata(&specs.WorkspacesImportMetadata{}))
 }
 
-func TestLifecycleNotImplemented(t *testing.T) {
-	h := NewHandler()
+// eventStreamSources canns GetSources with the sources the rETL filter in
+// LoadResourcesFromRemote checks connections against.
+func eventStreamSources(mock *MockConnectionClient, ids ...string) {
+	sources := make([]sourceClient.EventStreamSource, 0, len(ids))
+	for _, id := range ids {
+		sources = append(sources, sourceClient.EventStreamSource{ID: id})
+	}
+	mock.SetGetSourcesFunc(func(_ context.Context) ([]sourceClient.EventStreamSource, error) {
+		return sources, nil
+	})
+}
 
-	_, err := h.Create(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	_, err = h.Update(t.Context(), "id", resources.ResourceData{}, resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	err = h.Delete(t.Context(), "id", resources.ResourceData{})
-	assert.ErrorIs(t, err, ErrNotImplemented)
-	_, err = h.List(t.Context(), nil)
+func TestLoadResourcesFromRemote(t *testing.T) {
+	t.Run("collects externalId-carrying connections across pages", func(t *testing.T) {
+		mock := &MockConnectionClient{
+			ListFunc: func(_ client.ListConnectionsOptions) (*client.ConnectionsPage, error) {
+				return &client.ConnectionsPage{
+					APIPage: client.APIPage{Paging: client.Paging{Next: "/v2/connections?page=2"}},
+					Connections: []client.Connection{
+						{ID: "conn-remote-1", ExternalID: "android-to-s3", SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true},
+					},
+				}, nil
+			},
+			NextFunc: func(paging client.Paging) (*client.ConnectionsPage, error) {
+				if paging.Next == "" {
+					return nil, nil
+				}
+				return &client.ConnectionsPage{
+					Connections: []client.Connection{
+						{ID: "conn-remote-2", ExternalID: "web-to-s3", SourceID: "src-remote-2", DestinationID: "dst-remote-1", IsEnabled: false},
+					},
+				}, nil
+			},
+		}
+		eventStreamSources(mock, "src-remote-1", "src-remote-2")
+		h := NewHandler(mock)
+
+		collection, err := h.LoadResourcesFromRemote(t.Context())
+
+		require.NoError(t, err)
+		require.Len(t, mock.ListCalls, 1)
+		require.NotNil(t, mock.ListCalls[0].HasExternalID)
+		assert.True(t, *mock.ListCalls[0].HasExternalID, "must list only connections carrying an externalId")
+
+		remotes := collection.GetAll(EventStreamConnectionResourceType)
+		require.Len(t, remotes, 2)
+		first := remotes["conn-remote-1"]
+		require.NotNil(t, first)
+		assert.Equal(t, "android-to-s3", first.ExternalID)
+		assert.Equal(t, client.Connection{
+			ID: "conn-remote-1", ExternalID: "android-to-s3",
+			SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true,
+		}, first.Data)
+		second := remotes["conn-remote-2"]
+		require.NotNil(t, second)
+		assert.Equal(t, "web-to-s3", second.ExternalID)
+	})
+
+	t.Run("skips rETL connections", func(t *testing.T) {
+		// rETL rows appear in the same generic list; only connections whose
+		// source is an event stream source are kept.
+		mock := &MockConnectionClient{
+			ListFunc: func(_ client.ListConnectionsOptions) (*client.ConnectionsPage, error) {
+				return &client.ConnectionsPage{
+					Connections: []client.Connection{
+						{ID: "conn-remote-1", ExternalID: "android-to-s3", SourceID: "src-remote-1", DestinationID: "dst-remote-1"},
+						{ID: "conn-remote-retl", ExternalID: "retl-to-s3", SourceID: "retl-src-1", DestinationID: "dst-remote-1"},
+					},
+				}, nil
+			},
+		}
+		eventStreamSources(mock, "src-remote-1")
+		h := NewHandler(mock)
+
+		collection, err := h.LoadResourcesFromRemote(t.Context())
+
+		require.NoError(t, err)
+		remotes := collection.GetAll(EventStreamConnectionResourceType)
+		require.Len(t, remotes, 1)
+		assert.NotNil(t, remotes["conn-remote-1"])
+	})
+
+	t.Run("surfaces list errors", func(t *testing.T) {
+		mock := &MockConnectionClient{
+			ListFunc: func(_ client.ListConnectionsOptions) (*client.ConnectionsPage, error) {
+				return nil, errors.New("boom")
+			},
+		}
+		h := NewHandler(mock)
+
+		_, err := h.LoadResourcesFromRemote(t.Context())
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "listing event stream connections")
+	})
+}
+
+// remoteCollection builds the merged cross-provider collection MapRemoteToState
+// receives: event stream sources and destinations keyed by remote id (as their
+// handlers load them), plus the given connection rows.
+func remoteCollection(t *testing.T, conns ...client.Connection) *resources.RemoteResources {
+	t.Helper()
+	collection := resources.NewRemoteResources()
+	collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		"src-remote-1": {ID: "src-remote-1", ExternalID: "my-android-source"},
+	})
+	collection.Set(destination.DestinationResourceType, map[string]*resources.RemoteResource{
+		"dst-remote-1": {ID: "dst-remote-1", ExternalID: "s3"},
+		"dst-remote-2": {ID: "dst-remote-2", ExternalID: ""}, // remote-only destination, not CLI-managed
+	})
+	connMap := make(map[string]*resources.RemoteResource)
+	for _, conn := range conns {
+		connMap[conn.ID] = &resources.RemoteResource{ID: conn.ID, ExternalID: conn.ExternalID, Data: conn}
+	}
+	collection.Set(EventStreamConnectionResourceType, connMap)
+	return collection
+}
+
+func TestMapRemoteToState(t *testing.T) {
+	t.Run("keys state on externalId with spec-shaped endpoint refs", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := remoteCollection(t, client.Connection{
+			ID: "conn-remote-1", ExternalID: "android-to-s3",
+			SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true,
+		})
+
+		s, err := h.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		require.Len(t, s.Resources, 1)
+		rs := s.Resources["event-stream-connection:android-to-s3"]
+		require.NotNil(t, rs)
+		assert.Equal(t, "android-to-s3", rs.ID)
+		assert.Equal(t, EventStreamConnectionResourceType, rs.Type)
+		assert.Equal(t, map[string]any{
+			SourceKey:      &resources.PropertyRef{URN: "event-stream-source:my-android-source", Property: "id"},
+			DestinationKey: &resources.PropertyRef{URN: "destination:s3", Property: "id"},
+			EnabledKey:     true,
+		}, rs.Input)
+		assert.Equal(t, map[string]any{
+			IDKey:            "conn-remote-1",
+			SourceIDKey:      "src-remote-1",
+			DestinationIDKey: "dst-remote-1",
+		}, rs.Output)
+	})
+
+	// Absent from the collection is the common shape: the event stream source
+	// and destination handlers both drop rows without an externalId while
+	// loading, so an unmanaged endpoint never reaches the collection at all.
+	t.Run("skips rows whose source is absent from the collection", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := remoteCollection(t, client.Connection{
+			ID: "conn-remote-1", ExternalID: "unmanaged-to-s3",
+			SourceID: "src-remote-9", DestinationID: "dst-remote-1", IsEnabled: true,
+		})
+
+		s, err := h.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		assert.Empty(t, s.Resources)
+	})
+
+	t.Run("skips rows whose destination carries no externalId", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := remoteCollection(t, client.Connection{
+			ID: "conn-remote-1", ExternalID: "android-to-unmanaged",
+			SourceID: "src-remote-1", DestinationID: "dst-remote-2", IsEnabled: true,
+		})
+
+		s, err := h.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		assert.Empty(t, s.Resources)
+	})
+
+	t.Run("keeps rows whose endpoints are both CLI-managed alongside skipped ones", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := remoteCollection(t,
+			client.Connection{
+				ID: "conn-remote-1", ExternalID: "android-to-s3",
+				SourceID: "src-remote-1", DestinationID: "dst-remote-1", IsEnabled: true,
+			},
+			client.Connection{
+				ID: "conn-remote-2", ExternalID: "unmanaged-to-s3",
+				SourceID: "src-remote-9", DestinationID: "dst-remote-1", IsEnabled: true,
+			},
+		)
+
+		s, err := h.MapRemoteToState(collection)
+
+		require.NoError(t, err)
+		require.Len(t, s.Resources, 1)
+		assert.NotNil(t, s.Resources["event-stream-connection:android-to-s3"])
+	})
+
+	t.Run("errors on foreign data in the collection", func(t *testing.T) {
+		h := NewHandler(nil)
+		collection := resources.NewRemoteResources()
+		collection.Set(EventStreamConnectionResourceType, map[string]*resources.RemoteResource{
+			"x": {ID: "x", ExternalID: "x", Data: "not a connection"},
+		})
+
+		_, err := h.MapRemoteToState(collection)
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "unable to cast resource to event stream connection")
+	})
+}
+
+func TestListAndImportNotImplemented(t *testing.T) {
+	h := NewHandler(nil)
+
+	_, err := h.List(t.Context(), nil)
 	assert.ErrorIs(t, err, ErrNotImplemented)
 	_, err = h.Import(t.Context(), "id", resources.ResourceData{}, "remote-id")
 	assert.ErrorIs(t, err, ErrNotImplemented)
 }
 
-func TestRemoteLoadsAreEmptyUntilImplemented(t *testing.T) {
-	h := NewHandler()
-
-	remote, err := h.LoadResourcesFromRemote(t.Context())
-	require.NoError(t, err)
-	assert.Empty(t, remote.GetAll(EventStreamConnectionResourceType))
-
-	mapped, err := h.MapRemoteToState(resources.NewRemoteResources())
-	require.NoError(t, err)
-	assert.Empty(t, mapped.Resources)
+func TestImportLoadsAreEmptyUntilImplemented(t *testing.T) {
+	h := NewHandler(nil)
 
 	importable, err := h.LoadImportable(t.Context(), nil)
 	require.NoError(t, err)

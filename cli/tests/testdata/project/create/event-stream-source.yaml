@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: e2e-conn-android
+spec:
+  id: e2e-conn-android
+  name: E2E Connection Android Source
+  type: android
+  enabled: true
