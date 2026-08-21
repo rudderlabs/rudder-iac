@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -109,9 +110,21 @@ type SyncReporter interface {
 func (s *ProjectSyncer) Sync(ctx context.Context, target *resources.Graph) error {
 	errs := s.apply(ctx, target, false)
 	if len(errs) > 0 {
-		return errs[0]
+		return firstActionableError(errs)
 	}
 	return nil
+}
+
+func firstActionableError(errs []error) error {
+	for _, err := range errs {
+		var cancelled *tasker.ErrTaskCancelled
+		if errors.As(err, &cancelled) && cancelled.Dependency == nil && cancelled.Err != nil && cancelled.Err.Error() == "overall job failed" {
+			continue
+		}
+		return err
+	}
+
+	return errs[0]
 }
 
 func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
