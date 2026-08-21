@@ -203,22 +203,41 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assertError(t, errors, "/avro_schemas", "required")
 	})
 
-	// schema.json declares no required list inside avroSchemas.items, so a
-	// partially filled row must validate — otherwise a remote config holding one
-	// imports to a spec the CLI rejects.
-	t.Run("sparse avro schema rows are accepted", func(t *testing.T) {
+	// schema.json requires both fields inside the convertToAvro:true branch.
+	t.Run("avro schema entries require id and schema", func(t *testing.T) {
 		t.Parallel()
 
-		for _, entry := range []map[string]any{
-			{"schema_id": "event-value"},
-			{"schema": "{\"type\":\"record\"}"},
-			{"schema_id": "", "schema": ""},
+		for _, tc := range []struct {
+			entry map[string]any
+			path  string
+		}{
+			{map[string]any{"schema_id": "event-value"}, "/avro_schemas/0/schema"},
+			{map[string]any{"schema": "{}"}, "/avro_schemas/0/schema_id"},
 		} {
 			config := minimalConfig()
 			config["convert_to_avro"] = true
-			config["avro_schemas"] = []any{entry}
+			config["avro_schemas"] = []any{tc.entry}
 
-			assert.Empty(t, registered.ValidateConfig(config))
+			assertError(t, registered.ValidateConfig(config), tc.path, "required")
+		}
+	})
+
+	// Both mapping value fields are pattern-validated; cover the reject side.
+	t.Run("topic mapping values reject line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			field string
+			entry map[string]any
+			path  string
+		}{
+			{"event_type_to_topic_map", map[string]any{"from": "identify", "to": "bad\ntopic"}, "/event_type_to_topic_map/0/to"},
+			{"event_to_topic_map", map[string]any{"from": "bad\nevent", "to": "topic"}, "/event_to_topic_map/0/from"},
+		} {
+			config := minimalConfig()
+			config[tc.field] = []any{tc.entry}
+
+			assertError(t, registered.ValidateConfig(config), tc.path, "")
 		}
 	})
 
