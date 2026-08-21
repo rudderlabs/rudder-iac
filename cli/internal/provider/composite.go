@@ -71,6 +71,18 @@ func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
 	return all
 }
 
+// ImportableRefs aggregates import --merge reference listers from all providers.
+// Cross-provider order is immaterial — resource types are disjoint across
+// providers (enforced at construction) and the precheck aggregates conflicts —
+// so plain map iteration is fine.
+func (p *CompositeProvider) ImportableRefs() []importmatcher.RefLister {
+	var all []importmatcher.RefLister
+	for _, provider := range p.Providers {
+		all = append(all, provider.ImportableRefs()...)
+	}
+	return all
+}
+
 // SupportedMatchPatterns aggregates match patterns from all providers.
 func (p *CompositeProvider) SupportedMatchPatterns() []rules.MatchPattern {
 	var all []rules.MatchPattern
