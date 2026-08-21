@@ -1,0 +1,25 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: adj
+spec:
+  id: adj
+  display_name: E2E Adjust
+  type: adj
+  enabled: true
+  definition_version: 1
+  config:
+    app_token: rudderCliE2eAppToken
+    environment: false
+    delay: "60"
+    custom_mappings:
+      - from: Order Completed
+        to: abc123
+    partner_params_keys:
+      - from: userId
+        to: user_id
+    enable_install_attribution_tracking:
+      android: true
+      ios: false
+    event_filtering_blacklist:
+      - Password Reset

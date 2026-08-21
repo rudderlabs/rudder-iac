@@ -1,0 +1,38 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "adj",
+  "name": "E2E Adjust Updated",
+  "type": "ADJ",
+  "enabled": true,
+  "config": {
+    "appToken": "rudderCliE2eAppToken",
+    "blacklistedEvents": [
+      {
+        "eventName": "Password Reset"
+      }
+    ],
+    "customMappings": [
+      {
+        "from": "Order Completed",
+        "to": "def456"
+      }
+    ],
+    "delay": "120",
+    "enableInstallAttributionTracking": {
+      "android": false,
+      "ios": true
+    },
+    "environment": true,
+    "eventFilteringOption": "blacklistedEvents",
+    "partnerParamsKeys": [
+      {
+        "from": "userId",
+        "to": "user_id"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
