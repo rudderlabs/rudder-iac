@@ -258,7 +258,7 @@ func (h *HandlerImpl) FormatForExport(
 		}
 		entries = append(entries, handlers.ImportEntriesFromWorkspace(workspaceMetadata)...)
 
-		spec, err := handlers.ToImportSpec(AccountSpecKind, AccountMetadataName, workspaceMetadata, specMap)
+		spec, err := specs.ToImportSpec(AccountSpecKind, AccountMetadataName, workspaceMetadata, specMap)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating spec for account %s: %w", remote.ID, err)
 		}

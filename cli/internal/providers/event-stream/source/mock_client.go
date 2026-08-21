@@ -140,3 +140,15 @@ func (m *MockSourceClient) UpdateConnection(ctx context.Context, connection *cli
 func (m *MockSourceClient) DeleteConnection(ctx context.Context, id string) error {
 	return nil
 }
+
+func (m *MockSourceClient) GetConnection(ctx context.Context, id string) (*client.Connection, error) {
+	return &client.Connection{ID: id}, nil
+}
+
+func (m *MockSourceClient) SetConnectionExternalID(ctx context.Context, id string, externalID string) error {
+	return nil
+}
+
+func (m *MockSourceClient) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	return []client.Destination{}, nil
+}

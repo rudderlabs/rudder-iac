@@ -42,7 +42,7 @@ func TestCreate(t *testing.T) {
 				return &created, nil
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		output, err := h.Create(context.Background(), "android-to-s3", derefData("src-remote-1", "dst-remote-1", true))
 
@@ -67,7 +67,7 @@ func TestCreate(t *testing.T) {
 				return nil, errors.New("plan does not allow more connections")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Create(context.Background(), "android-to-s3", derefData("src-remote-1", "dst-remote-1", true))
 
@@ -79,7 +79,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Run("updates enabled in place", func(t *testing.T) {
 		mock := &MockConnectionClient{}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		output, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-1", false),
@@ -99,7 +99,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("no-op when nothing changed", func(t *testing.T) {
 		mock := &MockConnectionClient{}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		output, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-1", true),
@@ -122,7 +122,7 @@ func TestUpdate(t *testing.T) {
 				return &created, nil
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		output, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-9", true),
@@ -147,7 +147,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("source change replaces the connection", func(t *testing.T) {
 		mock := &MockConnectionClient{}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-9", "dst-remote-1", true),
@@ -169,7 +169,7 @@ func TestUpdate(t *testing.T) {
 				return &created, nil
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		output, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-1", true),
@@ -186,7 +186,7 @@ func TestUpdate(t *testing.T) {
 				return errors.New("forbidden")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-9", true),
@@ -203,7 +203,7 @@ func TestUpdate(t *testing.T) {
 				return nil, errors.New("plan gate")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-9", true),
@@ -216,7 +216,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("errors when state lacks the remote id", func(t *testing.T) {
-		h := NewHandler(&MockConnectionClient{})
+		h := NewHandler(&MockConnectionClient{}, "event-stream")
 
 		_, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-1", true),
@@ -232,7 +232,7 @@ func TestUpdate(t *testing.T) {
 				return nil, errors.New("plan gate")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		_, err := h.Update(context.Background(), "android-to-s3",
 			derefData("src-remote-1", "dst-remote-1", false),
@@ -245,7 +245,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Run("deletes only the connection", func(t *testing.T) {
 		mock := &MockConnectionClient{}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		err := h.Delete(context.Background(), "android-to-s3", stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 
@@ -255,7 +255,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("errors when state lacks the remote id", func(t *testing.T) {
-		h := NewHandler(&MockConnectionClient{})
+		h := NewHandler(&MockConnectionClient{}, "event-stream")
 
 		err := h.Delete(context.Background(), "android-to-s3", resources.ResourceData{})
 
@@ -269,7 +269,7 @@ func TestDelete(t *testing.T) {
 				return errors.New("forbidden")
 			},
 		}
-		h := NewHandler(mock)
+		h := NewHandler(mock, "event-stream")
 
 		err := h.Delete(context.Background(), "android-to-s3", stateData("conn-remote-1", "src-remote-1", "dst-remote-1", true))
 

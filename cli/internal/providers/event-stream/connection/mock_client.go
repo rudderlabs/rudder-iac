@@ -17,17 +17,28 @@ type MockConnectionClient struct {
 
 	Calls []string
 
-	ListCalls   []client.ListConnectionsOptions
-	NextCalls   []client.Paging
-	CreateCalls []client.Connection
-	UpdateCalls []client.Connection
-	DeleteCalls []string
+	ListCalls          []client.ListConnectionsOptions
+	NextCalls          []client.Paging
+	GetCalls           []string
+	CreateCalls        []client.Connection
+	UpdateCalls        []client.Connection
+	DeleteCalls        []string
+	SetExternalIDCalls []SetExternalIDCall
 
-	ListFunc   func(options client.ListConnectionsOptions) (*client.ConnectionsPage, error)
-	NextFunc   func(paging client.Paging) (*client.ConnectionsPage, error)
-	CreateFunc func(connection *client.Connection) (*client.Connection, error)
-	UpdateFunc func(connection *client.Connection) (*client.Connection, error)
-	DeleteFunc func(id string) error
+	ListFunc            func(options client.ListConnectionsOptions) (*client.ConnectionsPage, error)
+	NextFunc            func(paging client.Paging) (*client.ConnectionsPage, error)
+	GetFunc             func(id string) (*client.Connection, error)
+	CreateFunc          func(connection *client.Connection) (*client.Connection, error)
+	UpdateFunc          func(connection *client.Connection) (*client.Connection, error)
+	DeleteFunc          func(id string) error
+	SetExternalIDFunc   func(id string, externalID string) error
+	GetDestinationsFunc func() ([]client.Destination, error)
+}
+
+// SetExternalIDCall records one SetConnectionExternalID invocation.
+type SetExternalIDCall struct {
+	ID         string
+	ExternalID string
 }
 
 func (m *MockConnectionClient) ListConnections(_ context.Context, opts ...client.ListConnectionsOption) (*client.ConnectionsPage, error) {
@@ -80,4 +91,30 @@ func (m *MockConnectionClient) DeleteConnection(_ context.Context, id string) er
 		return m.DeleteFunc(id)
 	}
 	return nil
+}
+
+func (m *MockConnectionClient) GetConnection(_ context.Context, id string) (*client.Connection, error) {
+	m.Calls = append(m.Calls, "GetConnection")
+	m.GetCalls = append(m.GetCalls, id)
+	if m.GetFunc != nil {
+		return m.GetFunc(id)
+	}
+	return &client.Connection{ID: id}, nil
+}
+
+func (m *MockConnectionClient) SetConnectionExternalID(_ context.Context, id string, externalID string) error {
+	m.Calls = append(m.Calls, "SetConnectionExternalID")
+	m.SetExternalIDCalls = append(m.SetExternalIDCalls, SetExternalIDCall{ID: id, ExternalID: externalID})
+	if m.SetExternalIDFunc != nil {
+		return m.SetExternalIDFunc(id, externalID)
+	}
+	return nil
+}
+
+func (m *MockConnectionClient) GetDestinations(_ context.Context) ([]client.Destination, error) {
+	m.Calls = append(m.Calls, "GetDestinations")
+	if m.GetDestinationsFunc != nil {
+		return m.GetDestinationsFunc()
+	}
+	return []client.Destination{}, nil
 }
