@@ -149,6 +149,26 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assertHasPath(t, registered.ValidateConfig(cfg), "/private_key")
 	})
 
+	// schema.json's PEM pattern is unanchored, so a key carrying the trailing
+	// newline every .pem file ends with must still validate. Anchoring it would
+	// reject a pasted key that the API accepts.
+	t.Run("private key accepts surrounding whitespace", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{
+			"-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n",
+			"\n-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n",
+			"-----BEGIN ENCRYPTED PRIVATE KEY-----\nabc\n-----END ENCRYPTED PRIVATE KEY-----\n",
+		} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_key_pair_auth"] = true
+			delete(cfg, "password")
+			cfg["private_key"] = key
+
+			assert.Empty(t, registered.ValidateConfig(cfg))
+		}
+	})
+
 	t.Run("cloud provider required when rudder storage is off", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())

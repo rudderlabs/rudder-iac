@@ -8,9 +8,12 @@ import (
 )
 
 func init() {
+	// Unanchored, mirroring schema.json: upstream only requires that a PEM block is
+	// present, so a key carrying the trailing newline every .pem file ends with —
+	// or surrounding whitespace — stays valid. Anchoring would reject both.
 	funcs.NewPattern(
 		"snowflake_private_key",
-		`(?s)^-----BEGIN (ENCRYPTED )?PRIVATE KEY-----.+-----END (ENCRYPTED )?PRIVATE KEY-----$`,
+		`(?s)-----BEGIN (ENCRYPTED )?PRIVATE KEY-----.+-----END (ENCRYPTED )?PRIVATE KEY-----`,
 		"must be a PEM encoded private key",
 	)
 
