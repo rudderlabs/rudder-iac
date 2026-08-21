@@ -144,7 +144,7 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 	}
 
 	if err := validateSupportedSourcesValidation(def, configType); err != nil {
-		return nil, fmt.Errorf("validating supported sources validation: %w", err)
+		return nil, fmt.Errorf("validating supported sources requirements: %w", err)
 	}
 
 	keyPathSourceTypes, err := buildGatedKeyPaths(def, configType)
