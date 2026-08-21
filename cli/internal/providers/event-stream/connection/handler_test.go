@@ -192,6 +192,11 @@ func TestLoadSpecErrors(t *testing.T) {
 			body:    map[string]any{"connections": []any{entry(map[string]any{"source": "#event-stream-source:"})}},
 			wantErr: "expected format #event-stream-source:<id>",
 		},
+		{
+			name:    "ref with an id spanning multiple lines",
+			body:    map[string]any{"connections": []any{entry(map[string]any{"source": "#event-stream-source:src\nrogue"})}},
+			wantErr: "expected format #event-stream-source:<id>",
+		},
 	}
 
 	for _, tt := range tests {
@@ -201,6 +206,37 @@ func TestLoadSpecErrors(t *testing.T) {
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.wantErr)
 			assert.Empty(t, h.resources)
+		})
+	}
+}
+
+func TestRefID(t *testing.T) {
+	tests := []struct {
+		name   string
+		ref    string
+		kind   string
+		wantID string
+	}{
+		{name: "well formed ref", ref: "#destination:s3", kind: destination.DestinationSpecKind, wantID: "s3"},
+		{name: "surrounding whitespace is trimmed", ref: "  #destination:s3\n", kind: destination.DestinationSpecKind, wantID: "s3"},
+		{name: "id keeps every character after the first colon", ref: "#destination:s3:eu", kind: destination.DestinationSpecKind, wantID: "s3:eu"},
+		{name: "wrong kind", ref: "#event-stream-source:src", kind: destination.DestinationSpecKind},
+		{name: "empty id", ref: "#destination:", kind: destination.DestinationSpecKind},
+		{name: "missing hash prefix", ref: "destination:s3", kind: destination.DestinationSpecKind},
+		{name: "id spanning multiple lines", ref: "#destination:s3\nrogue", kind: destination.DestinationSpecKind},
+		{name: "kind with an unsupported character", ref: "#destination!:s3", kind: destination.DestinationSpecKind},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id, err := refID(tt.ref, tt.kind)
+			if tt.wantID == "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "expected format #"+tt.kind+":<id>")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, id)
 		})
 	}
 }
