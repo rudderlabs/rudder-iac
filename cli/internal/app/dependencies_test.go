@@ -57,7 +57,7 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 			name:                   "both flags enabled registers verified and unverified destinations",
 			destinationSupport:     true,
 			unverifiedDestinations: true,
-			wantTypes:              []string{"attentive_tag", "bq", "bqstream", "confluent_cloud", "customerio_audience", "facebook_conversions", "gcs", "googlepubsub", "googlesheets", "http", "kafka", "kinesis", "marketo", "postgres", "redis", "rs", "s3", "s3_datalake", "salesforce", "slack", "snowflake", "statsig", "zendesk"},
+			wantTypes:              []string{"adj", "attentive_tag", "bq", "bqstream", "confluent_cloud", "customerio_audience", "facebook_conversions", "gcs", "googlepubsub", "googlesheets", "http", "kafka", "kinesis", "marketo", "postgres", "redis", "rs", "s3", "s3_datalake", "salesforce", "slack", "snowflake", "statsig", "zendesk"},
 		},
 	}
 

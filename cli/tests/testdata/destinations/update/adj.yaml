@@ -1,0 +1,25 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: adj
+spec:
+  id: adj
+  display_name: E2E Adjust Updated
+  type: adj
+  enabled: true
+  definition_version: 1
+  config:
+    app_token: rudderCliE2eAppToken
+    environment: true
+    delay: "120"
+    custom_mappings:
+      - from: Order Completed
+        to: def456
+    partner_params_keys:
+      - from: userId
+        to: user_id
+    enable_install_attribution_tracking:
+      android: false
+      ios: true
+    event_filtering_whitelist:
+      - Order Completed
