@@ -18,6 +18,10 @@ spec:
     use_key_pair_auth: false
     password: "{{ .SNOWFLAKE_PASSWORD }}"
     sync_frequency: "180"
+    sync_start_at: "01:00"
+    exclude_window:
+      start_time: "02:00"
+      end_time: "03:00"
     skip_tracks_table: false
     skip_users_table: true
     prefer_append: true
