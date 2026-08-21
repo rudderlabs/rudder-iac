@@ -1,0 +1,9 @@
+{
+  "id": "<ignored>",
+  "externalId": "e2e-conn-android",
+  "name": "E2E Connection Android Source",
+  "type": "android",
+  "enabled": true,
+  "workspaceId": "<ignored>",
+  "trackingPlan": null
+}

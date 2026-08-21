@@ -13,7 +13,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -50,18 +53,47 @@ const importDir = "event-stream"
 
 type Provider struct {
 	provider.EmptyProvider
+	client     esClient.EventStreamStore
 	kindToType map[string]string
 	handlers   map[string]handler
+	// destinationRegistry backs the connection semantic rules' source-type
+	// compatibility checks against destination definitions.
+	destinationRegistry *definitions.Registry
 }
 
-func New(client esClient.EventStreamStore) *Provider {
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithConnectionSupport registers the event-stream-connections kind. Without
+// it the kind is simply not a supported spec, so callers gate this behind the
+// connectionSupport experimental flag.
+func WithConnectionSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client, importDir)
+	}
+}
+
+// WithDestinationRegistry supplies the destination definitions that back the
+// connection semantic rules' source-type compatibility checks.
+func WithDestinationRegistry(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		p.destinationRegistry = registry
+	}
+}
+
+func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
+		client: client,
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
 		},
 		handlers: make(map[string]handler),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	for _, opt := range opts {
+		opt(p)
+	}
 	return p
 }
 
@@ -87,10 +119,18 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	connectionHandler.EventStreamConnectionResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -105,9 +145,16 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for event stream sources.
+// --merge smart linking for event stream sources and connections. The
+// connection matcher is listed after the source matcher so its endpoint
+// lookups can rely on source matches being recorded already; it rides the
+// same gate as the kind itself.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sourceHandler.Matcher()}
+	matchers := []importmatcher.Matcher{sourceHandler.Matcher()}
+	if _, ok := p.handlers[connectionHandler.EventStreamConnectionResourceType]; ok {
+		matchers = append(matchers, connectionHandler.Matcher())
+	}
+	return matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -284,13 +331,30 @@ func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
+	r := []rules.Rule{
 		sourceRules.NewSourceSpecSyntaxValidRule(),
 	}
+	// Connection rules ride the same gate as the kind itself: when
+	// connectionSupport is off the kind is not a supported match pattern and
+	// registering a rule scoped to it would fail registry validation.
+	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
+		r = append(r, connectionRules.NewConnectionSpecSyntaxValidRule())
+	}
+	return r
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	r := []rules.Rule{
 		sourceRules.NewSourceSemanticValidRule(),
 	}
+	// Connection rules ride the same gate as the kind itself: when
+	// connectionSupport is off the kind is not a supported match pattern and
+	// registering a rule scoped to it would fail registry validation.
+	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
+		r = append(r,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
+	}
+	return r
 }

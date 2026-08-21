@@ -2,7 +2,9 @@ package definitions
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -26,6 +28,11 @@ type DestinationDefinition struct {
 	NewConfig       func() any
 	SourceTypes     []string
 	ConnectionModes map[string][]string
+	// SupportedSourcesValidation lists, per local source type, the local config
+	// keys that must be present for a source of that type to connect (mirrors
+	// the backend's connect-time supportedSourcesValidation check). Source
+	// types without an entry have no connect-time required keys.
+	SupportedSourcesValidation map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 }
@@ -85,6 +92,17 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
+// SupportedSourcesValidation returns the local config keys that must be
+// present for the given source type to connect. A nil result means the source
+// type has no connect-time required keys.
+func (d *RegisteredDefinition) SupportedSourcesValidation(sourceType string) []string {
+	fields, ok := d.DestinationDefinition.SupportedSourcesValidation[sourceType]
+	if !ok {
+		return nil
+	}
+	return append([]string(nil), fields...)
+}
+
 func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 	return append([]string(nil), sourceTypeConfigKeys...)
 }
@@ -125,6 +143,10 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating consent config model: %w", err)
 	}
 
+	if err := validateSupportedSourcesValidation(def, configType); err != nil {
+		return nil, fmt.Errorf("validating supported sources requirements: %w", err)
+	}
+
 	keyPathSourceTypes, err := buildGatedKeyPaths(def, configType)
 	if err != nil {
 		return nil, fmt.Errorf("building gated key paths: %w", err)
@@ -135,6 +157,32 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
 	}, nil
+}
+
+// validateSupportedSourcesValidation rejects entries for source types outside
+// SourceTypes and required keys outside the local config surface (the config
+// struct plus the source-type block keys) — the config model is a closed
+// allowlist, so an unknown required key could never be satisfied.
+func validateSupportedSourcesValidation(def *DestinationDefinition, configType reflect.Type) error {
+	configFields := structFieldsByMapstructureTag(configType)
+
+	for _, sourceType := range slices.Sorted(maps.Keys(def.SupportedSourcesValidation)) {
+		if !slices.Contains(def.SourceTypes, sourceType) {
+			return fmt.Errorf("supported sources validation configured for unsupported source type %q", sourceType)
+		}
+
+		requiredKeys := def.SupportedSourcesValidation[sourceType]
+		if len(requiredKeys) == 0 {
+			return fmt.Errorf("supported sources validation for source type %q has no required config keys", sourceType)
+		}
+		for _, key := range requiredKeys {
+			if _, ok := configFields[key]; ok || slices.Contains(sourceTypeConfigKeys, key) {
+				continue
+			}
+			return fmt.Errorf("supported sources validation for source type %q references unknown config key %q", sourceType, key)
+		}
+	}
+	return nil
 }
 
 func validateConsentConfigModel(def *DestinationDefinition, configType reflect.Type) error {

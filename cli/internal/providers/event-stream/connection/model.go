@@ -1,0 +1,81 @@
+package connection
+
+import (
+	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+)
+
+const (
+	ConnectionsKey = "connections"
+	SourceKey      = "source"
+	DestinationKey = "destination"
+	EnabledKey     = "enabled"
+
+	// Output-side keys: the remote identifiers the lifecycle stores in state.
+	// SourceIDKey/DestinationIDKey hold the resolved endpoint ids so Update can
+	// detect an endpoint change (a replacement) without re-dereferencing refs.
+	IDKey            = "id"
+	SourceIDKey      = "sourceId"
+	DestinationIDKey = "destinationId"
+
+	// ExternalIDKey marks CLI-managed rows in List output.
+	ExternalIDKey = "externalId"
+
+	EventStreamConnectionResourceType = "event-stream-connection"
+	EventStreamConnectionResourceKind = "event-stream-connections"
+	MetadataName                      = "event-stream-connections"
+
+	// ImportPath is the spec file all importable connections are written to,
+	// relative to the provider's import directory — export emits one spec of
+	// the event-stream-connections kind per run.
+	ImportPath = "connections.yaml"
+)
+
+// ConnectionsSpec mirrors the YAML spec structure: the body is a list of
+// connection entries. JSON tags enable the typed rule engine's
+// json.Marshal/Unmarshal round-trip; validate tags drive
+// go-playground/validator checks.
+type ConnectionsSpec struct {
+	Connections []ConnectionSpec `json:"connections" mapstructure:"connections" validate:"required,dive"`
+}
+
+// ConnectionSpec is a single connection entry. There is intentionally no
+// config field — event stream connections are pure links; connection settings live on the
+// destination spec. Unknown keys (config included) fail at decode time via
+// strict decoding.
+type ConnectionSpec struct {
+	LocalID     string `json:"id"          mapstructure:"id"          validate:"required"`
+	Source      string `json:"source"      mapstructure:"source"      validate:"required"`
+	Destination string `json:"destination" mapstructure:"destination" validate:"required"`
+	Enabled     *bool  `json:"enabled"     mapstructure:"enabled"`
+}
+
+// connectionResource is the graph-side representation of one connection: the
+// two endpoint references plus the resolved enabled flag. The PropertyRefs
+// give the resource graph its dependency edges on both endpoints.
+type connectionResource struct {
+	LocalID        string
+	Source         *resources.PropertyRef
+	Destination    *resources.PropertyRef
+	Enabled        bool
+	ImportMetadata map[string]*WorkspaceRemoteIDMapping
+}
+
+type WorkspaceRemoteIDMapping struct {
+	WorkspaceId string
+	RemoteId    string
+}
+
+// RemoteConnection carries an unmanaged remote connection through import,
+// together with identity the generic connections API row does not include:
+// the workspace id comes from the connection's event stream source, and the
+// endpoints' externalIds (empty when the endpoint is not CLI-managed) are the
+// endpoints' local resource ids — the matcher and export use them to identify
+// already-managed endpoints, whose graph entries the import ref resolver
+// cannot always serve.
+type RemoteConnection struct {
+	client.Connection
+	WorkspaceID           string
+	SourceExternalID      string
+	DestinationExternalID string
+}

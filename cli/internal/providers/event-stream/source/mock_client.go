@@ -3,20 +3,21 @@ package source
 import (
 	"context"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 )
 
 type MockSourceClient struct {
-	createCalled     bool
-	updateCalled     bool
-	deleteCalled     bool
-	linkTPCalled     bool
-	unlinkTPCalled   bool
+	createCalled             bool
+	updateCalled             bool
+	deleteCalled             bool
+	linkTPCalled             bool
+	unlinkTPCalled           bool
 	updateTPConnectionCalled bool
-	getSourcesCalled bool
-	setExternalIDCalled bool
-	getSourcesFunc   func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
+	getSourcesCalled         bool
+	setExternalIDCalled      bool
+	getSourcesFunc           func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 }
 
 func (m *MockSourceClient) Create(ctx context.Context, req *sourceClient.CreateSourceRequest) (*sourceClient.CreateUpdateSourceResponse, error) {
@@ -111,4 +112,43 @@ func (m *MockSourceClient) UpdateTPConnectionCalled() bool {
 
 func (m *MockSourceClient) SetExternalIDCalled() bool {
 	return m.setExternalIDCalled
+}
+
+// Connection methods keep MockSourceClient satisfying the full
+// EventStreamStore. Tests that exercise connection behaviour use the
+// richer connection.MockConnectionClient instead.
+
+func (m *MockSourceClient) ListConnections(ctx context.Context, opts ...client.ListConnectionsOption) (*client.ConnectionsPage, error) {
+	return &client.ConnectionsPage{}, nil
+}
+
+func (m *MockSourceClient) NextConnections(ctx context.Context, paging client.Paging) (*client.ConnectionsPage, error) {
+	return nil, nil
+}
+
+func (m *MockSourceClient) CreateConnection(ctx context.Context, connection *client.Connection) (*client.Connection, error) {
+	created := *connection
+	created.ID = "remote-connection-id"
+	return &created, nil
+}
+
+func (m *MockSourceClient) UpdateConnection(ctx context.Context, connection *client.Connection) (*client.Connection, error) {
+	updated := *connection
+	return &updated, nil
+}
+
+func (m *MockSourceClient) DeleteConnection(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *MockSourceClient) GetConnection(ctx context.Context, id string) (*client.Connection, error) {
+	return &client.Connection{ID: id}, nil
+}
+
+func (m *MockSourceClient) SetConnectionExternalID(ctx context.Context, id string, externalID string) error {
+	return nil
+}
+
+func (m *MockSourceClient) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	return []client.Destination{}, nil
 }

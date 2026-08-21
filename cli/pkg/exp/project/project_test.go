@@ -10,15 +10,24 @@ import (
 )
 
 func TestProjectLoad(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
-
-	// The shared create fixtures keep two api_tracking fields as {{ .VAR }}
-	// placeholders. Enable substitution and supply their values via env so the
-	// loader resolves them before validation, mirroring how apply/validate run.
+	// The umbrella flag has to come first: every per-flag setting below is
+	// ignored unless it is set. The create fixtures are shared with the e2e
+	// suites and carry a destination and an event-stream-connections spec, so
+	// those kinds need their flags on to pass syntax validation.
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
+	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
+	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
+
+	// Those same fixtures keep several fields as {{ .VAR }} placeholders.
+	// project.Load() resolves them from RUDDER_* env vars, so supply the values
+	// here; the e2e suites pass the same ones via the --var-file at
+	// tests/testdata/project/substitution.vars.yaml.
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 	t.Setenv("RUDDER_API_TRACKING_DESCRIPTION", "This event is triggered every time a user views a product.")
+	t.Setenv("RUDDER_S3_ACCESS_KEY_ID", "AKIAXXXXXXXXXXXXXXXX")
+	t.Setenv("RUDDER_S3_ACCESS_KEY", "wJalrXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 
 	t.Run("Load project and verify resource graph", func(t *testing.T) {
 		graph, err := project.Load(context.Background(), "../../../tests/testdata/project/create")

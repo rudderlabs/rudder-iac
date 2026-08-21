@@ -1,0 +1,175 @@
+rule_id: "event-stream/connection/enabled-endpoints-valid"
+match_behavior:
+  # V-C7: a connection marked enabled (or with enabled omitted — it defaults
+  # to true) should have both its source and destination enabled, otherwise it
+  # will not deliver anything. The API accepts the combination, so this is a
+  # warning, not an error.
+  - applies_to:
+      - kind: "event-stream-connections"
+        version: "rudder/v1"
+    valid:
+      - example_id: "es-connection-enabled-endpoints-all-enabled"
+        title: "Enabled connection whose source and destination are both enabled"
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+              enabled: true
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: true
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
+                  enabled: true
+      - example_id: "es-connection-enabled-endpoints-disabled-connection"
+        title: "Disabled connection may point at disabled endpoints"
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+              enabled: false
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: false
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
+                  enabled: false
+    invalid:
+      - example_id: "es-connection-enabled-endpoints-disabled-source"
+        title: "Enabled connection whose source is disabled"
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+              enabled: false
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: true
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/source"
+            severity: "warning"
+            message_contains: "connection 'js-to-s3' is enabled but its source 'my-js-source' is disabled"
+      - example_id: "es-connection-enabled-endpoints-disabled-destination"
+        title: "Enabled connection whose destination is disabled"
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+              enabled: true
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: false
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "warning"
+            message_contains: "connection 'js-to-s3' is enabled but its destination 'my-s3-destination' is disabled"

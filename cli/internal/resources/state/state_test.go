@@ -521,3 +521,54 @@ func TestDereferenceByReflectionBackwardCompatibility(t *testing.T) {
 	assert.True(t, input.NewRef.IsResolved)
 	assert.Equal(t, "new-456", input.NewRef.Value)
 }
+
+func TestDereferenceWithResolveFunction(t *testing.T) {
+	// The map-based path must honor Resolve funcs the same way the
+	// reflection path does: refs to typed-state resources carry their remote
+	// id in OutputRaw, not in the Input/Output maps.
+	state := s.EmptyState()
+
+	type DestinationStateRemote struct {
+		ID string
+	}
+
+	state.AddResource(&s.ResourceState{
+		ID:        "dst1",
+		Type:      "destination",
+		OutputRaw: &DestinationStateRemote{ID: "remote-dst-123"},
+	})
+
+	resolve := func(outputRaw any) (string, error) {
+		typed, ok := outputRaw.(*DestinationStateRemote)
+		if !ok {
+			return "", assert.AnError
+		}
+		return typed.ID, nil
+	}
+
+	t.Run("resolves from typed state", func(t *testing.T) {
+		data := resources.ResourceData{
+			"destination": &resources.PropertyRef{
+				URN:      resources.URN("dst1", "destination"),
+				Property: "id",
+				Resolve:  resolve,
+			},
+		}
+
+		dereferenced, err := s.Dereference(data, state)
+		assert.Nil(t, err)
+		assert.Equal(t, resources.ResourceData{"destination": "remote-dst-123"}, dereferenced)
+	})
+
+	t.Run("propagates resolver errors", func(t *testing.T) {
+		data := resources.ResourceData{
+			"destination": &resources.PropertyRef{
+				URN:     resources.URN("dst1", "destination"),
+				Resolve: func(any) (string, error) { return "", assert.AnError },
+			},
+		}
+
+		_, err := s.Dereference(data, state)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+}

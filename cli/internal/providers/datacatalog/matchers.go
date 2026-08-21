@@ -149,31 +149,15 @@ func propertyDataMatches(data resources.ResourceData, in propertyMatchInputs) bo
 }
 
 // resolveTypeRef maps a remote custom-type ID to the local custom-type URN it
-// corresponds to: either the URN of the custom type matched in this import, or
-// of one already managed locally (found by its import metadata's remote ID).
-// An empty definitionID means the property has no custom-type ref at that slot,
-// which resolves to the empty URN. ok is false only when a non-empty ID cannot
-// be resolved — the property then stays unmatched (namer fallback).
+// corresponds to. An empty definitionID means the property has no custom-type
+// ref at that slot, which resolves to the empty URN. ok is false only when a
+// non-empty ID cannot be resolved — the property then stays unmatched (namer
+// fallback).
 func resolveTypeRef(scope importmatcher.Scope, definitionID string) (urn string, ok bool) {
 	if definitionID == "" {
 		return "", true
 	}
-
-	if scope.Importable != nil {
-		if ct, found := scope.Importable.GetByID(types.CustomTypeResourceType, definitionID); found {
-			if ct.MatchedWith != nil {
-				return ct.MatchedWith.URN(), true
-			}
-			return "", false
-		}
-	}
-
-	for _, ct := range scope.LocalGraph.ResourcesByType(types.CustomTypeResourceType) {
-		if meta := ct.ImportMetadata(); meta != nil && meta.RemoteId == definitionID {
-			return ct.URN(), true
-		}
-	}
-	return "", false
+	return importmatcher.ResolveLocalURN(scope, types.CustomTypeResourceType, definitionID)
 }
 
 // typeMatches compares a local property's type against the remote's. When the

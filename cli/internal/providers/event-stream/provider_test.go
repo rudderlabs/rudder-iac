@@ -14,7 +14,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -23,40 +25,69 @@ import (
 
 func TestProvider(t *testing.T) {
 	t.Run("SupportedKinds", func(t *testing.T) {
-		provider := eventstream.New(source.NewMockSourceClient())
+		provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		kinds := provider.SupportedKinds()
 		assert.Contains(t, kinds, "event-stream-source")
-		assert.Len(t, kinds, 1)
+		assert.Contains(t, kinds, "event-stream-connections")
+		assert.Len(t, kinds, 2)
+	})
+
+	// Without the connectionSupport experimental flag the connections kind is
+	// not a supported spec at all.
+	t.Run("ConnectionSupportDisabled", func(t *testing.T) {
+		provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
+		assert.Equal(t, []string{"event-stream-source"}, provider.SupportedKinds())
+		assert.Equal(t, []string{source.ResourceType}, provider.SupportedTypes())
+
+		err := provider.LoadSpec("", &specs.Spec{Kind: connection.EventStreamConnectionResourceKind})
+		assert.ErrorContains(t, err, "unsupported kind")
 	})
 
 	t.Run("SupportedTypes", func(t *testing.T) {
-		provider := eventstream.New(source.NewMockSourceClient())
+		provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		types := provider.SupportedTypes()
 		assert.Contains(t, types, source.ResourceType)
-		assert.Len(t, types, 1)
+		assert.Contains(t, types, connection.EventStreamConnectionResourceType)
+		assert.Len(t, types, 2)
 	})
 
 	t.Run("SupportedMatchPatterns", func(t *testing.T) {
 		t.Parallel()
 
-		p := eventstream.New(source.NewMockSourceClient())
-		kind := "event-stream-source"
+		p := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		var want []vrules.MatchPattern
-		want = append(want, prules.LegacyVersionPatterns(kind)...)
-		want = append(want, prules.V1VersionPatterns(kind)...)
+		want = append(want, prules.LegacyVersionPatterns("event-stream-source")...)
+		want = append(want, prules.V1VersionPatterns("event-stream-source")...)
+		// event-stream-connections is a new kind: v1 only, no legacy versions
+		want = append(want, prules.V1VersionPatterns(connection.EventStreamConnectionResourceKind)...)
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+	})
+
+	// Connections travel the normal (map-based) lifecycle path: the provider
+	// routes them to the connection handler, which drives the store's
+	// connection surface.
+	t.Run("ConnectionLifecycleRoutesToConnectionStore", func(t *testing.T) {
+		mockConnections := &connection.MockConnectionClient{}
+		p := eventstream.New(mockConnections, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
+		_, err := p.Create(context.Background(), "android-to-s3", connection.EventStreamConnectionResourceType, resources.ResourceData{
+			connection.SourceKey:      "src-remote-1",
+			connection.DestinationKey: "dst-remote-1",
+			connection.EnabledKey:     true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"CreateConnection"}, mockConnections.Calls)
 	})
 
 	t.Run("LoadSpec", func(t *testing.T) {
 		t.Run("UnsupportedKind", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			err := provider.LoadSpec("", &specs.Spec{Kind: "unsupported"})
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "unsupported kind")
 		})
 
 		t.Run("ValidKind", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "event-stream-source",
 				Spec: map[string]interface{}{
@@ -70,7 +101,7 @@ func TestProvider(t *testing.T) {
 		})
 
 		t.Run("InvalidSpec", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			err := provider.LoadSpec("test.yaml", &specs.Spec{
 				Kind: "event-stream-source",
 				Spec: map[string]interface{}{
@@ -84,7 +115,7 @@ func TestProvider(t *testing.T) {
 	})
 
 	t.Run("GetResourceGraph", func(t *testing.T) {
-		provider := eventstream.New(source.NewMockSourceClient())
+		provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 
 		err := provider.LoadSpec("test1.yaml", &specs.Spec{
 			Kind: "event-stream-source",
@@ -126,7 +157,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("CRUD Operations", func(t *testing.T) {
 		t.Run("Create", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 
 			createData := resources.ResourceData{
@@ -143,7 +174,7 @@ func TestProvider(t *testing.T) {
 		})
 
 		t.Run("Update", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 
 			updateData := resources.ResourceData{
@@ -163,7 +194,7 @@ func TestProvider(t *testing.T) {
 		})
 
 		t.Run("Delete", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 			stateData := resources.ResourceData{
 				"id": "test-source-id",
@@ -186,7 +217,7 @@ func TestProvider(t *testing.T) {
 				},
 			}, nil
 		})
-		provider := eventstream.New(mockClient)
+		provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		ctx := context.Background()
 
 		data := resources.ResourceData{
@@ -226,7 +257,7 @@ func TestProvider(t *testing.T) {
 				}, nil
 			})
 
-			provider := eventstream.New(mockClient)
+			provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 
 			listed, err := provider.List(ctx, source.ResourceType, nil)
@@ -249,7 +280,7 @@ func TestProvider(t *testing.T) {
 		})
 
 		t.Run("unsupported resource type", func(t *testing.T) {
-			provider := eventstream.New(source.NewMockSourceClient())
+			provider := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 
 			_, err := provider.List(ctx, "unsupported-resource-type", lister.Filters{})
@@ -262,7 +293,7 @@ func TestProvider(t *testing.T) {
 			mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 				return nil, errors.New("api error")
 			})
-			provider := eventstream.New(mockClient)
+			provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 			ctx := context.Background()
 
 			_, err := provider.List(ctx, source.ResourceType, nil)
@@ -273,7 +304,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("LoadResourcesFromRemote", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
-		provider := eventstream.New(mockClient)
+		provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 
 		ctx := context.Background()
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
@@ -329,7 +360,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("MapRemoteToState", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
-		provider := eventstream.New(mockClient)
+		provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 
 		// Create a RemoteResources with test data
 		collection := resources.NewRemoteResources()
@@ -395,7 +426,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("LoadImportable", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
-		provider := eventstream.New(mockClient)
+		provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		ctx := context.Background()
 
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
@@ -451,7 +482,7 @@ func TestProvider(t *testing.T) {
 
 	t.Run("FormatForExport", func(t *testing.T) {
 		mockClient := source.NewMockSourceClient()
-		provider := eventstream.New(mockClient)
+		provider := eventstream.New(mockClient, eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 		collection := resources.NewRemoteResources()
 		resourceMap := map[string]*resources.RemoteResource{
 			"remote123": {
@@ -540,10 +571,26 @@ func (m *mockResolver) ResolveToReference(entityType string, remoteID string) (s
 func TestProviderResourceMatchers(t *testing.T) {
 	t.Parallel()
 
-	p := eventstream.New(source.NewMockSourceClient())
+	t.Run("connection matcher after the source matcher", func(t *testing.T) {
+		t.Parallel()
+		p := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 
-	matchers := p.ResourceMatchers()
+		matchers := p.ResourceMatchers()
 
-	require.Len(t, matchers, 1)
-	assert.Equal(t, source.ResourceType, matchers[0].ResourceType)
+		// The connection matcher must come after the source matcher: its
+		// endpoint lookups rely on source matches being recorded already.
+		require.Len(t, matchers, 2)
+		assert.Equal(t, source.ResourceType, matchers[0].ResourceType)
+		assert.Equal(t, connection.EventStreamConnectionResourceType, matchers[1].ResourceType)
+	})
+
+	t.Run("connection matcher rides the same gate as the kind", func(t *testing.T) {
+		t.Parallel()
+		p := eventstream.New(source.NewMockSourceClient(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
+
+		matchers := p.ResourceMatchers()
+
+		require.Len(t, matchers, 1)
+		assert.Equal(t, source.ResourceType, matchers[0].ResourceType)
+	})
 }
