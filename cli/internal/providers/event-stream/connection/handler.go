@@ -260,46 +260,37 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream connection")
 		}
-		sourceURN, managed, err := endpointURN(collection, source.ResourceType, conn.SourceID)
-		if err != nil {
-			return nil, fmt.Errorf("resolving source urn for connection %q: %w", conn.ExternalID, err)
-		}
-		if !managed {
+		// Both sentinels mean the endpoint is not CLI-managed: the event
+		// stream source and destination handlers drop rows without an
+		// externalId while loading, so an unmanaged endpoint is usually
+		// missing from the collection outright (ErrRemoteResourceNotFound)
+		// rather than present with an empty externalId
+		// (ErrRemoteResourceExternalIdNotFound).
+		sourceURN, err := collection.GetURNByID(source.ResourceType, conn.SourceID)
+		switch {
+		case errors.Is(err, resources.ErrRemoteResourceNotFound),
+			errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound):
 			log.Warn("skipping connection whose source is not managed by the CLI",
 				"connection", conn.ExternalID, "sourceId", conn.SourceID)
 			continue
+		case err != nil:
+			return nil, fmt.Errorf("resolving source urn for connection %q: %w", conn.ExternalID, err)
 		}
-		destinationURN, managed, err := endpointURN(collection, destination.DestinationResourceType, conn.DestinationID)
-		if err != nil {
-			return nil, fmt.Errorf("resolving destination urn for connection %q: %w", conn.ExternalID, err)
-		}
-		if !managed {
+
+		destinationURN, err := collection.GetURNByID(destination.DestinationResourceType, conn.DestinationID)
+		switch {
+		case errors.Is(err, resources.ErrRemoteResourceNotFound),
+			errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound):
 			log.Warn("skipping connection whose destination is not managed by the CLI",
 				"connection", conn.ExternalID, "destinationId", conn.DestinationID)
 			continue
+		case err != nil:
+			return nil, fmt.Errorf("resolving destination urn for connection %q: %w", conn.ExternalID, err)
 		}
+
 		s.AddResource(mapRemoteToState(&conn, sourceURN, destinationURN))
 	}
 	return s, nil
-}
-
-// endpointURN resolves a connection endpoint to the URN of its CLI-managed
-// resource, reporting managed=false when the endpoint is not CLI-managed.
-// Both sentinels mean that: the event stream source and destination handlers
-// drop rows without an externalId while loading, so an unmanaged endpoint is
-// usually missing from the collection outright (ErrRemoteResourceNotFound)
-// rather than present with an empty externalId
-// (ErrRemoteResourceExternalIdNotFound).
-func endpointURN(collection *resources.RemoteResources, resourceType string, id string) (string, bool, error) {
-	urn, err := collection.GetURNByID(resourceType, id)
-	switch {
-	case errors.Is(err, resources.ErrRemoteResourceNotFound),
-		errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound):
-		return "", false, nil
-	case err != nil:
-		return "", false, err
-	}
-	return urn, true, nil
 }
 
 // mapRemoteToState builds one connection's resource state: the spec-shaped
