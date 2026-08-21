@@ -47,3 +47,8 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## CFD-72 — Offline Conversions Destination Onboarding Blocker
+<!-- ticket:CFD-72 -->
+- CLI destination onboarding for `google_adwords_offline_conversions` / `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS` and `bingads_offline_conversions` / `BINGADS_OFFLINE_CONVERSIONS` depends on Terraform provider mappings from CFD-71.
+- The onboard-cli-destination workflow must not infer destination config shape from `rudder-integrations-config` alone; wait for Terraform mappings or use the in-flight Terraform branch as the source of truth before creating CLI definitions.
