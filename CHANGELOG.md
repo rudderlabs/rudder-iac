@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.24.0](https://github.com/rudderlabs/rudder-iac/compare/v0.23.0...v0.24.0) (2026-08-21)
+
+
+### Features
+
+* add externalId support to the connections API client ([#738](https://github.com/rudderlabs/rudder-iac/issues/738)) ([e2d7972](https://github.com/rudderlabs/rudder-iac/commit/e2d79726966fd3d5e1d8a5d6c6d045a3dd1ed9fd))
+* **cli:** onboard attentive_tag destination definition ([#688](https://github.com/rudderlabs/rudder-iac/issues/688)) ([8de47e4](https://github.com/rudderlabs/rudder-iac/commit/8de47e4e0a8e77f5f2c6996e0f869057a743ff43))
+* **cli:** onboard bqstream destination definition ([#689](https://github.com/rudderlabs/rudder-iac/issues/689)) ([bec3d35](https://github.com/rudderlabs/rudder-iac/commit/bec3d35c2c474b344efabc541a1a6599c43d2f5b))
+* **cli:** onboard customerio_audience destination ([#694](https://github.com/rudderlabs/rudder-iac/issues/694)) ([e637453](https://github.com/rudderlabs/rudder-iac/commit/e637453ffadd72e951c91f4795428d754d926399))
+* **cli:** onboard redis destination definition ([#705](https://github.com/rudderlabs/rudder-iac/issues/705)) ([935643e](https://github.com/rudderlabs/rudder-iac/commit/935643ecfdb3d00afb5be4e554bed6b5655afa00))
+* **cli:** onboard snowflake destination definition ([#690](https://github.com/rudderlabs/rudder-iac/issues/690)) ([331ab67](https://github.com/rudderlabs/rudder-iac/commit/331ab67ebbdc212993b78ad9c4a7eb70ec3d9625))
+* **cli:** onboard Statsig destination definition ([#693](https://github.com/rudderlabs/rudder-iac/issues/693)) ([8093d88](https://github.com/rudderlabs/rudder-iac/commit/8093d88eb508a85f2d25fd587e02b136e0fb339d))
+* **cli:** onboard zendesk destination definition ([#695](https://github.com/rudderlabs/rudder-iac/issues/695)) ([d935c96](https://github.com/rudderlabs/rudder-iac/commit/d935c962509898b0840191b4d4aa0401c6c191b4))
+* **connection:** import for event stream connections ([#754](https://github.com/rudderlabs/rudder-iac/issues/754)) ([8d482fb](https://github.com/rudderlabs/rudder-iac/commit/8d482fb803899d368992694f7f150136ef5d2e2d))
+* **connection:** project-level semantic validation rules for event stream connections ([#753](https://github.com/rudderlabs/rudder-iac/issues/753)) ([e56d9f8](https://github.com/rudderlabs/rudder-iac/commit/e56d9f82fc09fd8246dccf5f225ac512114b887a))
+* **destination:** onboard bigquery destination ([#756](https://github.com/rudderlabs/rudder-iac/issues/756)) ([fe7dbd9](https://github.com/rudderlabs/rudder-iac/commit/fe7dbd9f87feac26583d3176d3f585179a1d593f))
+* **destination:** onboard confluent cloud definition ([#752](https://github.com/rudderlabs/rudder-iac/issues/752)) ([6cde2ac](https://github.com/rudderlabs/rudder-iac/commit/6cde2acb568d2dd44ca6525c5b22c7e0a30f6901))
+* **destination:** onboard facebook conversions ([#734](https://github.com/rudderlabs/rudder-iac/issues/734)) ([54a0b11](https://github.com/rudderlabs/rudder-iac/commit/54a0b115b981d1e4e3876b8652732901311f86dd))
+* **destination:** onboard gcs definition and add dynamic_or_pattern validation ([#735](https://github.com/rudderlabs/rudder-iac/issues/735)) ([de94c92](https://github.com/rudderlabs/rudder-iac/commit/de94c92012b493a771a6cc8321abbe544e0ef61c))
+* **destination:** onboard Google Sheets destination ([#758](https://github.com/rudderlabs/rudder-iac/issues/758)) ([44a61b9](https://github.com/rudderlabs/rudder-iac/commit/44a61b900a3670723470d06695e5d3f62f9f5402))
+* **destination:** onboard kafka definition ([#761](https://github.com/rudderlabs/rudder-iac/issues/761)) ([d7adbe5](https://github.com/rudderlabs/rudder-iac/commit/d7adbe51e9d6d6de1598661e5973d3cb22c4c68b))
+* **destination:** onboard Marketo destination ([#745](https://github.com/rudderlabs/rudder-iac/issues/745)) ([d20c04a](https://github.com/rudderlabs/rudder-iac/commit/d20c04ae360c5533ad6712405c1f0a2d949951f9))
+* **destination:** onboard postgres definition ([#755](https://github.com/rudderlabs/rudder-iac/issues/755)) ([add562a](https://github.com/rudderlabs/rudder-iac/commit/add562a4c547c3c0ef4e238e3912456226c33d2c))
+* **destination:** onboard s3_datalake destination ([#757](https://github.com/rudderlabs/rudder-iac/issues/757)) ([25ad4d5](https://github.com/rudderlabs/rudder-iac/commit/25ad4d52ec4501abcd05a0bd59f0749de76e9584))
+* **destination:** onboard Salesforce destination ([#744](https://github.com/rudderlabs/rudder-iac/issues/744)) ([ccd33b5](https://github.com/rudderlabs/rudder-iac/commit/ccd33b5d70fd32f8a6bfa75218d887c085345f99))
+* **destination:** onboard Slack destination ([#747](https://github.com/rudderlabs/rudder-iac/issues/747)) ([9a99578](https://github.com/rudderlabs/rudder-iac/commit/9a99578b402b6ea324ab8a108f8be7106cceb3b7))
+* **destination:** register s3 as verified destination ([#725](https://github.com/rudderlabs/rudder-iac/issues/725)) ([9a07f10](https://github.com/rudderlabs/rudder-iac/commit/9a07f102b47a683d6c42c784ee286d4dfbef9773))
+* **event-stream:** define event-stream-connections spec kind ([#739](https://github.com/rudderlabs/rudder-iac/issues/739)) ([3826741](https://github.com/rudderlabs/rudder-iac/commit/38267416bd0a5da98c00c5f261d6b1a31380f41d))
+* **event-stream:** implement connection lifecycle and remote state ([#742](https://github.com/rudderlabs/rudder-iac/issues/742)) ([0e9a510](https://github.com/rudderlabs/rudder-iac/commit/0e9a51096f298951bebbabf63e75893ba3c3ff4e))
+* extend the destination registry with connection metadata ([#748](https://github.com/rudderlabs/rudder-iac/issues/748)) ([6daf03f](https://github.com/rudderlabs/rudder-iac/commit/6daf03f5e4e771bdc385a8305d1dc877108a6cb0))
+* onboard google pubsub definition ([#740](https://github.com/rudderlabs/rudder-iac/issues/740)) ([399220c](https://github.com/rudderlabs/rudder-iac/commit/399220c94b6c8b10004353e47f496363d575da08))
+* onboard kinesis definition ([#746](https://github.com/rudderlabs/rudder-iac/issues/746)) ([a5761e3](https://github.com/rudderlabs/rudder-iac/commit/a5761e3e09e0795591368ba534f2cc70f4c6f516))
+* spec-level syntactic validation rules for event stream connections (DEX-652) ([#750](https://github.com/rudderlabs/rudder-iac/issues/750)) ([1276d15](https://github.com/rudderlabs/rudder-iac/commit/1276d1554d4e8bab3f33a8b84201dc1a3e7f6424))
+
+
+### Bug Fixes
+
+* **destination:** prune empty imported config values ([#736](https://github.com/rudderlabs/rudder-iac/issues/736)) ([d4fb4f9](https://github.com/rudderlabs/rudder-iac/commit/d4fb4f9ff4bd67c08cf2e317dda3e881e5c7dabb))
+* **destination:** re-onboard Redshift config surface ([#759](https://github.com/rudderlabs/rudder-iac/issues/759)) ([92b16a6](https://github.com/rudderlabs/rudder-iac/commit/92b16a604daa7a2198445a85918623fc313860ac))
+* **destination:** tighten snowflake config validation tags ([#762](https://github.com/rudderlabs/rudder-iac/issues/762)) ([e84b751](https://github.com/rudderlabs/rudder-iac/commit/e84b751a13f8a0a9726bb664ecb804faac0d443d))
+* **typer:** remap camelCased TS keys to tracking-plan keys before the SDK call (DAW-3732) ([#642](https://github.com/rudderlabs/rudder-iac/issues/642)) ([7afbd71](https://github.com/rudderlabs/rudder-iac/commit/7afbd71e6fbc820a779e3f4e91f07752104d72a0))
+* **varsubst:** claim only dot-prefixed {{ .VAR }} tokens ([#737](https://github.com/rudderlabs/rudder-iac/issues/737)) ([3e86d8d](https://github.com/rudderlabs/rudder-iac/commit/3e86d8d3d282aa5782873e772bf693c5333e8ed5))
+
+
+### Miscellaneous
+
+* **accounts:** run accounts e2e in normal CI flow ([#729](https://github.com/rudderlabs/rudder-iac/issues/729)) ([f6a6551](https://github.com/rudderlabs/rudder-iac/commit/f6a65518977cff11cd4c57e96ed868e423077883))
+* **connections:** split event stream connection specs into their own e2e project and suite ([#764](https://github.com/rudderlabs/rudder-iac/issues/764)) ([e6e8e25](https://github.com/rudderlabs/rudder-iac/commit/e6e8e258f07523eb1156562496535560c5544d72))
+* pass RUN_DESTINATION_E2E into the test job environment ([#749](https://github.com/rudderlabs/rudder-iac/issues/749)) ([6e09dde](https://github.com/rudderlabs/rudder-iac/commit/6e09dde02ac8c56534e1753da8e1daeefc680e89))
+* **project:** restore TestProjectLoad env setup for shared create fixtures ([#763](https://github.com/rudderlabs/rudder-iac/issues/763)) ([f5ba437](https://github.com/rudderlabs/rudder-iac/commit/f5ba4375d8729c6c5adc35b92b2c31deed947e7f))
+
 ## [0.23.0](https://github.com/rudderlabs/rudder-iac/compare/v0.22.0...v0.23.0) (2026-08-07)
 
 
