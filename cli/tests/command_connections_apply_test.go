@@ -37,10 +37,15 @@ var (
 // same wall and solved it the same way, so this suite follows it: snapshot-compare
 // the non-secret upstream fields instead of asserting a clean no-op.
 //
-// Unlike TestDestinationsApply this is not gated behind an env var. Its fixtures
-// use a verified s3 destination and an android source, both of which any live
-// stack supports, so there is no reason to skip it by default.
+// Gated behind RUN_CONNECTION_E2E, mirroring TestDestinationsApply: it needs a
+// live stack whose destination snapshot matches the committed fixture, and the
+// destroy below would otherwise wipe the workspace before the (failing) apply on
+// a stack without that support. The skip must come before the destroy.
 func TestConnectionsApply(t *testing.T) {
+	if os.Getenv("RUN_CONNECTION_E2E") != "1" {
+		t.Skip("set RUN_CONNECTION_E2E=1 with a live connection-enabled stack")
+	}
+
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
