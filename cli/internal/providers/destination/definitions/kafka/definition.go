@@ -8,11 +8,16 @@ import (
 )
 
 const (
+	// schema.json guards hostName and sshHost with (?!-)/(?<!-), which RE2 cannot
+	// compile. These rewrites enforce the rule per label rather than only at the
+	// ends, so they are marginally stricter than upstream: a malformed label such
+	// as "a.b-" is rejected here but tolerated upstream. Deliberate — the rejected
+	// shapes are not resolvable host names.
 	kafkaHostNamePattern     = `^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?:,\s*(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)*$`
 	kafkaPortPattern         = `^([1-9]|[1-9][0-9]{1,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$`
 	kafkaTopicPattern        = `^[a-zA-Z0-9_.\-]{1,249}$`
 	kafkaSSHHostPattern      = `^(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-.]{0,251}[a-zA-Z0-9])(?::\d{1,5})?$`
-	kafkaSSHUserPattern      = `^[a-zA-Z0-9_-]{1,32}$`
+	kafkaUserNamePattern     = `^[a-zA-Z0-9_-]{1,32}$`
 	kafkaSSHPublicKeyPattern = `^ssh-(rsa|ed25519|dss) [A-Za-z0-9+/]+[=]{0,3}( [^@]+@[^@]+)?$`
 	kafkaMappingValuePattern = `^(.{0,100})$`
 )
@@ -22,7 +27,7 @@ func init() {
 	funcs.NewPattern("kafka_port", kafkaPortPattern, "must be a string integer from 1 to 65535")
 	funcs.NewPattern("kafka_topic", kafkaTopicPattern, "must be 1-249 characters and contain only letters, digits, underscores, periods, and hyphens")
 	funcs.NewPattern("kafka_ssh_host", kafkaSSHHostPattern, "must be a host name with an optional port")
-	funcs.NewPattern("kafka_ssh_user", kafkaSSHUserPattern, "must be 1-32 characters and contain only letters, digits, underscores, and hyphens")
+	funcs.NewPattern("kafka_user_name", kafkaUserNamePattern, "must be 1-32 characters and contain only letters, digits, underscores, and hyphens")
 	funcs.NewPattern("kafka_ssh_public_key", kafkaSSHPublicKeyPattern, "must be an ssh-rsa, ssh-ed25519, or ssh-dss public key")
 	funcs.NewPattern("kafka_mapping_value", kafkaMappingValuePattern, "must be at most 100 characters and must not contain line breaks")
 }
@@ -71,7 +76,7 @@ type kafkaConfig struct {
 	CACertificate       string                   `mapstructure:"ca_certificate"`
 	UseSASL             *bool                    `mapstructure:"use_sasl"`
 	SASLType            string                   `mapstructure:"sasl_type" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_oneof=plain sha256 sha512"`
-	Username            string                   `mapstructure:"username" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_pattern=kafka_ssh_user"`
+	Username            string                   `mapstructure:"username" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_pattern=kafka_user_name"`
 	Password            string                   `mapstructure:"password" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	ConvertToAvro       *bool                    `mapstructure:"convert_to_avro"`
 	AvroSchemas         []avroSchema             `mapstructure:"avro_schemas" validate:"required_if=ConvertToAvro true,omitempty,dive"`
@@ -81,12 +86,18 @@ type kafkaConfig struct {
 	UseSSH              *bool                    `mapstructure:"use_ssh"`
 	SSHHost             string                   `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_host"`
 	SSHPort             string                   `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_port"`
-	SSHUser             string                   `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_user"`
+	SSHUser             string                   `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_user_name"`
 	SSHPublicKey        string                   `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_public_key"`
 	EmbedAvroSchemaID   *bool                    `mapstructure:"embed_avro_schema_id"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
+// schema.json requires both fields inside avroSchemas.items, but only within the
+// convertToAvro:true branch — dive cannot reach a parent sibling, so requiredness
+// is enforced unconditionally here. That is the closest expressible form: the
+// array itself is only required when conversion is on, so a row can realistically
+// exist only alongside it. Unlike the topic-mapping structs below, whose items
+// carry no required list anywhere in schema.json.
 type avroSchema struct {
 	SchemaID string `mapstructure:"schema_id" validate:"required"`
 	Schema   string `mapstructure:"schema" validate:"required"`
