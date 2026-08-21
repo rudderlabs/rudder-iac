@@ -87,9 +87,13 @@ type kafkaConfig struct {
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
+// schema.json declares both fields as unconstrained strings with no required
+// list inside avroSchemas.items, so a partially filled row must validate —
+// otherwise a remote config holding one imports to a spec the CLI rejects.
+// Matches the sibling topic-mapping structs below and the marketo definition.
 type avroSchema struct {
-	SchemaID string `mapstructure:"schema_id" validate:"required"`
-	Schema   string `mapstructure:"schema" validate:"required"`
+	SchemaID string `mapstructure:"schema_id"`
+	Schema   string `mapstructure:"schema"`
 }
 
 type eventTypeTopicMapping struct {

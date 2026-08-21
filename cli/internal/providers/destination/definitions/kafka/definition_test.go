@@ -203,16 +203,23 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assertError(t, errors, "/avro_schemas", "required")
 	})
 
-	t.Run("avro schema entries require id and schema", func(t *testing.T) {
+	// schema.json declares no required list inside avroSchemas.items, so a
+	// partially filled row must validate — otherwise a remote config holding one
+	// imports to a spec the CLI rejects.
+	t.Run("sparse avro schema rows are accepted", func(t *testing.T) {
 		t.Parallel()
-		config := minimalConfig()
-		config["convert_to_avro"] = true
-		config["avro_schemas"] = []any{map[string]any{"schema_id": "event-value"}}
 
-		errors := registered.ValidateConfig(config)
+		for _, entry := range []map[string]any{
+			{"schema_id": "event-value"},
+			{"schema": "{\"type\":\"record\"}"},
+			{"schema_id": "", "schema": ""},
+		} {
+			config := minimalConfig()
+			config["convert_to_avro"] = true
+			config["avro_schemas"] = []any{entry}
 
-		require.NotEmpty(t, errors)
-		assertError(t, errors, "/avro_schemas/0/schema", "required")
+			assert.Empty(t, registered.ValidateConfig(config))
+		}
 	})
 
 	t.Run("event type mapping rejects unsupported type", func(t *testing.T) {
