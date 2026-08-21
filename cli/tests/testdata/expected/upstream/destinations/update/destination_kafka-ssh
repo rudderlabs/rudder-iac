@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "kafka-ssh",
+  "name": "E2E Kafka SSH Updated",
+  "type": "KAFKA",
+  "enabled": true,
+  "config": {
+    "convertToAvro": false,
+    "enableMultiTopic": false,
+    "hostName": "kafka-ssh.rudder-cli-e2e.internal",
+    "port": "9092",
+    "sshHost": "bastion.rudder-cli-e2e.internal:22",
+    "sshPort": "22",
+    "sshPublicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5rudderE2E rudder@rudder-cli-e2e",
+    "sshUser": "rudder-updated",
+    "sslEnabled": false,
+    "topic": "rudder-cli-e2e-ssh-updated",
+    "useSASL": false,
+    "useSSH": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
