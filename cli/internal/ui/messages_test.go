@@ -8,6 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestErrorMessage(t *testing.T) {
+	got := ErrorMessage("Access denied")
+
+	assert.Contains(t, got, "Error:")
+	assert.Contains(t, got, "Access denied")
+}
+
 func TestPrintDeprecationWarning(t *testing.T) {
 	t.Parallel()
 
