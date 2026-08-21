@@ -46,6 +46,7 @@ var destinationRawSecrets = []string{
 	"rudder-cli-google-pubsub-e2e@example.iam.gserviceaccount.com",
 	"111111111111111111111",
 	"facebookConversionsAccessTokenXXX",
+	"kafkaPasswordXXXXXXXXXXXX",
 	"AKIAKINESISXXXXXXXXX",
 	"kinesisSecretAccessKeyXXXXXXXXXXXXXXXXXXXX",
 	"marketoClientSecretXXXXXXXXXXX",

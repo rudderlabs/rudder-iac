@@ -114,3 +114,10 @@
 ## DEX-504 — Google Sheets Consent Config Surface
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
+
+## DEX-509 — Kafka Destination Config Surface
+<!-- ticket:DEX-509 -->
+- Kafka Avro schema config uses local key `avro_schemas` and API key `avroSchemas`; treat Terraform's singular `avro_schema` / `avroSchema` mapping as stale for this field because integrations-config schema/UI/runtime surfaces use the plural key.
+- Kafka `SecretKeys` should include only local key `password`; certificate/public-key material such as `ca_certificate` and `ssh_public_key` remains import/export visible because db-config marks only `password` as secret.
+- Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
+- Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
