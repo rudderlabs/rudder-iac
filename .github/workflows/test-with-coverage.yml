@@ -53,6 +53,10 @@ jobs:
           # the workspace RUDDERSTACK_ACCESS_TOKEN points at. Set the repository
           # variable to 1 only while that workspace is disposable.
           RUN_DESTINATION_E2E: ${{ vars.RUN_DESTINATION_E2E }}
+          # Gates TestConnectionsApply, which opens with the same workspace-wide
+          # destroy. Same rule: set the repository variable to 1 only while that
+          # workspace is disposable.
+          RUN_CONNECTION_E2E: ${{ vars.RUN_CONNECTION_E2E }}
 
       - name: upload cli logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
