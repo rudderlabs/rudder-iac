@@ -141,3 +141,8 @@
 <!-- ticket:DEX-504 -->
 - Google Sheets destination E2E fixture YAML was intentionally not added without matching live-confirmed upstream snapshots; `TestDestinationsApply` count-checks destination fixtures against expected snapshots, so fixture-only coverage would break unrelated destination E2E runs.
 - Defer Google Sheets destination apply fixture and snapshot coverage until an explicitly disposable live destination-enabled workspace is available; prefer unit/registry coverage and compile-only E2E validation in autonomous environments.
+
+## DEX-509 — Kafka E2E Snapshot Deferral
+<!-- ticket:DEX-509 -->
+- Kafka destination E2E fixture YAML should not be added without matching live-confirmed upstream snapshots; destination apply E2E is count-guarded, so fixture-only Kafka coverage would break `TestDestinationsApply` for all destinations.
+- Defer Kafka create/update destination fixture and snapshot coverage until an explicitly disposable live destination-enabled RudderStack workspace is available; rely on unit coverage for validation/conversion and handler extraction in autonomous environments.

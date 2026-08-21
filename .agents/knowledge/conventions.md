@@ -121,3 +121,9 @@
 - Keep Snowflake `use_key_pair_auth` required because it is the top-level warehouse auth selector that drives deterministic `password` versus `private_key` validation.
 - Allow Snowflake storage selectors `role_based_auth` and `use_sas_tokens` to be omitted so imports and partially specified storage configs can rely on backend/UI defaults instead of being rejected by CLI validation.
 - Keep Snowflake `bucket_name` on the shared `single_line_100` pattern; the field is shared across AWS and GCP storage, and provider-specific bucket-name regexes would over-restrict one side of that shared local config surface.
+## DEX-509 — Kafka Destination Config Surface
+<!-- ticket:DEX-509 -->
+- Kafka Avro schema config uses local key `avro_schemas` and API key `avroSchemas`; treat Terraform's singular `avro_schema` / `avroSchema` mapping as stale for this field because integrations-config schema/UI/runtime surfaces use the plural key.
+- Kafka `SecretKeys` should include only local key `password`; certificate/public-key material such as `ca_certificate` and `ssh_public_key` remains import/export visible because db-config marks only `password` as secret.
+- Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
+- Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
