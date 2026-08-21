@@ -8,6 +8,12 @@ import (
 )
 
 func init() {
+	funcs.NewPattern(
+		"snowflake_private_key",
+		`(?s)^-----BEGIN (ENCRYPTED )?PRIVATE KEY-----.+-----END (ENCRYPTED )?PRIVATE KEY-----$`,
+		"must be a PEM encoded private key",
+	)
+
 	// schema.json guards namespace with ^((?!pg_|PG_|pG_|Pg_).{0,64})$. RE2 has no
 	// lookahead, so the reserved-prefix half becomes a reject pattern.
 	funcs.NewPatternWithReject(
@@ -60,8 +66,8 @@ var connectionModes = map[string][]string{
 
 // excludeWindow mirrors the only genuinely nested object in the upstream config.
 type excludeWindow struct {
-	StartTime string `mapstructure:"start_time" validate:"omitempty"`
-	EndTime   string `mapstructure:"end_time" validate:"omitempty"`
+	StartTime string `mapstructure:"start_time" validate:"required"`
+	EndTime   string `mapstructure:"end_time" validate:"required"`
 }
 
 // snowflakeConfig is the local YAML config model. It is flat because the upstream
@@ -78,12 +84,12 @@ type snowflakeConfig struct {
 	Role      string `mapstructure:"role" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Namespace string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=snowflake_namespace"`
 
-	// schema.json gates password/privateKey on useKeyPairAuth. Neither carries a
-	// usable literal pattern: password is `.*`, and privateKey's PEM regex has no
-	// template branch, so enforcing it would reject a `{{ .VAR }}` reference.
+	// schema.json gates password/privateKey on useKeyPairAuth. password's literal
+	// pattern accepts any string, while privateKey has no template branch and must
+	// stay PEM-shaped after CLI variables have been resolved.
 	UseKeyPairAuth       *bool  `mapstructure:"use_key_pair_auth" validate:"required"`
 	Password             string `mapstructure:"password" validate:"required_if=UseKeyPairAuth false"`
-	PrivateKey           string `mapstructure:"private_key" validate:"required_if=UseKeyPairAuth true"`
+	PrivateKey           string `mapstructure:"private_key" validate:"required_if=UseKeyPairAuth true,omitempty,pattern=snowflake_private_key"`
 	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,pattern=single_line_100"`
 
 	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
@@ -98,32 +104,32 @@ type snowflakeConfig struct {
 	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
 	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
 
-	// Object-storage staging. cloudProvider selects the provider, but upstream
-	// keeps every provider's keys in the same flat object, so none of these are
-	// gated on it.
+	// Object-storage staging. Upstream keeps every provider's keys in the same
+	// flat object, so conditionals only validate the active provider; stale keys
+	// from another provider can still round-trip without erasure.
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	CloudProvider             string `mapstructure:"cloud_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=AWS GCP AZURE"`
 	Prefix                    string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
-	StorageIntegration        string `mapstructure:"storage_integration" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	StorageIntegration        string `mapstructure:"storage_integration" validate:"required_unless=UseRudderStorage true CloudProvider AWS,omitempty,dynamic_or_pattern=single_line_100"`
 
 	// AWS
-	BucketName    string `mapstructure:"bucket_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	BucketName    string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
-	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	AccessKeyID   string `mapstructure:"access_key_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	AccessKey     string `mapstructure:"access_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
+	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,pattern=single_line_100"`
+	AccessKey     string `mapstructure:"access_key" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	EnableSSE     *bool  `mapstructure:"enable_sse"`
 
 	// GCP
-	Credentials string `mapstructure:"credentials" validate:"omitempty"`
+	Credentials string `mapstructure:"credentials" validate:"required_if=UseRudderStorage false CloudProvider GCP"`
 
 	// Azure
-	ContainerName string `mapstructure:"container_name" validate:"omitempty,dynamic_or_pattern=azure_container_name"`
-	AccountName   string `mapstructure:"account_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	AccountKey    string `mapstructure:"account_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	ContainerName string `mapstructure:"container_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=azure_container_name"`
+	AccountName   string `mapstructure:"account_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
+	AccountKey    string `mapstructure:"account_key" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens false,omitempty,dynamic_or_pattern=single_line_100"`
 	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
-	SASToken      string `mapstructure:"sas_token" validate:"omitempty"`
+	SASToken      string `mapstructure:"sas_token" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens true"`
 
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

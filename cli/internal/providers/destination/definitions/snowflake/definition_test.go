@@ -43,6 +43,16 @@ func copyConfig(src map[string]any) map[string]any {
 	return out
 }
 
+func assertHasPath(t *testing.T, errors []definitions.ConfigError, path string) {
+	t.Helper()
+	for _, err := range errors {
+		if err.Path == path {
+			return
+		}
+	}
+	assert.Failf(t, "missing validation path", "expected path %s in %#v", path, errors)
+}
+
 func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -93,14 +103,13 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 	t.Run("required fields missing", func(t *testing.T) {
 		t.Parallel()
 
-		for _, field := range []string{"account", "database", "warehouse", "user", "sync_frequency"} {
+		for _, field := range []string{"account", "database", "warehouse", "user", "use_key_pair_auth", "sync_frequency", "use_rudder_storage"} {
 			cfg := copyConfig(minimalConfig())
 			delete(cfg, field)
 
 			errors := registered.ValidateConfig(cfg)
 			require.NotEmpty(t, errors, field)
-			assert.Equal(t, "/"+field, errors[0].Path)
-			assert.Contains(t, errors[0].Message, "required")
+			assertHasPath(t, errors, "/"+field)
 		}
 	})
 
@@ -130,6 +139,16 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assert.Equal(t, "/private_key", errors[0].Path)
 	})
 
+	t.Run("private key requires pem literal", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_key_pair_auth"] = true
+		delete(cfg, "password")
+		cfg["private_key"] = "raw-private-key"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/private_key")
+	})
+
 	t.Run("cloud provider required when rudder storage is off", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
@@ -147,6 +166,18 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			cfg := copyConfig(minimalConfig())
 			cfg["use_rudder_storage"] = false
 			cfg["cloud_provider"] = provider
+			switch provider {
+			case "AWS":
+				cfg["bucket_name"] = "rudder-bucket"
+			case "GCP":
+				cfg["bucket_name"] = "rudder-gcs"
+				cfg["storage_integration"] = "RUDDER_GCS"
+				cfg["credentials"] = "{}"
+			case "AZURE":
+				cfg["container_name"] = "rudder-logs"
+				cfg["storage_integration"] = "RUDDER_AZURE"
+				cfg["account_name"] = "rudderaccount"
+			}
 			assert.Empty(t, registered.ValidateConfig(cfg), provider)
 		}
 
@@ -156,6 +187,131 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(cfg)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/cloud_provider", errors[0].Path)
+	})
+
+	t.Run("exclude window requires both boundaries when present", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["exclude_window"] = map[string]any{"start_time": "05:00"}
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/exclude_window/end_time")
+	})
+
+	t.Run("aws storage requires bucket name", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/bucket_name")
+	})
+
+	t.Run("aws omitted role selector uses backend default", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("aws explicit role auth requires iam role arn", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		cfg["role_based_auth"] = true
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")
+	})
+
+	t.Run("aws explicit key auth requires both access keys", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		cfg["role_based_auth"] = false
+		cfg["access_key_id"] = "access-key-id"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key")
+	})
+
+	t.Run("aws access key id template does not bypass literal pattern", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		cfg["role_based_auth"] = false
+		cfg["access_key_id"] = "{{ config.key || " + strings.Repeat("a", 150) + " }}"
+		cfg["access_key"] = "{{ config.secret || secret-access-key }}"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key_id")
+	})
+
+	t.Run("gcp storage requires staging fields", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "GCP"
+
+		errors := registered.ValidateConfig(cfg)
+		assertHasPath(t, errors, "/bucket_name")
+		assertHasPath(t, errors, "/storage_integration")
+		assertHasPath(t, errors, "/credentials")
+	})
+
+	t.Run("azure storage requires staging fields", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+
+		errors := registered.ValidateConfig(cfg)
+		assertHasPath(t, errors, "/container_name")
+		assertHasPath(t, errors, "/storage_integration")
+		assertHasPath(t, errors, "/account_name")
+	})
+
+	t.Run("azure omitted sas selector uses backend default", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+		cfg["container_name"] = "azure-logs"
+		cfg["storage_integration"] = "RUDDER_AZURE"
+		cfg["account_name"] = "rudderaccount"
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("azure explicit account key auth requires account key", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+		cfg["container_name"] = "azure-logs"
+		cfg["storage_integration"] = "RUDDER_AZURE"
+		cfg["account_name"] = "rudderaccount"
+		cfg["use_sas_tokens"] = false
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/account_key")
+	})
+
+	t.Run("azure explicit sas auth requires sas token", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+		cfg["container_name"] = "azure-logs"
+		cfg["storage_integration"] = "RUDDER_AZURE"
+		cfg["account_name"] = "rudderaccount"
+		cfg["use_sas_tokens"] = true
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/sas_token")
 	})
 
 	// The full schema.json enum, including "10" which the definition originally omitted.
@@ -235,6 +391,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["cloud_provider"] = "AZURE"
 		cfg["bucket_name"] = "gcs"
 		cfg["container_name"] = "azure-logs"
+		cfg["storage_integration"] = "azure_int"
 		cfg["account_name"] = "accountname"
 		cfg["account_key"] = "key"
 		cfg["role_based_auth"] = true
