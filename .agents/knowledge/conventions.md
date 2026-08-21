@@ -115,6 +115,12 @@
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
 
+## DEX-691 — Snowflake Validation And Sources
+<!-- ticket:DEX-691 -->
+- Snowflake intentionally keeps its existing narrowed `SourceTypes`/connection-mode surface during focused config-tag/schema-parity fixes; do not broaden it to warehouse precedents such as Postgres, Redshift, or BigQuery unless the task explicitly requires source-type metadata changes.
+- Keep Snowflake `use_key_pair_auth` required because it is the top-level warehouse auth selector that drives deterministic `password` versus `private_key` validation.
+- Allow Snowflake storage selectors `role_based_auth` and `use_sas_tokens` to be omitted so imports and partially specified storage configs can rely on backend/UI defaults instead of being rejected by CLI validation.
+- Keep Snowflake `bucket_name` on the shared `single_line_100` pattern; the field is shared across AWS and GCP storage, and provider-specific bucket-name regexes would over-restrict one side of that shared local config surface.
 ## DEX-509 — Kafka Destination Config Surface
 <!-- ticket:DEX-509 -->
 - Kafka Avro schema config uses local key `avro_schemas` and API key `avroSchemas`; treat Terraform's singular `avro_schema` / `avroSchema` mapping as stale for this field because integrations-config schema/UI/runtime surfaces use the plural key.

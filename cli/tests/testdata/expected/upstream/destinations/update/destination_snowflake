@@ -8,20 +8,25 @@
   "enabled": true,
   "config": {
     "account": "rudder-cli-e2e.us-east-1",
+    "allowUsersContextTraits": false,
     "database": "RUDDER_E2E_UPD",
-    "warehouse": "RUDDER_WH",
-    "user": "RUDDER_CLI_E2E",
-    "role": "RUDDER_ROLE",
+    "excludeWindow": {
+      "excludeWindowEndTime": "05:00",
+      "excludeWindowStartTime": "04:00"
+    },
+    "manualSync": false,
     "namespace": "rudder_cli_e2e",
-    "useKeyPairAuth": false,
-    "syncFrequency": "360",
+    "preferAppend": true,
+    "role": "RUDDER_ROLE",
     "skipTracksTable": false,
     "skipUsersTable": true,
-    "preferAppend": true,
-    "manualSync": false,
+    "syncFrequency": "360",
+    "syncStartAt": "01:00",
     "underscoreDivideNumbers": false,
-    "allowUsersContextTraits": false,
-    "useRudderStorage": true
+    "useKeyPairAuth": false,
+    "useRudderStorage": true,
+    "user": "RUDDER_CLI_E2E",
+    "warehouse": "RUDDER_WH"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

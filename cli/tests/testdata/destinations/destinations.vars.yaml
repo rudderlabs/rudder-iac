@@ -14,7 +14,6 @@ CONFLUENT_CLOUD_API_SECRET: confluentCloudApiSecretXXXXXXX
 GCS_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy","private_key":"-----BEGIN PRIVATE KEY-----\\nnot-a-real-key\\n-----END PRIVATE KEY-----\\n","client_email":"rudder-cli-e2e@example.iam.gserviceaccount.com","client_id":"000000000000000000000"}'
 GOOGLE_PUBSUB_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"google-pubsub-dummy","private_key":"-----BEGIN PRIVATE KEY-----\\nnot-a-real-google-pubsub-key\\n-----END PRIVATE KEY-----\\n","client_email":"rudder-cli-google-pubsub-e2e@example.iam.gserviceaccount.com","client_id":"111111111111111111111"}'
 FACEBOOK_CONVERSIONS_ACCESS_TOKEN: facebookConversionsAccessTokenXXX
-KAFKA_PASSWORD: kafkaPasswordXXXXXXXXXXXX
 KINESIS_ACCESS_KEY_ID: AKIAKINESISXXXXXXXXX
 KINESIS_ACCESS_KEY: kinesisSecretAccessKeyXXXXXXXXXXXXXXXXXXXX
 MARKETO_CLIENT_SECRET: marketoClientSecretXXXXXXXXXXX
