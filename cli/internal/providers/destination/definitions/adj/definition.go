@@ -45,11 +45,11 @@ type enableInstallAttributionTracking struct {
 // adjustConfig is the local YAML config model. Field set mirrors terraform
 // destination_adjust mappings; validation constraints mirror schema.json.
 type adjustConfig struct {
-	AppToken                         string                            `mapstructure:"app_token" validate:"required,max=100"`
-	Delay                            string                            `mapstructure:"delay" validate:"omitempty,max=100"`
+	AppToken                         string                            `mapstructure:"app_token" validate:"required,dynamic_or_pattern=single_line_100"`
+	Delay                            string                            `mapstructure:"delay" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Environment                      *bool                             `mapstructure:"environment"`
 	CustomMappings                   []adjustMapping                   `mapstructure:"custom_mappings" validate:"omitempty,dive"`
-	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_param_keys" validate:"omitempty,dive"`
+	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_params_keys" validate:"omitempty,dive"`
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`
 	EventFilteringWhitelist          []string                          `mapstructure:"event_filtering_whitelist"`
 	EventFilteringBlacklist          []string                          `mapstructure:"event_filtering_blacklist"`
@@ -60,22 +60,22 @@ type adjustConfig struct {
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("appToken", "app_token"),
-		converter.Simple("delay", "delay", converter.SkipZeroValue),
-		converter.Simple("environment", "environment", converter.SkipZeroValue),
+		converter.Simple("delay", "delay"),
+		converter.Simple("environment", "environment"),
 		converter.ArrayWithObjects("customMappings", "custom_mappings", map[string]any{
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.ArrayWithObjects("partnerParamKeys", "partner_param_keys", map[string]any{
+		converter.ArrayWithObjects("partnerParamsKeys", "partner_params_keys", map[string]any{
 			"from": "from",
 			"to":   "to",
 		}),
 		converter.Gated(
-			converter.Simple("enableInstallAttributionTracking.android", "enable_install_attribution_tracking.android", converter.SkipZeroValue),
+			converter.Simple("enableInstallAttributionTracking.android", "enable_install_attribution_tracking.android"),
 			common.SourceTypeAndroid, common.SourceTypeAndroidKotlin,
 		),
 		converter.Gated(
-			converter.Simple("enableInstallAttributionTracking.ios", "enable_install_attribution_tracking.ios", converter.SkipZeroValue),
+			converter.Simple("enableInstallAttributionTracking.ios", "enable_install_attribution_tracking.ios"),
 			common.SourceTypeIOS, common.SourceTypeIOSSwift,
 		),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
@@ -92,8 +92,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ADJ",
 		Version:    1,
 		Properties: properties,
-		// db-config secretKeys is empty; terraform marks app_token Sensitive.
-		SecretKeys: []string{"app_token"},
+		// db-config declares no secretKeys. Terraform marks app_token Sensitive, but
+		// db-config is authoritative for write-only values: the API returns app_token,
+		// so wrapping it as a secret would make the destination diff on every apply
+		// and export as a "{{ .VAR }}" the user has to fill in by hand.
+		SecretKeys: nil,
 		NewConfig: func() any {
 			return &adjustConfig{}
 		},

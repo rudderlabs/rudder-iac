@@ -20,10 +20,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	registered, err := registry.Get("adj", 1)
 	require.NoError(t, err)
 
-	assert.Equal(t, "adjust", registered.Type)
+	assert.Equal(t, "adj", registered.Type)
 	assert.Equal(t, "ADJ", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"app_token"}, registered.SecretKeys())
+	assert.Empty(t, registered.SecretKeys(), "db-config declares no secretKeys")
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift",
@@ -94,7 +94,7 @@ func TestAdjustConfigValidation(t *testing.T) {
 			"custom_mappings": []any{
 				map[string]any{"from": "Product Purchased", "to": "tok1"},
 			},
-			"partner_param_keys": []any{
+			"partner_params_keys": []any{
 				map[string]any{"from": "userId", "to": "user_id"},
 			},
 			"enable_install_attribution_tracking": map[string]any{
@@ -124,7 +124,7 @@ func TestAdjustConfigValidation(t *testing.T) {
 				map[string]any{"from": "Product Purchased", "to": "abc123"},
 				map[string]any{"from": "Signup", "to": "def456"},
 			},
-			"partner_param_keys": []any{
+			"partner_params_keys": []any{
 				map[string]any{"from": "userId", "to": "user_id"},
 			},
 			"enable_install_attribution_tracking": map[string]any{
@@ -208,7 +208,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					{"from": "Product Purchased", "to": "tok1"},
 					{"from": "Signup", "to": "tok2"}
 				],
-				"partner_param_keys": [
+				"partner_params_keys": [
 					{"from": "userId", "to": "user_id"}
 				],
 				"enable_install_attribution_tracking": {
@@ -225,7 +225,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					{"from": "Product Purchased", "to": "tok1"},
 					{"from": "Signup", "to": "tok2"}
 				],
-				"partnerParamKeys": [
+				"partnerParamsKeys": [
 					{"from": "userId", "to": "user_id"}
 				],
 				"enableInstallAttributionTracking": {
