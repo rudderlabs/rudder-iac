@@ -57,7 +57,7 @@ func validateConnectionsSemantic(
 	spec esConnection.ConnectionsSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
-	edgeCounts := projectConnectionEdges(graph)
+	edges := projectConnectionEdges(graph)
 
 	var results []rules.ValidationResult
 	for index, c := range spec.Connections {
@@ -65,12 +65,12 @@ func validateConnectionsSemantic(
 
 		results = append(results, validateEndpointsExist(index, endpoints)...)
 		if endpoints.sourceRefOK && endpoints.destinationRefOK {
-			results = append(results, validatePairUniqueness(edgeCounts, index, endpoints)...)
+			results = append(results, validatePairUniqueness(edges, index, endpoints)...)
 		}
 		// Sharing a destination is only meaningful for a destination that
 		// exists; a dangling ref already carries the V-C1 error above.
 		if endpoints.destination != nil {
-			results = append(results, validateDestinationHasOnlyEventStreamSources(edgeCounts, index, endpoints.destinationID)...)
+			results = append(results, validateDestinationHasOnlyEventStreamSources(edges, index, endpoints.destinationID)...)
 		}
 		if endpoints.source != nil && endpoints.destination != nil {
 			results = append(results, validateSourceTypeCompatibility(registry, index, endpoints)...)
@@ -176,13 +176,19 @@ func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.Va
 // connected once in the project. The count runs over every project
 // connection, so duplicates are flagged whether they sit in this spec or in
 // another one.
-func validatePairUniqueness(edgeCounts map[connectionEdge]int, index int, endpoints connectionEndpoints) []rules.ValidationResult {
+func validatePairUniqueness(edges []connectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
 	pair := connectionEdge{
 		sourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
 		destinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
 	}
 
-	if edgeCounts[pair] <= 1 {
+	count := 0
+	for _, e := range edges {
+		if e == pair {
+			count++
+		}
+	}
+	if count <= 1 {
 		return nil
 	}
 
@@ -199,25 +205,16 @@ func validatePairUniqueness(edgeCounts map[connectionEdge]int, index int, endpoi
 // cannot share a destination with a rETL source — every project connection to
 // this destination must come from an event stream source. This is enforced
 // only in the webapp today, so the CLI is the last line of defense.
-func validateDestinationHasOnlyEventStreamSources(edgeCounts map[connectionEdge]int, index int, destinationID string) []rules.ValidationResult {
+func validateDestinationHasOnlyEventStreamSources(edges []connectionEdge, index int, destinationID string) []rules.ValidationResult {
 	destinationURN := resources.URN(destinationID, destination.DestinationResourceType)
 	sourcePrefix := esSource.ResourceType + ":"
 
-	// Edges are keyed by pair, so each foreign source is reported once however
-	// many times it is connected. Map iteration is unordered — sort so the
-	// reported order is stable across runs.
-	var foreignIDs []string
-	for e := range edgeCounts {
+	var results []rules.ValidationResult
+	for _, e := range edges {
 		if e.destinationURN != destinationURN || strings.HasPrefix(e.sourceURN, sourcePrefix) {
 			continue
 		}
 		_, foreignID, _ := strings.Cut(e.sourceURN, ":")
-		foreignIDs = append(foreignIDs, foreignID)
-	}
-	slices.Sort(foreignIDs)
-
-	var results []rules.ValidationResult
-	for _, foreignID := range foreignIDs {
 		results = append(results, rules.ValidationResult{
 			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
@@ -323,16 +320,20 @@ type connectionEdge struct {
 	destinationURN string
 }
 
-// projectConnectionEdges counts how many project connections wire each
-// endpoint URN pair, so the topology checks (V-C3, V-E1) are map lookups
-// rather than a scan per connection. Event stream connections are the only
-// project-managed connections today; when the retl-connections kind lands,
-// its validations must fold its connections into these checks. Known
-// limitation: only project-managed connections are visible — a connection
-// that exists remotely but is not in the project is invisible at validate
-// time.
-func projectConnectionEdges(graph *resources.Graph) map[connectionEdge]int {
-	edges := make(map[connectionEdge]int)
+// projectConnectionEdges reduces every event stream connection in the graph
+// to its endpoint URN pair for the topology checks (V-C3, V-E1). Event
+// stream connections are the only project-managed connections today; when
+// the retl-connections kind lands, its validations must fold its connections
+// into these checks. Known limitation: only project-managed connections are
+// visible — a connection that exists remotely but is not in the project is
+// invisible at validate time.
+//
+// Edges stay a slice with one entry per declared connection rather than a
+// count keyed by pair: V-E1 must fire once for every place the offending
+// edge is written in the YAML, so the author sees an error against each
+// declaration they have to fix.
+func projectConnectionEdges(graph *resources.Graph) []connectionEdge {
+	var edges []connectionEdge
 	for _, res := range graph.ResourcesByType(esConnection.EventStreamConnectionResourceType) {
 		data := res.Data()
 		src, srcOK := data[esConnection.SourceKey].(*resources.PropertyRef)
@@ -340,7 +341,7 @@ func projectConnectionEdges(graph *resources.Graph) map[connectionEdge]int {
 		if !srcOK || !dstOK {
 			continue
 		}
-		edges[connectionEdge{sourceURN: src.URN, destinationURN: dst.URN}]++
+		edges = append(edges, connectionEdge{sourceURN: src.URN, destinationURN: dst.URN})
 	}
 	return edges
 }
