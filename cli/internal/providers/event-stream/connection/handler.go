@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -184,17 +185,20 @@ func parseDestinationRef(ref string) (*resources.PropertyRef, error) {
 	return propertyRef, nil
 }
 
+// scalarRefRegex matches a well-formed scalar reference "#<kind>:<id>". It is
+// the same pattern the connection spec validation rule applies, so parsing and
+// validation agree on what a reference looks like. The id side deliberately
+// accepts any non-empty single-line value — endpoint local ids carry no charset
+// restriction, but neither the kind nor the id may span multiple lines.
+var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
+
 // refID extracts <id> from a scalar "#<kind>:<id>" reference.
 func refID(ref string, kind string) (string, error) {
-	trimmed := strings.TrimSpace(ref)
-	if !strings.HasPrefix(trimmed, "#") {
+	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
+	if matches == nil || matches[1] != kind {
 		return "", fmt.Errorf("invalid reference %q: expected format #%s:<id>", ref, kind)
 	}
-	parts := strings.SplitN(strings.TrimPrefix(trimmed, "#"), ":", 2)
-	if len(parts) != 2 || parts[0] != kind || parts[1] == "" {
-		return "", fmt.Errorf("invalid reference %q: expected format #%s:<id>", ref, kind)
-	}
-	return parts[1], nil
+	return matches[2], nil
 }
 
 // LoadImportMetadata is a no-op: import support for connections lands with
