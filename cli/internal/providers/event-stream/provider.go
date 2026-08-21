@@ -15,6 +15,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -311,9 +312,16 @@ func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
+	r := []rules.Rule{
 		sourceRules.NewSourceSpecSyntaxValidRule(),
 	}
+	// Connection rules ride the same gate as the kind itself: when
+	// connectionSupport is off the kind is not a supported match pattern and
+	// registering a rule scoped to it would fail registry validation.
+	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
+		r = append(r, connectionRules.NewConnectionSpecSyntaxValidRule())
+	}
+	return r
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {

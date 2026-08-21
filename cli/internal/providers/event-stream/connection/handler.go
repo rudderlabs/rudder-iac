@@ -192,16 +192,17 @@ func parseDestinationRef(ref string) (*resources.PropertyRef, error) {
 	return propertyRef, nil
 }
 
-// scalarRefRegex matches a well-formed scalar reference "#<kind>:<id>". It is
-// the same pattern the connection spec validation rule applies, so parsing and
-// validation agree on what a reference looks like. The id side deliberately
-// accepts any non-empty single-line value — endpoint local ids carry no charset
+// ScalarRefRegex matches a well-formed scalar reference "#<kind>:<id>". It is
+// the single definition of the connection reference format: refID parses with
+// it below, and the connection spec syntax rule matches against it, so parsing
+// and validation cannot drift apart. The id side deliberately accepts any
+// non-empty single-line value — endpoint local ids carry no charset
 // restriction, but neither the kind nor the id may span multiple lines.
-var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
+var ScalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
 
 // refID extracts <id> from a scalar "#<kind>:<id>" reference.
 func refID(ref string, kind string) (string, error) {
-	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
+	matches := ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil || matches[1] != kind {
 		return "", fmt.Errorf("invalid reference %q: expected format #%s:<id>", ref, kind)
 	}
