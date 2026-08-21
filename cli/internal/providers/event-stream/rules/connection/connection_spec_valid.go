@@ -2,7 +2,6 @@ package connection
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -12,13 +11,6 @@ import (
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
-
-// scalarRefRegex matches any well-formed scalar reference "#<kind>:<id>" so a
-// ref pointing at the wrong kind can be told apart from a malformed one. The
-// id side deliberately accepts any non-empty single-line value — endpoint
-// local ids carry no charset restriction, but neither the kind nor the id may
-// span multiple lines.
-var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
 
 var validateConnectionsSpec = func(
 	_ string,
@@ -59,7 +51,10 @@ func validateEndpointRef(index int, field, ref, wantKind, wantLabel string) []ru
 
 	reference := fmt.Sprintf("/connections/%d/%s", index, field)
 
-	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
+	// esConnection.ScalarRefRegex is the same pattern the handler parses with,
+	// so a ref pointing at the wrong kind can be told apart from a malformed
+	// one without the two definitions drifting apart.
+	matches := esConnection.ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return []rules.ValidationResult{{
 			Reference: reference,
