@@ -1,0 +1,40 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "kafka-avro",
+  "name": "E2E Kafka Avro Updated",
+  "type": "KAFKA",
+  "enabled": true,
+  "config": {
+    "avroSchemas": [
+      {
+        "schema": "{\"type\":\"record\",\"name\":\"Track\",\"fields\":[{\"name\":\"event\",\"type\":\"string\"}]}",
+        "schemaId": "track-value"
+      }
+    ],
+    "convertToAvro": true,
+    "embedAvroSchemaID": true,
+    "enableMultiTopic": true,
+    "eventToTopicMap": [
+      {
+        "from": "Order Completed",
+        "to": "rudder-orders-updated"
+      }
+    ],
+    "eventTypeToTopicMap": [
+      {
+        "from": "identify",
+        "to": "rudder-identifies"
+      }
+    ],
+    "hostName": "kafka-avro.rudder-cli-e2e.internal",
+    "port": "9092",
+    "sslEnabled": false,
+    "topic": "rudder-cli-e2e-avro-updated",
+    "useSASL": false,
+    "useSSH": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

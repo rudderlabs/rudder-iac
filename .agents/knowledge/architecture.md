@@ -184,3 +184,8 @@
 <!-- ticket:DEX-504 -->
 - Google Sheets destination support is implemented as CLI destination type `googlesheets` for API type `GOOGLESHEETS` under `cli/internal/providers/destination/definitions/googlesheets`; Terraform's `google_sheets` registration name is not used for CLI resource identity.
 - `googlesheets` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+
+## DEX-509 — Kafka Destination Onboarding
+<!-- ticket:DEX-509 -->
+- `kafka` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Kafka destination registry code order follows the explicit onboarding placement after Kinesis and before Marketo inside the unverified block, while exported/supported type lists may still be sorted lexicographically by implementation.

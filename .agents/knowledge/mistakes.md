@@ -38,3 +38,9 @@
 - Durable mitigation: e2e tests that may run with destination support against a shared workspace should also enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` so remote state loading can decode unverified managed destinations left by destination e2e.
 - In the test-with-coverage workflow, `RUDDERSTACK_X_DESTINATION_SUPPORT` is passed to every `cli/tests` E2E command; the unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, and opt-in `AccountsImportWorkspace`, not only destination-specific tests.
 - Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors.
+
+## DEX-509 — Kafka Destination Fixture Snapshot Count Mismatch
+<!-- ticket:DEX-509 -->
+- CI failed when Kafka expected upstream destination snapshots were added under `cli/tests/testdata/expected/upstream/destinations/{create,update}/` without matching Kafka fixture YAML under `cli/tests/testdata/destinations/{create,update}/`.
+- The live `TestDestinationsApply` snapshot tester reported `resource count mismatch: got 45 managed destinations, want 48 resources`, showing that fixture and expected snapshot counts must stay exactly matched.
+- Durable mitigation: defer live destination snapshots by omitting both Kafka fixtures and snapshots until they can be captured together in an explicitly disposable live destination-enabled workspace.

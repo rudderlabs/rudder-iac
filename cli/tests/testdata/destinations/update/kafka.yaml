@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: kafka
+spec:
+  id: kafka
+  display_name: E2E Kafka Updated
+  type: kafka
+  enabled: true
+  definition_version: 1
+  config:
+    host_name: kafka-1.rudder-cli-e2e.internal,kafka-2.rudder-cli-e2e.internal
+    port: "9092"
+    topic: rudder-cli-e2e-updated
+    ssl_enabled: true
+    ca_certificate: "-----BEGIN CERTIFICATE-----\nrudderCliE2eKafkaCa\n-----END CERTIFICATE-----"
+    use_sasl: true
+    sasl_type: sha512
+    username: rudder_cli_e2e
+    password: "{{ .KAFKA_PASSWORD }}"
+    convert_to_avro: false
+    enable_multi_topic: false
+    use_ssh: false
