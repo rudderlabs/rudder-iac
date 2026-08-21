@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -54,7 +55,20 @@ type Provider struct {
 	handlers   map[string]handler
 }
 
-func New(client esClient.EventStreamStore) *Provider {
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithConnectionSupport registers the event-stream-connections kind. Without
+// it the kind is simply not a supported spec, so callers gate this behind the
+// connectionSupport experimental flag.
+func WithConnectionSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
+		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler()
+	}
+}
+
+func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
 		kindToType: map[string]string{
 			"event-stream-source": sourceHandler.ResourceType,
@@ -62,6 +76,9 @@ func New(client esClient.EventStreamStore) *Provider {
 		handlers: make(map[string]handler),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	for _, opt := range opts {
+		opt(p)
+	}
 	return p
 }
 
@@ -87,10 +104,18 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	connectionHandler.EventStreamConnectionResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
