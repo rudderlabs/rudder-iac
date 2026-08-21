@@ -17,6 +17,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
@@ -296,6 +297,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
+		if err := registry.Register(activecampaign.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering active_campaign destination definition: %w", err)
+		}
 		if err := registry.Register(adj.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering adj destination definition: %w", err)
 		}
