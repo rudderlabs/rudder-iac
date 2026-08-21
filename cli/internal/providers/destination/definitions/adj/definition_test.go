@@ -1,6 +1,7 @@
 package adj_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -142,6 +143,66 @@ func TestAdjustConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("pattern constraints reject invalid literals", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			field string
+			value any
+			path  string
+		}{
+			{"app_token", "bad\ntoken", "/app_token"},
+			{"delay", "bad\ndelay", "/delay"},
+			{"custom_mappings", []any{map[string]any{"from": "bad\nfrom", "to": "x"}}, "/custom_mappings/0/from"},
+			{"partner_params_keys", []any{map[string]any{"from": "x", "to": "bad\nto"}}, "/partner_params_keys/0/to"},
+			{"event_filtering_blacklist", []any{"bad\nevent"}, "/event_filtering_blacklist/0"},
+			{"event_filtering_whitelist", []any{"bad\nevent"}, "/event_filtering_whitelist/0"},
+		}
+
+		for _, tc := range cases {
+			cfg := map[string]any{"app_token": "token"}
+			cfg[tc.field] = tc.value
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, tc.field)
+			assert.Equal(t, tc.path, errors[0].Path)
+		}
+	})
+
+	// Only the nested mapping and event-filter patterns carry a template branch
+	// upstream; app_token and delay do not, so a template must be rejected there.
+	t.Run("templates accepted only where schema allows them", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"app_token":                 "token",
+			"custom_mappings":           []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
+			"partner_params_keys":       []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
+			"event_filtering_blacklist": []any{"{{ config.event || Password Reset }}"},
+		}))
+
+		for _, field := range []string{"app_token", "delay"} {
+			cfg := map[string]any{"app_token": "token"}
+			cfg[field] = "{{ config.x || " + strings.Repeat("a", 150) + " }}"
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+		}
+	})
+
+	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{"one_trust_cookie_categories", "ketch_consent_purposes"} {
+			cfg := map[string]any{"app_token": "token", key: map[string]any{}}
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {

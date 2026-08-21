@@ -8,11 +8,6 @@
   "enabled": true,
   "config": {
     "appToken": "rudderCliE2eAppToken",
-    "blacklistedEvents": [
-      {
-        "eventName": "Password Reset"
-      }
-    ],
     "customMappings": [
       {
         "from": "Order Completed",
@@ -25,11 +20,16 @@
       "ios": true
     },
     "environment": true,
-    "eventFilteringOption": "blacklistedEvents",
+    "eventFilteringOption": "whitelistedEvents",
     "partnerParamsKeys": [
       {
         "from": "userId",
         "to": "user_id"
+      }
+    ],
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
       }
     ]
   },
