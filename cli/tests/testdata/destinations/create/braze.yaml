@@ -1,0 +1,34 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: braze
+spec:
+  id: braze
+  display_name: E2E Braze
+  type: braze
+  enabled: true
+  definition_version: 1
+  config:
+    data_center: US-01
+    rest_api_key: "{{ .BRAZE_REST_API_KEY }}"
+    app_key: rudder-cli-e2e-app-key
+    use_platform_specific_api_keys: false
+    enable_subscription_group_in_group_call: false
+    enable_nested_array_operations: false
+    send_purchase_event_with_extra_properties: false
+    support_dedup: false
+    use_ecommerce_recommended_events: true
+    event_filtering:
+      whitelist:
+        - Order Completed
+    use_native_sdk:
+      web: true
+      android: false
+    track_anonymous_user:
+      web: false
+    enable_braze_logging:
+      web: false
+    enable_push_notification:
+      web: false
+    allow_user_supplied_javascript:
+      web: false

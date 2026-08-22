@@ -1,0 +1,55 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "braze",
+  "name": "E2E Braze Updated",
+  "type": "BRAZE",
+  "enabled": true,
+  "config": {
+    "dataCenter": "EU-01",
+    "enableSubscriptionGroupInGroupCall": true,
+    "enableNestedArrayOperations": true,
+    "sendPurchaseEventWithExtraProperties": true,
+    "supportDedup": true,
+    "useEcommerceRecommendedEvents": false,
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "useNativeSDK": {
+      "web": false,
+      "android": true
+    },
+    "trackAnonymousUser": {
+      "web": true
+    },
+    "enableBrazeLogging": {
+      "web": true
+    },
+    "enablePushNotification": {
+      "web": true
+    },
+    "allowUserSuppliedJavascript": {
+      "web": true
+    },
+    "appKey": "rudder-cli-e2e-app-key-updated",
+    "usePlatformSpecificApiKeys": false,
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
