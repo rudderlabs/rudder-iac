@@ -1,0 +1,39 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: posthog
+spec:
+  id: posthog
+  display_name: E2E PostHog Updated
+  type: posthog
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: "{{ .POSTHOG_API_KEY }}"
+    endpoint: eu.posthog.com
+    use_v2_group: true
+    event_filtering:
+      blacklist:
+        - Page Viewed
+    use_native_sdk:
+      web: false
+    autocapture:
+      web: true
+    capture_page_view:
+      web: false
+    disable_session_recording:
+      web: false
+    enable_local_storage_persistence:
+      web: true
+    person_profiles:
+      web: identified_only
+    xhr_headers:
+      - key: X-Rudder-Source
+        value: rudder-cli-e2e-updated
+    property_blacklist:
+      - property: phone
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

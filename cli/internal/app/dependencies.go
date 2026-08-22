@@ -36,6 +36,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -356,6 +357,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(postgres.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering postgres destination definition: %w", err)
+		}
+		if err := registry.Register(posthog.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering posthog destination definition: %w", err)
 		}
 		if err := registry.Register(redis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering redis destination definition: %w", err)
