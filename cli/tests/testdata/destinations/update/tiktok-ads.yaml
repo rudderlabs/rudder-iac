@@ -1,0 +1,30 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: tiktok-ads
+spec:
+  id: tiktok-ads
+  display_name: E2E TikTok Ads Updated
+  type: tiktok_ads
+  enabled: true
+  definition_version: 1
+  config:
+    pixel_code: C0000000000000000011
+    access_token: "{{ .TIKTOK_ADS_ACCESS_TOKEN }}"
+    version: v2
+    hash_user_properties: false
+    send_custom_events: true
+    events_to_standard:
+      - from: Order Completed
+        to: Purchase
+      - from: Product Added
+        to: AddToCart
+    event_filtering_whitelist:
+      - Order Completed
+    use_native_sdk:
+      web: false
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics
