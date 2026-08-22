@@ -1,0 +1,33 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: customerio
+spec:
+  id: customerio
+  display_name: E2E Customer.io
+  type: customerio
+  enabled: true
+  definition_version: 1
+  config:
+    site_id: rudderCliE2eSiteId
+    api_key: "{{ .CUSTOMERIO_API_KEY }}"
+    datacenter: US
+    device_token_event_name: Device Token Registered
+    event_filtering:
+      whitelist:
+        - Order Completed
+    use_native_sdk:
+      web: true
+      android: false
+      ios: false
+    send_page_name_in_sdk:
+      web: false
+    data_use_in_app:
+      web: false
+    auto_track_device_attributes:
+      android: false
+      ios: false
+    background_queue_min_number_of_tasks:
+      android: "10"
+    background_queue_seconds_delay:
+      android: "30"
