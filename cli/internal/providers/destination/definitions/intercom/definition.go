@@ -67,22 +67,6 @@ type useNativeSDK struct {
 	Web     *bool `mapstructure:"web"`
 }
 
-type connectionMode struct {
-	Android       string `mapstructure:"android" validate:"omitempty,dynamic_or_oneof=cloud device"`
-	AndroidKotlin string `mapstructure:"android_kotlin" validate:"omitempty,dynamic_or_oneof=cloud"`
-	IOS           string `mapstructure:"ios" validate:"omitempty,dynamic_or_oneof=cloud device"`
-	IOSSwift      string `mapstructure:"ios_swift" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Web           string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud device"`
-	Unity         string `mapstructure:"unity" validate:"omitempty,dynamic_or_oneof=cloud"`
-	AMP           string `mapstructure:"amp" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Cloud         string `mapstructure:"cloud" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Warehouse     string `mapstructure:"warehouse" validate:"omitempty,dynamic_or_oneof=cloud"`
-	ReactNative   string `mapstructure:"react_native" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Flutter       string `mapstructure:"flutter" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Cordova       string `mapstructure:"cordova" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Shopify       string `mapstructure:"shopify" validate:"omitempty,dynamic_or_oneof=cloud"`
-}
-
 // NewDefinition returns the Intercom destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
