@@ -24,6 +24,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
 	confluentcloud "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/confluent_cloud"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
@@ -319,6 +320,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(confluentcloud.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering confluent_cloud destination definition: %w", err)
+		}
+		if err := registry.Register(customerio.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering customerio destination definition: %w", err)
 		}
 		if err := registry.Register(customerioaudience.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering customerio_audience destination definition: %w", err)

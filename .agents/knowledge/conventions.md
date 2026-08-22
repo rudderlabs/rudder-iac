@@ -139,3 +139,8 @@
 - Braze destination definitions should keep the broad non-storage db-config/Terraform source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Do not add custom cross-field requiredness for Braze `rest_api_key`, `app_key`, or platform API keys based on nested `connection_mode` values; the upstream schema uses broad `anyOf`/OR branches with `usePlatformSpecificApiKeys`, and mirroring that with validator tags is brittle and can over-restrict imports with backend/UI defaults.
 - Braze validation should still enforce required `data_center`, enum/mode constraints, unknown-key rejection, and schema-derived key/event patterns, leaving mode-dependent requiredness to backend apply semantics when built-in tags cannot express it cleanly.
+## DEX-494 — Customer.io Config Surface
+<!-- ticket:DEX-494 -->
+- Customer.io models shared `consent_management` only; legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unknown local config fields because the backend migrates those surfaces into `consentManagement` and drops the legacy keys.
+- Customer.io `SecretKeys` should stay empty because db-config `secretKeys` is authoritative for CLI write-only secret handling; Terraform sensitivity alone should not make `api_key` a CLI secret placeholder field.
+- Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; `useNativeSDK` is handled through source-type config rather than the ordinary gated-property list.

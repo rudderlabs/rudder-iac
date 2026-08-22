@@ -200,3 +200,9 @@
 <!-- ticket:DEX-492 -->
 - `braze` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Braze destination support is implemented as a CLI destination definition under `cli/internal/providers/destination/definitions/braze`, with integrations-config left read-only for onboarding changes.
+## DEX-494 — Customer.io Destination Onboarding
+<!-- ticket:DEX-494 -->
+- Customer.io destination support is implemented as CLI local type `customerio`, API type `CUSTOMERIO`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/customerio`.
+- `customerio` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Customer.io source-type support intentionally keeps the broad mapped upstream set rather than the S3/GCS-style storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Customer.io local config maps `site_id`, `api_key`, `device_token_event_name`, `datacenter`, SDK/device nested source blocks, `event_filtering` whitelist/blacklist discriminator, and shared `consent_management`; `use_native_sdk` remains a source-type config block rather than an ordinary gated property.
