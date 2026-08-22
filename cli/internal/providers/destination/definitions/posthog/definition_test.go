@@ -281,6 +281,34 @@ func TestPosthogConfigValidation(t *testing.T) {
 // with a capital L; terraform spells it propertyBlacklist. Writing terraform's
 // spelling would set a key the backend does not read, and erase the real one on
 // the first apply — a silent data loss with no validation error.
+// eventFilteringOption can only carry one list, and the discriminator selects by
+// map iteration, so allowing both would emit a non-deterministic option value.
+func TestPosthogEventFilteringListsAreExclusive(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(posthog.NewDefinition()))
+	registered, err := registry.Get("posthog", 1)
+	require.NoError(t, err)
+
+	errs := registered.ValidateConfig(map[string]any{
+		"api_key": "phc_key",
+		"event_filtering": map[string]any{
+			"whitelist": []any{"Order Completed"},
+			"blacklist": []any{"Page Viewed"},
+		},
+	})
+	require.NotEmpty(t, errs, "whitelist and blacklist must be mutually exclusive")
+
+	// schema.json constrains each eventName with ^(.{0,100})$
+	errs = registered.ValidateConfig(map[string]any{
+		"api_key":         "phc_key",
+		"event_filtering": map[string]any{"whitelist": []any{"bad\nevent"}},
+	})
+	require.NotEmpty(t, errs)
+	assert.Equal(t, "/event_filtering/whitelist/0", errs[0].Path)
+}
+
 func TestPosthogPropertyBlackListUsesUpstreamCasing(t *testing.T) {
 	t.Parallel()
 

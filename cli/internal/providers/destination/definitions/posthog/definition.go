@@ -62,9 +62,11 @@ type propertyBlacklistItem struct {
 	Property string `mapstructure:"property"`
 }
 
+// The eventFilteringOption discriminator can only represent one list, and it
+// picks by map iteration, so setting both would emit a non-deterministic value.
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist"`
-	Blacklist []string `mapstructure:"blacklist"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 type useNativeSDK struct {
