@@ -151,3 +151,9 @@
 <!-- ticket:DEX-487 -->
 - ActiveCampaign destination E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available, avoiding `TestDestinationsApply` fixture/snapshot count-guard failures.
 - The intended deferred ActiveCampaign E2E variation is a standard `active_campaign` destination with `api_url`/`api_key` plus optional `actid`/`event_key`, updating `display_name` and mutable optional values while keeping secrets variable-backed.
+
+## DEX-492 — Braze E2E Snapshot Deferral
+<!-- ticket:DEX-492 -->
+- Braze destination apply E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable destination-enabled RudderStack workspace is available to live-capture matching snapshots.
+- Do not add fixture-only Braze YAML or hand-derived Braze upstream snapshots: `TestDestinationsApply` count-checks fixture/snapshot parity, so unmatched Braze fixtures or snapshots can break the entire destination E2E suite.
+- Until live snapshots are available, rely on Braze definition validation/conversion tests plus compile/skip E2E validation for autonomous coverage.

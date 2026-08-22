@@ -195,3 +195,8 @@
 - ActiveCampaign destination support is implemented as CLI local type `active_campaign`, API type `ACTIVE_CAMPAIGN`, and destination version `1`.
 - `active_campaign` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - ActiveCampaign local config is intentionally flat: `api_url`, `api_key`, `actid`, `event_key`, plus shared `consent_management`; `connection_mode`, `use_native_sdk`, and legacy oneTrust/Ketch include-key blocks are not ordinary definition config fields.
+
+## DEX-492 — Braze Destination Onboarding
+<!-- ticket:DEX-492 -->
+- `braze` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Braze destination support is implemented as a CLI destination definition under `cli/internal/providers/destination/definitions/braze`, with integrations-config left read-only for onboarding changes.

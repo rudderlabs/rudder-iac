@@ -133,3 +133,9 @@
 - ActiveCampaign models shared `consent_management` only; reject legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config keys for this onboarding.
 - ActiveCampaign `SecretKeys` follow db-config `secretKeys`: local `api_key` and `event_key` are write-only secrets, while `actid` remains import/export visible despite UI metadata marking it secret.
 - ActiveCampaign API URL validation uses destination-local named pattern `active_campaign_api_url` with the schema URL allow regex adapted for CLI validation plus an RE2-compatible reject for `.ngrok.io`; templates/environment values remain accepted through the dynamic-pattern path.
+
+## DEX-492 — Braze Validation And Sources
+<!-- ticket:DEX-492 -->
+- Braze destination definitions should keep the broad non-storage db-config/Terraform source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Do not add custom cross-field requiredness for Braze `rest_api_key`, `app_key`, or platform API keys based on nested `connection_mode` values; the upstream schema uses broad `anyOf`/OR branches with `usePlatformSpecificApiKeys`, and mirroring that with validator tags is brittle and can over-restrict imports with backend/UI defaults.
+- Braze validation should still enforce required `data_center`, enum/mode constraints, unknown-key rejection, and schema-derived key/event patterns, leaving mode-dependent requiredness to backend apply semantics when built-in tags cannot express it cleanly.
