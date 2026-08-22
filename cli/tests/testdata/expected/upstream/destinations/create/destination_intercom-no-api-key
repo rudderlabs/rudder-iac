@@ -1,0 +1,30 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "intercom-no-api-key",
+  "name": "E2E Intercom No API Key",
+  "type": "INTERCOM",
+  "enabled": true,
+  "config": {
+    "appId": "rudderCliE2eDeviceAppId",
+    "apiServer": "standard",
+    "apiVersion": "v2",
+    "sendAnonymousId": false,
+    "updateLastRequestAt": true,
+    "useNativeSDK": {
+      "web": true,
+      "android": true,
+      "ios": true
+    },
+    "mobileApiKeyAndroid": {
+      "android": "rudderCliE2eDeviceAndroidKey"
+    },
+    "mobileApiKeyIOS": {
+      "ios": "rudderCliE2eDeviceIosKey"
+    },
+    "eventFilteringOption": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,0 +1,22 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: intercom-no-api-key
+spec:
+  id: intercom-no-api-key
+  display_name: E2E Intercom No API Key
+  type: intercom
+  enabled: true
+  definition_version: 1
+  config:
+    app_id: rudderCliE2eDeviceAppId
+    api_server: standard
+    api_version: v2
+    send_anonymous_id: false
+    update_last_request_at: true
+    use_native_sdk:
+      web: true
+      android: true
+      ios: true
+    mobile_api_key_android: rudderCliE2eDeviceAndroidKey
+    mobile_api_key_ios: rudderCliE2eDeviceIosKey
