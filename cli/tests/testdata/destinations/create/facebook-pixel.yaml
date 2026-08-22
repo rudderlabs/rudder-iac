@@ -1,0 +1,40 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: facebook-pixel
+spec:
+  id: facebook-pixel
+  display_name: E2E Facebook Pixel
+  type: facebook_pixel
+  enabled: true
+  definition_version: 1
+  config:
+    pixel_id: "1234567890123456"
+    access_token: "{{ .FACEBOOK_PIXEL_ACCESS_TOKEN }}"
+    standard_page_call: true
+    value_field_identifier: properties.value
+    advanced_mapping: false
+    limited_data_usage: false
+    test_destination: false
+    test_event_code: TEST12345
+    remove_external_id: false
+    use_updated_mapping: false
+    events_to_events:
+      - from: Order Completed
+        to: Purchase
+    blacklist_pii_properties:
+      - property: email
+        hash: true
+    whitelist_pii_properties:
+      - property: plan
+    event_filtering:
+      whitelist:
+        - Order Completed
+    use_native_sdk:
+      web: true
+    auto_config:
+      web: true
+    legacy_conversion_pixel_id:
+      web:
+        - from: Product Viewed
+          to: "9876543210"

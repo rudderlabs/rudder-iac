@@ -1,0 +1,71 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "facebook-pixel",
+  "name": "E2E Facebook Pixel Updated",
+  "type": "FACEBOOK_PIXEL",
+  "enabled": true,
+  "config": {
+    "pixelId": "6543210987654321",
+    "standardPageCall": false,
+    "valueFieldIdentifier": "properties.price",
+    "advancedMapping": true,
+    "limitedDataUSage": true,
+    "testDestination": true,
+    "testEventCode": "TEST67890",
+    "removeExternalId": true,
+    "useUpdatedMapping": true,
+    "eventsToEvents": [
+      {
+        "from": "Order Completed",
+        "to": "Lead"
+      }
+    ],
+    "blacklistPiiProperties": [
+      {
+        "blacklistPiiProperties": "email",
+        "blacklistPiiHash": false
+      }
+    ],
+    "whitelistPiiProperties": [
+      {
+        "whitelistPiiProperties": "plan"
+      }
+    ],
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "useNativeSDK": {
+      "web": false
+    },
+    "autoConfig": {
+      "web": false
+    },
+    "legacyConversionPixelId": {
+      "web": [
+        {
+          "from": "Product Viewed",
+          "to": "1111111111"
+        }
+      ]
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
