@@ -151,3 +151,9 @@
 - Do not globally require Intercom `app_id` or `api_key`; credential requiredness depends on source-specific device/cloud modes and should remain backend/connect-time enforced rather than over-restricted with coarse CLI validation.
 - Intercom models shared `consent_management` only; reject legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` even though upstream metadata mentions them, because current backend behavior migrates them into `consentManagement` and re-sending deprecated keys risks non-converging updates.
 - Omit Terraform-only `collect_context` for Intercom because it is absent from the selected schema/db-config destination contract.
+## DEX-497 — Facebook Pixel Config Surface
+<!-- ticket:DEX-497 -->
+- Facebook Pixel models `legacyConversionPixelId` in local YAML as `legacy_conversion_pixel_id.web[]` and maps it to API `legacyConversionPixelId.web[]`; do not use Terraform's flattened `legacyConversionPixelId.from` / `legacyConversionPixelId.to` artifact as the CLI shape.
+- Facebook Pixel should model schema/db-config keys that Terraform does not map, including `limitedDataUSage` as `limited_data_usage`, `removeExternalId` as `remove_external_id`, `useUpdatedMapping` as `use_updated_mapping`, and `autoConfig.web` as `auto_config.web`.
+- Keep `access_token` modeled because db-config lists API key `accessToken` in `defaultConfig` and `secretKeys`, but do not add a regex/required validation tag from UI or Terraform because `schema.json` omits `accessToken`.
+- Facebook Pixel models shared `consent_management` only; legacy `one_trust_cookie_categories` and `ketch_consent_purposes` blocks should remain unknown unless a future task explicitly changes that destination-definition policy.
