@@ -1,6 +1,7 @@
 package ga4_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,10 +55,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	assert.Equal(t, map[string][]string{
-		"extend_page_view_params":             {"web"},
 		"capture_page_view/web":               {"web"},
 		"debug_view/web":                      {"web"},
 		"override_client_and_session_ids/web": {"web"},
+		"extend_page_view_params/web":         {"web"},
+		"use_native_sdk_to_send/web":          {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("GA4", 1)
@@ -92,6 +94,61 @@ func TestGA4ConfigValidation(t *testing.T) {
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/client_type", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	// schema.json requires the G- prefix on the gtag measurement ID; the branch
+	// previously enforced only max=100, which accepted any string.
+	t.Run("measurement_id must carry the G- prefix", func(t *testing.T) {
+		t.Parallel()
+
+		for _, id := range []string{"XXXXXXXXXX", "g-lowercase", "G" + strings.Repeat("x", 120)} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    "gtag",
+				"measurement_id": id,
+			})
+			require.NotEmpty(t, errors, id)
+			assert.Equal(t, "/measurement_id", errors[0].Path)
+		}
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+		}))
+	})
+
+	// Terraform maps blockPageViewEvent and sendUserId, but neither appears in
+	// schema.json or db-config defaultConfig, so they are not part of the surface.
+	t.Run("terraform only keys rejected", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{"block_page_view_event", "send_user_id"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    "gtag",
+				"measurement_id": "G-XXXXXXXXXX",
+				key:              true,
+			})
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "unknown config field")
+		}
+	})
+
+	t.Run("event filtering lists are mutually exclusive", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed"},
+				"blacklist": []any{"Page Viewed"},
+			},
+		})
+		require.NotEmpty(t, errors)
 	})
 
 	t.Run("measurement_id required when client_type gtag", func(t *testing.T) {
@@ -173,7 +230,12 @@ func TestGA4ConfigValidation(t *testing.T) {
 			"override_client_and_session_ids": map[string]any{
 				"web": true,
 			},
-			"extend_page_view_params": true,
+			"extend_page_view_params": map[string]any{
+				"web": true,
+			},
+			"use_native_sdk_to_send": map[string]any{
+				"web": true,
+			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -272,9 +334,6 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"measurement_id": "G-XXXXXXXXXX",
 				"firebase_app_id": "1:123:android:abc",
 				"debug_mode": true,
-				"block_page_view_event": true,
-				"extend_page_view_params": true,
-				"send_user_id": true,
 				"sdk_base_url": "https://www.googletagmanager.com",
 				"server_container_url": "https://gtm.example.com",
 				"pii_properties_to_ignore": [
@@ -291,7 +350,9 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				},
 				"capture_page_view": {"web": "rs"},
 				"debug_view": {"web": true},
-				"override_client_and_session_ids": {"web": true}
+				"override_client_and_session_ids": {"web": true},
+				"extend_page_view_params": {"web": true},
+				"use_native_sdk_to_send": {"web": false}
 			}`,
 			APIJSON: `{
 				"apiSecret": "secret",
@@ -299,9 +360,6 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"measurementId": "G-XXXXXXXXXX",
 				"firebaseAppId": "1:123:android:abc",
 				"debugMode": true,
-				"blockPageViewEvent": true,
-				"extendPageViewParams": true,
-				"sendUserId": true,
 				"sdkBaseUrl": "https://www.googletagmanager.com",
 				"serverContainerUrl": "https://gtm.example.com",
 				"piiPropertiesToIgnore": [
@@ -320,7 +378,9 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				},
 				"capturePageView": {"web": "rs"},
 				"debugView": {"web": true},
-				"overrideClientAndSessionId": {"web": true}
+				"overrideClientAndSessionId": {"web": true},
+				"extendPageViewParams": {"web": true},
+				"useNativeSDKToSend": {"web": false}
 			}`,
 		},
 		{

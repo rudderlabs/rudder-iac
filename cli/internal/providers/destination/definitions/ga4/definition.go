@@ -1,10 +1,20 @@
 package ga4
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
+
+func init() {
+	// schema.json requires the gtag measurement ID to carry the G- prefix.
+	funcs.NewPattern(
+		"ga4_measurement_id",
+		`^(G-.{1,100})$`,
+		"must start with 'G-' and be at most 101 characters",
+	)
+}
 
 // Source types from integrations-config destinations/ga4/db-config.json
 // supportedSourceTypes, restricted to types the CLI event-stream provider owns.
@@ -35,12 +45,12 @@ var connectionModes = map[string][]string{
 }
 
 type piiProperty struct {
-	PIIProperty string `mapstructure:"pii_property" validate:"omitempty,max=100"`
+	PIIProperty string `mapstructure:"pii_property" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 }
 
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist"`
-	Blacklist []string `mapstructure:"blacklist"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 type useNativeSDK struct {
@@ -61,20 +71,21 @@ type webCapturePageView struct {
 // destination_google_analytics4 mappings; validation constraints mirror
 // overlapping schema.json rules (required, enums, client-type conditionals).
 type ga4Config struct {
-	APISecret             string                   `mapstructure:"api_secret" validate:"required,min=1,max=100"`
-	ClientType            string                   `mapstructure:"client_type" validate:"required,dynamic_or_oneof=gtag firebase"`
-	MeasurementID         string                   `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,max=100"`
-	FirebaseAppID         string                   `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,max=100"`
-	DebugMode             *bool                    `mapstructure:"debug_mode"`
-	BlockPageViewEvent    *bool                    `mapstructure:"block_page_view_event"`
-	ExtendPageViewParams  *bool                    `mapstructure:"extend_page_view_params"`
-	SendUserID            *bool                    `mapstructure:"send_user_id"`
-	SDKBaseURL            string                   `mapstructure:"sdk_base_url"`
-	ServerContainerURL    string                   `mapstructure:"server_container_url"`
-	PIIPropertiesToIgnore []piiProperty            `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
-	EventFiltering        *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK          *useNativeSDK            `mapstructure:"use_native_sdk"`
-	CapturePageView       *webCapturePageView      `mapstructure:"capture_page_view"`
+	APISecret             string              `mapstructure:"api_secret" validate:"required,dynamic_or_pattern=single_line_100"`
+	ClientType            string              `mapstructure:"client_type" validate:"required,dynamic_or_oneof=gtag firebase"`
+	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
+	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
+	DebugMode             *bool               `mapstructure:"debug_mode"`
+	SDKBaseURL            string              `mapstructure:"sdk_base_url"`
+	ServerContainerURL    string              `mapstructure:"server_container_url"`
+	PIIPropertiesToIgnore []piiProperty       `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
+	EventFiltering        *eventFiltering     `mapstructure:"event_filtering"`
+	UseNativeSDK          *useNativeSDK       `mapstructure:"use_native_sdk"`
+	CapturePageView       *webCapturePageView `mapstructure:"capture_page_view"`
+	ExtendPageViewParams  *webBool            `mapstructure:"extend_page_view_params"`
+	// schema.json declares useNativeSDKToSend under web but terraform does not map
+	// it; modelled so a CLI apply does not erase a UI-set value.
+	UseNativeSDKToSend    *webBool                 `mapstructure:"use_native_sdk_to_send"`
 	DebugView             *webBool                 `mapstructure:"debug_view"`
 	OverrideClientSession *webBool                 `mapstructure:"override_client_and_session_ids"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
@@ -85,17 +96,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("apiSecret", "api_secret"),
 		converter.Simple("typesOfClient", "client_type"),
-		converter.Simple("measurementId", "measurement_id", converter.SkipZeroValue),
-		converter.Simple("firebaseAppId", "firebase_app_id", converter.SkipZeroValue),
+		converter.Simple("measurementId", "measurement_id"),
+		converter.Simple("firebaseAppId", "firebase_app_id"),
 		converter.Simple("debugMode", "debug_mode"),
-		converter.Simple("blockPageViewEvent", "block_page_view_event", converter.SkipZeroValue),
-		converter.Gated(
-			converter.Simple("extendPageViewParams", "extend_page_view_params", converter.SkipZeroValue),
-			common.SourceTypeWeb,
-		),
-		converter.Simple("sendUserId", "send_user_id", converter.SkipZeroValue),
-		converter.Simple("sdkBaseUrl", "sdk_base_url", converter.SkipZeroValue),
-		converter.Simple("serverContainerUrl", "server_container_url", converter.SkipZeroValue),
+		converter.Simple("sdkBaseUrl", "sdk_base_url"),
+		converter.Simple("serverContainerUrl", "server_container_url"),
 		converter.ArrayWithObjects("piiPropertiesToIgnore", "pii_properties_to_ignore", map[string]any{
 			"piiProperty": "pii_property",
 		}),
@@ -118,6 +123,14 @@ func NewDefinition() *definitions.DestinationDefinition {
 		),
 		converter.Gated(
 			converter.Simple("overrideClientAndSessionId.web", "override_client_and_session_ids.web"),
+			common.SourceTypeWeb,
+		),
+		converter.Gated(
+			converter.Simple("extendPageViewParams.web", "extend_page_view_params.web"),
+			common.SourceTypeWeb,
+		),
+		converter.Gated(
+			converter.Simple("useNativeSDKToSend.web", "use_native_sdk_to_send.web"),
 			common.SourceTypeWeb,
 		),
 	}
