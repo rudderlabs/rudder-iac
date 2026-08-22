@@ -14,6 +14,17 @@ func init() {
 		`^(G-.{1,100})$`,
 		"must start with 'G-' and be at most 101 characters",
 	)
+
+	// sdkBaseUrl is constrained deep in schema.json, under
+	// typesOfClient=gtag > connectionMode.web=device. RE2 has no lookahead, so the
+	// ngrok guard becomes a reject pattern; the empty alternative is preserved
+	// because upstream allows an unset value.
+	funcs.NewPatternWithReject(
+		"ga4_sdk_base_url",
+		`^(?:https?://)?[\w.-]+(?:\.[\w.-]+)+[\w\-._~:/?#[\]@!$&'()*+,;=.]*|^$`,
+		`\.ngrok\.io`,
+		"must be a domain URL and must not use ngrok",
+	)
 }
 
 // Source types from integrations-config destinations/ga4/db-config.json
@@ -76,7 +87,7 @@ type ga4Config struct {
 	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
 	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
 	DebugMode             *bool               `mapstructure:"debug_mode"`
-	SDKBaseURL            string              `mapstructure:"sdk_base_url"`
+	SDKBaseURL            string              `mapstructure:"sdk_base_url" validate:"omitempty,dynamic_or_pattern=ga4_sdk_base_url"`
 	ServerContainerURL    string              `mapstructure:"server_container_url"`
 	PIIPropertiesToIgnore []piiProperty       `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
 	EventFiltering        *eventFiltering     `mapstructure:"event_filtering"`

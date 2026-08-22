@@ -118,6 +118,32 @@ func TestGA4ConfigValidation(t *testing.T) {
 		}))
 	})
 
+	// schema.json constrains sdkBaseUrl under typesOfClient=gtag >
+	// connectionMode.web=device; the branch left it entirely unvalidated.
+	t.Run("sdk_base_url pattern enforced", func(t *testing.T) {
+		t.Parallel()
+
+		for _, url := range []string{"nodots", "https://foo.ngrok.io", "foo.ngrok.io/gtm"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    "gtag",
+				"measurement_id": "G-XXXXXXXXXX",
+				"sdk_base_url":   url,
+			})
+			require.NotEmpty(t, errors, url)
+			assert.Equal(t, "/sdk_base_url", errors[0].Path)
+		}
+
+		for _, url := range []string{"https://www.googletagmanager.com", "www.googletagmanager.com", ""} {
+			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    "gtag",
+				"measurement_id": "G-XXXXXXXXXX",
+				"sdk_base_url":   url,
+			}), url)
+		}
+	})
+
 	// Terraform maps blockPageViewEvent and sendUserId, but neither appears in
 	// schema.json or db-config defaultConfig, so they are not part of the surface.
 	t.Run("terraform only keys rejected", func(t *testing.T) {
