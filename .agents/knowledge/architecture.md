@@ -189,3 +189,9 @@
 <!-- ticket:DEX-509 -->
 - `kafka` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Kafka destination registry code order follows the explicit onboarding placement after Kinesis and before Marketo inside the unverified block, while exported/supported type lists may still be sorted lexicographically by implementation.
+
+## DEX-487 — ActiveCampaign Destination Onboarding
+<!-- ticket:DEX-487 -->
+- ActiveCampaign destination support is implemented as CLI local type `active_campaign`, API type `ACTIVE_CAMPAIGN`, and destination version `1`.
+- `active_campaign` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- ActiveCampaign local config is intentionally flat: `api_url`, `api_key`, `actid`, `event_key`, plus shared `consent_management`; `connection_mode`, `use_native_sdk`, and legacy oneTrust/Ketch include-key blocks are not ordinary definition config fields.

@@ -1,0 +1,30 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "active-campaign",
+  "name": "E2E ActiveCampaign Updated",
+  "type": "ACTIVE_CAMPAIGN",
+  "enabled": true,
+  "config": {
+    "apiUrl": "https://rudder-cli-e2e-updated.api-us2.com",
+    "actid": "67890",
+    "useNativeSDK": {
+      "web": true
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

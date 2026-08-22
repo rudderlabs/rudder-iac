@@ -127,3 +127,9 @@
 - Kafka `SecretKeys` should include only local key `password`; certificate/public-key material such as `ca_certificate` and `ssh_public_key` remains import/export visible because db-config marks only `password` as secret.
 - Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
 - Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
+
+## DEX-487 — ActiveCampaign Config Surface
+<!-- ticket:DEX-487 -->
+- ActiveCampaign models shared `consent_management` only; reject legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config keys for this onboarding.
+- ActiveCampaign `SecretKeys` follow db-config `secretKeys`: local `api_key` and `event_key` are write-only secrets, while `actid` remains import/export visible despite UI metadata marking it secret.
+- ActiveCampaign API URL validation uses destination-local named pattern `active_campaign_api_url` with the schema URL allow regex adapted for CLI validation plus an RE2-compatible reject for `.ngrok.io`; templates/environment values remain accepted through the dynamic-pattern path.

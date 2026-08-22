@@ -146,3 +146,8 @@
 <!-- ticket:DEX-509 -->
 - Kafka destination E2E fixture YAML should not be added without matching live-confirmed upstream snapshots; destination apply E2E is count-guarded, so fixture-only Kafka coverage would break `TestDestinationsApply` for all destinations.
 - Defer Kafka create/update destination fixture and snapshot coverage until an explicitly disposable live destination-enabled RudderStack workspace is available; rely on unit coverage for validation/conversion and handler extraction in autonomous environments.
+
+## DEX-487 — ActiveCampaign E2E Snapshot Deferral
+<!-- ticket:DEX-487 -->
+- ActiveCampaign destination E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available, avoiding `TestDestinationsApply` fixture/snapshot count-guard failures.
+- The intended deferred ActiveCampaign E2E variation is a standard `active_campaign` destination with `api_url`/`api_key` plus optional `actid`/`event_key`, updating `display_name` and mutable optional values while keeping secrets variable-backed.
