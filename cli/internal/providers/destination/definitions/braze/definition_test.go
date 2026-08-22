@@ -28,10 +28,13 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter",
-		"cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device", "hybrid"},
@@ -40,13 +43,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud", "device", "hybrid"},
 		"web":            {"cloud", "device", "hybrid"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud", "device"},
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -182,9 +182,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
 		config["rest_api_key"] = "rest-key"
-		config["connection_mode"] = map[string]any{
-			"cloud": "cloud",
-		}
 		config["enable_subscription_group_in_group_call"] = true
 		config["enable_nested_array_operations"] = true
 		config["support_dedup"] = true
@@ -204,12 +201,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 		config["android_api_key"] = "android-key"
 		config["ios_api_key"] = "ios-key"
 		config["web_api_key"] = "web-key"
-		config["connection_mode"] = map[string]any{
-			"android_kotlin": "hybrid",
-			"ios_swift":      "device",
-			"web":            "device",
-			"react_native":   "device",
-		}
 		config["use_native_sdk"] = map[string]any{
 			"android_kotlin": true,
 			"ios_swift":      true,
@@ -237,9 +228,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 			"support_dedup":                    true,
 			"use_ecommerce_recommended_events": true,
 			"use_platform_specific_api_keys":   false,
-			"connection_mode": map[string]any{
-				"web": "hybrid",
-			},
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
@@ -261,22 +249,21 @@ func TestBrazeConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	t.Run("invalid connection mode rejected", func(t *testing.T) {
+	t.Run("connection_mode is not a supported key", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
-		config["connection_mode"] = map[string]any{
-			"react_native": "hybrid",
-		}
+		config["connection_mode"] = map[string]any{"web": "device"}
 
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode/react_native", errors[0].Path)
+		assert.Equal(t, "/connection_mode", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
 	t.Run("unsupported source key rejected in source-type blocks", func(t *testing.T) {
 		t.Parallel()
 
-		for _, key := range []string{"connection_mode", "use_native_sdk"} {
+		for _, key := range []string{"use_native_sdk"} {
 			t.Run(key, func(t *testing.T) {
 				t.Parallel()
 				config := minimalConfig()
@@ -358,13 +345,11 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 			Name: "minimal cloud",
 			LocalJSON: `{
 				"data_center": "US-01",
-				"rest_api_key": "rest-key",
-				"connection_mode": {"cloud": "cloud"}
+				"rest_api_key": "rest-key"
 			}`,
 			APIJSON: `{
 				"dataCenter": "US-01",
-				"restApiKey": "rest-key",
-				"connectionMode": {"cloud": "cloud"}
+				"restApiKey": "rest-key"
 			}`,
 		},
 		{
@@ -373,11 +358,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"data_center": "US-02",
 				"app_key": "default-app-key",
 				"use_platform_specific_api_keys": false,
-				"connection_mode": {
-					"web": "device",
-					"android": "device",
-					"ios": "hybrid"
-				},
 				"use_native_sdk": {
 					"web": true,
 					"android": true,
@@ -388,11 +368,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"dataCenter": "US-02",
 				"appKey": "default-app-key",
 				"usePlatformSpecificApiKeys": false,
-				"connectionMode": {
-					"web": "device",
-					"android": "device",
-					"ios": "hybrid"
-				},
 				"useNativeSDK": {
 					"web": true,
 					"android": true,
@@ -409,13 +384,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"android_api_key": "android-key",
 				"ios_api_key": "ios-key",
 				"web_api_key": "web-key",
-				"connection_mode": {
-					"android_kotlin": "hybrid",
-					"ios_swift": "device",
-					"react_native": "device",
-					"flutter": "device",
-					"web": "hybrid"
-				},
 				"use_native_sdk": {
 					"android_kotlin": true,
 					"ios_swift": true,
@@ -435,13 +403,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"androidApiKey": "android-key",
 				"iOSApiKey": "ios-key",
 				"webApiKey": "web-key",
-				"connectionMode": {
-					"androidKotlin": "hybrid",
-					"iosSwift": "device",
-					"reactnative": "device",
-					"flutter": "device",
-					"web": "hybrid"
-				},
 				"useNativeSDK": {
 					"androidKotlin": true,
 					"iosSwift": true,
@@ -508,7 +469,7 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
+					"cloud": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -517,7 +478,7 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{
+					"cloud": [{
 						"provider": "custom",
 						"resolutionStrategy": "or",
 						"consents": [{"consent": "analytics"}]

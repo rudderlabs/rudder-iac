@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,13 +27,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud", "device", "hybrid"},
 	common.SourceTypeWeb:           {"cloud", "device", "hybrid"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type eventFiltering struct {
@@ -58,22 +52,6 @@ type webBool struct {
 	Web *bool `mapstructure:"web"`
 }
 
-type brazeConnectionMode struct {
-	Android       string `mapstructure:"android" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
-	AndroidKotlin string `mapstructure:"android_kotlin" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
-	IOS           string `mapstructure:"ios" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
-	IOSSwift      string `mapstructure:"ios_swift" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
-	Web           string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
-	ReactNative   string `mapstructure:"react_native" validate:"omitempty,dynamic_or_oneof=cloud device"`
-	Flutter       string `mapstructure:"flutter" validate:"omitempty,dynamic_or_oneof=cloud device"`
-	Unity         string `mapstructure:"unity" validate:"omitempty,dynamic_or_oneof=cloud"`
-	AMP           string `mapstructure:"amp" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Cloud         string `mapstructure:"cloud" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Warehouse     string `mapstructure:"warehouse" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Cordova       string `mapstructure:"cordova" validate:"omitempty,dynamic_or_oneof=cloud"`
-	Shopify       string `mapstructure:"shopify" validate:"omitempty,dynamic_or_oneof=cloud"`
-}
-
 // brazeConfig is the local YAML config model. Field set mirrors integrations-config
 // destinations/braze schema/defaultConfig; validation constraints mirror schema.json
 // where they can be expressed without making mode-dependent import paths stricter
@@ -91,7 +69,6 @@ type brazeConfig struct {
 	EnablePushNotification               *webBool                 `mapstructure:"enable_push_notification"`
 	AllowUserSuppliedJavascript          *webBool                 `mapstructure:"allow_user_supplied_javascript"`
 	EventFiltering                       *eventFiltering          `mapstructure:"event_filtering"`
-	ConnectionMode                       *brazeConnectionMode     `mapstructure:"connection_mode"`
 	UseNativeSDK                         *useNativeSDK            `mapstructure:"use_native_sdk"`
 	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events"`
 	UsePlatformSpecificAPIKeys           *bool                    `mapstructure:"use_platform_specific_api_keys"`
@@ -133,19 +110,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("connectionMode.web", "connection_mode.web"),
-		converter.Simple("connectionMode.ios", "connection_mode.ios"),
-		converter.Simple("connectionMode.iosSwift", "connection_mode.ios_swift"),
-		converter.Simple("connectionMode.android", "connection_mode.android"),
-		converter.Simple("connectionMode.androidKotlin", "connection_mode.android_kotlin"),
-		converter.Simple("connectionMode.reactnative", "connection_mode.react_native"),
-		converter.Simple("connectionMode.unity", "connection_mode.unity"),
-		converter.Simple("connectionMode.amp", "connection_mode.amp"),
-		converter.Simple("connectionMode.flutter", "connection_mode.flutter"),
-		converter.Simple("connectionMode.cordova", "connection_mode.cordova"),
-		converter.Simple("connectionMode.shopify", "connection_mode.shopify"),
-		converter.Simple("connectionMode.cloud", "connection_mode.cloud"),
-		converter.Simple("connectionMode.warehouse", "connection_mode.warehouse"),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.Simple("useNativeSDK.androidKotlin", "use_native_sdk.android_kotlin"),
