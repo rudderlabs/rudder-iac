@@ -1,0 +1,45 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "braze-platform-keys",
+  "name": "E2E Braze Platform Keys",
+  "type": "BRAZE",
+  "enabled": true,
+  "config": {
+    "dataCenter": "US-03",
+    "enableSubscriptionGroupInGroupCall": false,
+    "enableNestedArrayOperations": false,
+    "sendPurchaseEventWithExtraProperties": false,
+    "supportDedup": false,
+    "useEcommerceRecommendedEvents": true,
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "web": true,
+      "android": false
+    },
+    "trackAnonymousUser": {
+      "web": false
+    },
+    "enableBrazeLogging": {
+      "web": false
+    },
+    "enablePushNotification": {
+      "web": false
+    },
+    "allowUserSuppliedJavascript": {
+      "web": false
+    },
+    "usePlatformSpecificApiKeys": true,
+    "androidApiKey": "android-key",
+    "iOSApiKey": "ios-android-key",
+    "webApiKey": "web-android-key"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

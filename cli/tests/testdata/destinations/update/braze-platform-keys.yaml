@@ -1,0 +1,41 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: braze-platform-keys
+spec:
+  id: braze-platform-keys
+  display_name: E2E Braze Platform Keys Updated
+  type: braze
+  enabled: true
+  definition_version: 1
+  config:
+    data_center: US-05
+    rest_api_key: "{{ .BRAZE_REST_API_KEY }}"
+    use_platform_specific_api_keys: true
+    android_api_key: android-key-updated
+    ios_api_key: ios-android-key-updated
+    web_api_key: web-android-key-updated
+    enable_subscription_group_in_group_call: true
+    enable_nested_array_operations: true
+    send_purchase_event_with_extra_properties: true
+    support_dedup: true
+    use_ecommerce_recommended_events: false
+    event_filtering:
+      blacklist:
+        - Page Viewed
+    use_native_sdk:
+      web: false
+      android: true
+    track_anonymous_user:
+      web: true
+    enable_braze_logging:
+      web: true
+    enable_push_notification:
+      web: true
+    allow_user_supplied_javascript:
+      web: true
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics
