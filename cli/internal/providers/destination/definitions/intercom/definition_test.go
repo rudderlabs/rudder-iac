@@ -28,10 +28,13 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter",
-		"cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -40,13 +43,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -86,9 +86,6 @@ func TestIntercomConfigValidation(t *testing.T) {
 
 		assert.Empty(t, registered.ValidateConfig(map[string]any{
 			"app_id": "fll5vd90",
-			"connection_mode": map[string]any{
-				"web": "device",
-			},
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
@@ -128,17 +125,16 @@ func TestIntercomConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("connection modes rejected when unsupported", func(t *testing.T) {
+	// connection_mode is not destination config; modes stay in ConnectionModes() metadata.
+	t.Run("connection_mode is not a supported key", func(t *testing.T) {
 		t.Parallel()
-
 		config := validFullConfig()
-		config["connection_mode"] = map[string]any{
-			"android_kotlin": "device",
-		}
+		config["connection_mode"] = map[string]any{"web": "device"}
 
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode/android_kotlin", errors[0].Path)
+		assert.Equal(t, "/connection_mode", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
 	t.Run("credential fields reject empty strings", func(t *testing.T) {
@@ -247,9 +243,6 @@ func TestIntercomConfigValidation(t *testing.T) {
 			"api_version":            "v2",
 			"send_anonymous_id":      true,
 			"update_last_request_at": true,
-			"connection_mode": map[string]any{
-				"web": "cloud",
-			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Order Completed", "Signed Up"},
 			},
@@ -313,7 +306,6 @@ func TestIntercomConfigValidation(t *testing.T) {
 			key   string
 			value any
 		}{
-			{name: "connection_mode", key: "connection_mode", value: "cloud"},
 			{name: "use_native_sdk", key: "use_native_sdk", value: true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -371,27 +363,20 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 				"api_server": "standard",
 				"api_version": "v2",
 				"send_anonymous_id": true,
-				"update_last_request_at": true,
-				"connection_mode": {"web": "cloud"}
+				"update_last_request_at": true
 			}`,
 			APIJSON: `{
 				"apiKey": "intercom-access-token",
 				"apiServer": "standard",
 				"apiVersion": "v2",
 				"sendAnonymousId": true,
-				"updateLastRequestAt": true,
-				"connectionMode": {"web": "cloud"}
+				"updateLastRequestAt": true
 			}`,
 		},
 		{
 			Name: "device config",
 			LocalJSON: `{
 				"app_id": "fll5vd90",
-				"connection_mode": {
-					"web": "device",
-					"android": "device",
-					"ios": "device"
-				},
 				"use_native_sdk": {
 					"web": true,
 					"android": true,
@@ -405,11 +390,6 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"appId": "fll5vd90",
-				"connectionMode": {
-					"web": "device",
-					"android": "device",
-					"ios": "device"
-				},
 				"useNativeSDK": {
 					"web": true,
 					"android": true,
@@ -441,11 +421,7 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 		{
 			Name: "boundary source mappings",
 			LocalJSON: `{
-				"connection_mode": {
-					"android_kotlin": "cloud",
-					"ios_swift": "cloud",
-					"react_native": "cloud"
-				},
+
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
@@ -453,11 +429,7 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 			APIJSON: `{
-				"connectionMode": {
-					"androidKotlin": "cloud",
-					"iosSwift": "cloud",
-					"reactnative": "cloud"
-				},
+
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
@@ -532,14 +504,6 @@ func validFullConfig() map[string]any {
 		"update_last_request_at": true,
 		"mobile_api_key_android": "android-sdk-key",
 		"mobile_api_key_ios":     "ios-sdk-key",
-		"connection_mode": map[string]any{
-			"web":            "device",
-			"android":        "device",
-			"ios":            "device",
-			"android_kotlin": "cloud",
-			"ios_swift":      "cloud",
-			"react_native":   "cloud",
-		},
 		"use_native_sdk": map[string]any{
 			"web":     true,
 			"android": true,

@@ -23,13 +23,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -39,13 +36,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type intercomConfig struct {
@@ -59,7 +53,6 @@ type intercomConfig struct {
 	MobileAPIKeyIOS     string                   `mapstructure:"mobile_api_key_ios" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventFiltering      *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK        *useNativeSDK            `mapstructure:"use_native_sdk"`
-	ConnectionMode      *connectionMode          `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -116,19 +109,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("connectionMode.web", "connection_mode.web"),
-		converter.Simple("connectionMode.android", "connection_mode.android"),
-		converter.Simple("connectionMode.androidKotlin", "connection_mode.android_kotlin"),
-		converter.Simple("connectionMode.ios", "connection_mode.ios"),
-		converter.Simple("connectionMode.iosSwift", "connection_mode.ios_swift"),
-		converter.Simple("connectionMode.unity", "connection_mode.unity"),
-		converter.Simple("connectionMode.amp", "connection_mode.amp"),
-		converter.Simple("connectionMode.cloud", "connection_mode.cloud"),
-		converter.Simple("connectionMode.warehouse", "connection_mode.warehouse"),
-		converter.Simple("connectionMode.reactnative", "connection_mode.react_native"),
-		converter.Simple("connectionMode.flutter", "connection_mode.flutter"),
-		converter.Simple("connectionMode.cordova", "connection_mode.cordova"),
-		converter.Simple("connectionMode.shopify", "connection_mode.shopify"),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 
