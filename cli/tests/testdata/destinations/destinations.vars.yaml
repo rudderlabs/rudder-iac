@@ -45,3 +45,4 @@ POSTGRES_MINIO_SECRET_ACCESS_KEY: postgresMinioSecretAccessKeyXX
 S3_DATALAKE_ACCESS_KEY_ID: AKIADATALAKEXXXXXXXX
 S3_DATALAKE_ACCESS_KEY: s3DatalakeSecretAccessKeyXXXXXXXXXXXXXXXXX
 GOOGLESHEETS_CREDENTIALS: '{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"googlesheets-dummy"}'
+GA4_API_SECRET: ga4ApiSecretXXXXXXXXXXXXXXXX
