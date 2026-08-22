@@ -54,8 +54,8 @@ type webPersonProfiles struct {
 }
 
 type xhrHeader struct {
-	Key   string `mapstructure:"key" validate:"omitempty,max=100"`
-	Value string `mapstructure:"value" validate:"omitempty,max=100"`
+	Key   string `mapstructure:"key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	Value string `mapstructure:"value" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 }
 
 type propertyBlacklistItem struct {
@@ -74,7 +74,7 @@ type useNativeSDK struct {
 // posthogConfig is the local YAML config model. Field set mirrors terraform
 // destination_posthog mappings; validation constraints mirror schema.json.
 type posthogConfig struct {
-	APIKey                        string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
+	APIKey                        string                   `mapstructure:"api_key" validate:"required,pattern=single_line_100"`
 	Endpoint                      string                   `mapstructure:"endpoint" validate:"omitempty,pattern=posthog_endpoint"`
 	UseV2Group                    *bool                    `mapstructure:"use_v2_group"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
@@ -92,7 +92,7 @@ type posthogConfig struct {
 // NewDefinition returns the PostHog destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
-		converter.Simple("yourInstance", "endpoint", converter.SkipZeroValue),
+		converter.Simple("yourInstance", "endpoint"),
 		converter.Simple("teamApiKey", "api_key"),
 		converter.Simple("useV2Group", "use_v2_group"),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
@@ -119,9 +119,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 			}),
 			common.SourceTypeWeb,
 		),
-		// terraform maps propertyBlacklist (lowercase L); upstream db-config/schema use propertyBlackList.
+		// The API key is propertyBlackList (capital L) in both db-config defaultConfig
+		// and schema.json. Terraform spells it propertyBlacklist; using that would
+		// write a key the backend does not read and erase the real one.
 		converter.Gated(
-			converter.ArrayWithObjects("propertyBlacklist.web", "property_blacklist", map[string]any{
+			converter.ArrayWithObjects("propertyBlackList.web", "property_blacklist", map[string]any{
 				"property": "property",
 			}),
 			common.SourceTypeWeb,

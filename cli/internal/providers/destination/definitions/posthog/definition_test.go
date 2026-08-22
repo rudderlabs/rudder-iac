@@ -277,6 +277,31 @@ func TestPosthogConfigValidation(t *testing.T) {
 	})
 }
 
+// db-config defaultConfig and schema.json both spell this key propertyBlackList
+// with a capital L; terraform spells it propertyBlacklist. Writing terraform's
+// spelling would set a key the backend does not read, and erase the real one on
+// the first apply — a silent data loss with no validation error.
+func TestPosthogPropertyBlackListUsesUpstreamCasing(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(posthog.NewDefinition()))
+	registered, err := registry.Get("posthog", 1)
+	require.NoError(t, err)
+
+	api, err := registered.LocalToAPI(map[string]any{
+		"api_key": "phc_key",
+		"property_blacklist": []any{
+			map[string]any{"property": "email"},
+		},
+	})
+	require.NoError(t, err)
+
+	_, wrongCasing := api["propertyBlacklist"]
+	assert.False(t, wrongCasing, "must not emit terraform's lowercase propertyBlacklist")
+	assert.Equal(t, map[string]any{"web": []any{map[string]any{"property": "email"}}}, api["propertyBlackList"])
+}
+
 func TestPosthogConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -333,7 +358,7 @@ func TestPosthogConversionRoundTrip(t *testing.T) {
 						{"key": "X-Custom", "value": "value"}
 					]
 				},
-				"propertyBlacklist": {
+				"propertyBlackList": {
 					"web": [
 						{"property": "ssn"}
 					]
