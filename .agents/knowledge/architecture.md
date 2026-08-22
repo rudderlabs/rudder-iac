@@ -206,3 +206,10 @@
 - `customerio` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Customer.io source-type support intentionally keeps the broad mapped upstream set rather than the S3/GCS-style storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Customer.io local config maps `site_id`, `api_key`, `device_token_event_name`, `datacenter`, SDK/device nested source blocks, `event_filtering` whitelist/blacklist discriminator, and shared `consent_management`; `use_native_sdk` remains a source-type config block rather than an ordinary gated property.
+
+## DEX-508 — Intercom Destination Onboarding
+<!-- ticket:DEX-508 -->
+- Intercom destination support is implemented as the legacy CLI destination type `intercom`, API type `INTERCOM`, and destination version `1`; do not substitute `intercom_v2` / `INTERCOM_V2` for this onboarding path.
+- The `INTERCOM_V2` contract remains excluded because it has no Terraform destination registration/mapping source and represents a separate OAuth/account-management contract.
+- `intercom` should be treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Intercom's modeled config surface includes `app_id`, `api_key`, `api_server`, `api_version`, `send_anonymous_id`, `update_last_request_at`, source-scoped `connection_mode`, source-scoped `use_native_sdk`, Android-only `mobile_api_key_android`, iOS-only `mobile_api_key_ios`, `event_filtering`, and shared `consent_management`; `api_key` is the sole db-config secret key.

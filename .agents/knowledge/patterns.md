@@ -157,3 +157,8 @@
 - Braze destination apply E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable destination-enabled RudderStack workspace is available to live-capture matching snapshots.
 - Do not add fixture-only Braze YAML or hand-derived Braze upstream snapshots: `TestDestinationsApply` count-checks fixture/snapshot parity, so unmatched Braze fixtures or snapshots can break the entire destination E2E suite.
 - Until live snapshots are available, rely on Braze definition validation/conversion tests plus compile/skip E2E validation for autonomous coverage.
+
+## DEX-508 — Intercom E2E Snapshot Deferral
+<!-- ticket:DEX-508 -->
+- Intercom destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable destination-enabled RudderStack workspace and credentials are available.
+- Do not add fixture-only Intercom YAML or unmatched upstream snapshots: `TestDestinationsApply` count-checks destination fixture/snapshot parity, so unmatched Intercom coverage can break the entire destination E2E suite.
