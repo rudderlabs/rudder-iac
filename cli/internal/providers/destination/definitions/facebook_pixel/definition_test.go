@@ -27,10 +27,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud"},
@@ -39,13 +43,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -325,6 +326,31 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 	})
 }
 
+// schema.json bounds accessToken with ^(.{1,300})$ inside the allOf branch — a
+// wider limit than the usual single_line_100, and previously unenforced.
+func TestFacebookPixelAccessTokenPattern(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(facebookpixel.NewDefinition()))
+	registered, err := registry.Get("facebook_pixel", 1)
+	require.NoError(t, err)
+
+	base := map[string]any{"pixel_id": "1234567890"}
+
+	// 300 characters is allowed; 301 is not, and line breaks never are.
+	ok := base
+	ok["access_token"] = strings.Repeat("a", 300)
+	assert.Empty(t, registered.ValidateConfig(ok))
+
+	for _, bad := range []string{strings.Repeat("a", 301), "bad\ntoken"} {
+		cfg := map[string]any{"pixel_id": "1234567890", "access_token": bad}
+		errs := registered.ValidateConfig(cfg)
+		require.NotEmpty(t, errs)
+		assert.Equal(t, "/access_token", errs[0].Path)
+	}
+}
+
 func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -453,7 +479,7 @@ func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"cloud": [{"provider": "ketch"}]
 				}
 			}`,
 			APIJSON: `{
@@ -461,7 +487,7 @@ func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"cloud": [{"provider": "ketch"}]
 				}
 			}`,
 		},

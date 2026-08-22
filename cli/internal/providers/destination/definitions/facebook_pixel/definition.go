@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,13 +27,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type eventMapping struct {
@@ -76,7 +70,7 @@ type legacyConversionPixelMapping struct {
 // validation constraints mirror schema.json where present.
 type facebookPixelConfig struct {
 	PixelID                 string                   `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	AccessToken             string                   `mapstructure:"access_token"`
+	AccessToken             string                   `mapstructure:"access_token" validate:"omitempty,dynamic_or_pattern=single_line_300"`
 	StandardPageCall        *bool                    `mapstructure:"standard_page_call"`
 	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price"`
 	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping"`
