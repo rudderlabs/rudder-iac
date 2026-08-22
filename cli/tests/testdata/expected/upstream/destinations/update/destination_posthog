@@ -1,0 +1,67 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "posthog",
+  "name": "E2E PostHog Updated",
+  "type": "POSTHOG",
+  "enabled": true,
+  "config": {
+    "teamApiKey": "phcPosthogApiKeyXXXXXXXXXXXXXX",
+    "yourInstance": "eu.posthog.com",
+    "useV2Group": true,
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "useNativeSDK": {
+      "web": false
+    },
+    "autocapture": {
+      "web": true
+    },
+    "capturePageView": {
+      "web": false
+    },
+    "disableSessionRecording": {
+      "web": false
+    },
+    "enableLocalStoragePersistence": {
+      "web": true
+    },
+    "personProfiles": {
+      "web": "identified_only"
+    },
+    "xhrHeaders": {
+      "web": [
+        {
+          "key": "X-Rudder-Source",
+          "value": "rudder-cli-e2e-updated"
+        }
+      ]
+    },
+    "propertyBlackList": {
+      "web": [
+        {
+          "property": "phone"
+        }
+      ]
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

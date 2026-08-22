@@ -1,0 +1,55 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "posthog",
+  "name": "E2E PostHog",
+  "type": "POSTHOG",
+  "enabled": true,
+  "config": {
+    "teamApiKey": "phcPosthogApiKeyXXXXXXXXXXXXXX",
+    "yourInstance": "app.posthog.com",
+    "useV2Group": false,
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "web": true
+    },
+    "autocapture": {
+      "web": false
+    },
+    "capturePageView": {
+      "web": true
+    },
+    "disableSessionRecording": {
+      "web": true
+    },
+    "enableLocalStoragePersistence": {
+      "web": false
+    },
+    "personProfiles": {
+      "web": "always"
+    },
+    "xhrHeaders": {
+      "web": [
+        {
+          "key": "X-Rudder-Source",
+          "value": "rudder-cli-e2e"
+        }
+      ]
+    },
+    "propertyBlackList": {
+      "web": [
+        {
+          "property": "email"
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

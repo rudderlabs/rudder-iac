@@ -1,0 +1,34 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: posthog
+spec:
+  id: posthog
+  display_name: E2E PostHog
+  type: posthog
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: "{{ .POSTHOG_API_KEY }}"
+    endpoint: app.posthog.com
+    use_v2_group: false
+    event_filtering:
+      whitelist:
+        - Order Completed
+    use_native_sdk:
+      web: true
+    autocapture:
+      web: false
+    capture_page_view:
+      web: true
+    disable_session_recording:
+      web: true
+    enable_local_storage_persistence:
+      web: false
+    person_profiles:
+      web: always
+    xhr_headers:
+      - key: X-Rudder-Source
+        value: rudder-cli-e2e
+    property_blacklist:
+      - property: email
