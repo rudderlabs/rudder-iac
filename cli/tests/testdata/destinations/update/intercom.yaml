@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: intercom
+spec:
+  id: intercom
+  display_name: E2E Intercom Updated
+  type: intercom
+  enabled: true
+  definition_version: 1
+  config:
+    app_id: rudderCliE2eAppIdUpdated
+    api_key: "{{ .INTERCOM_API_KEY }}"
+    api_server: eu
+    api_version: v1
+    send_anonymous_id: true
+    update_last_request_at: false
+    event_filtering:
+      blacklist:
+        - Page Viewed
+    use_native_sdk:
+      web: false
+      android: true
+      ios: true
+    mobile_api_key_android: rudderCliE2eAndroidKeyUpdated
+    mobile_api_key_ios: rudderCliE2eIosKeyUpdated
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

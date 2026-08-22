@@ -32,6 +32,7 @@ import (
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
@@ -345,6 +346,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)
+		}
+		if err := registry.Register(intercom.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering intercom destination definition: %w", err)
 		}
 		if err := registry.Register(kinesis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kinesis destination definition: %w", err)

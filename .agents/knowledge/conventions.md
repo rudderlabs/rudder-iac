@@ -144,3 +144,10 @@
 - Customer.io models shared `consent_management` only; legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unknown local config fields because the backend migrates those surfaces into `consentManagement` and drops the legacy keys.
 - Customer.io `SecretKeys` should stay empty because db-config `secretKeys` is authoritative for CLI write-only secret handling; Terraform sensitivity alone should not make `api_key` a CLI secret placeholder field.
 - Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; `useNativeSDK` is handled through source-type config rather than the ordinary gated-property list.
+
+## DEX-508 — Intercom Config Surface
+<!-- ticket:DEX-508 -->
+- Legacy Intercom keeps `connection_mode` as local config instead of treating it as metadata-only, because Intercom schema/db-config use source-specific connection-mode behavior and imports must preserve device/cloud mode state.
+- Do not globally require Intercom `app_id` or `api_key`; credential requiredness depends on source-specific device/cloud modes and should remain backend/connect-time enforced rather than over-restricted with coarse CLI validation.
+- Intercom models shared `consent_management` only; reject legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` even though upstream metadata mentions them, because current backend behavior migrates them into `consentManagement` and re-sending deprecated keys risks non-converging updates.
+- Omit Terraform-only `collect_context` for Intercom because it is absent from the selected schema/db-config destination contract.
