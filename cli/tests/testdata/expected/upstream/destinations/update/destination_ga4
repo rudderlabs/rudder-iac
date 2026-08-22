@@ -1,0 +1,61 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "ga4",
+  "name": "E2E GA4 Gtag Updated",
+  "type": "GA4",
+  "enabled": true,
+  "config": {
+    "typesOfClient": "gtag",
+    "measurementId": "G-E2EUPDATE1",
+    "debugMode": true,
+    "sdkBaseUrl": "https://www.googletagmanager.com",
+    "serverContainerUrl": "https://gtm.example.com",
+    "piiPropertiesToIgnore": [
+      {
+        "piiProperty": "email"
+      }
+    ],
+    "whitelistedEvents": [
+      {
+        "eventName": "Checkout Started"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "web": true,
+      "android": false,
+      "ios": false
+    },
+    "capturePageView": {
+      "web": "gtag"
+    },
+    "debugView": {
+      "web": true
+    },
+    "overrideClientAndSessionId": {
+      "web": false
+    },
+    "extendPageViewParams": {
+      "web": false
+    },
+    "useNativeSDKToSend": {
+      "web": false
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

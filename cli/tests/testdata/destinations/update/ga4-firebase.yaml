@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: ga4-firebase
+spec:
+  id: ga4-firebase
+  display_name: E2E GA4 Firebase Updated
+  type: ga4
+  enabled: true
+  definition_version: 1
+  config:
+    api_secret: "{{ .GA4_API_SECRET }}"
+    client_type: firebase
+    firebase_app_id: 1:9876543210:ios:fedcba
+    debug_mode: true
+    event_filtering:
+      blacklist:
+        - Page Viewed
+        - Screen Viewed
+    use_native_sdk:
+      android: true
+      ios: true
+      web: false

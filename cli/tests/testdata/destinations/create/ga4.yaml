@@ -1,0 +1,37 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: ga4
+spec:
+  id: ga4
+  display_name: E2E GA4 Gtag
+  type: ga4
+  enabled: true
+  definition_version: 1
+  config:
+    api_secret: "{{ .GA4_API_SECRET }}"
+    client_type: gtag
+    measurement_id: G-E2ECREATE1
+    debug_mode: false
+    sdk_base_url: https://www.googletagmanager.com
+    server_container_url: https://gtm.example.com
+    pii_properties_to_ignore:
+      - pii_property: email
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
+    use_native_sdk:
+      web: true
+      android: false
+      ios: false
+    capture_page_view:
+      web: rs
+    debug_view:
+      web: false
+    override_client_and_session_ids:
+      web: false
+    extend_page_view_params:
+      web: false
+    use_native_sdk_to_send:
+      web: false

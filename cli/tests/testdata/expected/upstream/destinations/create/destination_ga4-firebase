@@ -1,0 +1,27 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "ga4-firebase",
+  "name": "E2E GA4 Firebase",
+  "type": "GA4",
+  "enabled": true,
+  "config": {
+    "typesOfClient": "firebase",
+    "firebaseAppId": "1:1234567890:android:abcdef",
+    "debugMode": false,
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "useNativeSDK": {
+      "android": true,
+      "ios": true,
+      "web": false
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
