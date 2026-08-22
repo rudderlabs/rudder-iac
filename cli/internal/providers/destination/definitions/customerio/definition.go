@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,13 +27,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type customerioConfig struct {
@@ -126,6 +120,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "CUSTOMERIO",
 		Version:    1,
 		Properties: properties,
+		// db-config lists no secretKeys for customerio, but terraform marks api_key
+		// Sensitive and it is a real credential, so it is wrapped write-only here.
+		// Note the API does still return apiKey, so the value is never absent from
+		// remote state — see the churn note in the PR.
 		SecretKeys: []string{"api_key"},
 		NewConfig: func() any {
 			return &customerioConfig{}

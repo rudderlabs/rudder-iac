@@ -32,10 +32,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -44,13 +48,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -270,12 +271,12 @@ func TestCustomerioConfigValidation(t *testing.T) {
 
 		config := minimalConfig()
 		config["consent_management"] = map[string]any{
-			"warehouse": []any{map[string]any{"provider": "custom"}},
+			"cloud": []any{map[string]any{"provider": "custom"}},
 		}
 
 		errors := registered.ValidateConfig(config)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/warehouse/0/resolution_strategy", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/resolution_strategy", errors[0].Path)
 	})
 }
 
@@ -382,7 +383,11 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 	})
 }
 
-func TestCustomerioSecretHandling(t *testing.T) {
+// api_key is wrapped write-only even though db-config lists no secretKeys,
+// because terraform marks it Sensitive and it is a real credential. The API does
+// return apiKey, so remote state holds an always-unknown secret and re-apply
+// re-sends it — the same churn every write-only key has.
+func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
@@ -407,9 +412,13 @@ func TestCustomerioSecretHandling(t *testing.T) {
 	resource := extracted["customerio-production"]
 	require.NotNil(t, resource)
 	assert.Equal(t, "site-id-1", resource.Config["site_id"])
-	apiKey := assertWrappedSecret(t, resource.Config, "api_key", "customerio-api-key")
-	assert.NotContains(t, fmt.Sprintf("%v", apiKey), "customerio-api-key")
 
+	wrapped, ok := resource.Config["api_key"].(*secret.String)
+	require.True(t, ok, "api_key must be wrapped as a secret")
+	assert.Equal(t, "customerio-api-key", wrapped.Reveal())
+	assert.NotContains(t, fmt.Sprintf("%v", wrapped), "customerio-api-key")
+
+	// The API returns apiKey, so remote state carries it — as an unknown secret.
 	remote := &destination.RemoteDestination{Destination: &client.Destination{
 		ID:         "dst-customerio",
 		ExternalID: "customerio-production",
@@ -417,13 +426,15 @@ func TestCustomerioSecretHandling(t *testing.T) {
 		Type:       "CUSTOMERIO",
 		Version:    1,
 		IsEnabled:  true,
-		Config:     []byte(`{"siteID":"site-id-1","apiKey":"","datacenter":"US"}`),
+		Config:     []byte(`{"siteID":"site-id-1","apiKey":"customerio-api-key","datacenter":"US"}`),
 	}}
 
 	remoteResource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
 	require.NoError(t, err)
-	remoteAPIKey := requireSecret(t, remoteResource.Config, "api_key")
-	assert.True(t, remoteAPIKey.IsUnknown())
+	remoteKey, ok := remoteResource.Config["api_key"].(*secret.String)
+	require.True(t, ok)
+	assert.True(t, remoteKey.IsUnknown(),
+		"a returned value wrapped as a secret reads back unknown, so every plan re-applies it")
 	assert.Equal(t, "site-id-1", remoteResource.Config["site_id"])
 
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
@@ -443,7 +454,7 @@ func TestCustomerioSecretHandling(t *testing.T) {
 	require.True(t, ok)
 	config, ok := spec.Spec["config"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "(unknown)", config["api_key"])
+	assert.NotEqual(t, "customerio-api-key", config["api_key"], "export must not leak the raw key")
 	assert.Equal(t, "site-id-1", config["site_id"])
 }
 
@@ -487,7 +498,7 @@ func fullConfig() map[string]any {
 					"consents": []any{"analytics"},
 				},
 			},
-			"warehouse": []any{
+			"cloud": []any{
 				map[string]any{
 					"provider":            "custom",
 					"resolution_strategy": "and",
@@ -537,26 +548,6 @@ func assertValidationPaths(t *testing.T, errors []definitions.ConfigError, paths
 	for _, path := range paths {
 		assert.Contains(t, byPath, path)
 	}
-}
-
-func assertWrappedSecret(t *testing.T, config map[string]any, key string, want string) *secret.String {
-	t.Helper()
-
-	s := requireSecret(t, config, key)
-	assert.False(t, s.IsUnknown())
-	assert.Equal(t, want, s.Reveal())
-	return s
-}
-
-func requireSecret(t *testing.T, config map[string]any, key string) *secret.String {
-	t.Helper()
-
-	v, ok := config[key]
-	require.True(t, ok, "missing secret key %q", key)
-	s, ok := v.(*secret.String)
-	require.True(t, ok, "key %q: expected *secret.String, got %T", key, v)
-	require.NotNil(t, s)
-	return s
 }
 
 type urnResolver struct{}
