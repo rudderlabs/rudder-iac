@@ -1,0 +1,18 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "active-campaign",
+  "name": "E2E ActiveCampaign",
+  "type": "ACTIVE_CAMPAIGN",
+  "enabled": true,
+  "config": {
+    "apiUrl": "https://rudder-cli-e2e.api-us1.com",
+    "actid": "12345",
+    "useNativeSDK": {
+      "web": false
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

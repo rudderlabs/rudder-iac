@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: active-campaign
+spec:
+  id: active-campaign
+  display_name: E2E ActiveCampaign
+  type: active_campaign
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://rudder-cli-e2e.api-us1.com
+    api_key: "{{ .ACTIVE_CAMPAIGN_API_KEY }}"
+    actid: "12345"
+    event_key: "{{ .ACTIVE_CAMPAIGN_EVENT_KEY }}"
+    use_native_sdk:
+      web: false
