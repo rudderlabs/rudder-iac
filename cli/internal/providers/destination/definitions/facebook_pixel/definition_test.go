@@ -326,6 +326,32 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 	})
 }
 
+// Both of these empty values are deliberately accepted, and a review flagged
+// them as gaps, so pin the reasoning:
+//   - eventsToEvents[].to lists "" among its schema enum members, and omitempty
+//     lets it through before the enum tag runs;
+//   - accessToken's ^(.{1,300})$ lower bound lives in an allOf branch gated on
+//     connectionMode, which the CLI does not model. Enforcing a non-empty
+//     minimum would reject configs whose branch does not apply.
+func TestFacebookPixelEmptyOptionalValuesAccepted(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(facebookpixel.NewDefinition()))
+	registered, err := registry.Get("facebook_pixel", 1)
+	require.NoError(t, err)
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{
+		"pixel_id":         "1234567890",
+		"events_to_events": []any{map[string]any{"from": "Order Completed", "to": ""}},
+	}), `eventsToEvents[].to accepts "" — it is a schema enum member`)
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{
+		"pixel_id":     "1234567890",
+		"access_token": "",
+	}), "access_token is optional; its non-empty bound is connectionMode-gated")
+}
+
 // schema.json bounds accessToken with ^(.{1,300})$ inside the allOf branch — a
 // wider limit than the usual single_line_100, and previously unenforced.
 func TestFacebookPixelAccessTokenPattern(t *testing.T) {
