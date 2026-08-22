@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.25.0](https://github.com/rudderlabs/rudder-iac/compare/v0.24.0...v0.25.0) (2026-08-22)
+
+
+### Features
+
+* **cli:** onboard adjust destination definition ([#692](https://github.com/rudderlabs/rudder-iac/issues/692)) ([a765da5](https://github.com/rudderlabs/rudder-iac/commit/a765da5cc0d1cc9a20311e64be2b8e9666612cf6))
+* **cli:** onboard GA4 destination definition ([#696](https://github.com/rudderlabs/rudder-iac/issues/696)) ([f2fc1d7](https://github.com/rudderlabs/rudder-iac/commit/f2fc1d795d0aade8f8c570f577fcee3bfdc58b58))
+* **cli:** onboard posthog destination definition ([#700](https://github.com/rudderlabs/rudder-iac/issues/700)) ([02a6b27](https://github.com/rudderlabs/rudder-iac/commit/02a6b275b8341fd215abc28f5b8cded2976ec98d))
+* **cli:** onboard tiktok_ads destination definition ([#707](https://github.com/rudderlabs/rudder-iac/issues/707)) ([839555e](https://github.com/rudderlabs/rudder-iac/commit/839555e8b169a678d67586a41549731d0a23539a))
+* **destination:** onboard ActiveCampaign destination ([#767](https://github.com/rudderlabs/rudder-iac/issues/767)) ([7cad6f5](https://github.com/rudderlabs/rudder-iac/commit/7cad6f5263b607153199aec869ed26f3a938267a))
+* **destination:** onboard Braze destination ([#768](https://github.com/rudderlabs/rudder-iac/issues/768)) ([225d5b2](https://github.com/rudderlabs/rudder-iac/commit/225d5b2224c629bd526903d6ed0b53b767159f5a))
+* **destination:** onboard customerio definition ([#769](https://github.com/rudderlabs/rudder-iac/issues/769)) ([4e312cc](https://github.com/rudderlabs/rudder-iac/commit/4e312cc54e1ce132f8fa0506fcd3b29211394600))
+* **destination:** onboard intercom definition ([#770](https://github.com/rudderlabs/rudder-iac/issues/770)) ([dfdfe26](https://github.com/rudderlabs/rudder-iac/commit/dfdfe26abc8ed4fea227a821c5f2822290227a7f))
+
 ## [0.24.0](https://github.com/rudderlabs/rudder-iac/compare/v0.23.0...v0.24.0) (2026-08-21)
 
 
