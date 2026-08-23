@@ -246,6 +246,22 @@ func TestS3ConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
+			// enable_sse:false is bool's zero value, so a zero-skipping filter on
+			// this property would silently drop it. The connections e2e update
+			// fixture relies on it being sent: the backend merges definition
+			// defaults on create but replaces config wholesale on update, so an
+			// unsent enableSSE disappears upstream.
+			Name: "enable_sse false is sent, not skipped as a zero value",
+			LocalJSON: `{
+				"bucket_name": "my-bucket",
+				"enable_sse": false
+			}`,
+			APIJSON: `{
+				"bucketName": "my-bucket",
+				"enableSSE": false
+			}`,
+		},
+		{
 			Name: "role based auth",
 			LocalJSON: `{
 				"bucket_name": "my-bucket",
