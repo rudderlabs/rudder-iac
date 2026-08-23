@@ -1,0 +1,16 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "firebase-minimal",
+  "name": "E2E Firebase Minimal Updated",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "useNativeSDK": {
+      "android": true
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

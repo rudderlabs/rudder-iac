@@ -65,15 +65,6 @@ func TestFirebaseConfigValidation(t *testing.T) {
 	t.Run("valid full example config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"connection_mode": map[string]any{
-				"android":        "device",
-				"android_kotlin": "device",
-				"ios":            "device",
-				"ios_swift":      "device",
-				"unity":          "device",
-				"react_native":   "device",
-				"flutter":        "device",
-			},
 			"use_native_sdk": map[string]any{
 				"android":        true,
 				"android_kotlin": true,
@@ -99,16 +90,6 @@ func TestFirebaseConfigValidation(t *testing.T) {
 						"resolution_strategy": "and",
 						"consents":            []any{"marketing"},
 					},
-				},
-			},
-			"one_trust_cookie_categories": map[string]any{
-				"android": []any{
-					map[string]any{"one_trust_cookie_category": "C0002"},
-				},
-			},
-			"ketch_consent_purposes": map[string]any{
-				"react_native": []any{
-					map[string]any{"purpose": "analytics"},
 				},
 			},
 		})
@@ -145,28 +126,17 @@ func TestFirebaseConfigValidation(t *testing.T) {
 		}))
 	})
 
-	t.Run("connection mode accepts only device", func(t *testing.T) {
+	t.Run("connection mode rejected as config", func(t *testing.T) {
 		t.Parallel()
 
 		errors := registered.ValidateConfig(map[string]any{
 			"connection_mode": map[string]any{
-				"android": "cloud",
+				"android": "device",
 			},
 		})
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode/android", errors[0].Path)
-	})
-
-	t.Run("connection mode rejects dynamic values", func(t *testing.T) {
-		t.Parallel()
-
-		errors := registered.ValidateConfig(map[string]any{
-			"connection_mode": map[string]any{
-				"android": "{{ .FIREBASE_CONNECTION_MODE }}",
-			},
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode/android", errors[0].Path)
+		assert.Equal(t, "/connection_mode", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
 	t.Run("unsupported source keys rejected under source-scoped config", func(t *testing.T) {
@@ -177,7 +147,6 @@ func TestFirebaseConfigValidation(t *testing.T) {
 			key  string
 			path string
 		}{
-			{name: "connection mode", key: "connection_mode", path: "/connection_mode/web"},
 			{name: "use native sdk", key: "use_native_sdk", path: "/use_native_sdk/web"},
 		}
 		for _, tc := range cases {
@@ -232,73 +201,21 @@ func TestFirebaseConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
 
-	t.Run("unsupported legacy consent source keys rejected", func(t *testing.T) {
+	// The backend migrates these into consentManagement and never returns them,
+	// so modelling them would make every plan diff.
+	t.Run("legacy consent keys rejected as config", func(t *testing.T) {
 		t.Parallel()
 
-		cases := []struct {
-			name       string
-			key        string
-			sourceType string
-			path       string
-		}{
-			{name: "one trust android kotlin", key: "one_trust_cookie_categories", sourceType: "android_kotlin", path: "/one_trust_cookie_categories/android_kotlin"},
-			{name: "one trust ios swift", key: "one_trust_cookie_categories", sourceType: "ios_swift", path: "/one_trust_cookie_categories/ios_swift"},
-			{name: "ketch android kotlin", key: "ketch_consent_purposes", sourceType: "android_kotlin", path: "/ketch_consent_purposes/android_kotlin"},
-			{name: "ketch ios swift", key: "ketch_consent_purposes", sourceType: "ios_swift", path: "/ketch_consent_purposes/ios_swift"},
-		}
-		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
-				errors := registered.ValidateConfig(map[string]any{
-					tc.key: map[string]any{
-						tc.sourceType: []any{},
-					},
-				})
-				require.NotEmpty(t, errors)
-				assert.Equal(t, tc.path, errors[0].Path)
-				assert.Contains(t, errors[0].Message, "unknown config field")
+		for _, key := range []string{"one_trust_cookie_categories", "ketch_consent_purposes"} {
+			errors := registered.ValidateConfig(map[string]any{
+				key: map[string]any{"android": []any{"C0001"}},
 			})
+			require.NotEmpty(t, errors)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "unknown config field")
 		}
 	})
 
-	t.Run("legacy consent strings enforce single line pattern", func(t *testing.T) {
-		t.Parallel()
-
-		cases := []struct {
-			name   string
-			config map[string]any
-			path   string
-		}{
-			{
-				name: "one trust",
-				config: map[string]any{
-					"one_trust_cookie_categories": map[string]any{
-						"android": []any{map[string]any{"one_trust_cookie_category": "line one\nline two"}},
-					},
-				},
-				path: "/one_trust_cookie_categories/android/0/one_trust_cookie_category",
-			},
-			{
-				name: "ketch",
-				config: map[string]any{
-					"ketch_consent_purposes": map[string]any{
-						"flutter": []any{map[string]any{"purpose": "line one\nline two"}},
-					},
-				},
-				path: "/ketch_consent_purposes/flutter/0/purpose",
-			},
-		}
-		for _, tc := range cases {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
-				errors := registered.ValidateConfig(tc.config)
-				require.NotEmpty(t, errors)
-				assert.Equal(t, tc.path, errors[0].Path)
-			})
-		}
-	})
 }
 
 func TestFirebaseConversionRoundTrip(t *testing.T) {
@@ -341,31 +258,6 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "connection mode source mapping",
-			LocalJSON: `{
-				"connection_mode": {
-					"android": "device",
-					"android_kotlin": "device",
-					"ios": "device",
-					"ios_swift": "device",
-					"unity": "device",
-					"react_native": "device",
-					"flutter": "device"
-				}
-			}`,
-			APIJSON: `{
-				"connectionMode": {
-					"android": "device",
-					"androidKotlin": "device",
-					"ios": "device",
-					"iosSwift": "device",
-					"unity": "device",
-					"reactnative": "device",
-					"flutter": "device"
-				}
-			}`,
-		},
-		{
 			Name: "use native sdk source mapping",
 			LocalJSON: `{
 				"use_native_sdk": {
@@ -404,48 +296,6 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}]
-				}
-			}`,
-		},
-		{
-			Name: "one trust cookie categories source mapping",
-			LocalJSON: `{
-				"one_trust_cookie_categories": {
-					"android": [{"one_trust_cookie_category": "C0001"}],
-					"ios": [{"one_trust_cookie_category": "C0002"}],
-					"unity": [{"one_trust_cookie_category": "C0003"}],
-					"react_native": [{"one_trust_cookie_category": "C0004"}],
-					"flutter": [{"one_trust_cookie_category": "C0005"}]
-				}
-			}`,
-			APIJSON: `{
-				"oneTrustCookieCategories": {
-					"android": [{"oneTrustCookieCategory": "C0001"}],
-					"ios": [{"oneTrustCookieCategory": "C0002"}],
-					"unity": [{"oneTrustCookieCategory": "C0003"}],
-					"reactnative": [{"oneTrustCookieCategory": "C0004"}],
-					"flutter": [{"oneTrustCookieCategory": "C0005"}]
-				}
-			}`,
-		},
-		{
-			Name: "ketch consent purposes source mapping",
-			LocalJSON: `{
-				"ketch_consent_purposes": {
-					"android": [{"purpose": "analytics"}],
-					"ios": [{"purpose": "marketing"}],
-					"unity": [{"purpose": "functional"}],
-					"react_native": [{"purpose": "personalization"}],
-					"flutter": [{"purpose": "advertising"}]
-				}
-			}`,
-			APIJSON: `{
-				"ketchConsentPurposes": {
-					"android": [{"purpose": "analytics"}],
-					"ios": [{"purpose": "marketing"}],
-					"unity": [{"purpose": "functional"}],
-					"reactnative": [{"purpose": "personalization"}],
-					"flutter": [{"purpose": "advertising"}]
 				}
 			}`,
 		},

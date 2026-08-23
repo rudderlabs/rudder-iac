@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: firebase-minimal
+spec:
+  id: firebase-minimal
+  display_name: E2E Firebase Minimal Updated
+  type: firebase
+  enabled: true
+  definition_version: 1
+  config:
+    use_native_sdk:
+      android: true

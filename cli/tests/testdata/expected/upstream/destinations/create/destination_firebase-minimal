@@ -1,0 +1,14 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "firebase-minimal",
+  "name": "E2E Firebase Minimal",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "eventFilteringOption": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
