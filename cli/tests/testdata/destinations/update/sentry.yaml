@@ -1,0 +1,36 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: sentry
+spec:
+  id: sentry
+  display_name: E2E Sentry Updated
+  type: sentry
+  enabled: true
+  definition_version: 1
+  config:
+    dsn: https://rudderclie2eupdated@o0.ingest.sentry.io/1
+    environment: production
+    release: 2.0.0
+    server_name: rudder-cli-e2e-updated
+    logger: rudder-cli-updated
+    custom_version_property: buildVersion
+    debug_mode: true
+    use_native_sdk:
+      web: true
+    ignore_errors:
+      - Non-Error promise rejection captured
+    include_paths:
+      - https://cdn.rudder-cli-e2e.com/assets
+    deny_urls:
+      - https://internal.rudder-cli-e2e.com
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics
+            - marketing

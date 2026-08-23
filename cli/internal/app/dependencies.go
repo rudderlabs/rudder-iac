@@ -45,6 +45,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	s3datalake "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3_datalake"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/salesforce"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/sentry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/slack"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowflake"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
@@ -384,6 +385,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(salesforce.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering salesforce destination definition: %w", err)
+		}
+		if err := registry.Register(sentry.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering sentry destination definition: %w", err)
 		}
 		if err := registry.Register(slack.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering slack destination definition: %w", err)

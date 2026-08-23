@@ -1,0 +1,47 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "sentry",
+  "name": "E2E Sentry",
+  "type": "SENTRY",
+  "enabled": true,
+  "config": {
+    "allowUrls": [
+      {
+        "allowUrls": "https://app.rudder-cli-e2e.com"
+      }
+    ],
+    "customVersionProperty": "appVersion",
+    "debugMode": false,
+    "dsn": "https://rudderclie2e@o0.ingest.sentry.io/0",
+    "environment": "staging",
+    "eventFilteringOption": "whitelistedEvents",
+    "ignoreErrors": [
+      {
+        "ignoreErrors": "ResizeObserver loop limit exceeded"
+      }
+    ],
+    "includePaths": [
+      {
+        "includePaths": "https://cdn.rudder-cli-e2e.com/static"
+      }
+    ],
+    "logger": "rudder-cli",
+    "release": "1.0.0",
+    "serverName": "rudder-cli-e2e",
+    "useNativeSDK": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
