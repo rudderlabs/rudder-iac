@@ -1,0 +1,44 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "hs",
+  "name": "E2E HubSpot Updated",
+  "type": "HS",
+  "enabled": true,
+  "config": {
+    "apiVersion": "legacyApi",
+    "authorizationType": "legacyApiKey",
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "consentManagement": {
+      "androidKotlin": [
+        {
+          "provider": "ketch"
+        }
+      ],
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "doAssociation": false,
+    "eventFilteringOption": "blacklistedEvents",
+    "hubID": "87654321",
+    "useNativeSDK": {
+      "web": false
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
