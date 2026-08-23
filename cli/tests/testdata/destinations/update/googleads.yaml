@@ -1,0 +1,49 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: googleads
+spec:
+  id: googleads
+  display_name: E2E Google Ads Updated
+  type: googleads
+  enabled: true
+  definition_version: 1
+  config:
+    conversion_id: AW-987654321
+    v2: false
+    allow_identify: true
+    sdk_base_url: cdn-updated.rudder-cli-e2e.com/gtag
+    send_page_view: false
+    conversion_linker: false
+    disable_ad_personalization: true
+    enable_conversion_label: false
+    allow_enhanced_conversions: true
+    default_page_conversion: checkout
+    use_native_sdk:
+      web: true
+    dynamic_remarketing:
+      web: true
+    page_load_conversions:
+      - label: updatedPageLabel
+        name: Checkout Page
+    click_event_conversions:
+      - label: updatedClickLabel
+        name: Purchase Click
+    event_mapping_from_config:
+      - from: Lead Captured
+        to: Lead
+    track_conversions: false
+    track_dynamic_remarketing: true
+    enable_dynamic_remarketing_events_filtering: true
+    events_to_track_dynamic_remarketing:
+      - Product Viewed
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics
+            - marketing

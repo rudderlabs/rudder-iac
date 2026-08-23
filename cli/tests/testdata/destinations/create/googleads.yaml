@@ -1,0 +1,45 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: googleads
+spec:
+  id: googleads
+  display_name: E2E Google Ads
+  type: googleads
+  enabled: true
+  definition_version: 1
+  config:
+    conversion_id: AW-123456789
+    v2: true
+    allow_identify: false
+    sdk_base_url: https://cdn.rudder-cli-e2e.com/gtag
+    send_page_view: true
+    conversion_linker: true
+    disable_ad_personalization: false
+    enable_conversion_label: true
+    allow_enhanced_conversions: false
+    default_page_conversion: home
+    use_native_sdk:
+      web: true
+    dynamic_remarketing:
+      web: false
+    page_load_conversions:
+      - label: pageLoadLabel
+        name: Home Page
+    click_event_conversions:
+      - label: clickLabel
+        name: Signup Click
+    event_mapping_from_config:
+      - from: Order Completed
+        to: purchase
+      - from: Product Added
+        to: AddToCart
+    track_conversions: true
+    enable_conversion_events_filtering: true
+    events_to_track_conversions:
+      - Order Completed
+    track_dynamic_remarketing: false
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed

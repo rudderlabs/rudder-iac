@@ -1,0 +1,68 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googleads",
+  "name": "E2E Google Ads",
+  "type": "GOOGLEADS",
+  "enabled": true,
+  "config": {
+    "allowEnhancedConversions": false,
+    "allowIdentify": false,
+    "clickEventConversions": [
+      {
+        "conversionLabel": "clickLabel",
+        "name": "Signup Click"
+      }
+    ],
+    "conversionID": "AW-123456789",
+    "conversionLinker": true,
+    "defaultPageConversion": "home",
+    "disableAdPersonalization": false,
+    "dynamicRemarketing": {
+      "web": false
+    },
+    "enableConversionEventsFiltering": true,
+    "enableConversionLabel": true,
+    "eventFilteringOption": "whitelistedEvents",
+    "eventMappingFromConfig": [
+      {
+        "from": "Order Completed",
+        "to": "purchase"
+      },
+      {
+        "from": "Product Added",
+        "to": "AddToCart"
+      }
+    ],
+    "eventsToTrackConversions": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "pageLoadConversions": [
+      {
+        "conversionLabel": "pageLoadLabel",
+        "name": "Home Page"
+      }
+    ],
+    "sdkBaseUrl": "https://cdn.rudder-cli-e2e.com/gtag",
+    "sendPageView": true,
+    "trackConversions": true,
+    "trackDynamicRemarketing": false,
+    "useNativeSDK": {
+      "web": true
+    },
+    "v2": true,
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
