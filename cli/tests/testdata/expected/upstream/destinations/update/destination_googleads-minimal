@@ -1,0 +1,14 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googleads-minimal",
+  "name": "E2E Google Ads Minimal Updated",
+  "type": "GOOGLEADS",
+  "enabled": true,
+  "config": {
+    "conversionID": "AW-444555666"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

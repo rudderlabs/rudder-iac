@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "googleads-minimal",
+  "name": "E2E Google Ads Minimal",
+  "type": "GOOGLEADS",
+  "enabled": true,
+  "config": {
+    "conversionID": "AW-111222333",
+    "v2": true,
+    "allowIdentify": false,
+    "trackConversions": true,
+    "trackDynamicRemarketing": false,
+    "sendPageView": true,
+    "conversionLinker": true,
+    "disableAdPersonalization": false,
+    "enableConversionLabel": false,
+    "allowEnhancedConversions": false,
+    "eventFilteringOption": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
