@@ -1,0 +1,42 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "gtm",
+  "name": "E2E GTM Updated",
+  "type": "GTM",
+  "enabled": true,
+  "config": {
+    "authorizationToken": "rudderCliE2eGtmAuthTokenUpdated",
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            },
+            {
+              "consent": "marketing"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "containerID": "GTM-E2EUPDATE",
+    "environmentID": "env-9",
+    "eventFilteringOption": "blacklistedEvents",
+    "serverUrl": "sgtm-updated.rudder-cli-e2e.com/collect",
+    "useNativeSDK": {
+      "web": true
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
