@@ -1,0 +1,27 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: gtm
+spec:
+  id: gtm
+  display_name: E2E GTM Updated
+  type: gtm
+  enabled: true
+  definition_version: 1
+  config:
+    container_id: GTM-E2EUPDATE
+    server_url: sgtm-updated.rudder-cli-e2e.com/collect
+    environment_id: env-9
+    authorization_token: rudderCliE2eGtmAuthTokenUpdated
+    use_native_sdk:
+      web: true
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics
+            - marketing

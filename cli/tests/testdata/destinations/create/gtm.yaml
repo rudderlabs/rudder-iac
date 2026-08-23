@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: gtm
+spec:
+  id: gtm
+  display_name: E2E GTM
+  type: gtm
+  enabled: true
+  definition_version: 1
+  config:
+    container_id: GTM-E2ECREATE
+    server_url: https://sgtm.rudder-cli-e2e.com
+    environment_id: env-5
+    authorization_token: rudderCliE2eGtmAuthToken
+    use_native_sdk:
+      web: true
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
