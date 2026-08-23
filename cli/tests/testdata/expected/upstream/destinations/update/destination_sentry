@@ -1,0 +1,60 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "sentry",
+  "name": "E2E Sentry Updated",
+  "type": "SENTRY",
+  "enabled": true,
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            },
+            {
+              "consent": "marketing"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "customVersionProperty": "buildVersion",
+    "debugMode": true,
+    "denyUrls": [
+      {
+        "denyUrls": "https://internal.rudder-cli-e2e.com"
+      }
+    ],
+    "dsn": "https://rudderclie2eupdated@o0.ingest.sentry.io/1",
+    "environment": "production",
+    "eventFilteringOption": "blacklistedEvents",
+    "ignoreErrors": [
+      {
+        "ignoreErrors": "Non-Error promise rejection captured"
+      }
+    ],
+    "includePaths": [
+      {
+        "includePaths": "https://cdn.rudder-cli-e2e.com/assets"
+      }
+    ],
+    "logger": "rudder-cli-updated",
+    "release": "2.0.0",
+    "serverName": "rudder-cli-e2e-updated",
+    "useNativeSDK": {
+      "web": true
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

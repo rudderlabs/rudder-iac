@@ -1,0 +1,30 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: sentry
+spec:
+  id: sentry
+  display_name: E2E Sentry
+  type: sentry
+  enabled: true
+  definition_version: 1
+  config:
+    dsn: https://rudderclie2e@o0.ingest.sentry.io/0
+    environment: staging
+    release: 1.0.0
+    server_name: rudder-cli-e2e
+    logger: rudder-cli
+    custom_version_property: appVersion
+    debug_mode: false
+    use_native_sdk:
+      web: true
+    ignore_errors:
+      - ResizeObserver loop limit exceeded
+    include_paths:
+      - https://cdn.rudder-cli-e2e.com/static
+    allow_urls:
+      - https://app.rudder-cli-e2e.com
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
