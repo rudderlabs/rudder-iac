@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const defaultCommandTimeout = 5 * time.Minute
-
 // Executor allows callers to run external commands and capture their combined output.
 // Implementations should be safe for concurrent use by multiple goroutines.
 // All helpers in tests package use Executor to abstract command execution.
@@ -49,7 +47,7 @@ func NewCmdExecutor(workDir string) (*CmdExecutor, error) {
 			return nil, fmt.Errorf("invalid workDir %q: %w", workDir, err)
 		}
 	}
-	return &CmdExecutor{WorkDir: workDir, Timeout: defaultCommandTimeout}, nil
+	return &CmdExecutor{WorkDir: workDir, Timeout: 2 * time.Minute}, nil
 }
 
 // Execute runs the given command with arguments, capturing combined stdout/stderr.
@@ -71,8 +69,5 @@ func (c *CmdExecutor) Execute(cmd string, args ...string) ([]byte, error) {
 	}
 
 	output, err := command.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		return output, fmt.Errorf("command timed out after %s: %w", c.Timeout, err)
-	}
 	return output, err
 }
