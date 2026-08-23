@@ -23,7 +23,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "iterable", registered.Type)
 	assert.Equal(t, "ITERABLE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{}, registered.SecretKeys())
+	assert.Equal(t, []string{"register_device_or_browser_api_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -65,6 +65,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"icon_path/web":                      {"web"},
 		"is_required_to_dismiss_message/web": {"web"},
 		"close_button_position/web":          {"web"},
+		"event_filtering_option/web":         {"web"},
+		"whitelisted_events/web":             {"web"},
+		"blacklisted_events/web":             {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("ITERABLE", 1)
@@ -95,7 +98,8 @@ func TestIterableConfigValidation(t *testing.T) {
 			long[i] = 'a'
 		}
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": string(long),
+			"api_key":     string(long),
+			"data_center": "USDC",
 		})
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/api_key", errors[0].Path)
@@ -105,7 +109,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("invalid initialisation_identifier", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"initialisation_identifier": map[string]any{
 				"web": "phone",
 			},
@@ -117,7 +122,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("invalid handle_links", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"handle_links": map[string]any{
 				"web": "invalid-option",
 			},
@@ -129,7 +135,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("invalid close_button_position", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"close_button_position": map[string]any{
 				"web": "bottom-right",
 			},
@@ -141,7 +148,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 		})
 		assert.Empty(t, errors)
 	})
@@ -150,6 +158,7 @@ func TestIterableConfigValidation(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"api_key":                 "iterable-api-key",
+			"data_center":             "USDC",
 			"map_to_single_event":     true,
 			"track_all_pages":         false,
 			"track_categorized_pages": true,
@@ -175,9 +184,7 @@ func TestIterableConfigValidation(t *testing.T) {
 			"display_interval": map[string]any{
 				"web": "2500",
 			},
-			"package_name": map[string]any{
-				"web": "com.example.app",
-			},
+			"package_name": "com.example.app",
 			"handle_links": map[string]any{
 				"web": "open-all-new-tab",
 			},
@@ -200,6 +207,7 @@ func TestIterableConfigValidation(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"not_a_field": true,
 		})
 		require.NotEmpty(t, errors)
@@ -210,7 +218,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"consent_management": map[string]any{
 				"warehouse": []any{},
 			},
@@ -223,7 +232,8 @@ func TestIterableConfigValidation(t *testing.T) {
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"api_key": "iterable-api-key",
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
 			"consent_management": map[string]any{
 				"ios_swift": []any{
 					map[string]any{"provider": "unknown"},
@@ -254,6 +264,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			Name: "full TF fields",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
+			"data_center": "USDC",
 				"map_to_single_event": true,
 				"track_all_pages": true,
 				"track_categorized_pages": true,
@@ -267,7 +278,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 				"display_interval": {"web": "2500"},
 				"on_open_screen_reader_message": {"web": "New message"},
 				"on_open_node_to_take_focus": {"web": "#main"},
-				"package_name": {"web": "com.example.app"},
+				"package_name": "com.example.app",
 				"right_offset": {"web": "15"},
 				"top_offset": {"web": "11"},
 				"bottom_offset": {"web": "24%"},
@@ -282,6 +293,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
 				"mapToSingleEvent": true,
 				"trackAllPages": true,
 				"trackCategorisedPages": true,
@@ -295,7 +307,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 				"displayInterval": {"web": "2500"},
 				"onOpenScreenReaderMessage": {"web": "New message"},
 				"onOpenNodeToTakeFocus": {"web": "#main"},
-				"packageName": {"web": "com.example.app"},
+				"packageName": "com.example.app",
 				"rightOffset": {"web": "15"},
 				"topOffset": {"web": "11"},
 				"bottomOffset": {"web": "24%"},
@@ -313,10 +325,12 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			Name: "array reshape get in app mapping",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
+			"data_center": "USDC",
 				"get_in_app_event_mapping": {"web": ["one", "two"]}
 			}`,
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
 				"getInAppEventMapping": {"web": [{"eventName": "one"}, {"eventName": "two"}]}
 			}`,
 		},
@@ -324,6 +338,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			Name: "consent for web",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
+			"data_center": "USDC",
 				"consent_management": {
 					"web": [
 						{
@@ -336,6 +351,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
 				"consentManagement": {
 					"web": [
 						{
@@ -354,6 +370,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			Name: "consent source boundary mappings",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
+			"data_center": "USDC",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
@@ -362,6 +379,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],

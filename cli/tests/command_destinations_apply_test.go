@@ -30,6 +30,7 @@ var destinationRawSecrets = []string{
 	"mpGdprApiTokenXXXXXXXXXXXXXXXX",
 	"mpServiceAccountSecretXXXXXXXX",
 	"hsAccessTokenXXXXXXXXXXXXXXXXX",
+	"iterableRegisterDeviceKeyXXXXX",
 	"fbPixelAccessTokenXXXXXXXXXXXX",
 	"intercomApiKeyXXXXXXXXXXXXXXXX",
 	"phcPosthogApiKeyXXXXXXXXXXXXXX",
