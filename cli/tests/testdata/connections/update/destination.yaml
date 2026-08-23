@@ -14,3 +14,7 @@ spec:
     role_based_auth: false
     access_key_id: "{{ .S3_ACCESS_KEY_ID }}"
     access_key: "{{ .S3_ACCESS_KEY }}"
+    # Declared explicitly because the backend only merges definition defaults on
+    # create: the update PUT replaces config wholesale, so a key the spec omits
+    # is dropped rather than retained. destinations/update/s3.yaml does the same.
+    enable_sse: false
