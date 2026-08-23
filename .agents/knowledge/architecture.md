@@ -213,3 +213,9 @@
 - The `INTERCOM_V2` contract remains excluded because it has no Terraform destination registration/mapping source and represents a separate OAuth/account-management contract.
 - `intercom` should be treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Intercom's modeled config surface includes `app_id`, `api_key`, `api_server`, `api_version`, `send_anonymous_id`, `update_last_request_at`, source-scoped `connection_mode`, source-scoped `use_native_sdk`, Android-only `mobile_api_key_android`, iOS-only `mobile_api_key_ios`, `event_filtering`, and shared `consent_management`; `api_key` is the sole db-config secret key.
+## DEX-497 — Facebook Pixel Destination Onboarding
+<!-- ticket:DEX-497 -->
+- Facebook Pixel destination support is implemented as CLI local type `facebook_pixel`, API type `FACEBOOK_PIXEL`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/facebook_pixel`.
+- `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
+- Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
