@@ -332,6 +332,13 @@ Final response must include:
   the nested `eventChannelWebhook` are absent from terraform, and leaving them
   out made the backend drop `incomingWebhooksType` between create and update —
   visible as a create/update snapshot mismatch in the gated e2e.
+- **A key the backend rewrites on write must NOT be modelled**, even though it
+  is in `schema.json`. `oneTrustCookieCategories` and `ketchConsentPurposes` are
+  the worked example: the backend converts them into `consentManagement`
+  entries and never stores the originals, so a definition that models them
+  reads back a different key than it wrote and diffs on every plan. This is the
+  one exception to "model every schema.json key" — there is nothing to erase,
+  because the key was never stored. See DEX-696 Discrepancy 3.
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced
