@@ -33,6 +33,7 @@ import (
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
@@ -352,6 +353,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(gtm.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gtm destination definition: %w", err)
+		}
+		if err := registry.Register(hs.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering hs destination definition: %w", err)
 		}
 		if err := registry.Register(httpdest.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering http destination definition: %w", err)

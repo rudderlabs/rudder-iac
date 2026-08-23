@@ -1,0 +1,46 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "hs",
+  "name": "E2E HubSpot",
+  "type": "HS",
+  "enabled": true,
+  "config": {
+    "apiVersion": "newApi",
+    "authorizationType": "newPrivateAppApi",
+    "doAssociation": true,
+    "eventFilteringOption": "whitelistedEvents",
+    "hubID": "12345678",
+    "hubspotEvents": [
+      {
+        "eventProperties": [
+          {
+            "from": "revenue",
+            "to": "amount"
+          },
+          {
+            "from": "currency",
+            "to": "currency_code"
+          }
+        ],
+        "hubspotEventName": "pe12345678_order_completed",
+        "rsEventName": "Order Completed"
+      }
+    ],
+    "lookupField": "email",
+    "useNativeSDK": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

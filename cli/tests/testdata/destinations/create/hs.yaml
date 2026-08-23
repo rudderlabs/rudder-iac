@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: hs
+spec:
+  id: hs
+  display_name: E2E HubSpot
+  type: hs
+  enabled: true
+  definition_version: 1
+  config:
+    authorization_type: newPrivateAppApi
+    api_version: newApi
+    access_token: "{{ .HS_ACCESS_TOKEN }}"
+    hub_id: "12345678"
+    lookup_field: email
+    do_association: true
+    use_native_sdk:
+      web: true
+    hubspot_events:
+      - rs_event_name: Order Completed
+        hubspot_event_name: pe12345678_order_completed
+        event_properties:
+          - from: revenue
+            to: amount
+          - from: currency
+            to: currency_code
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
