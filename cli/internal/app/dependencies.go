@@ -32,6 +32,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	googleanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_analytics"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
@@ -356,6 +357,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
+		}
+		if err := registry.Register(googleanalytics.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering google_analytics destination definition: %w", err)
 		}
 		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
