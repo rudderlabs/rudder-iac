@@ -29,6 +29,7 @@ import (
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
@@ -343,6 +344,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(facebookpixel.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering facebook_pixel destination definition: %w", err)
+		}
+		if err := registry.Register(firebase.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering firebase destination definition: %w", err)
 		}
 		if err := registry.Register(ga4.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
