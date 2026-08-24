@@ -157,3 +157,11 @@
 - Facebook Pixel should model schema/db-config keys that Terraform does not map, including `limitedDataUSage` as `limited_data_usage`, `removeExternalId` as `remove_external_id`, `useUpdatedMapping` as `use_updated_mapping`, and `autoConfig.web` as `auto_config.web`.
 - Keep `access_token` modeled because db-config lists API key `accessToken` in `defaultConfig` and `secretKeys`, but do not add a regex/required validation tag from UI or Terraform because `schema.json` omits `accessToken`.
 - Facebook Pixel models shared `consent_management` only; legacy `one_trust_cookie_categories` and `ketch_consent_purposes` blocks should remain unknown unless a future task explicitly changes that destination-definition policy.
+
+## DEX-702 — HubSpot Config Surface And Sources
+<!-- ticket:DEX-702 -->
+- HubSpot destination support uses CLI type `hs`; re-onboarding should follow current schema/db-config and broad non-storage destination precedents rather than the older event-stream-only source subset.
+- HubSpot should include every mapped db-config source type that has a common destination mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- HubSpot models shared `consent_management` only; keep legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` unsupported even though schema/db-config still mention the corresponding API keys, because re-sending legacy blocks can cause non-converging applies after backend migration to `consentManagement`.
+- HubSpot local config should omit stale `authorization_type` and `api_key`; current schema root required keys are `accessToken` and `apiVersion`, and `apiKey` should not be retained merely because db-config still lists it as secret metadata.
+- HubSpot `access_token` is the only modeled secret and is required with `api_version`; `lookup_field` is required only for `api_version: newApi`, and `use_native_sdk.web` remains gated to the `web` source.
