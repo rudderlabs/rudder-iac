@@ -46,10 +46,8 @@ func TestConnectionsApply(t *testing.T) {
 		t.Skip("set RUN_CONNECTION_E2E=1 with a live connection-enabled stack")
 	}
 
-	enableLiveWorkspaceCleanupFlags(t)
-
-	// Needed for this test's own apply, not for cleanup — the shared
-	// helper deliberately omits it (see live_e2e_flags_test.go).
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
@@ -59,7 +57,6 @@ func TestConnectionsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "connections")
 	varFile := filepath.Join(projectDir, "connections.vars.yaml")
 
-	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 	assertNoRawSecrets(t, out)
@@ -68,7 +65,6 @@ func TestConnectionsApply(t *testing.T) {
 	// the managed destination is an unrecognised kind and cleanup cannot remove
 	// it. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
-		cleanupLiveWorkspaceEventStreamConnections(t)
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 		assertNoRawSecrets(t, out)

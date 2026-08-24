@@ -119,8 +119,9 @@ func TestDestinationsApply(t *testing.T) {
 		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
 	}
 
-	enableLiveWorkspaceCleanupFlags(t)
-
+	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
+	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
@@ -129,7 +130,6 @@ func TestDestinationsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "destinations")
 	varFile := filepath.Join(projectDir, "destinations.vars.yaml")
 
-	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 	assertNoRawSecrets(t, out)
@@ -138,7 +138,6 @@ func TestDestinationsApply(t *testing.T) {
 	// UnverifiedDestinations is off. Registered after t.Setenv so the flags still
 	// hold when this cleanup runs. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
-		cleanupLiveWorkspaceEventStreamConnections(t)
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 		assertNoRawSecrets(t, out)

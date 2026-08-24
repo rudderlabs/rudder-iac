@@ -19,13 +19,10 @@ import (
 )
 
 func TestTransformationsTest(t *testing.T) {
-	enableLiveWorkspaceCleanupFlags(t)
-
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
 	// Clean slate — destroy any residual state from previous runs
-	cleanupLiveWorkspaceEventStreamConnections(t)
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", string(output))
 
