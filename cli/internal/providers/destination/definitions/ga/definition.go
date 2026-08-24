@@ -1,11 +1,10 @@
-package googleanalytics
+package ga
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
-	"github.com/tidwall/gjson"
 )
 
 func init() {
@@ -24,13 +23,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -40,13 +36,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type eventFiltering struct {
@@ -121,8 +114,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("doubleClick", "double_click"),
 		converter.Simple("enhancedLinkAttribution", "enhanced_link_attribution"),
 		converter.Simple("includeSearch", "include_search"),
-		converter.Conditional("serverSideIdentifyEventCategory", "server_side_identify.event_category", serverSideIdentifyEnabled),
-		converter.Conditional("serverSideIdentifyEventAction", "server_side_identify.event_action", serverSideIdentifyEnabled),
+		converter.Simple("serverSideIdentifyEventCategory", "server_side_identify.event_category"),
+		converter.Simple("serverSideIdentifyEventAction", "server_side_identify.event_action"),
 		converter.Discriminator("enableServerSideIdentify", converter.DiscriminatorValues{
 			"server_side_identify.event_category": true,
 		}),
@@ -131,14 +124,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("enhancedEcommerce", "enhanced_ecommerce"),
 		converter.Simple("nonInteraction", "non_interaction"),
 		converter.Simple("sendUserId", "send_user_id"),
-		conditionalToLocal(
-			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
-			converter.Equals("eventFilteringOption", "whitelistedEvents"),
-		),
-		conditionalToLocal(
-			converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
-			converter.Equals("eventFilteringOption", "blacklistedEvents"),
-		),
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
@@ -208,31 +195,14 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "google_analytics",
+		Type:       "ga",
 		APIType:    "GA",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{},
 		NewConfig: func() any {
 			return &googleAnalyticsConfig{}
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
 	}
-}
-
-func serverSideIdentifyEnabled(config string) bool {
-	return gjson.Get(config, "enableServerSideIdentify").Bool()
-}
-
-func conditionalToLocal(prop converter.ConfigProperty, condition converter.ConfigConditionFunc) converter.ConfigProperty {
-	toLocal := prop.ToLocalFunc
-	prop.ToLocalFunc = func(local, config string) (string, error) {
-		if !condition(config) {
-			return local, nil
-		}
-
-		return toLocal(local, config)
-	}
-	return prop
 }

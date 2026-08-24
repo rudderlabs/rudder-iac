@@ -1,0 +1,14 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "ga-minimal",
+  "name": "E2E Google Analytics Minimal Updated",
+  "type": "GA",
+  "enabled": true,
+  "config": {
+    "trackingID": "UA-222222-2"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "ga-minimal",
+  "name": "E2E Google Analytics Minimal",
+  "type": "GA",
+  "enabled": true,
+  "config": {
+    "trackingID": "UA-111111-1",
+    "doubleClick": false,
+    "enhancedLinkAttribution": false,
+    "includeSearch": false,
+    "enableServerSideIdentify": false,
+    "disableMd5": false,
+    "anonymizeIp": false,
+    "enhancedEcommerce": false,
+    "nonInteraction": false,
+    "sendUserId": false,
+    "eventFilteringOption": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

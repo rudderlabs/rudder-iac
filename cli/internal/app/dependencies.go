@@ -30,9 +30,9 @@ import (
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
-	googleanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_analytics"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
@@ -352,14 +352,14 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(firebase.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering firebase destination definition: %w", err)
 		}
+		if err := registry.Register(ga.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering ga destination definition: %w", err)
+		}
 		if err := registry.Register(ga4.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
 		}
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
-		}
-		if err := registry.Register(googleanalytics.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering google_analytics destination definition: %w", err)
 		}
 		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)

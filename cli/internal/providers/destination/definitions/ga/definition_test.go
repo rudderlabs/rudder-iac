@@ -1,4 +1,4 @@
-package googleanalytics_test
+package ga_test
 
 import (
 	"strings"
@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
-	googleanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_analytics"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 )
 
@@ -17,19 +16,19 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(googleanalytics.NewDefinition()))
+	require.NoError(t, registry.Register(ga.NewDefinition()))
 
-	registered, err := registry.Get("google_analytics", 1)
+	registered, err := registry.Get("ga", 1)
 	require.NoError(t, err)
 
-	assert.Equal(t, "google_analytics", registered.Type)
+	assert.Equal(t, "ga", registered.Type)
 	assert.Equal(t, "GA", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Empty(t, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -40,13 +39,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -77,8 +73,8 @@ func TestGoogleAnalyticsConfigValidation(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(googleanalytics.NewDefinition()))
-	registered, err := registry.Get("google_analytics", 1)
+	require.NoError(t, registry.Register(ga.NewDefinition()))
+	registered, err := registry.Get("ga", 1)
 	require.NoError(t, err)
 
 	t.Run("missing tracking_id", func(t *testing.T) {
@@ -316,7 +312,7 @@ func TestGoogleAnalyticsConfigValidation(t *testing.T) {
 func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	def := googleanalytics.NewDefinition()
+	def := ga.NewDefinition()
 	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
 		{
 			Name: "minimal",
@@ -431,64 +427,39 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 	})
 }
 
-func TestGoogleAnalyticsAPIToLocalRespectsDisabledDiscriminators(t *testing.T) {
+// Import keeps every stored value, including a list the selector does not
+// currently point at. Gating APIToLocal on the selector would emit a spec that
+// silently drops the other list, which the next apply then erases upstream.
+func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
 	t.Parallel()
 
-	def := googleanalytics.NewDefinition()
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(ga.NewDefinition()))
+	registered, err := registry.Get("ga", 1)
+	require.NoError(t, err)
 
-	for _, tc := range []struct {
-		name      string
-		apiConfig map[string]any
-		wantLocal map[string]any
-	}{
-		{
-			name: "server side identify disabled",
-			apiConfig: map[string]any{
-				"trackingID":                      "UA-123456-1",
-				"enableServerSideIdentify":        false,
-				"serverSideIdentifyEventCategory": "User",
-				"serverSideIdentifyEventAction":   "Identify",
-			},
-			wantLocal: map[string]any{
-				"tracking_id": "UA-123456-1",
-			},
-		},
-		{
-			name: "event filtering disabled",
-			apiConfig: map[string]any{
-				"trackingID":           "UA-123456-1",
-				"eventFilteringOption": "disable",
-				"whitelistedEvents":    []any{map[string]any{"eventName": "Signed Up"}},
-				"blacklistedEvents":    []any{map[string]any{"eventName": "Signed Out"}},
-			},
-			wantLocal: map[string]any{
-				"tracking_id": "UA-123456-1",
-			},
-		},
-		{
-			name: "only selected event filtering list imported",
-			apiConfig: map[string]any{
-				"trackingID":           "UA-123456-1",
-				"eventFilteringOption": "whitelistedEvents",
-				"whitelistedEvents":    []any{map[string]any{"eventName": "Signed Up"}},
-				"blacklistedEvents":    []any{map[string]any{"eventName": "Signed Out"}},
-			},
-			wantLocal: map[string]any{
-				"tracking_id": "UA-123456-1",
-				"event_filtering": map[string]any{
-					"whitelist": []any{"Signed Up"},
-				},
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	local, err := registered.APIToLocal(map[string]any{
+		"trackingID":                      "UA-123456-1",
+		"whitelistedEvents":               []any{map[string]any{"eventName": "Order Completed"}},
+		"blacklistedEvents":               []any{map[string]any{"eventName": "Application Opened"}},
+		"eventFilteringOption":            "whitelistedEvents",
+		"enableServerSideIdentify":        false,
+		"serverSideIdentifyEventCategory": "All",
+		"serverSideIdentifyEventAction":   "User Enriched",
+	})
+	require.NoError(t, err)
 
-			gotLocal, err := converter.APIToLocal(def.Properties, tc.apiConfig)
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantLocal, gotLocal)
-		})
-	}
+	assert.Equal(t, map[string]any{
+		"tracking_id": "UA-123456-1",
+		"event_filtering": map[string]any{
+			"whitelist": []any{"Order Completed"},
+			"blacklist": []any{"Application Opened"},
+		},
+		"server_side_identify": map[string]any{
+			"event_category": "All",
+			"event_action":   "User Enriched",
+		},
+	}, local)
 }
 
 func validMinimalConfig() map[string]any {

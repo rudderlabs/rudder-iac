@@ -10,7 +10,6 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
-	googleanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_analytics"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -75,32 +74,6 @@ func TestSpecSyntaxValidRuleMetadata(t *testing.T) {
 	assert.Equal(t, vrules.Error, rule.Severity())
 	assert.NotEmpty(t, rule.Description())
 	assert.Equal(t, prules.V1VersionPatterns(DestinationSpecKind), rule.AppliesTo())
-}
-
-func TestSpecSyntaxValidRuleGoogleAnalyticsSpec(t *testing.T) {
-	t.Parallel()
-
-	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(googleanalytics.NewDefinition()))
-
-	results := runSyntaxRule(t, registry, map[string]any{
-		"id":                 "google-analytics-prod",
-		"display_name":       "Google Analytics Prod",
-		"type":               "google_analytics",
-		"enabled":            true,
-		"definition_version": 1,
-		"config": map[string]any{
-			"tracking_id": "UA-123456-1",
-			"domain": map[string]any{
-				"web": "auto",
-			},
-		},
-	})
-	assert.Empty(t, results)
-
-	registered, err := registry.Get("google_analytics", 1)
-	require.NoError(t, err)
-	assert.Equal(t, "GA", registered.APIType)
 }
 
 func TestSpecSyntaxValidRuleDecodeFailure(t *testing.T) {

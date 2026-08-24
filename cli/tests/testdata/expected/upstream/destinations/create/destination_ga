@@ -1,0 +1,99 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "ga",
+  "name": "E2E Google Analytics",
+  "type": "GA",
+  "enabled": true,
+  "config": {
+    "anonymizeIp": true,
+    "contentGroupings": [
+      {
+        "from": "section",
+        "to": "contentGroup1"
+      }
+    ],
+    "customMappings": [
+      {
+        "from": "Order Completed",
+        "to": "purchase"
+      }
+    ],
+    "dimensions": [
+      {
+        "from": "plan",
+        "to": "dimension1"
+      }
+    ],
+    "disableMd5": false,
+    "domain": {
+      "web": "auto"
+    },
+    "doubleClick": true,
+    "enableServerSideIdentify": true,
+    "enhancedEcommerce": true,
+    "enhancedLinkAttribution": true,
+    "eventFilteringOption": "whitelistedEvents",
+    "includeSearch": false,
+    "metrics": [
+      {
+        "from": "revenue",
+        "to": "metric1"
+      }
+    ],
+    "namedTracker": {
+      "web": false
+    },
+    "nonInteraction": false,
+    "optimize": {
+      "web": "OPT-E2ECREATE"
+    },
+    "resetCustomDimensionsOnPage": {
+      "web": [
+        {
+          "resetCustomDimensionsOnPage": "dimension1"
+        }
+      ]
+    },
+    "rudderDeleteAccountId": "rudderCliE2eDeleteAccount",
+    "sampleRate": {
+      "web": "100"
+    },
+    "sendUserId": true,
+    "serverSideIdentifyEventAction": "User Enriched",
+    "serverSideIdentifyEventCategory": "All",
+    "setAllMappedProps": {
+      "web": true
+    },
+    "siteSpeedSampleRate": {
+      "web": "10"
+    },
+    "trackCategorizedPages": {
+      "web": true
+    },
+    "trackNamedPages": {
+      "web": false
+    },
+    "trackingID": "UA-123456-1",
+    "useGoogleAmpClientId": {
+      "web": false
+    },
+    "useNativeSDK": {
+      "web": true
+    },
+    "useRichEventNames": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

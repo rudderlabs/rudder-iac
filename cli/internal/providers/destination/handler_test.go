@@ -16,7 +16,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
-	googleanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_analytics"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -37,16 +36,15 @@ func newTestClient(t *testing.T, baseURL string) *client.Client {
 	return c
 }
 
-// testRegistry builds a registry with the destination definitions used by handler tests,
-// mirroring the shapes in definitions/export_test.go where practical (those helpers
-// are only visible inside the definitions package's own test binary).
+// testRegistry builds a registry with a webhook and a GA4 definition, mirroring
+// the shapes in definitions/export_test.go (which are only visible inside the
+// definitions package's own test binary).
 func testRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(webhookTestDefinition()))
 	require.NoError(t, registry.Register(ga4TestDefinition()))
-	require.NoError(t, registry.Register(googleanalytics.NewDefinition()))
 	return registry
 }
 
@@ -354,54 +352,6 @@ func TestHandlerImpl_Create(t *testing.T) {
 		"config": map[string]any{
 			"apiSecret":     "secret-value",
 			"measurementId": "G-123",
-		},
-	}, payload)
-}
-
-func TestHandlerImpl_Create_GoogleAnalyticsUsesGAAPIType(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	registry := testRegistry(t)
-
-	var createBody string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/v2/destinations", r.URL.Path)
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		createBody = string(body)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"destination":{"id":"dst-ga","name":"Production GA","type":"GA","enabled":true,"version":1,"config":{"trackingID":"UA-123456-1"}}}`))
-	}))
-	t.Cleanup(srv.Close)
-
-	c := newTestClient(t, srv.URL)
-	h := destination.NewHandler(c, registry)
-
-	state, err := h.Impl.Create(ctx, &destination.DestinationResource{
-		ID:                "google-analytics-production",
-		DisplayName:       "Production Google Analytics",
-		Type:              "google_analytics",
-		Enabled:           true,
-		DefinitionVersion: 1,
-		Config: map[string]any{
-			"tracking_id": "UA-123456-1",
-		},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, &destination.DestinationState{ID: "dst-ga", TransformationID: ""}, state)
-
-	var payload map[string]any
-	require.NoError(t, json.Unmarshal([]byte(createBody), &payload))
-	assert.Equal(t, map[string]any{
-		"name":       "Production Google Analytics",
-		"type":       "GA",
-		"enabled":    true,
-		"externalId": "google-analytics-production",
-		"version":    float64(1),
-		"config": map[string]any{
-			"trackingID": "UA-123456-1",
 		},
 	}, payload)
 }

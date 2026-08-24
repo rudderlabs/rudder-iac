@@ -1,0 +1,65 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: ga
+spec:
+  id: ga
+  display_name: E2E Google Analytics
+  type: ga
+  enabled: true
+  definition_version: 1
+  config:
+    tracking_id: UA-123456-1
+    rudder_delete_account_id: rudderCliE2eDeleteAccount
+    double_click: true
+    enhanced_link_attribution: true
+    include_search: false
+    disable_md5: false
+    anonymize_ip: true
+    enhanced_ecommerce: true
+    non_interaction: false
+    send_user_id: true
+    server_side_identify:
+      event_category: All
+      event_action: User Enriched
+    use_native_sdk:
+      web: true
+    track_categorized_pages:
+      web: true
+    track_named_pages:
+      web: false
+    use_rich_event_names:
+      web: true
+    sample_rate:
+      web: "100"
+    site_speed_sample_rate:
+      web: "10"
+    set_all_mapped_props:
+      web: true
+    domain:
+      web: auto
+    optimize:
+      web: OPT-E2ECREATE
+    use_google_amp_client_id:
+      web: false
+    named_tracker:
+      web: false
+    reset_custom_dimensions_on_page:
+      web:
+        - dimension1
+    dimensions:
+      - from: plan
+        to: dimension1
+    metrics:
+      - from: revenue
+        to: metric1
+    content_groupings:
+      - from: section
+        to: contentGroup1
+    custom_mappings:
+      - from: Order Completed
+        to: purchase
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
