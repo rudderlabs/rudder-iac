@@ -49,14 +49,3 @@
 <!-- ticket:DEX-497 -->
 - CI live E2E can exceed a 2-minute per-command `cli/tests` executor timeout while apply is still making valid progress; the observed `TestProjectApply/rudder/v1_specs_after_migration/should_update_entities_in_catalog_from_project` failure was `signal: killed` after about 125s with many successful catalog/transformation updates already printed.
 - Durable mitigation: keep live E2E CLI command timeouts above the normal slow-apply window and report deadline timeouts explicitly from `cli/tests/helpers.go`, so future failures distinguish real apply errors from the test helper killing a long-running command.
-
-## DEX-702 — Event Stream Connection Cleanup Gate
-<!-- ticket:DEX-702 -->
-- CI live E2E cleanup can fail when workspace-wide `destroy` sees event-stream sources and destinations but event-stream connection support is not enabled; the observed symptom is HTTP 400 while deleting an event-stream source because it still has active connections.
-- Durable mitigation: enable `RUDDERSTACK_X_CONNECTION_SUPPORT` alongside destination support and unverified destination support before any `cli/tests` live E2E path calls `rudder-cli destroy`, so managed connections are loaded and deleted before their endpoints.
-- CI live E2E cleanup can still fail after enabling connection support if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`; observed symptoms include HTTP 400 on `destination:webapp-test` or `event-stream-source:e2e-conn-android` because active connections remain.
-- Durable mitigation for `cli/tests` live workspace cleanup is to delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`; production remote loading should continue loading only `externalId`-managed connections.
-- The lint workflow can fail before linting when `golangci/golangci-lint-action` runs config verification and `golangci-lint config verify` times out fetching the remote `golangci.v2.9.jsonschema.json` schema.
-- Durable mitigation: set `verify: false` in `.github/workflows/lint.yml` while keeping the pinned `golangci-lint` run enabled, so lint CI no longer depends on remote schema availability before running lint.
-- HubSpot create snapshots can still include backend default `config.authorizationType = "newPrivateAppApi"` even though the CLI intentionally omits local `authorization_type` and legacy `api_key` from the current HS definition.
-- Durable mitigation: keep `authorization_type` out of HubSpot local YAML/definition, but include `authorizationType: "newPrivateAppApi"` in the HS create upstream snapshot when live create responses return that default; update snapshots may omit it if live update responses omit it.

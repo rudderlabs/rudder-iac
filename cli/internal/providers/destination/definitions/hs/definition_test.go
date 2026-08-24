@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -39,13 +39,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -54,9 +51,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.Nil(t, registered.SupportedSourcesValidation("web"))
-	assert.Equal(t, map[string][]string{
-		"use_native_sdk/web": {"web"},
-	}, registered.GatedKeyPaths())
+	assert.Empty(t, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("HS", 1)
 	require.NoError(t, err)
@@ -168,9 +163,12 @@ func TestHSConfigValidation(t *testing.T) {
 
 	t.Run("single line fields accept dynamic templates", func(t *testing.T) {
 		t.Parallel()
+		// access_token is deliberately literal here: its schema pattern
+		// (^(.{1,100})$) carries no {{ }} / env. branch, unlike every other
+		// field in this test, so it does not get dynamic template acceptance.
 		config := map[string]any{
 			"api_version":  "newApi",
-			"access_token": "{{ .HS_ACCESS_TOKEN || fallback-token }}",
+			"access_token": "private-app-token",
 			"hub_id":       "{{ .HS_HUB_ID || fallback-hub }}",
 			"lookup_field": "{{ .HS_LOOKUP_FIELD || email }}",
 			"event_filtering": map[string]any{
@@ -192,6 +190,20 @@ func TestHSConfigValidation(t *testing.T) {
 
 		errors := registered.ValidateConfig(config)
 		assert.Empty(t, errors)
+	})
+
+	// access_token's schema pattern is unconditional and template-free, unlike
+	// every other single_line_100 field: an over-length {{ path || fallback }}
+	// template — accepted everywhere else via dynamic_or_pattern — is rejected
+	// here because the plain pattern enforces the 100-char cap even on templates.
+	t.Run("access_token rejects an over-length template", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["access_token"] = "{{ path || " + strings.Repeat("a", 100) + " }}"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/access_token", errors[0].Path)
 	})
 
 	t.Run("over 100 character literals rejected", func(t *testing.T) {
@@ -276,7 +288,7 @@ func TestHSConfigValidation(t *testing.T) {
 						"consents": []any{"analytics"},
 					},
 				},
-				"warehouse": []any{
+				"cloud": []any{
 					map[string]any{
 						"provider":            "custom",
 						"resolution_strategy": "or",
@@ -358,25 +370,6 @@ func TestHSConfigValidation(t *testing.T) {
 				assert.Contains(t, errors[0].Message, "unknown config field")
 			})
 		}
-	})
-
-	t.Run("broad source consent config is supported", func(t *testing.T) {
-		t.Parallel()
-		config := minimalConfig()
-		config["consent_management"] = map[string]any{
-			"amp": []any{
-				map[string]any{"provider": "oneTrust"},
-			},
-			"warehouse": []any{
-				map[string]any{"provider": "ketch"},
-			},
-			"shopify": []any{
-				map[string]any{"provider": "iubenda"},
-			},
-		}
-
-		errors := registered.ValidateConfig(config)
-		assert.Empty(t, errors)
 	})
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
@@ -517,8 +510,8 @@ func TestHSConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
-					"shopify": [{"provider": "oneTrust"}]
+					"cloud": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
+					"cordova": [{"provider": "oneTrust"}]
 				}
 			}`,
 			APIJSON: `{
@@ -528,12 +521,12 @@ func TestHSConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{
+					"cloud": [{
 						"provider": "custom",
 						"resolutionStrategy": "or",
 						"consents": [{"consent": "analytics"}]
 					}],
-					"shopify": [{"provider": "oneTrust"}]
+					"cordova": [{"provider": "oneTrust"}]
 				}
 			}`,
 		},

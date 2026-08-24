@@ -6,7 +6,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-// Source types from integrations-config destinations/hs/db-config.json.
+// Source types from integrations-config destinations/hs/db-config.json,
+// restricted to the types the CLI event-stream provider owns.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -14,13 +15,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,18 +28,17 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type hsConfig struct {
-	APIVersion        string                   `mapstructure:"api_version" validate:"required,dynamic_or_oneof=newApi legacyApi"`
-	AccessToken       string                   `mapstructure:"access_token" validate:"required,dynamic_or_pattern=single_line_100"`
+	APIVersion string `mapstructure:"api_version" validate:"required,dynamic_or_oneof=newApi legacyApi"`
+	// accessToken's schema pattern (^(.{1,100})$) carries no {{ }} / env.
+	// branch, unlike every other single_line_100 field here — plain pattern.
+	AccessToken       string                   `mapstructure:"access_token" validate:"required,pattern=single_line_100"`
 	HubID             string                   `mapstructure:"hub_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	LookupField       string                   `mapstructure:"lookup_field" validate:"required_if=APIVersion newApi,omitempty,dynamic_or_pattern=single_line_100"`
 	DoAssociation     *bool                    `mapstructure:"do_association"`
@@ -90,7 +87,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Gated(converter.Simple("useNativeSDK.web", "use_native_sdk.web"), common.SourceTypeWeb),
+		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 
