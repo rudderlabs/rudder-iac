@@ -219,3 +219,9 @@
 - `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
 - Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
+
+## INT-7023 — ClickHouse JsonPaths Terraform Ownership Boundary
+<!-- ticket:INT-7023 -->
+- ClickHouse `jsonPaths` dashboard component rollout is a Terraform/Flagsmith registration concern outside `rudder-iac`; this repository has Go CLI destination definitions but does not own the Terraform environment rollout needed for dashboard rendering.
+- Do not add a placeholder ClickHouse CLI destination definition in `cli/internal/providers/destination/definitions` solely to satisfy ClickHouse `jsonPaths` component registration; that would not complete the Terraform/Flagsmith acceptance path.
+- Existing `jsonPaths` support in `rudder-iac` is limited to CLI-managed warehouse destination definitions such as BigQuery (`bq`), Postgres, Redshift (`rs`), and Snowflake.
