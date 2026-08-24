@@ -24,11 +24,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "hs", registered.Type)
 	assert.Equal(t, "HS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key", "access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -39,10 +39,13 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
+		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
+		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -51,7 +54,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.Nil(t, registered.SupportedSourcesValidation("web"))
-	assert.Empty(t, registered.GatedKeyPaths())
+	assert.Equal(t, map[string][]string{
+		"use_native_sdk/web": {"web"},
+	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("HS", 1)
 	require.NoError(t, err)
@@ -68,23 +73,11 @@ func TestHSConfigValidation(t *testing.T) {
 
 	minimalConfig := func() map[string]any {
 		return map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "newApi",
-			"access_token":       "private-app-token",
-			"lookup_field":       "email",
+			"api_version":  "newApi",
+			"access_token": "private-app-token",
+			"lookup_field": "email",
 		}
 	}
-
-	t.Run("missing authorization_type", func(t *testing.T) {
-		t.Parallel()
-		config := minimalConfig()
-		delete(config, "authorization_type")
-
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/authorization_type", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
 
 	t.Run("missing api_version", func(t *testing.T) {
 		t.Parallel()
@@ -97,25 +90,12 @@ func TestHSConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("api_key required for legacy API key auth", func(t *testing.T) {
+	t.Run("missing access_token", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "legacyApiKey",
-			"api_version":        "legacyApi",
-		})
+		config := minimalConfig()
+		delete(config, "access_token")
 
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/api_key", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "required")
-	})
-
-	t.Run("access_token required for private app auth", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "legacyApi",
-		})
-
+		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/access_token", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "required")
@@ -124,9 +104,8 @@ func TestHSConfigValidation(t *testing.T) {
 	t.Run("lookup_field required for new api", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "newApi",
-			"access_token":       "private-app-token",
+			"api_version":  "newApi",
+			"access_token": "private-app-token",
 		})
 
 		require.NotEmpty(t, errors)
@@ -137,38 +116,21 @@ func TestHSConfigValidation(t *testing.T) {
 	t.Run("lookup_field not required for legacy api", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "legacyApi",
-			"access_token":       "private-app-token",
+			"api_version":  "legacyApi",
+			"access_token": "private-app-token",
 		})
 
 		assert.Empty(t, errors)
 	})
 
-	t.Run("invalid enum values rejected", func(t *testing.T) {
+	t.Run("invalid api_version enum rejected", func(t *testing.T) {
 		t.Parallel()
+		config := minimalConfig()
+		config["api_version"] = "v2"
 
-		cases := []struct {
-			field string
-			value string
-			path  string
-		}{
-			{field: "authorization_type", value: "oauth", path: "/authorization_type"},
-			{field: "api_version", value: "v2", path: "/api_version"},
-		}
-
-		for _, tc := range cases {
-			tc := tc
-			t.Run(tc.field, func(t *testing.T) {
-				t.Parallel()
-				config := minimalConfig()
-				config[tc.field] = tc.value
-
-				errors := registered.ValidateConfig(config)
-				require.NotEmpty(t, errors)
-				assert.Equal(t, tc.path, errors[0].Path)
-			})
-		}
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/api_version", errors[0].Path)
 	})
 
 	t.Run("single line fields reject newlines", func(t *testing.T) {
@@ -179,7 +141,6 @@ func TestHSConfigValidation(t *testing.T) {
 			value any
 			path  string
 		}{
-			{field: "api_key", value: "bad\nkey", path: "/api_key"},
 			{field: "access_token", value: "bad\ntoken", path: "/access_token"},
 			{field: "hub_id", value: "bad\nhub", path: "/hub_id"},
 			{field: "lookup_field", value: "bad\nfield", path: "/lookup_field"},
@@ -197,12 +158,6 @@ func TestHSConfigValidation(t *testing.T) {
 				t.Parallel()
 				config := minimalConfig()
 				config[tc.field] = tc.value
-				if tc.field == "api_key" {
-					config["authorization_type"] = "legacyApiKey"
-					config["api_version"] = "legacyApi"
-					delete(config, "access_token")
-					delete(config, "lookup_field")
-				}
 
 				errors := registered.ValidateConfig(config)
 				require.NotEmpty(t, errors)
@@ -214,12 +169,10 @@ func TestHSConfigValidation(t *testing.T) {
 	t.Run("single line fields accept dynamic templates", func(t *testing.T) {
 		t.Parallel()
 		config := map[string]any{
-			"authorization_type": "legacyApiKey",
-			"api_version":        "newApi",
-			"api_key":            "{{ .HS_API_KEY || fallback-key }}",
-			"access_token":       "{{ .HS_ACCESS_TOKEN || fallback-token }}",
-			"hub_id":             "{{ .HS_HUB_ID || fallback-hub }}",
-			"lookup_field":       "{{ .HS_LOOKUP_FIELD || email }}",
+			"api_version":  "newApi",
+			"access_token": "{{ .HS_ACCESS_TOKEN || fallback-token }}",
+			"hub_id":       "{{ .HS_HUB_ID || fallback-hub }}",
+			"lookup_field": "{{ .HS_LOOKUP_FIELD || email }}",
 			"event_filtering": map[string]any{
 				"blacklist": []any{"{{ .HS_BLOCKED_EVENT || Internal Event }}"},
 			},
@@ -263,24 +216,31 @@ func TestHSConfigValidation(t *testing.T) {
 		assertValidationPaths(t, errors, "/event_filtering/whitelist", "/event_filtering/blacklist")
 	})
 
-	t.Run("valid minimal private app example", func(t *testing.T) {
+	t.Run("hubspot event nested fields follow schema optionality", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["hubspot_events"] = []any{map[string]any{"event_properties": []any{map[string]any{}}}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("valid minimal new api example", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "newApi",
-			"access_token":       "{{ .HS_ACCESS_TOKEN }}",
-			"lookup_field":       "email",
+			"api_version":  "newApi",
+			"access_token": "{{ .HS_ACCESS_TOKEN }}",
+			"lookup_field": "email",
 		})
 
 		assert.Empty(t, errors)
 	})
 
-	t.Run("valid legacy api key config", func(t *testing.T) {
+	t.Run("valid legacy api config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "legacyApiKey",
-			"api_version":        "legacyApi",
-			"api_key":            "legacy-api-key",
+			"api_version":  "legacyApi",
+			"access_token": "private-app-token",
 		})
 
 		assert.Empty(t, errors)
@@ -289,13 +249,11 @@ func TestHSConfigValidation(t *testing.T) {
 	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"authorization_type": "newPrivateAppApi",
-			"api_version":        "newApi",
-			"access_token":       "private-app-token",
-			"api_key":            "legacy-api-key",
-			"hub_id":             "123456",
-			"lookup_field":       "email",
-			"do_association":     true,
+			"api_version":    "newApi",
+			"access_token":   "private-app-token",
+			"hub_id":         "123456",
+			"lookup_field":   "email",
+			"do_association": true,
 			"hubspot_events": []any{
 				map[string]any{
 					"rs_event_name":      "Product Viewed",
@@ -318,6 +276,13 @@ func TestHSConfigValidation(t *testing.T) {
 						"consents": []any{"analytics"},
 					},
 				},
+				"warehouse": []any{
+					map[string]any{
+						"provider":            "custom",
+						"resolution_strategy": "or",
+						"consents":            []any{"marketing"},
+					},
+				},
 			},
 		})
 
@@ -333,6 +298,24 @@ func TestHSConfigValidation(t *testing.T) {
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/not_a_field", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "unknown config field")
+	})
+
+	t.Run("stale auth keys are not supported", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{"authorization_type", "api_key"} {
+			key := key
+			t.Run(key, func(t *testing.T) {
+				t.Parallel()
+				config := minimalConfig()
+				config[key] = "legacy"
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors)
+				assert.Equal(t, "/"+key, errors[0].Path)
+				assert.Contains(t, errors[0].Message, "unknown config field")
+			})
+		}
 	})
 
 	t.Run("connection_mode is not a supported key", func(t *testing.T) {
@@ -356,6 +339,9 @@ func TestHSConfigValidation(t *testing.T) {
 		assert.Equal(t, "/use_native_sdk/android", errors[0].Path)
 	})
 
+	// schema.json declares oneTrustCookieCategories and ketchConsentPurposes, but
+	// they are deliberately not modelled: payloads using the legacy include-key
+	// blocks are migrated into consentManagement by the backend and then dropped.
 	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
 
@@ -372,6 +358,25 @@ func TestHSConfigValidation(t *testing.T) {
 				assert.Contains(t, errors[0].Message, "unknown config field")
 			})
 		}
+	})
+
+	t.Run("broad source consent config is supported", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["consent_management"] = map[string]any{
+			"amp": []any{
+				map[string]any{"provider": "oneTrust"},
+			},
+			"warehouse": []any{
+				map[string]any{"provider": "ketch"},
+			},
+			"shopify": []any{
+				map[string]any{"provider": "iubenda"},
+			},
+		}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
 	})
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
@@ -409,40 +414,34 @@ func TestHSConversionRoundTrip(t *testing.T) {
 	def := hs.NewDefinition()
 	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
 		{
-			Name: "minimal private app",
+			Name: "minimal new api",
 			LocalJSON: `{
-				"authorization_type": "newPrivateAppApi",
 				"api_version": "newApi",
 				"access_token": "private-app-token",
 				"lookup_field": "email"
 			}`,
 			APIJSON: `{
-				"authorizationType": "newPrivateAppApi",
 				"apiVersion": "newApi",
 				"accessToken": "private-app-token",
 				"lookupField": "email"
 			}`,
 		},
 		{
-			Name: "legacy api key",
+			Name: "legacy api still uses access token",
 			LocalJSON: `{
-				"authorization_type": "legacyApiKey",
 				"api_version": "legacyApi",
-				"api_key": "legacy-api-key"
+				"access_token": "private-app-token"
 			}`,
 			APIJSON: `{
-				"authorizationType": "legacyApiKey",
 				"apiVersion": "legacyApi",
-				"apiKey": "legacy-api-key"
+				"accessToken": "private-app-token"
 			}`,
 		},
 		{
 			Name: "full config with hubspot events and whitelist",
 			LocalJSON: `{
-				"authorization_type": "newPrivateAppApi",
 				"api_version": "newApi",
 				"access_token": "private-app-token",
-				"api_key": "legacy-api-key",
 				"hub_id": "123456",
 				"lookup_field": "email",
 				"do_association": true,
@@ -464,10 +463,8 @@ func TestHSConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 			APIJSON: `{
-				"authorizationType": "newPrivateAppApi",
 				"apiVersion": "newApi",
 				"accessToken": "private-app-token",
-				"apiKey": "legacy-api-key",
 				"hubID": "123456",
 				"lookupField": "email",
 				"doAssociation": true,
@@ -494,7 +491,6 @@ func TestHSConversionRoundTrip(t *testing.T) {
 		{
 			Name: "event filtering blacklist",
 			LocalJSON: `{
-				"authorization_type": "newPrivateAppApi",
 				"api_version": "newApi",
 				"access_token": "private-app-token",
 				"lookup_field": "email",
@@ -503,7 +499,6 @@ func TestHSConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 			APIJSON: `{
-				"authorizationType": "newPrivateAppApi",
 				"apiVersion": "newApi",
 				"accessToken": "private-app-token",
 				"lookupField": "email",
@@ -516,31 +511,29 @@ func TestHSConversionRoundTrip(t *testing.T) {
 		{
 			Name: "consent source boundary mappings",
 			LocalJSON: `{
-				"authorization_type": "newPrivateAppApi",
 				"api_version": "legacyApi",
 				"access_token": "private-app-token",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"cloud": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
-					"cordova": [{"provider": "oneTrust"}]
+					"warehouse": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
+					"shopify": [{"provider": "oneTrust"}]
 				}
 			}`,
 			APIJSON: `{
-				"authorizationType": "newPrivateAppApi",
 				"apiVersion": "legacyApi",
 				"accessToken": "private-app-token",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"cloud": [{
+					"warehouse": [{
 						"provider": "custom",
 						"resolutionStrategy": "or",
 						"consents": [{"consent": "analytics"}]
 					}],
-					"cordova": [{"provider": "oneTrust"}]
+					"shopify": [{"provider": "oneTrust"}]
 				}
 			}`,
 		},

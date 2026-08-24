@@ -6,8 +6,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-// Source types from integrations-config destinations/hs/db-config.json,
-// restricted to the types the CLI event-stream provider owns.
+// Source types from integrations-config destinations/hs/db-config.json.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -15,10 +14,13 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
+	common.SourceTypeAMP,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -28,17 +30,18 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
+	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeShopify:       {"cloud"},
 }
 
 type hsConfig struct {
-	AuthorizationType string                   `mapstructure:"authorization_type" validate:"required,dynamic_or_oneof=legacyApiKey newPrivateAppApi"`
 	APIVersion        string                   `mapstructure:"api_version" validate:"required,dynamic_or_oneof=newApi legacyApi"`
-	APIKey            string                   `mapstructure:"api_key" validate:"required_if=AuthorizationType legacyApiKey,omitempty,dynamic_or_pattern=single_line_100"`
-	AccessToken       string                   `mapstructure:"access_token" validate:"required_if=AuthorizationType newPrivateAppApi,omitempty,dynamic_or_pattern=single_line_100"`
+	AccessToken       string                   `mapstructure:"access_token" validate:"required,dynamic_or_pattern=single_line_100"`
 	HubID             string                   `mapstructure:"hub_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	LookupField       string                   `mapstructure:"lookup_field" validate:"required_if=APIVersion newApi,omitempty,dynamic_or_pattern=single_line_100"`
 	DoAssociation     *bool                    `mapstructure:"do_association"`
@@ -71,9 +74,7 @@ type useNativeSDK struct {
 // NewDefinition returns the HubSpot destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
-		converter.Simple("authorizationType", "authorization_type"),
 		converter.Simple("apiVersion", "api_version"),
-		converter.Simple("apiKey", "api_key"),
 		converter.Simple("accessToken", "access_token"),
 		converter.Simple("hubID", "hub_id"),
 		converter.Simple("lookupField", "lookup_field"),
@@ -89,7 +90,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
+		converter.Gated(converter.Simple("useNativeSDK.web", "use_native_sdk.web"), common.SourceTypeWeb),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)
 
@@ -98,7 +99,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "HS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_key", "access_token"},
+		SecretKeys: []string{"access_token"},
 		NewConfig: func() any {
 			return &hsConfig{}
 		},

@@ -219,3 +219,9 @@
 - `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
 - Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
+
+## DEX-702 — HubSpot Destination Re-Onboarding
+<!-- ticket:DEX-702 -->
+- HubSpot destination support is implemented as CLI local type `hs` for the current HubSpot API contract.
+- `hs` should keep the broad mapped non-storage source-type set: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- HubSpot's current modeled auth surface is `access_token` plus `api_version`; legacy `authorization_type` and `api_key` are intentionally omitted because current schema no longer declares `authorizationType` or `apiKey`.
