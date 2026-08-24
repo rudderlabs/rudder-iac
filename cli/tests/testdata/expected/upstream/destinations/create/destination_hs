@@ -8,7 +8,6 @@
   "enabled": true,
   "config": {
     "apiVersion": "newApi",
-    "authorizationType": "newPrivateAppApi",
     "doAssociation": true,
     "eventFilteringOption": "whitelistedEvents",
     "hubID": "12345678",
