@@ -46,9 +46,8 @@ func TestConnectionsApply(t *testing.T) {
 		t.Skip("set RUN_CONNECTION_E2E=1 with a live connection-enabled stack")
 	}
 
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
+	enableLiveWorkspaceCleanupFlags(t)
+
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")

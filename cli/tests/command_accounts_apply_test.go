@@ -42,10 +42,11 @@ var accountSnapshotIgnore = []string{"id", "workspaceId", "createdAt", "updatedA
 // the SOURCE_BIGQUERY, SOURCE_POSTGRES and SOURCE_SNOWFLAKE account definitions
 // deployed and a PAT.
 func TestAccountsApply(t *testing.T) {
+	enableLiveWorkspaceCleanupFlags(t)
+
 	// Accounts are gated behind an experimental flag, and the specs reference
 	// secrets via {{ .VAR }} placeholders resolved at apply time.
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")

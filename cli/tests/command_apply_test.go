@@ -23,6 +23,8 @@ const concurrencyForTest = 1
 var varFilePath = filepath.Join("testdata", "project", "substitution.vars.yaml")
 
 func TestProjectApply(t *testing.T) {
+	enableLiveWorkspaceCleanupFlags(t)
+
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
 
 	// The api_tracking event keeps its name and description as {{ .VAR }}
@@ -33,7 +35,6 @@ func TestProjectApply(t *testing.T) {
 	//     var wins, resolving to "API Tracking" (the var file value is ignored).
 	// Both resolve to the values already in the snapshots, so a precedence
 	// regression — env losing to the file — would fail the snapshot comparison.
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 

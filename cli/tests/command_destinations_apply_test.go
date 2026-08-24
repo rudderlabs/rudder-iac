@@ -119,9 +119,8 @@ func TestDestinationsApply(t *testing.T) {
 		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
 	}
 
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	enableLiveWorkspaceCleanupFlags(t)
+
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
