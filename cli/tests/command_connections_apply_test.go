@@ -48,6 +48,9 @@ func TestConnectionsApply(t *testing.T) {
 
 	enableLiveWorkspaceCleanupFlags(t)
 
+	// Needed for this test's own apply, not for cleanup — the shared
+	// helper deliberately omits it (see live_e2e_flags_test.go).
+	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")

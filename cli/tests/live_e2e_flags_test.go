@@ -11,16 +11,18 @@ import (
 )
 
 // enableLiveWorkspaceCleanupFlags enables every gated resource family that can
-// leave managed resources behind in the shared live E2E workspace. Tests that
-// start with a workspace-wide destroy need these flags before invoking the CLI,
-// otherwise cleanup can see endpoints but miss their active connections.
+// leave managed destinations behind in the shared live E2E workspace, so a
+// workspace-wide destroy can see and remove them. It deliberately excludes
+// RUDDERSTACK_X_CONNECTION_SUPPORT: cleanupLiveWorkspaceEventStreamConnections
+// removes every connection via direct API calls before destroy runs, so
+// destroy never needs to see connections as a resource kind itself — verified
+// live by running destroy with the flag unset immediately after that cleanup.
 func enableLiveWorkspaceCleanupFlags(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
-	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 }
 
 // cleanupLiveWorkspaceEventStreamConnections deletes event-stream connections
