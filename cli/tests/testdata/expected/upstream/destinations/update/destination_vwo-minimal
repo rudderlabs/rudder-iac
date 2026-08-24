@@ -1,0 +1,14 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "vwo-minimal",
+  "name": "E2E VWO Minimal Updated",
+  "type": "VWO",
+  "enabled": true,
+  "config": {
+    "accountId": "rudderCliE2eMinimalUpdated"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -65,7 +65,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "VWO",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{},
 		NewConfig: func() any {
 			return &vwoConfig{}
 		},
