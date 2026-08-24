@@ -10,6 +10,8 @@
         "to": "X-Rudder-Source"
       }
     ],
+    "isBatchingEnabled": false,
+    "isDefaultMapping": true,
     "method": "POST"
   },
   "createdAt": "<ignored>",

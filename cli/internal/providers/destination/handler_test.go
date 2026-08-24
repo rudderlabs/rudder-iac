@@ -67,6 +67,32 @@ func webhookTestDefinition() *definitions.DestinationDefinition {
 	}
 }
 
+// defaultsTestDefinition carries `default` tags so the handler's enrichment of
+// local specs can be asserted independently of any real destination.
+func defaultsTestDefinition() *definitions.DestinationDefinition {
+	return &definitions.DestinationDefinition{
+		Type:    "DEFAULTED",
+		Version: 1,
+		Properties: []converter.ConfigProperty{
+			converter.Simple("apiSecret", "api_secret"),
+			converter.Simple("mode", "mode"),
+			converter.Simple("debugMode", "debug_mode"),
+			converter.Simple("sendUserId", "send_user_id"),
+		},
+		SecretKeys: []string{"api_secret"},
+		NewConfig: func() any {
+			return &struct {
+				APISecret  string `mapstructure:"api_secret" validate:"required"`
+				Mode       string `mapstructure:"mode" default:"cloud"`
+				DebugMode  *bool  `mapstructure:"debug_mode" default:"true"`
+				SendUserID *bool  `mapstructure:"send_user_id" default:"false"`
+			}{}
+		},
+		SourceTypes:     []string{"web"},
+		ConnectionModes: map[string][]string{"web": {"cloud"}},
+	}
+}
+
 func ga4TestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
 		Type:    "GA4",
@@ -200,6 +226,35 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		resource := extracted["ga4-no-secret"]
 		assert.NotContains(t, resource.Config, "api_secret", "absent secrets are not invented")
 		assert.Equal(t, "G-1", resource.Config["measurement_id"])
+	})
+
+	t.Run("applies declared config defaults", func(t *testing.T) {
+		t.Parallel()
+
+		registry := definitions.NewRegistry()
+		require.NoError(t, registry.Register(defaultsTestDefinition()))
+		h := destination.NewHandler(nil, registry)
+
+		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/defaulted.yaml", &destination.DestinationSpec{
+			ID:                "defaulted",
+			Type:              "DEFAULTED",
+			DefinitionVersion: 1,
+			Config: map[string]any{
+				"api_secret": "secret",
+				"debug_mode": true, // explicit value must survive
+			},
+		})
+		require.NoError(t, err)
+
+		resource := extracted["defaulted"]
+		require.NotNil(t, resource)
+
+		assert.Equal(t, true, resource.Config["debug_mode"], "explicit value wins over the default")
+		assert.Equal(t, false, resource.Config["send_user_id"], "omitted default is filled")
+		assert.Equal(t, "cloud", resource.Config["mode"], "omitted default is filled")
+
+		apiSecret := requireSecret(t, resource.Config, "api_secret")
+		assert.Equal(t, "secret", apiSecret.Reveal(), "defaults do not disturb secret wrapping")
 	})
 
 	t.Run("error", func(t *testing.T) {

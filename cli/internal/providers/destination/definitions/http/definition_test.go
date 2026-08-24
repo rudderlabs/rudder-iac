@@ -48,9 +48,103 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 	assert.Empty(t, registered.GatedKeyPaths())
 
+	// Mirrors the defaults declared in integrations-config
+	// destinations/http/schema.json. auth/method/format are also defaulted
+	// upstream but are required here, so a spec always carries them.
+	assert.Equal(t, map[string]any{
+		"is_batching_enabled": false,
+		"is_default_mapping":  true,
+	}, registered.ConfigDefaults())
+
 	byAPI, err := registry.GetByAPIType("HTTP", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestHTTPApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredHTTPDefinition(t)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		enriched := registered.ApplyDefaults(validMinimalConfig())
+
+		assert.Equal(t, false, enriched["is_batching_enabled"])
+		assert.Equal(t, true, enriched["is_default_mapping"])
+		assert.Equal(t, "https://example.com/webhook", enriched["api_url"])
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = "50"
+		config["is_default_mapping"] = false
+
+		enriched := registered.ApplyDefaults(config)
+
+		assert.Equal(t, true, enriched["is_batching_enabled"])
+		assert.Equal(t, false, enriched["is_default_mapping"])
+	})
+
+	t.Run("enriched config stays valid", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(registered.ApplyDefaults(validMinimalConfig())))
+	})
+}
+
+// TestHTTPSpecMatchesRemoteStateWithDefaults is the regression guard for the
+// phantom diff this enrichment exists to remove: a spec that omits the
+// defaulted keys must produce the same local config as the remote destination
+// the backend stored for it, so a second apply reports no change.
+func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+	h := destination.NewHandler(nil, registry)
+
+	// The spec omits is_batching_enabled / is_default_mapping entirely.
+	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/http.yaml", &destination.DestinationSpec{
+		ID:                "http-noauth",
+		DisplayName:       "HTTP No Auth",
+		Type:              "http",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config:            validMinimalConfig(),
+	})
+	require.NoError(t, err)
+
+	// What the backend stores and returns for that spec: the same values plus
+	// the schema defaults it applied, including eventFilteringOption, which has
+	// no local key and is dropped on the way back.
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-http",
+		ExternalID: "http-noauth",
+		Name:       "HTTP No Auth",
+		Type:       "HTTP",
+		Version:    1,
+		IsEnabled:  true,
+		Config: []byte(`{
+			"apiUrl": "https://example.com/webhook",
+			"auth": "noAuth",
+			"method": "POST",
+			"format": "JSON",
+			"isBatchingEnabled": false,
+			"isDefaultMapping": true,
+			"eventFilteringOption": "disable"
+		}`),
+	}}
+
+	remoteResource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	assert.Equal(t, remoteResource.Config, extracted["http-noauth"].Config,
+		"enriched spec config must equal the remote-derived config, otherwise apply reports a phantom diff")
 }
 
 func TestHTTPConfigValidation(t *testing.T) {

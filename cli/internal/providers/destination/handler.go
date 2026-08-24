@@ -75,13 +75,19 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
+	// Enrich before the config enters the resource graph so the spec matches
+	// what the backend stores: it applies the same schema defaults on write, so
+	// a spec omitting a defaulted key would otherwise diff against remote state
+	// forever, and an update would drop the key upstream.
+	config := registered.ApplyDefaults(spec.Config)
+
 	resource := &DestinationResource{
 		ID:                spec.ID,
 		DisplayName:       spec.DisplayName,
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
 		DefinitionVersion: spec.DefinitionVersion,
-		Config:            secret.WrapKnownSecrets(spec.Config, registered.SecretKeys()),
+		Config:            secret.WrapKnownSecrets(config, registered.SecretKeys()),
 	}
 
 	if spec.Transformation != "" {
