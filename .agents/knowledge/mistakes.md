@@ -54,3 +54,5 @@
 <!-- ticket:DEX-702 -->
 - CI live E2E cleanup can fail when workspace-wide `destroy` sees event-stream sources and destinations but event-stream connection support is not enabled; the observed symptom is HTTP 400 while deleting an event-stream source because it still has active connections.
 - Durable mitigation: enable `RUDDERSTACK_X_CONNECTION_SUPPORT` alongside destination support and unverified destination support before any `cli/tests` live E2E path calls `rudder-cli destroy`, so managed connections are loaded and deleted before their endpoints.
+- CI live E2E cleanup can still fail after enabling connection support if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`; observed symptoms include HTTP 400 on `destination:webapp-test` or `event-stream-source:e2e-conn-android` because active connections remain.
+- Durable mitigation for `cli/tests` live workspace cleanup is to delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`; production remote loading should continue loading only `externalId`-managed connections.
