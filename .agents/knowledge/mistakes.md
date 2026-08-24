@@ -49,3 +49,8 @@
 <!-- ticket:DEX-497 -->
 - CI live E2E can exceed a 2-minute per-command `cli/tests` executor timeout while apply is still making valid progress; the observed `TestProjectApply/rudder/v1_specs_after_migration/should_update_entities_in_catalog_from_project` failure was `signal: killed` after about 125s with many successful catalog/transformation updates already printed.
 - Durable mitigation: keep live E2E CLI command timeouts above the normal slow-apply window and report deadline timeouts explicitly from `cli/tests/helpers.go`, so future failures distinguish real apply errors from the test helper killing a long-running command.
+
+## DEX-702 — Event Stream Connection Cleanup Gate
+<!-- ticket:DEX-702 -->
+- CI live E2E cleanup can fail when workspace-wide `destroy` sees event-stream sources and destinations but event-stream connection support is not enabled; the observed symptom is HTTP 400 while deleting an event-stream source because it still has active connections.
+- Durable mitigation: enable `RUDDERSTACK_X_CONNECTION_SUPPORT` alongside destination support and unverified destination support before any `cli/tests` live E2E path calls `rudder-cli destroy`, so managed connections are loaded and deleted before their endpoints.
