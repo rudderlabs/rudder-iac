@@ -56,6 +56,7 @@ func TestConnectionsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "connections")
 	varFile := filepath.Join(projectDir, "connections.vars.yaml")
 
+	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 	assertNoRawSecrets(t, out)
@@ -64,6 +65,7 @@ func TestConnectionsApply(t *testing.T) {
 	// the managed destination is an unrecognised kind and cleanup cannot remove
 	// it. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
+		cleanupLiveWorkspaceEventStreamConnections(t)
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 		assertNoRawSecrets(t, out)

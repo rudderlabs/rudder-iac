@@ -129,6 +129,7 @@ func TestDestinationsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "destinations")
 	varFile := filepath.Join(projectDir, "destinations.vars.yaml")
 
+	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 	assertNoRawSecrets(t, out)
@@ -137,6 +138,7 @@ func TestDestinationsApply(t *testing.T) {
 	// UnverifiedDestinations is off. Registered after t.Setenv so the flags still
 	// hold when this cleanup runs. assert (not require) avoids FailNow mid-cleanup.
 	t.Cleanup(func() {
+		cleanupLiveWorkspaceEventStreamConnections(t)
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 		assertNoRawSecrets(t, out)

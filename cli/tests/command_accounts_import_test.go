@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -70,6 +69,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	// Import is refused while anything is out of sync, so clear the managed
 	// resources first — the same precondition TestAccountsApply establishes.
+	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 
@@ -136,14 +136,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 func newAccountsAPIClient(t *testing.T) *client.Client {
 	t.Helper()
 
-	config.InitConfig(config.DefaultConfigFile())
-	apiClient, err := client.New(
-		config.GetConfig().Auth.AccessToken,
-		client.WithBaseURL(config.GetConfig().APIURL),
-		client.WithUserAgent("rudder-cli-test"),
-	)
-	require.NoError(t, err)
-	return apiClient
+	return newLiveE2EAPIClient(t)
 }
 
 // seedUnmanagedAccount creates the account the import is meant to discover: no

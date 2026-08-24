@@ -55,6 +55,7 @@ func TestAccountsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "accounts")
 	varFile := filepath.Join(projectDir, "credentials.vars.yaml")
 
+	cleanupLiveWorkspaceEventStreamConnections(t)
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 

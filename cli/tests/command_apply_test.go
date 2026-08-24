@@ -63,6 +63,7 @@ func TestProjectApply(t *testing.T) {
 func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	t.Helper()
 
+	cleanupLiveWorkspaceEventStreamConnections(t)
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
 
