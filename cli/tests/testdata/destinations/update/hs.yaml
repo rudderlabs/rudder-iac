@@ -9,9 +9,8 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    authorization_type: legacyApiKey
     api_version: legacyApi
-    api_key: "{{ .HS_API_KEY }}"
+    access_token: "{{ .HS_ACCESS_TOKEN }}"
     hub_id: "87654321"
     do_association: false
     use_native_sdk:

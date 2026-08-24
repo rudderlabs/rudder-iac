@@ -157,3 +157,11 @@
 - Facebook Pixel should model schema/db-config keys that Terraform does not map, including `limitedDataUSage` as `limited_data_usage`, `removeExternalId` as `remove_external_id`, `useUpdatedMapping` as `use_updated_mapping`, and `autoConfig.web` as `auto_config.web`.
 - Keep `access_token` modeled because db-config lists API key `accessToken` in `defaultConfig` and `secretKeys`, but do not add a regex/required validation tag from UI or Terraform because `schema.json` omits `accessToken`.
 - Facebook Pixel models shared `consent_management` only; legacy `one_trust_cookie_categories` and `ketch_consent_purposes` blocks should remain unknown unless a future task explicitly changes that destination-definition policy.
+
+## DEX-702 — HubSpot Config Surface And Sources
+<!-- ticket:DEX-702 -->
+- HubSpot destination support uses CLI type `hs`; re-onboarding should follow the current schema/db-config surface without changing integrations-config or Terraform.
+- HubSpot should keep the broad mapped db-config source-type set, not the older event-stream-only subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- HubSpot models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even if upstream schema/db-config still mention their API keys, because re-sending legacy consent keys can cause non-converging applies after backend migration to `consentManagement`.
+- HubSpot local config should omit stale legacy auth fields `authorization_type` and `api_key`; current schema requires `accessToken` and `apiVersion`, so local YAML should model `access_token` as the only secret and require it with `api_version`.
+- HubSpot `lookup_field` remains required only for `api_version: newApi`, and `use_native_sdk.web` stays source-gated to `web`.

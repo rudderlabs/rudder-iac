@@ -8,7 +8,6 @@
   "enabled": true,
   "config": {
     "apiVersion": "legacyApi",
-    "authorizationType": "legacyApiKey",
     "blacklistedEvents": [
       {
         "eventName": "Application Opened"

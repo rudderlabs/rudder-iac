@@ -9,7 +9,6 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    authorization_type: newPrivateAppApi
     api_version: newApi
     access_token: "{{ .HS_ACCESS_TOKEN }}"
     hub_id: "12345678"
