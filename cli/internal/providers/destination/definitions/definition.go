@@ -50,6 +50,9 @@ type RegisteredDefinition struct {
 	// keyPathSourceTypes is the reverse index of gated properties:
 	// local config keypath (JSON pointer) -> source types entitled to it.
 	keyPathSourceTypes map[string][]string
+	// configDefaults holds the config model's `default` tags keyed by local
+	// config key, applied to local specs via ApplyDefaults.
+	configDefaults map[string]any
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
@@ -152,10 +155,16 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("building gated key paths: %w", err)
 	}
 
+	configDefaults, err := buildConfigDefaults(configType)
+	if err != nil {
+		return nil, fmt.Errorf("building config defaults: %w", err)
+	}
+
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
+		configDefaults:        configDefaults,
 	}, nil
 }
 

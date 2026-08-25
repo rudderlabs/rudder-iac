@@ -69,6 +69,71 @@ Notes:
   which keys carry it: the backend 400s on any change to one, and the e2e update
   fixture must leave them untouched (see e2e-tests.md).
 
+## Declaring defaults
+
+The control plane applies `schema.json` `default` values when it persists a
+destination (its validator runs with `useDefaults: true`, mutating the config it
+validates). A defaulted key is therefore **never optional in storage** — the
+backend fills it in. If the CLI does not declare the same default, a spec that
+omits the key diffs forever against the remote state that carries it, and an
+update drops the key upstream.
+
+Declare each default as a `default:"…"` struct tag beside the field's
+`mapstructure`/`validate` tags. The registry parses them once at `Register()`
+and `ApplyDefaults` fills only the keys a spec omitted, so an explicit value —
+including one equal to the zero value — always wins.
+
+### Finding every default
+
+Do **not** read `configSchema.properties` alone. Descend:
+
+- **Combinators** — `allOf`, `anyOf`, `oneOf`, `if`, `then`, `else`,
+  `dependentSchemas` — describe the *same* config object, so a default found
+  inside one still belongs to a top-level key. Several destinations declare
+  defaults only here (`SNOWFLAKE`, `RS`, `GOOGLEADS`, `KAFKA`, `POSTGRES`,
+  `REDIS`, `HS`).
+- `properties.<name>` and `items` describe the level *below* — a default there
+  is nested, not top level.
+
+### Writing the tag
+
+The schema's `"type"` picks the Go field type; the tag value is always a string:
+
+| schema type | Go field | tag |
+| --- | --- | --- |
+| `"boolean"` | `*bool` (pointer keeps absent ≠ false) | `default:"false"` |
+| `"string"` | `string` | `default:"cloud"` |
+| `"integer"` | `int` | `default:"2"` |
+
+Only these three are implemented — they are the only types `default` takes
+across the destinations we model. A `uint`, float, slice or map field is
+rejected at registration rather than guessed at; extend `parseDefaultValue` when
+a schema first needs one.
+
+**Let the schema type decide, not how the value looks.** `syncFrequency` is
+`"type": "string"` with default `"180"` in `BQ`, `POSTGRES`, `RS`,
+`S3_DATALAKE` and `SNOWFLAKE` — declare it `string`. An `int` field would store
+`180` where the API returns `"180"`, producing a permanent diff.
+
+### When NOT to declare one
+
+- **The field is `validate:"required"`.** Registration rejects the combination:
+  a key that must always be present can never take a default. This includes
+  fields the CLI marks required even when `schema.json` does not (e.g.
+  `s3_datalake` `use_glue` / `role_based_auth`, deliberately `*bool` +
+  `required` so absent stays distinct from false). `required_if` is fine — that
+  field is genuinely optional.
+- **The key has no local config key.** `eventFilteringOption` is defaulted by 21
+  destinations but is derived by `converter.Discriminator` from the
+  whitelist/blacklist arrays, so it cannot carry a tag.
+  terraform-provider-rudderstack neither sends nor reads it; match that.
+- **The default is nested or inside array `items`.** `ApplyDefaults` is
+  top-level only. Flag these in the final report instead.
+
+There is no shared catalogue to copy from — scan the destination's own
+`schema.json` with the traversal above, and record in the final report every
+default you found but did not declare, with the reason.
+
 ## Conditional requiredness
 
 `schema.json` states conditional requiredness as `allOf` branches, and

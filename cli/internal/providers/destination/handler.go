@@ -75,13 +75,17 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
+	// Enriched before secret wrapping so the graph carries the same config the
+	// backend persists (see ApplyDefaults).
+	config := registered.ApplyDefaults(spec.Config)
+
 	resource := &DestinationResource{
 		ID:                spec.ID,
 		DisplayName:       spec.DisplayName,
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
 		DefinitionVersion: spec.DefinitionVersion,
-		Config:            secret.WrapKnownSecrets(spec.Config, registered.SecretKeys()),
+		Config:            secret.WrapKnownSecrets(config, registered.SecretKeys()),
 	}
 
 	if spec.Transformation != "" {
