@@ -62,15 +62,15 @@ Notes:
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
-- `consentManagement` subtrees in schema.json are handled by `common` — do
-  not model as an ad-hoc field; always append `common.Properties(sourceTypes)`.
-- `connectionMode` subtrees may also be modelled, the same way, via
-  `common.ConnectionMode` + `common.ConnectionModeProperties(sourceTypes)` —
-  see definition-anatomy.md. Modelling it is opt-in per destination (the
-  fleet-wide rollout decision is tracked in DEX-708); do it only when asked to
-  for a given destination, not by default. Either way it stays boilerplate for
-  the `Gated`-scan below and the `converter.Gated` prohibition — never wrap it
-  in `Gated`, modelled or not.
+- `consentManagement` and `connectionMode` subtrees in schema.json are handled
+  by `common` — do not model either as an ad-hoc field; always append
+  `common.Properties(sourceTypes)` and `common.ConnectionModeProperties(sourceTypes)`
+  (see definition-anatomy.md), and add both `ConsentManagement` and
+  `ConnectionMode` fields to the config struct. `connection_mode` persists as
+  real, validated destination config (DEX-708's `ga4` pilot established the
+  pattern and it is being rolled out to existing destinations too). Neither
+  is ever wrapped in `Gated` — both stay handled by the source-type-keyed
+  block machinery, not the `Gated`-scan below.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update

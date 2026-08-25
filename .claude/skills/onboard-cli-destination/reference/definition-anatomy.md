@@ -48,26 +48,27 @@ type s3Config struct {
     EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
-    // Optional: only add when explicitly asked to model connection_mode for
-    // this destination (see source-extraction.md). Same integration pattern
-    // as consent — a common helper plus a model field — but a different value
-    // shape (map[string]string, not map[string][]ConsentEntry).
+    // Mandatory type, same as consent — model connection_mode as real config
+    // for every destination (see source-extraction.md). Same integration
+    // pattern as consent — a common helper plus a model field — but a
+    // different value shape (map[string]string, not map[string][]ConsentEntry).
     // common.ConnectionModeProperties(sourceTypes) below does the mapping,
     // and its values are validated against this destination's own
     // ConnectionModes map, not a struct tag (see DEX-708 / ga4).
     ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// 4. NewDefinition: properties ported from terraform + consent (+ connection
-// mode, if modelled), then metadata.
+// 4. NewDefinition: properties ported from terraform + consent + connection
+// mode, then metadata.
 func NewDefinition() *definitions.DestinationDefinition {
     properties := []converter.ConfigProperty{
         converter.Simple("bucketName", "bucket_name"),
         converter.Simple("prefix", "prefix"), // bare — no SkipZeroValue (see converter-mapping.md)
         // ...
     }
-    properties = append(properties, common.ConnectionModeProperties(sourceTypes)...) // only if modelled
-    properties = append(properties, common.Properties(sourceTypes)...)
+    properties = append(properties,
+        append(common.ConnectionModeProperties(sourceTypes), common.Properties(sourceTypes)...)...,
+    )
 
     return &definitions.DestinationDefinition{
         Type:       "s3",       // lowercase(APIType), deterministic; equals the input localType

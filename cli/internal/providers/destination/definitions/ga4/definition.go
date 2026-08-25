@@ -192,8 +192,9 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
-	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
-	properties = append(properties, common.Properties(sourceTypes)...)
+	properties = append(properties,
+		append(common.ConnectionModeProperties(sourceTypes), common.Properties(sourceTypes)...)...,
+	)
 
 	return &definitions.DestinationDefinition{
 		Type:       "ga4",
