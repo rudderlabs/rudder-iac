@@ -77,8 +77,7 @@ func TestApplyDefaultsKeepsExplicitValues(t *testing.T) {
 
 	registered := registeredWithConfig(t, func() any { return &defaultsTestConfig{} })
 
-	// Explicit values win, including ones equal to the zero value or to the
-	// default itself.
+	// A zero value is still an explicit value.
 	enriched := registered.ApplyDefaults(map[string]any{
 		"api_secret":   "secret",
 		"mode":         "device",
@@ -164,8 +163,7 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			wantErr: `config key "batch_size": invalid integer default "1.5"`,
 		},
 		{
-			// Unsigned and float fields are deliberately unimplemented — no
-			// destination schema declares such a default yet.
+			// Unimplemented: no upstream schema defaults these types.
 			name: "unsigned field kind",
 			newConfig: func() any {
 				return &struct {
@@ -214,8 +212,7 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 func TestRegisterAllowsDefaultOnConditionallyRequiredField(t *testing.T) {
 	t.Parallel()
 
-	// required_if leaves the field optional in the general case, so a default
-	// is meaningful.
+	// required_if leaves the field optional, so a default still applies.
 	registered := registeredWithConfig(t, func() any {
 		return &struct {
 			ClientType string `mapstructure:"client_type"`

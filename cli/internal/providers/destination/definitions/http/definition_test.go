@@ -48,9 +48,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 	assert.Empty(t, registered.GatedKeyPaths())
 
-	// Mirrors the defaults declared in integrations-config
-	// destinations/http/schema.json. auth/method/format are also defaulted
-	// upstream but are required here, so a spec always carries them.
+	// auth/method/format are defaulted upstream too, but are required here, so
+	// a spec always carries them.
 	assert.Equal(t, map[string]any{
 		"is_batching_enabled": false,
 		"is_default_mapping":  true,
@@ -105,10 +104,9 @@ func TestHTTPApplyDefaults(t *testing.T) {
 	})
 }
 
-// TestHTTPSpecMatchesRemoteStateWithDefaults is the regression guard for the
-// phantom diff this enrichment exists to remove: a spec that omits the
-// defaulted keys must produce the same local config as the remote destination
-// the backend stored for it, so a second apply reports no change.
+// Regression guard for the phantom diff: a spec omitting the defaulted keys
+// must yield the same local config as the destination the backend stored for
+// it, so a second apply reports no change.
 func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -127,9 +125,9 @@ func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// What the backend stores and returns for that spec: the same values plus
-	// the schema defaults it applied, including eventFilteringOption, which has
-	// no local key and is dropped on the way back.
+	// What the backend stores for that spec: the same values plus the defaults
+	// it applied. eventFilteringOption has no local key and is dropped on the
+	// way back.
 	remote := &destination.RemoteDestination{Destination: &client.Destination{
 		ID:         "dst-http",
 		ExternalID: "http-noauth",

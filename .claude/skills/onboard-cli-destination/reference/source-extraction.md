@@ -130,8 +130,9 @@ a schema first needs one.
 - **The default is nested or inside array `items`.** `ApplyDefaults` is
   top-level only. Flag these in the final report instead.
 
-`docs/destination-schema-defaults.md` catalogues every default across the 48
-Terraform-supported destinations, with these exclusions already marked.
+There is no shared catalogue to copy from — scan the destination's own
+`schema.json` with the traversal above, and record in the final report every
+default you found but did not declare, with the reason.
 
 ## Conditional requiredness
 
