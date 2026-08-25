@@ -93,30 +93,23 @@ key list; `if` says when it applies. Only branches conditioned on
 | `if.properties.connectionMode.anyOf[]`, each branch `{properties: {<apiSourceType>: {const: <mode>}}, required: [<apiSourceType>]}` | Braze | the union of the listed `(source type, mode)` pairs |
 | `if.properties.connectionMode.properties`, mapping `<apiSourceType>` → `{const: <mode>}` (usually with `additionalProperties: false`) | Intercom | each `(source type, mode)` pair in the object |
 | `if.not { … connectionMode … }` | Facebook Pixel: `not(connectionMode.web == "device")` → `accessToken` | every supported `(source type, mode)` pair **except** the ones the negated clause matches |
-| `if.properties` carries `connectionMode` **and** another config key (Braze `usePlatformSpecificApiKeys: {const: true}`, `if.required: ["usePlatformSpecificApiKeys", "connectionMode"]`) | Braze `appKey` / `androidApiKey` / `iOSApiKey` / `webApiKey` | **not expressible as a `SupportedSourcesValidation` entry** — the map has no room for a value-dependent condition. If the destination also models `connection_mode` as real config, express the whole branch as a custom validator instead (see "Expressing it as a custom validator instead" below) and drop it from this map. Otherwise omit the branch and flag it in the final report, naming the key and the config value it depends on |
+| `if.properties` carries `connectionMode` **and** another config key (Braze `usePlatformSpecificApiKeys: {const: true}`, `if.required: ["usePlatformSpecificApiKeys", "connectionMode"]`) | Braze `appKey` / `androidApiKey` / `iOSApiKey` / `webApiKey` | **not expressible as a `SupportedSourcesValidation` entry** — the map has no room for a value-dependent condition. Express the whole branch as a custom validator instead (see "Expressing it as a custom validator instead" below) and drop it from this map |
 
 ### Expressing it as a custom validator instead
 
 The last row above is unexpressible only *as a `SupportedSourcesValidation`
 entry* — that map has one key per `(source type, mode)` pair and no room for a
-condition on another config key. If the destination also models
-`connection_mode` as real, validated config (opt-in per destination; see
-source-extraction.md's `connectionMode` note and DEX-708's `ga4` pilot), the
-same branch can be expressed directly as ordinary config validation instead:
-a custom go-playground tag, scoped to that one definition via
+condition on another config key. Since every destination models
+`connection_mode` as real, validated config (source-extraction.md's
+`connectionMode` note; DEX-708's `ga4` pilot established the pattern), the
+branch is expressed directly as ordinary config validation instead: a custom
+go-playground tag, scoped to that one definition via
 `DestinationDefinition.ConfigValidateFuncs`, whose `validator.Func` reads both
 the sibling config key and `connection_mode` off `FieldLevel.Parent()` via
 reflection — the technique `ga4`'s `sdkBaseURLConditional` uses for its
-`sdk_base_url` pattern condition, adapted to return presence
-(`value != ""`) instead of a pattern match. See source-extraction.md
-"Conditional requiredness" for the full writeup and the pointer-field caveat.
-
-This only applies when the destination models `connection_mode` as config —
-it is still an opt-in choice, not triggered automatically by finding a
-connectionMode-and-config-key branch. Do not model `connection_mode` just to
-reach this exception without weighing the tradeoff source-extraction.md
-describes; when it is not modelled, the branch stays unexpressible and is
-omitted + flagged as before.
+`sdk_base_url` pattern condition, adapted to return presence (`value != ""`)
+instead of a pattern match. See source-extraction.md "Conditional
+requiredness" for the full writeup and the pointer-field caveat.
 
 ### Derivation
 

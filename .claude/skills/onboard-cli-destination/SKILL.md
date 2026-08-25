@@ -143,13 +143,12 @@ Mechanical rules:
   translated to CLI-local types via the same mapping, keys to snake_case.
   **There is no `supportedSourcesValidation` key in db-config** — do not look
   for one. A branch whose requiredness also depends on another config value
-  (Braze `usePlatformSpecificApiKeys`) has no room in this map: if the
-  destination also models `connection_mode` as real config, express the whole
-  branch as a `ConfigValidateFuncs` custom validator instead (see
-  source-extraction.md "Conditional requiredness"); otherwise omit it and flag
-  it. See source-type-mapping.md "Per-source-type connect-time required keys"
-  for the recognised `if` shapes and the full derivation; omit the field when
-  no kept source type contributes a key.
+  (Braze `usePlatformSpecificApiKeys`) has no room in this map: express the
+  whole branch as a `ConfigValidateFuncs` custom validator instead (see
+  source-extraction.md "Conditional requiredness"). See source-type-mapping.md
+  "Per-source-type connect-time required keys" for the recognised `if` shapes
+  and the full derivation; omit the field when no kept source type
+  contributes a key.
 - Source-type-gated keys: if a terraform-mapped property's API key is absent
   from `db-config.json` `destConfig.defaultConfig` but present under specific
   `destConfig.<sourceType>` lists, wrap the ported property in
