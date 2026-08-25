@@ -71,6 +71,13 @@ Notes:
 
 ## Conditional requiredness
 
+**First, route the branch.** An `allOf` branch whose `if` tests
+`connectionMode` states a requirement that depends on the *connected source*,
+not on the config alone — no struct tag can express it. Those branches become
+`SupportedSourcesValidation` entries instead (source-type-mapping.md
+"Per-source-type connect-time required keys"). Everything below is for branches
+conditioned on ordinary config keys.
+
 `schema.json` states conditional requiredness as `allOf` branches, and
 go-playground's built-in tags cover every shape upstream uses. **Never write a
 custom validator or a `CustomValidateConfig`-style hook for this** — see the
@@ -203,6 +210,12 @@ File: `rudder-integrations-config/src/configurations/destinations/<dir>/db-confi
 | Connection modes | `config.supportedConnectionModes` (map per source type) | `ConnectionModes` keyed by **local** source type. Every entry in `SourceTypes` must have modes — the registry rejects gaps |
 | Field allowlist | `config.destConfig.defaultConfig` | Sanity check: every mapped property's API key should appear here OR in a per-source-type list (then it is gated, see below); in neither → flag |
 | Source-type-gated keys | `config.destConfig.<sourceType>` lists | API keys that appear only under specific source types (not in `defaultConfig`) are gated: wrap the ported property in `converter.Gated(prop, localSourceTypes...)` |
+
+db-config has **no** `supportedSourcesValidation` key — that name exists only on
+the config-backend entity, and `destConfig` says which keys are *scoped* to a
+source type, never which are *required*. Connect-time required keys come from
+`schema.json`; see source-type-mapping.md "Per-source-type connect-time required
+keys".
 
 **A secret you cannot express is a signal the local shape is wrong, not a
 licence to drop it.** `SecretKeys` holds local key paths, so every entry in
