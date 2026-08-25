@@ -62,8 +62,14 @@ Notes:
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
-- `consentManagement` and `connectionMode` subtrees in schema.json are
-  handled by `common` — do not model them as ad-hoc fields.
+- `consentManagement` in schema.json is handled by `common` — do not model it
+  as an ad-hoc field. `connectionMode` is handled the same way by default
+  (`common.ConnectionMode` / `common.ConnectionModeProperties`), but may be
+  modelled as real, validated per-destination config when explicitly asked —
+  see DEX-708's `ga4` pilot. This is an opt-in decision per destination, not
+  boilerplate to add unprompted; see "Conditional requiredness" below for the
+  one case (a connectionMode-and-config-key conditional) where modelling it
+  unlocks an otherwise-unexpressible branch.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update
@@ -75,14 +81,49 @@ Notes:
 `connectionMode` states a requirement that depends on the *connected source*,
 not on the config alone — no struct tag can express it. Those branches become
 `SupportedSourcesValidation` entries instead (source-type-mapping.md
-"Per-source-type connect-time required keys"). Everything below is for branches
-conditioned on ordinary config keys.
+"Per-source-type connect-time required keys") — unless the destination also
+models `connection_mode` as real config, in which case the branch can be
+expressed directly as a custom validator instead; see "The one exception"
+below and source-type-mapping.md "Expressing it as a custom validator
+instead". Everything else in this section is for branches conditioned on
+ordinary config keys.
 
 `schema.json` states conditional requiredness as `allOf` branches, and
 go-playground's built-in tags cover every shape upstream uses. **Never write a
 custom validator or a `CustomValidateConfig`-style hook for this** — see the
 worked example in `definitions/postgres/definition.go`, which enforces all eight
 of its branches with built-ins alone.
+
+**The one exception:** `required_if`/`excluded_if` resolve conditions against
+direct struct field names only, so a condition keyed on a **map field** —
+in practice this means `connection_mode.<sourceType>`, when a destination
+models it as real config (opt-in per destination, see the `connectionMode`
+note above and DEX-708's `ga4` pilot) — cannot be expressed
+with a built-in tag, whether the thing being gated is a pattern (`ga4`'s
+`sdk_base_url`, conditioned on `client_type` **and** `connection_mode.web`) or
+plain requiredness (Braze's `app_key` / `android_api_key` / `ios_api_key` /
+`web_api_key`, conditioned on `use_platform_specific_api_keys` **and**
+`connection_mode.<sourceType>` — see source-type-mapping.md "Recognised `if`
+shapes").
+
+There, register a custom tag scoped to the one definition via
+`DestinationDefinition.ConfigValidateFuncs` (never the global
+`vrules.RegisterDefaultValidator` — that registry is shared by every
+destination's validation call and reserved for fleet-wide conventions), whose
+`validator.Func` reads the sibling fields off `FieldLevel.Parent()` by name.
+`ga4`'s `sdkBaseURLConditional` is the worked example for a pattern condition;
+a requiredness version follows the identical shape but returns whether the
+target field is non-empty once the condition holds, instead of matching a
+pattern. This does **not** lift the pointer restriction below: the target
+field must still be a plain type (`string`, not `*bool`), since go-playground
+never invokes a custom tag's function for a nil pointer.
+
+Modelling `connection_mode` as config purely to reach this exception is a real
+tradeoff — it changes what a CLI apply sends for that key, and any existing
+destination of this type set up via the UI needs its spec to declare
+`connection_mode` before its first CLI-managed apply, or the next apply drops
+it (update replaces the whole config object). Treat it as a deliberate
+per-destination call, not a default reached for just one conditional branch.
 
 Three facts settle almost every branch:
 
