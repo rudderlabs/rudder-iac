@@ -28,6 +28,11 @@
       "android": false,
       "ios": false
     },
+    "connectionMode": {
+      "web": "device",
+      "android": "device",
+      "unity": "cloud"
+    },
     "capturePageView": {
       "web": "gtag"
     },

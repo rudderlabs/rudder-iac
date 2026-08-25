@@ -12,7 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-func validateConfigModel(config map[string]any, configType reflect.Type, basePath string) []ConfigError {
+func validateConfigModel(config map[string]any, configType reflect.Type, basePath string, extraFuncs ...rules.CustomValidateFunc) []ConfigError {
 	configType = derefType(configType)
 	if configType == nil || configType.Kind() != reflect.Struct {
 		return []ConfigError{{
@@ -32,7 +32,7 @@ func validateConfigModel(config map[string]any, configType reflect.Type, basePat
 		return errors
 	}
 
-	errors = append(errors, structValidationErrors(decoded, basePath, configType)...)
+	errors = append(errors, structValidationErrors(decoded, basePath, configType, extraFuncs...)...)
 	return errors
 }
 
@@ -61,8 +61,8 @@ func decodeErrorPath(err error, basePath string) string {
 	return basePath + "/" + strings.TrimPrefix(path, "/")
 }
 
-func structValidationErrors(decoded any, basePath string, rootType reflect.Type) []ConfigError {
-	validationErrors, err := rules.ValidateStructWithTagPriority(decoded, []string{"mapstructure"}, configValidateFuncs()...)
+func structValidationErrors(decoded any, basePath string, rootType reflect.Type, extraFuncs ...rules.CustomValidateFunc) []ConfigError {
+	validationErrors, err := rules.ValidateStructWithTagPriority(decoded, []string{"mapstructure"}, append(configValidateFuncs(), extraFuncs...)...)
 	if err != nil {
 		return []ConfigError{{
 			Path:    basePath,

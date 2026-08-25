@@ -45,6 +45,10 @@ func (r *Registry) Register(def *DestinationDefinition) error {
 		return err
 	}
 
+	if err := validateConfigValidateFuncs(def); err != nil {
+		return err
+	}
+
 	key := typeVersion{Type: def.Type, Version: def.Version}
 	if _, exists := r.byTypeVersion[key]; exists {
 		return fmt.Errorf("destination definition %s version %d already registered", def.Type, def.Version)
@@ -78,6 +82,23 @@ func validateDefinitionSourceTypes(def *DestinationDefinition) error {
 		return err
 	}
 	return validateConsentValidationOverrides(def)
+}
+
+func validateConfigValidateFuncs(def *DestinationDefinition) error {
+	seen := make(map[string]bool, len(def.ConfigValidateFuncs))
+	for _, fn := range def.ConfigValidateFuncs {
+		if fn.Tag == "" {
+			return fmt.Errorf("config validate func has an empty tag")
+		}
+		if fn.Func == nil {
+			return fmt.Errorf("config validate func %q has a nil func", fn.Tag)
+		}
+		if seen[fn.Tag] {
+			return fmt.Errorf("config validate func %q registered more than once", fn.Tag)
+		}
+		seen[fn.Tag] = true
+	}
+	return nil
 }
 
 func validateConnectionModeSourceTypes(def *DestinationDefinition) error {

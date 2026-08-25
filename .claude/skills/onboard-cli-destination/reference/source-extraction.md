@@ -33,7 +33,7 @@ Translate constraints to `validate` struct tags on the config struct:
 | --- | --- |
 | key in `required` | `required` |
 | `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
-| `enum: ["a","b"]` | `dynamic_or_oneof=a b` (custom tag in `definitions/dynamicvalues.go`: passes `env.VAR` / `{{ ... }}` dynamic values, otherwise enforces the enum). Use plain `oneof=a b` only when the field can never hold a dynamic value |
+| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether an enum may be dynamic" below |
 | any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
@@ -58,12 +58,35 @@ Notes:
   `{{ config.x || … }}` longer than the literal limit stays valid.
 - **`env.VAR` is deprecated — never give it an escape hatch.** It is judged as an
   ordinary literal, so it passes only when it happens to satisfy the pattern.
-  Do not add it to a pattern or a tag.
+  Do not add it to a pattern or a tag. It also plays no part in deciding whether
+  a property admits a dynamic value: upstream writes these wrappers as
+  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`, and only the `{{ … || … }}` branch
+  counts. Disregard `(^env[.].+)` wherever it appears — in schema.json and in
+  terraform validators alike.
+- **Let schema.json decide whether an enum may be dynamic.** Pick the tag from
+  what the property declares, not from the shape of the constraint: if it admits
+  the `{{ path || fallback }}` form, use `dynamic_or_oneof`; if it does not, use
+  `oneof`, since such a value would then be stored verbatim and rejected by the
+  backend. In practice this currently splits by shape — `pattern` properties
+  carry the template branch, `enum` properties do not (checked across every
+  onboarded destination), so enums take `oneof` today — but check the property
+  rather than assuming, since an enum that did declare it would take
+  `dynamic_or_oneof`. terraform shows the same split: its enum validators carry
+  no `{{ … || … }}` branch where its pattern validators do. Many existing
+  definitions use `dynamic_or_oneof` for strict enums; reconciling them is tracked
+  separately, so check the schema rather than copying a neighbouring definition.
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
-- `consentManagement` and `connectionMode` subtrees in schema.json are
-  handled by `common` — do not model them as ad-hoc fields.
+- `consentManagement` and `connectionMode` subtrees in schema.json are handled
+  by `common` — do not model either as an ad-hoc field; always append
+  `common.Properties(sourceTypes)` and `common.ConnectionModeProperties(sourceTypes)`
+  (see definition-anatomy.md), and add both `ConsentManagement` and
+  `ConnectionMode` fields to the config struct. `connection_mode` persists as
+  real, validated destination config (DEX-708's `ga4` pilot established the
+  pattern and it is being rolled out to existing destinations too). Neither
+  is ever wrapped in `Gated` — both stay handled by the source-type-keyed
+  block machinery, not the `Gated`-scan below.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update
@@ -142,6 +165,21 @@ custom validator or a `CustomValidateConfig`-style hook for this** — see the
 worked example in `definitions/postgres/definition.go`, which enforces all eight
 of its branches with built-ins alone.
 
+The one exception: `required_if`/`excluded_if` resolve conditions against
+direct struct field names only, so a condition keyed on a **map field** — in
+practice this means `connection_mode.<sourceType>`, once modelled per the note
+above — cannot be expressed with a built-in tag, whether the thing being gated
+is requiredness or (as in GA4's `sdk_base_url`) a pattern. There, register a
+custom tag whose `validator.Func` reads the sibling fields off `fl.Parent()` by
+name — see GA4's `sdkBaseURLConditional` as the worked example. Scope it to the
+one definition via `DestinationDefinition.ConfigValidateFuncs` in `NewDefinition`
+(not `vrules.RegisterDefaultValidator`, which is global, shared by every
+destination's validation call, and reserved for fleet-wide conventions like
+`pattern`/`dynamic_or_pattern` — a one-destination condition doesn't belong
+there). The error message falls through to `funcs/utils.go`'s generic
+`default` case (the raw go-playground message); that is acceptable for a rare,
+narrowly-scoped tag and isn't worth widening the shared formatter for.
+
 Three facts settle almost every branch:
 
 1. **`required_if` ANDs multiple field/value pairs.** A branch guarded by two
@@ -202,7 +240,7 @@ in the report when a minimal named pattern can express them.
      `(\{\{…\}\})|` branches.
    - Error message: short, user-facing (what the value must look like).
 3. Only if the constraint is a genuine `minLength`/`maxLength` keyword or an
-   enum fall back to `min`/`max` / `dynamic_or_oneof` / report note.
+   enum fall back to `min`/`max` / `oneof` / report note.
 
 ### Tag usage
 

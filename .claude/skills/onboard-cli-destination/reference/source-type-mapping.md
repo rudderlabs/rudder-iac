@@ -51,3 +51,7 @@ Current mapping (local → API):
   source type; drop entries whose source type was dropped and flag them.
 - Consent management uses the same mapping automatically via
   `common.Properties(sourceTypes)` — no extra work per source type.
+- Connection mode uses the same mapping automatically via
+  `common.ConnectionModeProperties(sourceTypes)` — no extra work per source
+  type. Its values are validated against this destination's own
+  `ConnectionModes` map, not a fixed enum.

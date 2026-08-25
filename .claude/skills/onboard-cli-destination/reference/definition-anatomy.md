@@ -48,15 +48,26 @@ type s3Config struct {
     EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+    // Mandatory field on every destination, and mandatory type when present
+    // (see source-extraction.md). Same integration pattern as consent — a
+    // common helper plus a model field — but a different value shape
+    // (map[string]string, not map[string][]ConsentEntry).
+    // common.ConnectionModeProperties(sourceTypes) below does the mapping.
+    // No validate tag: the legal values differ per source type, so
+    // validateConnectionMode checks each entry against this definition's own
+    // ConnectionModes map instead (see DEX-708 / ga4).
+    ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// 4. NewDefinition: properties ported from terraform + consent, then metadata.
+// 4. NewDefinition: properties ported from terraform + consent + connection
+// mode, then metadata.
 func NewDefinition() *definitions.DestinationDefinition {
     properties := []converter.ConfigProperty{
         converter.Simple("bucketName", "bucket_name"),
         converter.Simple("prefix", "prefix"), // bare — no SkipZeroValue (see converter-mapping.md)
         // ...
     }
+    properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
     properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
@@ -110,7 +121,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   every required key must exist on the config struct or be a source-type block
   key (`connection_mode`, `use_native_sdk`). Entries are optional per source
   type.
-- A `consent_management` config field must be `common.ConsentManagement`.
+- A `consent_management` config field must be `common.ConsentManagement`, and a
+  `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
+  either is rejected at registration: it would silently opt the key out of the
+  shared validation those types drive.
 - `(Type, Version)` and `(APIType, Version)` must be unique.
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key
