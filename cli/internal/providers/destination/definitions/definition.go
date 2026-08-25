@@ -57,7 +57,8 @@ type RegisteredDefinition struct {
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
 	errors := validateConfigModel(config, d.configType, "")
-	return append(errors, d.validateConsentManagement(config)...)
+	errors = append(errors, d.validateConsentManagement(config)...)
+	return append(errors, d.validateConnectionMode(config)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {

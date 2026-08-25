@@ -247,6 +247,11 @@ func TestGA4ConfigValidation(t *testing.T) {
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
+			"connection_mode": map[string]any{
+				"web":     "hybrid",
+				"android": "device",
+				"unity":   "cloud",
+			},
 			"capture_page_view": map[string]any{
 				"web": "rs",
 			},
@@ -332,6 +337,52 @@ func TestGA4ConfigValidation(t *testing.T) {
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/capture_page_view/web", errors[0].Path)
 	})
+
+	t.Run("connection_mode value validated per source type", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web":   "hybrid",
+				"unity": "hybrid", // unity only allows cloud
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode accepts a template", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"unity": "{{ .GA4_CONNECTION_MODE || cloud }}",
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	// The framework's generic source-type-scoped-key check (not this
+	// definition's own validation) is what catches this — connection_mode was
+	// reserved for it before any destination modeled a config field for it.
+	// See rule_spec_syntax_valid_test.go's coverage of this path.
+	t.Run("connection_mode for an unsupported source type does not error here", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"warehouse": "cloud",
+			},
+		})
+		assert.Empty(t, errors)
+	})
 }
 
 func TestGA4ConversionRoundTrip(t *testing.T) {
@@ -374,6 +425,10 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 					"android": true,
 					"ios": false
 				},
+				"connection_mode": {
+					"web": "hybrid",
+					"android": "device"
+				},
 				"capture_page_view": {"web": "rs"},
 				"debug_view": {"web": true},
 				"override_client_and_session_ids": {"web": true},
@@ -401,6 +456,10 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 					"web": true,
 					"android": true,
 					"ios": false
+				},
+				"connectionMode": {
+					"web": "hybrid",
+					"android": "device"
 				},
 				"capturePageView": {"web": "rs"},
 				"debugView": {"web": true},

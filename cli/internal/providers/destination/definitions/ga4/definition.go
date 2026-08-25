@@ -99,6 +99,7 @@ type ga4Config struct {
 	UseNativeSDKToSend    *webBool                 `mapstructure:"use_native_sdk_to_send"`
 	DebugView             *webBool                 `mapstructure:"debug_view"`
 	OverrideClientSession *webBool                 `mapstructure:"override_client_and_session_ids"`
+	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -145,6 +146,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
