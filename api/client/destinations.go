@@ -20,12 +20,30 @@ type Destination struct {
 	Name           string                         `json:"name"`
 	Type           string                         `json:"type"`
 	Version        int64                          `json:"version,omitempty"`
+	VersionInfo    *VersionInfo                   `json:"versionInfo,omitempty"`
 	IsEnabled      bool                           `json:"enabled"`
 	Config         json.RawMessage                `json:"config"`
 	WorkspaceID    string                         `json:"workspaceId,omitempty"`
 	CreatedAt      *time.Time                     `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                     `json:"updatedAt,omitempty"`
 	Transformation *DestinationTransformationLink `json:"transformation,omitempty"`
+}
+
+// VersionInfo is the lifecycle advisory the API attaches to a destination whose stored major is not
+// its definition's current one: whether that major is still supported or already retired, how
+// urgently the user should move, and where the upgrade is documented.
+//
+// Response only, and nil when the destination is already on the current major — absence is the "no
+// advisory" signal, so there is no `action: none` on the wire and consumers should branch on the
+// pointer rather than on a field value.
+//
+// The JSON tag on MigrationDocsURL is `migrationDocsUrl`: that is the key the control plane emits,
+// and a Go-idiomatic `...URL` field name must not leak into the wire contract.
+type VersionInfo struct {
+	Status           string  `json:"status"`                   // supported | retired
+	Action           string  `json:"action"`                   // upgrade_recommended | upgrade_required
+	RetirementDate   *string `json:"retirementDate,omitempty"` // ISO date; set once a retirement is scheduled
+	MigrationDocsURL *string `json:"migrationDocsUrl,omitempty"`
 }
 
 type destinations struct {
@@ -125,6 +143,9 @@ func (s *destinations) Create(ctx context.Context, destination *Destination) (*D
 	// copy input and remove fields that should not be in request body without modifying input
 	dst := *destination
 	dst.ID = ""
+	// Response-only: a caller that read a destination and passed it straight back would otherwise
+	// echo the server's own advisory into the request body.
+	dst.VersionInfo = nil
 
 	response := struct{ Destination *Destination }{}
 	if err := s.create(ctx, &dst, &response); err != nil {
@@ -139,6 +160,8 @@ func (s *destinations) Update(ctx context.Context, destination *Destination) (*D
 	dst := *destination
 	dst.ID = ""
 	dst.ExternalID = ""
+	// Response-only — see Create.
+	dst.VersionInfo = nil
 
 	response := struct{ Destination *Destination }{}
 	if err := s.update(ctx, destination.ID, &dst, &response); err != nil {
