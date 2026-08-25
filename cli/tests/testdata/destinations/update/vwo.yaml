@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: vwo
+spec:
+  id: vwo
+  display_name: E2E VWO Updated
+  type: vwo
+  enabled: true
+  definition_version: 1
+  config:
+    account_id: rudderCliE2eAccountUpdated
+    is_spa: false
+    send_experiment_track: false
+    send_experiment_identify: true
+    library_tolerance: "3000"
+    settings_tolerance: "3000"
+    use_existing_jquery: true
+    use_native_sdk:
+      web: true
+    connection_mode:
+      web: device
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics
