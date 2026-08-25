@@ -84,6 +84,7 @@ agree with what the YAML holds locally:
 | string list (`ArrayWithStrings` local side) | `[]string` |
 | object list | `[]struct{...}` with `mapstructure` tags per field, `validate:"omitempty,dive"` on the slice |
 | consent block | `common.ConsentManagement` tagged `mapstructure:"consent_management"` (mandatory type) |
+| connection mode block (opt-in, see source-extraction.md) | `common.ConnectionMode` tagged `mapstructure:"connection_mode"` (convention, not registry-enforced) |
 
 Unknown local keys are rejected by the validator automatically — the struct
 is the closed allowlist, so every mapped property needs a struct field.

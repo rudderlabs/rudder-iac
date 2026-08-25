@@ -1,6 +1,7 @@
 package ga4_test
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -120,15 +121,20 @@ func TestGA4ConfigValidation(t *testing.T) {
 
 	// schema.json constrains sdkBaseUrl under typesOfClient=gtag >
 	// connectionMode.web=device; the branch left it entirely unvalidated.
-	t.Run("sdk_base_url pattern enforced", func(t *testing.T) {
+	// schema.json only constrains sdk_base_url's format under
+	// client_type=gtag AND connection_mode.web=device — see
+	// ga4SDKBaseURLConditional, which now that connection_mode is real config
+	// (DEX-708) reads both siblings instead of applying the pattern always.
+	t.Run("sdk_base_url pattern enforced when gtag and device", func(t *testing.T) {
 		t.Parallel()
 
 		for _, url := range []string{"nodots", "https://foo.ngrok.io", "foo.ngrok.io/gtm"} {
 			errors := registered.ValidateConfig(map[string]any{
-				"api_secret":     "secret",
-				"client_type":    "gtag",
-				"measurement_id": "G-XXXXXXXXXX",
-				"sdk_base_url":   url,
+				"api_secret":      "secret",
+				"client_type":     "gtag",
+				"measurement_id":  "G-XXXXXXXXXX",
+				"connection_mode": map[string]any{"web": "device"},
+				"sdk_base_url":    url,
 			})
 			require.NotEmpty(t, errors, url)
 			assert.Equal(t, "/sdk_base_url", errors[0].Path)
@@ -136,12 +142,52 @@ func TestGA4ConfigValidation(t *testing.T) {
 
 		for _, url := range []string{"https://www.googletagmanager.com", "www.googletagmanager.com", ""} {
 			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"api_secret":      "secret",
+				"client_type":     "gtag",
+				"measurement_id":  "G-XXXXXXXXXX",
+				"connection_mode": map[string]any{"web": "device"},
+				"sdk_base_url":    url,
+			}), url)
+		}
+	})
+
+	t.Run("sdk_base_url unconstrained outside gtag+device", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name   string
+			config map[string]any
+		}{
+			{
+				name: "connection_mode.web not device",
+				config: map[string]any{
+					"connection_mode": map[string]any{"web": "cloud"},
+				},
+			},
+			{
+				name:   "connection_mode not set at all",
+				config: map[string]any{},
+			},
+		}
+		for _, tc := range cases {
+			config := map[string]any{
 				"api_secret":     "secret",
 				"client_type":    "gtag",
 				"measurement_id": "G-XXXXXXXXXX",
-				"sdk_base_url":   url,
-			}), url)
+				"sdk_base_url":   "not a domain url with spaces!!",
+			}
+			maps.Copy(config, tc.config)
+			assert.Empty(t, registered.ValidateConfig(config), tc.name)
 		}
+
+		// client_type=firebase never satisfies the gtag half of the condition.
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_secret":      "secret",
+			"client_type":     "firebase",
+			"firebase_app_id": "1:123:android:abc",
+			"connection_mode": map[string]any{"web": "device"},
+			"sdk_base_url":    "not a domain url with spaces!!",
+		}))
 	})
 
 	// Terraform maps blockPageViewEvent and sendUserId, but neither appears in

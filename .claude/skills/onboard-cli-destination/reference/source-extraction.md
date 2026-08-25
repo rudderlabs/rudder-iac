@@ -62,8 +62,15 @@ Notes:
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
-- `consentManagement` and `connectionMode` subtrees in schema.json are
-  handled by `common` — do not model them as ad-hoc fields.
+- `consentManagement` subtrees in schema.json are handled by `common` — do
+  not model as an ad-hoc field; always append `common.Properties(sourceTypes)`.
+- `connectionMode` subtrees may also be modelled, the same way, via
+  `common.ConnectionMode` + `common.ConnectionModeProperties(sourceTypes)` —
+  see definition-anatomy.md. Modelling it is opt-in per destination (the
+  fleet-wide rollout decision is tracked in DEX-708); do it only when asked to
+  for a given destination, not by default. Either way it stays boilerplate for
+  the `Gated`-scan below and the `converter.Gated` prohibition — never wrap it
+  in `Gated`, modelled or not.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update
@@ -141,6 +148,18 @@ go-playground's built-in tags cover every shape upstream uses. **Never write a
 custom validator or a `CustomValidateConfig`-style hook for this** — see the
 worked example in `definitions/postgres/definition.go`, which enforces all eight
 of its branches with built-ins alone.
+
+The one exception: `required_if`/`excluded_if` resolve conditions against
+direct struct field names only, so a condition keyed on a **map field** — in
+practice this means `connection_mode.<sourceType>`, once modelled per the note
+above — cannot be expressed with a built-in tag, whether the thing being gated
+is requiredness or (as in GA4's `sdk_base_url`) a pattern. There, register a
+custom tag via `vrules.RegisterDefaultValidator`, whose `validator.Func` reads
+the sibling fields off `fl.Parent()` by name — see GA4's `sdkBaseURLConditional`
+as the worked example. Carry the underlying pattern name as the tag's param
+(`ga4_sdk_base_url_conditional=ga4_sdk_base_url`) rather than hardcoding it in
+the function, so the shared error-message fallback in `funcs/utils.go` resolves
+a friendly message instead of a raw go-playground one.
 
 Three facts settle almost every branch:
 

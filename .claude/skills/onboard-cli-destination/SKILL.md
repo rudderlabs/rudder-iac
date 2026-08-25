@@ -160,6 +160,13 @@ Mechanical rules:
   `ConsentManagement common.ConsentManagement` field tagged
   `mapstructure:"consent_management"` to the config struct. The registry
   rejects any other type for that field.
+- `connection_mode` stays boilerplate — skipped, not modelled — unless
+  explicitly asked to model it for this destination. When asked: append
+  `common.ConnectionModeProperties(sourceTypes)...` to properties and add a
+  `ConnectionMode common.ConnectionMode` field tagged
+  `mapstructure:"connection_mode"`. Values are validated against this
+  destination's own `ConnectionModes` map (see source-extraction.md and
+  DEX-708's `ga4` pilot) — no per-destination enum to write.
 
 ### Step 5: Register in dependencies.go
 

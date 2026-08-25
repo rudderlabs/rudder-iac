@@ -48,15 +48,23 @@ type s3Config struct {
     EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+    // Optional: only add when explicitly asked to model connection_mode for
+    // this destination (see source-extraction.md). Same shape as consent —
+    // common.ConnectionModeProperties(sourceTypes) below does the mapping,
+    // and its values are validated against this destination's own
+    // ConnectionModes map, not a struct tag (see DEX-708 / ga4).
+    ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// 4. NewDefinition: properties ported from terraform + consent, then metadata.
+// 4. NewDefinition: properties ported from terraform + consent (+ connection
+// mode, if modelled), then metadata.
 func NewDefinition() *definitions.DestinationDefinition {
     properties := []converter.ConfigProperty{
         converter.Simple("bucketName", "bucket_name"),
         converter.Simple("prefix", "prefix"), // bare — no SkipZeroValue (see converter-mapping.md)
         // ...
     }
+    properties = append(properties, common.ConnectionModeProperties(sourceTypes)...) // only if modelled
     properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
@@ -111,6 +119,8 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   key (`connection_mode`, `use_native_sdk`). Entries are optional per source
   type.
 - A `consent_management` config field must be `common.ConsentManagement`.
+  There is no equivalent Register()-time type check for `connection_mode` yet
+  — use `common.ConnectionMode` by convention, not enforcement.
 - `(Type, Version)` and `(APIType, Version)` must be unique.
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key
