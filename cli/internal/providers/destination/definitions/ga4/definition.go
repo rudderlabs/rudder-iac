@@ -9,7 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
-	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func init() {
@@ -31,26 +31,21 @@ func init() {
 		`\.ngrok\.io`,
 		"must be a domain URL and must not use ngrok",
 	)
-
-	// The condition above spans two sibling fields (client_type and
-	// connection_mode.web), which a named pattern or a built-in required_if-style
-	// tag cannot express — required_if only compares against direct struct
-	// fields, and connection_mode is a map. This custom tag reads both via
-	// FieldLevel.Parent() instead, matching how connection_mode.web is now real,
-	// validated config (see DEX-708).
-	vrules.RegisterDefaultValidator(vrules.CustomValidateFunc{
-		Tag:  "ga4_sdk_base_url_conditional",
-		Func: sdkBaseURLConditional,
-	})
 }
 
 // sdkBaseURLConditional enforces the named pattern given as its tag param
 // (ga4_sdk_base_url) only when client_type=gtag and connection_mode.web=device
 // — outside that condition, schema.json imposes no format constraint on
 // sdk_base_url at all. Templates are still accepted unconditionally within the
-// branch, matching dynamic_or_pattern elsewhere in this destination. Carrying
-// the pattern name as a param (rather than hardcoding it) lets the shared
-// error-message fallback resolve a friendly message for this tag too.
+// branch, matching dynamic_or_pattern elsewhere in this destination.
+//
+// The condition spans two sibling fields (client_type and connection_mode.web),
+// which a named pattern or a built-in required_if-style tag cannot express —
+// required_if only compares against direct struct fields, and connection_mode
+// is a map. This custom tag reads both via FieldLevel.Parent() instead.
+// It is registered via NewDefinition's ConfigValidateFuncs, scoped to this
+// definition alone, rather than a global default validator: it is GA4-specific,
+// not a reusable convention other destinations opt into.
 func sdkBaseURLConditional(fl validator.FieldLevel) bool {
 	value := fl.Field().String()
 
@@ -205,5 +200,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "ga4_sdk_base_url_conditional", Func: sdkBaseURLConditional},
+		},
 	}
 }

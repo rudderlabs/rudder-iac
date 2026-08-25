@@ -209,13 +209,6 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		return fmt.Sprintf("'%s' and '%s' cannot be specified together", fieldName, otherField)
 
 	default:
-		// A custom tag whose param names a registered pattern (e.g. a
-		// conditional wrapper around dynamic_or_pattern, carrying the pattern
-		// name rather than duplicating its message) gets that pattern's
-		// friendly message instead of the raw go-playground error text.
-		if msg, ok := getPatternErrorMessage(err.Param()); ok {
-			return fmt.Sprintf("'%s' is not valid: %s", fieldName, msg)
-		}
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
 }

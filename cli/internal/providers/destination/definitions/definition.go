@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var sourceTypeConfigKeys = []string{
@@ -35,6 +36,11 @@ type DestinationDefinition struct {
 	SupportedSourcesValidation map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
+	// ConfigValidateFuncs registers extra go-playground custom validate tags scoped
+	// to this definition's config struct alone — for constraints that reference
+	// sibling fields a built-in cross-field tag cannot resolve (e.g. a map key)
+	// and that are specific to one destination, not a fleet-wide convention.
+	ConfigValidateFuncs []rules.CustomValidateFunc
 }
 
 // ConfigError represents a single validation failure with a JSON-pointer path.
@@ -56,7 +62,7 @@ type RegisteredDefinition struct {
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
-	errors := validateConfigModel(config, d.configType, "")
+	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
 	return append(errors, d.validateConnectionMode(config)...)
 }

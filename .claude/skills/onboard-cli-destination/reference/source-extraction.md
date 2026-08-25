@@ -154,12 +154,15 @@ direct struct field names only, so a condition keyed on a **map field** — in
 practice this means `connection_mode.<sourceType>`, once modelled per the note
 above — cannot be expressed with a built-in tag, whether the thing being gated
 is requiredness or (as in GA4's `sdk_base_url`) a pattern. There, register a
-custom tag via `vrules.RegisterDefaultValidator`, whose `validator.Func` reads
-the sibling fields off `fl.Parent()` by name — see GA4's `sdkBaseURLConditional`
-as the worked example. Carry the underlying pattern name as the tag's param
-(`ga4_sdk_base_url_conditional=ga4_sdk_base_url`) rather than hardcoding it in
-the function, so the shared error-message fallback in `funcs/utils.go` resolves
-a friendly message instead of a raw go-playground one.
+custom tag whose `validator.Func` reads the sibling fields off `fl.Parent()` by
+name — see GA4's `sdkBaseURLConditional` as the worked example. Scope it to the
+one definition via `DestinationDefinition.ConfigValidateFuncs` in `NewDefinition`
+(not `vrules.RegisterDefaultValidator`, which is global, shared by every
+destination's validation call, and reserved for fleet-wide conventions like
+`pattern`/`dynamic_or_pattern` — a one-destination condition doesn't belong
+there). The error message falls through to `funcs/utils.go`'s generic
+`default` case (the raw go-playground message); that is acceptable for a rare,
+narrowly-scoped tag and isn't worth widening the shared formatter for.
 
 Three facts settle almost every branch:
 
