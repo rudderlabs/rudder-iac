@@ -48,8 +48,12 @@ func TestConfigDefaultsReturnsCopy(t *testing.T) {
 	mutated["mode"] = "mutated"
 	delete(mutated, "debug_mode")
 
-	assert.Equal(t, "cloud", registered.ConfigDefaults()["mode"])
-	assert.Equal(t, false, registered.ConfigDefaults()["debug_mode"])
+	assert.Equal(t, map[string]any{
+		"mode":         "cloud",
+		"debug_mode":   false,
+		"send_user_id": true,
+		"batch_size":   float64(100),
+	}, registered.ConfigDefaults())
 }
 
 func TestApplyDefaultsFillsOmittedKeys(t *testing.T) {
@@ -82,9 +86,13 @@ func TestApplyDefaultsKeepsExplicitValues(t *testing.T) {
 		"debug_mode":   false,
 	})
 
-	assert.Equal(t, "device", enriched["mode"])
-	assert.Equal(t, false, enriched["send_user_id"])
-	assert.Equal(t, false, enriched["debug_mode"])
+	assert.Equal(t, map[string]any{
+		"api_secret":   "secret",
+		"mode":         "device",
+		"send_user_id": false,
+		"debug_mode":   false,
+		"batch_size":   float64(100), // untouched keys still take their default
+	}, enriched)
 }
 
 func TestApplyDefaultsDoesNotMutateInput(t *testing.T) {
@@ -171,7 +179,7 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 					Events []string `mapstructure:"events" default:"a,b"`
 				}{}
 			},
-			wantErr: `config key "events": unsupported default on slice field`,
+			wantErr: `config key "events": unsupported kind slice for a default tag`,
 		},
 	}
 

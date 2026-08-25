@@ -69,11 +69,14 @@ func TestHTTPApplyDefaults(t *testing.T) {
 	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
 		t.Parallel()
 
-		enriched := registered.ApplyDefaults(validMinimalConfig())
-
-		assert.Equal(t, false, enriched["is_batching_enabled"])
-		assert.Equal(t, true, enriched["is_default_mapping"])
-		assert.Equal(t, "https://example.com/webhook", enriched["api_url"])
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": false,
+			"is_default_mapping":  true,
+		}, registered.ApplyDefaults(validMinimalConfig()))
 	})
 
 	t.Run("keeps values the spec sets", func(t *testing.T) {
@@ -84,10 +87,15 @@ func TestHTTPApplyDefaults(t *testing.T) {
 		config["max_batch_size"] = "50"
 		config["is_default_mapping"] = false
 
-		enriched := registered.ApplyDefaults(config)
-
-		assert.Equal(t, true, enriched["is_batching_enabled"])
-		assert.Equal(t, false, enriched["is_default_mapping"])
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": true,
+			"max_batch_size":      "50",
+			"is_default_mapping":  false,
+		}, registered.ApplyDefaults(config))
 	})
 
 	t.Run("enriched config stays valid", func(t *testing.T) {

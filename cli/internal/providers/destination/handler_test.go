@@ -228,6 +228,10 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		assert.Equal(t, "G-1", resource.Config["measurement_id"])
 	})
 
+	// Covers the wiring itself against a synthetic definition: that enrichment
+	// runs here at all, and that it lands before secret wrapping. The
+	// destination-specific consequence (a spec matching remote state) is
+	// asserted per definition, e.g. TestHTTPSpecMatchesRemoteStateWithDefaults.
 	t.Run("applies declared config defaults", func(t *testing.T) {
 		t.Parallel()
 

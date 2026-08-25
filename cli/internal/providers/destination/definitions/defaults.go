@@ -28,8 +28,8 @@ func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 
 	// Sorted so a definition with more than one bad tag always fails on the
 	// same key.
-	for _, tag := range slices.Sorted(maps.Keys(fields)) {
-		field := fields[tag]
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		field := fields[key]
 		raw, ok := field.Tag.Lookup(configDefaultTag)
 		if !ok {
 			continue
@@ -38,14 +38,14 @@ func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 		// A required field is always present, so a default for it is dead
 		// config that would silently never apply.
 		if isRequiredField(field) {
-			return nil, fmt.Errorf("config key %q is required and cannot declare a default", tag)
+			return nil, fmt.Errorf("config key %q is required and cannot declare a default", key)
 		}
 
 		value, err := parseDefaultValue(field, raw)
 		if err != nil {
-			return nil, fmt.Errorf("config key %q: %w", tag, err)
+			return nil, fmt.Errorf("config key %q: %w", key, err)
 		}
-		defaults[tag] = value
+		defaults[key] = value
 	}
 
 	return defaults, nil
@@ -73,30 +73,32 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 		}
 		return value, nil
 
+	// Integer kinds are range-checked against their own parser first — float
+	// parsing alone would accept "1.5" for an int or "-1" for a uint.
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if _, err := strconv.ParseInt(raw, 10, 64); err != nil {
 			return nil, fmt.Errorf("invalid integer default %q", raw)
 		}
-		return jsonNumber(raw)
+		return parseNumericDefault(raw)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		if _, err := strconv.ParseUint(raw, 10, 64); err != nil {
 			return nil, fmt.Errorf("invalid unsigned integer default %q", raw)
 		}
-		return jsonNumber(raw)
+		return parseNumericDefault(raw)
 
 	case reflect.Float32, reflect.Float64:
-		return jsonNumber(raw)
+		return parseNumericDefault(raw)
 
 	default:
-		return nil, fmt.Errorf("unsupported default on %s field", kind)
+		return nil, fmt.Errorf("unsupported kind %s for a default tag", kind)
 	}
 }
 
-// jsonNumber parses a numeric default as float64 — the type JSON decoding
-// yields — so a defaulted value compares equal to the same value read back
+// parseNumericDefault returns the default as float64 — the type JSON decoding
+// yields — so a defaulted number compares equal to the same value read back
 // from the API.
-func jsonNumber(raw string) (any, error) {
+func parseNumericDefault(raw string) (any, error) {
 	value, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid numeric default %q", raw)
@@ -126,6 +128,7 @@ func (d *RegisteredDefinition) ApplyDefaults(config map[string]any) map[string]a
 }
 
 // ConfigDefaults returns the declared defaults keyed by local config key.
+// Values are scalars, so the copy shields the definition from callers.
 func (d *RegisteredDefinition) ConfigDefaults() map[string]any {
 	out := make(map[string]any, len(d.configDefaults))
 	maps.Copy(out, d.configDefaults)
