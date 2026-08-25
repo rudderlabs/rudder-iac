@@ -36,10 +36,11 @@ type DestinationDefinition struct {
 	SupportedSourcesValidation map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
-	// ConfigValidateFuncs registers extra go-playground custom validate tags scoped
-	// to this definition's config struct alone — for constraints that reference
-	// sibling fields a built-in cross-field tag cannot resolve (e.g. a map key)
-	// and that are specific to one destination, not a fleet-wide convention.
+	// ConfigValidateFuncs registers extra go-playground custom validate tags,
+	// scoped to this definition's config struct alone. Use it for
+	// destination-specific constraints a built-in cross-field tag cannot
+	// express (e.g. a condition keyed on a map entry), never for fleet-wide
+	// conventions.
 	ConfigValidateFuncs []rules.CustomValidateFunc
 }
 
@@ -153,6 +154,10 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating consent config model: %w", err)
 	}
 
+	if err := validateConnectionModeConfigModel(configType); err != nil {
+		return nil, fmt.Errorf("validating connection mode config model: %w", err)
+	}
+
 	if err := validateSupportedSourcesValidation(def, configType); err != nil {
 		return nil, fmt.Errorf("validating supported sources requirements: %w", err)
 	}
@@ -208,6 +213,18 @@ func validateConsentConfigModel(def *DestinationDefinition, configType reflect.T
 	}
 	if len(def.ConsentValidationOverrides) > 0 && !hasConsentField {
 		return fmt.Errorf("consent validation overrides require a common.ConsentManagement config field")
+	}
+	return nil
+}
+
+// validateConnectionModeConfigModel mirrors the consent type check. A bespoke
+// type here would silently opt out of validateConnectionMode's per-source-type
+// enum check — its type assertion would yield an empty map — so a mistyped
+// field surfaces at registration rather than as a decode error at apply time.
+func validateConnectionModeConfigModel(configType reflect.Type) error {
+	field, ok := structFieldsByMapstructureTag(configType)["connection_mode"]
+	if ok && derefType(field.Type) != reflect.TypeOf(common.ConnectionMode{}) {
+		return fmt.Errorf("connection_mode config field must use common.ConnectionMode")
 	}
 	return nil
 }

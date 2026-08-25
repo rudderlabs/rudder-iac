@@ -7,9 +7,9 @@ import (
 )
 
 // ConnectionMode stores the connection mode value by local source type, e.g.
-// {"web": "device"}. The valid values differ per source type per destination —
-// see RegisteredDefinition.ConnectionModes, which is the authority both this
-// property mapping and its validation defer to.
+// {"web": "device"}. The property mapping copies values verbatim; the valid
+// values differ per source type per destination and are enforced by
+// validateConnectionMode against RegisteredDefinition.ConnectionModes.
 type ConnectionMode map[string]string
 
 // ConnectionModeProperties returns ConfigProperty entries for the

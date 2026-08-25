@@ -119,12 +119,10 @@ func TestGA4ConfigValidation(t *testing.T) {
 		}))
 	})
 
-	// schema.json constrains sdkBaseUrl under typesOfClient=gtag >
-	// connectionMode.web=device; the branch left it entirely unvalidated.
-	// schema.json only constrains sdk_base_url's format under
-	// client_type=gtag AND connection_mode.web=device — see
-	// ga4SDKBaseURLConditional, which now that connection_mode is real config
-	// (DEX-708) reads both siblings instead of applying the pattern always.
+	// schema.json only constrains sdk_base_url's format under client_type=gtag
+	// AND connection_mode.web=device. Now that connection_mode is real config
+	// (DEX-708), sdkBaseURLConditional reads both sibling fields and applies
+	// the pattern only inside that branch, instead of unconditionally.
 	t.Run("sdk_base_url pattern enforced when gtag and device", func(t *testing.T) {
 		t.Parallel()
 
@@ -250,15 +248,34 @@ func TestGA4ConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
+	// Plain oneof, not dynamic_or_oneof: schema.json states these as exact-match
+	// enums with no template branch, so a template is rejected like any other
+	// value outside the enum.
 	t.Run("invalid client_type rejected", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"api_secret":     "secret",
-			"client_type":    "other",
-			"measurement_id": "G-XXXXXXXXXX",
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/client_type", errors[0].Path)
+		for _, clientType := range []string{"other", "{{ config.clientType || gtag }}", "env.CLIENT_TYPE"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    clientType,
+				"measurement_id": "G-XXXXXXXXXX",
+			})
+			require.NotEmpty(t, errors, clientType)
+			assert.Equal(t, "/client_type", errors[0].Path, clientType)
+		}
+	})
+
+	t.Run("invalid capture_page_view.web rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{"other", "{{ config.capturePageView || rs }}", "env.CAPTURE_PAGE_VIEW"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":        "secret",
+				"client_type":       "gtag",
+				"measurement_id":    "G-XXXXXXXXXX",
+				"capture_page_view": map[string]any{"web": value},
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/capture_page_view/web", errors[0].Path, value)
+		}
 	})
 
 	t.Run("valid minimal gtag", func(t *testing.T) {
@@ -405,7 +422,10 @@ func TestGA4ConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("connection_mode accepts a template", func(t *testing.T) {
+	// connectionMode is a plain enum upstream — no template branch, unlike the
+	// pattern-validated fields — so a template is rejected rather than passed
+	// through as an opaque dynamic value.
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"api_secret":     "secret",
@@ -415,7 +435,9 @@ func TestGA4ConfigValidation(t *testing.T) {
 				"unity": "{{ .GA4_CONNECTION_MODE || cloud }}",
 			},
 		})
-		assert.Empty(t, errors)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
 	// An explicit empty string is a real value, not an absent key — it must be
@@ -437,10 +459,10 @@ func TestGA4ConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	// A non-string value produces both a decode-time type error and
-	// validateConnectionMode's own type check — a duplicate diagnostic this
-	// destination inherits from the same, pre-existing shape check
-	// consent_management has always had; not something to fix here.
+	// A non-string value trips both the mapstructure decode error and
+	// validateConnectionMode's own type check, so the same path is reported
+	// twice. consent_management's shape check has the same pre-existing
+	// duplication; not something to fix here.
 	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

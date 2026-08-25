@@ -48,13 +48,14 @@ type s3Config struct {
     EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
-    // Mandatory type, same as consent — model connection_mode as real config
-    // for every destination (see source-extraction.md). Same integration
-    // pattern as consent — a common helper plus a model field — but a
-    // different value shape (map[string]string, not map[string][]ConsentEntry).
-    // common.ConnectionModeProperties(sourceTypes) below does the mapping,
-    // and its values are validated against this destination's own
-    // ConnectionModes map, not a struct tag (see DEX-708 / ga4).
+    // Mandatory field on every destination, and mandatory type when present
+    // (see source-extraction.md). Same integration pattern as consent — a
+    // common helper plus a model field — but a different value shape
+    // (map[string]string, not map[string][]ConsentEntry).
+    // common.ConnectionModeProperties(sourceTypes) below does the mapping.
+    // No validate tag: the legal values differ per source type, so
+    // validateConnectionMode checks each entry against this definition's own
+    // ConnectionModes map instead (see DEX-708 / ga4).
     ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
@@ -66,9 +67,8 @@ func NewDefinition() *definitions.DestinationDefinition {
         converter.Simple("prefix", "prefix"), // bare — no SkipZeroValue (see converter-mapping.md)
         // ...
     }
-    properties = append(properties,
-        append(common.ConnectionModeProperties(sourceTypes), common.Properties(sourceTypes)...)...,
-    )
+    properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
+    properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
         Type:       "s3",       // lowercase(APIType), deterministic; equals the input localType
@@ -121,9 +121,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   every required key must exist on the config struct or be a source-type block
   key (`connection_mode`, `use_native_sdk`). Entries are optional per source
   type.
-- A `consent_management` config field must be `common.ConsentManagement`.
-  There is no equivalent Register()-time type check for `connection_mode` yet
-  — use `common.ConnectionMode` by convention, not enforcement.
+- A `consent_management` config field must be `common.ConsentManagement`, and a
+  `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
+  either is rejected at registration: it would silently opt the key out of the
+  shared validation those types drive.
 - `(Type, Version)` and `(APIType, Version)` must be unique.
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key

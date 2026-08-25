@@ -21,6 +21,11 @@ import (
 // here too would just double-report through the rule pipeline. An unsupported
 // source type here simply has no allowed-values list to check against, so its
 // value is skipped rather than flagged as invalid.
+//
+// Dynamic values get no exemption: schema.json declares connectionMode as a
+// plain enum per source type, and terraform's validators admit env./template
+// forms only on pattern fields, never on enums. A template here would be
+// stored verbatim and rejected upstream, so reject it locally instead.
 func (d *RegisteredDefinition) validateConnectionMode(config map[string]any) []ConfigError {
 	if _, ok := structFieldsByMapstructureTag(d.configType)["connection_mode"]; !ok {
 		return nil
@@ -46,10 +51,6 @@ func (d *RegisteredDefinition) validateConnectionMode(config map[string]any) []C
 			})
 			continue
 		}
-		if IsDynamicConfigValue(value) {
-			continue
-		}
-
 		if !slices.Contains(allowed, value) {
 			errors = append(errors, ConfigError{
 				Path: path,

@@ -121,15 +121,21 @@ type webBool struct {
 }
 
 type webCapturePageView struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=rs gtag"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=rs gtag"`
 }
 
 // ga4Config is the local YAML config model. Field set mirrors terraform-provider
 // destination_google_analytics4 mappings; validation constraints mirror
 // overlapping schema.json rules (required, enums, client-type conditionals).
+//
+// Enum fields use plain oneof rather than dynamic_or_oneof: schema.json states
+// them as exact-match enums with no template branch, and terraform admits the
+// template form only on its pattern-validated fields. A template here would be
+// stored verbatim and rejected upstream. Most destinations still use
+// dynamic_or_oneof for enums; reconciling the fleet is tracked separately.
 type ga4Config struct {
 	APISecret             string              `mapstructure:"api_secret" validate:"required,dynamic_or_pattern=single_line_100"`
-	ClientType            string              `mapstructure:"client_type" validate:"required,dynamic_or_oneof=gtag firebase"`
+	ClientType            string              `mapstructure:"client_type" validate:"required,oneof=gtag firebase"`
 	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
 	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
 	DebugMode             *bool               `mapstructure:"debug_mode"`
@@ -192,9 +198,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
-	properties = append(properties,
-		append(common.ConnectionModeProperties(sourceTypes), common.Properties(sourceTypes)...)...,
-	)
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
+	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
 		Type:       "ga4",

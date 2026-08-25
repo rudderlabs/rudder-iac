@@ -45,6 +45,10 @@ func (r *Registry) Register(def *DestinationDefinition) error {
 		return err
 	}
 
+	if err := validateConfigValidateFuncs(def); err != nil {
+		return err
+	}
+
 	key := typeVersion{Type: def.Type, Version: def.Version}
 	if _, exists := r.byTypeVersion[key]; exists {
 		return fmt.Errorf("destination definition %s version %d already registered", def.Type, def.Version)
@@ -77,10 +81,7 @@ func validateDefinitionSourceTypes(def *DestinationDefinition) error {
 	if err := validateConnectionModeSourceTypes(def); err != nil {
 		return err
 	}
-	if err := validateConsentValidationOverrides(def); err != nil {
-		return err
-	}
-	return validateConfigValidateFuncs(def)
+	return validateConsentValidationOverrides(def)
 }
 
 func validateConfigValidateFuncs(def *DestinationDefinition) error {
