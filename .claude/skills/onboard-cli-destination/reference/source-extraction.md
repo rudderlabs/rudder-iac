@@ -33,7 +33,7 @@ Translate constraints to `validate` struct tags on the config struct:
 | --- | --- |
 | key in `required` | `required` |
 | `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
-| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether a value may be dynamic" below |
+| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether an enum may be dynamic" below |
 | any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
@@ -58,21 +58,21 @@ Notes:
   `{{ config.x || … }}` longer than the literal limit stays valid.
 - **`env.VAR` is deprecated — never give it an escape hatch.** It is judged as an
   ordinary literal, so it passes only when it happens to satisfy the pattern.
-  Do not add it to a pattern or a tag.
-- **Let schema.json decide whether a value may be dynamic.** Pick the tag from
+  Do not add it to a pattern or a tag. It also plays no part in deciding whether
+  a property admits a dynamic value: upstream writes these wrappers as
+  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`, and only the `{{ … || … }}` branch
+  counts. Disregard `(^env[.].+)` wherever it appears — in schema.json and in
+  terraform validators alike.
+- **Let schema.json decide whether an enum may be dynamic.** Pick the tag from
   what the property declares, not from the shape of the constraint: if it admits
-  the `{{ path || fallback }}` form — as patterns do when wrapped
-  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>` — use the `dynamic_or_*` tag; if it
-  does not, use the strict one, since a dynamic value would then be stored
-  verbatim and rejected by the backend.
-  In practice this currently splits by shape: `pattern` properties carry the
-  template branch, `enum` properties do not (checked across every onboarded
-  destination), so enums take `oneof` today — but check the property rather than
-  assuming, since an enum that does declare the alternative takes
-  `dynamic_or_oneof`. terraform corroborates the split: its enum validators read
-  `(^env[.].+)|^(a|b)$`, admitting the template form only on pattern-validated
-  fields. Note `dynamic_or_oneof` also accepts `env.` values, which the rule above
-  forbids, so prefer `oneof` wherever the schema allows it. Many existing
+  the `{{ path || fallback }}` form, use `dynamic_or_oneof`; if it does not, use
+  `oneof`, since such a value would then be stored verbatim and rejected by the
+  backend. In practice this currently splits by shape — `pattern` properties
+  carry the template branch, `enum` properties do not (checked across every
+  onboarded destination), so enums take `oneof` today — but check the property
+  rather than assuming, since an enum that did declare it would take
+  `dynamic_or_oneof`. terraform shows the same split: its enum validators carry
+  no `{{ … || … }}` branch where its pattern validators do. Many existing
   definitions use `dynamic_or_oneof` for strict enums; reconciling them is tracked
   separately, so check the schema rather than copying a neighbouring definition.
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
