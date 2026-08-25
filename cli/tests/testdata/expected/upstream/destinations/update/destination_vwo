@@ -13,6 +13,9 @@
         "eventName": "Application Opened"
       }
     ],
+    "connectionMode": {
+      "web": "device"
+    },
     "consentManagement": {
       "web": [
         {

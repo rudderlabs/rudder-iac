@@ -28,15 +28,19 @@ type useNativeSDKConfig struct {
 // vwoConfig is the local YAML config model. Field set mirrors the
 // terraform-provider VWO mapping contract plus shared source-scoped settings.
 type vwoConfig struct {
-	AccountID              string                   `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	IsSPA                  *bool                    `mapstructure:"is_spa"`
-	SendExperimentTrack    *bool                    `mapstructure:"send_experiment_track"`
-	SendExperimentIdentify *bool                    `mapstructure:"send_experiment_identify"`
+	AccountID string `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
+	// schema.json defaults these four to false. The backend fills them in on
+	// create but not on update, so declaring them keeps a spec that omits them
+	// from diffing forever against the stored config.
+	IsSPA                  *bool                    `mapstructure:"is_spa" default:"false"`
+	SendExperimentTrack    *bool                    `mapstructure:"send_experiment_track" default:"false"`
+	SendExperimentIdentify *bool                    `mapstructure:"send_experiment_identify" default:"false"`
 	LibraryTolerance       string                   `mapstructure:"library_tolerance" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	SettingsTolerance      string                   `mapstructure:"settings_tolerance" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	UseExistingJquery      *bool                    `mapstructure:"use_existing_jquery"`
+	UseExistingJquery      *bool                    `mapstructure:"use_existing_jquery" default:"false"`
 	EventFiltering         *eventFilteringConfig    `mapstructure:"event_filtering"`
 	UseNativeSDK           *useNativeSDKConfig      `mapstructure:"use_native_sdk"`
+	ConnectionMode         common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement      common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -58,6 +62,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

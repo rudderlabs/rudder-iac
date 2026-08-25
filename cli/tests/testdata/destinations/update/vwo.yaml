@@ -18,6 +18,8 @@ spec:
     use_existing_jquery: true
     use_native_sdk:
       web: true
+    connection_mode:
+      web: device
     event_filtering:
       blacklist:
         - Application Opened

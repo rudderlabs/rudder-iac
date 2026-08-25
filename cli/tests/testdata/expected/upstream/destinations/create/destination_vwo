@@ -8,6 +8,9 @@
   "enabled": true,
   "config": {
     "accountId": "rudderCliE2eAccount",
+    "connectionMode": {
+      "web": "device"
+    },
     "eventFilteringOption": "whitelistedEvents",
     "isSPA": true,
     "libraryTolerance": "2000",

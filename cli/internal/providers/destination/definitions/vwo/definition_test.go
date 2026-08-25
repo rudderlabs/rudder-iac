@@ -35,6 +35,28 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	assert.Empty(t, registered.GatedKeyPaths())
 
+	// schema.json defaults these four to false, and the backend injects them on
+	// create but not on update — declaring them keeps a spec that omits them
+	// from diffing forever against the stored config.
+	assert.Equal(t, map[string]any{
+		"is_spa":                   false,
+		"send_experiment_track":    false,
+		"send_experiment_identify": false,
+		"use_existing_jquery":      false,
+	}, registered.ApplyDefaults(map[string]any{}))
+
+	// An explicit value wins, including one equal to the default.
+	assert.Equal(t, map[string]any{
+		"account_id":               "410057",
+		"is_spa":                   true,
+		"send_experiment_track":    false,
+		"send_experiment_identify": false,
+		"use_existing_jquery":      false,
+	}, registered.ApplyDefaults(map[string]any{
+		"account_id": "410057",
+		"is_spa":     true,
+	}))
+
 	byAPI, err := registry.GetByAPIType("VWO", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
@@ -80,6 +102,9 @@ func TestVWOConfigValidation(t *testing.T) {
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
+			"connection_mode": map[string]any{
+				"web": "device",
+			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -90,6 +115,20 @@ func TestVWOConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	// db-config lists "device" as web's only supported mode.
+	t.Run("connection_mode value validated per source type", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"cloud", "hybrid", "{{ config.mode || device }}"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"account_id":      "410057",
+				"connection_mode": map[string]any{"web": mode},
+			})
+			require.NotEmpty(t, errors, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of")
+		}
 	})
 
 	t.Run("valid example yaml config", func(t *testing.T) {
@@ -107,6 +146,9 @@ func TestVWOConfigValidation(t *testing.T) {
 			},
 			"use_native_sdk": map[string]any{
 				"web": true,
+			},
+			"connection_mode": map[string]any{
+				"web": "device",
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -245,15 +287,17 @@ func TestVWOConfigValidation(t *testing.T) {
 
 	t.Run("legacy consent key rejected", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"account_id": "410057",
-			"one_trust_cookie_categories": map[string]any{
-				"web": []any{"analytics"},
-			},
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/one_trust_cookie_categories", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		for _, key := range []string{"one_trust_cookie_categories", "ketch_consent_purposes"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"account_id": "410057",
+				key: map[string]any{
+					"web": []any{"analytics"},
+				},
+			})
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "unknown config field")
+		}
 	})
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
@@ -362,6 +406,21 @@ func TestVWOConversionRoundTrip(t *testing.T) {
 				"accountId": "410057",
 				"useNativeSDK": {
 					"web": false
+				}
+			}`,
+		},
+		{
+			Name: "connection mode web",
+			LocalJSON: `{
+				"account_id": "410057",
+				"connection_mode": {
+					"web": "device"
+				}
+			}`,
+			APIJSON: `{
+				"accountId": "410057",
+				"connectionMode": {
+					"web": "device"
 				}
 			}`,
 		},
