@@ -140,7 +140,12 @@ func TestGA4ConfigValidation(t *testing.T) {
 			assert.Equal(t, "/sdk_base_url", errors[0].Path)
 		}
 
-		for _, url := range []string{"https://www.googletagmanager.com", "www.googletagmanager.com", ""} {
+		for _, url := range []string{
+			"https://www.googletagmanager.com",
+			"www.googletagmanager.com",
+			"",
+			"{{ sdkBaseUrl || https://www.googletagmanager.com }}",
+		} {
 			assert.Empty(t, registered.ValidateConfig(map[string]any{
 				"api_secret":      "secret",
 				"client_type":     "gtag",
@@ -411,6 +416,45 @@ func TestGA4ConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	// An explicit empty string is a real value, not an absent key — it must be
+	// rejected like any other invalid entry, since converter.Simple never skips
+	// zero values (see converter-mapping.md) and would otherwise send an empty
+	// connectionMode.web upstream unvalidated.
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web": "",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// A non-string value produces both a decode-time type error and
+	// validateConnectionMode's own type check — a duplicate diagnostic this
+	// destination inherits from the same, pre-existing shape check
+	// consent_management has always had; not something to fix here.
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	// The framework's generic source-type-scoped-key check (not this

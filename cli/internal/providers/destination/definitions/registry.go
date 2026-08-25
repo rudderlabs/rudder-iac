@@ -77,7 +77,27 @@ func validateDefinitionSourceTypes(def *DestinationDefinition) error {
 	if err := validateConnectionModeSourceTypes(def); err != nil {
 		return err
 	}
-	return validateConsentValidationOverrides(def)
+	if err := validateConsentValidationOverrides(def); err != nil {
+		return err
+	}
+	return validateConfigValidateFuncs(def)
+}
+
+func validateConfigValidateFuncs(def *DestinationDefinition) error {
+	seen := make(map[string]bool, len(def.ConfigValidateFuncs))
+	for _, fn := range def.ConfigValidateFuncs {
+		if fn.Tag == "" {
+			return fmt.Errorf("config validate func has an empty tag")
+		}
+		if fn.Func == nil {
+			return fmt.Errorf("config validate func %q has a nil func", fn.Tag)
+		}
+		if seen[fn.Tag] {
+			return fmt.Errorf("config validate func %q registered more than once", fn.Tag)
+		}
+		seen[fn.Tag] = true
+	}
+	return nil
 }
 
 func validateConnectionModeSourceTypes(def *DestinationDefinition) error {

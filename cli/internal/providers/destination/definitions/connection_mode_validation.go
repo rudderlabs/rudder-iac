@@ -46,7 +46,7 @@ func (d *RegisteredDefinition) validateConnectionMode(config map[string]any) []C
 			})
 			continue
 		}
-		if value == "" || IsDynamicConfigValue(value) {
+		if IsDynamicConfigValue(value) {
 			continue
 		}
 

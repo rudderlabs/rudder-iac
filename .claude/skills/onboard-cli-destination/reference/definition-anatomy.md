@@ -49,7 +49,9 @@ type s3Config struct {
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
     // Optional: only add when explicitly asked to model connection_mode for
-    // this destination (see source-extraction.md). Same shape as consent —
+    // this destination (see source-extraction.md). Same integration pattern
+    // as consent — a common helper plus a model field — but a different value
+    // shape (map[string]string, not map[string][]ConsentEntry).
     // common.ConnectionModeProperties(sourceTypes) below does the mapping,
     // and its values are validated against this destination's own
     // ConnectionModes map, not a struct tag (see DEX-708 / ga4).

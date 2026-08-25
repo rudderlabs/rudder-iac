@@ -54,8 +54,14 @@ func sdkBaseURLConditional(fl validator.FieldLevel) bool {
 		parent = parent.Elem()
 	}
 
-	clientType := parent.FieldByName("ClientType").String()
-	connectionMode, _ := parent.FieldByName("ConnectionMode").Interface().(common.ConnectionMode)
+	clientTypeField := parent.FieldByName("ClientType")
+	connectionModeField := parent.FieldByName("ConnectionMode")
+	if !clientTypeField.IsValid() || !connectionModeField.IsValid() {
+		return true
+	}
+
+	clientType := clientTypeField.String()
+	connectionMode, _ := connectionModeField.Interface().(common.ConnectionMode)
 
 	if clientType != "gtag" || connectionMode["web"] != "device" {
 		return true
