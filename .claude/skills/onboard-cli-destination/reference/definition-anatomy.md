@@ -30,7 +30,9 @@ var connectionModes = map[string][]string{
 }
 
 // 3. Config struct: the closed allowlist of local YAML config keys.
-//    mapstructure tag = snake_case local key; validate tag from schema.json.
+//    mapstructure tag = snake_case local key; validate tag from schema.json;
+//    default tag from schema.json `default` (see source-extraction.md
+//    "Declaring defaults" — never on a `required` field).
 type s3Config struct {
     BucketName    string `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
     Prefix        string `mapstructure:"prefix" validate:"omitempty,max=100"`
@@ -41,7 +43,9 @@ type s3Config struct {
     IAMRoleARN  string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,max=100"`
     AccessKeyID string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,max=100"`
     AccessKey   string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,max=100"`
-    EnableSSE   *bool  `mapstructure:"enable_sse"`
+    // schema.json defaults enableSSE to false. Optional + *bool, so it may
+    // carry the tag; RoleBasedAuth above is `required` and must not.
+    EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

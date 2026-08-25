@@ -8,12 +8,12 @@ import (
 )
 
 type defaultsTestConfig struct {
-	APISecret     string  `mapstructure:"api_secret" validate:"required"`
-	MeasurementID string  `mapstructure:"measurement_id"`
-	Mode          string  `mapstructure:"mode" default:"cloud"`
-	DebugMode     *bool   `mapstructure:"debug_mode" default:"false"`
-	SendUserID    bool    `mapstructure:"send_user_id" default:"true"`
-	BatchSize     float64 `mapstructure:"batch_size" default:"100"`
+	APISecret     string `mapstructure:"api_secret" validate:"required"`
+	MeasurementID string `mapstructure:"measurement_id"`
+	Mode          string `mapstructure:"mode" default:"cloud"`
+	DebugMode     *bool  `mapstructure:"debug_mode" default:"false"`
+	SendUserID    bool   `mapstructure:"send_user_id" default:"true"`
+	BatchSize     int    `mapstructure:"batch_size" default:"100"`
 }
 
 func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinition {
@@ -164,13 +164,24 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			wantErr: `config key "batch_size": invalid integer default "1.5"`,
 		},
 		{
-			name: "negative default on an unsigned field",
+			// Unsigned and float fields are deliberately unimplemented — no
+			// destination schema declares such a default yet.
+			name: "unsigned field kind",
 			newConfig: func() any {
 				return &struct {
-					RetryLimit uint `mapstructure:"retry_limit" default:"-1"`
+					RetryLimit uint `mapstructure:"retry_limit" default:"3"`
 				}{}
 			},
-			wantErr: `config key "retry_limit": invalid unsigned integer default "-1"`,
+			wantErr: `config key "retry_limit": unsupported kind uint for a default tag`,
+		},
+		{
+			name: "float field kind",
+			newConfig: func() any {
+				return &struct {
+					Ratio float64 `mapstructure:"ratio" default:"0.5"`
+				}{}
+			},
+			wantErr: `config key "ratio": unsupported kind float64 for a default tag`,
 		},
 		{
 			name: "unsupported field kind",

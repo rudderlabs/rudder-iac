@@ -129,6 +129,12 @@ Mechanical rules:
   a pattern, not a length limit (it forbids newlines) — reuse the shared
   `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
   reject templates too (see source-extraction.md "Enforcing regex patterns").
+- `schema.json` `default` keywords → `default:"…"` struct tags (see
+  source-extraction.md "Declaring defaults"). The backend applies these when it
+  persists a destination, so a spec that omits the key must still carry it or
+  every apply reports a phantom diff. **Never put a `default` on a field tagged
+  `validate:"required"`** — registration rejects it, since a key that is always
+  present can never take a default. `required_if` is fine.
 - `db-config.json` `secretKeys` → `SecretKeys` field, translated to snake_case
   local keys.
 - `db-config.json` `supportedSourceTypes` / `supportedConnectionModes` →

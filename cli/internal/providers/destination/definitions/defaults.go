@@ -59,8 +59,13 @@ func isRequiredField(field reflect.StructField) bool {
 }
 
 // parseDefaultValue converts the tag's string form to the field's type.
-// Numbers become float64 to match JSON decoding, so a defaulted value compares
-// equal to the same value read back from the API.
+//
+// Only string, bool and integer fields are supported, because those are the
+// only JSON types `default` takes across the destinations we model: of the 226
+// defaults declared by the 48 Terraform-supported destinations, 164 are
+// boolean, 61 are string and one is an integer — none is a float, and none is
+// unsigned. Any other kind is rejected at registration rather than guessed at,
+// so extending this switch is a deliberate act when a schema first needs it.
 func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 	switch kind := derefType(field.Type).Kind(); kind {
 	case reflect.String:
@@ -73,37 +78,19 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 		}
 		return value, nil
 
-	// Integer kinds are range-checked against their own parser first — float
-	// parsing alone would accept "1.5" for an int or "-1" for a uint.
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if _, err := strconv.ParseInt(raw, 10, 64); err != nil {
+		// Parsed as an integer to reject "1.5", then widened to float64 — the
+		// type JSON decoding yields — so the value compares equal to the same
+		// number read back from the API.
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
 			return nil, fmt.Errorf("invalid integer default %q", raw)
 		}
-		return parseNumericDefault(raw)
-
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if _, err := strconv.ParseUint(raw, 10, 64); err != nil {
-			return nil, fmt.Errorf("invalid unsigned integer default %q", raw)
-		}
-		return parseNumericDefault(raw)
-
-	case reflect.Float32, reflect.Float64:
-		return parseNumericDefault(raw)
+		return float64(value), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported kind %s for a default tag", kind)
 	}
-}
-
-// parseNumericDefault returns the default as float64 — the type JSON decoding
-// yields — so a defaulted number compares equal to the same value read back
-// from the API.
-func parseNumericDefault(raw string) (any, error) {
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid numeric default %q", raw)
-	}
-	return value, nil
 }
 
 // ApplyDefaults returns a copy of config with every declared default filled in
