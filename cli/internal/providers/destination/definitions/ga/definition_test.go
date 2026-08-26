@@ -64,6 +64,30 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"use_rich_event_names/web":            {"web"},
 	}, registered.GatedKeyPaths())
 
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// schema.json defaults these eight; the backend injects them on create but
+	// not update, so declaring them keeps a spec that omits them from diffing
+	// forever. enableServerSideIdentify and eventFilteringOption are absent by
+	// design: both are Discriminator-derived and have no local key to tag.
+	assert.Equal(t, map[string]any{
+		"double_click":              false,
+		"enhanced_link_attribution": false,
+		"include_search":            false,
+		"disable_md5":               false,
+		"anonymize_ip":              false,
+		"enhanced_ecommerce":        false,
+		"non_interaction":           false,
+		"send_user_id":              false,
+	}, registered.ApplyDefaults(map[string]any{}))
+
+	// An explicit value wins, including one equal to the default.
+	assert.Equal(t, true, registered.ApplyDefaults(map[string]any{
+		"anonymize_ip": true,
+	})["anonymize_ip"])
+
 	byAPI, err := registry.GetByAPIType("GA", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
