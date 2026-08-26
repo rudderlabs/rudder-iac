@@ -40,6 +40,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
+	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
@@ -378,6 +379,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(kafka.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kafka destination definition: %w", err)
+		}
+		if err := registry.Register(linkedininsighttag.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering linkedin_insight_tag destination definition: %w", err)
 		}
 		if err := registry.Register(marketo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
