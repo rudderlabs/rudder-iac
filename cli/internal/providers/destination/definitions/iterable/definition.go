@@ -1,9 +1,14 @@
 package iterable
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // Source types from integrations-config destinations/iterable/db-config.json
@@ -49,19 +54,19 @@ type webStringList struct {
 // Iterable is unusual: event filtering is web-gated and web-keyed, rather than
 // the flat arrays plus discriminator most destinations use.
 type webEventFilteringOption struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=disable whitelistedEvents blacklistedEvents"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=disable whitelistedEvents blacklistedEvents"`
 }
 
 type webInitIdentifier struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=email userId"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=email userId"`
 }
 
 type webHandleLinks struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=open-all-new-tab open-all-same-tab external-new-tab"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=open-all-new-tab open-all-same-tab external-new-tab"`
 }
 
 type webCloseButtonPosition struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=top-right top-left"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=top-right top-left"`
 }
 
 // iterableConfig is the local YAML config model. Field set mirrors terraform
@@ -69,7 +74,7 @@ type webCloseButtonPosition struct {
 // schema.json rules.
 type iterableConfig struct {
 	APIKey             string `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
-	DataCenter         string `mapstructure:"data_center" validate:"required,dynamic_or_oneof=USDC EUDC"`
+	DataCenter         string `mapstructure:"data_center" validate:"required,oneof=USDC EUDC"`
 	PreferUserID       *bool  `mapstructure:"prefer_user_id" default:"true"`
 	MergeNestedObjects *bool  `mapstructure:"merge_nested_objects" default:"true"`
 	// db-config lists registerDeviceOrBrowserApiKey as the only secretKey.
@@ -87,7 +92,7 @@ type iterableConfig struct {
 	DisplayInterval               webString                `mapstructure:"display_interval"`
 	OnOpenScreenReaderMessage     webString                `mapstructure:"on_open_screen_reader_message"`
 	OnOpenNodeToTakeFocus         webString                `mapstructure:"on_open_node_to_take_focus"`
-	PackageName                   string                   `mapstructure:"package_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	PackageName                   string                   `mapstructure:"package_name" validate:"iterable_package_name_required,omitempty,dynamic_or_pattern=single_line_100"`
 	RightOffset                   webString                `mapstructure:"right_offset"`
 	TopOffset                     webString                `mapstructure:"top_offset"`
 	BottomOffset                  webString                `mapstructure:"bottom_offset"`
@@ -104,6 +109,33 @@ type iterableConfig struct {
 	BlacklistedEvents             webStringList            `mapstructure:"blacklisted_events"`
 	ConnectionMode                common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement             common.ConsentManagement `mapstructure:"consent_management"`
+}
+
+// packageNameConditional enforces schema.json's anyOf branch: when
+// connection_mode.web is device, package_name is required. The condition is
+// keyed on a map entry, which required_if cannot resolve, so it reads the
+// sibling field off FieldLevel.Parent() — the same shape as ga4's
+// sdkBaseURLConditional, and registered the same way, scoped to this
+// definition via ConfigValidateFuncs.
+//
+// The tag must precede omitempty in the validate list: omitempty short-circuits
+// every validator after it on an empty value, which is exactly the case this
+// needs to reject.
+func packageNameConditional(fl validator.FieldLevel) bool {
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	field := parent.FieldByName("ConnectionMode")
+	if !field.IsValid() {
+		return true
+	}
+	connectionMode, _ := field.Interface().(common.ConnectionMode)
+	if connectionMode["web"] != "device" {
+		return true
+	}
+	return fl.Field().String() != ""
 }
 
 // NewDefinition returns the Iterable destination definition.
@@ -219,6 +251,9 @@ func NewDefinition() *definitions.DestinationDefinition {
 		Version:    1,
 		Properties: properties,
 		SecretKeys: []string{"register_device_or_browser_api_key"},
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "iterable_package_name_required", Func: packageNameConditional},
+		},
 		NewConfig: func() any {
 			return &iterableConfig{}
 		},

@@ -246,6 +246,60 @@ func TestIterableConfigValidation(t *testing.T) {
 	})
 }
 
+// schema.json's anyOf branch makes package_name required when
+// connection_mode.web is device. connection_mode is real config for this
+// destination, so the branch is enforceable rather than merely flagged.
+func TestIterablePackageNameConditional(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(iterable.NewDefinition()))
+	registered, err := registry.Get("iterable", 1)
+	require.NoError(t, err)
+
+	base := func(extra map[string]any) map[string]any {
+		cfg := map[string]any{"api_key": "key", "data_center": "USDC"}
+		for k, v := range extra {
+			cfg[k] = v
+		}
+		return cfg
+	}
+
+	errors := registered.ValidateConfig(base(map[string]any{
+		"connection_mode": map[string]any{"web": "device"},
+	}))
+	require.NotEmpty(t, errors)
+	assert.Equal(t, "/package_name", errors[0].Path)
+
+	assert.Empty(t, registered.ValidateConfig(base(map[string]any{
+		"connection_mode": map[string]any{"web": "device"},
+		"package_name":    "com.example.app",
+	})))
+
+	// Outside the branch the key stays optional.
+	assert.Empty(t, registered.ValidateConfig(base(map[string]any{
+		"connection_mode": map[string]any{"web": "cloud"},
+	})))
+	assert.Empty(t, registered.ValidateConfig(base(nil)))
+}
+
+// schema.json states these as exact-match enums with no template branch.
+func TestIterableStrictEnumsRejectTemplates(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(iterable.NewDefinition()))
+	registered, err := registry.Get("iterable", 1)
+	require.NoError(t, err)
+
+	errors := registered.ValidateConfig(map[string]any{
+		"api_key":     "key",
+		"data_center": "{{ config.dc || USDC }}",
+	})
+	require.NotEmpty(t, errors)
+	assert.Equal(t, "/data_center", errors[0].Path)
+}
+
 func TestIterableConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
