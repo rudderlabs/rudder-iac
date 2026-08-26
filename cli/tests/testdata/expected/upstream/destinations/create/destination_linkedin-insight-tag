@@ -1,0 +1,36 @@
+{
+  "config": {
+    "eventFilteringOption": "whitelistedEvents",
+    "eventToConversionIdMap": [
+      {
+        "from": "Order Completed",
+        "to": "1234567"
+      },
+      {
+        "from": "Product Viewed",
+        "to": "7654321"
+      }
+    ],
+    "partnerId": "rudderCliE2eFullPartner",
+    "useNativeSDK": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "linkedin-insight-tag",
+  "id": "\u003cignored\u003e",
+  "name": "E2E LinkedIn Insight Tag",
+  "type": "LINKEDIN_INSIGHT_TAG",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

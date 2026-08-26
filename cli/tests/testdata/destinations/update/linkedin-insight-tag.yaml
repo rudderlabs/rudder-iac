@@ -1,0 +1,26 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: linkedin-insight-tag
+spec:
+  id: linkedin-insight-tag
+  display_name: E2E LinkedIn Insight Tag Updated
+  type: linkedin_insight_tag
+  enabled: true
+  definition_version: 1
+  config:
+    partner_id: rudderCliE2eFullPartnerUpdated
+    event_to_conversion_id_map:
+      - from: Checkout Started
+        to: "9998887"
+    use_native_sdk:
+      web: false
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics

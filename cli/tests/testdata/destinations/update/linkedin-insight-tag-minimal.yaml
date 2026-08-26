@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: linkedin-insight-tag-minimal
+spec:
+  id: linkedin-insight-tag-minimal
+  display_name: E2E LinkedIn Insight Tag Minimal Updated
+  type: linkedin_insight_tag
+  enabled: true
+  definition_version: 1
+  config:
+    partner_id: rudderCliE2ePartnerUpdated

@@ -1,0 +1,15 @@
+{
+  "config": {
+    "eventFilteringOption": "disable",
+    "partnerId": "rudderCliE2ePartner"
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "linkedin-insight-tag-minimal",
+  "id": "\u003cignored\u003e",
+  "name": "E2E LinkedIn Insight Tag Minimal",
+  "type": "LINKEDIN_INSIGHT_TAG",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}
