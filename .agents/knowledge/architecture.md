@@ -225,3 +225,9 @@
 - Qualtrics destination support is implemented as CLI local type `qualtrics`, API type `QUALTRICS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/qualtrics`.
 - `qualtrics` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Qualtrics source-type support is intentionally narrow: only `web`, `android`, and `ios` are supported, all in device-only connection mode.
+
+## DEX-719 — GCS Connection Mode Re-Onboarding
+<!-- ticket:DEX-719 -->
+- GCS is an existing destination definition, so connection-mode re-onboarding should update the existing GCS definition/tests/fixture-snapshot pairs rather than adding duplicate destination registry imports, app flag-matrix cases, or new definitions.
+- GCS remains an unverified destination in `cli/internal/app/dependencies.go`; keep registry gating under both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations`.
+- Integrations-config and Terraform remain read-only source-of-truth references for this re-onboarding path; the durable CLI-owned changes belong in `cli/internal/providers/destination/definitions/gcs` and destination E2E testdata.
