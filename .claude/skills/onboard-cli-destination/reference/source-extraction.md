@@ -338,11 +338,14 @@ For each terraform-mapped property's API key:
    flag in the report.
 3. In no list at all → flag as discrepancy.
 
-Skip the boilerplate keys when doing this scan — `connectionMode`,
-`useNativeSDK`, `consentManagement`, `oneTrustCookieCategories`,
-`ketchConsentPurposes`, `eventFilteringOption`, `whitelistedEvents`,
-`blacklistedEvents` are handled by the `common` package and the
-source-type-keyed block machinery, never by `Gated`.
+Skip the boilerplate keys when doing this scan — none of them is ever wrapped
+in `Gated`, though for two different reasons. `connectionMode`, `useNativeSDK`,
+`consentManagement`, `eventFilteringOption`, `whitelistedEvents` and
+`blacklistedEvents` are handled by the `common` package, the converter and the
+source-type-keyed block machinery. `oneTrustCookieCategories` and
+`ketchConsentPurposes` are not handled at all — they are deliberately left
+unmodelled because the backend rewrites them into `consentManagement` on write
+(see the migration-on-write exception in SKILL.md).
 
 Example (Intercom): `mobileApiKeyAndroid` appears only in
 `destConfig.android` → `converter.Gated(converter.Simple("mobileApiKeyAndroid", "mobile_api_key_android"), common.SourceTypeAndroid)`.

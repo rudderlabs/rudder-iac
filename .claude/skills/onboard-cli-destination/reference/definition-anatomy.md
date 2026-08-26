@@ -48,10 +48,13 @@ type s3Config struct {
     EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
-    // Mandatory field on every destination, and mandatory type when present
-    // (see source-extraction.md). Same integration pattern as consent — a
-    // common helper plus a model field — but a different value shape
-    // (map[string]string, not map[string][]ConsentEntry).
+    // Present only when schema.json declares a connectionMode property, and
+    // mandatory type when present (see source-extraction.md). db-config's
+    // destConfig lists are not the signal — firebase names connectionMode
+    // under all seven source types yet declares no schema property, so it
+    // omits this field. Same integration pattern as consent — a common helper
+    // plus a model field — but a different value shape (map[string]string,
+    // not map[string][]ConsentEntry).
     // common.ConnectionModeProperties(sourceTypes) below does the mapping.
     // No validate tag: the legal values differ per source type, so
     // validateConnectionMode checks each entry against this definition's own
