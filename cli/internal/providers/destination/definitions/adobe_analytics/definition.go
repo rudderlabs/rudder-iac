@@ -41,7 +41,7 @@ type mappingEntry struct {
 
 type eventToTypeEntry struct {
 	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"required,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
 }
 
 type delimiterEntry struct {
@@ -55,25 +55,24 @@ type eventFiltering struct {
 }
 
 type useNativeSDK struct {
-	Web         *bool `mapstructure:"web"`
-	IOS         *bool `mapstructure:"ios"`
-	Android     *bool `mapstructure:"android"`
-	ReactNative *bool `mapstructure:"react_native"`
+	Web     *bool `mapstructure:"web"`
+	IOS     *bool `mapstructure:"ios"`
+	Android *bool `mapstructure:"android"`
 }
 
 // adobeAnalyticsConfig is the local YAML config model. Field set mirrors
 // terraform-provider destination_adobe_analytics.go; validation constraints
 // mirror overlapping schema.json rules for those mapped fields.
 type adobeAnalyticsConfig struct {
-	TrackingServerUrl             string                   `mapstructure:"tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,pattern=adobe_analytics_url"`
+	TrackingServerUrl             string                   `mapstructure:"tracking_server_url" validate:"omitempty,dynamic_or_pattern=adobe_analytics_url"`
+	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,dynamic_or_pattern=adobe_analytics_url"`
 	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,dynamic_or_pattern=single_line_300"`
 	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat" default:"true"`
 	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	EventsToTypes                 []eventToTypeEntry       `mapstructure:"events_to_types" validate:"omitempty,dive"`
-	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,pattern=single_line_100"`
 	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id" default:"true"`
 	TimestampOption               string                   `mapstructure:"timestamp_option" validate:"omitempty,oneof=disabled hybrid optional enabled" default:"disabled"`
 	TimestampOptionalReporting    *bool                    `mapstructure:"timestamp_optional_reporting" default:"false"`
@@ -82,11 +81,8 @@ type adobeAnalyticsConfig struct {
 	RudderEventsToAdobeEvents     []mappingEntry           `mapstructure:"rudder_events_to_adobe_events" validate:"omitempty,dive"`
 	TrackPageName                 *bool                    `mapstructure:"track_page_name" default:"true"`
 	ContextDataMapping            []mappingEntry           `mapstructure:"context_data_mapping" validate:"omitempty,dive"`
-	ContextDataPrefix             string                   `mapstructure:"context_data_prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	UseLegacyLinkName             *bool                    `mapstructure:"use_legacy_link_name"`
-	PageNameFallbackToString      *bool                    `mapstructure:"page_name_fallback_tostring"`
+	ContextDataPrefix             string                   `mapstructure:"context_data_prefix" validate:"omitempty,pattern=single_line_100"`
 	MobileEventMapping            []mappingEntry           `mapstructure:"mobile_event_mapping" validate:"omitempty,dive"`
-	SendFalseValues               *bool                    `mapstructure:"send_false_values"`
 	EVarMapping                   []mappingEntry           `mapstructure:"e_var_mapping" validate:"omitempty,dive"`
 	HierMapping                   []mappingEntry           `mapstructure:"hier_mapping" validate:"omitempty,dive"`
 	ListMapping                   []mappingEntry           `mapstructure:"list_mapping" validate:"omitempty,dive"`
@@ -135,13 +131,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 		converter.Simple("contextDataPrefix", "context_data_prefix"),
-		converter.Simple("useLegacyLinkName", "use_legacy_link_name"),
-		converter.Simple("pageNameFallbackTostring", "page_name_fallback_tostring"),
 		converter.ArrayWithObjects("mobileEventMapping", "mobile_event_mapping", map[string]any{
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.Simple("sendFalseValues", "send_false_values"),
 		converter.ArrayWithObjects("eVarMapping", "e_var_mapping", map[string]any{
 			"from": "from",
 			"to":   "to",
@@ -184,7 +177,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.reactnative", "use_native_sdk.react_native"),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{

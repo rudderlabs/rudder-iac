@@ -124,13 +124,10 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 			"context_data_mapping": []any{
 				map[string]any{"from": "traits.email", "to": "email"},
 			},
-			"context_data_prefix":         "rudder_",
-			"use_legacy_link_name":        true,
-			"page_name_fallback_tostring": true,
+			"context_data_prefix": "rudder_",
 			"mobile_event_mapping": []any{
 				map[string]any{"from": "screen.name", "to": "pageName"},
 			},
-			"send_false_values": true,
 			"e_var_mapping": []any{
 				map[string]any{"from": "category", "to": "1"},
 			},
@@ -165,10 +162,9 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
 			"use_native_sdk": map[string]any{
-				"web":          true,
-				"ios":          true,
-				"android":      true,
-				"react_native": false,
+				"web":     true,
+				"ios":     true,
+				"android": true,
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -461,12 +457,9 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 					{"from": "traits.email", "to": "email"}
 				],
 				"context_data_prefix": "rudder_",
-				"use_legacy_link_name": true,
-				"page_name_fallback_tostring": true,
 				"mobile_event_mapping": [
 					{"from": "screen.name", "to": "pageName"}
 				],
-				"send_false_values": true,
 				"e_var_mapping": [
 					{"from": "category", "to": "1"}
 				],
@@ -503,8 +496,7 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 				"use_native_sdk": {
 					"web": true,
 					"ios": true,
-					"android": true,
-					"react_native": false
+					"android": true
 				}
 			}`,
 			APIJSON: `{
@@ -532,12 +524,9 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 					{"from": "traits.email", "to": "email"}
 				],
 				"contextDataPrefix": "rudder_",
-				"useLegacyLinkName": true,
-				"pageNameFallbackTostring": true,
 				"mobileEventMapping": [
 					{"from": "screen.name", "to": "pageName"}
 				],
-				"sendFalseValues": true,
 				"eVarMapping": [
 					{"from": "category", "to": "1"}
 				],
@@ -582,8 +571,7 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 				"useNativeSDK": {
 					"web": true,
 					"ios": true,
-					"android": true,
-					"reactnative": false
+					"android": true
 				}
 			}`,
 		},
