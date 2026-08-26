@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: am-minimal
+spec:
+  id: am-minimal
+  display_name: E2E Amplitude Minimal Updated
+  type: am
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: rudderCliE2eAmKeyUpdated
