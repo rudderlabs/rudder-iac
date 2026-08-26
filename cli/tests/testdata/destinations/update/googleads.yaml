@@ -21,6 +21,8 @@ spec:
     default_page_conversion: checkout
     use_native_sdk:
       web: true
+    connection_mode:
+      web: device
     dynamic_remarketing:
       web: true
     page_load_conversions:

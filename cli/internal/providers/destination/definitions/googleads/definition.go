@@ -42,7 +42,7 @@ type conversionEntry struct {
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof=Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
 }
 
 type eventFilteringConfig struct {
@@ -59,33 +59,34 @@ type webBoolConfig struct {
 // schema.json.
 type googleAdsConfig struct {
 	ConversionID             string            `mapstructure:"conversion_id" validate:"required,dynamic_or_pattern=googleads_conversion_id"`
-	V2                       *bool             `mapstructure:"v2"`
-	AllowIdentify            *bool             `mapstructure:"allow_identify"`
+	V2                       *bool             `mapstructure:"v2" default:"true"`
+	AllowIdentify            *bool             `mapstructure:"allow_identify" default:"false"`
 	SDKBaseURL               string            `mapstructure:"sdk_base_url" validate:"omitempty,max=500,dynamic_or_pattern=googleads_sdk_base_url"`
 	EventMappingFromConfig   []eventMapping    `mapstructure:"event_mapping_from_config" validate:"omitempty,dive"`
 	PageLoadConversions      []conversionEntry `mapstructure:"page_load_conversions" validate:"omitempty,dive"`
 	ClickEventConversions    []conversionEntry `mapstructure:"click_event_conversions" validate:"omitempty,dive"`
 	DefaultPageConversion    string            `mapstructure:"default_page_conversion" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	DynamicRemarketing       *webBoolConfig    `mapstructure:"dynamic_remarketing"`
-	ConversionLinker         *bool             `mapstructure:"conversion_linker"`
-	SendPageView             *bool             `mapstructure:"send_page_view"`
-	DisableAdPersonalization *bool             `mapstructure:"disable_ad_personalization"`
-	EnableConversionLabel    *bool             `mapstructure:"enable_conversion_label"`
-	AllowEnhancedConversions *bool             `mapstructure:"allow_enhanced_conversions"`
+	ConversionLinker         *bool             `mapstructure:"conversion_linker" default:"true"`
+	SendPageView             *bool             `mapstructure:"send_page_view" default:"true"`
+	DisableAdPersonalization *bool             `mapstructure:"disable_ad_personalization" default:"false"`
+	EnableConversionLabel    *bool             `mapstructure:"enable_conversion_label" default:"false"`
+	AllowEnhancedConversions *bool             `mapstructure:"allow_enhanced_conversions" default:"false"`
 
 	// Conversion and dynamic-remarketing tracking each gate a filtering toggle,
 	// which in turn gates an event list. schema.json expresses that as nested
 	// allOf branches; the keys are modelled unconditionally because every one of
 	// them lives in destConfig.defaultConfig and would otherwise be erased.
-	TrackConversions                        *bool    `mapstructure:"track_conversions"`
-	EnableConversionEventsFiltering         *bool    `mapstructure:"enable_conversion_events_filtering"`
+	TrackConversions                        *bool    `mapstructure:"track_conversions" default:"true"`
+	EnableConversionEventsFiltering         *bool    `mapstructure:"enable_conversion_events_filtering" default:"false"`
 	EventsToTrackConversions                []string `mapstructure:"events_to_track_conversions" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	TrackDynamicRemarketing                 *bool    `mapstructure:"track_dynamic_remarketing"`
-	EnableDynamicRemarketingEventsFiltering *bool    `mapstructure:"enable_dynamic_remarketing_events_filtering"`
+	TrackDynamicRemarketing                 *bool    `mapstructure:"track_dynamic_remarketing" default:"false"`
+	EnableDynamicRemarketingEventsFiltering *bool    `mapstructure:"enable_dynamic_remarketing_events_filtering" default:"false"`
 	EventsToTrackDynamicRemarketing         []string `mapstructure:"events_to_track_dynamic_remarketing" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 
 	EventFiltering    *eventFilteringConfig    `mapstructure:"event_filtering"`
 	UseNativeSDK      *webBoolConfig           `mapstructure:"use_native_sdk"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -129,6 +130,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

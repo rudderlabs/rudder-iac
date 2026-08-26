@@ -1,11 +1,4 @@
 {
-  "id": "<ignored>",
-  "workspaceId": "<ignored>",
-  "version": "<ignored>",
-  "externalId": "googleads",
-  "name": "E2E Google Ads",
-  "type": "GOOGLEADS",
-  "enabled": true,
   "config": {
     "allowEnhancedConversions": false,
     "allowIdentify": false,
@@ -15,6 +8,9 @@
         "name": "Signup Click"
       }
     ],
+    "connectionMode": {
+      "web": "device"
+    },
     "conversionID": "AW-123456789",
     "conversionLinker": true,
     "defaultPageConversion": "home",
@@ -24,6 +20,7 @@
     },
     "enableConversionEventsFiltering": true,
     "enableConversionLabel": true,
+    "enableDynamicRemarketingEventsFiltering": false,
     "eventFilteringOption": "whitelistedEvents",
     "eventMappingFromConfig": [
       {
@@ -63,6 +60,13 @@
       }
     ]
   },
-  "createdAt": "<ignored>",
-  "updatedAt": "<ignored>"
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "googleads",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Ads",
+  "type": "GOOGLEADS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
 }

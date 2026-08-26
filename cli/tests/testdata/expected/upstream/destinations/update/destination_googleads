@@ -1,11 +1,4 @@
 {
-  "id": "<ignored>",
-  "workspaceId": "<ignored>",
-  "version": "<ignored>",
-  "externalId": "googleads",
-  "name": "E2E Google Ads Updated",
-  "type": "GOOGLEADS",
-  "enabled": true,
   "config": {
     "allowEnhancedConversions": true,
     "allowIdentify": true,
@@ -20,6 +13,9 @@
         "name": "Purchase Click"
       }
     ],
+    "connectionMode": {
+      "web": "device"
+    },
     "consentManagement": {
       "web": [
         {
@@ -43,6 +39,7 @@
     "dynamicRemarketing": {
       "web": true
     },
+    "enableConversionEventsFiltering": false,
     "enableConversionLabel": false,
     "enableDynamicRemarketingEventsFiltering": true,
     "eventFilteringOption": "blacklistedEvents",
@@ -72,6 +69,13 @@
     },
     "v2": false
   },
-  "createdAt": "<ignored>",
-  "updatedAt": "<ignored>"
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "googleads",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Ads Updated",
+  "type": "GOOGLEADS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
 }

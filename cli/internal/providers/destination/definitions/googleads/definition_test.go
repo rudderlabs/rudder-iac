@@ -298,6 +298,47 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 	})
 }
 
+func TestGoogleAdsDefaultsAndConnectionMode(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(googleads.NewDefinition()))
+	registered, err := registry.Get("googleads", 1)
+	require.NoError(t, err)
+
+	// schema.json defaults these; two of them (enable_*_events_filtering) are
+	// declared inside allOf branches, which the skill treats as belonging to
+	// the top-level key. eventFilteringOption is Discriminator-derived and has
+	// no local key to tag.
+	assert.Equal(t, map[string]any{
+		"v2":                                          true,
+		"allow_identify":                              false,
+		"conversion_linker":                           true,
+		"send_page_view":                              true,
+		"disable_ad_personalization":                  false,
+		"enable_conversion_label":                     false,
+		"allow_enhanced_conversions":                  false,
+		"track_conversions":                           true,
+		"track_dynamic_remarketing":                   false,
+		"enable_conversion_events_filtering":          false,
+		"enable_dynamic_remarketing_events_filtering": false,
+	}, registered.ApplyDefaults(map[string]any{}))
+
+	// db-config allows web device only.
+	assert.Empty(t, registered.ValidateConfig(map[string]any{
+		"conversion_id":   "AW-123456789",
+		"connection_mode": map[string]any{"web": "device"},
+	}))
+
+	errors := registered.ValidateConfig(map[string]any{
+		"conversion_id":   "AW-123456789",
+		"connection_mode": map[string]any{"web": "cloud"},
+	})
+	require.NotEmpty(t, errors)
+	assert.Equal(t, "/connection_mode/web", errors[0].Path)
+	assert.Contains(t, errors[0].Message, "must be one of")
+}
+
 func TestGoogleAdsConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
