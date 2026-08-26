@@ -16,6 +16,13 @@ type defaultsTestConfig struct {
 	BatchSize     int    `mapstructure:"batch_size" default:"100"`
 }
 
+type defaultJSONTestConfig struct {
+	APISecret  string `mapstructure:"api_secret" validate:"required"`
+	SDKVersion *struct {
+		Web int `mapstructure:"web"`
+	} `mapstructure:"sdk_version" default_json:"{\"web\":2}"`
+}
+
 func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinition {
 	t.Helper()
 
@@ -53,6 +60,19 @@ func TestConfigDefaultsReturnsCopy(t *testing.T) {
 		"debug_mode":   false,
 		"send_user_id": true,
 		"batch_size":   float64(100),
+	}, registered.ConfigDefaults())
+}
+
+func TestConfigDefaultsReturnsDeepCopy(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &defaultJSONTestConfig{} })
+
+	mutated := registered.ConfigDefaults()
+	mutated["sdk_version"].(map[string]any)["web"] = float64(1)
+
+	assert.Equal(t, map[string]any{
+		"sdk_version": map[string]any{"web": float64(2)},
 	}, registered.ConfigDefaults())
 }
 
@@ -103,6 +123,45 @@ func TestApplyDefaultsDoesNotMutateInput(t *testing.T) {
 	registered.ApplyDefaults(config)
 
 	assert.Equal(t, map[string]any{"api_secret": "secret"}, config)
+}
+
+func TestApplyDefaultsFillsJSONObject(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &defaultJSONTestConfig{} })
+
+	assert.Equal(t, map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": float64(2)},
+	}, registered.ApplyDefaults(map[string]any{"api_secret": "secret"}))
+}
+
+func TestApplyDefaultsKeepsExplicitJSONObject(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &defaultJSONTestConfig{} })
+
+	assert.Equal(t, map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": 1},
+	}, registered.ApplyDefaults(map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": 1},
+	}))
+}
+
+func TestApplyDefaultsMergesJSONObject(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &defaultJSONTestConfig{} })
+
+	assert.Equal(t, map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": float64(2)},
+	}, registered.ApplyDefaults(map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{},
+	}))
 }
 
 func TestApplyDefaultsWithoutDeclaredDefaults(t *testing.T) {
@@ -161,6 +220,33 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 				}{}
 			},
 			wantErr: `config key "batch_size": invalid integer default "1.5"`,
+		},
+		{
+			name: "default and default_json on the same field",
+			newConfig: func() any {
+				return &struct {
+					SDKVersion map[string]any `mapstructure:"sdk_version" default:"2" default_json:"{\"web\":2}"`
+				}{}
+			},
+			wantErr: `config key "sdk_version" cannot declare both default and default_json`,
+		},
+		{
+			name: "default_json on a required field",
+			newConfig: func() any {
+				return &struct {
+					SDKVersion map[string]any `mapstructure:"sdk_version" validate:"required" default_json:"{\"web\":2}"`
+				}{}
+			},
+			wantErr: `config key "sdk_version" is required and cannot declare a default_json`,
+		},
+		{
+			name: "invalid default_json",
+			newConfig: func() any {
+				return &struct {
+					SDKVersion map[string]any `mapstructure:"sdk_version" default_json:"{not-json}"`
+				}{}
+			},
+			wantErr: `config key "sdk_version": invalid default_json "{not-json}"`,
 		},
 		{
 			// Unimplemented: no upstream schema defaults these types.
