@@ -160,12 +160,16 @@ Mechanical rules:
   `ConsentManagement common.ConsentManagement` field tagged
   `mapstructure:"consent_management"` to the config struct. The registry
   rejects any other type for that field.
-- Model `connection_mode` as real config, same as consent management: append
-  `common.ConnectionModeProperties(sourceTypes)...` to properties and add a
-  `ConnectionMode common.ConnectionMode` field tagged
+- Model `connection_mode` as real config **when `schema.json` declares a
+  `connectionMode` property**: append `common.ConnectionModeProperties(sourceTypes)...`
+  to properties and add a `ConnectionMode common.ConnectionMode` field tagged
   `mapstructure:"connection_mode"`. Values are validated against this
   destination's own `ConnectionModes` map (see source-extraction.md and
   DEX-708's `ga4` pilot) — no per-destination enum to write.
+  When `schema.json` does not declare it, omit it — even though db-config's
+  `destConfig.<sourceType>` lists still name `connectionMode`, as they do for
+  every source type on `firebase`. Say so in a comment on the config struct,
+  or the omission reads as an oversight to the next reader.
 
 ### Step 5: Register in dependencies.go
 
@@ -332,6 +336,13 @@ Final response must include:
   the nested `eventChannelWebhook` are absent from terraform, and leaving them
   out made the backend drop `incomingWebhooksType` between create and update —
   visible as a create/update snapshot mismatch in the gated e2e.
+- **A key the backend rewrites on write must NOT be modelled**, even though it
+  is in `schema.json`. `oneTrustCookieCategories` and `ketchConsentPurposes` are
+  the worked example: the backend converts them into `consentManagement`
+  entries and never stores the originals, so a definition that models them
+  reads back a different key than it wrote and diffs on every plan. This is the
+  one exception to "model every schema.json key" — there is nothing to erase,
+  because the key was never stored. See DEX-696 Discrepancy 3.
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced

@@ -79,14 +79,20 @@ Notes:
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
 - `consentManagement` and `connectionMode` subtrees in schema.json are handled
-  by `common` — do not model either as an ad-hoc field; always append
-  `common.Properties(sourceTypes)` and `common.ConnectionModeProperties(sourceTypes)`
-  (see definition-anatomy.md), and add both `ConsentManagement` and
-  `ConnectionMode` fields to the config struct. `connection_mode` persists as
-  real, validated destination config (DEX-708's `ga4` pilot established the
-  pattern and it is being rolled out to existing destinations too). Neither
-  is ever wrapped in `Gated` — both stay handled by the source-type-keyed
-  block machinery, not the `Gated`-scan below.
+  by `common` — do not model either as an ad-hoc field. Append
+  `common.Properties(sourceTypes)` and add a `ConsentManagement` field when the
+  destination supports consent; append `common.ConnectionModeProperties(sourceTypes)`
+  and add a `ConnectionMode` field **only when schema.json declares a
+  `connectionMode` property** (see definition-anatomy.md). Where it does,
+  `connection_mode` persists as real, validated destination config — DEX-708's
+  `ga4` pilot established the pattern. Where it does not, omit it: db-config's
+  `destConfig.<sourceType>` lists name `connectionMode` for far more
+  destinations than schema.json constrains it for, so the destConfig lists are
+  not the signal. `firebase` is the worked example — every one of its seven
+  source types lists `connectionMode` in db-config, and schema.json declares no
+  such property, so it stays unmodelled. Neither key is ever wrapped in
+  `Gated` — both stay handled by the source-type-keyed block machinery, not the
+  `Gated`-scan below.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update
@@ -332,11 +338,14 @@ For each terraform-mapped property's API key:
    flag in the report.
 3. In no list at all → flag as discrepancy.
 
-Skip the boilerplate keys when doing this scan — `connectionMode`,
-`useNativeSDK`, `consentManagement`, `oneTrustCookieCategories`,
-`ketchConsentPurposes`, `eventFilteringOption`, `whitelistedEvents`,
-`blacklistedEvents` are handled by the `common` package and the
-source-type-keyed block machinery, never by `Gated`.
+Skip the boilerplate keys when doing this scan — none of them is ever wrapped
+in `Gated`, though for two different reasons. `connectionMode`, `useNativeSDK`,
+`consentManagement`, `eventFilteringOption`, `whitelistedEvents` and
+`blacklistedEvents` are handled by the `common` package, the converter and the
+source-type-keyed block machinery. `oneTrustCookieCategories` and
+`ketchConsentPurposes` are not handled at all — they are deliberately left
+unmodelled because the backend rewrites them into `consentManagement` on write
+(see the migration-on-write exception in SKILL.md).
 
 Example (Intercom): `mobileApiKeyAndroid` appears only in
 `destConfig.android` → `converter.Gated(converter.Simple("mobileApiKeyAndroid", "mobile_api_key_android"), common.SourceTypeAndroid)`.
