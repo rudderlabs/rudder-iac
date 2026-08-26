@@ -167,3 +167,9 @@
 - Facebook Pixel destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled RudderStack workspace is available for capture.
 - Do not add fixture-only Facebook Pixel YAML without matching live-verified upstream snapshots because `TestDestinationsApply` count-checks destination fixture/snapshot parity and can fail the entire destination suite before payload comparison.
 - Until live snapshots are available, rely on Facebook Pixel definition/unit coverage plus ungated compile/skip validation of `TestDestinationsApply` in autonomous environments.
+
+## DEX-518 — Qualtrics E2E Snapshot Deferral
+<!-- ticket:DEX-518 -->
+- Qualtrics destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available.
+- Do not add fixture-only Qualtrics YAML under `cli/tests/testdata/destinations/{create,update}` without matching live snapshots because `TestDestinationsApply` count-checks fixture/snapshot parity and unmatched fixtures can break the entire destination E2E suite.
+- Until live snapshots are available, rely on Qualtrics definition/unit coverage plus ungated compile/skip E2E validation in autonomous environments.

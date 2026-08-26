@@ -219,3 +219,9 @@
 - `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
 - Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
+
+## DEX-518 — Qualtrics Destination Onboarding
+<!-- ticket:DEX-518 -->
+- Qualtrics destination support is implemented as CLI local type `qualtrics`, API type `QUALTRICS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/qualtrics`.
+- `qualtrics` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Qualtrics source-type support is intentionally narrow: only `web`, `android`, and `ios` are supported, all in device-only connection mode.

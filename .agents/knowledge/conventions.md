@@ -165,3 +165,10 @@
 - HubSpot models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even if upstream schema/db-config still mention their API keys, because re-sending legacy consent keys can cause non-converging applies after backend migration to `consentManagement`.
 - HubSpot local config should omit stale legacy auth fields `authorization_type` and `api_key`; current schema requires `accessToken` and `apiVersion`, so local YAML should model `access_token` as the only secret and require it with `api_version`.
 - HubSpot `lookup_field` remains required only for `api_version: newApi`, and `use_native_sdk.web` stays source-gated to `web`.
+
+## DEX-518 — Qualtrics Config Surface
+<!-- ticket:DEX-518 -->
+- Qualtrics `SecretKeys` should stay empty because integrations-config `db-config.json` `secretKeys` is authoritative for CLI write-only secret handling; Terraform `Sensitive` metadata and UI secret metadata do not by themselves make `project_id` a CLI secret placeholder.
+- Qualtrics `project_id` remains a normal required local config field, not a write-only secret field.
+- Qualtrics local `enable_generic_page_title.web` maps to API `enableGenericPageTitle.web`; do not use Terraform's flat `enable_generic_page_title` shape as the CLI YAML shape.
+- Omit `connection_mode` from Qualtrics local config because `schema.json` does not declare `connectionMode`, even though db-config destination config lists it per source.
