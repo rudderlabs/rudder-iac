@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: linkedin-insight-tag
+spec:
+  id: linkedin-insight-tag
+  display_name: E2E LinkedIn Insight Tag
+  type: linkedin_insight_tag
+  enabled: true
+  definition_version: 1
+  config:
+    partner_id: rudderCliE2eFullPartner
+    event_to_conversion_id_map:
+      - from: Order Completed
+        to: "1234567"
+      - from: Product Viewed
+        to: "7654321"
+    use_native_sdk:
+      web: true
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed
