@@ -164,6 +164,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "MP",
 		Version:    1,
 		Properties: properties,
+		// Deliberately broader than db-config secretKeys, which lists only
+		// gdprApiToken. token is Sensitive in terraform, and serviceAccountSecret
+		// is a credential by name and function though neither source classifies it
+		// (terraform does not model it at all). The cost is accepted: the API
+		// returns both, so each reads back as an unknown secret and re-applies on
+		// every plan — the same trade recorded for customerio and posthog.
 		SecretKeys: []string{"token", "gdpr_api_token", "service_account_secret"},
 		NewConfig: func() any {
 			return &mpConfig{}
