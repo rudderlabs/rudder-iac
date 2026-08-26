@@ -42,6 +42,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/qualtrics"
@@ -385,6 +386,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(marketo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
+		}
+		if err := registry.Register(mp.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering mp destination definition: %w", err)
 		}
 		if err := registry.Register(postgres.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering postgres destination definition: %w", err)
