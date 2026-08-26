@@ -1,0 +1,79 @@
+{
+  "config": {
+    "animationDuration": {
+      "web": "400"
+    },
+    "apiKey": "rudderCliE2eApiKey",
+    "closeButtonColor": {
+      "web": "#ffffff"
+    },
+    "closeButtonPosition": {
+      "web": "top-right"
+    },
+    "closeButtonSize": {
+      "web": "16"
+    },
+    "connectionMode": {
+      "web": "device"
+    },
+    "dataCenter": "USDC",
+    "displayInterval": {
+      "web": "2500"
+    },
+    "eventFilteringOption": {
+      "web": "whitelistedEvents"
+    },
+    "getInAppEventMapping": {
+      "web": [
+        {
+          "eventName": "Product Viewed"
+        }
+      ]
+    },
+    "handleLinks": {
+      "web": "open-all-new-tab"
+    },
+    "initialisationIdentifier": {
+      "web": "email"
+    },
+    "isRequiredToDismissMessage": {
+      "web": false
+    },
+    "mapToSingleEvent": false,
+    "mergeNestedObjects": false,
+    "packageName": "com.rudderstack.e2e",
+    "preferUserId": false,
+    "purchaseEventMapping": {
+      "web": [
+        {
+          "eventName": "Order Completed"
+        }
+      ]
+    },
+    "sendTrackForInapp": {
+      "web": false
+    },
+    "trackAllPages": true,
+    "trackCategorisedPages": false,
+    "trackNamedPages": false,
+    "useNativeSDK": {
+      "web": true
+    },
+    "whitelistedEvents": {
+      "web": [
+        {
+          "eventName": "Order Completed"
+        }
+      ]
+    }
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "iterable",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Iterable",
+  "type": "ITERABLE",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

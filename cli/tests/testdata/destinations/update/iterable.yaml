@@ -1,0 +1,59 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: iterable
+spec:
+  id: iterable
+  display_name: E2E Iterable Updated
+  type: iterable
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: rudderCliE2eApiKeyUpdated
+    data_center: EUDC
+    package_name: com.rudderstack.e2e.updated
+    prefer_user_id: true
+    merge_nested_objects: true
+    map_to_single_event: true
+    track_all_pages: false
+    track_named_pages: true
+    track_categorized_pages: true
+    register_device_or_browser_api_key: "{{ .ITERABLE_REGISTER_DEVICE_API_KEY }}"
+    use_native_sdk:
+      web: true
+    connection_mode:
+      web: cloud
+    initialisation_identifier:
+      web: userId
+    get_in_app_event_mapping:
+      web:
+        - Product Viewed
+    purchase_event_mapping:
+      web:
+        - Page Viewed
+    send_track_for_inapp:
+      web: false
+    animation_duration:
+      web: "400"
+    display_interval:
+      web: "2500"
+    handle_links:
+      web: external-new-tab
+    close_button_position:
+      web: top-left
+    close_button_color:
+      web: "#ffffff"
+    close_button_size:
+      web: "16"
+    is_required_to_dismiss_message:
+      web: false
+    event_filtering_option:
+      web: blacklistedEvents
+    blacklisted_events:
+      web:
+        - Page Viewed
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics
