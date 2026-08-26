@@ -9,5 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    use_native_sdk:
-      android: true
+    event_filtering:
+      blacklist:
+        - Application Backgrounded
+        - Application Updated

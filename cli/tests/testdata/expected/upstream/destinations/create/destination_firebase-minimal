@@ -7,7 +7,12 @@
   "type": "FIREBASE",
   "enabled": true,
   "config": {
-    "eventFilteringOption": "disable"
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

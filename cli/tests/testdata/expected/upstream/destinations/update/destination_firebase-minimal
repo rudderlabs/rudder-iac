@@ -7,9 +7,15 @@
   "type": "FIREBASE",
   "enabled": true,
   "config": {
-    "useNativeSDK": {
-      "android": true
-    }
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Backgrounded"
+      },
+      {
+        "eventName": "Application Updated"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

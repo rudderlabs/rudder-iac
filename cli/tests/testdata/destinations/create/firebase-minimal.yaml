@@ -8,4 +8,7 @@ spec:
   type: firebase
   enabled: true
   definition_version: 1
-  config: {}
+  config:
+    event_filtering:
+      blacklist:
+        - Application Opened
