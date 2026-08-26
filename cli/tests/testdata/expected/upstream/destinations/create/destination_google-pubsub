@@ -7,6 +7,10 @@
   "type": "GOOGLEPUBSUB",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "projectId": "rudder-cli-e2e",
     "eventToTopicMap": [
       {

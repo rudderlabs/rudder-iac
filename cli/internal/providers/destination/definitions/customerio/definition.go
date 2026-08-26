@@ -45,6 +45,7 @@ type customerioConfig struct {
 	BackgroundQueueMinTasks     *androidString           `mapstructure:"background_queue_min_number_of_tasks"`
 	BackgroundQueueSecondsDelay *androidString           `mapstructure:"background_queue_seconds_delay"`
 	EventFiltering              *eventFiltering          `mapstructure:"event_filtering"`
+	ConnectionMode              common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement           common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -113,6 +114,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

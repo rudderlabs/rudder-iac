@@ -22,3 +22,6 @@ spec:
         - provider: oneTrust
           consents:
             - analytics
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

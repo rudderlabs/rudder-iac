@@ -1,5 +1,9 @@
 {
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "apiKeyName": "X-Api-Key",
     "apiUrl": "https://webhooks.example.com/rudder/events",
     "auth": "apiKeyAuth",

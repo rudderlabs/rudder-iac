@@ -51,6 +51,7 @@ type marketoConfig struct {
 	RudderEventsMapping       []rudderEventMapping     `mapstructure:"rudder_events_mapping" validate:"omitempty,dive"`
 	LeadTraitMapping          []fieldMapping           `mapstructure:"lead_trait_mapping" validate:"omitempty,dive"`
 	CustomActivityPropertyMap []fieldMapping           `mapstructure:"custom_activity_property_map" validate:"omitempty,dive"`
+	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -91,6 +92,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

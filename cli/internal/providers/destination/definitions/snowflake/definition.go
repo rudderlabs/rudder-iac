@@ -134,6 +134,7 @@ type snowflakeConfig struct {
 	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
 	SASToken      string `mapstructure:"sas_token" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens true"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -179,6 +180,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useSASTokens", "use_sas_tokens"),
 		converter.Simple("sasToken", "sas_token"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

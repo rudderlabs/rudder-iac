@@ -7,6 +7,10 @@
   "type": "ACTIVE_CAMPAIGN",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "apiUrl": "https://rudder-cli-e2e-updated.api-us2.com",
     "actid": "67890",
     "useNativeSDK": {

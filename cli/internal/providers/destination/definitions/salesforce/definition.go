@@ -49,6 +49,7 @@ type salesforceConfig struct {
 	MapProperties      *bool                    `mapstructure:"map_properties"`
 	Sandbox            *bool                    `mapstructure:"sandbox"`
 	UseContactID       *bool                    `mapstructure:"use_contact_id"`
+	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -62,6 +63,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("sandbox", "sandbox"),
 		converter.Simple("useContactId", "use_contact_id"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

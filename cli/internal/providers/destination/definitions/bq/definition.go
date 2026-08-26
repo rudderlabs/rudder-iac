@@ -88,6 +88,7 @@ type bqConfig struct {
 	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files"`
 	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers"`
 	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits"`
+	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -114,6 +115,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("underscoreDivideNumbers", "underscore_divide_numbers"),
 		converter.Simple("allowUsersContextTraits", "allow_users_context_traits"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

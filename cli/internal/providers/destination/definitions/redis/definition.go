@@ -63,6 +63,7 @@ type redisConfig struct {
 	// map it. Modelled anyway: an unmodelled key is dropped from the update
 	// payload and erased upstream on the first apply.
 	UseJSONModule     *bool                    `mapstructure:"use_json_module"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -79,6 +80,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("skipVerify", "skip_verify"),
 		converter.Simple("useJSONModule", "use_json_module"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

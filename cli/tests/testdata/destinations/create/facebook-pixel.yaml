@@ -38,3 +38,6 @@ spec:
       web:
         - from: Product Viewed
           to: "9876543210"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

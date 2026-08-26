@@ -41,6 +41,7 @@ var connectionModes = map[string][]string{
 // half and the shared pattern covers the rest.
 type statsigConfig struct {
 	SecretKey         string                   `mapstructure:"secret_key" validate:"required,dynamic_or_pattern=single_line_200"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -49,6 +50,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("secretKey", "secret_key"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

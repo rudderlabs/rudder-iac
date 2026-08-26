@@ -65,6 +65,7 @@ type slackConfig struct {
 	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
 	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	ConnectionMode           common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement        common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -101,6 +102,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.ArrayWithStrings("whitelistedTraitsSettings", "trait", "whitelisted_trait_settings"),
 		converter.ArrayWithStrings("denyListOfEvents", "eventName", "deny_list_of_events"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

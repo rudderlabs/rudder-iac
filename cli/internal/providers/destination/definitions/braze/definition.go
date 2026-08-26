@@ -75,6 +75,7 @@ type brazeConfig struct {
 	AndroidAPIKey                        string                   `mapstructure:"android_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	IOSAPIKey                            string                   `mapstructure:"ios_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	WebAPIKey                            string                   `mapstructure:"web_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	ConnectionMode                       common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement                    common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -123,6 +124,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("iOSApiKey", "ios_api_key"),
 		converter.Simple("webApiKey", "web_api_key"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

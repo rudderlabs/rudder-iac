@@ -49,6 +49,7 @@ type zendeskConfig struct {
 	SendGroupCallsWithoutUserID *bool                    `mapstructure:"send_group_calls_without_user_id"`
 	RemoveUsersFromOrganization *bool                    `mapstructure:"remove_users_from_organization"`
 	SearchByExternalID          *bool                    `mapstructure:"search_by_external_id"`
+	ConnectionMode              common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement           common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -64,6 +65,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("removeUsersFromOrganization", "remove_users_from_organization"),
 		converter.Simple("searchByExternalId", "search_by_external_id"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

@@ -12,3 +12,6 @@ spec:
     api_key: "{{ .ATTENTIVE_TAG_API_KEY }}"
     sign_up_source_id: "654321"
     enable_new_identify_flow: true
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

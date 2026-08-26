@@ -26,3 +26,6 @@ spec:
             - analytics
       android_kotlin:
         - provider: ketch
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

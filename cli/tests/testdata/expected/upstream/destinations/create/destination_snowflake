@@ -7,6 +7,10 @@
   "type": "SNOWFLAKE",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "account": "rudder-cli-e2e.us-east-1",
     "allowUsersContextTraits": false,
     "database": "RUDDER_E2E",

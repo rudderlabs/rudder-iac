@@ -20,3 +20,6 @@ spec:
     enable_sse: true
     skip_tracks_table: true
     skip_users_table: true
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

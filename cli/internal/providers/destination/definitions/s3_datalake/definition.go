@@ -100,6 +100,7 @@ type s3DatalakeConfig struct {
 	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers"`
 	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files"`
 	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits"`
+	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -126,6 +127,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("cleanupObjectStorageFiles", "cleanup_object_storage_files"),
 		converter.Simple("allowUsersContextTraits", "allow_users_context_traits"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

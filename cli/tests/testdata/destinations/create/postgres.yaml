@@ -21,3 +21,6 @@ spec:
     skip_tracks_table: false
     skip_users_table: false
     prefer_append: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud
