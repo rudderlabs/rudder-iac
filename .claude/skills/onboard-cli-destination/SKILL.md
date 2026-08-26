@@ -160,12 +160,16 @@ Mechanical rules:
   `ConsentManagement common.ConsentManagement` field tagged
   `mapstructure:"consent_management"` to the config struct. The registry
   rejects any other type for that field.
-- Model `connection_mode` as real config, same as consent management: append
-  `common.ConnectionModeProperties(sourceTypes)...` to properties and add a
-  `ConnectionMode common.ConnectionMode` field tagged
+- Model `connection_mode` as real config **when `schema.json` declares a
+  `connectionMode` property**: append `common.ConnectionModeProperties(sourceTypes)...`
+  to properties and add a `ConnectionMode common.ConnectionMode` field tagged
   `mapstructure:"connection_mode"`. Values are validated against this
   destination's own `ConnectionModes` map (see source-extraction.md and
   DEX-708's `ga4` pilot) — no per-destination enum to write.
+  When `schema.json` does not declare it, omit it — even though db-config's
+  `destConfig.<sourceType>` lists still name `connectionMode`, as they do for
+  every source type on `firebase`. Say so in a comment on the config struct,
+  or the omission reads as an oversight to the next reader.
 
 ### Step 5: Register in dependencies.go
 
