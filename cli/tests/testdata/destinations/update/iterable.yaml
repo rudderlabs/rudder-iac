@@ -21,6 +21,8 @@ spec:
     register_device_or_browser_api_key: "{{ .ITERABLE_REGISTER_DEVICE_API_KEY }}"
     use_native_sdk:
       web: true
+    connection_mode:
+      web: cloud
     initialisation_identifier:
       web: userId
     get_in_app_event_mapping:

@@ -70,14 +70,14 @@ type webCloseButtonPosition struct {
 type iterableConfig struct {
 	APIKey             string `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
 	DataCenter         string `mapstructure:"data_center" validate:"required,dynamic_or_oneof=USDC EUDC"`
-	PreferUserID       *bool  `mapstructure:"prefer_user_id"`
-	MergeNestedObjects *bool  `mapstructure:"merge_nested_objects"`
+	PreferUserID       *bool  `mapstructure:"prefer_user_id" default:"true"`
+	MergeNestedObjects *bool  `mapstructure:"merge_nested_objects" default:"true"`
 	// db-config lists registerDeviceOrBrowserApiKey as the only secretKey.
 	RegisterDeviceOrBrowserAPIKey string                   `mapstructure:"register_device_or_browser_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	MapToSingleEvent              *bool                    `mapstructure:"map_to_single_event"`
-	TrackAllPages                 *bool                    `mapstructure:"track_all_pages"`
-	TrackCategorizedPages         *bool                    `mapstructure:"track_categorized_pages"`
-	TrackNamedPages               *bool                    `mapstructure:"track_named_pages"`
+	MapToSingleEvent              *bool                    `mapstructure:"map_to_single_event" default:"true"`
+	TrackAllPages                 *bool                    `mapstructure:"track_all_pages" default:"false"`
+	TrackCategorizedPages         *bool                    `mapstructure:"track_categorized_pages" default:"true"`
+	TrackNamedPages               *bool                    `mapstructure:"track_named_pages" default:"true"`
 	UseNativeSDK                  webBool                  `mapstructure:"use_native_sdk"`
 	InitialisationIdentifier      webInitIdentifier        `mapstructure:"initialisation_identifier"`
 	GetInAppEventMapping          webStringList            `mapstructure:"get_in_app_event_mapping"`
@@ -102,6 +102,7 @@ type iterableConfig struct {
 	EventFilteringOption          webEventFilteringOption  `mapstructure:"event_filtering_option"`
 	WhitelistedEvents             webStringList            `mapstructure:"whitelisted_events"`
 	BlacklistedEvents             webStringList            `mapstructure:"blacklisted_events"`
+	ConnectionMode                common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement             common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -209,6 +210,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

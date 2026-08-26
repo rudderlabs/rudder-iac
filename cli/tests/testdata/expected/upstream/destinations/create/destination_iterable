@@ -1,11 +1,4 @@
 {
-  "id": "<ignored>",
-  "workspaceId": "<ignored>",
-  "version": "<ignored>",
-  "externalId": "iterable",
-  "name": "E2E Iterable",
-  "type": "ITERABLE",
-  "enabled": true,
   "config": {
     "animationDuration": {
       "web": "400"
@@ -19,6 +12,9 @@
     },
     "closeButtonSize": {
       "web": "16"
+    },
+    "connectionMode": {
+      "web": "device"
     },
     "dataCenter": "USDC",
     "displayInterval": {
@@ -71,6 +67,13 @@
       ]
     }
   },
-  "createdAt": "<ignored>",
-  "updatedAt": "<ignored>"
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "iterable",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Iterable",
+  "type": "ITERABLE",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
 }
