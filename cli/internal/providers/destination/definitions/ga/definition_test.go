@@ -173,18 +173,26 @@ func TestGoogleAnalyticsConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("connection_mode rejected as unknown key", func(t *testing.T) {
+	// schema.json declares connectionMode for this destination, so it is real
+	// config: db-config allows web cloud+device and everything else cloud only.
+	t.Run("connection_mode value validated per source type", func(t *testing.T) {
 		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"tracking_id":     "UA-123456-1",
+			"connection_mode": map[string]any{"web": "device"},
+		}))
 
 		errors := registered.ValidateConfig(map[string]any{
 			"tracking_id": "UA-123456-1",
 			"connection_mode": map[string]any{
-				"web": "device",
+				"web":     "device",
+				"android": "device", // android is cloud-only
 			},
 		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/android", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
 	t.Run("string fields reject values over maximum length", func(t *testing.T) {

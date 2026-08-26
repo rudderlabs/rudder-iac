@@ -1,24 +1,24 @@
 {
-  "id": "<ignored>",
-  "workspaceId": "<ignored>",
-  "version": "<ignored>",
-  "externalId": "ga-minimal",
-  "name": "E2E Google Analytics Minimal",
-  "type": "GA",
-  "enabled": true,
   "config": {
-    "trackingID": "UA-111111-1",
-    "doubleClick": false,
-    "enhancedLinkAttribution": false,
-    "includeSearch": false,
-    "enableServerSideIdentify": false,
-    "disableMd5": false,
     "anonymizeIp": false,
+    "disableMd5": false,
+    "doubleClick": false,
+    "enableServerSideIdentify": false,
     "enhancedEcommerce": false,
+    "enhancedLinkAttribution": false,
+    "eventFilteringOption": "disable",
+    "includeSearch": false,
     "nonInteraction": false,
     "sendUserId": false,
-    "eventFilteringOption": "disable"
+    "trackingID": "UA-111111-1"
   },
-  "createdAt": "<ignored>",
-  "updatedAt": "<ignored>"
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "ga-minimal",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Analytics Minimal",
+  "type": "GA",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
 }

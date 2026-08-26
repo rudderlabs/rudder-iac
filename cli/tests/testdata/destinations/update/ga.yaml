@@ -24,6 +24,8 @@ spec:
       event_action: User Enriched
     use_native_sdk:
       web: true
+    connection_mode:
+      web: cloud
     track_categorized_pages:
       web: true
     track_named_pages:

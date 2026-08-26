@@ -77,15 +77,15 @@ type serverSideIdentify struct {
 type googleAnalyticsConfig struct {
 	TrackingID                  string                   `mapstructure:"tracking_id" validate:"required,dynamic_or_pattern=google_analytics_tracking_id"`
 	RudderDeleteAccountID       string                   `mapstructure:"rudder_delete_account_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	DoubleClick                 *bool                    `mapstructure:"double_click"`
-	EnhancedLinkAttribution     *bool                    `mapstructure:"enhanced_link_attribution"`
-	IncludeSearch               *bool                    `mapstructure:"include_search"`
+	DoubleClick                 *bool                    `mapstructure:"double_click" default:"false"`
+	EnhancedLinkAttribution     *bool                    `mapstructure:"enhanced_link_attribution" default:"false"`
+	IncludeSearch               *bool                    `mapstructure:"include_search" default:"false"`
 	ServerSideIdentify          *serverSideIdentify      `mapstructure:"server_side_identify"`
-	DisableMD5                  *bool                    `mapstructure:"disable_md5"`
-	AnonymizeIP                 *bool                    `mapstructure:"anonymize_ip"`
-	EnhancedEcommerce           *bool                    `mapstructure:"enhanced_ecommerce"`
-	NonInteraction              *bool                    `mapstructure:"non_interaction"`
-	SendUserID                  *bool                    `mapstructure:"send_user_id"`
+	DisableMD5                  *bool                    `mapstructure:"disable_md5" default:"false"`
+	AnonymizeIP                 *bool                    `mapstructure:"anonymize_ip" default:"false"`
+	EnhancedEcommerce           *bool                    `mapstructure:"enhanced_ecommerce" default:"false"`
+	NonInteraction              *bool                    `mapstructure:"non_interaction" default:"false"`
+	SendUserID                  *bool                    `mapstructure:"send_user_id" default:"false"`
 	EventFiltering              *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                *useNativeSDK            `mapstructure:"use_native_sdk"`
 	TrackCategorizedPages       *webBool                 `mapstructure:"track_categorized_pages"`
@@ -103,6 +103,7 @@ type googleAnalyticsConfig struct {
 	Metrics                     []fieldMapping           `mapstructure:"metrics" validate:"omitempty,dive"`
 	ContentGroupings            []fieldMapping           `mapstructure:"content_groupings" validate:"omitempty,dive"`
 	CustomMappings              []fieldMapping           `mapstructure:"custom_mappings" validate:"omitempty,dive"`
+	ConnectionMode              common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement           common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -192,6 +193,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
