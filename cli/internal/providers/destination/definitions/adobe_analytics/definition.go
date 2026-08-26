@@ -35,23 +35,23 @@ var connectionModes = map[string][]string{
 }
 
 type mappingEntry struct {
-	From string `mapstructure:"from" validate:"required,max=100"`
-	To   string `mapstructure:"to" validate:"required,max=100"`
+	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"required,dynamic_or_pattern=single_line_100"`
 }
 
 type eventToTypeEntry struct {
-	From string `mapstructure:"from" validate:"required,max=100"`
-	To   string `mapstructure:"to" validate:"required,dynamic_or_oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
+	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"required,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
 }
 
 type delimiterEntry struct {
-	From string `mapstructure:"from" validate:"required,max=100"`
+	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
 	To   string `mapstructure:"to" validate:"required,pattern=adobe_analytics_delimiter"`
 }
 
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,dive,max=100"`
-	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,dive,max=100"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 type useNativeSDK struct {
@@ -67,24 +67,22 @@ type useNativeSDK struct {
 type adobeAnalyticsConfig struct {
 	TrackingServerUrl             string                   `mapstructure:"tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,min=1,max=300"`
-	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat"`
+	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,dynamic_or_pattern=single_line_300"`
+	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat" default:"true"`
 	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	UseUTF8Charset                *bool                    `mapstructure:"use_utf8_charset"`
-	UseSecureServerSide           *bool                    `mapstructure:"use_secure_server_side"`
 	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url"`
 	EventsToTypes                 []eventToTypeEntry       `mapstructure:"events_to_types" validate:"omitempty,dive"`
-	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,max=100"`
-	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id"`
-	TimestampOption               string                   `mapstructure:"timestamp_option" validate:"omitempty,dynamic_or_oneof=disabled hybrid optional enabled"`
-	TimestampOptionalReporting    *bool                    `mapstructure:"timestamp_optional_reporting"`
-	NoFallbackVisitorID           *bool                    `mapstructure:"no_fallback_visitor_id"`
-	PreferVisitorID               *bool                    `mapstructure:"prefer_visitor_id"`
+	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id" default:"true"`
+	TimestampOption               string                   `mapstructure:"timestamp_option" validate:"omitempty,oneof=disabled hybrid optional enabled" default:"disabled"`
+	TimestampOptionalReporting    *bool                    `mapstructure:"timestamp_optional_reporting" default:"false"`
+	NoFallbackVisitorID           *bool                    `mapstructure:"no_fallback_visitor_id" default:"false"`
+	PreferVisitorID               *bool                    `mapstructure:"prefer_visitor_id" default:"false"`
 	RudderEventsToAdobeEvents     []mappingEntry           `mapstructure:"rudder_events_to_adobe_events" validate:"omitempty,dive"`
-	TrackPageName                 *bool                    `mapstructure:"track_page_name"`
+	TrackPageName                 *bool                    `mapstructure:"track_page_name" default:"true"`
 	ContextDataMapping            []mappingEntry           `mapstructure:"context_data_mapping" validate:"omitempty,dive"`
-	ContextDataPrefix             string                   `mapstructure:"context_data_prefix" validate:"omitempty,max=100"`
+	ContextDataPrefix             string                   `mapstructure:"context_data_prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	UseLegacyLinkName             *bool                    `mapstructure:"use_legacy_link_name"`
 	PageNameFallbackToString      *bool                    `mapstructure:"page_name_fallback_tostring"`
 	MobileEventMapping            []mappingEntry           `mapstructure:"mobile_event_mapping" validate:"omitempty,dive"`
@@ -96,33 +94,32 @@ type adobeAnalyticsConfig struct {
 	CustomPropsMapping            []mappingEntry           `mapstructure:"custom_props_mapping" validate:"omitempty,dive"`
 	PropsDelimiter                []delimiterEntry         `mapstructure:"props_delimiter" validate:"omitempty,dive"`
 	EventMerchEventToAdobeEvent   []mappingEntry           `mapstructure:"event_merch_event_to_adobe_event" validate:"omitempty,dive"`
-	EventMerchProperties          []string                 `mapstructure:"event_merch_properties" validate:"omitempty,dive,max=100"`
+	EventMerchProperties          []string                 `mapstructure:"event_merch_properties" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	ProductMerchEventToAdobeEvent []mappingEntry           `mapstructure:"product_merch_event_to_adobe_event" validate:"omitempty,dive"`
-	ProductMerchProperties        []string                 `mapstructure:"product_merch_properties" validate:"omitempty,dive,max=100"`
+	ProductMerchProperties        []string                 `mapstructure:"product_merch_properties" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	ProductMerchEvarsMap          []mappingEntry           `mapstructure:"product_merch_evars_map" validate:"omitempty,dive"`
-	ProductIdentifier             string                   `mapstructure:"product_identifier" validate:"omitempty,dynamic_or_oneof=name id sku"`
+	ProductIdentifier             string                   `mapstructure:"product_identifier" validate:"omitempty,oneof=name id sku" default:"name"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                  *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode                common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement             common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 // NewDefinition returns the Adobe Analytics destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
-		converter.Simple("trackingServerUrl", "tracking_server_url", converter.SkipZeroValue),
-		converter.Simple("trackingServerSecureUrl", "tracking_server_secure_url", converter.SkipZeroValue),
+		converter.Simple("trackingServerUrl", "tracking_server_url"),
+		converter.Simple("trackingServerSecureUrl", "tracking_server_secure_url"),
 		converter.Simple("reportSuiteIds", "report_suite_ids"),
 		converter.Simple("sslHeartbeat", "ssl_heartbeat"),
-		converter.Simple("heartbeatTrackingServerUrl", "heartbeat_tracking_server_url", converter.SkipZeroValue),
-		converter.Simple("useUtf8Charset", "use_utf8_charset"),
-		converter.Simple("useSecureServerSide", "use_secure_server_side"),
-		converter.Simple("proxyNormalUrl", "proxy_normal_url", converter.SkipZeroValue),
-		converter.Simple("proxyHeartbeatUrl", "proxy_heartbeat_url", converter.SkipZeroValue),
+		converter.Simple("heartbeatTrackingServerUrl", "heartbeat_tracking_server_url"),
+		converter.Simple("proxyNormalUrl", "proxy_normal_url"),
+		converter.Simple("proxyHeartbeatUrl", "proxy_heartbeat_url"),
 		converter.ArrayWithObjects("eventsToTypes", "events_to_types", map[string]any{
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.Simple("marketingCloudOrgId", "marketing_cloud_org_id", converter.SkipZeroValue),
+		converter.Simple("marketingCloudOrgId", "marketing_cloud_org_id"),
 		converter.Simple("dropVisitorId", "drop_visitor_id"),
 		converter.Simple("timestampOption", "timestamp_option"),
 		converter.Simple("timestampOptionalReporting", "timestamp_optional_reporting"),
@@ -137,7 +134,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.Simple("contextDataPrefix", "context_data_prefix", converter.SkipZeroValue),
+		converter.Simple("contextDataPrefix", "context_data_prefix"),
 		converter.Simple("useLegacyLinkName", "use_legacy_link_name"),
 		converter.Simple("pageNameFallbackTostring", "page_name_fallback_tostring"),
 		converter.ArrayWithObjects("mobileEventMapping", "mobile_event_mapping", map[string]any{
@@ -195,6 +192,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

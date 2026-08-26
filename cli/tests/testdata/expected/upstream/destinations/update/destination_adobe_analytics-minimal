@@ -1,0 +1,22 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "adobe-analytics-minimal",
+  "name": "E2E Adobe Analytics Minimal Updated",
+  "type": "ADOBE_ANALYTICS",
+  "enabled": true,
+  "config": {
+    "dropVisitorId": true,
+    "noFallbackVisitorId": false,
+    "preferVisitorId": false,
+    "productIdentifier": "name",
+    "reportSuiteIds": "rudderCliE2eMinimalRsidUpdated",
+    "sslHeartbeat": true,
+    "timestampOption": "disabled",
+    "timestampOptionalReporting": false,
+    "trackPageName": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -55,6 +55,20 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	assert.Empty(t, registered.GatedKeyPaths())
 
+	// schema.json defaults these; the backend injects them on create but not on
+	// update, so declaring them keeps a spec that omits them from diffing
+	// forever against the stored config.
+	assert.Equal(t, map[string]any{
+		"ssl_heartbeat":                true,
+		"drop_visitor_id":              true,
+		"track_page_name":              true,
+		"timestamp_optional_reporting": false,
+		"no_fallback_visitor_id":       false,
+		"prefer_visitor_id":            false,
+		"timestamp_option":             "disabled",
+		"product_identifier":           "name",
+	}, registered.ApplyDefaults(map[string]any{}))
+
 	byAPI, err := registry.GetByAPIType("ADOBE_ANALYTICS", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
@@ -92,8 +106,6 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 			"report_suite_ids":              "rsid1,rsid2",
 			"ssl_heartbeat":                 true,
 			"heartbeat_tracking_server_url": "heartbeat.example.com",
-			"use_utf8_charset":              true,
-			"use_secure_server_side":        true,
 			"proxy_normal_url":              "cdn.example.com/aa.js",
 			"proxy_heartbeat_url":           "cdn.example.com/hb.js",
 			"events_to_types": []any{
@@ -298,6 +310,53 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "100")
 	})
 
+	// db-config lists connection modes for every supported source type.
+	t.Run("connection_mode value validated per source type", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"report_suite_ids": "rsid1",
+			"connection_mode": map[string]any{
+				"web":   "device", // web allows cloud + device
+				"unity": "device", // unity is cloud-only
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// Terraform maps useUtf8Charset and useSecureServerSide, but neither appears
+	// in schema.json or db-config defaultConfig, so they are not part of the
+	// config surface.
+	t.Run("terraform only keys rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, key := range []string{"use_utf8_charset", "use_secure_server_side"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				key:                true,
+			})
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "unknown config field")
+		}
+	})
+
+	// schema.json states these as exact-match enums with no template branch.
+	t.Run("strict enums reject templates", func(t *testing.T) {
+		t.Parallel()
+		for field, value := range map[string]string{
+			"timestamp_option":   "{{ config.ts || enabled }}",
+			"product_identifier": "{{ config.pid || name }}",
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field:              value,
+			})
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path, field)
+		}
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
@@ -357,6 +416,25 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
+			Name: "connection mode across source types",
+			LocalJSON: `{
+				"report_suite_ids": "rsid1",
+				"connection_mode": {
+					"web": "device",
+					"android_kotlin": "cloud",
+					"react_native": "cloud"
+				}
+			}`,
+			APIJSON: `{
+				"reportSuiteIds": "rsid1",
+				"connectionMode": {
+					"web": "device",
+					"androidKotlin": "cloud",
+					"reactnative": "cloud"
+				}
+			}`,
+		},
+		{
 			Name: "full TF fields with whitelist",
 			LocalJSON: `{
 				"tracking_server_url": "metrics.example.com",
@@ -364,8 +442,6 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 				"report_suite_ids": "rsid1,rsid2",
 				"ssl_heartbeat": true,
 				"heartbeat_tracking_server_url": "heartbeat.example.com",
-				"use_utf8_charset": true,
-				"use_secure_server_side": true,
 				"proxy_normal_url": "cdn.example.com/aa.js",
 				"proxy_heartbeat_url": "cdn.example.com/hb.js",
 				"events_to_types": [
@@ -437,8 +513,6 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 				"reportSuiteIds": "rsid1,rsid2",
 				"sslHeartbeat": true,
 				"heartbeatTrackingServerUrl": "heartbeat.example.com",
-				"useUtf8Charset": true,
-				"useSecureServerSide": true,
 				"proxyNormalUrl": "cdn.example.com/aa.js",
 				"proxyHeartbeatUrl": "cdn.example.com/hb.js",
 				"eventsToTypes": [
