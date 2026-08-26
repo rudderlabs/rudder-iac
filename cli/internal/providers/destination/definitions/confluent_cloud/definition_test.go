@@ -29,7 +29,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
 		"unity", "cloud", "react_native",
-		"flutter", "cordova"}
+		"flutter", "cordova",
+	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {

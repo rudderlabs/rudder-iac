@@ -76,7 +76,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "cloud", "react_native", "flutter", "cordova"}
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
+	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {

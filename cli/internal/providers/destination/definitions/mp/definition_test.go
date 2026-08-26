@@ -28,7 +28,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova"}
+		"cloud", "react_native", "flutter", "cordova",
+	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	expectedModes := map[string][]string{
