@@ -34,11 +34,21 @@ Current mapping (local → API):
   Upstream values with no row here (e.g. `tiktokAds`, `singer-*`): drop them
   and flag in the final report — `registry.Register` fails on any local source
   type missing from the mapping, so guessing breaks the build anyway.
-- The CLI intentionally supports a subset: follow the S3 precedent of
-  restricting to source types the CLI event-stream provider owns (S3 dropped
-  `amp`, `shopify`, `warehouse` even though upstream lists them). When unsure
-  whether to include a mapped-but-unusual type, include what S3 includes and
-  flag the rest.
+- The CLI intentionally supports a subset. Never declare `amp`, `shopify`,
+  `warehouse` or `cloud_source`, even when upstream lists them — the CLI cannot
+  produce those tokens, so a destination declaring one can never have a matching
+  connection validated. `SourceSpec`
+  (`cli/internal/providers/event-stream/source/model.go`) carries no category
+  field and constrains `type` to the SDK definitions, and the sole
+  `common.SourceTypeToken` call site
+  (`event-stream/rules/connection/connection_semantic_valid.go`) passes an empty
+  category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` and
+  `SourceCategoryWarehouse` → `warehouse` branches dead. What remains is the ten
+  types S3 declares: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`,
+  `unity`, `cloud`, `react_native`, `flutter`, `cordova`. `customerio_audience`
+  is the sole exception, since `warehouse` is its only source type (DEX-720).
+  When unsure about another mapped-but-unusual type, include what S3 includes
+  and flag the rest.
 - `ConnectionModes` must be keyed by the same local types and cover every
   entry in `SourceTypes` — registration errors otherwise. Copy the modes per
   source type from db-config `supportedConnectionModes` (values are `cloud`,

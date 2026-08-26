@@ -140,8 +140,10 @@ Mechanical rules:
 - `db-config.json` `supportedSourceTypes` / `supportedConnectionModes` →
   `SourceTypes` / `ConnectionModes`, translated to CLI-local source types via
   [reference/source-type-mapping.md](reference/source-type-mapping.md).
-  Unmapped upstream types (e.g. `amp`, `shopify`, `warehouse` when not
-  CLI-owned): drop and flag in the final report — never guess.
+  Drop and flag in the final report — never guess — both upstream types with no
+  row in that mapping (e.g. `tiktokAds`, `singer-*`) and the never-declared set
+  (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
+  reach.
 - `db-config.json` `supportedSourcesValidation` (when present and non-empty) →
   `SupportedSourcesValidation`: keys translated to CLI-local source types via
   the same mapping, values translated from API camelCase field names to
