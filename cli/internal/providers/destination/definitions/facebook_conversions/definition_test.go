@@ -28,9 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
-	}
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "cloud", "react_native", "flutter", "cordova"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {
@@ -347,8 +345,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"access_token": "access-token-1",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
@@ -356,8 +353,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"accessToken": "access-token-1",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},

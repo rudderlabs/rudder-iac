@@ -71,9 +71,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
-	}
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "cloud", "react_native", "flutter", "cordova"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {
@@ -312,12 +310,12 @@ func TestBQConfigValidation(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "unknown"}},
+			"cloud": []any{map[string]any{"provider": "unknown"}},
 		}
 
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
 }
@@ -432,7 +430,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
-					"cloud_source": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
+					"react_native": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -443,7 +441,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
-					"cloudSource": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}]
+					"reactnative": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}]
 				}
 			}`,
 		},

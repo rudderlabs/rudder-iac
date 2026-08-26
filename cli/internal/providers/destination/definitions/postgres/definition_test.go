@@ -78,9 +78,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
-	}
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "cloud", "react_native", "flutter", "cordova"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {
@@ -420,12 +418,12 @@ func TestPostgresConfigValidation(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "unknown"}},
+			"cloud": []any{map[string]any{"provider": "unknown"}},
 		}
 
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
 	// connection_mode legality is per source type, taken from this definition's
@@ -828,7 +826,6 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": true,
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"cloud_source": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
@@ -843,7 +840,6 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"useRudderStorage": true,
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"cloudSource": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,

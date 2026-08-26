@@ -28,8 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
-	}
+		"cloud", "react_native", "flutter", "cordova"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	expectedModes := map[string][]string{
@@ -39,13 +38,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -297,7 +293,7 @@ func TestMPConfigValidation(t *testing.T) {
 		assert.Equal(t, "/connection_mode/web", errors[0].Path)
 
 		config = validMinimalConfig()
-		config["connection_mode"] = map[string]any{"web": "device", "amp": "cloud"}
+		config["connection_mode"] = map[string]any{"web": "device", "android": "cloud"}
 		assert.Empty(t, registered.ValidateConfig(config))
 	})
 
@@ -600,9 +596,8 @@ func validFullConfig() map[string]any {
 		},
 		"use_new_mapping": true,
 		"connection_mode": map[string]any{
-			"web":       "device",
-			"android":   "cloud",
-			"warehouse": "cloud",
+			"web":     "device",
+			"android": "cloud",
 		},
 		"consent_management": map[string]any{
 			"web": []any{

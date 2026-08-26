@@ -76,9 +76,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
-	}
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "cloud", "react_native", "flutter", "cordova"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	for _, sourceType := range expectedSourceTypes {
@@ -153,7 +151,7 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 		cfg["cleanup_object_storage_files"] = true
 		cfg["allow_users_context_traits"] = false
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "oneTrust", "consents": []any{"analytics"}}},
+			"cloud": []any{map[string]any{"provider": "oneTrust", "consents": []any{"analytics"}}},
 		}
 
 		assert.Empty(t, registered.ValidateConfig(cfg))
@@ -312,12 +310,12 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalRoleConfig())
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "unknown"}},
+			"cloud": []any{map[string]any{"provider": "unknown"}},
 		}
 
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
 	// connection_mode legality is per source type, taken from this definition's
@@ -473,16 +471,14 @@ func TestS3DatalakeConversionRoundTrip(t *testing.T) {
 				"bucket_name": "rudder-s3-datalake",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"cloud_source": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
 				"bucketName": "rudder-s3-datalake",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"cloudSource": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},
