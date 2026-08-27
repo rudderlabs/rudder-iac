@@ -45,7 +45,7 @@ type customerioConfig struct {
 	// the default would diff on every apply. Modelled without one so an explicit
 	// value still round-trips instead of being erased.
 	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2"`
-	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"omitempty,oneof=id email phone cio_id"`
+	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"required_if=APIVersion v2,omitempty,oneof=id email phone cio_id"`
 	UseNativeSDK                *sdkSourceBools          `mapstructure:"use_native_sdk"`
 	SendPageNameInSDK           *webBool                 `mapstructure:"send_page_name_in_sdk"`
 	DataUseInApp                *webBool                 `mapstructure:"data_use_in_app"`

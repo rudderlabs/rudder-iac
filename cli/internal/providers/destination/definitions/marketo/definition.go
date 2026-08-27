@@ -33,6 +33,14 @@ var connectionModes = map[string][]string{
 	common.SourceTypeCordova:       {"cloud"},
 }
 
+// useNativeSDK is deliberately absent. schema.json declares it as a plain
+// boolean, but db-config lists it nowhere — not in defaultConfig and not under
+// any source type — so the upstream sources disagree on whether the key exists.
+// Every other destination models use_native_sdk as an object keyed by source
+// type, and the framework treats that name as a source-type block key, so a
+// scalar under it would collide with the shared source-type-scoped validation.
+// Settle it in integrations-config before modelling it here (DEX-721).
+//
 // marketoConfig is the local YAML config model. Field set mirrors integrations-config
 // destinations/marketo defaultConfig; validation constraints mirror schema.json
 // plus Terraform-required nested mapping fields.
