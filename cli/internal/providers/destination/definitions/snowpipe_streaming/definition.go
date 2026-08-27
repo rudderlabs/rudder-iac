@@ -30,13 +30,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
 	common.SourceTypeReactNative,
-	common.SourceTypeCloudSource,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -46,15 +43,15 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
-	common.SourceTypeCloudSource:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
+// oneTrustCookieCategories and ketchConsentPurposes are deliberately absent:
+// the backend migrates them into consentManagement on write and never returns
+// them, so modelling them makes every plan diff. See DEX-696 Discrepancy 3.
 type snowpipeStreamingConfig struct {
 	Account   string `mapstructure:"account" validate:"required,dynamic_or_pattern=single_line_100"`
 	Database  string `mapstructure:"database" validate:"required,dynamic_or_pattern=single_line_100"`
@@ -68,13 +65,14 @@ type snowpipeStreamingConfig struct {
 	PrivateKey           string `mapstructure:"private_key" validate:"required"`
 	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 
-	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table"`
+	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
 	JSONPaths               string `mapstructure:"json_paths"`
-	EnableIceberg           *bool  `mapstructure:"enable_iceberg"`
+	EnableIceberg           *bool  `mapstructure:"enable_iceberg" default:"false"`
 	ExternalVolume          string `mapstructure:"external_volume" validate:"required_if=EnableIceberg true,omitempty,dynamic_or_pattern=single_line_100"`
-	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
-	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
+	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
+	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -96,6 +94,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("underscoreDivideNumbers", "underscore_divide_numbers"),
 		converter.Simple("allowUsersContextTraits", "allow_users_context_traits"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

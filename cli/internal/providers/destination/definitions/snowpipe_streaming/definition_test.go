@@ -74,7 +74,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"amp", "cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -260,11 +260,15 @@ func TestSnowpipeStreamingConversionRoundTrip(t *testing.T) {
 				"external_volume": "RUDDER_EXTERNAL_VOLUME",
 				"underscore_divide_numbers": false,
 				"allow_users_context_traits": false,
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				},
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"cloud_source": [{"provider": "custom", "resolution_strategy": "and", "consents": ["marketing"]}]
+					"cloud": [{"provider": "custom", "resolution_strategy": "and", "consents": ["marketing"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -282,11 +286,15 @@ func TestSnowpipeStreamingConversionRoundTrip(t *testing.T) {
 				"externalVolume": "RUDDER_EXTERNAL_VOLUME",
 				"underscoreDivideNumbers": false,
 				"allowUsersContextTraits": false,
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				},
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"cloudSource": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent":"marketing"}]}]
+					"cloud": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent":"marketing"}]}]
 				}
 			}`,
 		},
@@ -307,4 +315,52 @@ func TestSnowpipeStreamingRawPrivateKeyWrapsForAPI(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "-----BEGIN PRIVATE KEY-----\nrawSnowpipePrivateKeyBody\n-----END PRIVATE KEY-----", actual["privateKey"])
+}
+
+func TestSnowpipeStreamingDefaultsAndConnectionMode(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(snowpipestreaming.NewDefinition()))
+	registered, err := registry.Get("snowpipe_streaming", 1)
+	require.NoError(t, err)
+
+	// The backend injects these on create even when the spec omits them, so the
+	// definition must declare them or every apply reports a phantom diff.
+	// Confirmed against a live create: the stored config came back carrying all four.
+	assert.Equal(t, map[string]any{
+		"skip_tracks_table":          false,
+		"enable_iceberg":             false,
+		"underscore_divide_numbers":  false,
+		"allow_users_context_traits": false,
+	}, registered.ConfigDefaults())
+
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map. Upstream declares every source type cloud-only.
+	t.Run("accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
 }
