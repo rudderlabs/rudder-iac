@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: qualtrics-minimal
+spec:
+  id: qualtrics-minimal
+  display_name: E2E Qualtrics Minimal
+  type: qualtrics
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudderCliE2eProject
+    brand_id: rudderCliE2eBrand

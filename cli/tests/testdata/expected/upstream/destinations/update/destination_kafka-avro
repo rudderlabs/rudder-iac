@@ -33,7 +33,8 @@
     "sslEnabled": false,
     "topic": "rudder-cli-e2e-avro-updated",
     "useSASL": false,
-    "useSSH": false
+    "useSSH": false,
+    "saslType": "plain"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

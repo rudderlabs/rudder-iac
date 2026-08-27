@@ -12,3 +12,6 @@ spec:
     bucket_name: rudder-cli-e2e-gcs
     prefix: rudder/gcs/
     credentials: '{{ .GCS_CREDENTIALS }}'
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

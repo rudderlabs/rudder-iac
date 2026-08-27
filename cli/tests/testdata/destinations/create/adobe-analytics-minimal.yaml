@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: adobe-analytics-minimal
+spec:
+  id: adobe-analytics-minimal
+  display_name: E2E Adobe Analytics Minimal
+  type: adobe_analytics
+  enabled: true
+  definition_version: 1
+  config:
+    report_suite_ids: rudderCliE2eMinimalRsid

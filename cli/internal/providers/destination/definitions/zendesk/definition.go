@@ -45,10 +45,11 @@ type zendeskConfig struct {
 	// anyway: an unmodelled key is dropped from the update payload and erased
 	// upstream on the first apply.
 	SourceName                  string                   `mapstructure:"source_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	CreateUsersAsVerified       *bool                    `mapstructure:"create_users_as_verified"`
-	SendGroupCallsWithoutUserID *bool                    `mapstructure:"send_group_calls_without_user_id"`
-	RemoveUsersFromOrganization *bool                    `mapstructure:"remove_users_from_organization"`
-	SearchByExternalID          *bool                    `mapstructure:"search_by_external_id"`
+	CreateUsersAsVerified       *bool                    `mapstructure:"create_users_as_verified" default:"false"`
+	SendGroupCallsWithoutUserID *bool                    `mapstructure:"send_group_calls_without_user_id" default:"false"`
+	RemoveUsersFromOrganization *bool                    `mapstructure:"remove_users_from_organization" default:"false"`
+	SearchByExternalID          *bool                    `mapstructure:"search_by_external_id" default:"false"`
+	ConnectionMode              common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement           common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -64,6 +65,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("removeUsersFromOrganization", "remove_users_from_organization"),
 		converter.Simple("searchByExternalId", "search_by_external_id"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

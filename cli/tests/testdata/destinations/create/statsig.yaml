@@ -10,3 +10,6 @@ spec:
   definition_version: 1
   config:
     secret_key: "{{ .STATSIG_SECRET_KEY }}"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

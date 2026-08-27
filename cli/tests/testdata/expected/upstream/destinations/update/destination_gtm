@@ -7,6 +7,9 @@
   "type": "GTM",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "device"
+    },
     "authorizationToken": "rudderCliE2eGtmAuthTokenUpdated",
     "blacklistedEvents": [
       {

@@ -48,9 +48,109 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 	assert.Empty(t, registered.GatedKeyPaths())
 
+	// auth/method/format are defaulted upstream too, but are required here, so
+	// a spec always carries them.
+	assert.Equal(t, map[string]any{
+		"is_batching_enabled": false,
+		"is_default_mapping":  true,
+	}, registered.ConfigDefaults())
+
 	byAPI, err := registry.GetByAPIType("HTTP", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestHTTPApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredHTTPDefinition(t)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": false,
+			"is_default_mapping":  true,
+		}, registered.ApplyDefaults(validMinimalConfig()))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = "50"
+		config["is_default_mapping"] = false
+
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": true,
+			"max_batch_size":      "50",
+			"is_default_mapping":  false,
+		}, registered.ApplyDefaults(config))
+	})
+
+	t.Run("enriched config stays valid", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(registered.ApplyDefaults(validMinimalConfig())))
+	})
+}
+
+// Regression guard for the phantom diff: a spec omitting the defaulted keys
+// must yield the same local config as the destination the backend stored for
+// it, so a second apply reports no change.
+func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+	h := destination.NewHandler(nil, registry)
+
+	// The spec omits is_batching_enabled / is_default_mapping entirely.
+	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/http.yaml", &destination.DestinationSpec{
+		ID:                "http-noauth",
+		DisplayName:       "HTTP No Auth",
+		Type:              "http",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config:            validMinimalConfig(),
+	})
+	require.NoError(t, err)
+
+	// What the backend stores for that spec: the same values plus the defaults
+	// it applied. eventFilteringOption has no local key and is dropped on the
+	// way back.
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-http",
+		ExternalID: "http-noauth",
+		Name:       "HTTP No Auth",
+		Type:       "HTTP",
+		Version:    1,
+		IsEnabled:  true,
+		Config: []byte(`{
+			"apiUrl": "https://example.com/webhook",
+			"auth": "noAuth",
+			"method": "POST",
+			"format": "JSON",
+			"isBatchingEnabled": false,
+			"isDefaultMapping": true,
+			"eventFilteringOption": "disable"
+		}`),
+	}}
+
+	remoteResource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	assert.Equal(t, remoteResource.Config, extracted["http-noauth"].Config,
+		"enriched spec config must equal the remote-derived config, otherwise apply reports a phantom diff")
 }
 
 func TestHTTPConfigValidation(t *testing.T) {
@@ -426,6 +526,35 @@ func TestHTTPConfigValidation(t *testing.T) {
 		assert.Equal(t, "/consent_management/web/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
 }
 
 func TestHTTPConversionRoundTrip(t *testing.T) {

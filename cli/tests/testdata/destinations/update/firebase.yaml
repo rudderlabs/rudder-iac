@@ -1,0 +1,30 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: firebase
+spec:
+  id: firebase
+  display_name: E2E Firebase Updated
+  type: firebase
+  enabled: true
+  definition_version: 1
+  config:
+    use_native_sdk:
+      android: false
+      android_kotlin: false
+      ios: false
+      ios_swift: true
+      unity: true
+      react_native: false
+      flutter: true
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      android_kotlin:
+        - provider: ketch
+      ios_swift:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics

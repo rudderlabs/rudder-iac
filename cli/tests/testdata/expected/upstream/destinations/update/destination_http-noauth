@@ -4,6 +4,7 @@
     "auth": "noAuth",
     "format": "JSON",
     "isBatchingEnabled": true,
+    "isDefaultMapping": true,
     "maxBatchSize": "50",
     "method": "PUT"
   },

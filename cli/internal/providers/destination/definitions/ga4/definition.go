@@ -1,10 +1,15 @@
 package ga4
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func init() {
@@ -15,16 +20,57 @@ func init() {
 		"must start with 'G-' and be at most 101 characters",
 	)
 
-	// sdkBaseUrl is constrained deep in schema.json, under
-	// typesOfClient=gtag > connectionMode.web=device. RE2 has no lookahead, so the
-	// ngrok guard becomes a reject pattern; the empty alternative is preserved
-	// because upstream allows an unset value.
+	// sdkBaseUrl's format is constrained only under typesOfClient=gtag >
+	// connectionMode.web=device (schema.json declares no sdkBaseUrl property
+	// outside that branch); RE2 has no lookahead, so the ngrok guard becomes a
+	// reject pattern, and the empty alternative is preserved because upstream
+	// allows an unset value.
 	funcs.NewPatternWithReject(
 		"ga4_sdk_base_url",
 		`^(?:https?://)?[\w.-]+(?:\.[\w.-]+)+[\w\-._~:/?#[\]@!$&'()*+,;=.]*|^$`,
 		`\.ngrok\.io`,
 		"must be a domain URL and must not use ngrok",
 	)
+}
+
+// sdkBaseURLConditional enforces the named pattern given as its tag param
+// (ga4_sdk_base_url) only when client_type=gtag and connection_mode.web=device
+// — outside that condition, schema.json imposes no format constraint on
+// sdk_base_url at all. Templates are still accepted unconditionally within the
+// branch, matching dynamic_or_pattern elsewhere in this destination.
+//
+// The condition spans two sibling fields (client_type and connection_mode.web),
+// which a named pattern or a built-in required_if-style tag cannot express —
+// required_if only compares against direct struct fields, and connection_mode
+// is a map. This custom tag reads both via FieldLevel.Parent() instead.
+// It is registered via NewDefinition's ConfigValidateFuncs, scoped to this
+// definition alone, rather than a global default validator: it is GA4-specific,
+// not a reusable convention other destinations opt into.
+func sdkBaseURLConditional(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	clientTypeField := parent.FieldByName("ClientType")
+	connectionModeField := parent.FieldByName("ConnectionMode")
+	if !clientTypeField.IsValid() || !connectionModeField.IsValid() {
+		return true
+	}
+
+	clientType := clientTypeField.String()
+	connectionMode, _ := connectionModeField.Interface().(common.ConnectionMode)
+
+	if clientType != "gtag" || connectionMode["web"] != "device" {
+		return true
+	}
+
+	if definitions.IsTemplateConfigValue(value) {
+		return true
+	}
+	return funcs.MatchPattern(fl.Param(), value)
 }
 
 // Source types from integrations-config destinations/ga4/db-config.json
@@ -75,19 +121,25 @@ type webBool struct {
 }
 
 type webCapturePageView struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=rs gtag"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=rs gtag"`
 }
 
 // ga4Config is the local YAML config model. Field set mirrors terraform-provider
 // destination_google_analytics4 mappings; validation constraints mirror
 // overlapping schema.json rules (required, enums, client-type conditionals).
+//
+// Enum fields use plain oneof rather than dynamic_or_oneof: schema.json states
+// them as exact-match enums with no template branch, and terraform admits the
+// template form only on its pattern-validated fields. A template here would be
+// stored verbatim and rejected upstream. Most destinations still use
+// dynamic_or_oneof for enums; reconciling the fleet is tracked separately.
 type ga4Config struct {
 	APISecret             string              `mapstructure:"api_secret" validate:"required,dynamic_or_pattern=single_line_100"`
-	ClientType            string              `mapstructure:"client_type" validate:"required,dynamic_or_oneof=gtag firebase"`
+	ClientType            string              `mapstructure:"client_type" validate:"required,oneof=gtag firebase"`
 	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
 	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
-	DebugMode             *bool               `mapstructure:"debug_mode"`
-	SDKBaseURL            string              `mapstructure:"sdk_base_url" validate:"omitempty,dynamic_or_pattern=ga4_sdk_base_url"`
+	DebugMode             *bool               `mapstructure:"debug_mode" default:"false"`
+	SDKBaseURL            string              `mapstructure:"sdk_base_url" validate:"omitempty,ga4_sdk_base_url_conditional=ga4_sdk_base_url"`
 	ServerContainerURL    string              `mapstructure:"server_container_url"`
 	PIIPropertiesToIgnore []piiProperty       `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
 	EventFiltering        *eventFiltering     `mapstructure:"event_filtering"`
@@ -99,6 +151,7 @@ type ga4Config struct {
 	UseNativeSDKToSend    *webBool                 `mapstructure:"use_native_sdk_to_send"`
 	DebugView             *webBool                 `mapstructure:"debug_view"`
 	OverrideClientSession *webBool                 `mapstructure:"override_client_and_session_ids"`
+	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -145,6 +198,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
@@ -158,5 +212,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "ga4_sdk_base_url_conditional", Func: sdkBaseURLConditional},
+		},
 	}
 }

@@ -53,16 +53,17 @@ var connectionModes = map[string][]string{
 type redisConfig struct {
 	Address       string `mapstructure:"address" validate:"required,dynamic_or_pattern=redis_address"`
 	Password      string `mapstructure:"password" validate:"omitempty"`
-	ClusterMode   *bool  `mapstructure:"cluster_mode"`
-	Secure        *bool  `mapstructure:"secure"`
+	ClusterMode   *bool  `mapstructure:"cluster_mode" default:"true"`
+	Secure        *bool  `mapstructure:"secure" default:"false"`
 	Prefix        string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Database      string `mapstructure:"database" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	CACertificate string `mapstructure:"ca_certificate" validate:"omitempty"`
-	SkipVerify    *bool  `mapstructure:"skip_verify"`
+	SkipVerify    *bool  `mapstructure:"skip_verify" default:"false"`
 	// schema.json and defaultConfig declare useJSONModule but terraform does not
 	// map it. Modelled anyway: an unmodelled key is dropped from the update
 	// payload and erased upstream on the first apply.
-	UseJSONModule     *bool                    `mapstructure:"use_json_module"`
+	UseJSONModule     *bool                    `mapstructure:"use_json_module" default:"false"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -79,6 +80,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("skipVerify", "skip_verify"),
 		converter.Simple("useJSONModule", "use_json_module"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

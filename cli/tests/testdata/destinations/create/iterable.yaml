@@ -1,0 +1,54 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: iterable
+spec:
+  id: iterable
+  display_name: E2E Iterable
+  type: iterable
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: rudderCliE2eApiKey
+    data_center: USDC
+    package_name: com.rudderstack.e2e
+    prefer_user_id: false
+    merge_nested_objects: false
+    map_to_single_event: false
+    track_all_pages: true
+    track_named_pages: false
+    track_categorized_pages: false
+    register_device_or_browser_api_key: "{{ .ITERABLE_REGISTER_DEVICE_API_KEY }}"
+    use_native_sdk:
+      web: true
+    connection_mode:
+      web: device
+    initialisation_identifier:
+      web: email
+    get_in_app_event_mapping:
+      web:
+        - Product Viewed
+    purchase_event_mapping:
+      web:
+        - Order Completed
+    send_track_for_inapp:
+      web: false
+    animation_duration:
+      web: "400"
+    display_interval:
+      web: "2500"
+    handle_links:
+      web: open-all-new-tab
+    close_button_position:
+      web: top-right
+    close_button_color:
+      web: "#ffffff"
+    close_button_size:
+      web: "16"
+    is_required_to_dismiss_message:
+      web: false
+    event_filtering_option:
+      web: whitelistedEvents
+    whitelisted_events:
+      web:
+        - Order Completed

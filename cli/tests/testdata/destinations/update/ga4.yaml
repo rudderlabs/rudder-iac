@@ -24,6 +24,10 @@ spec:
       web: true
       android: false
       ios: false
+    connection_mode:
+      web: device
+      android: device
+      unity: cloud
     capture_page_view:
       web: gtag
     debug_view:

@@ -62,7 +62,7 @@ func TestValidateConfigConditionalRequired(t *testing.T) {
 	assert.Empty(t, errors)
 }
 
-func TestValidateConfigConnectionModeEnum(t *testing.T) {
+func TestValidateConfigNestedEnumField(t *testing.T) {
 	t.Parallel()
 
 	registered := registerTestDefinition(t)
@@ -71,14 +71,14 @@ func TestValidateConfigConnectionModeEnum(t *testing.T) {
 		"api_secret":      "secret",
 		"types_of_client": "gtag",
 		"measurement_id":  "G-123",
-		"connection_mode": map[string]any{
+		"nested_block": map[string]any{
 			"web": "invalid-mode",
 		},
 	})
 	assertConfigError(
 		t,
 		errors,
-		"/connection_mode/web",
+		"/nested_block/web",
 		"'web' must be one of [cloud device hybrid] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
 	)
 }

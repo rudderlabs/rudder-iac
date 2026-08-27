@@ -1,0 +1,22 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "firebase-minimal",
+  "name": "E2E Firebase Minimal Updated",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Backgrounded"
+      },
+      {
+        "eventName": "Application Updated"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

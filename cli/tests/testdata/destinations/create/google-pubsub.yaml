@@ -21,3 +21,6 @@ spec:
         to: plan
       - from: properties.currency
         to: currency
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

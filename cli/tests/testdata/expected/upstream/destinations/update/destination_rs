@@ -7,6 +7,10 @@
   "type": "RS",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "allowUsersContextTraits": false,
     "database": "analytics",
     "host": "rudder-cli-e2e.redshift.amazonaws.com",
@@ -18,7 +22,13 @@
     "underscoreDivideNumbers": false,
     "useIAMForAuth": false,
     "useRudderStorage": true,
-    "user": "rudder"
+    "user": "rudder",
+    "useServerless": false,
+    "useSSH": false,
+    "preferAppend": true,
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

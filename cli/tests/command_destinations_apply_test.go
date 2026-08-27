@@ -26,7 +26,11 @@ var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "create
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
+	"mpTokenXXXXXXXXXXXXXXXXXXXXXX",
+	"mpGdprApiTokenXXXXXXXXXXXXXXXX",
+	"mpServiceAccountSecretXXXXXXXX",
 	"hsAccessTokenXXXXXXXXXXXXXXXXX",
+	"iterableRegisterDeviceKeyXXXXX",
 	"fbPixelAccessTokenXXXXXXXXXXXX",
 	"intercomApiKeyXXXXXXXXXXXXXXXX",
 	"phcPosthogApiKeyXXXXXXXXXXXXXX",
@@ -69,6 +73,8 @@ var destinationRawSecrets = []string{
 	"snowflakePasswordXXXXXXXXXXXXX",
 	"snowflakePrivateKeyXXXXXXXXXXX",
 	"snowflakeKeyPassphraseXXXXXXXX",
+	"snowpipeStreamingPrivateKeyXXXXXXXXXX",
+	"snowpipeKeyPassphraseXXXXXXXXX",
 	"AKIASNOWFLAKEXXXXXXX",
 	"snowflakeSecretAccessKeyXXXXXXXXXXXXXXXXXX",
 	"snowflake-dummy",

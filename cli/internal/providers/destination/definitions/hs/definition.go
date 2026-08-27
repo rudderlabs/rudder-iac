@@ -41,10 +41,11 @@ type hsConfig struct {
 	AccessToken       string                   `mapstructure:"access_token" validate:"required,pattern=single_line_100"`
 	HubID             string                   `mapstructure:"hub_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	LookupField       string                   `mapstructure:"lookup_field" validate:"required_if=APIVersion newApi,omitempty,dynamic_or_pattern=single_line_100"`
-	DoAssociation     *bool                    `mapstructure:"do_association"`
+	DoAssociation     *bool                    `mapstructure:"do_association" default:"false"`
 	HubSpotEvents     []hubSpotEvent           `mapstructure:"hubspot_events" validate:"omitempty,dive"`
 	EventFiltering    *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -89,6 +90,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

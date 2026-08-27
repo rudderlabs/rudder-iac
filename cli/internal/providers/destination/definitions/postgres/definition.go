@@ -41,13 +41,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
 	common.SourceTypeReactNative,
-	common.SourceTypeCloudSource,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -57,13 +54,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
-	common.SourceTypeCloudSource:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // excludeWindow mirrors the only genuinely nested object in the upstream config.
@@ -82,7 +76,7 @@ type postgresConfig struct {
 	Port     string `mapstructure:"port" validate:"required,dynamic_or_pattern=single_line_100"`
 
 	Namespace string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=postgres_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh"`
+	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
 	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
@@ -100,12 +94,12 @@ type postgresConfig struct {
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
-	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table"`
-	SkipUsersTable          *bool  `mapstructure:"skip_users_table"`
-	PreferAppend            *bool  `mapstructure:"prefer_append"`
+	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
+	SkipUsersTable          *bool  `mapstructure:"skip_users_table" default:"true"`
+	PreferAppend            *bool  `mapstructure:"prefer_append" default:"true"`
 	JSONPaths               string `mapstructure:"json_paths"`
-	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
-	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
+	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
+	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
 
 	// Object-storage staging. Upstream keeps every provider's keys in the same
 	// flat object, so a key is required only for the providers schema.json names
@@ -119,7 +113,7 @@ type postgresConfig struct {
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	BucketProvider            string `mapstructure:"bucket_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=S3 GCS AZURE_BLOB MINIO"`
 	BucketName                string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true BucketProvider AZURE_BLOB,omitempty,dynamic_or_pattern=single_line_100"`
-	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
+	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 
 	// S3
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
@@ -140,6 +134,7 @@ type postgresConfig struct {
 	SecretAccessKey string `mapstructure:"secret_access_key" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,dynamic_or_pattern=single_line_100"`
 	UseSSL          *bool  `mapstructure:"use_ssl" validate:"required_if=UseRudderStorage false BucketProvider MINIO"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -189,6 +184,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("secretAccessKey", "secret_access_key"),
 		converter.Simple("useSSL", "use_ssl"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

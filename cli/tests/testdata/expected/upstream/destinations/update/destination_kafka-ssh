@@ -18,7 +18,8 @@
     "sslEnabled": false,
     "topic": "rudder-cli-e2e-ssh-updated",
     "useSASL": false,
-    "useSSH": true
+    "useSSH": true,
+    "saslType": "plain"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

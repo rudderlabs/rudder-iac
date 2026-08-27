@@ -70,15 +70,15 @@ func TestValidateConfigAllowsDynamicValues(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	t.Run("connection mode via env reference", func(t *testing.T) {
+	t.Run("nested enum field via env reference", func(t *testing.T) {
 		t.Parallel()
 
 		errors := registered.ValidateConfig(map[string]any{
 			"api_secret":      "secret",
 			"types_of_client": "gtag",
 			"measurement_id":  "G-123",
-			"connection_mode": map[string]any{
-				"web": "env.WEB_CONNECTION_MODE",
+			"nested_block": map[string]any{
+				"web": "env.WEB_MODE",
 			},
 		})
 		assert.Empty(t, errors)

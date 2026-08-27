@@ -26,3 +26,6 @@ spec:
         hash: true
     whitelist_pii_properties:
       - property: phone
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

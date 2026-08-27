@@ -24,3 +24,6 @@ spec:
       ios: false
     mobile_api_key_android: rudderCliE2eAndroidKey
     mobile_api_key_ios: rudderCliE2eIosKey
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

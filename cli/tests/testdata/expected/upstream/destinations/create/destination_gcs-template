@@ -8,7 +8,10 @@
   "enabled": true,
   "config": {
     "bucketName": "{{ config.bucketName || rudder-cli-e2e-gcs }}",
-    "prefix": "{{ config.prefix || rudder/gcs/ }}"
+    "prefix": "{{ config.prefix || rudder/gcs/ }}",
+    "connectionMode": {
+      "web": "cloud"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

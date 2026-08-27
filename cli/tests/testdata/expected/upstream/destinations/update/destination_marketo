@@ -7,6 +7,10 @@
   "type": "MARKETO",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "accountId": "123-ABC-456",
     "clientId": "marketo-client-id",
     "trackAnonymousEvents": true,

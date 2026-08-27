@@ -167,3 +167,27 @@
 - Facebook Pixel destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled RudderStack workspace is available for capture.
 - Do not add fixture-only Facebook Pixel YAML without matching live-verified upstream snapshots because `TestDestinationsApply` count-checks destination fixture/snapshot parity and can fail the entire destination suite before payload comparison.
 - Until live snapshots are available, rely on Facebook Pixel definition/unit coverage plus ungated compile/skip validation of `TestDestinationsApply` in autonomous environments.
+
+## DEX-518 — Qualtrics E2E Snapshot Deferral
+<!-- ticket:DEX-518 -->
+- Qualtrics destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available.
+- Do not add fixture-only Qualtrics YAML under `cli/tests/testdata/destinations/{create,update}` without matching live snapshots because `TestDestinationsApply` count-checks fixture/snapshot parity and unmatched fixtures can break the entire destination E2E suite.
+- Until live snapshots are available, rely on Qualtrics definition/unit coverage plus ungated compile/skip E2E validation in autonomous environments.
+
+## DEX-719 — GCS Connection Mode E2E Fixture Updates
+<!-- ticket:DEX-719 -->
+- For GCS connection-mode re-onboarding, update existing GCS destination fixture and expected upstream snapshot pairs in lockstep instead of adding new fixture files.
+- GCS destination E2E fixtures that include `connection_mode` should use literal `cloud` values, not templates, because connection mode is enum-like and template values are rejected by validation.
+- Preserve `TestDestinationsApply` fixture/snapshot parity: no fixture-only additions, because the snapshot tester count-checks expected upstream destinations before payload comparison.
+## DEX-512 — LinkedIn Ads Cannot Have Destination E2E Fixtures
+<!-- ticket:DEX-512 -->
+- `rudderAccountId` is a foreign key to an account that must already exist in the target workspace, not a free-form string. A fixture with a dummy value fails at create with `400 ... 'Account not found with given id in the workspace'`, so LinkedIn Ads cannot participate in `TestDestinationsApply` as it stands — this is a missing prerequisite, not a missing stack, and no amount of snapshot capture fixes it.
+- Do not add create/update fixtures for account-framework destinations until the destination e2e can provision (or reference) a real account. Fixtures without runnable configs break the whole suite for every other destination, because a failed apply aborts before snapshot verification.
+- The same shape applies to any destination whose config references another resource by ID; check for such keys in `destConfig.defaultConfig` before writing e2e fixtures.
+## DEX-527 — Snowpipe Streaming E2E Is Workspace-Gated; `namespace` Is Immutable
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming is gated by the `SNOWFLAKE_STREAMING` flag (`options.hidden.gate.flags` in its db-config), and the gate **is enforced by the destinations API**, not just a UI hint. A workspace without the entitlement rejects create with `403 destination "SNOWPIPE_STREAMING" is not available for your account`; the dedicated destination-e2e workspace has it and creates cleanly. Gate behaviour is therefore per workspace — establish which workspace a gated run targets before concluding a destination is or is not runnable.
+- Because the failure lands at apply, before any snapshot comparison, running these fixtures against a non-entitled workspace fails the whole `TestDestinationsApply` suite and takes every other destination's coverage with it. `RUN_DESTINATION_E2E` is wired from a repo variable in `test-with-coverage.yml`, so enabling it against a non-entitled workspace is the failure mode to guard against.
+- `namespace` is **immutable upstream**: changing it between the create and update fixtures fails with `400 Field "namespace" is immutable and cannot be modified`. Update fixtures must hold it constant and vary other fields (`display_name`, `database`, `role`, `json_paths` all update cleanly).
+- The backend injects `skipTracksTable`, `enableIceberg`, `underscoreDivideNumbers` and `allowUsersContextTraits` as `false` on create even when the spec omits them, so all four need `default:"false"` struct tags or every apply reports a phantom diff. Confirmed by inspecting the stored config after a live create.
+- `privateKey` and `privateKeyPassphrase` are write-only and correctly absent from upstream snapshots. `privateKey` must be PEM-shaped: schema declares no template branch, so it is validated with a local `pattern` rather than wrapped by a custom converter (terraform wraps raw bodies; the CLI validates, matching `snowflake`).

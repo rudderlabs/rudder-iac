@@ -7,6 +7,10 @@
   "type": "BRAZE",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "dataCenter": "US-01",
     "enableSubscriptionGroupInGroupCall": false,
     "enableNestedArrayOperations": false,

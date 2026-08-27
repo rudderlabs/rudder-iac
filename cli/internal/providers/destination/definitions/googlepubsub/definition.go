@@ -42,6 +42,7 @@ type googlePubSubConfig struct {
 	Credentials         string                   `mapstructure:"credentials" validate:"required"`
 	EventToTopicMap     []eventMapping           `mapstructure:"event_to_topic_map" validate:"omitempty,dive"`
 	EventToAttributeMap []eventMapping           `mapstructure:"event_to_attribute_map" validate:"omitempty,dive"`
+	ConnectionMode      common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -64,6 +65,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

@@ -1,0 +1,15 @@
+{
+  "config": {
+    "brandId": "rudderCliE2eBrandUpdated",
+    "projectId": "rudderCliE2eProjectUpdated"
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "qualtrics-minimal",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Qualtrics Minimal Updated",
+  "type": "QUALTRICS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

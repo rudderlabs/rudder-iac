@@ -19,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
+	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
@@ -28,19 +29,27 @@ import (
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
+	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
+	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/qualtrics"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -49,8 +58,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/sentry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/slack"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowflake"
+	snowpipestreaming "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowpipe_streaming"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
 	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -312,6 +323,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(adj.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering adj destination definition: %w", err)
 		}
+		if err := registry.Register(adobeanalytics.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering adobe_analytics destination definition: %w", err)
+		}
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
 		}
@@ -339,11 +353,20 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(facebookpixel.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering facebook_pixel destination definition: %w", err)
 		}
+		if err := registry.Register(firebase.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering firebase destination definition: %w", err)
+		}
+		if err := registry.Register(ga.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering ga destination definition: %w", err)
+		}
 		if err := registry.Register(ga4.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
 		}
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
+		}
+		if err := registry.Register(googleads.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
 		}
 		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
@@ -366,17 +389,32 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(kinesis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kinesis destination definition: %w", err)
 		}
+		if err := registry.Register(iterable.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering iterable destination definition: %w", err)
+		}
 		if err := registry.Register(kafka.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kafka destination definition: %w", err)
 		}
+		if err := registry.Register(linkedinads.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering linkedin_ads destination definition: %w", err)
+		}
+		if err := registry.Register(linkedininsighttag.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering linkedin_insight_tag destination definition: %w", err)
+		}
 		if err := registry.Register(marketo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
+		}
+		if err := registry.Register(mp.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering mp destination definition: %w", err)
 		}
 		if err := registry.Register(postgres.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering postgres destination definition: %w", err)
 		}
 		if err := registry.Register(posthog.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering posthog destination definition: %w", err)
+		}
+		if err := registry.Register(qualtrics.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering qualtrics destination definition: %w", err)
 		}
 		if err := registry.Register(redis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering redis destination definition: %w", err)
@@ -399,11 +437,17 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(snowflake.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering snowflake destination definition: %w", err)
 		}
+		if err := registry.Register(snowpipestreaming.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering snowpipe_streaming destination definition: %w", err)
+		}
 		if err := registry.Register(statsig.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering statsig destination definition: %w", err)
 		}
 		if err := registry.Register(tiktokads.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering tiktok_ads destination definition: %w", err)
+		}
+		if err := registry.Register(vwo.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering vwo destination definition: %w", err)
 		}
 		if err := registry.Register(zendesk.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering zendesk destination definition: %w", err)

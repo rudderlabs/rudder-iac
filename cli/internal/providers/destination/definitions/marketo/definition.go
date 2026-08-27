@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,15 +27,20 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
+// useNativeSDK is deliberately absent. schema.json declares it as a plain
+// boolean, but db-config lists it nowhere — not in defaultConfig and not under
+// any source type — so the upstream sources disagree on whether the key exists.
+// Every other destination models use_native_sdk as an object keyed by source
+// type, and the framework treats that name as a source-type block key, so a
+// scalar under it would collide with the shared source-type-scoped validation.
+// Settle it in integrations-config before modelling it here (DEX-721).
+//
 // marketoConfig is the local YAML config model. Field set mirrors integrations-config
 // destinations/marketo defaultConfig; validation constraints mirror schema.json
 // plus Terraform-required nested mapping fields.
@@ -46,11 +48,12 @@ type marketoConfig struct {
 	AccountID                 string                   `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	ClientID                  string                   `mapstructure:"client_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	ClientSecret              string                   `mapstructure:"client_secret" validate:"required,dynamic_or_pattern=single_line_100"`
-	TrackAnonymousEvents      *bool                    `mapstructure:"track_anonymous_events"`
-	CreateIfNotExist          *bool                    `mapstructure:"create_if_not_exist"`
+	TrackAnonymousEvents      *bool                    `mapstructure:"track_anonymous_events" default:"false"`
+	CreateIfNotExist          *bool                    `mapstructure:"create_if_not_exist" default:"true"`
 	RudderEventsMapping       []rudderEventMapping     `mapstructure:"rudder_events_mapping" validate:"omitempty,dive"`
 	LeadTraitMapping          []fieldMapping           `mapstructure:"lead_trait_mapping" validate:"omitempty,dive"`
 	CustomActivityPropertyMap []fieldMapping           `mapstructure:"custom_activity_property_map" validate:"omitempty,dive"`
+	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -91,6 +94,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

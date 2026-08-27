@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: vwo-minimal
+spec:
+  id: vwo-minimal
+  display_name: E2E VWO Minimal
+  type: vwo
+  enabled: true
+  definition_version: 1
+  config:
+    account_id: rudderCliE2eMinimal

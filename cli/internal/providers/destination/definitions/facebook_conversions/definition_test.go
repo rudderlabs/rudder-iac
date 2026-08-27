@@ -26,10 +26,16 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
+	assert.Equal(t, map[string]any{
+		"action_source":      "website",
+		"limited_data_usage": false,
+		"test_destination":   false,
+		"remove_external_id": false,
+	}, registered.ConfigDefaults())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -42,6 +48,47 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	byAPI, err := registry.GetByAPIType("FACEBOOK_CONVERSIONS", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestFacebookConversionsApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(facebookconversions.NewDefinition()))
+	registered, err := registry.Get("facebook_conversions", 1)
+	require.NoError(t, err)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"dataset_id":         "dataset-1",
+			"access_token":       "access-token-1",
+			"action_source":      "website",
+			"limited_data_usage": false,
+			"test_destination":   false,
+			"remove_external_id": false,
+		}, registered.ApplyDefaults(validMinimalConfig()))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["action_source"] = "app"
+		config["limited_data_usage"] = true
+		config["test_destination"] = true
+		config["remove_external_id"] = true
+
+		assert.Equal(t, map[string]any{
+			"dataset_id":         "dataset-1",
+			"access_token":       "access-token-1",
+			"action_source":      "app",
+			"limited_data_usage": true,
+			"test_destination":   true,
+			"remove_external_id": true,
+		}, registered.ApplyDefaults(config))
+	})
 }
 
 func TestFacebookConversionsConfigValidation(t *testing.T) {
@@ -250,6 +297,35 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/consent_management/web/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
 }
 
 func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
@@ -318,8 +394,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"access_token": "access-token-1",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
@@ -327,8 +402,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"accessToken": "access-token-1",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},

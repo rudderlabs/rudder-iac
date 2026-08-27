@@ -30,7 +30,9 @@ var connectionModes = map[string][]string{
 }
 
 // 3. Config struct: the closed allowlist of local YAML config keys.
-//    mapstructure tag = snake_case local key; validate tag from schema.json.
+//    mapstructure tag = snake_case local key; validate tag from schema.json;
+//    default tag from schema.json `default` (see source-extraction.md
+//    "Declaring defaults" — never on a `required` field).
 type s3Config struct {
     BucketName    string `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
     Prefix        string `mapstructure:"prefix" validate:"omitempty,max=100"`
@@ -41,18 +43,34 @@ type s3Config struct {
     IAMRoleARN  string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,max=100"`
     AccessKeyID string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,max=100"`
     AccessKey   string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,max=100"`
-    EnableSSE   *bool  `mapstructure:"enable_sse"`
+    // schema.json defaults enableSSE to false. Optional + *bool, so it may
+    // carry the tag; RoleBasedAuth above is `required` and must not.
+    EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
     // Mandatory type when consent is supported.
     ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+    // Present only when schema.json declares a connectionMode property, and
+    // mandatory type when present (see source-extraction.md). db-config's
+    // destConfig lists are not the signal — firebase names connectionMode
+    // under all seven source types yet declares no schema property, so it
+    // omits this field. Same integration pattern as consent — a common helper
+    // plus a model field — but a different value shape (map[string]string,
+    // not map[string][]ConsentEntry).
+    // common.ConnectionModeProperties(sourceTypes) below does the mapping.
+    // No validate tag: the legal values differ per source type, so
+    // validateConnectionMode checks each entry against this definition's own
+    // ConnectionModes map instead (see DEX-708 / ga4).
+    ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// 4. NewDefinition: properties ported from terraform + consent, then metadata.
+// 4. NewDefinition: properties ported from terraform + consent + connection
+// mode, then metadata.
 func NewDefinition() *definitions.DestinationDefinition {
     properties := []converter.ConfigProperty{
         converter.Simple("bucketName", "bucket_name"),
         converter.Simple("prefix", "prefix"), // bare — no SkipZeroValue (see converter-mapping.md)
         // ...
     }
+    properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
     properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
@@ -105,11 +123,14 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
 - `SupportedSourcesValidation` (nested shape pending DEX-709) keys ⊆
-  `SourceTypes`, every inner mode ∈
-  `ConnectionModes[sourceType]`, each key list non-empty, and every required key
-  must exist on the config struct. Entries are optional per source type and per
-  mode.
-- A `consent_management` config field must be `common.ConsentManagement`.
+  `SourceTypes`, every inner mode ∈ `ConnectionModes[sourceType]`, each key list
+  non-empty, and every required key must exist on the config struct or be a
+  source-type block key (`connection_mode`, `use_native_sdk`). Entries are
+  optional per source type and per mode.
+- A `consent_management` config field must be `common.ConsentManagement`, and a
+  `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
+  either is rejected at registration: it would silently opt the key out of the
+  shared validation those types drive.
 - `(Type, Version)` and `(APIType, Version)` must be unique.
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key

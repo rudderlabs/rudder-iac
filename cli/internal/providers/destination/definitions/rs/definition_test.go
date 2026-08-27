@@ -106,8 +106,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -163,7 +163,7 @@ func TestRSConfigValidation(t *testing.T) {
 		t.Parallel()
 		cfg := fullConfig()
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{
+			"cloud": []any{map[string]any{
 				"provider":            "custom",
 				"resolution_strategy": "or",
 				"consents":            []any{"analytics", "marketing"},
@@ -438,32 +438,48 @@ func TestRSConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
 	})
 
-	t.Run("retained consent source accepted", func(t *testing.T) {
-		t.Parallel()
-
-		cfg := copyConfig(minimalPasswordConfig())
-		cfg["consent_management"] = map[string]any{
-			"amp":          []any{map[string]any{"provider": "oneTrust"}},
-			"cloud_source": []any{map[string]any{"provider": "ketch"}},
-			"shopify":      []any{map[string]any{"provider": "iubenda"}},
-		}
-
-		assert.Empty(t, registered.ValidateConfig(cfg))
-	})
-
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
 		t.Parallel()
 
 		cfg := copyConfig(minimalPasswordConfig())
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "unknown"}},
+			"cloud": []any{map[string]any{"provider": "unknown"}},
 		}
 
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
 }
 
 func TestRSModelsCurrentDefaultConfigKeys(t *testing.T) {
@@ -673,8 +689,7 @@ func TestRSConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": true,
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"cloud_source": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}],
-					"shopify": [{"provider": "ketch"}]
+					"react_native": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -693,8 +708,7 @@ func TestRSConversionRoundTrip(t *testing.T) {
 				"useRudderStorage": true,
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"cloudSource": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}],
-					"shopify": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}]
 				}
 			}`,
 		},

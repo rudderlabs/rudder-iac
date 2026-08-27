@@ -18,7 +18,7 @@ import (
 // the only guard, which is exactly what these tests exercise.
 type ruleTestConfig struct {
 	WebhookURL        string                   `mapstructure:"webhook_url" validate:"required"`
-	ConnectionMode    map[string]string        `mapstructure:"connection_mode"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	UseNativeSDK      map[string]bool          `mapstructure:"use_native_sdk"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

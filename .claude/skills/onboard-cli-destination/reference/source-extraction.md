@@ -33,7 +33,7 @@ Translate constraints to `validate` struct tags on the config struct:
 | --- | --- |
 | key in `required` | `required` |
 | `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
-| `enum: ["a","b"]` | `dynamic_or_oneof=a b` (custom tag in `definitions/dynamicvalues.go`: passes `env.VAR` / `{{ ... }}` dynamic values, otherwise enforces the enum). Use plain `oneof=a b` only when the field can never hold a dynamic value |
+| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether an enum may be dynamic" below |
 | any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
@@ -58,23 +58,112 @@ Notes:
   `{{ config.x || … }}` longer than the literal limit stays valid.
 - **`env.VAR` is deprecated — never give it an escape hatch.** It is judged as an
   ordinary literal, so it passes only when it happens to satisfy the pattern.
-  Do not add it to a pattern or a tag.
+  Do not add it to a pattern or a tag. It also plays no part in deciding whether
+  a property admits a dynamic value: upstream writes these wrappers as
+  `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`, and only the `{{ … || … }}` branch
+  counts. Disregard `(^env[.].+)` wherever it appears — in schema.json and in
+  terraform validators alike.
+- **Let schema.json decide whether an enum may be dynamic.** Pick the tag from
+  what the property declares, not from the shape of the constraint: if it admits
+  the `{{ path || fallback }}` form, use `dynamic_or_oneof`; if it does not, use
+  `oneof`, since such a value would then be stored verbatim and rejected by the
+  backend. In practice this currently splits by shape — `pattern` properties
+  carry the template branch, `enum` properties do not (checked across every
+  onboarded destination), so enums take `oneof` today — but check the property
+  rather than assuming, since an enum that did declare it would take
+  `dynamic_or_oneof`. terraform shows the same split: its enum validators carry
+  no `{{ … || … }}` branch where its pattern validators do. Many existing
+  definitions use `dynamic_or_oneof` for strict enums; reconciling them is tracked
+  separately, so check the schema rather than copying a neighbouring definition.
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
 - `consentManagement` and `connectionMode` subtrees in schema.json are handled
-  by `common` — do not model either as an ad-hoc field; always append
-  `common.Properties(sourceTypes)` and `common.ConnectionModeProperties(sourceTypes)`,
-  and add both `ConsentManagement` and `ConnectionMode` fields to the config
-  struct. `connection_mode` persists as real, validated destination config for
-  every destination (DEX-708's `ga4` pilot established the pattern; it is
-  being rolled out to existing destinations too) — see "Conditional
-  requiredness" below for the connectionMode-and-config-key conditional this
-  unlocks.
+  by `common` — do not model either as an ad-hoc field. Append
+  `common.Properties(sourceTypes)` and add a `ConsentManagement` field when the
+  destination supports consent; append `common.ConnectionModeProperties(sourceTypes)`
+  and add a `ConnectionMode` field **only when schema.json declares a
+  `connectionMode` property** (see definition-anatomy.md). Where it does,
+  `connection_mode` persists as real, validated destination config — DEX-708's
+  `ga4` pilot established the pattern, since rolled out to every
+  schema-declaring destination; see "Conditional requiredness" below for the
+  connectionMode-and-config-key conditional this unlocks. Where it does not,
+  omit it: db-config's `destConfig.<sourceType>` lists name `connectionMode` for
+  far more destinations than schema.json constrains it for, so the destConfig
+  lists are not the signal. `firebase` is the worked example — every one of its
+  seven source types lists `connectionMode` in db-config, and schema.json
+  declares no such property, so it stays unmodelled. Neither key is ever wrapped
+  in `Gated` — both stay handled by the source-type-keyed block machinery, not
+  the `Gated`-scan below.
 - A property marked `"rs-immutable": true` is still modelled and validated
   normally — immutability constrains *updates*, not the config surface. Record
   which keys carry it: the backend 400s on any change to one, and the e2e update
   fixture must leave them untouched (see e2e-tests.md).
+
+## Declaring defaults
+
+The control plane applies `schema.json` `default` values when it persists a
+destination (its validator runs with `useDefaults: true`, mutating the config it
+validates). A defaulted key is therefore **never optional in storage** — the
+backend fills it in. If the CLI does not declare the same default, a spec that
+omits the key diffs forever against the remote state that carries it, and an
+update drops the key upstream.
+
+Declare each default as a `default:"…"` struct tag beside the field's
+`mapstructure`/`validate` tags. The registry parses them once at `Register()`
+and `ApplyDefaults` fills only the keys a spec omitted, so an explicit value —
+including one equal to the zero value — always wins.
+
+### Finding every default
+
+Do **not** read `configSchema.properties` alone. Descend:
+
+- **Combinators** — `allOf`, `anyOf`, `oneOf`, `if`, `then`, `else`,
+  `dependentSchemas` — describe the *same* config object, so a default found
+  inside one still belongs to a top-level key. Several destinations declare
+  defaults only here (`SNOWFLAKE`, `RS`, `GOOGLEADS`, `KAFKA`, `POSTGRES`,
+  `REDIS`, `HS`).
+- `properties.<name>` and `items` describe the level *below* — a default there
+  is nested, not top level.
+
+### Writing the tag
+
+The schema's `"type"` picks the Go field type; the tag value is always a string:
+
+| schema type | Go field | tag |
+| --- | --- | --- |
+| `"boolean"` | `*bool` (pointer keeps absent ≠ false) | `default:"false"` |
+| `"string"` | `string` | `default:"cloud"` |
+| `"integer"` | `int` | `default:"2"` |
+
+Only these three are implemented — they are the only types `default` takes
+across the destinations we model. A `uint`, float, slice or map field is
+rejected at registration rather than guessed at; extend `parseDefaultValue` when
+a schema first needs one.
+
+**Let the schema type decide, not how the value looks.** `syncFrequency` is
+`"type": "string"` with default `"180"` in `BQ`, `POSTGRES`, `RS`,
+`S3_DATALAKE` and `SNOWFLAKE` — declare it `string`. An `int` field would store
+`180` where the API returns `"180"`, producing a permanent diff.
+
+### When NOT to declare one
+
+- **The field is `validate:"required"`.** Registration rejects the combination:
+  a key that must always be present can never take a default. This includes
+  fields the CLI marks required even when `schema.json` does not (e.g.
+  `s3_datalake` `use_glue` / `role_based_auth`, deliberately `*bool` +
+  `required` so absent stays distinct from false). `required_if` is fine — that
+  field is genuinely optional.
+- **The key has no local config key.** `eventFilteringOption` is defaulted by 21
+  destinations but is derived by `converter.Discriminator` from the
+  whitelist/blacklist arrays, so it cannot carry a tag.
+  terraform-provider-rudderstack neither sends nor reads it; match that.
+- **The default is nested or inside array `items`.** `ApplyDefaults` is
+  top-level only. Flag these in the final report instead.
+
+There is no shared catalogue to copy from — scan the destination's own
+`schema.json` with the traversal above, and record in the final report every
+default you found but did not declare, with the reason.
 
 ## Conditional requiredness
 
@@ -98,30 +187,34 @@ of its branches with built-ins alone.
 
 **The one exception:** `required_if`/`excluded_if` resolve conditions against
 direct struct field names only, so a condition keyed on a **map field** — in
-practice this means `connection_mode.<sourceType>` — cannot be expressed with
-a built-in tag, whether the thing being gated is a pattern (`ga4`'s
-`sdk_base_url`, conditioned on `client_type` **and** `connection_mode.web`) or
-plain requiredness (Braze's `app_key` / `android_api_key` / `ios_api_key` /
-`web_api_key`, conditioned on `use_platform_specific_api_keys` **and**
-`connection_mode.<sourceType>` — see source-type-mapping.md "Recognised `if`
-shapes").
+practice this means `connection_mode.<sourceType>`, where the destination models
+it per the note above — cannot be expressed with a built-in tag, whether the
+thing being gated is a pattern (`ga4`'s `sdk_base_url`, conditioned on
+`client_type` **and** `connection_mode.web`) or plain requiredness (Braze's
+`app_key` / `android_api_key` / `ios_api_key` / `web_api_key`, conditioned on
+`use_platform_specific_api_keys` **and** `connection_mode.<sourceType>` — see
+source-type-mapping.md "Recognised `if` shapes").
 
 There, register a custom tag scoped to the one definition via
-`DestinationDefinition.ConfigValidateFuncs` (never the global
+`DestinationDefinition.ConfigValidateFuncs` in `NewDefinition` (never the global
 `vrules.RegisterDefaultValidator` — that registry is shared by every
-destination's validation call and reserved for fleet-wide conventions), whose
-`validator.Func` reads the sibling fields off `FieldLevel.Parent()` by name.
-`ga4`'s `sdkBaseURLConditional` (DEX-708) is the worked example for a pattern
-condition; a requiredness version follows the identical shape but returns
-whether the target field is non-empty once the condition holds, instead of
-matching a pattern. This does **not** lift the pointer restriction below: the
+destination's validation call and reserved for fleet-wide conventions like
+`pattern`/`dynamic_or_pattern`, so a one-destination condition doesn't belong
+there), whose `validator.Func` reads the sibling fields off `FieldLevel.Parent()`
+by name. `ga4`'s `sdkBaseURLConditional` (DEX-708) is the worked example for a
+pattern condition; a requiredness version follows the identical shape but
+returns whether the target field is non-empty once the condition holds, instead
+of matching a pattern. This does **not** lift the pointer restriction below: the
 target field must still be a plain type (`string`, not `*bool`), since
-go-playground never invokes a custom tag's function for a nil pointer.
+go-playground never invokes a custom tag's function for a nil pointer. The error
+message falls through to `funcs/utils.go`'s generic `default` case (the raw
+go-playground message); that is acceptable for a rare, narrowly-scoped tag and
+isn't worth widening the shared formatter for.
 
-`connection_mode` persisting for every destination changes what a CLI apply
-sends for that key: an existing destination set up via the UI needs its spec
-to declare `connection_mode` before its first CLI-managed apply, or that
-apply drops it (update replaces the whole config object).
+Where `connection_mode` is modelled, it changes what a CLI apply sends for that
+key: an existing destination set up via the UI needs its spec to declare
+`connection_mode` before its first CLI-managed apply, or that apply drops it
+(update replaces the whole config object).
 
 Three facts settle almost every branch:
 
@@ -183,7 +276,7 @@ in the report when a minimal named pattern can express them.
      `(\{\{…\}\})|` branches.
    - Error message: short, user-facing (what the value must look like).
 3. Only if the constraint is a genuine `minLength`/`maxLength` keyword or an
-   enum fall back to `min`/`max` / `dynamic_or_oneof` / report note.
+   enum fall back to `min`/`max` / `oneof` / report note.
 
 ### Tag usage
 
@@ -281,11 +374,14 @@ For each terraform-mapped property's API key:
    flag in the report.
 3. In no list at all → flag as discrepancy.
 
-Skip the boilerplate keys when doing this scan — `connectionMode`,
-`useNativeSDK`, `consentManagement`, `oneTrustCookieCategories`,
-`ketchConsentPurposes`, `eventFilteringOption`, `whitelistedEvents`,
-`blacklistedEvents` are handled by the `common` package and the
-source-type-keyed block machinery, never by `Gated`.
+Skip the boilerplate keys when doing this scan — none of them is ever wrapped
+in `Gated`, though for two different reasons. `connectionMode`, `useNativeSDK`,
+`consentManagement`, `eventFilteringOption`, `whitelistedEvents` and
+`blacklistedEvents` are handled by the `common` package, the converter and the
+source-type-keyed block machinery. `oneTrustCookieCategories` and
+`ketchConsentPurposes` are not handled at all — they are deliberately left
+unmodelled because the backend rewrites them into `consentManagement` on write
+(see the migration-on-write exception in SKILL.md).
 
 Example (Intercom): `mobileApiKeyAndroid` appears only in
 `destConfig.android` → `converter.Gated(converter.Simple("mobileApiKeyAndroid", "mobile_api_key_android"), common.SourceTypeAndroid)`.
