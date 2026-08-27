@@ -178,3 +178,9 @@
 - GCS models schema-declared `connectionMode` as local YAML key `connection_mode` through the shared `common.ConnectionMode` / `common.ConnectionModeProperties(sourceTypes)` helpers.
 - Keep GCS on the CLI-owned event-stream source set from DEX-499 with cloud-only connection modes; do not broaden GCS source ownership while adding `connection_mode`.
 - GCS `connection_mode` validation should reject templates, empty strings, and non-cloud values via existing registered-definition connection-mode validation.
+## DEX-512 — LinkedIn Ads Destination Naming And Validation
+<!-- ticket:DEX-512 -->
+- LinkedIn Ads uses canonical CLI type `linkedin_ads`, derived by lowercasing API type `LINKEDIN_ADS`, even though the integrations-config source directory is named `linkedIn_ads`.
+- The LinkedIn Ads Go definition package uses `linkedinads`, keeping the package name idiomatic while preserving `linkedin_ads` as the CLI resource identity.
+- For LinkedIn Ads, model `hash_data` as a required pointer boolean: upstream schema requires `hashData`, and pointer optionality preserves absent versus explicit `false` so validation can reject omission while accepting explicit false.
+- Destination onboarding validation should follow upstream `schema.json` over Terraform-provider defaults; for `hash_data`, do not make the field optional solely because Terraform marks it optional with default `true`.

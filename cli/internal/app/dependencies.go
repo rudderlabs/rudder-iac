@@ -43,6 +43,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
+	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
 	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
@@ -392,6 +393,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(kafka.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kafka destination definition: %w", err)
+		}
+		if err := registry.Register(linkedinads.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering linkedin_ads destination definition: %w", err)
 		}
 		if err := registry.Register(linkedininsighttag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering linkedin_insight_tag destination definition: %w", err)

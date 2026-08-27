@@ -231,3 +231,7 @@
 - GCS is an existing destination definition, so connection-mode re-onboarding should update the existing GCS definition/tests/fixture-snapshot pairs rather than adding duplicate destination registry imports, app flag-matrix cases, or new definitions.
 - GCS remains an unverified destination in `cli/internal/app/dependencies.go`; keep registry gating under both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations`.
 - Integrations-config and Terraform remain read-only source-of-truth references for this re-onboarding path; the durable CLI-owned changes belong in `cli/internal/providers/destination/definitions/gcs` and destination E2E testdata.
+## DEX-512 — LinkedIn Ads Destination Onboarding
+<!-- ticket:DEX-512 -->
+- `linkedin_ads` follows ads-destination source-type precedent, closer to Facebook Conversions than cloud-storage destinations: include every upstream db-config source type with a destination common mapping (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) instead of trimming to the CLI-owned event-stream subset.
+- LinkedIn Ads supported source connection modes are cloud-only for all retained source types, matching the linkedIn_ads db-config contract.
