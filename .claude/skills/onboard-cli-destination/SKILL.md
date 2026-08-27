@@ -144,12 +144,19 @@ Mechanical rules:
   row in that mapping (e.g. `tiktokAds`, `singer-*`) and the never-declared set
   (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
   reach.
-- `db-config.json` `supportedSourcesValidation` (when present and non-empty) →
-  `SupportedSourcesValidation`: keys translated to CLI-local source types via
-  the same mapping, values translated from API camelCase field names to
-  snake_case local keys. Drop entries whose source type was dropped from
-  `SourceTypes` and flag them in the final report. Most destinations have no
-  `supportedSourcesValidation` — omit the field then; never invent entries.
+- `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
+  `SupportedSourcesValidation`, a
+  `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the
+  branch's `then.required` makes **required**, never optional ones. Source types
+  translated to CLI-local types via the same mapping, keys to snake_case.
+  **There is no `supportedSourcesValidation` key in db-config** — do not look
+  for one. A branch whose requiredness also depends on another config value
+  (Braze `usePlatformSpecificApiKeys`) has no room in this map: express the
+  whole branch as a `ConfigValidateFuncs` custom validator instead (see
+  source-extraction.md "Conditional requiredness"). See source-type-mapping.md
+  "Per-source-type connect-time required keys" for the recognised `if` shapes
+  and the full derivation; omit the field when no kept source type
+  contributes a key.
 - Source-type-gated keys: if a terraform-mapped property's API key is absent
   from `db-config.json` `destConfig.defaultConfig` but present under specific
   `destConfig.<sourceType>` lists, wrap the ported property in
@@ -213,8 +220,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
    `APIType`, `Version`, `SecretKeys()`, `SupportedSourceTypes()`,
    `ConnectionModes()` per source type, and `GetByAPIType` lookup. When the
    definition carries `SupportedSourcesValidation`, also assert
-   `SupportedSourcesValidation(sourceType)` per configured source type and
-   `Nil` for one source type without an entry. When the
+   `SupportedSourcesValidation(sourceType, connectionMode)` per configured
+   pair and `Nil` for one supported pair without an entry. When the
    definition has gated properties, also assert the full `GatedKeyPaths()`
    map with `assert.Equal` (JSON-pointer keypaths, e.g.
    `map[string][]string{"/mobile_api_key_android": {"android"}}`).
@@ -293,7 +300,8 @@ Final response must include:
 - E2E verification status: skip/compile result and whether the gated live run was
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
-  source types, dropped `supportedSourcesValidation` entries, upstream fields
+  source types, connectionMode-conditioned required keys that could not be
+  expressed in `SupportedSourcesValidation`, upstream fields
   intentionally omitted, and every `schema.json` key modelled without a
   terraform mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates
