@@ -13,6 +13,7 @@
     },
     "siteID": "rudderCliE2eSiteId",
     "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
+    "apiVersion": "v1",
     "datacenter": "US",
     "deviceTokenEventName": "Device Token Registered",
     "whitelistedEvents": [
