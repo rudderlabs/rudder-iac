@@ -189,3 +189,10 @@
 - Snowpipe Streaming `private_key` accepts Terraform-compatible raw key bodies in local YAML; local-to-API conversion should wrap non-PEM values as `-----BEGIN PRIVATE KEY-----\n<raw>\n-----END PRIVATE KEY-----`.
 - API-to-local conversion for Snowpipe Streaming `private_key` should return the API value unchanged so PEM payloads round-trip stably.
 - Keep this behavior in a Snowpipe Streaming destination-local converter property rather than changing generic secret conversion or validation behavior.
+
+## DEX-721 — Adjust And Facebook Conversions Default Corrections
+<!-- ticket:DEX-721 -->
+- Adjust should keep local config key `partner_params_keys` mapped to API `partnerParamsKeys`; do not rename it to Terraform's `partner_param_keys` spelling because that would break existing CLI YAML compatibility.
+- Adjust should add schema-derived default metadata only for modeled `environment`; do not add/default a direct `event_filtering_option` local key because event filtering is represented through discriminator-derived event filter arrays.
+- Facebook Conversions should add schema-derived top-level defaults for modeled optional fields `action_source`, `limited_data_usage`, `test_destination`, and `remove_external_id`.
+- Facebook Conversions should leave required credentials (`dataset_id`, `access_token`), array/nested keys, and `test_event_code` without default tags, and avoid tightening existing `dynamic_or_oneof` validation in default-only changes.

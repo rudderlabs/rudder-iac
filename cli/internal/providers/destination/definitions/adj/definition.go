@@ -52,7 +52,7 @@ type enableInstallAttributionTracking struct {
 type adjustConfig struct {
 	AppToken                         string                            `mapstructure:"app_token" validate:"required,pattern=single_line_100"`
 	Delay                            string                            `mapstructure:"delay" validate:"omitempty,pattern=single_line_100"`
-	Environment                      *bool                             `mapstructure:"environment"`
+	Environment                      *bool                             `mapstructure:"environment" default:"false"`
 	CustomMappings                   []adjustMapping                   `mapstructure:"custom_mappings" validate:"omitempty,dive"`
 	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_params_keys" validate:"omitempty,dive"`
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`

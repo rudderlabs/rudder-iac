@@ -57,9 +57,44 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"enable_install_attribution_tracking/ios":     {"ios", "ios_swift"},
 	}, registered.GatedKeyPaths())
 
+	// eventFilteringOption is discriminator-derived and has no direct local key to default.
+	assert.Equal(t, map[string]any{
+		"environment": false,
+	}, registered.ConfigDefaults())
+
 	byAPI, err := registry.GetByAPIType("ADJ", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestAdjustApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"app_token":   "abc123",
+			"environment": false,
+		}, registered.ApplyDefaults(map[string]any{"app_token": "abc123"}))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"app_token":   "abc123",
+			"environment": true,
+		}, registered.ApplyDefaults(map[string]any{
+			"app_token":   "abc123",
+			"environment": true,
+		}))
+	})
 }
 
 func TestAdjustConfigValidation(t *testing.T) {
