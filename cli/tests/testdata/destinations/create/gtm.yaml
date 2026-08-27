@@ -19,3 +19,5 @@ spec:
       whitelist:
         - Order Completed
         - Product Viewed
+    connection_mode:
+      web: device

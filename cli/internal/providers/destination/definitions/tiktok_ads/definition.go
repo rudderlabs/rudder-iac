@@ -57,6 +57,7 @@ type tiktokAdsConfig struct {
 	EventFilteringWhitelist []string                 `mapstructure:"event_filtering_whitelist" validate:"omitempty,excluded_with=EventFilteringBlacklist,dive,dynamic_or_pattern=single_line_100"`
 	EventFilteringBlacklist []string                 `mapstructure:"event_filtering_blacklist" validate:"omitempty,excluded_with=EventFilteringWhitelist,dive,dynamic_or_pattern=single_line_100"`
 	UseNativeSDK            useNativeSDK             `mapstructure:"use_native_sdk"`
+	ConnectionMode          common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -80,6 +81,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

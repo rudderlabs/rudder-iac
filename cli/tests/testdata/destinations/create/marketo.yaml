@@ -29,3 +29,6 @@ spec:
     custom_activity_property_map:
       - from: properties.product_id
         to: Product ID
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

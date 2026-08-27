@@ -45,6 +45,7 @@ type hsConfig struct {
 	HubSpotEvents     []hubSpotEvent           `mapstructure:"hubspot_events" validate:"omitempty,dive"`
 	EventFiltering    *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -89,6 +90,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

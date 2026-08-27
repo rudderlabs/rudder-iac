@@ -40,13 +40,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -56,13 +53,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // kafkaConfig is the local YAML config model. Field set mirrors
@@ -89,6 +83,7 @@ type kafkaConfig struct {
 	SSHUser             string                   `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_user_name"`
 	SSHPublicKey        string                   `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_public_key"`
 	EmbedAvroSchemaID   *bool                    `mapstructure:"embed_avro_schema_id"`
+	ConnectionMode      common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -146,6 +141,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("sshUser", "ssh_user"),
 		converter.Simple("sshPublicKey", "ssh_public_key"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

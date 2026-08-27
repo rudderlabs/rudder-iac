@@ -28,8 +28,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -250,6 +250,35 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/consent_management/web/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
 }
 
 func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
@@ -318,8 +347,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"access_token": "access-token-1",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
@@ -327,8 +355,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				"accessToken": "access-token-1",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},

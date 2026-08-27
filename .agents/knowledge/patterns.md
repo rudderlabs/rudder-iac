@@ -173,3 +173,9 @@
 - Qualtrics destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available.
 - Do not add fixture-only Qualtrics YAML under `cli/tests/testdata/destinations/{create,update}` without matching live snapshots because `TestDestinationsApply` count-checks fixture/snapshot parity and unmatched fixtures can break the entire destination E2E suite.
 - Until live snapshots are available, rely on Qualtrics definition/unit coverage plus ungated compile/skip E2E validation in autonomous environments.
+
+## DEX-719 — GCS Connection Mode E2E Fixture Updates
+<!-- ticket:DEX-719 -->
+- For GCS connection-mode re-onboarding, update existing GCS destination fixture and expected upstream snapshot pairs in lockstep instead of adding new fixture files.
+- GCS destination E2E fixtures that include `connection_mode` should use literal `cloud` values, not templates, because connection mode is enum-like and template values are rejected by validation.
+- Preserve `TestDestinationsApply` fixture/snapshot parity: no fixture-only additions, because the snapshot tester count-checks expected upstream destinations before payload comparison.

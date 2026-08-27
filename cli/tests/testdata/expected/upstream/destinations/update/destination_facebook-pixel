@@ -7,6 +7,10 @@
   "type": "FACEBOOK_PIXEL",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "pixelId": "6543210987654321",
     "standardPageCall": false,
     "valueFieldIdentifier": "properties.price",

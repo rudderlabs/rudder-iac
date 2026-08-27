@@ -15,3 +15,6 @@ spec:
     api_key_value: "{{ .HTTP_API_KEY_VALUE }}"
     method: POST
     format: JSON
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

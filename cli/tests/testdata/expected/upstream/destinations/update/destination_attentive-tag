@@ -1,5 +1,9 @@
 {
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "enableNewIdentifyFlow": true,
     "signUpSourceId": "654321"
   },

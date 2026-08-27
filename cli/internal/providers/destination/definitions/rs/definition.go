@@ -56,13 +56,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
 	common.SourceTypeReactNative,
-	common.SourceTypeCloudSource,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -72,13 +69,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
-	common.SourceTypeCloudSource:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // excludeWindow mirrors the only genuinely nested object in the upstream config.
@@ -141,6 +135,7 @@ type rsConfig struct {
 	EnableSSE                 *bool  `mapstructure:"enable_sse"`
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -184,6 +179,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("cleanupObjectStorageFiles", "cleanup_object_storage_files"),
 		converter.Simple("allowUsersContextTraits", "allow_users_context_traits"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

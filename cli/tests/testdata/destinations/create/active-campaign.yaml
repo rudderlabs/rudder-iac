@@ -15,3 +15,6 @@ spec:
     event_key: "{{ .ACTIVE_CAMPAIGN_EVENT_KEY }}"
     use_native_sdk:
       web: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

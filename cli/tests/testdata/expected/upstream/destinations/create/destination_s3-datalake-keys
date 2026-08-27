@@ -7,6 +7,10 @@
   "type": "S3_DATALAKE",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "allowUsersContextTraits": false,
     "bucketName": "rudder-cli-e2e-datalake",
     "cleanupObjectStorageFiles": false,

@@ -29,13 +29,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -45,13 +42,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // slackConfig is the local YAML config model. Field set mirrors the Terraform
@@ -65,6 +59,7 @@ type slackConfig struct {
 	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
 	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	ConnectionMode           common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement        common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -101,6 +96,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.ArrayWithStrings("whitelistedTraitsSettings", "trait", "whitelisted_trait_settings"),
 		converter.ArrayWithStrings("denyListOfEvents", "eventName", "deny_list_of_events"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

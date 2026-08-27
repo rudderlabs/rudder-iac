@@ -15,3 +15,6 @@ spec:
     map_properties: false
     sandbox: true
     use_contact_id: true
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

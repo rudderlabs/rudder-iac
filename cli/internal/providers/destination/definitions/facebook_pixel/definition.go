@@ -86,6 +86,7 @@ type facebookPixelConfig struct {
 	UseNativeSDK            webBool                  `mapstructure:"use_native_sdk"`
 	AutoConfig              webBool                  `mapstructure:"auto_config"`
 	LegacyConversionPixelID legacyConversionPixelID  `mapstructure:"legacy_conversion_pixel_id"`
+	ConnectionMode          common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -132,6 +133,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

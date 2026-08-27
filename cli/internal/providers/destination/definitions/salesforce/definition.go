@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,13 +27,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // salesforceConfig is the local YAML config model. Field set mirrors
@@ -49,6 +43,7 @@ type salesforceConfig struct {
 	MapProperties      *bool                    `mapstructure:"map_properties"`
 	Sandbox            *bool                    `mapstructure:"sandbox"`
 	UseContactID       *bool                    `mapstructure:"use_contact_id"`
+	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -62,6 +57,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("sandbox", "sandbox"),
 		converter.Simple("useContactId", "use_contact_id"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

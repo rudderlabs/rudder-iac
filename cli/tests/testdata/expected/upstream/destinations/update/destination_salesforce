@@ -7,6 +7,10 @@
   "type": "SALESFORCE",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "userName": "rudder-cli-e2e@example.com",
     "mapProperties": false,
     "sandbox": true,

@@ -53,6 +53,7 @@ type intercomConfig struct {
 	MobileAPIKeyIOS     string                   `mapstructure:"mobile_api_key_ios" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventFiltering      *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK        *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode      common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -94,6 +95,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

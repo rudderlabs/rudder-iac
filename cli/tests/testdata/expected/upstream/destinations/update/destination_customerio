@@ -7,6 +7,10 @@
   "type": "CUSTOMERIO",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "siteID": "rudderCliE2eSiteIdUpdated",
     "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
     "datacenter": "EU",

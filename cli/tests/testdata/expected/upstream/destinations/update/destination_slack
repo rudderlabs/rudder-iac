@@ -7,6 +7,10 @@
   "type": "SLACK",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
     "incomingWebhooksType": "modern",
     "identifyTemplate": "Identify user",

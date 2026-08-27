@@ -53,6 +53,7 @@ type attentiveTagConfig struct {
 	APIKey                string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
 	SignUpSourceID        string                   `mapstructure:"sign_up_source_id" validate:"omitempty,pattern=attentive_tag_sign_up_source_id"`
 	EnableNewIdentifyFlow *bool                    `mapstructure:"enable_new_identify_flow"`
+	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -63,6 +64,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("signUpSourceId", "sign_up_source_id"),
 		converter.Simple("enableNewIdentifyFlow", "enable_new_identify_flow"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

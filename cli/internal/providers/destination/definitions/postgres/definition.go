@@ -41,13 +41,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
 	common.SourceTypeReactNative,
-	common.SourceTypeCloudSource,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -57,13 +54,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
-	common.SourceTypeCloudSource:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // excludeWindow mirrors the only genuinely nested object in the upstream config.
@@ -140,6 +134,7 @@ type postgresConfig struct {
 	SecretAccessKey string `mapstructure:"secret_access_key" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,dynamic_or_pattern=single_line_100"`
 	UseSSL          *bool  `mapstructure:"use_ssl" validate:"required_if=UseRudderStorage false BucketProvider MINIO"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -189,6 +184,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("secretAccessKey", "secret_access_key"),
 		converter.Simple("useSSL", "use_ssl"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

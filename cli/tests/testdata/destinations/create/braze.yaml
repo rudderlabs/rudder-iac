@@ -32,3 +32,6 @@ spec:
       web: false
     allow_user_supplied_javascript:
       web: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

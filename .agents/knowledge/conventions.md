@@ -172,3 +172,9 @@
 - Qualtrics `project_id` remains a normal required local config field, not a write-only secret field.
 - Qualtrics local `enable_generic_page_title.web` maps to API `enableGenericPageTitle.web`; do not use Terraform's flat `enable_generic_page_title` shape as the CLI YAML shape.
 - Omit `connection_mode` from Qualtrics local config because `schema.json` does not declare `connectionMode`, even though db-config destination config lists it per source.
+
+## DEX-719 — GCS Connection Mode Config Surface
+<!-- ticket:DEX-719 -->
+- GCS models schema-declared `connectionMode` as local YAML key `connection_mode` through the shared `common.ConnectionMode` / `common.ConnectionModeProperties(sourceTypes)` helpers.
+- Keep GCS on the CLI-owned event-stream source set from DEX-499 with cloud-only connection modes; do not broaden GCS source ownership while adding `connection_mode`.
+- GCS `connection_mode` validation should reject templates, empty strings, and non-cloud values via existing registered-definition connection-mode validation.

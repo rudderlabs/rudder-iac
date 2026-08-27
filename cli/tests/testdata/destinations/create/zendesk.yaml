@@ -17,3 +17,6 @@ spec:
     send_group_calls_without_user_id: false
     remove_users_from_organization: false
     search_by_external_id: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud
