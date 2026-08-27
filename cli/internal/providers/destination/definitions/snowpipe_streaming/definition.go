@@ -63,12 +63,12 @@ type snowpipeStreamingConfig struct {
 	// Terraform accepts raw key bodies and wraps them for the API; mirror that
 	// behavior instead of forcing every spec to carry PEM headers.
 	PrivateKey           string `mapstructure:"private_key" validate:"required"`
-	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,pattern=single_line_100"`
 
 	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
 	JSONPaths               string `mapstructure:"json_paths"`
 	EnableIceberg           *bool  `mapstructure:"enable_iceberg" default:"false"`
-	ExternalVolume          string `mapstructure:"external_volume" validate:"required_if=EnableIceberg true,omitempty,dynamic_or_pattern=single_line_100"`
+	ExternalVolume          string `mapstructure:"external_volume" validate:"required_if=EnableIceberg true,omitempty,pattern=single_line_100"`
 	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
 	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
 

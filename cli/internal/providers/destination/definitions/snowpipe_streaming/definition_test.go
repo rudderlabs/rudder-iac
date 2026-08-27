@@ -339,13 +339,18 @@ func TestSnowpipeStreamingDefaultsAndConnectionMode(t *testing.T) {
 	// own ConnectionModes map. Upstream declares every source type cloud-only.
 	t.Run("accepts a supported mode", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"connection_mode": map[string]any{"web": "cloud"},
-		})
-
-		for _, err := range errors {
-			assert.NotEqual(t, "/connection_mode/web", err.Path)
-		}
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"account":     "rudder-cli-e2e.us-east-1",
+			"database":    "RUDDER_E2E",
+			"warehouse":   "RUDDER_WH",
+			"user":        "RUDDER_CLI_E2E",
+			"namespace":   "rudder_cli_e2e",
+			"private_key": "abc",
+			"connection_mode": map[string]any{
+				"web":            "cloud",
+				"android_kotlin": "cloud",
+			},
+		}))
 	})
 
 	t.Run("rejects an unsupported mode", func(t *testing.T) {
