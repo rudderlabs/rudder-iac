@@ -26,6 +26,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
+	assert.Equal(t, map[string]any{
+		"action_source":      "website",
+		"limited_data_usage": false,
+		"test_destination":   false,
+		"remove_external_id": false,
+	}, registered.ConfigDefaults())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
@@ -42,6 +48,47 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	byAPI, err := registry.GetByAPIType("FACEBOOK_CONVERSIONS", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestFacebookConversionsApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(facebookconversions.NewDefinition()))
+	registered, err := registry.Get("facebook_conversions", 1)
+	require.NoError(t, err)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"dataset_id":         "dataset-1",
+			"access_token":       "access-token-1",
+			"action_source":      "website",
+			"limited_data_usage": false,
+			"test_destination":   false,
+			"remove_external_id": false,
+		}, registered.ApplyDefaults(validMinimalConfig()))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["action_source"] = "app"
+		config["limited_data_usage"] = true
+		config["test_destination"] = true
+		config["remove_external_id"] = true
+
+		assert.Equal(t, map[string]any{
+			"dataset_id":         "dataset-1",
+			"access_token":       "access-token-1",
+			"action_source":      "app",
+			"limited_data_usage": true,
+			"test_destination":   true,
+			"remove_external_id": true,
+		}, registered.ApplyDefaults(config))
+	})
 }
 
 func TestFacebookConversionsConfigValidation(t *testing.T) {

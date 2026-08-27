@@ -78,7 +78,7 @@ type useNativeSDK struct {
 type posthogConfig struct {
 	APIKey                        string                   `mapstructure:"api_key" validate:"required,pattern=single_line_100"`
 	Endpoint                      string                   `mapstructure:"endpoint" validate:"omitempty,pattern=posthog_endpoint"`
-	UseV2Group                    *bool                    `mapstructure:"use_v2_group"`
+	UseV2Group                    *bool                    `mapstructure:"use_v2_group" default:"false"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                  *useNativeSDK            `mapstructure:"use_native_sdk"`
 	Autocapture                   *webBool                 `mapstructure:"autocapture"`

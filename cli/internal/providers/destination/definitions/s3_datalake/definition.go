@@ -81,19 +81,19 @@ type s3DatalakeConfig struct {
 	// do not expose it; keep it modelled so imports/specs can preserve and wrap it.
 	Password string `mapstructure:"password"`
 
-	EnableSSE *bool `mapstructure:"enable_sse"`
+	EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
 
 	// schema.json requires only bucketName, so sync_frequency is optional here
 	// even though sibling warehouse destinations mark it required.
-	SyncFrequency string `mapstructure:"sync_frequency" validate:"omitempty,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
+	SyncFrequency string `mapstructure:"sync_frequency" validate:"omitempty,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440" default:"180"`
 	SyncStartAt   string `mapstructure:"sync_start_at"`
 
-	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table"`
-	SkipUsersTable            *bool                    `mapstructure:"skip_users_table"`
+	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table" default:"false"`
+	SkipUsersTable            *bool                    `mapstructure:"skip_users_table" default:"true"`
 	TimeWindowLayout          string                   `mapstructure:"time_window_layout"`
-	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers"`
-	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files"`
-	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits"`
+	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers" default:"false"`
+	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files" default:"false"`
+	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits" default:"false"`
 	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }

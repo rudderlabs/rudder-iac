@@ -1,10 +1,15 @@
 package intercom
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func init() {
@@ -43,12 +48,12 @@ var connectionModes = map[string][]string{
 }
 
 type intercomConfig struct {
-	AppID               *string                  `mapstructure:"app_id" validate:"omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
-	APIKey              *string                  `mapstructure:"api_key" validate:"omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
-	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,dynamic_or_oneof=standard eu au"`
-	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,dynamic_or_oneof=v1 v2"`
-	SendAnonymousID     *bool                    `mapstructure:"send_anonymous_id"`
-	UpdateLastRequestAt *bool                    `mapstructure:"update_last_request_at"`
+	AppID               *string                  `mapstructure:"app_id" validate:"intercom_app_id_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
+	APIKey              *string                  `mapstructure:"api_key" validate:"intercom_api_key_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
+	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,dynamic_or_oneof=standard eu au" default:"standard"`
+	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,dynamic_or_oneof=v1 v2" default:"v2"`
+	SendAnonymousID     *bool                    `mapstructure:"send_anonymous_id" default:"false"`
+	UpdateLastRequestAt *bool                    `mapstructure:"update_last_request_at" default:"true"`
 	MobileAPIKeyAndroid string                   `mapstructure:"mobile_api_key_android" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	MobileAPIKeyIOS     string                   `mapstructure:"mobile_api_key_ios" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventFiltering      *eventFiltering          `mapstructure:"event_filtering"`
@@ -67,6 +72,53 @@ type useNativeSDK struct {
 	IOS     *bool `mapstructure:"ios"`
 	Web     *bool `mapstructure:"web"`
 }
+
+// schema.json splits Intercom's credentials by connection mode: device-mode
+// sources need app_id, cloud-mode sources need api_key. Both conditions are
+// keyed on connection_mode entries, which required_if cannot resolve, so they
+// read the sibling off FieldLevel.Parent(). Each tag precedes omitempty, which
+// would otherwise short-circuit it on the empty value being rejected.
+func intercomModeConditional(want string, sources []string) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		parent := fl.Parent()
+		if parent.Kind() == reflect.Pointer {
+			parent = parent.Elem()
+		}
+
+		field := parent.FieldByName("ConnectionMode")
+		if !field.IsValid() {
+			return true
+		}
+		connectionMode, _ := field.Interface().(common.ConnectionMode)
+
+		var matched bool
+		for _, sourceType := range sources {
+			if connectionMode[sourceType] == want {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return true
+		}
+		return nonEmptyValue(fl)
+	}
+}
+
+// app_id and api_key are *string so an absent key (nil) stays distinguishable
+// from a present-but-empty one, which the pattern rejects.
+func nonEmptyValue(fl validator.FieldLevel) bool {
+	value := fl.Field()
+	if value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return false
+		}
+		value = value.Elem()
+	}
+	return value.String() != ""
+}
+
+var intercomDeviceSources = []string{common.SourceTypeWeb, common.SourceTypeIOS, common.SourceTypeAndroid}
 
 // NewDefinition returns the Intercom destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
@@ -103,6 +155,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "INTERCOM",
 		Version:    1,
 		Properties: properties,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "intercom_app_id_required", Func: intercomModeConditional("device", intercomDeviceSources), CallEvenIfNull: true},
+			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", sourceTypes), CallEvenIfNull: true},
+		},
 		SecretKeys: []string{"api_key"},
 		NewConfig: func() any {
 			return &intercomConfig{}

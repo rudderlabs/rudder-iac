@@ -52,14 +52,54 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
+	// One flag per platform, matching schema.json's four sub-keys and db-config's
+	// per-source-type destConfig. use_native_sdk is a source-type block key and is
+	// deliberately ungated, so it does not appear here.
 	assert.Equal(t, map[string][]string{
-		"enable_install_attribution_tracking/android": {"android", "android_kotlin"},
-		"enable_install_attribution_tracking/ios":     {"ios", "ios_swift"},
+		"enable_install_attribution_tracking/android":        {"android"},
+		"enable_install_attribution_tracking/android_kotlin": {"android_kotlin"},
+		"enable_install_attribution_tracking/ios":            {"ios"},
+		"enable_install_attribution_tracking/ios_swift":      {"ios_swift"},
 	}, registered.GatedKeyPaths())
+
+	// eventFilteringOption is discriminator-derived and has no direct local key to default.
+	assert.Equal(t, map[string]any{
+		"environment": false,
+	}, registered.ConfigDefaults())
 
 	byAPI, err := registry.GetByAPIType("ADJ", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestAdjustApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"app_token":   "abc123",
+			"environment": false,
+		}, registered.ApplyDefaults(map[string]any{"app_token": "abc123"}))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"app_token":   "abc123",
+			"environment": true,
+		}, registered.ApplyDefaults(map[string]any{
+			"app_token":   "abc123",
+			"environment": true,
+		}))
+	})
 }
 
 func TestAdjustConfigValidation(t *testing.T) {
@@ -330,6 +370,53 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}]
+				}
+			}`,
+		},
+	})
+}
+
+// use_native_sdk and the two added attribution sub-keys are declared by
+// schema.json; unmodelled they were dropped from the payload and erased upstream
+// on the first apply.
+func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	testutil.AssertConversion(t, adj.NewDefinition().Properties, []testutil.ConversionCase{
+		{
+			Name: "use_native_sdk and per-platform attribution",
+			LocalJSON: `{
+				"app_token": "adjToken",
+				"use_native_sdk": {
+					"android": true,
+					"android_kotlin": true,
+					"ios": false,
+					"ios_swift": true,
+					"unity": false,
+					"flutter": true
+				},
+				"enable_install_attribution_tracking": {
+					"android": true,
+					"android_kotlin": false,
+					"ios": true,
+					"ios_swift": false
+				}
+			}`,
+			APIJSON: `{
+				"appToken": "adjToken",
+				"useNativeSDK": {
+					"android": true,
+					"androidKotlin": true,
+					"ios": false,
+					"iosSwift": true,
+					"unity": false,
+					"flutter": true
+				},
+				"enableInstallAttributionTracking": {
+					"android": true,
+					"androidKotlin": false,
+					"ios": true,
+					"iosSwift": false
 				}
 			}`,
 		},

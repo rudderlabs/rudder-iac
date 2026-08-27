@@ -47,7 +47,7 @@ type kinesisConfig struct {
 	IAMRoleARN   string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKeyID  string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKey    string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
-	UseMessageID *bool  `mapstructure:"use_message_id"`
+	UseMessageID *bool  `mapstructure:"use_message_id" default:"false"`
 
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`

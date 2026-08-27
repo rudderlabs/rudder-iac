@@ -543,3 +543,64 @@ func validFullConfig() map[string]any {
 		},
 	}
 }
+
+// schema.json splits credentials by connection mode: device-mode sources need
+// app_id, cloud-mode sources need api_key. Both branches were unexpressed, so a
+// config missing the credential its mode requires validated locally.
+func TestIntercomCredentialConditionals(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(intercom.NewDefinition()))
+	registered, err := registry.Get("intercom", 1)
+	require.NoError(t, err)
+
+	paths := func(errors []definitions.ConfigError) []string {
+		out := make([]string, 0, len(errors))
+		for _, err := range errors {
+			out = append(out, err.Path)
+		}
+		return out
+	}
+
+	cases := []struct {
+		name   string
+		config map[string]any
+		want   []string
+	}{
+		{
+			name:   "device mode requires app_id",
+			config: map[string]any{"connection_mode": map[string]any{"web": "device"}},
+			want:   []string{"/app_id"},
+		},
+		{
+			name:   "device mode satisfied by app_id",
+			config: map[string]any{"connection_mode": map[string]any{"web": "device"}, "app_id": "app-1"},
+			want:   []string{},
+		},
+		{
+			name:   "cloud mode requires api_key",
+			config: map[string]any{"connection_mode": map[string]any{"cloud": "cloud"}},
+			want:   []string{"/api_key"},
+		},
+		{
+			name:   "cloud mode satisfied by api_key",
+			config: map[string]any{"connection_mode": map[string]any{"cloud": "cloud"}, "api_key": "key-1"},
+			want:   []string{},
+		},
+		{
+			// Without a connection mode neither branch applies, so neither
+			// credential is required.
+			name:   "no connection mode requires neither",
+			config: map[string]any{},
+			want:   []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.ElementsMatch(t, tc.want, paths(registered.ValidateConfig(tc.config)))
+		})
+	}
+}

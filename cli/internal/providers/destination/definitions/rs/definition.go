@@ -102,12 +102,12 @@ type rsConfig struct {
 
 	IAMRoleARNForAuth string `mapstructure:"iam_role_arn_for_auth" validate:"required_if=UseIAMForAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	ClusterRegion     string `mapstructure:"cluster_region" validate:"required_if=UseIAMForAuth true,omitempty,dynamic_or_pattern=rs_single_line_255"`
-	UseServerless     *bool  `mapstructure:"use_serverless" validate:"required_if=UseIAMForAuth true"`
+	UseServerless     *bool  `mapstructure:"use_serverless" validate:"required_if=UseIAMForAuth true" default:"false"`
 	ClusterID         string `mapstructure:"cluster_id" validate:"required_if=UseIAMForAuth true UseServerless false,omitempty,dynamic_or_pattern=rs_single_line_255"`
 	WorkgroupName     string `mapstructure:"workgroup_name" validate:"required_if=UseIAMForAuth true UseServerless true,omitempty,dynamic_or_pattern=rs_single_line_255"`
 
 	Namespace string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=rs_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh"`
+	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
 	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
@@ -119,21 +119,21 @@ type rsConfig struct {
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
-	SkipTracksTable           *bool  `mapstructure:"skip_tracks_table"`
-	SkipUsersTable            *bool  `mapstructure:"skip_users_table"`
-	PreferAppend              *bool  `mapstructure:"prefer_append"`
+	SkipTracksTable           *bool  `mapstructure:"skip_tracks_table" default:"false"`
+	SkipUsersTable            *bool  `mapstructure:"skip_users_table" default:"true"`
+	PreferAppend              *bool  `mapstructure:"prefer_append" default:"true"`
 	JSONPaths                 string `mapstructure:"json_paths"`
-	UnderscoreDivideNumbers   *bool  `mapstructure:"underscore_divide_numbers"`
-	AllowUsersContextTraits   *bool  `mapstructure:"allow_users_context_traits"`
+	UnderscoreDivideNumbers   *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
+	AllowUsersContextTraits   *bool  `mapstructure:"allow_users_context_traits" default:"false"`
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	BucketName                string `mapstructure:"bucket_name" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_pattern=rs_bucket_name"`
 	IAMRoleARN                string `mapstructure:"iam_role_arn" validate:"required_if=UseRudderStorage false RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
-	RoleBasedAuth             *bool  `mapstructure:"role_based_auth"`
+	RoleBasedAuth             *bool  `mapstructure:"role_based_auth" default:"true"`
 	AccessKeyID               string `mapstructure:"access_key_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKey                 string `mapstructure:"access_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Prefix                    string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=rs_prefix"`
-	EnableSSE                 *bool  `mapstructure:"enable_sse"`
-	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
+	EnableSSE                 *bool  `mapstructure:"enable_sse" default:"false"`
+	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`

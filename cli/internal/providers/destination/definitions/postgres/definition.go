@@ -76,7 +76,7 @@ type postgresConfig struct {
 	Port     string `mapstructure:"port" validate:"required,dynamic_or_pattern=single_line_100"`
 
 	Namespace string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=postgres_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh"`
+	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
 	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
 	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
@@ -94,12 +94,12 @@ type postgresConfig struct {
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
-	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table"`
-	SkipUsersTable          *bool  `mapstructure:"skip_users_table"`
-	PreferAppend            *bool  `mapstructure:"prefer_append"`
+	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
+	SkipUsersTable          *bool  `mapstructure:"skip_users_table" default:"true"`
+	PreferAppend            *bool  `mapstructure:"prefer_append" default:"true"`
 	JSONPaths               string `mapstructure:"json_paths"`
-	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
-	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
+	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
+	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
 
 	// Object-storage staging. Upstream keeps every provider's keys in the same
 	// flat object, so a key is required only for the providers schema.json names
@@ -113,7 +113,7 @@ type postgresConfig struct {
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	BucketProvider            string `mapstructure:"bucket_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=S3 GCS AZURE_BLOB MINIO"`
 	BucketName                string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true BucketProvider AZURE_BLOB,omitempty,dynamic_or_pattern=single_line_100"`
-	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
+	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 
 	// S3
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`

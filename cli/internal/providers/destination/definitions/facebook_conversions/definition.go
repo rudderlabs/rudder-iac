@@ -39,11 +39,11 @@ var connectionModes = map[string][]string{
 type facebookConversionsConfig struct {
 	DatasetID              string                   `mapstructure:"dataset_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	AccessToken            string                   `mapstructure:"access_token" validate:"required,dynamic_or_pattern=single_line_500"`
-	ActionSource           string                   `mapstructure:"action_source" validate:"omitempty,dynamic_or_oneof=website email app phone_call chat physical_store system_generated other"`
-	LimitedDataUsage       *bool                    `mapstructure:"limited_data_usage"`
-	TestDestination        *bool                    `mapstructure:"test_destination"`
+	ActionSource           string                   `mapstructure:"action_source" validate:"omitempty,dynamic_or_oneof=website email app phone_call chat physical_store system_generated other" default:"website"`
+	LimitedDataUsage       *bool                    `mapstructure:"limited_data_usage" default:"false"`
+	TestDestination        *bool                    `mapstructure:"test_destination" default:"false"`
 	TestEventCode          string                   `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	RemoveExternalID       *bool                    `mapstructure:"remove_external_id"`
+	RemoveExternalID       *bool                    `mapstructure:"remove_external_id" default:"false"`
 	EventsToEvents         []eventMapping           `mapstructure:"events_to_events" validate:"omitempty,dive"`
 	BlacklistPIIProperties []piiDenylistEntry       `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
 	WhitelistPIIProperties []piiAllowlistEntry      `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`

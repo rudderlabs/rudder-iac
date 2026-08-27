@@ -506,3 +506,93 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 		},
 	})
 }
+
+// schema.json gates the five API keys on connection_mode combined with
+// use_platform_specific_api_keys. Every branch was previously unexpressed, so a
+// config missing a genuinely required key validated locally and failed upstream.
+func TestBrazeAPIKeyConditionals(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(braze.NewDefinition()))
+	registered, err := registry.Get("braze", 1)
+	require.NoError(t, err)
+
+	config := func(extra map[string]any) map[string]any {
+		cfg := map[string]any{"data_center": "US-01"}
+		for k, v := range extra {
+			cfg[k] = v
+		}
+		return cfg
+	}
+	paths := func(errors []definitions.ConfigError) []string {
+		out := make([]string, 0, len(errors))
+		for _, err := range errors {
+			out = append(out, err.Path)
+		}
+		return out
+	}
+
+	cases := []struct {
+		name  string
+		extra map[string]any
+		want  []string
+	}{
+		{
+			name:  "cloud requires rest_api_key",
+			extra: map[string]any{"connection_mode": map[string]any{"web": "cloud"}},
+			want:  []string{"/rest_api_key"},
+		},
+		{
+			name:  "cloud satisfied by rest_api_key",
+			extra: map[string]any{"connection_mode": map[string]any{"web": "cloud"}, "rest_api_key": "rest-key"},
+			want:  []string{},
+		},
+		{
+			name: "device without platform-specific keys requires app_key",
+			extra: map[string]any{
+				"connection_mode":                map[string]any{"web": "device"},
+				"use_platform_specific_api_keys": false,
+			},
+			want: []string{"/app_key"},
+		},
+		{
+			name: "platform-specific android requires android_api_key",
+			extra: map[string]any{
+				"connection_mode":                map[string]any{"android": "device"},
+				"use_platform_specific_api_keys": true,
+			},
+			want: []string{"/android_api_key"},
+		},
+		{
+			name: "platform-specific web requires web_api_key",
+			extra: map[string]any{
+				"connection_mode":                map[string]any{"web": "device"},
+				"use_platform_specific_api_keys": true,
+			},
+			want: []string{"/web_api_key"},
+		},
+		{
+			// react_native and flutter ship both native SDKs, so schema.json's
+			// last branch requires the Android and iOS keys together.
+			name: "platform-specific react_native requires both native keys",
+			extra: map[string]any{
+				"connection_mode":                map[string]any{"react_native": "device"},
+				"use_platform_specific_api_keys": true,
+			},
+			want: []string{"/android_api_key", "/ios_api_key"},
+		},
+		{
+			name:  "no connection mode requires no api key",
+			extra: map[string]any{},
+			want:  []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.ElementsMatch(t, tc.want, paths(registered.ValidateConfig(config(tc.extra))))
+		})
+	}
+}

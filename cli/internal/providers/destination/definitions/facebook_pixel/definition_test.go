@@ -86,6 +86,7 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"pixel_id":               "pixel-1",
+			"access_token":           "fbAccessToken",
 			"value_field_identifier": "properties.revenue",
 		})
 		require.NotEmpty(t, errors)
@@ -97,6 +98,7 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
 			"pixel_id":               "pixel-1",
+			"access_token":           "fbAccessToken",
 			"value_field_identifier": "{{ .FACEBOOK_VALUE_FIELD_IDENTIFIER }}",
 		})
 		assert.Empty(t, errors)
@@ -105,7 +107,8 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 	t.Run("invalid mapped event target", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"pixel_id": "pixel-1",
+			"pixel_id":     "pixel-1",
+			"access_token": "fbAccessToken",
 			"events_to_events": []any{
 				map[string]any{"from": "Signed Up", "to": "InvalidEvent"},
 			},
@@ -118,7 +121,8 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"pixel_id": "pixel-1",
+			"pixel_id":     "pixel-1",
+			"access_token": "fbAccessToken",
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed"},
 				"blacklist": []any{"Order Completed"},
@@ -359,13 +363,22 @@ func TestFacebookPixelEmptyOptionalValuesAccepted(t *testing.T) {
 
 	assert.Empty(t, registered.ValidateConfig(map[string]any{
 		"pixel_id":         "1234567890",
+		"access_token":     "fbAccessToken",
 		"events_to_events": []any{map[string]any{"from": "Order Completed", "to": ""}},
 	}), `eventsToEvents[].to accepts "" — it is a schema enum member`)
 
+	// schema.json requires accessToken unless connection_mode.web is device, so an
+	// empty token is accepted only in that one case.
 	assert.Empty(t, registered.ValidateConfig(map[string]any{
+		"pixel_id":        "1234567890",
+		"access_token":    "",
+		"connection_mode": map[string]any{"web": "device"},
+	}), "device-mode web needs no access_token")
+
+	assert.NotEmpty(t, registered.ValidateConfig(map[string]any{
 		"pixel_id":     "1234567890",
 		"access_token": "",
-	}), "access_token is optional; its non-empty bound is connectionMode-gated")
+	}), "without a device-mode web source, access_token is required")
 }
 
 // schema.json bounds accessToken with ^(.{1,300})$ inside the allOf branch — a
@@ -378,7 +391,7 @@ func TestFacebookPixelAccessTokenPattern(t *testing.T) {
 	registered, err := registry.Get("facebook_pixel", 1)
 	require.NoError(t, err)
 
-	base := map[string]any{"pixel_id": "1234567890"}
+	base := map[string]any{"pixel_id": "1234567890", "access_token": "fbAccessToken"}
 
 	// 300 characters is allowed; 301 is not, and line breaks never are.
 	ok := base
@@ -552,7 +565,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "pixel_id",
 			path: "/pixel_id",
 			config: map[string]any{
-				"pixel_id": value,
+				"pixel_id":     value,
+				"access_token": "fbAccessToken",
 			},
 		},
 		{
@@ -560,6 +574,7 @@ func patternFieldCases(value string) []patternFieldCase {
 			path: "/test_event_code",
 			config: map[string]any{
 				"pixel_id":        "pixel-1",
+				"access_token":    "fbAccessToken",
 				"test_event_code": value,
 			},
 		},
@@ -567,7 +582,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "event from",
 			path: "/events_to_events/0/from",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"events_to_events": []any{
 					map[string]any{"from": value, "to": "Purchase"},
 				},
@@ -577,7 +593,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "denylist property",
 			path: "/blacklist_pii_properties/0/property",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"blacklist_pii_properties": []any{
 					map[string]any{"property": value, "hash": true},
 				},
@@ -587,7 +604,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "allowlist property",
 			path: "/whitelist_pii_properties/0/property",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"whitelist_pii_properties": []any{
 					map[string]any{"property": value},
 				},
@@ -597,7 +615,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "event filtering whitelist",
 			path: "/event_filtering/whitelist/0",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"event_filtering": map[string]any{
 					"whitelist": []any{value},
 				},
@@ -607,7 +626,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "event filtering blacklist",
 			path: "/event_filtering/blacklist/0",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"event_filtering": map[string]any{
 					"blacklist": []any{value},
 				},
@@ -617,7 +637,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "legacy conversion event",
 			path: "/legacy_conversion_pixel_id/web/0/from",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"legacy_conversion_pixel_id": map[string]any{
 					"web": []any{
 						map[string]any{"from": value, "to": "1234567890"},
@@ -629,7 +650,8 @@ func patternFieldCases(value string) []patternFieldCase {
 			name: "legacy conversion pixel id",
 			path: "/legacy_conversion_pixel_id/web/0/to",
 			config: map[string]any{
-				"pixel_id": "pixel-1",
+				"pixel_id":     "pixel-1",
+				"access_token": "fbAccessToken",
 				"legacy_conversion_pixel_id": map[string]any{
 					"web": []any{
 						map[string]any{"from": "Signup", "to": value},
@@ -642,7 +664,8 @@ func patternFieldCases(value string) []patternFieldCase {
 
 func validMinimalConfig() map[string]any {
 	return map[string]any{
-		"pixel_id": "pixel-1",
+		"pixel_id":     "pixel-1",
+		"access_token": "fbAccessToken",
 	}
 }
 
@@ -685,7 +708,8 @@ func validFullConfig() map[string]any {
 
 func validWebDeviceConfig() map[string]any {
 	return map[string]any{
-		"pixel_id": "pixel-1",
+		"pixel_id":     "pixel-1",
+		"access_token": "fbAccessToken",
 		"use_native_sdk": map[string]any{
 			"web": true,
 		},

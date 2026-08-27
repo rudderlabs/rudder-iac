@@ -1,9 +1,14 @@
 package braze
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // Source types from integrations-config destinations/braze/db-config.json.
@@ -57,26 +62,112 @@ type webBool struct {
 // where they can be expressed without making mode-dependent import paths stricter
 // than the backend.
 type brazeConfig struct {
-	RestAPIKey                           string                   `mapstructure:"rest_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	AppKey                               string                   `mapstructure:"app_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	RestAPIKey                           string                   `mapstructure:"rest_api_key" validate:"braze_rest_api_key_required,omitempty,dynamic_or_pattern=single_line_100"`
+	AppKey                               string                   `mapstructure:"app_key" validate:"braze_app_key_required,omitempty,dynamic_or_pattern=single_line_100"`
 	DataCenter                           string                   `mapstructure:"data_center" validate:"required,dynamic_or_oneof=US-01 US-02 US-03 US-04 US-05 US-06 US-07 US-08 EU-01 EU-02 EU-03 AU-01"`
-	EnableSubscriptionGroupInGroupCall   *bool                    `mapstructure:"enable_subscription_group_in_group_call"`
-	EnableNestedArrayOperations          *bool                    `mapstructure:"enable_nested_array_operations"`
-	SendPurchaseEventWithExtraProperties *bool                    `mapstructure:"send_purchase_event_with_extra_properties"`
+	EnableSubscriptionGroupInGroupCall   *bool                    `mapstructure:"enable_subscription_group_in_group_call" default:"false"`
+	EnableNestedArrayOperations          *bool                    `mapstructure:"enable_nested_array_operations" default:"false"`
+	SendPurchaseEventWithExtraProperties *bool                    `mapstructure:"send_purchase_event_with_extra_properties" default:"false"`
 	TrackAnonymousUser                   *webBool                 `mapstructure:"track_anonymous_user"`
-	SupportDedup                         *bool                    `mapstructure:"support_dedup"`
+	SupportDedup                         *bool                    `mapstructure:"support_dedup" default:"false"`
 	EnableBrazeLogging                   *webBool                 `mapstructure:"enable_braze_logging"`
 	EnablePushNotification               *webBool                 `mapstructure:"enable_push_notification"`
 	AllowUserSuppliedJavascript          *webBool                 `mapstructure:"allow_user_supplied_javascript"`
 	EventFiltering                       *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                         *useNativeSDK            `mapstructure:"use_native_sdk"`
-	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events"`
+	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events" default:"true"`
 	UsePlatformSpecificAPIKeys           *bool                    `mapstructure:"use_platform_specific_api_keys"`
-	AndroidAPIKey                        string                   `mapstructure:"android_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	IOSAPIKey                            string                   `mapstructure:"ios_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	WebAPIKey                            string                   `mapstructure:"web_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	AndroidAPIKey                        string                   `mapstructure:"android_api_key" validate:"braze_android_api_key_required,omitempty,dynamic_or_pattern=single_line_100"`
+	IOSAPIKey                            string                   `mapstructure:"ios_api_key" validate:"braze_ios_api_key_required,omitempty,dynamic_or_pattern=single_line_100"`
+	WebAPIKey                            string                   `mapstructure:"web_api_key" validate:"braze_web_api_key_required,omitempty,dynamic_or_pattern=single_line_100"`
 	ConnectionMode                       common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement                    common.ConsentManagement `mapstructure:"consent_management"`
+}
+
+// schema.json gates each API key on connection_mode — a map — combined with the
+// sibling use_platform_specific_api_keys flag. required_if cannot resolve a map
+// entry, so these read both off FieldLevel.Parent(), the same shape as
+// iterable's packageNameConditional, scoped here via ConfigValidateFuncs.
+//
+// Each tag must precede omitempty in the validate list: omitempty short-circuits
+// every validator after it on an empty value, which is the case these reject.
+func brazeParent(fl validator.FieldLevel) (common.ConnectionMode, *bool, bool) {
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	modeField := parent.FieldByName("ConnectionMode")
+	if !modeField.IsValid() {
+		return nil, nil, false
+	}
+	mode, _ := modeField.Interface().(common.ConnectionMode)
+
+	var platformSpecific *bool
+	if f := parent.FieldByName("UsePlatformSpecificAPIKeys"); f.IsValid() {
+		platformSpecific, _ = f.Interface().(*bool)
+	}
+	return mode, platformSpecific, true
+}
+
+func anyMode(mode common.ConnectionMode, sourceTypes []string, want ...string) bool {
+	for _, sourceType := range sourceTypes {
+		for _, w := range want {
+			if mode[sourceType] == w {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// restApiKey is required whenever any source connects in cloud or hybrid mode.
+func restAPIKeyConditional(fl validator.FieldLevel) bool {
+	mode, _, ok := brazeParent(fl)
+	if !ok || !anyMode(mode, sourceTypes, "cloud", "hybrid") {
+		return true
+	}
+	return fl.Field().String() != ""
+}
+
+// appKey is the single-key alternative: required for any device or hybrid source
+// when platform-specific keys are off.
+func appKeyConditional(fl validator.FieldLevel) bool {
+	mode, platformSpecific, ok := brazeParent(fl)
+	if !ok || platformSpecific == nil || *platformSpecific {
+		return true
+	}
+	if !anyMode(mode, sourceTypes, "device", "hybrid") {
+		return true
+	}
+	return fl.Field().String() != ""
+}
+
+// With platform-specific keys on, react_native and flutter in device mode need
+// both the Android and the iOS key, so each appears in both lists below.
+var (
+	brazeAndroidSources = []string{
+		common.SourceTypeAndroid, common.SourceTypeAndroidKotlin,
+		common.SourceTypeReactNative, common.SourceTypeFlutter,
+	}
+	brazeIOSSources = []string{
+		common.SourceTypeIOS, common.SourceTypeIOSSwift,
+		common.SourceTypeReactNative, common.SourceTypeFlutter,
+	}
+	brazeWebSources = []string{common.SourceTypeWeb}
+)
+
+func platformKeyConditional(sources []string) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		mode, platformSpecific, ok := brazeParent(fl)
+		if !ok || platformSpecific == nil || !*platformSpecific {
+			return true
+		}
+		if !anyMode(mode, sources, "device", "hybrid") {
+			return true
+		}
+		return fl.Field().String() != ""
+	}
 }
 
 // NewDefinition returns the Braze destination definition.
@@ -134,6 +225,13 @@ func NewDefinition() *definitions.DestinationDefinition {
 		Properties: properties,
 		// db-config declares only restApiKey as a secret. Terraform also marks appKey
 		// sensitive, but db-config is authoritative for CLI write-only wrapping.
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "braze_rest_api_key_required", Func: restAPIKeyConditional},
+			{Tag: "braze_app_key_required", Func: appKeyConditional},
+			{Tag: "braze_android_api_key_required", Func: platformKeyConditional(brazeAndroidSources)},
+			{Tag: "braze_ios_api_key_required", Func: platformKeyConditional(brazeIOSSources)},
+			{Tag: "braze_web_api_key_required", Func: platformKeyConditional(brazeWebSources)},
+		},
 		SecretKeys: []string{"rest_api_key"},
 		NewConfig: func() any {
 			return &brazeConfig{}
