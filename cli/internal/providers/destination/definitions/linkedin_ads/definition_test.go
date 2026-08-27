@@ -28,8 +28,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -123,6 +123,7 @@ func TestLinkedInAdsConfigValidation(t *testing.T) {
 			"ad_account_id":      "urn:li:sponsoredAccount:123456789",
 			"deduplication_key":  "properties.order_id",
 			"conversion_mapping": []any{map[string]any{"from": "Order Completed", "to": "123456"}},
+			"connection_mode":    map[string]any{"web": "cloud", "cloud": "cloud"},
 		})
 
 		assert.Empty(t, errors)
@@ -216,18 +217,27 @@ func TestLinkedInAdsConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	// connection_mode is definition-level metadata (ConnectionModes), never a
-	// user-settable config key — the same treatment every other definition gives it.
-	t.Run("connection_mode rejected as unknown key", func(t *testing.T) {
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum. Upstream declares every
+	// LinkedIn Ads source type as cloud-only.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
 		t.Parallel()
 		config := validMinimalConfig()
 		config["connection_mode"] = map[string]any{"web": "cloud"}
 
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": "device"}
+
 		errors := registered.ValidateConfig(config)
 
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -295,13 +305,21 @@ func TestLinkedInAdsConversionRoundTrip(t *testing.T) {
 				"rudder_account_id": "account-1",
 				"hash_data": true,
 				"ad_account_id": "urn:li:sponsoredAccount:123456789",
-				"deduplication_key": "properties.order_id"
+				"deduplication_key": "properties.order_id",
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"rudderAccountId": "account-1",
 				"hashData": true,
 				"adAccountId": "urn:li:sponsoredAccount:123456789",
-				"deduplicationKey": "properties.order_id"
+				"deduplicationKey": "properties.order_id",
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{
@@ -332,7 +350,7 @@ func TestLinkedInAdsConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolution_strategy": "and", "consents": ["analytics"]}]
+					"cloud": [{"provider": "custom", "resolution_strategy": "and", "consents": ["analytics"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -342,7 +360,7 @@ func TestLinkedInAdsConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent": "analytics"}]}]
+					"cloud": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent": "analytics"}]}]
 				}
 			}`,
 		},

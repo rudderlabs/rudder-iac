@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,15 +27,16 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
+// oneTrustCookieCategories and ketchConsentPurposes are deliberately absent:
+// the backend migrates them into consentManagement on write and never returns
+// them, so modelling them makes every plan diff. See DEX-696 Discrepancy 3.
+//
 // linkedinAdsConfig is the local YAML config model. Field set mirrors
 // integrations-config destinations/linkedIn_ads defaultConfig; validation
 // constraints mirror schema.json for overlapping terraform-mapped fields.
@@ -48,6 +46,7 @@ type linkedinAdsConfig struct {
 	AdAccountID       string                   `mapstructure:"ad_account_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	DeduplicationKey  string                   `mapstructure:"deduplication_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	ConversionMapping []conversionMapping      `mapstructure:"conversion_mapping" validate:"omitempty,dive"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -70,6 +69,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
