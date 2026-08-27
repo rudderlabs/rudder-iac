@@ -60,17 +60,17 @@ type brazeConfig struct {
 	RestAPIKey                           string                   `mapstructure:"rest_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	AppKey                               string                   `mapstructure:"app_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	DataCenter                           string                   `mapstructure:"data_center" validate:"required,dynamic_or_oneof=US-01 US-02 US-03 US-04 US-05 US-06 US-07 US-08 EU-01 EU-02 EU-03 AU-01"`
-	EnableSubscriptionGroupInGroupCall   *bool                    `mapstructure:"enable_subscription_group_in_group_call"`
-	EnableNestedArrayOperations          *bool                    `mapstructure:"enable_nested_array_operations"`
-	SendPurchaseEventWithExtraProperties *bool                    `mapstructure:"send_purchase_event_with_extra_properties"`
+	EnableSubscriptionGroupInGroupCall   *bool                    `mapstructure:"enable_subscription_group_in_group_call" default:"false"`
+	EnableNestedArrayOperations          *bool                    `mapstructure:"enable_nested_array_operations" default:"false"`
+	SendPurchaseEventWithExtraProperties *bool                    `mapstructure:"send_purchase_event_with_extra_properties" default:"false"`
 	TrackAnonymousUser                   *webBool                 `mapstructure:"track_anonymous_user"`
-	SupportDedup                         *bool                    `mapstructure:"support_dedup"`
+	SupportDedup                         *bool                    `mapstructure:"support_dedup" default:"false"`
 	EnableBrazeLogging                   *webBool                 `mapstructure:"enable_braze_logging"`
 	EnablePushNotification               *webBool                 `mapstructure:"enable_push_notification"`
 	AllowUserSuppliedJavascript          *webBool                 `mapstructure:"allow_user_supplied_javascript"`
 	EventFiltering                       *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK                         *useNativeSDK            `mapstructure:"use_native_sdk"`
-	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events"`
+	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events" default:"true"`
 	UsePlatformSpecificAPIKeys           *bool                    `mapstructure:"use_platform_specific_api_keys"`
 	AndroidAPIKey                        string                   `mapstructure:"android_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	IOSAPIKey                            string                   `mapstructure:"ios_api_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`

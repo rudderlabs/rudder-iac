@@ -47,7 +47,7 @@ type sentryConfig struct {
 	Release               string                   `mapstructure:"release"`
 	ServerName            string                   `mapstructure:"server_name"`
 	Logger                string                   `mapstructure:"logger"`
-	DebugMode             *bool                    `mapstructure:"debug_mode"`
+	DebugMode             *bool                    `mapstructure:"debug_mode" default:"false"`
 	IgnoreErrors          []string                 `mapstructure:"ignore_errors" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	IncludePaths          []string                 `mapstructure:"include_paths" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	AllowURLs             []string                 `mapstructure:"allow_urls" validate:"omitempty,dive,dynamic_or_pattern=sentry_url"`

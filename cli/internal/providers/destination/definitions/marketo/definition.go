@@ -40,8 +40,8 @@ type marketoConfig struct {
 	AccountID                 string                   `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	ClientID                  string                   `mapstructure:"client_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	ClientSecret              string                   `mapstructure:"client_secret" validate:"required,dynamic_or_pattern=single_line_100"`
-	TrackAnonymousEvents      *bool                    `mapstructure:"track_anonymous_events"`
-	CreateIfNotExist          *bool                    `mapstructure:"create_if_not_exist"`
+	TrackAnonymousEvents      *bool                    `mapstructure:"track_anonymous_events" default:"false"`
+	CreateIfNotExist          *bool                    `mapstructure:"create_if_not_exist" default:"true"`
 	RudderEventsMapping       []rudderEventMapping     `mapstructure:"rudder_events_mapping" validate:"omitempty,dive"`
 	LeadTraitMapping          []fieldMapping           `mapstructure:"lead_trait_mapping" validate:"omitempty,dive"`
 	CustomActivityPropertyMap []fieldMapping           `mapstructure:"custom_activity_property_map" validate:"omitempty,dive"`

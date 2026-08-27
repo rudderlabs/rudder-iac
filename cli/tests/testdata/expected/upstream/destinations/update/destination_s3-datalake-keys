@@ -19,7 +19,10 @@
     "skipTracksTable": true,
     "skipUsersTable": true,
     "syncFrequency": "360",
-    "useGlue": false
+    "useGlue": false,
+    "underscoreDivideNumbers": false,
+    "cleanupObjectStorageFiles": false,
+    "allowUsersContextTraits": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

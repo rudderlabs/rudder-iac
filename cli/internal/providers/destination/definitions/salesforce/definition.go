@@ -40,9 +40,9 @@ type salesforceConfig struct {
 	UserName           string                   `mapstructure:"user_name" validate:"required,dynamic_or_pattern=single_line_100"`
 	Password           string                   `mapstructure:"password" validate:"required,dynamic_or_pattern=single_line_100"`
 	InitialAccessToken string                   `mapstructure:"initial_access_token" validate:"required,dynamic_or_pattern=single_line_100"`
-	MapProperties      *bool                    `mapstructure:"map_properties"`
-	Sandbox            *bool                    `mapstructure:"sandbox"`
-	UseContactID       *bool                    `mapstructure:"use_contact_id"`
+	MapProperties      *bool                    `mapstructure:"map_properties" default:"true"`
+	Sandbox            *bool                    `mapstructure:"sandbox" default:"false"`
+	UseContactID       *bool                    `mapstructure:"use_contact_id" default:"false"`
 	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }

@@ -22,7 +22,13 @@
     "underscoreDivideNumbers": false,
     "useIAMForAuth": false,
     "useRudderStorage": true,
-    "user": "rudder"
+    "user": "rudder",
+    "useServerless": false,
+    "useSSH": false,
+    "preferAppend": true,
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

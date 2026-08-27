@@ -51,7 +51,7 @@ type s3Config struct {
 	// them (e.g. via {{ .VAR }} + a var file) when role_based_auth is false.
 	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,max=100"`
 	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,max=100"`
-	EnableSSE         *bool                    `mapstructure:"enable_sse"`
+	EnableSSE         *bool                    `mapstructure:"enable_sse" default:"false"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

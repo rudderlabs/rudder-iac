@@ -21,7 +21,11 @@
     "sslMode": "require",
     "syncFrequency": "360",
     "useRudderStorage": true,
-    "user": "rudder"
+    "user": "rudder",
+    "useSSH": false,
+    "allowUsersContextTraits": false,
+    "underscoreDivideNumbers": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

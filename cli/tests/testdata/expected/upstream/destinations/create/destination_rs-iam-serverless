@@ -22,7 +22,10 @@
     "useSSH": false,
     "useServerless": true,
     "user": "rudder",
-    "workgroupName": "rudder-cli-e2e-wg"
+    "workgroupName": "rudder-cli-e2e-wg",
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -34,10 +34,18 @@ var connectionModes = map[string][]string{
 }
 
 type customerioConfig struct {
-	SiteID                      string                   `mapstructure:"site_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	APIKey                      string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
-	DeviceTokenEventName        string                   `mapstructure:"device_token_event_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Datacenter                  string                   `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
+	SiteID               string `mapstructure:"site_id" validate:"required,dynamic_or_pattern=single_line_100"`
+	APIKey               string `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
+	DeviceTokenEventName string `mapstructure:"device_token_event_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	Datacenter           string `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
+	// The v2 API path: both keys are declared by schema.json and db-config, and
+	// were unmodelled, so update erased whatever the UI had set.
+	// schema.json defaults api_version to "v1", but the backend does not persist
+	// it: a live create sending "v1" came back with the key absent, so declaring
+	// the default would diff on every apply. Modelled without one so an explicit
+	// value still round-trips instead of being erased.
+	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2"`
+	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"omitempty,oneof=id email phone cio_id"`
 	UseNativeSDK                *sdkSourceBools          `mapstructure:"use_native_sdk"`
 	SendPageNameInSDK           *webBool                 `mapstructure:"send_page_name_in_sdk"`
 	DataUseInApp                *webBool                 `mapstructure:"data_use_in_app"`
@@ -80,6 +88,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("apiKey", "api_key"),
 		converter.Simple("deviceTokenEventName", "device_token_event_name"),
 		converter.Simple("datacenter", "datacenter"),
+		converter.Simple("apiVersion", "api_version"),
+		converter.Simple("userIdIdentifierType", "user_id_identifier_type"),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),

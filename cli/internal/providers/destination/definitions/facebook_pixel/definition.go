@@ -71,14 +71,14 @@ type legacyConversionPixelMapping struct {
 type facebookPixelConfig struct {
 	PixelID                 string                   `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	AccessToken             string                   `mapstructure:"access_token" validate:"omitempty,dynamic_or_pattern=single_line_300"`
-	StandardPageCall        *bool                    `mapstructure:"standard_page_call"`
-	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price"`
-	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping"`
-	LimitedDataUsage        *bool                    `mapstructure:"limited_data_usage"`
-	TestDestination         *bool                    `mapstructure:"test_destination"`
+	StandardPageCall        *bool                    `mapstructure:"standard_page_call" default:"false"`
+	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price" default:"properties.price"`
+	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping" default:"false"`
+	LimitedDataUsage        *bool                    `mapstructure:"limited_data_usage" default:"false"`
+	TestDestination         *bool                    `mapstructure:"test_destination" default:"false"`
 	TestEventCode           string                   `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	RemoveExternalID        *bool                    `mapstructure:"remove_external_id"`
-	UseUpdatedMapping       *bool                    `mapstructure:"use_updated_mapping"`
+	RemoveExternalID        *bool                    `mapstructure:"remove_external_id" default:"false"`
+	UseUpdatedMapping       *bool                    `mapstructure:"use_updated_mapping" default:"false"`
 	EventsToEvents          []eventMapping           `mapstructure:"events_to_events" validate:"omitempty,dive"`
 	BlacklistPIIProperties  []piiDenylistEntry       `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
 	WhitelistPIIProperties  []piiAllowlistEntry      `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`

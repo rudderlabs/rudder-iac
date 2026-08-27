@@ -138,7 +138,7 @@ type ga4Config struct {
 	ClientType            string              `mapstructure:"client_type" validate:"required,oneof=gtag firebase"`
 	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
 	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
-	DebugMode             *bool               `mapstructure:"debug_mode"`
+	DebugMode             *bool               `mapstructure:"debug_mode" default:"false"`
 	SDKBaseURL            string              `mapstructure:"sdk_base_url" validate:"omitempty,ga4_sdk_base_url_conditional=ga4_sdk_base_url"`
 	ServerContainerURL    string              `mapstructure:"server_container_url"`
 	PIIPropertiesToIgnore []piiProperty       `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`

@@ -73,15 +73,15 @@ type bqConfig struct {
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
-	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table"`
-	SkipViews                 *bool                    `mapstructure:"skip_views"`
-	SkipUsersTable            *bool                    `mapstructure:"skip_users_table"`
-	PartitionColumn           string                   `mapstructure:"partition_column" validate:"omitempty,dynamic_or_oneof=_PARTITIONTIME loaded_at received_at timestamp sent_at original_timestamp"`
-	PartitionType             string                   `mapstructure:"partition_type" validate:"omitempty,dynamic_or_oneof=hour day"`
+	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table" default:"false"`
+	SkipViews                 *bool                    `mapstructure:"skip_views" default:"false"`
+	SkipUsersTable            *bool                    `mapstructure:"skip_users_table" default:"true"`
+	PartitionColumn           string                   `mapstructure:"partition_column" validate:"omitempty,dynamic_or_oneof=_PARTITIONTIME loaded_at received_at timestamp sent_at original_timestamp" default:"_PARTITIONTIME"`
+	PartitionType             string                   `mapstructure:"partition_type" validate:"omitempty,dynamic_or_oneof=hour day" default:"day"`
 	JSONPaths                 string                   `mapstructure:"json_paths"`
-	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files"`
-	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers"`
-	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits"`
+	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files" default:"false"`
+	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers" default:"false"`
+	AllowUsersContextTraits   *bool                    `mapstructure:"allow_users_context_traits" default:"false"`
 	ConnectionMode            common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement         common.ConsentManagement `mapstructure:"consent_management"`
 }

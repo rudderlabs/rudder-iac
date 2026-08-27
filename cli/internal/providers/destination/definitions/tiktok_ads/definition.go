@@ -50,9 +50,9 @@ type useNativeSDK struct {
 type tiktokAdsConfig struct {
 	PixelCode               string                   `mapstructure:"pixel_code" validate:"required,dynamic_or_pattern=single_line_100"`
 	AccessToken             string                   `mapstructure:"access_token"`
-	Version                 string                   `mapstructure:"version" validate:"omitempty,dynamic_or_oneof=v2 v1"`
-	HashUserProperties      *bool                    `mapstructure:"hash_user_properties"`
-	SendCustomEvents        *bool                    `mapstructure:"send_custom_events"`
+	Version                 string                   `mapstructure:"version" validate:"omitempty,dynamic_or_oneof=v2 v1" default:"v2"`
+	HashUserProperties      *bool                    `mapstructure:"hash_user_properties" default:"true"`
+	SendCustomEvents        *bool                    `mapstructure:"send_custom_events" default:"false"`
 	EventsToStandard        []eventToStandard        `mapstructure:"events_to_standard" validate:"omitempty,dive"`
 	EventFilteringWhitelist []string                 `mapstructure:"event_filtering_whitelist" validate:"omitempty,excluded_with=EventFilteringBlacklist,dive,dynamic_or_pattern=single_line_100"`
 	EventFilteringBlacklist []string                 `mapstructure:"event_filtering_blacklist" validate:"omitempty,excluded_with=EventFilteringWhitelist,dive,dynamic_or_pattern=single_line_100"`

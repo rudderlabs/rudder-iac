@@ -22,7 +22,10 @@
     "useRudderStorage": true,
     "useSSH": false,
     "useServerless": false,
-    "user": "rudder"
+    "user": "rudder",
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -24,7 +24,11 @@
     "useIAMForAuth": false,
     "useRudderStorage": true,
     "useSSH": false,
-    "user": "rudder"
+    "user": "rudder",
+    "useServerless": false,
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

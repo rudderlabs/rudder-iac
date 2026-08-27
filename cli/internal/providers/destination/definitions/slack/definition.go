@@ -53,7 +53,7 @@ var connectionModes = map[string][]string{
 // mapped fields.
 type slackConfig struct {
 	WebhookURL               string                   `mapstructure:"webhook_url" validate:"required,dynamic_or_pattern=slack_webhook_url"`
-	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,dynamic_or_oneof=legacy modern"`
+	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,dynamic_or_oneof=legacy modern" default:"legacy"`
 	IdentifyTemplate         string                   `mapstructure:"identify_template" validate:"omitempty,dynamic_or_pattern=single_line_1000"`
 	EventChannelSettings     []eventChannelSetting    `mapstructure:"event_channel_settings" validate:"omitempty,dive"`
 	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
