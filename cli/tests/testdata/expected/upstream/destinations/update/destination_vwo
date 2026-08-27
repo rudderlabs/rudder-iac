@@ -1,0 +1,45 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "vwo",
+  "name": "E2E VWO Updated",
+  "type": "VWO",
+  "enabled": true,
+  "config": {
+    "accountId": "rudderCliE2eAccountUpdated",
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "connectionMode": {
+      "web": "device"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "eventFilteringOption": "blacklistedEvents",
+    "isSPA": false,
+    "libraryTolerance": "3000",
+    "sendExperimentIdentify": true,
+    "sendExperimentTrack": false,
+    "settingsTolerance": "3000",
+    "useExistingJquery": true,
+    "useNativeSDK": {
+      "web": true
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

@@ -1,5 +1,8 @@
 {
   "config": {
+    "connectionMode": {
+      "warehouse": "cloud"
+    },
     "region": "EU",
     "siteId": "rudderCliE2eSiteIdUpdated"
   },

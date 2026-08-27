@@ -1,0 +1,65 @@
+{
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "consolidatedPageCalls": true,
+    "crossSubdomainCookie": false,
+    "dataResidency": "eu",
+    "dropTraitsInTrackEvent": false,
+    "eventFilteringOption": "blacklistedEvents",
+    "identityMergeApi": "original",
+    "ignoreDnt": false,
+    "people": false,
+    "persistenceName": "rudderCliE2eCookieUpdated",
+    "persistenceType": "cookie",
+    "projectId": "rudderCliE2eProjectUpdated",
+    "secureCookie": false,
+    "serviceAccountSecret": "mpServiceAccountSecretXXXXXXXX",
+    "serviceAccountUserName": "rudderCliE2eServiceUserUpdated",
+    "sessionReplayPercentage": {
+      "web": "50"
+    },
+    "setAllTraitsByDefault": true,
+    "strictMode": false,
+    "token": "mpTokenXXXXXXXXXXXXXXXXXXXXXX",
+    "trackCategorizedPages": false,
+    "trackNamedPages": false,
+    "useNativeSDK": {
+      "web": false
+    },
+    "useNewMapping": false,
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false,
+    "userDefinedPageEventTemplate": "Viewed {{ category }} {{ name }} page",
+    "userDefinedScreenEventTemplate": "Viewed {{ category }} {{ name }} screen",
+    "userDeletionApi": "engage"
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "mp",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Mixpanel Updated",
+  "type": "MP",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

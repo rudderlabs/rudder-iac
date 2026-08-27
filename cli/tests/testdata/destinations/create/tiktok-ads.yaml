@@ -22,3 +22,6 @@ spec:
       - Product Added
     use_native_sdk:
       web: true
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

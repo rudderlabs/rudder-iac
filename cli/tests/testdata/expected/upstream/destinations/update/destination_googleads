@@ -1,0 +1,81 @@
+{
+  "config": {
+    "allowEnhancedConversions": true,
+    "allowIdentify": true,
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "clickEventConversions": [
+      {
+        "conversionLabel": "updatedClickLabel",
+        "name": "Purchase Click"
+      }
+    ],
+    "connectionMode": {
+      "web": "device"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            },
+            {
+              "consent": "marketing"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "conversionID": "AW-987654321",
+    "conversionLinker": false,
+    "defaultPageConversion": "checkout",
+    "disableAdPersonalization": true,
+    "dynamicRemarketing": {
+      "web": true
+    },
+    "enableConversionEventsFiltering": false,
+    "enableConversionLabel": false,
+    "enableDynamicRemarketingEventsFiltering": true,
+    "eventFilteringOption": "blacklistedEvents",
+    "eventMappingFromConfig": [
+      {
+        "from": "Lead Captured",
+        "to": "Lead"
+      }
+    ],
+    "eventsToTrackDynamicRemarketing": [
+      {
+        "eventName": "Product Viewed"
+      }
+    ],
+    "pageLoadConversions": [
+      {
+        "conversionLabel": "updatedPageLabel",
+        "name": "Checkout Page"
+      }
+    ],
+    "sdkBaseUrl": "cdn-updated.rudder-cli-e2e.com/gtag",
+    "sendPageView": false,
+    "trackConversions": false,
+    "trackDynamicRemarketing": true,
+    "useNativeSDK": {
+      "web": true
+    },
+    "v2": false
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "googleads",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Ads Updated",
+  "type": "GOOGLEADS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

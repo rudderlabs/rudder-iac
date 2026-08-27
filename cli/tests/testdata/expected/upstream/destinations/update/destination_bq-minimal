@@ -9,7 +9,15 @@
   "config": {
     "bucketName": "rudder-cli-e2e-bq-minimal-updated",
     "project": "rudder-cli-e2e",
-    "syncFrequency": "360"
+    "syncFrequency": "360",
+    "skipTracksTable": false,
+    "skipViews": false,
+    "skipUsersTable": true,
+    "partitionColumn": "_PARTITIONTIME",
+    "partitionType": "day",
+    "cleanupObjectStorageFiles": false,
+    "underscoreDivideNumbers": false,
+    "allowUsersContextTraits": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

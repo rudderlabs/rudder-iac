@@ -7,6 +7,10 @@
   "type": "HS",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "apiVersion": "newApi",
     "authorizationType": "newPrivateAppApi",
     "doAssociation": true,

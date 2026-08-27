@@ -1,0 +1,102 @@
+{
+  "config": {
+    "anonymizeIp": true,
+    "connectionMode": {
+      "web": "device"
+    },
+    "contentGroupings": [
+      {
+        "from": "section",
+        "to": "contentGroup1"
+      }
+    ],
+    "customMappings": [
+      {
+        "from": "Order Completed",
+        "to": "purchase"
+      }
+    ],
+    "dimensions": [
+      {
+        "from": "plan",
+        "to": "dimension1"
+      }
+    ],
+    "disableMd5": false,
+    "domain": {
+      "web": "auto"
+    },
+    "doubleClick": true,
+    "enableServerSideIdentify": true,
+    "enhancedEcommerce": true,
+    "enhancedLinkAttribution": true,
+    "eventFilteringOption": "whitelistedEvents",
+    "includeSearch": false,
+    "metrics": [
+      {
+        "from": "revenue",
+        "to": "metric1"
+      }
+    ],
+    "namedTracker": {
+      "web": false
+    },
+    "nonInteraction": false,
+    "optimize": {
+      "web": "OPT-E2ECREATE"
+    },
+    "resetCustomDimensionsOnPage": {
+      "web": [
+        {
+          "resetCustomDimensionsOnPage": "dimension1"
+        }
+      ]
+    },
+    "rudderDeleteAccountId": "rudderCliE2eDeleteAccount",
+    "sampleRate": {
+      "web": "100"
+    },
+    "sendUserId": true,
+    "serverSideIdentifyEventAction": "User Enriched",
+    "serverSideIdentifyEventCategory": "All",
+    "setAllMappedProps": {
+      "web": true
+    },
+    "siteSpeedSampleRate": {
+      "web": "10"
+    },
+    "trackCategorizedPages": {
+      "web": true
+    },
+    "trackNamedPages": {
+      "web": false
+    },
+    "trackingID": "UA-123456-1",
+    "useGoogleAmpClientId": {
+      "web": false
+    },
+    "useNativeSDK": {
+      "web": true
+    },
+    "useRichEventNames": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "ga",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Analytics",
+  "type": "GA",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

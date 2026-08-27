@@ -15,7 +15,12 @@
     "region": "us-west-2",
     "roleBasedAuth": true,
     "syncFrequency": "360",
-    "useGlue": true
+    "useGlue": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "underscoreDivideNumbers": false,
+    "cleanupObjectStorageFiles": false,
+    "allowUsersContextTraits": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

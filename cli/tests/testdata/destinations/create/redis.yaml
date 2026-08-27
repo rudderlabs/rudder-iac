@@ -17,3 +17,6 @@ spec:
     secure: false
     skip_verify: false
     use_json_module: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

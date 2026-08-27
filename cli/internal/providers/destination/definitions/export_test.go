@@ -5,26 +5,29 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-type testConnectionMode struct {
+// testNestedEnumBlock is a generic nested block with enum-validated fields; it
+// exercises nested-struct machinery and is deliberately not named after a real
+// config key, so it does not squat on one the registry reserves a type for.
+type testNestedEnumBlock struct {
 	Web     *string `json:"web" mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud device hybrid"`
 	Android *string `json:"android" mapstructure:"android" validate:"omitempty,dynamic_or_oneof=cloud device"`
 }
 
 type testGA4Config struct {
-	APISecret      string             `json:"api_secret" mapstructure:"api_secret" validate:"required"`
-	TypesOfClient  string             `json:"types_of_client" mapstructure:"types_of_client" validate:"required,dynamic_or_oneof=gtag firebase"`
-	MeasurementID  string             `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
-	DebugMode      *bool              `json:"debug_mode" mapstructure:"debug_mode"`
-	ConnectionMode testConnectionMode `json:"connection_mode" mapstructure:"connection_mode"`
+	APISecret     string              `json:"api_secret" mapstructure:"api_secret" validate:"required"`
+	TypesOfClient string              `json:"types_of_client" mapstructure:"types_of_client" validate:"required,dynamic_or_oneof=gtag firebase"`
+	MeasurementID string              `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
+	DebugMode     *bool               `json:"debug_mode" mapstructure:"debug_mode"`
+	NestedBlock   testNestedEnumBlock `json:"nested_block" mapstructure:"nested_block"`
 }
 
-type testWebhookConnectionMode struct {
+type testWebhookNestedEnumBlock struct {
 	Web *string `json:"web" mapstructure:"web" validate:"omitempty,dynamic_or_oneof=cloud"`
 }
 
 type testWebhookConfig struct {
-	WebhookURL     string                    `json:"webhook_url" mapstructure:"webhook_url" validate:"required"`
-	ConnectionMode testWebhookConnectionMode `json:"connection_mode" mapstructure:"connection_mode"`
+	WebhookURL  string                     `json:"webhook_url" mapstructure:"webhook_url" validate:"required"`
+	NestedBlock testWebhookNestedEnumBlock `json:"nested_block" mapstructure:"nested_block"`
 }
 
 // GA4TestDefinition returns a destination definition used by external tests.

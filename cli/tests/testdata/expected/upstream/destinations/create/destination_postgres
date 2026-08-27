@@ -7,6 +7,10 @@
   "type": "POSTGRES",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "allowUsersContextTraits": false,
     "database": "analytics",
     "host": "postgres.rudder-cli-e2e.internal",
@@ -20,7 +24,8 @@
     "underscoreDivideNumbers": false,
     "useRudderStorage": true,
     "useSSH": false,
-    "user": "rudder"
+    "user": "rudder",
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

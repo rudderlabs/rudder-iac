@@ -1,0 +1,35 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "vwo",
+  "name": "E2E VWO",
+  "type": "VWO",
+  "enabled": true,
+  "config": {
+    "accountId": "rudderCliE2eAccount",
+    "connectionMode": {
+      "web": "device"
+    },
+    "eventFilteringOption": "whitelistedEvents",
+    "isSPA": true,
+    "libraryTolerance": "2000",
+    "sendExperimentIdentify": false,
+    "sendExperimentTrack": true,
+    "settingsTolerance": "2000",
+    "useExistingJquery": false,
+    "useNativeSDK": {
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

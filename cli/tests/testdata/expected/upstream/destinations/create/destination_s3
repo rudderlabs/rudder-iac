@@ -7,6 +7,10 @@
   "type": "S3",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "bucketName": "rudder-cli-e2e",
     "prefix": "rudder/",
     "roleBasedAuth": false,

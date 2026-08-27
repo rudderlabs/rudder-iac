@@ -1,0 +1,42 @@
+{
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "eventFilteringOption": "blacklistedEvents",
+    "eventToConversionIdMap": [
+      {
+        "from": "Checkout Started",
+        "to": "9998887"
+      }
+    ],
+    "partnerId": "rudderCliE2eFullPartnerUpdated",
+    "useNativeSDK": {
+      "web": false
+    }
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "linkedin-insight-tag",
+  "id": "\u003cignored\u003e",
+  "name": "E2E LinkedIn Insight Tag Updated",
+  "type": "LINKEDIN_INSIGHT_TAG",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

@@ -1,0 +1,74 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "firebase",
+  "name": "E2E Firebase",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "consentManagement": {
+      "android": [
+        {
+          "consents": [
+            {
+              "consent": "C0001"
+            },
+            {
+              "consent": "C0002"
+            }
+          ],
+          "provider": "oneTrust"
+        },
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "ketch"
+        }
+      ],
+      "flutter": [
+        {
+          "consents": [
+            {
+              "consent": "advertising"
+            }
+          ],
+          "provider": "ketch"
+        }
+      ],
+      "ios": [
+        {
+          "consents": [
+            {
+              "consent": "C0003"
+            }
+          ],
+          "provider": "oneTrust"
+        }
+      ]
+    },
+    "eventFilteringOption": "whitelistedEvents",
+    "useNativeSDK": {
+      "android": true,
+      "androidKotlin": true,
+      "flutter": false,
+      "ios": true,
+      "iosSwift": false,
+      "reactnative": true,
+      "unity": false
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

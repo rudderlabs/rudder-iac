@@ -35,22 +35,26 @@ var connectionModes = map[string][]string{
 }
 
 // gcsConfig is the local YAML config model. Field set mirrors integrations-config
-// destinations/gcs defaultConfig; validation constraints mirror schema.json for
-// overlapping terraform-mapped fields.
+// destinations/gcs defaultConfig plus schema-declared source-scoped config such
+// as connectionMode, exposed locally as connection_mode.
 type gcsConfig struct {
 	BucketName        string                   `mapstructure:"bucket_name" validate:"required,dynamic_or_pattern=single_line_100"`
 	Prefix            string                   `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Credentials       string                   `mapstructure:"credentials"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
-// NewDefinition returns the Google Cloud Storage destination definition.
+// NewDefinition returns the Google Cloud Storage destination definition. GCS stays
+// behind the unverified destination gate; source support remains restricted to the
+// CLI-owned event-stream types above.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("bucketName", "bucket_name"),
 		converter.Simple("prefix", "prefix"),
 		converter.Simple("credentials", "credentials"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

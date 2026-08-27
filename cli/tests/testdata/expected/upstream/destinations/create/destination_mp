@@ -1,0 +1,52 @@
+{
+  "config": {
+    "connectionMode": {
+      "web": "device"
+    },
+    "consolidatedPageCalls": true,
+    "crossSubdomainCookie": false,
+    "dataResidency": "us",
+    "dropTraitsInTrackEvent": false,
+    "eventFilteringOption": "whitelistedEvents",
+    "identityMergeApi": "simplified",
+    "ignoreDnt": false,
+    "people": true,
+    "persistenceName": "rudderCliE2eCookie",
+    "persistenceType": "localStorage",
+    "projectId": "rudderCliE2eProject",
+    "secureCookie": true,
+    "serviceAccountSecret": "mpServiceAccountSecretXXXXXXXX",
+    "serviceAccountUserName": "rudderCliE2eServiceUser",
+    "sessionReplayPercentage": {
+      "web": "25"
+    },
+    "setAllTraitsByDefault": false,
+    "strictMode": true,
+    "token": "mpTokenXXXXXXXXXXXXXXXXXXXXXX",
+    "trackCategorizedPages": false,
+    "trackNamedPages": false,
+    "useNativeSDK": {
+      "web": true
+    },
+    "useNewMapping": false,
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false,
+    "userDefinedPageEventTemplate": "Viewed {{ category }} {{ name }} page",
+    "userDefinedScreenEventTemplate": "Viewed {{ category }} {{ name }} screen",
+    "userDeletionApi": "task",
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ]
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "mp",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Mixpanel",
+  "type": "MP",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

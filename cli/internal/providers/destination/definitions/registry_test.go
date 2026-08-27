@@ -181,6 +181,28 @@ func TestRegistryRejectsNonSharedConsentModel(t *testing.T) {
 	assert.Contains(t, err.Error(), "consent_management config field must use common.ConsentManagement")
 }
 
+func TestRegistryRejectsNonSharedConnectionModeModel(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				ConnectionMode map[string]string `mapstructure:"connection_mode"`
+			}{}
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection_mode config field must use common.ConnectionMode")
+}
+
 func TestRegistrySupportedTypesAndVersions(t *testing.T) {
 	t.Parallel()
 

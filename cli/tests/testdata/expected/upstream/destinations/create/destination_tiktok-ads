@@ -7,6 +7,10 @@
   "type": "TIKTOK_ADS",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "pixelCode": "C0000000000000000001",
     "version": "v2",
     "hashUserProperties": true,

@@ -19,9 +19,9 @@ type unknownKeysConsentBySource struct {
 }
 
 type unknownKeysConfig struct {
-	APISecret      string                     `mapstructure:"api_secret"`
-	ConnectionMode testConnectionMode         `mapstructure:"connection_mode"`
-	Consent        unknownKeysConsentBySource `mapstructure:"consent_management"`
+	APISecret   string                     `mapstructure:"api_secret"`
+	NestedBlock testNestedEnumBlock        `mapstructure:"nested_block"`
+	Consent     unknownKeysConsentBySource `mapstructure:"consent_management"`
 }
 
 type unknownKeysMapConfig struct {
@@ -48,14 +48,14 @@ func TestFindUnknownKeysNestedStruct(t *testing.T) {
 
 	errors := findUnknownKeys(map[string]any{
 		"api_secret": "secret",
-		"connection_mode": map[string]any{
+		"nested_block": map[string]any{
 			"web":     "cloud",
 			"unknown": "cloud",
 		},
 	}, reflect.TypeOf(testGA4Config{}), "")
 
 	require.Len(t, errors, 1)
-	assert.Equal(t, "/connection_mode/unknown", errors[0].Path)
+	assert.Equal(t, "/nested_block/unknown", errors[0].Path)
 	assert.Equal(t, `unknown config field "unknown"`, errors[0].Message)
 }
 
@@ -65,7 +65,7 @@ func TestFindUnknownKeysMultipleLevels(t *testing.T) {
 	errors := findUnknownKeys(map[string]any{
 		"api_secret": "secret",
 		"extra_top":  "x",
-		"connection_mode": map[string]any{
+		"nested_block": map[string]any{
 			"web":       "cloud",
 			"extra_src": "cloud",
 		},
@@ -79,7 +79,7 @@ func TestFindUnknownKeysMultipleLevels(t *testing.T) {
 
 	assertConfigErrors(t, errors,
 		ConfigError{Path: "/extra_top", Message: `unknown config field "extra_top"`},
-		ConfigError{Path: "/connection_mode/extra_src", Message: `unknown config field "extra_src"`},
+		ConfigError{Path: "/nested_block/extra_src", Message: `unknown config field "extra_src"`},
 		ConfigError{Path: "/consent_management/extra_source", Message: `unknown config field "extra_source"`},
 	)
 }
@@ -128,7 +128,7 @@ func TestFindUnknownKeysValidConfig(t *testing.T) {
 	errors := findUnknownKeys(map[string]any{
 		"api_secret":      "secret",
 		"types_of_client": "gtag",
-		"connection_mode": map[string]any{
+		"nested_block": map[string]any{
 			"web": "cloud",
 		},
 	}, reflect.TypeOf(testGA4Config{}), "")
@@ -214,7 +214,7 @@ func TestStructFieldsByMapstructureTag(t *testing.T) {
 	fields := structFieldsByMapstructureTag(reflect.TypeOf(testGA4Config{}))
 
 	assert.Contains(t, fields, "api_secret")
-	assert.Contains(t, fields, "connection_mode")
+	assert.Contains(t, fields, "nested_block")
 	assert.NotContains(t, fields, "APISecret")
 }
 

@@ -37,6 +37,11 @@ var defaultTagNameFunc = func(fld reflect.StructField) string {
 type CustomValidateFunc struct {
 	Tag  string
 	Func validator.Func
+	// CallEvenIfNull runs Func on nil pointer fields too. go-playground skips a
+	// custom validator on a nil pointer and marks the field invalid without
+	// calling it, so a conditional-requiredness rule on a pointer field needs
+	// this to ever see the absent case.
+	CallEvenIfNull bool
 }
 
 // defaultValidators holds globally registered validators that are automatically
@@ -85,13 +90,13 @@ func validateStruct(data any, tagFn func(reflect.StructField) string, funcs ...C
 	v.RegisterTagNameFunc(tagFn)
 
 	for _, fn := range defaultValidators {
-		if err := v.RegisterValidation(fn.Tag, fn.Func); err != nil {
+		if err := v.RegisterValidation(fn.Tag, fn.Func, fn.CallEvenIfNull); err != nil {
 			return nil, fmt.Errorf("registering default validation rule: %w", err)
 		}
 	}
 
 	for _, fn := range funcs {
-		if err := v.RegisterValidation(fn.Tag, fn.Func); err != nil {
+		if err := v.RegisterValidation(fn.Tag, fn.Func, fn.CallEvenIfNull); err != nil {
 			return nil, fmt.Errorf("registering validation rule: %w", err)
 		}
 	}

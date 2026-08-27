@@ -1,0 +1,91 @@
+{
+  "config": {
+    "animationDuration": {
+      "web": "400"
+    },
+    "apiKey": "rudderCliE2eApiKeyUpdated",
+    "blacklistedEvents": {
+      "web": [
+        {
+          "eventName": "Page Viewed"
+        }
+      ]
+    },
+    "closeButtonColor": {
+      "web": "#ffffff"
+    },
+    "closeButtonPosition": {
+      "web": "top-left"
+    },
+    "closeButtonSize": {
+      "web": "16"
+    },
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust"
+        }
+      ]
+    },
+    "dataCenter": "EUDC",
+    "displayInterval": {
+      "web": "2500"
+    },
+    "eventFilteringOption": {
+      "web": "blacklistedEvents"
+    },
+    "getInAppEventMapping": {
+      "web": [
+        {
+          "eventName": "Product Viewed"
+        }
+      ]
+    },
+    "handleLinks": {
+      "web": "external-new-tab"
+    },
+    "initialisationIdentifier": {
+      "web": "userId"
+    },
+    "isRequiredToDismissMessage": {
+      "web": false
+    },
+    "mapToSingleEvent": true,
+    "mergeNestedObjects": true,
+    "packageName": "com.rudderstack.e2e.updated",
+    "preferUserId": true,
+    "purchaseEventMapping": {
+      "web": [
+        {
+          "eventName": "Page Viewed"
+        }
+      ]
+    },
+    "sendTrackForInapp": {
+      "web": false
+    },
+    "trackAllPages": false,
+    "trackCategorisedPages": true,
+    "trackNamedPages": true,
+    "useNativeSDK": {
+      "web": true
+    }
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "iterable",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Iterable Updated",
+  "type": "ITERABLE",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

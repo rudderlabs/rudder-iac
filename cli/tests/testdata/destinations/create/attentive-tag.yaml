@@ -11,3 +11,6 @@ spec:
   config:
     api_key: "{{ .ATTENTIVE_TAG_API_KEY }}"
     sign_up_source_id: "123456"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

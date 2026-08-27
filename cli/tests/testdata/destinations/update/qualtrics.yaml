@@ -1,0 +1,28 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: qualtrics
+spec:
+  id: qualtrics
+  display_name: E2E Qualtrics Updated
+  type: qualtrics
+  enabled: true
+  definition_version: 1
+  config:
+    project_id: rudderCliE2eFullProjectUpdated
+    brand_id: rudderCliE2eFullBrandUpdated
+    enable_generic_page_title:
+      web: false
+    use_native_sdk:
+      web: false
+      android: true
+      ios: true
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics

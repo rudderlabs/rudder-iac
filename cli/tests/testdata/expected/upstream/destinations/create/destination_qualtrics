@@ -1,0 +1,32 @@
+{
+  "config": {
+    "brandId": "rudderCliE2eFullBrand",
+    "enableGenericPageTitle": {
+      "web": true
+    },
+    "eventFilteringOption": "whitelistedEvents",
+    "projectId": "rudderCliE2eFullProject",
+    "useNativeSDK": {
+      "android": true,
+      "ios": false,
+      "web": true
+    },
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "qualtrics",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Qualtrics",
+  "type": "QUALTRICS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

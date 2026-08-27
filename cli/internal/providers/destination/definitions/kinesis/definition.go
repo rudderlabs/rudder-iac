@@ -40,15 +40,16 @@ var connectionModes = map[string][]string{
 type kinesisConfig struct {
 	Region        string `mapstructure:"region" validate:"required,dynamic_or_pattern=single_line_100"`
 	Stream        string `mapstructure:"stream" validate:"required,dynamic_or_pattern=single_line_100"`
-	RoleBasedAuth *bool `mapstructure:"role_based_auth" validate:"required"`
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
 	// schema.json requires the mode's own fields but never forbids the other
 	// mode's, so neither does this — matching S3, and keeping a remote config
 	// that carries a stale iam_role_arn importable.
 	IAMRoleARN   string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKeyID  string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKey    string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
-	UseMessageID *bool  `mapstructure:"use_message_id"`
+	UseMessageID *bool  `mapstructure:"use_message_id" default:"false"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -63,6 +64,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("accessKey", "access_key"),
 		converter.Simple("useMessageId", "use_message_id"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

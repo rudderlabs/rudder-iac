@@ -76,8 +76,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "react_native", "cloud_source", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -153,7 +153,7 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 		cfg["cleanup_object_storage_files"] = true
 		cfg["allow_users_context_traits"] = false
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "oneTrust", "consents": []any{"analytics"}}},
+			"cloud": []any{map[string]any{"provider": "oneTrust", "consents": []any{"analytics"}}},
 		}
 
 		assert.Empty(t, registered.ValidateConfig(cfg))
@@ -312,14 +312,43 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalRoleConfig())
 		cfg["consent_management"] = map[string]any{
-			"cloud_source": []any{map[string]any{"provider": "unknown"}},
+			"cloud": []any{map[string]any{"provider": "unknown"}},
 		}
 
 		errors := registered.ValidateConfig(cfg)
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/cloud_source/0/provider", errors[0].Path)
+		assert.Equal(t, "/consent_management/cloud/0/provider", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "'provider' must be one of")
 	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
 }
 
 func assertHasPath(t *testing.T, errors []definitions.ConfigError, path string) {
@@ -444,16 +473,14 @@ func TestS3DatalakeConversionRoundTrip(t *testing.T) {
 				"bucket_name": "rudder-s3-datalake",
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"cloud_source": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
 				"bucketName": "rudder-s3-datalake",
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"cloudSource": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},

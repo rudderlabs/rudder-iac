@@ -7,6 +7,10 @@
   "type": "KAFKA",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "caCertificate": "-----BEGIN CERTIFICATE-----\nrudderCliE2eKafkaCa\n-----END CERTIFICATE-----",
     "convertToAvro": false,
     "enableMultiTopic": false,
