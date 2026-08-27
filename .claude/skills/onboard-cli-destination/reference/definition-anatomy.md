@@ -82,11 +82,13 @@ func NewDefinition() *definitions.DestinationDefinition {
         NewConfig:  func() any { return &s3Config{} },
         SourceTypes:     append([]string(nil), sourceTypes...),
         ConnectionModes: connectionModes,
-        // Only when db-config has supportedSourcesValidation: per local source
-        // type, the snake_case local config keys required at connect time.
-        // Omit the field when upstream has none (the common case).
-        SupportedSourcesValidation: map[string][]string{
-            common.SourceTypeWeb: {"use_native_sdk"},
+        // Per local source type and connection mode, the snake_case local
+        // config keys required at connect time — derived from the
+        // connectionMode-conditioned `allOf` branches in schema.json (see
+        // source-type-mapping.md "Per-source-type connect-time required keys").
+        // Omit the field when no source type contributes a key.
+        SupportedSourcesValidation: map[string]map[string][]string{
+            common.SourceTypeWeb: {"cloud": {"api_key"}, "device": {"app_id"}},
         },
     }
 }
@@ -120,10 +122,11 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - `NewConfig` must return a pointer to struct.
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
-- `SupportedSourcesValidation` keys ⊆ `SourceTypes`, each entry non-empty, and
-  every required key must exist on the config struct or be a source-type block
-  key (`connection_mode`, `use_native_sdk`). Entries are optional per source
-  type.
+- `SupportedSourcesValidation` (nested shape pending DEX-709) keys ⊆
+  `SourceTypes`, every inner mode ∈ `ConnectionModes[sourceType]`, each key list
+  non-empty, and every required key must exist on the config struct or be a
+  source-type block key (`connection_mode`, `use_native_sdk`). Entries are
+  optional per source type and per mode.
 - A `consent_management` config field must be `common.ConsentManagement`, and a
   `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
   either is rejected at registration: it would silently opt the key out of the
