@@ -40,11 +40,11 @@ type customerioConfig struct {
 	Datacenter           string `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
 	// The v2 API path: both keys are declared by schema.json and db-config, and
 	// were unmodelled, so update erased whatever the UI had set.
-	// schema.json defaults api_version to "v1", but the backend does not persist
-	// it: a live create sending "v1" came back with the key absent, so declaring
-	// the default would diff on every apply. Modelled without one so an explicit
-	// value still round-trips instead of being erased.
-	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2"`
+	// Since integrations-config #2661 the backend persists api_version, applying
+	// the schema default "v1" when the key is absent (the destinations e2e caught
+	// the extra key upstream). Declare the same default so a spec omitting it
+	// matches what the backend stores instead of diffing on every apply.
+	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2" default:"v1"`
 	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"required_if=APIVersion v2,omitempty,oneof=id email phone cio_id"`
 	UseNativeSDK                *sdkSourceBools          `mapstructure:"use_native_sdk"`
 	SendPageNameInSDK           *webBool                 `mapstructure:"send_page_name_in_sdk"`

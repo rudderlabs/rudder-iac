@@ -78,7 +78,17 @@ type useNativeSDK struct {
 // keyed on connection_mode entries, which required_if cannot resolve, so they
 // read the sibling off FieldLevel.Parent(). Each tag precedes omitempty, which
 // would otherwise short-circuit it on the empty value being rejected.
+// The schema branches carry additionalProperties:false, so each matches only
+// when connection_mode is present and every key it holds is in that branch's
+// list with that branch's value. A key outside the list — or a different value —
+// takes the config out of the branch entirely, and the credential is not
+// required. An empty connection_mode satisfies the key check vacuously.
 func intercomModeConditional(want string, sources []string) validator.Func {
+	allowed := make(map[string]struct{}, len(sources))
+	for _, sourceType := range sources {
+		allowed[sourceType] = struct{}{}
+	}
+
 	return func(fl validator.FieldLevel) bool {
 		parent := fl.Parent()
 		if parent.Kind() == reflect.Pointer {
@@ -90,16 +100,14 @@ func intercomModeConditional(want string, sources []string) validator.Func {
 			return true
 		}
 		connectionMode, _ := field.Interface().(common.ConnectionMode)
-
-		var matched bool
-		for _, sourceType := range sources {
-			if connectionMode[sourceType] == want {
-				matched = true
-				break
-			}
-		}
-		if !matched {
+		if connectionMode == nil {
 			return true
+		}
+
+		for sourceType, mode := range connectionMode {
+			if _, ok := allowed[sourceType]; !ok || mode != want {
+				return true
+			}
 		}
 		return nonEmptyValue(fl)
 	}
@@ -118,7 +126,16 @@ func nonEmptyValue(fl validator.FieldLevel) bool {
 	return value.String() != ""
 }
 
-var intercomDeviceSources = []string{common.SourceTypeWeb, common.SourceTypeIOS, common.SourceTypeAndroid}
+var (
+	intercomDeviceSources = []string{common.SourceTypeWeb, common.SourceTypeIOS, common.SourceTypeAndroid}
+	// Mirrors the apiKey branch's key list exactly; notably it does not include
+	// the `cloud` source type, so a cloud-source-only config falls outside it.
+	intercomCloudSources = []string{
+		common.SourceTypeWeb, common.SourceTypeIOS, common.SourceTypeAndroid,
+		common.SourceTypeUnity, common.SourceTypeAMP, common.SourceTypeReactNative,
+		common.SourceTypeFlutter, common.SourceTypeCordova, common.SourceTypeShopify,
+	}
+)
 
 // NewDefinition returns the Intercom destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
@@ -157,7 +174,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		Properties: properties,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "intercom_app_id_required", Func: intercomModeConditional("device", intercomDeviceSources), CallEvenIfNull: true},
-			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", sourceTypes), CallEvenIfNull: true},
+			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", intercomCloudSources), CallEvenIfNull: true},
 		},
 		SecretKeys: []string{"api_key"},
 		NewConfig: func() any {

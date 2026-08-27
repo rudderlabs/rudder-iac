@@ -580,12 +580,28 @@ func TestIntercomCredentialConditionals(t *testing.T) {
 		},
 		{
 			name:   "cloud mode requires api_key",
-			config: map[string]any{"connection_mode": map[string]any{"cloud": "cloud"}},
+			config: map[string]any{"connection_mode": map[string]any{"web": "cloud"}},
 			want:   []string{"/api_key"},
 		},
 		{
 			name:   "cloud mode satisfied by api_key",
-			config: map[string]any{"connection_mode": map[string]any{"cloud": "cloud"}, "api_key": "key-1"},
+			config: map[string]any{"connection_mode": map[string]any{"web": "cloud"}, "api_key": "key-1"},
+			want:   []string{},
+		},
+		{
+			// The apiKey branch carries additionalProperties:false over a key list
+			// that does not include the `cloud` source type, so a cloud-source-only
+			// config falls outside the branch and needs no credential. Flagged
+			// upstream as a likely schema oversight (DEX-723).
+			name:   "cloud source type falls outside the branch",
+			config: map[string]any{"connection_mode": map[string]any{"cloud": "cloud"}},
+			want:   []string{},
+		},
+		{
+			// A key outside a branch's list takes the config out of that branch
+			// entirely, so neither credential is required.
+			name:   "mixed keys leave both branches",
+			config: map[string]any{"connection_mode": map[string]any{"web": "device", "unity": "cloud"}},
 			want:   []string{},
 		},
 		{
