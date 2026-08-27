@@ -73,6 +73,8 @@ var destinationRawSecrets = []string{
 	"snowflakePasswordXXXXXXXXXXXXX",
 	"snowflakePrivateKeyXXXXXXXXXXX",
 	"snowflakeKeyPassphraseXXXXXXXX",
+	"snowpipeStreamingPrivateKeyXXXXXXXXXX",
+	"snowpipeKeyPassphraseXXXXXXXXX",
 	"AKIASNOWFLAKEXXXXXXX",
 	"snowflakeSecretAccessKeyXXXXXXXXXXXXXXXXXX",
 	"snowflake-dummy",

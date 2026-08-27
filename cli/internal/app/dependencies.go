@@ -58,6 +58,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/sentry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/slack"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowflake"
+	snowpipestreaming "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowpipe_streaming"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
 	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
@@ -435,6 +436,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(snowflake.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering snowflake destination definition: %w", err)
+		}
+		if err := registry.Register(snowpipestreaming.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering snowpipe_streaming destination definition: %w", err)
 		}
 		if err := registry.Register(statsig.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering statsig destination definition: %w", err)
