@@ -121,10 +121,6 @@ func anyMode(mode common.ConnectionMode, sourceTypes []string, want ...string) b
 	return false
 }
 
-func platformSpecificIs(platformSpecific *bool, want bool) bool {
-	return platformSpecific != nil && *platformSpecific == want
-}
-
 // restApiKey is required whenever any source connects in cloud or hybrid mode.
 func restAPIKeyConditional(fl validator.FieldLevel) bool {
 	mode, _, ok := brazeParent(fl)
@@ -138,7 +134,7 @@ func restAPIKeyConditional(fl validator.FieldLevel) bool {
 // when platform-specific keys are off.
 func appKeyConditional(fl validator.FieldLevel) bool {
 	mode, platformSpecific, ok := brazeParent(fl)
-	if !ok || !platformSpecificIs(platformSpecific, false) {
+	if !ok || platformSpecific == nil || *platformSpecific {
 		return true
 	}
 	if !anyMode(mode, sourceTypes, "device", "hybrid") {
@@ -158,12 +154,13 @@ var (
 		common.SourceTypeIOS, common.SourceTypeIOSSwift,
 		common.SourceTypeReactNative, common.SourceTypeFlutter,
 	}
+	brazeWebSources = []string{common.SourceTypeWeb}
 )
 
 func platformKeyConditional(sources []string) validator.Func {
 	return func(fl validator.FieldLevel) bool {
 		mode, platformSpecific, ok := brazeParent(fl)
-		if !ok || !platformSpecificIs(platformSpecific, true) {
+		if !ok || platformSpecific == nil || !*platformSpecific {
 			return true
 		}
 		if !anyMode(mode, sources, "device", "hybrid") {
@@ -171,17 +168,6 @@ func platformKeyConditional(sources []string) validator.Func {
 		}
 		return fl.Field().String() != ""
 	}
-}
-
-func webAPIKeyConditional(fl validator.FieldLevel) bool {
-	mode, platformSpecific, ok := brazeParent(fl)
-	if !ok || !platformSpecificIs(platformSpecific, true) {
-		return true
-	}
-	if !anyMode(mode, []string{common.SourceTypeWeb}, "device", "hybrid") {
-		return true
-	}
-	return fl.Field().String() != ""
 }
 
 // NewDefinition returns the Braze destination definition.
@@ -244,7 +230,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			{Tag: "braze_app_key_required", Func: appKeyConditional},
 			{Tag: "braze_android_api_key_required", Func: platformKeyConditional(brazeAndroidSources)},
 			{Tag: "braze_ios_api_key_required", Func: platformKeyConditional(brazeIOSSources)},
-			{Tag: "braze_web_api_key_required", Func: webAPIKeyConditional},
+			{Tag: "braze_web_api_key_required", Func: platformKeyConditional(brazeWebSources)},
 		},
 		SecretKeys: []string{"rest_api_key"},
 		NewConfig: func() any {
