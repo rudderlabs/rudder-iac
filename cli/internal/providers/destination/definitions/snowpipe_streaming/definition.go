@@ -1,17 +1,22 @@
 package snowpipestreaming
 
 import (
-	"strings"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
-	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 )
 
 func init() {
+	// schema.json requires privateKey to carry PEM headers and declares no template
+	// branch. Unanchored, mirroring upstream: it only requires that a PEM block is
+	// present, so trailing newlines or surrounding whitespace stay valid.
+	funcs.NewPattern(
+		"snowpipe_streaming_private_key",
+		`(?s)-----BEGIN (ENCRYPTED )?PRIVATE KEY-----.+-----END (ENCRYPTED )?PRIVATE KEY-----`,
+		"must be a PEM encoded private key",
+	)
+
 	// schema.json guards namespace with ^((?!pg_|PG_|pG_|Pg_).{1,64})$.
 	// RE2 has no lookahead, so the reserved-prefix half becomes a reject pattern.
 	funcs.NewPatternWithReject(
@@ -60,9 +65,7 @@ type snowpipeStreamingConfig struct {
 	Role      string `mapstructure:"role" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	Namespace string `mapstructure:"namespace" validate:"required,dynamic_or_pattern=snowpipe_streaming_namespace"`
 
-	// Terraform accepts raw key bodies and wraps them for the API; mirror that
-	// behavior instead of forcing every spec to carry PEM headers.
-	PrivateKey           string `mapstructure:"private_key" validate:"required"`
+	PrivateKey           string `mapstructure:"private_key" validate:"required,pattern=snowpipe_streaming_private_key"`
 	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,pattern=single_line_100"`
 
 	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
@@ -85,7 +88,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("user", "user"),
 		converter.Simple("role", "role"),
 		converter.Simple("namespace", "namespace"),
-		privateKeyProperty(),
+		converter.Simple("privateKey", "private_key"),
 		converter.Simple("privateKeyPassphrase", "private_key_passphrase"),
 		converter.Simple("skipTracksTable", "skip_tracks_table"),
 		converter.Simple("jsonPaths", "json_paths"),
@@ -109,31 +112,4 @@ func NewDefinition() *definitions.DestinationDefinition {
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
 	}
-}
-
-func privateKeyProperty() converter.ConfigProperty {
-	return converter.ConfigProperty{
-		LocalKey: "private_key",
-		FromLocalFunc: func(config, local string) (string, error) {
-			v := gjson.Get(local, "private_key")
-			if !v.Exists() || v.Value() == nil || v.String() == "" {
-				return config, nil
-			}
-			return sjson.Set(config, "privateKey", wrapPEMKey(v.String()))
-		},
-		ToLocalFunc: func(local, config string) (string, error) {
-			r := gjson.Get(config, "privateKey")
-			if !r.Exists() {
-				return local, nil
-			}
-			return sjson.Set(local, "private_key", r.Value())
-		},
-	}
-}
-
-func wrapPEMKey(key string) string {
-	if strings.HasPrefix(key, "-----BEGIN") {
-		return key
-	}
-	return "-----BEGIN PRIVATE KEY-----\n" + key + "\n-----END PRIVATE KEY-----"
 }

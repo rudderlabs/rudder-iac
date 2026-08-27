@@ -30,7 +30,7 @@ func minimalConfig() map[string]any {
 		"warehouse":   "RUDDER_WH",
 		"user":        "RUDDER_CLI_E2E",
 		"namespace":   "rudder_cli_e2e",
-		"private_key": "rawSnowpipePrivateKeyXXXXXXXX",
+		"private_key": "-----BEGIN PRIVATE KEY-----\nsnowpipeKeyBody\n-----END PRIVATE KEY-----",
 	}
 }
 
@@ -165,11 +165,19 @@ func TestSnowpipeStreamingConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
-	t.Run("raw private key accepted", func(t *testing.T) {
+	// schema.json requires PEM headers and declares no template branch, so a raw
+	// key body is rejected locally instead of being silently wrapped. Terraform
+	// wraps it; the CLI validates it, matching what upstream actually accepts.
+	t.Run("raw private key rejected", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["private_key"] = "rawSnowpipePrivateKeyBody"
-		assert.Empty(t, registered.ValidateConfig(cfg))
+
+		errors := registered.ValidateConfig(cfg)
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/private_key", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "PEM encoded private key")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -301,9 +309,10 @@ func TestSnowpipeStreamingConversionRoundTrip(t *testing.T) {
 	})
 }
 
-func TestSnowpipeStreamingRawPrivateKeyWrapsForAPI(t *testing.T) {
+func TestSnowpipeStreamingPrivateKeyMapsVerbatim(t *testing.T) {
 	t.Parallel()
 
+	pem := "-----BEGIN PRIVATE KEY-----\nsnowpipeKeyBody\n-----END PRIVATE KEY-----"
 	def := snowpipestreaming.NewDefinition()
 	actual, err := converter.LocalToAPI(def.Properties, map[string]any{
 		"account":     "rudder-cli-e2e.us-east-1",
@@ -311,10 +320,10 @@ func TestSnowpipeStreamingRawPrivateKeyWrapsForAPI(t *testing.T) {
 		"warehouse":   "RUDDER_WH",
 		"user":        "RUDDER_CLI_E2E",
 		"namespace":   "rudder_cli_e2e",
-		"private_key": "rawSnowpipePrivateKeyBody",
+		"private_key": pem,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "-----BEGIN PRIVATE KEY-----\nrawSnowpipePrivateKeyBody\n-----END PRIVATE KEY-----", actual["privateKey"])
+	assert.Equal(t, pem, actual["privateKey"])
 }
 
 func TestSnowpipeStreamingDefaultsAndConnectionMode(t *testing.T) {
@@ -345,7 +354,7 @@ func TestSnowpipeStreamingDefaultsAndConnectionMode(t *testing.T) {
 			"warehouse":   "RUDDER_WH",
 			"user":        "RUDDER_CLI_E2E",
 			"namespace":   "rudder_cli_e2e",
-			"private_key": "abc",
+			"private_key": "-----BEGIN PRIVATE KEY-----\nsnowpipeKeyBody\n-----END PRIVATE KEY-----",
 			"connection_mode": map[string]any{
 				"web":            "cloud",
 				"android_kotlin": "cloud",
