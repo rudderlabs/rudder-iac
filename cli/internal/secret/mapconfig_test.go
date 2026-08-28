@@ -2,12 +2,21 @@ package secret
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func knownSecret(v string) *String {
+	s := New(v)
+	return &s
+}
+
+func unknownSecret() *String {
+	s := NewUnknown()
+	return &s
+}
 
 func TestMapConfigNestedSecretPaths(t *testing.T) {
 	config := map[string]any{
@@ -19,38 +28,43 @@ func TestMapConfigNestedSecretPaths(t *testing.T) {
 	}
 
 	wrapped := WrapKnownSecrets(config, []string{"headers.to"})
-	headers, ok := wrapped["headers"].([]any)
-	require.True(t, ok)
-	for i, header := range headers {
-		h, ok := header.(map[string]any)
-		require.True(t, ok)
-		assert.IsType(t, &String{}, h["to"])
-		assert.Equal(t, fmt.Sprintf("header-secret-%s", []string{"one", "two"}[i]), h["to"].(*String).Reveal())
-		assert.IsType(t, "", h["from"])
+	wantWrapped := map[string]any{
+		"headers": []any{
+			map[string]any{"from": "X-Api-Key", "to": knownSecret("header-secret-one")},
+			map[string]any{"from": "X-Trace", "to": knownSecret("header-secret-two")},
+		},
+		"webhook_url": "https://webhooks.example.com/rudder",
 	}
+	assert.Equal(t, wantWrapped, wrapped)
 
 	revealed := RevealSecrets(wrapped, []string{"headers.to"})
-	revealedHeaders, ok := revealed["headers"].([]any)
-	require.True(t, ok)
-	assert.Equal(t, "header-secret-one", revealedHeaders[0].(map[string]any)["to"])
-	assert.Equal(t, "header-secret-two", revealedHeaders[1].(map[string]any)["to"])
-	assert.IsType(t, &String{}, wrapped["headers"].([]any)[0].(map[string]any)["to"], "RevealSecrets must not mutate caller config")
+	assert.Equal(t, map[string]any{
+		"headers": []any{
+			map[string]any{"from": "X-Api-Key", "to": "header-secret-one"},
+			map[string]any{"from": "X-Trace", "to": "header-secret-two"},
+		},
+		"webhook_url": "https://webhooks.example.com/rudder",
+	}, revealed)
+	assert.Equal(t, wantWrapped, wrapped, "RevealSecrets must not mutate caller config")
 
 	unknown := WrapUnknownSecrets(revealed, []string{"headers.to"})
-	unknownHeaders, ok := unknown["headers"].([]any)
-	require.True(t, ok)
-	assert.True(t, unknownHeaders[0].(map[string]any)["to"].(*String).IsUnknown())
-	assert.True(t, unknownHeaders[1].(map[string]any)["to"].(*String).IsUnknown())
+	assert.Equal(t, map[string]any{
+		"headers": []any{
+			map[string]any{"from": "X-Api-Key", "to": unknownSecret()},
+			map[string]any{"from": "X-Trace", "to": unknownSecret()},
+		},
+		"webhook_url": "https://webhooks.example.com/rudder",
+	}, unknown)
 
 	enableVarSubstitution(t)
 	require.NoError(t, MaskSecrets(unknown, "webhook-prod", []string{"headers.to"}))
-	maskedHeaders, ok := unknown["headers"].([]any)
-	require.True(t, ok)
-	assert.Equal(t, "{{ .WEBHOOK_PROD_HEADERS_0_TO }}", maskedHeaders[0].(map[string]any)["to"])
-	assert.Equal(t, "{{ .WEBHOOK_PROD_HEADERS_1_TO }}", maskedHeaders[1].(map[string]any)["to"])
-	assert.NotEqual(t, maskedHeaders[0].(map[string]any)["to"], maskedHeaders[1].(map[string]any)["to"])
-	assert.Equal(t, "X-Api-Key", maskedHeaders[0].(map[string]any)["from"])
-	assert.Equal(t, "https://webhooks.example.com/rudder", unknown["webhook_url"])
+	assert.Equal(t, map[string]any{
+		"headers": []any{
+			map[string]any{"from": "X-Api-Key", "to": "{{ .WEBHOOK_PROD_HEADERS_0_TO }}"},
+			map[string]any{"from": "X-Trace", "to": "{{ .WEBHOOK_PROD_HEADERS_1_TO }}"},
+		},
+		"webhook_url": "https://webhooks.example.com/rudder",
+	}, unknown, "each slice member exports its own indexed variable")
 
 	payload, err := json.Marshal(unknown)
 	require.NoError(t, err)
@@ -59,22 +73,22 @@ func TestMapConfigNestedSecretPaths(t *testing.T) {
 
 func TestMapConfigNestedSecretPathsDoNotInventAbsentSecrets(t *testing.T) {
 	config := map[string]any{
-		"headers": []any{
-			map[string]any{"from": "X-Trace"},
-		},
+		"headers": []any{map[string]any{"from": "X-Trace"}},
+	}
+	want := map[string]any{
+		"headers": []any{map[string]any{"from": "X-Trace"}},
 	}
 
 	WrapKnownSecrets(config, []string{"headers.to"})
-	assert.Equal(t, []any{map[string]any{"from": "X-Trace"}}, config["headers"])
+	assert.Equal(t, want, config)
 
 	WrapUnknownSecrets(config, []string{"headers.to"})
-	assert.Equal(t, []any{map[string]any{"from": "X-Trace"}}, config["headers"])
+	assert.Equal(t, want, config)
 
-	revealed := RevealSecrets(config, []string{"headers.to"})
-	assert.Equal(t, config, revealed)
+	assert.Equal(t, want, RevealSecrets(config, []string{"headers.to"}))
 
 	require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
-	assert.Equal(t, []any{map[string]any{"from": "X-Trace"}}, config["headers"])
+	assert.Equal(t, want, config)
 }
 
 // Secret paths carry no container information — the walkers dispatch on the
@@ -89,23 +103,31 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 		}
 
 		wrapped := WrapKnownSecrets(config, []string{"auth.token"})
-		auth, ok := wrapped["auth"].(map[string]any)
-		require.True(t, ok)
-		require.IsType(t, &String{}, auth["token"])
-		assert.Equal(t, "map-secret", auth["token"].(*String).Reveal())
-		assert.Equal(t, "bearer", auth["kind"], "sibling keys stay untouched")
+		wantWrapped := map[string]any{
+			"auth":        map[string]any{"token": knownSecret("map-secret"), "kind": "bearer"},
+			"webhook_url": "https://webhooks.example.com/rudder",
+		}
+		assert.Equal(t, wantWrapped, wrapped, "sibling keys stay untouched")
 
 		revealed := RevealSecrets(wrapped, []string{"auth.token"})
-		assert.Equal(t, "map-secret", revealed["auth"].(map[string]any)["token"])
-		assert.IsType(t, &String{}, wrapped["auth"].(map[string]any)["token"], "RevealSecrets must not mutate caller config")
+		assert.Equal(t, map[string]any{
+			"auth":        map[string]any{"token": "map-secret", "kind": "bearer"},
+			"webhook_url": "https://webhooks.example.com/rudder",
+		}, revealed)
+		assert.Equal(t, wantWrapped, wrapped, "RevealSecrets must not mutate caller config")
 
 		unknown := WrapUnknownSecrets(revealed, []string{"auth.token"})
-		require.IsType(t, &String{}, unknown["auth"].(map[string]any)["token"])
-		assert.True(t, unknown["auth"].(map[string]any)["token"].(*String).IsUnknown())
+		assert.Equal(t, map[string]any{
+			"auth":        map[string]any{"token": unknownSecret(), "kind": "bearer"},
+			"webhook_url": "https://webhooks.example.com/rudder",
+		}, unknown)
 
 		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(unknown, "webhook-prod", []string{"auth.token"}))
-		assert.Equal(t, "{{ .WEBHOOK_PROD_AUTH_TOKEN }}", unknown["auth"].(map[string]any)["token"], "map descent adds no index to the variable name")
+		assert.Equal(t, map[string]any{
+			"auth":        map[string]any{"token": "{{ .WEBHOOK_PROD_AUTH_TOKEN }}", "kind": "bearer"},
+			"webhook_url": "https://webhooks.example.com/rudder",
+		}, unknown, "map descent adds no index to the variable name")
 	})
 
 	t.Run("typed object slices walk like generic slices", func(t *testing.T) {
@@ -117,20 +139,31 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 		}
 
 		WrapKnownSecrets(config, []string{"headers.to"})
-		headers, ok := config["headers"].([]map[string]any)
-		require.True(t, ok, "wrapping must not reshape the typed slice")
-		assert.Equal(t, "typed-secret-one", headers[0]["to"].(*String).Reveal())
-		assert.Equal(t, "typed-secret-two", headers[1]["to"].(*String).Reveal())
+		wantWrapped := map[string]any{
+			"headers": []map[string]any{
+				{"from": "X-Api-Key", "to": knownSecret("typed-secret-one")},
+				{"from": "X-Trace", "to": knownSecret("typed-secret-two")},
+			},
+		}
+		assert.Equal(t, wantWrapped, config, "wrapping must not reshape the typed slice")
 
 		revealed := RevealSecrets(config, []string{"headers.to"})
-		assert.Equal(t, "typed-secret-one", revealed["headers"].([]map[string]any)[0]["to"])
-		assert.IsType(t, &String{}, headers[0]["to"], "RevealSecrets must not mutate caller config")
+		assert.Equal(t, map[string]any{
+			"headers": []map[string]any{
+				{"from": "X-Api-Key", "to": "typed-secret-one"},
+				{"from": "X-Trace", "to": "typed-secret-two"},
+			},
+		}, revealed)
+		assert.Equal(t, wantWrapped, config, "RevealSecrets must not mutate caller config")
 
 		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
-		assert.Equal(t, "{{ .WEBHOOK_PROD_HEADERS_0_TO }}", headers[0]["to"])
-		assert.Equal(t, "{{ .WEBHOOK_PROD_HEADERS_1_TO }}", headers[1]["to"])
-		assert.Equal(t, "X-Api-Key", headers[0]["from"])
+		assert.Equal(t, map[string]any{
+			"headers": []map[string]any{
+				{"from": "X-Api-Key", "to": "{{ .WEBHOOK_PROD_HEADERS_0_TO }}"},
+				{"from": "X-Trace", "to": "{{ .WEBHOOK_PROD_HEADERS_1_TO }}"},
+			},
+		}, config)
 	})
 
 	t.Run("heterogeneous deep shapes resolve per member", func(t *testing.T) {
@@ -146,17 +179,27 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 		}
 
 		WrapKnownSecrets(config, []string{"a.b.c"})
-		first := config["a"].([]any)[0].(map[string]any)["b"].([]any)
-		second := config["a"].([]any)[1].(map[string]any)["b"].(map[string]any)
-		assert.Equal(t, "deep-1", first[0].(map[string]any)["c"].(*String).Reveal())
-		assert.Equal(t, "deep-2", first[1].(map[string]any)["c"].(*String).Reveal())
-		assert.Equal(t, "deep-3", second["c"].(*String).Reveal())
+		assert.Equal(t, map[string]any{
+			"a": []any{
+				map[string]any{"b": []any{
+					map[string]any{"c": knownSecret("deep-1")},
+					map[string]any{"c": knownSecret("deep-2")},
+				}},
+				map[string]any{"b": map[string]any{"c": knownSecret("deep-3")}},
+			},
+		}, config)
 
 		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"a.b.c"}))
-		assert.Equal(t, "{{ .WEBHOOK_PROD_A_0_B_0_C }}", first[0].(map[string]any)["c"])
-		assert.Equal(t, "{{ .WEBHOOK_PROD_A_0_B_1_C }}", first[1].(map[string]any)["c"])
-		assert.Equal(t, "{{ .WEBHOOK_PROD_A_1_B_C }}", second["c"], "map hop contributes no index between the slice indices")
+		assert.Equal(t, map[string]any{
+			"a": []any{
+				map[string]any{"b": []any{
+					map[string]any{"c": "{{ .WEBHOOK_PROD_A_0_B_0_C }}"},
+					map[string]any{"c": "{{ .WEBHOOK_PROD_A_0_B_1_C }}"},
+				}},
+				map[string]any{"b": map[string]any{"c": "{{ .WEBHOOK_PROD_A_1_B_C }}"}},
+			},
+		}, config, "a map hop contributes no index between the slice indices")
 	})
 }
 
@@ -170,25 +213,29 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 			"headers": []any{map[string]any{"to": "header-secret"}},
 			"":        "empty-key-value",
 		}
+		want := map[string]any{
+			"headers": []any{map[string]any{"to": "header-secret"}},
+			"":        "empty-key-value",
+		}
 
 		for _, key := range []string{"", ".", "headers.", ".to", "headers..to"} {
 			WrapKnownSecrets(config, []string{key})
 			WrapUnknownSecrets(config, []string{key})
 			require.NoError(t, MaskSecrets(config, "webhook-prod", []string{key}))
-			assert.Equal(t, config, RevealSecrets(config, []string{key}), key)
+			assert.Equal(t, want, RevealSecrets(config, []string{key}), key)
+			assert.Equal(t, want, config, "even a literal empty key is never resolved: %q", key)
 		}
-		assert.Equal(t, "header-secret", config["headers"].([]any)[0].(map[string]any)["to"])
-		assert.Equal(t, "empty-key-value", config[""], "even a literal empty key is never resolved")
 	})
 
 	t.Run("keys containing literal dots are not addressable", func(t *testing.T) {
 		config := map[string]any{"headers.to": "flat-secret"}
+		want := map[string]any{"headers.to": "flat-secret"}
 
 		WrapKnownSecrets(config, []string{"headers.to"})
-		assert.Equal(t, "flat-secret", config["headers.to"], "a dotted key is a path, never a literal lookup")
+		assert.Equal(t, want, config, "a dotted key is a path, never a literal lookup")
 
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
-		assert.Equal(t, "flat-secret", config["headers.to"])
+		assert.Equal(t, want, config)
 	})
 
 	t.Run("non-object array members are skipped", func(t *testing.T) {
@@ -201,16 +248,22 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 		}
 
 		WrapKnownSecrets(config, []string{"headers.to"})
-		headers := config["headers"].([]any)
-		assert.Equal(t, "not-an-object", headers[0])
-		assert.IsType(t, &String{}, headers[1].(map[string]any)["to"])
-		assert.Equal(t, 42, headers[2])
+		assert.Equal(t, map[string]any{
+			"headers": []any{
+				"not-an-object",
+				map[string]any{"to": knownSecret("header-secret")},
+				42,
+			},
+		}, config)
 
 		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
-		headers = config["headers"].([]any)
-		assert.Equal(t, "not-an-object", headers[0])
-		assert.Equal(t, "{{ .WEBHOOK_PROD_HEADERS_1_TO }}", headers[1].(map[string]any)["to"])
-		assert.Equal(t, 42, headers[2])
+		assert.Equal(t, map[string]any{
+			"headers": []any{
+				"not-an-object",
+				map[string]any{"to": "{{ .WEBHOOK_PROD_HEADERS_1_TO }}"},
+				42,
+			},
+		}, config)
 	})
 }

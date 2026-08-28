@@ -73,12 +73,7 @@ func MaskSecrets(config map[string]any, externalID string, secretKeys []string) 
 	}
 	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
 	for _, key := range secretKeys {
-		path := strings.Split(key, ".")
-		if !secretPathExists(config, path) {
-			continue
-		}
-
-		if err := maskSecret(config, path, prefix); err != nil {
+		if err := maskSecret(config, strings.Split(key, "."), prefix); err != nil {
 			return fmt.Errorf("masking secret key %q: %w", key, err)
 		}
 	}
@@ -207,43 +202,6 @@ func setNestedSecretValue(value any, path []string, replace func(any) any) {
 	case map[string]any:
 		setSecretValue(v, path, replace)
 	}
-}
-
-func secretPathExists(config map[string]any, path []string) bool {
-	if len(path) == 0 || path[0] == "" {
-		return false
-	}
-
-	value, ok := config[path[0]]
-	if !ok {
-		return false
-	}
-
-	if len(path) == 1 {
-		return true
-	}
-
-	return nestedSecretPathExists(value, path[1:])
-}
-
-func nestedSecretPathExists(value any, path []string) bool {
-	switch v := value.(type) {
-	case []any:
-		for _, item := range v {
-			if nestedSecretPathExists(item, path) {
-				return true
-			}
-		}
-	case []map[string]any:
-		for i := range v {
-			if secretPathExists(v[i], path) {
-				return true
-			}
-		}
-	case map[string]any:
-		return secretPathExists(v, path)
-	}
-	return false
 }
 
 func cloneSecretConfig(config map[string]any) map[string]any {
