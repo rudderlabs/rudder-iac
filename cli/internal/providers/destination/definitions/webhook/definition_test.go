@@ -134,6 +134,14 @@ func TestWebhookConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/webhook_method", errors[0].Path)
+
+		// schema.json declares a strict enum with no template branch, so a
+		// templated value would be stored verbatim and rejected by the backend.
+		config = validMinimalConfig()
+		config["webhook_method"] = `{{ .WEBHOOK_METHOD || "POST" }}`
+		errors = registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/webhook_method", errors[0].Path)
 	})
 
 	t.Run("headers validate nested single line patterns", func(t *testing.T) {
