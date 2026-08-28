@@ -201,3 +201,5 @@
 <!-- ticket:DEX-725 -->
 - `bqstream`, `confluent_cloud`, and `googlesheets` model schema-declared `connectionMode` as local YAML key `connection_mode` through `common.ConnectionModeProperties(sourceTypes)`.
 - Adding `connection_mode` to those destinations should not change their existing `SourceTypes` or `ConnectionModes`; it only exposes the config key for the already-supported modes.
+- Event filtering always uses the nested local block `event_filtering.{whitelist,blacklist}` with `excluded_with` on both fields and a `Discriminator` deriving `eventFilteringOption` — never flat `event_filtering_*` local keys and never a user-set option field. When upstream scopes the keys per source type (iterable: `whitelistedEvents.web`, `eventFilteringOption.web`), keep the identical local block and express the scoping in the converters: `Gated` arrays with dotted API keys, Discriminator ungated (it has no local key; the lists it derives from carry the gate).
+- Per-definition pattern registrations (`funcs.NewPattern` / `NewPatternWithReject`) live in an `init()` inside `definition.go`, not a separate `patterns.go` (adobe_analytics was the one outlier and was folded in).
