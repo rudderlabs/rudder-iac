@@ -111,8 +111,17 @@ func accessTokenConditional(fl validator.FieldLevel) bool {
 		return true
 	}
 	connectionMode, _ := field.Interface().(common.ConnectionMode)
-	if connectionMode["web"] == "device" {
-		return true
+
+	// The schema branch is not-wrapped over "connectionMode present AND, if web
+	// is set, web is device". JSON Schema `properties` constrains only keys that
+	// are present, so an absent web key satisfies it vacuously: a config with
+	// connection_mode {android: cloud} needs no token, while an absent
+	// connection_mode does.
+	if connectionMode != nil {
+		web, ok := connectionMode["web"]
+		if !ok || web == "device" {
+			return true
+		}
 	}
 	return fl.Field().String() != ""
 }

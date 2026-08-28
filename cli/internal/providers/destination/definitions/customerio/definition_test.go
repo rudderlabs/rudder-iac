@@ -588,3 +588,84 @@ func (urnResolver) GetURNByID(string, string) (string, error) {
 func (urnResolver) ResolveToReference(string, string) (string, error) {
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }
+
+// api_version and user_id_identifier_type are the v2 API path. Both are declared
+// by schema.json and db-config but were unmodelled, so update erased whatever the
+// UI had set, and the v2 path was unreachable from IaC.
+func TestCustomerioAPIVersionKeys(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(customerio.NewDefinition()))
+	registered, err := registry.Get("customerio", 1)
+	require.NoError(t, err)
+
+	base := func(extra map[string]any) map[string]any {
+		cfg := map[string]any{"site_id": "site-1", "api_key": "key-1", "datacenter": "US"}
+		for k, v := range extra {
+			cfg[k] = v
+		}
+		return cfg
+	}
+
+	t.Run("v2 requires user_id_identifier_type", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(base(map[string]any{"api_version": "v2"}))
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/user_id_identifier_type", errors[0].Path)
+	})
+
+	t.Run("v2 satisfied by user_id_identifier_type", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(base(map[string]any{
+			"api_version":             "v2",
+			"user_id_identifier_type": "email",
+		})))
+	})
+
+	t.Run("v1 does not require it", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(base(map[string]any{"api_version": "v1"})))
+	})
+
+	t.Run("both keys are optional when api_version is unset", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(base(nil)))
+	})
+
+	t.Run("invalid enum values rejected", func(t *testing.T) {
+		t.Parallel()
+		for key, bad := range map[string]string{
+			"api_version":             "v3",
+			"user_id_identifier_type": "username",
+		} {
+			cfg := base(map[string]any{key: bad})
+			if key == "user_id_identifier_type" {
+				cfg["api_version"] = "v2"
+			}
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/"+key, errors[0].Path, key)
+		}
+	})
+
+	t.Run("api_version round-trips to the API key", func(t *testing.T) {
+		t.Parallel()
+		testutil.AssertConversion(t, customerio.NewDefinition().Properties, []testutil.ConversionCase{
+			{
+				Name: "v2 api path",
+				LocalJSON: `{
+					"site_id": "site-1",
+					"api_version": "v2",
+					"user_id_identifier_type": "email"
+				}`,
+				APIJSON: `{
+					"siteID": "site-1",
+					"apiVersion": "v2",
+					"userIdIdentifierType": "email"
+				}`,
+			},
+		})
+	})
+}

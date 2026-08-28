@@ -51,10 +51,15 @@ type webStringList struct {
 	Web []string `mapstructure:"web" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 }
 
-// Iterable is unusual: event filtering is web-gated and web-keyed, rather than
-// the flat arrays plus discriminator most destinations use.
-type webEventFilteringOption struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=disable whitelistedEvents blacklistedEvents"`
+// Iterable is unusual upstream: the event-filter keys are web-scoped objects
+// (whitelistedEvents.web, eventFilteringOption.web) rather than the flat
+// arrays most destinations use. The local surface still follows the fleet
+// convention — a nested event_filtering block with mutual exclusion and a
+// derived option — with the web scoping expressed in the converters (Gated)
+// instead of in the local key names.
+type eventFiltering struct {
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 type webInitIdentifier struct {
@@ -104,9 +109,7 @@ type iterableConfig struct {
 	IconPath                      webString                `mapstructure:"icon_path"`
 	IsRequiredToDismissMessage    webBool                  `mapstructure:"is_required_to_dismiss_message"`
 	CloseButtonPosition           webCloseButtonPosition   `mapstructure:"close_button_position"`
-	EventFilteringOption          webEventFilteringOption  `mapstructure:"event_filtering_option"`
-	WhitelistedEvents             webStringList            `mapstructure:"whitelisted_events"`
-	BlacklistedEvents             webStringList            `mapstructure:"blacklisted_events"`
+	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
 	ConnectionMode                common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement             common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -230,17 +233,19 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 		converter.Gated(
-			converter.Simple("eventFilteringOption.web", "event_filtering_option.web"),
+			converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "event_filtering.whitelist"),
 			common.SourceTypeWeb,
 		),
 		converter.Gated(
-			converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "whitelisted_events.web"),
+			converter.ArrayWithStrings("blacklistedEvents.web", "eventName", "event_filtering.blacklist"),
 			common.SourceTypeWeb,
 		),
-		converter.Gated(
-			converter.ArrayWithStrings("blacklistedEvents.web", "eventName", "blacklisted_events.web"),
-			common.SourceTypeWeb,
-		),
+		// Derived, never user-set; ungated because a Discriminator carries no
+		// local key (the lists it derives from are gated above).
+		converter.Discriminator("eventFilteringOption.web", converter.DiscriminatorValues{
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
+		}),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

@@ -14,3 +14,6 @@ spec:
     table_id: events
     insert_id: messageId
     credentials: '{{ .BQSTREAM_CREDENTIALS }}'
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

@@ -11,6 +11,10 @@
     "datasetId": "rudder_e2e_updated",
     "tableId": "events_updated",
     "insertId": "anonymousId",
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "consentManagement": {
       "web": [
         {

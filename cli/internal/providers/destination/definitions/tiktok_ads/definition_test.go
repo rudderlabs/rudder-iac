@@ -153,7 +153,9 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 				map[string]any{"from": "Order Completed", "to": "CompletePayment"},
 				map[string]any{"from": "Product Added", "to": "AddToCart"},
 			},
-			"event_filtering_whitelist": []any{"Order Completed", "Product Added"},
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed", "Product Added"},
+			},
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
@@ -180,9 +182,25 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 			"events_to_standard": []any{
 				map[string]any{"from": "Signed Up", "to": "CompleteRegistration"},
 			},
-			"event_filtering_blacklist": []any{"Page Viewed"},
+			"event_filtering": map[string]any{
+				"blacklist": []any{"Page Viewed"},
+			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"pixel_code": "C12345",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed"},
+				"blacklist": []any{"Page Viewed"},
+			},
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/event_filtering/whitelist", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -250,7 +268,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 				"events_to_standard": [
 					{"from": "Order Completed", "to": "CompletePayment"}
 				],
-				"event_filtering_whitelist": ["Order Completed", "Product Added"],
+				"event_filtering": {"whitelist": ["Order Completed", "Product Added"]},
 				"use_native_sdk": {"web": true}
 			}`,
 			APIJSON: `{
@@ -274,7 +292,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 			Name: "blacklist reshape",
 			LocalJSON: `{
 				"pixel_code": "C12345",
-				"event_filtering_blacklist": ["Page Viewed"]
+				"event_filtering": {"blacklist": ["Page Viewed"]}
 			}`,
 			APIJSON: `{
 				"pixelCode": "C12345",

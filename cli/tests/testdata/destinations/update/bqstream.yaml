@@ -14,6 +14,9 @@ spec:
     table_id: events_updated
     insert_id: anonymousId
     credentials: '{{ .BQSTREAM_CREDENTIALS }}'
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud
     consent_management:
       web:
         - provider: oneTrust

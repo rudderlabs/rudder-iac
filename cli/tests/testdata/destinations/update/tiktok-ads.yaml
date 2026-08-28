@@ -19,8 +19,9 @@ spec:
         to: Purchase
       - from: Product Added
         to: AddToCart
-    event_filtering_whitelist:
-      - Order Completed
+    event_filtering:
+      whitelist:
+        - Order Completed
     use_native_sdk:
       web: false
     consent_management:

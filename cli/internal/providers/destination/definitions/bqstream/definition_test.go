@@ -123,6 +123,10 @@ func TestBQStreamConfigValidation(t *testing.T) {
 			"table_id":    "my_table",
 			"insert_id":   "messageId",
 			"credentials": `{"type":"service_account","project_id":"my-gcp-project"}`,
+			"connection_mode": map[string]any{
+				"web":            "cloud",
+				"android_kotlin": "cloud",
+			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -133,6 +137,73 @@ func TestBQStreamConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects non-cloud values", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"device", "hybrid"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"project_id":  "my-gcp-project",
+				"dataset_id":  "my_dataset",
+				"table_id":    "my_table",
+				"credentials": `{"type":"service_account"}`,
+				"connection_mode": map[string]any{
+					"web": mode,
+				},
+			})
+			require.Len(t, errors, 1, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of", mode)
+		}
+	})
+
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"project_id":  "my-gcp-project",
+			"dataset_id":  "my_dataset",
+			"table_id":    "my_table",
+			"credentials": `{"type":"service_account"}`,
+			"connection_mode": map[string]any{
+				"web": "{{ .BQSTREAM_CONNECTION_MODE || cloud }}",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"project_id":  "my-gcp-project",
+			"dataset_id":  "my_dataset",
+			"table_id":    "my_table",
+			"credentials": `{"type":"service_account"}`,
+			"connection_mode": map[string]any{
+				"web": "",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"project_id":  "my-gcp-project",
+			"dataset_id":  "my_dataset",
+			"table_id":    "my_table",
+			"credentials": `{"type":"service_account"}`,
+			"connection_mode": map[string]any{
+				"web": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -206,20 +277,28 @@ func TestBQStreamConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "full TF fields",
+			Name: "full TF fields with connection mode",
 			LocalJSON: `{
 				"project_id": "my-gcp-project",
 				"dataset_id": "my_dataset",
 				"table_id": "my_table",
 				"insert_id": "messageId",
-				"credentials": "{\"type\":\"service_account\"}"
+				"credentials": "{\"type\":\"service_account\"}",
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"projectId": "my-gcp-project",
 				"datasetId": "my_dataset",
 				"tableId": "my_table",
 				"insertId": "messageId",
-				"credentials": "{\"type\":\"service_account\"}"
+				"credentials": "{\"type\":\"service_account\"}",
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{

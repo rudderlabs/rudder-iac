@@ -16,11 +16,13 @@ import (
 )
 
 // Volatile upstream fields excluded from the connection-scenario snapshot
-// comparisons. Like the other e2e ignore lists these are ignored by value, not
-// by presence: the API must still return each key or the comparison fails.
+// comparisons. Like the other e2e ignore lists, a key a snapshot records must
+// still come back — ignoring it drops the value comparison, not the presence
+// check — while an ignored key the snapshot does not record may be extra in the
+// response. That is what keeps the conditional versionInfo advisory harmless.
 var (
 	connSourceSnapshotIgnore      = []string{"id", "workspaceId"}
-	connDestinationSnapshotIgnore = []string{"id", "workspaceId", "version", "createdAt", "updatedAt"}
+	connDestinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versionInfo", "createdAt", "updatedAt"}
 	connectionSnapshotIgnore      = []string{"id", "sourceId", "destinationId", "createdAt", "updatedAt"}
 )
 

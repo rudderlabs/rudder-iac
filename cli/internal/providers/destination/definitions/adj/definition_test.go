@@ -142,7 +142,9 @@ func TestAdjustConfigValidation(t *testing.T) {
 				"android": true,
 				"ios":     true,
 			},
-			"event_filtering_whitelist": []any{"Purchase", "Signup"},
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Purchase", "Signup"},
+			},
 			"consent_management": map[string]any{
 				"android": []any{
 					map[string]any{
@@ -153,6 +155,20 @@ func TestAdjustConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"app_token": "token",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Purchase"},
+				"blacklist": []any{"Signup"},
+			},
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/event_filtering/whitelist", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
 	t.Run("example yaml config", func(t *testing.T) {
@@ -172,7 +188,9 @@ func TestAdjustConfigValidation(t *testing.T) {
 				"android": true,
 				"ios":     true,
 			},
-			"event_filtering_whitelist": []any{"Product Purchased", "Signup"},
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Product Purchased", "Signup"},
+			},
 			"consent_management": map[string]any{
 				"android": []any{
 					map[string]any{
@@ -197,8 +215,8 @@ func TestAdjustConfigValidation(t *testing.T) {
 			{"delay", "bad\ndelay", "/delay"},
 			{"custom_mappings", []any{map[string]any{"from": "bad\nfrom", "to": "x"}}, "/custom_mappings/0/from"},
 			{"partner_params_keys", []any{map[string]any{"from": "x", "to": "bad\nto"}}, "/partner_params_keys/0/to"},
-			{"event_filtering_blacklist", []any{"bad\nevent"}, "/event_filtering_blacklist/0"},
-			{"event_filtering_whitelist", []any{"bad\nevent"}, "/event_filtering_whitelist/0"},
+			{"event_filtering", map[string]any{"blacklist": []any{"bad\nevent"}}, "/event_filtering/blacklist/0"},
+			{"event_filtering", map[string]any{"whitelist": []any{"bad\nevent"}}, "/event_filtering/whitelist/0"},
 		}
 
 		for _, tc := range cases {
@@ -220,7 +238,7 @@ func TestAdjustConfigValidation(t *testing.T) {
 			"app_token":                 "token",
 			"custom_mappings":           []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
 			"partner_params_keys":       []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
-			"event_filtering_blacklist": []any{"{{ config.event || Password Reset }}"},
+			"event_filtering":           map[string]any{"blacklist": []any{"{{ config.event || Password Reset }}"}},
 		}))
 
 		for _, field := range []string{"app_token", "delay"} {
@@ -316,7 +334,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					"android": true,
 					"ios": true
 				},
-				"event_filtering_whitelist": ["one", "two"]
+				"event_filtering": {"whitelist": ["one", "two"]}
 			}`,
 			APIJSON: `{
 				"appToken": "abc123",
@@ -344,7 +362,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 			Name: "event filtering blacklist",
 			LocalJSON: `{
 				"app_token": "abc123",
-				"event_filtering_blacklist": ["noise"]
+				"event_filtering": {"blacklist": ["noise"]}
 			}`,
 			APIJSON: `{
 				"appToken": "abc123",
