@@ -61,6 +61,31 @@ converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 }),
 ```
 
+When upstream scopes the same keys per source type (iterable declares
+`whitelistedEvents.web` / `eventFilteringOption.web`), keep the identical local
+`event_filtering` block and express the scoping in the converters instead:
+dotted API keys plus `Gated` on the two arrays. The Discriminator stays ungated
+— it has no local key, and the lists it derives from carry the gate:
+
+```go
+converter.Gated(
+    converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "event_filtering.whitelist"),
+    common.SourceTypeWeb,
+),
+converter.Gated(
+    converter.ArrayWithStrings("blacklistedEvents.web", "eventName", "event_filtering.blacklist"),
+    common.SourceTypeWeb,
+),
+converter.Discriminator("eventFilteringOption.web", converter.DiscriminatorValues{
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
+}),
+```
+
+Never model `eventFilteringOption` (scoped or not) as a user-set field — it is
+always derived, so the backend default applies and inconsistent states (option
+set with no list, or contradicting the list) stay unrepresentable.
+
 List of objects with field rename:
 
 ```go

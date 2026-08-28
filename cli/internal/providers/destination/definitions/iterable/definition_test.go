@@ -65,9 +65,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"icon_path/web":                      {"web"},
 		"is_required_to_dismiss_message/web": {"web"},
 		"close_button_position/web":          {"web"},
-		"event_filtering_option/web":         {"web"},
-		"whitelisted_events/web":             {"web"},
-		"blacklisted_events/web":             {"web"},
+		"event_filtering/whitelist":          {"web"},
+		"event_filtering/blacklist":          {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("ITERABLE", 1)
@@ -191,6 +190,9 @@ func TestIterableConfigValidation(t *testing.T) {
 			"close_button_position": map[string]any{
 				"web": "top-right",
 			},
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed", "Product Viewed"},
+			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -201,6 +203,21 @@ func TestIterableConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":     "iterable-api-key",
+			"data_center": "USDC",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed"},
+				"blacklist": []any{"Page Viewed"},
+			},
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/event_filtering/whitelist", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -386,6 +403,34 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 				"apiKey": "iterable-api-key",
 				"dataCenter": "USDC",
 				"getInAppEventMapping": {"web": [{"eventName": "one"}, {"eventName": "two"}]}
+			}`,
+		},
+		{
+			Name: "event filtering whitelist derives web-scoped option",
+			LocalJSON: `{
+				"api_key": "iterable-api-key",
+				"data_center": "USDC",
+				"event_filtering": {"whitelist": ["one", "two"]}
+			}`,
+			APIJSON: `{
+				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
+				"eventFilteringOption": {"web": "whitelistedEvents"},
+				"whitelistedEvents": {"web": [{"eventName": "one"}, {"eventName": "two"}]}
+			}`,
+		},
+		{
+			Name: "event filtering blacklist derives web-scoped option",
+			LocalJSON: `{
+				"api_key": "iterable-api-key",
+				"data_center": "USDC",
+				"event_filtering": {"blacklist": ["noise"]}
+			}`,
+			APIJSON: `{
+				"apiKey": "iterable-api-key",
+				"dataCenter": "USDC",
+				"eventFilteringOption": {"web": "blacklistedEvents"},
+				"blacklistedEvents": {"web": [{"eventName": "noise"}]}
 			}`,
 		},
 		{
