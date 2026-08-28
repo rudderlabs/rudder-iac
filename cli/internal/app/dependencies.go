@@ -456,12 +456,16 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	return registry, nil
 }
 
-func SyncReporter() syncer.SyncReporter {
+func SyncReporter(workspace *client.Workspace) syncer.SyncReporter {
 	if ui.IsTerminal() {
-		return &reporters.ProgressSyncReporter{}
+		reporter := &reporters.ProgressSyncReporter{}
+		reporter.SetWorkspace(workspace)
+		return reporter
 	}
 
-	return &reporters.PlainSyncReporter{}
+	reporter := &reporters.PlainSyncReporter{}
+	reporter.SetWorkspace(workspace)
+	return reporter
 }
 
 func (d *deps) Client() *client.Client {
