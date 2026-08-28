@@ -169,6 +169,53 @@ func TestWebhookConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(exampleConfig()))
 	})
 
+	t.Run("connection_mode rejects non-cloud values", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"device", "hybrid"} {
+			config := validMinimalConfig()
+			config["connection_mode"] = map[string]any{"web": mode}
+
+			errors := registered.ValidateConfig(config)
+			require.Len(t, errors, 1, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of", mode)
+		}
+	})
+
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": "{{ .WEBHOOK_CONNECTION_MODE || cloud }}"}
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": ""}
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": true}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		config := validMinimalConfig()
@@ -227,7 +274,11 @@ func TestWebhookConversionRoundTrip(t *testing.T) {
 				"headers": [
 					{"from": "X-Api-Key", "to": "{{ .WEBHOOK_HEADER_VALUE }}"},
 					{"from": "X-Trace", "to": "rudder-cli"}
-				]
+				],
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"webhookUrl": "https://webhooks.example.com/rudder",
@@ -235,7 +286,11 @@ func TestWebhookConversionRoundTrip(t *testing.T) {
 				"headers": [
 					{"from": "X-Api-Key", "to": "{{ .WEBHOOK_HEADER_VALUE }}"},
 					{"from": "X-Trace", "to": "rudder-cli"}
-				]
+				],
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{
@@ -348,6 +403,10 @@ func validFullConfig() map[string]any {
 		"headers": []any{
 			map[string]any{"from": "X-Api-Key", "to": "{{ .WEBHOOK_HEADER_VALUE || safe-dummy-value }}"},
 			map[string]any{"from": "X-Trace", "to": "rudder-cli"},
+		},
+		"connection_mode": map[string]any{
+			"web":            "cloud",
+			"android_kotlin": "cloud",
 		},
 		"consent_management": map[string]any{
 			"web": []any{

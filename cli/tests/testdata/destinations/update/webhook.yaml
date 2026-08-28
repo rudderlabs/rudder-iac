@@ -16,6 +16,9 @@ spec:
         to: "{{ .WEBHOOK_HEADER_TOKEN }}"
       - from: X-Rudder-Trace
         to: rudder-cli-e2e
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud
     consent_management:
       web:
         - provider: oneTrust

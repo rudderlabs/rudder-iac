@@ -59,9 +59,12 @@ var connectionModes = map[string][]string{
 }
 
 type webhookConfig struct {
-	WebhookURL        string                   `mapstructure:"webhook_url" validate:"required,dynamic_or_pattern=webhook_url"`
-	WebhookMethod     string                   `mapstructure:"webhook_method" validate:"omitempty,dynamic_or_oneof=POST PUT PATCH GET DELETE"`
+	WebhookURL string `mapstructure:"webhook_url" validate:"required,dynamic_or_pattern=webhook_url"`
+	// schema.json defaults webhookMethod to POST and the backend applies it on
+	// persist, so the tag keeps a spec that omits the key from diffing.
+	WebhookMethod     string                   `mapstructure:"webhook_method" validate:"omitempty,dynamic_or_oneof=POST PUT PATCH GET DELETE" default:"POST"`
 	Headers           []header                 `mapstructure:"headers" validate:"omitempty,dive"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -80,6 +83,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

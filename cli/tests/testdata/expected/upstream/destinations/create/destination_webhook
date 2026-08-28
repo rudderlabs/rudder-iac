@@ -14,7 +14,11 @@
         "from": "X-Rudder-Token",
         "to": ""
       }
-    ]
+    ],
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
