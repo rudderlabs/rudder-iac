@@ -14,14 +14,16 @@ import (
 )
 
 // destinationSnapshotIgnore are the volatile upstream fields excluded from the
-// snapshot comparison: server-assigned id, workspace scoping, version, and
-// timestamps. Write-only secrets (e.g. S3 access keys) are never returned by the
-// API, so they never appear here.
+// snapshot comparison: server-assigned id, workspace scoping, definition version
+// and its lifecycle advisory, and timestamps. Write-only secrets (e.g. S3 access
+// keys) are never returned by the API, so they never appear here.
 //
-// These fields are ignored by value, not by presence: CompareStates reports a
-// missing key before it consults the ignore list, so the API must still return
-// each key or the comparison fails.
-var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "createdAt", "updatedAt"}
+// A key recorded in a snapshot is still required to come back: ignoring it drops
+// the value comparison, not the presence check. The one asymmetry is that an
+// ignored key may be *extra* in the response, which is what keeps versionInfo
+// harmless — the API only attaches it once a destination's stored major falls
+// behind its definition's current one, so it is absent from every snapshot here.
+var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versionInfo", "createdAt", "updatedAt"}
 
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
