@@ -45,20 +45,26 @@ type useNativeSDK struct {
 	Web *bool `mapstructure:"web"`
 }
 
+// Nested event_filtering block, matching the fleet convention (braze,
+// facebook_pixel, ...).
+type eventFiltering struct {
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
+}
+
 // tiktokAdsConfig is the local YAML config model. Field set mirrors terraform
 // destination_tiktok_ads mappings; validation constraints mirror schema.json.
 type tiktokAdsConfig struct {
-	PixelCode               string                   `mapstructure:"pixel_code" validate:"required,dynamic_or_pattern=single_line_100"`
-	AccessToken             string                   `mapstructure:"access_token"`
-	Version                 string                   `mapstructure:"version" validate:"omitempty,dynamic_or_oneof=v2 v1" default:"v2"`
-	HashUserProperties      *bool                    `mapstructure:"hash_user_properties" default:"true"`
-	SendCustomEvents        *bool                    `mapstructure:"send_custom_events" default:"false"`
-	EventsToStandard        []eventToStandard        `mapstructure:"events_to_standard" validate:"omitempty,dive"`
-	EventFilteringWhitelist []string                 `mapstructure:"event_filtering_whitelist" validate:"omitempty,excluded_with=EventFilteringBlacklist,dive,dynamic_or_pattern=single_line_100"`
-	EventFilteringBlacklist []string                 `mapstructure:"event_filtering_blacklist" validate:"omitempty,excluded_with=EventFilteringWhitelist,dive,dynamic_or_pattern=single_line_100"`
-	UseNativeSDK            useNativeSDK             `mapstructure:"use_native_sdk"`
-	ConnectionMode          common.ConnectionMode    `mapstructure:"connection_mode"`
-	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
+	PixelCode          string                   `mapstructure:"pixel_code" validate:"required,dynamic_or_pattern=single_line_100"`
+	AccessToken        string                   `mapstructure:"access_token"`
+	Version            string                   `mapstructure:"version" validate:"omitempty,dynamic_or_oneof=v2 v1" default:"v2"`
+	HashUserProperties *bool                    `mapstructure:"hash_user_properties" default:"true"`
+	SendCustomEvents   *bool                    `mapstructure:"send_custom_events" default:"false"`
+	EventsToStandard   []eventToStandard        `mapstructure:"events_to_standard" validate:"omitempty,dive"`
+	EventFiltering     *eventFiltering          `mapstructure:"event_filtering"`
+	UseNativeSDK       useNativeSDK             `mapstructure:"use_native_sdk"`
+	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
+	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 // NewDefinition returns the TikTok Ads destination definition.
@@ -73,11 +79,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
-		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering_blacklist"),
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
-			"event_filtering_whitelist": "whitelistedEvents",
-			"event_filtering_blacklist": "blacklistedEvents",
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}

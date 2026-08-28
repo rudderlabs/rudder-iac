@@ -47,10 +47,8 @@ spec:
       web: "16"
     is_required_to_dismiss_message:
       web: false
-    event_filtering_option:
-      web: blacklistedEvents
-    blacklisted_events:
-      web:
+    event_filtering:
+      blacklist:
         - Page Viewed
     consent_management:
       web:

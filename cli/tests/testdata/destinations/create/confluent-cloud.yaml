@@ -13,3 +13,6 @@ spec:
     topic: rudder-cli-e2e
     api_key: "{{ .CONFLUENT_CLOUD_API_KEY }}"
     api_secret: "{{ .CONFLUENT_CLOUD_API_SECRET }}"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

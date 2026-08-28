@@ -9,6 +9,10 @@
   "config": {
     "bootstrapServer": "pkc-11111.us-east1.gcp.confluent.cloud:9092",
     "topic": "rudder-cli-e2e-updated",
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "consentManagement": {
       "web": [
         {

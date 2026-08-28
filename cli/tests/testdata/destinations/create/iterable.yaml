@@ -47,8 +47,6 @@ spec:
       web: "16"
     is_required_to_dismiss_message:
       web: false
-    event_filtering_option:
-      web: whitelistedEvents
-    whitelisted_events:
-      web:
+    event_filtering:
+      whitelist:
         - Order Completed

@@ -10,7 +10,11 @@
     "projectId": "rudder-cli-e2e",
     "datasetId": "rudder_e2e",
     "tableId": "events",
-    "insertId": "messageId"
+    "insertId": "messageId",
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
