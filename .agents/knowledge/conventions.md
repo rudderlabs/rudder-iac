@@ -19,7 +19,7 @@
 
 ## INT-6489 — Destination Version Field Naming
 <!-- ticket:INT-6489 -->
-- Destination versioning fields follow the public API client convention of exported Go fields with camelCase JSON tags: `version`, `versionInfo`, `status`, `action`, `retirementDate`, and `migrationDocsURL`.
+- Destination versioning fields follow the public API client convention of exported Go fields with camelCase JSON tags: `version`, `versionInfo`, `status`, `action`, `retirementDate`, and `migrationDocsUrl`.
 - Optional destination version metadata uses pointer fields for optional date/URL values, matching `omitempty` semantics instead of inventing sentinel zero values.
 - `VersionInfo` is an exported `api/client` package type so callers can directly consume destination version status, action, retirement date, and migration docs URL metadata.
 
@@ -203,3 +203,9 @@
 - Adding `connection_mode` to those destinations should not change their existing `SourceTypes` or `ConnectionModes`; it only exposes the config key for the already-supported modes.
 - Event filtering always uses the nested local block `event_filtering.{whitelist,blacklist}` with `excluded_with` on both fields and a `Discriminator` deriving `eventFilteringOption` — never flat `event_filtering_*` local keys and never a user-set option field. When upstream scopes the keys per source type (iterable: `whitelistedEvents.web`, `eventFilteringOption.web`), keep the identical local block and express the scoping in the converters: `Gated` arrays with dotted API keys, Discriminator ungated (it has no local key; the lists it derives from carry the gate).
 - Per-definition pattern registrations (`funcs.NewPattern` / `NewPatternWithReject`) live in an `init()` inside `definition.go`, not a separate `patterns.go` (adobe_analytics was the one outlier and was folded in).
+
+## INT-7057 — Destination VersionInfo Wire Name
+<!-- ticket:INT-7057 -->
+- The lifecycle advisory's docs link is `migrationDocsUrl` on the wire, so `VersionInfo.MigrationDocsURL` carries `json:"migrationDocsUrl,omitempty"`. This supersedes the `migrationDocsURL` spelling first recorded under INT-6489, which has been corrected in place.
+- Go's `encoding/json` matches field names case-insensitively, so the wrong tag still decodes and a round-trip test stays green. What breaks is the published contract: the generated OpenAPI advertises a key no producer emits. Confirm a wire name against the producer, not against a passing test.
+- `VersionInfo` is response-only. `Create` and `Update` nil it on the copy they send, so a caller that reads a destination and hands it straight back never echoes the server's own advisory into a request body.
