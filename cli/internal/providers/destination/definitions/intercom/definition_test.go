@@ -58,7 +58,21 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"mobile_api_key_android": {"android"},
 		"mobile_api_key_ios":     {"ios"},
 	}, registered.GatedKeyPaths())
-	assert.Nil(t, registered.SupportedSourcesValidation("web"))
+	// A device-mode source needs app_id, a cloud-mode one api_key. Upstream's
+	// cloud branch omits android_kotlin, ios_swift and cloud, so those carry no
+	// entry rather than a guessed api_key.
+	assert.Equal(t, map[string]map[string][]string{
+		"android":      {"cloud": {"api_key"}, "device": {"app_id"}},
+		"ios":          {"cloud": {"api_key"}, "device": {"app_id"}},
+		"web":          {"cloud": {"api_key"}, "device": {"app_id"}},
+		"unity":        {"cloud": {"api_key"}},
+		"react_native": {"cloud": {"api_key"}},
+		"flutter":      {"cloud": {"api_key"}},
+		"cordova":      {"cloud": {"api_key"}},
+	}, intercom.NewDefinition().SupportedSourcesValidation)
+	assert.Equal(t, []string{"app_id"}, registered.SupportedSourcesValidation("web", "device"))
+	assert.Equal(t, []string{"api_key"}, registered.SupportedSourcesValidation("web", "cloud"))
+	assert.Nil(t, registered.SupportedSourcesValidation("android_kotlin", "cloud"), "upstream gap: no entry rather than a guess")
 
 	byAPI, err := registry.GetByAPIType("INTERCOM", 1)
 	require.NoError(t, err)

@@ -60,7 +60,15 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"enable_push_notification/web":       {"web"},
 		"allow_user_supplied_javascript/web": {"web"},
 	}, registered.GatedKeyPaths())
-	assert.Nil(t, registered.SupportedSourcesValidation("web"))
+	// rest_api_key is required wherever Braze talks to the API itself: every
+	// cloud-mode source plus the hybrid modes. Device mode needs no entry.
+	for _, sourceType := range expectedSourceTypes {
+		assert.Equal(t, []string{"rest_api_key"}, registered.SupportedSourcesValidation(sourceType, "cloud"), sourceType)
+		assert.Nil(t, registered.SupportedSourcesValidation(sourceType, "device"), sourceType)
+	}
+	for _, sourceType := range []string{"android", "android_kotlin", "ios", "ios_swift", "web"} {
+		assert.Equal(t, []string{"rest_api_key"}, registered.SupportedSourcesValidation(sourceType, "hybrid"), sourceType)
+	}
 
 	byAPI, err := registry.GetByAPIType("BRAZE", 1)
 	require.NoError(t, err)

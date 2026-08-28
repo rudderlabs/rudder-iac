@@ -64,11 +64,6 @@ Current mapping (local → API):
 
 ## Per-source-type connect-time required keys
 
-> **Pending DEX-709.** The Go field is still `map[string][]string` and the
-> accessor still takes only a source type. Until that lands, derive the map as
-> below and put it in the report instead of `definition.go` — do not hand-fold
-> the modes away to make it compile.
-
 `SupportedSourcesValidation` is
 `map[localSourceType]map[connectionMode][]localConfigKey` — the config keys a
 destination must carry for a source of that type, connected in that mode, to be

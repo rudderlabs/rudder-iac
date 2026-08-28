@@ -47,17 +47,28 @@ type modeAwareTestConfig struct {
 	UseNativeSDK   *modeAwareUseNativeSDK `mapstructure:"use_native_sdk"`
 }
 
-// newTestRegistry registers three definitions, each shaped for one facet of
-// the settings check:
+// multiModeTestConfig backs a definition whose web source type supports more
+// than one connection mode, so required keys differ by mode.
+type multiModeTestConfig struct {
+	AppID          string                `mapstructure:"app_id"`
+	APIKey         string                `mapstructure:"api_key"`
+	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
+}
+
+// newTestRegistry registers four definitions, each shaped for one facet of the
+// checks:
 //
-//   - "webhook" has neither settings block, so the check never applies. Its
-//     connect-time required keys drive the V-C5 tests instead: web needs
-//     webhook_url and use_native_sdk, android needs connection_mode, ios needs
-//     nothing.
-//   - "mode-aware" has both blocks, so either can satisfy the check. Its
-//     use_native_sdk names web, android and ios but not cloud, and only ios
-//     lists connection_mode as a required key.
+//   - "webhook" has neither settings block, so the settings check never
+//     applies. Its connect-time required keys drive the V-C5 tests instead:
+//     web needs webhook_url and use_native_sdk, android needs connection_mode,
+//     ios needs nothing.
+//   - "mode-aware" has both blocks, so either can satisfy the settings check.
+//     Its use_native_sdk names web, android and ios but not cloud, and only
+//     ios lists connection_mode as a required key.
 //   - "native-only" has use_native_sdk alone, naming web but not android.
+//   - "multimode" mirrors intercom: a web source needs api_key in cloud mode
+//     and app_id in device mode, so required keys cannot be resolved from the
+//     source type alone.
 func newTestRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
@@ -76,9 +87,9 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"android": {"cloud"},
 			"ios":     {"cloud"},
 		},
-		SupportedSourcesValidation: map[string][]string{
-			"web":     {"webhook_url", "use_native_sdk"},
-			"android": {"connection_mode"},
+		SupportedSourcesValidation: map[string]map[string][]string{
+			"web":     {"cloud": {"webhook_url", "use_native_sdk"}},
+			"android": {"cloud": {"connection_mode"}},
 		},
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
@@ -97,8 +108,8 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"ios":     {"cloud"},
 			"cloud":   {"cloud"},
 		},
-		SupportedSourcesValidation: map[string][]string{
-			"ios": {"connection_mode"},
+		SupportedSourcesValidation: map[string]map[string][]string{
+			"ios": {"cloud": {"connection_mode"}},
 		},
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
@@ -109,6 +120,21 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		ConnectionModes: map[string][]string{
 			"web":     {"device"},
 			"android": {"cloud"},
+		},
+	}))
+
+	// Mirrors intercom: a web source needs api_key in cloud mode and app_id in
+	// device mode, so the required keys cannot be resolved from the source type
+	// alone.
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:            "multimode",
+		Version:         1,
+		NewConfig:       func() any { return &multiModeTestConfig{} },
+		SourceTypes:     []string{"web", "android"},
+		ConnectionModes: map[string][]string{"web": {"cloud", "device"}, "android": {"cloud"}},
+		SupportedSourcesValidation: map[string]map[string][]string{
+			"web":     {"cloud": {"api_key"}, "device": {"app_id"}},
+			"android": {"cloud": {"api_key"}},
 		},
 	}))
 	return registry
@@ -401,6 +427,99 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.Contains(t, results[0].Message, "use_native_sdk.web")
 		assert.NotContains(t, results[0].Message, "webhook_url")
+	})
+
+	t.Run("declared connection_mode selects that mode's required keys", func(t *testing.T) {
+		t.Parallel()
+
+		// app_id satisfies device mode; the cloud-mode key api_key is absent
+		// and must not be demanded.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{
+			"app_id":          "intercom-app",
+			"connection_mode": map[string]any{"web": "device"},
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("the other mode's key does not satisfy the declared mode", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{
+			"app_id":          "intercom-app",
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "destination 'dest-1' config is missing fields required to connect a 'web' source")
+		assert.Contains(t, results[0].Message, "api_key")
+	})
+
+	// V-C5 stays silent rather than guessing a mode; reporting the absent
+	// declaration is the settings check's job, and it does.
+	t.Run("undeclared connection_mode on a multi-mode source type is not checked", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'web'")
+	})
+
+	// A source type the definition offers exactly one mode for still resolves:
+	// no other mode could apply, so an undeclared connection_mode is no excuse.
+	// The settings check reports the absent declaration alongside it.
+	t.Run("undeclared connection_mode on a single-mode source type still validates", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "android", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 2)
+		assert.Contains(t, results[0].Message, "api_key")
+		assert.Contains(t, results[1].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
 	t.Run("missing connection_mode entry for the source type", func(t *testing.T) {

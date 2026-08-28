@@ -50,7 +50,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		assert.Equal(t, want, modes, "source type %s", sourceType)
 	}
 
-	assert.Nil(t, registered.SupportedSourcesValidation("web"))
+	assert.Nil(t, registered.SupportedSourcesValidation("web", "cloud"))
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("HS", 1)
