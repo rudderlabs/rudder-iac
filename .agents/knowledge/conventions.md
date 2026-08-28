@@ -196,3 +196,8 @@
 - Adjust should add schema-derived default metadata only for modeled `environment`; do not add/default a direct `event_filtering_option` local key because event filtering is represented through discriminator-derived event filter arrays.
 - Facebook Conversions should add schema-derived top-level defaults for modeled optional fields `action_source`, `limited_data_usage`, `test_destination`, and `remove_external_id`.
 - Facebook Conversions should leave required credentials (`dataset_id`, `access_token`), array/nested keys, and `test_event_code` without default tags, and avoid tightening existing `dynamic_or_oneof` validation in default-only changes.
+
+## DEX-725 — Destination Connection Mode Config Surface
+<!-- ticket:DEX-725 -->
+- `bqstream`, `confluent_cloud`, and `googlesheets` model schema-declared `connectionMode` as local YAML key `connection_mode` through `common.ConnectionModeProperties(sourceTypes)`.
+- Adding `connection_mode` to those destinations should not change their existing `SourceTypes` or `ConnectionModes`; it only exposes the config key for the already-supported modes.

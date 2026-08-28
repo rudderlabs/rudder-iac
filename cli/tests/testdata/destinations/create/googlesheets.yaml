@@ -12,6 +12,9 @@ spec:
     credentials: '{{ .GOOGLESHEETS_CREDENTIALS }}'
     sheet_id: 1RudderCliE2eSheetIdXXXXXXXXXXXXXXXXXXXXXXXX
     sheet_name: rudder-cli-e2e
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud
     event_key_map:
       - from: userId
         to: User ID

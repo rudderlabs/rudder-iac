@@ -7,6 +7,10 @@
   "type": "GOOGLESHEETS",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "consentManagement": {
       "web": [
         {

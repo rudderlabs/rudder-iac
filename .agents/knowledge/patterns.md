@@ -191,3 +191,8 @@
 - `namespace` is **immutable upstream**: changing it between the create and update fixtures fails with `400 Field "namespace" is immutable and cannot be modified`. Update fixtures must hold it constant and vary other fields (`display_name`, `database`, `role`, `json_paths` all update cleanly).
 - The backend injects `skipTracksTable`, `enableIceberg`, `underscoreDivideNumbers` and `allowUsersContextTraits` as `false` on create even when the spec omits them, so all four need `default:"false"` struct tags or every apply reports a phantom diff. Confirmed by inspecting the stored config after a live create.
 - `privateKey` and `privateKeyPassphrase` are write-only and correctly absent from upstream snapshots. `privateKey` must be PEM-shaped: schema declares no template branch, so it is validated with a local `pattern` rather than wrapped by a custom converter (terraform wraps raw bodies; the CLI validates, matching `snowflake`).
+
+## DEX-725 — Connection Mode Snapshot Updates
+<!-- ticket:DEX-725 -->
+- For `bqstream`, `confluent_cloud`, and `googlesheets` connection-mode additions, E2E upstream snapshots may be updated mechanically from the existing converter mapping and snapshot conventions when no explicitly disposable live destination-enabled workspace is available.
+- Avoid live `RUN_DESTINATION_E2E` execution for these destination snapshot updates in autonomous environments unless disposable credentials are explicitly provided, because destination E2E mutates the configured workspace.

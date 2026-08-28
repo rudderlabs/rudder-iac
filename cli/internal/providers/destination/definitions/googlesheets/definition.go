@@ -34,14 +34,16 @@ var connectionModes = map[string][]string{
 }
 
 // googleSheetsConfig is the local YAML config model. Field set mirrors the
-// integrations-config destinations/googlesheets defaultConfig; validation
-// constraints mirror schema.json, with required nested event mappings from the
-// Google Sheets UI/Terraform contract.
+// integrations-config destinations/googlesheets defaultConfig plus schema-declared
+// source-scoped config such as connectionMode, exposed locally as connection_mode.
+// Validation constraints mirror schema.json, with required nested event mappings
+// from the Google Sheets UI/Terraform contract.
 type googleSheetsConfig struct {
 	Credentials       string                   `mapstructure:"credentials" validate:"required"`
 	SheetID           string                   `mapstructure:"sheet_id" validate:"required"`
 	SheetName         string                   `mapstructure:"sheet_name" validate:"required"`
 	EventKeyMap       []eventKeyMapping        `mapstructure:"event_key_map" validate:"required,dive"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -66,6 +68,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

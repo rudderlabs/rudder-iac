@@ -8,7 +8,11 @@
   "enabled": true,
   "config": {
     "bootstrapServer": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
-    "topic": "rudder-cli-e2e"
+    "topic": "rudder-cli-e2e",
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
