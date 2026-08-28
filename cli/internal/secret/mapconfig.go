@@ -3,7 +3,7 @@ package secret
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
+	"strconv"
 	"strings"
 )
 
@@ -13,8 +13,12 @@ import (
 // them here is the framework-level DRY that lets a new provider get
 // destination-grade secret handling for free — no per-provider reflection, no
 // struct-tag machinery.
+//
+// Secret keys are dotted paths ("headers.to") where "." is purely a separator
+// — there is no escape syntax. Upstream secret keys are camelCase identifiers,
+// so a literal dot never occurs in a key; empty segments resolve to nothing.
 
-// WrapKnownSecrets wraps each listed secret key that is already present in
+// WrapKnownSecrets wraps each listed secret path that is already present in
 // config as a *String holding the known local value. Pointer form survives the
 // differ's struct→map decode. Absent secrets are not invented — requiredness is
 // owned by the caller's spec model (e.g. validate tags), so a provider that
@@ -24,21 +28,12 @@ func WrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any
 		return config
 	}
 	for _, key := range secretKeys {
-		v, ok := config[key]
-		if !ok {
-			continue
-		}
-		raw := ""
-		if s, ok := v.(string); ok {
-			raw = s
-		}
-		s := New(raw)
-		config[key] = &s
+		wrapKnownSecret(config, strings.Split(key, "."))
 	}
 	return config
 }
 
-// WrapUnknownSecrets marks each listed secret key that is already present in
+// WrapUnknownSecrets marks each listed secret path that is already present in
 // config as an unknown *String. Used when mapping remote state: APIs never
 // return secret values, so a present-but-opaque key must always diff (see
 // String.Diff). Absent keys stay absent — inventing them would force perpetual
@@ -49,44 +44,26 @@ func WrapUnknownSecrets(config map[string]any, secretKeys []string) map[string]a
 		return config
 	}
 	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
-			continue
-		}
-		s := NewUnknown()
-		config[key] = &s
+		wrapUnknownSecret(config, strings.Split(key, "."))
 	}
 	return config
 }
 
-// RevealSecrets returns a shallow copy of config with every listed secret key
-// replaced by its Reveal() string. Run before marshalling to the wire so the
-// real value is sent instead of a masked form. Keys absent from config are left
-// alone.
+// RevealSecrets returns a copy of config with every listed secret path replaced
+// by its Reveal() string. Run before marshalling to the wire so the real value is
+// sent instead of a masked form. Keys absent from config are left alone.
 func RevealSecrets(config map[string]any, secretKeys []string) map[string]any {
 	if config == nil || len(secretKeys) == 0 {
 		return config
 	}
-	out := maps.Clone(config)
+	out := cloneSecretConfig(config)
 	for _, key := range secretKeys {
-		v, ok := out[key]
-		if !ok {
-			continue
-		}
-		switch s := v.(type) {
-		case *String:
-			if s == nil {
-				out[key] = ""
-				continue
-			}
-			out[key] = s.Reveal()
-		case String:
-			out[key] = s.Reveal()
-		}
+		revealSecret(out, strings.Split(key, "."))
 	}
 	return out
 }
 
-// MaskSecrets replaces each listed secret key present in config with a masked
+// MaskSecrets replaces each listed secret path present in config with a masked
 // token derived from externalID — a "{{ .VAR }}" reference under the variable
 // substitution gate, otherwise a masked literal. Only keys present in config are
 // touched; absent secrets are not invented.
@@ -96,17 +73,211 @@ func MaskSecrets(config map[string]any, externalID string, secretKeys []string) 
 	}
 	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
 	for _, key := range secretKeys {
-		if _, ok := config[key]; !ok {
+		path := strings.Split(key, ".")
+		if !secretPathExists(config, path) {
 			continue
 		}
-		varName := fmt.Sprintf("%s_%s", prefix, strings.ToUpper(key))
-		token, err := marshalToken(NewUnknown(WithVariableName(varName)))
-		if err != nil {
+
+		if err := maskSecret(config, path, prefix); err != nil {
 			return fmt.Errorf("masking secret key %q: %w", key, err)
 		}
-		config[key] = token
 	}
 	return nil
+}
+
+func wrapKnownSecret(config map[string]any, path []string) {
+	setSecretValue(config, path, func(v any) any {
+		raw := ""
+		if s, ok := v.(string); ok {
+			raw = s
+		}
+		s := New(raw)
+		return &s
+	})
+}
+
+func wrapUnknownSecret(config map[string]any, path []string) {
+	setSecretValue(config, path, func(any) any {
+		s := NewUnknown()
+		return &s
+	})
+}
+
+func revealSecret(config map[string]any, path []string) {
+	setSecretValue(config, path, func(v any) any {
+		switch s := v.(type) {
+		case *String:
+			if s == nil {
+				return ""
+			}
+			return s.Reveal()
+		case String:
+			return s.Reveal()
+		default:
+			return v
+		}
+	})
+}
+
+func maskSecret(config map[string]any, path []string, prefix string) error {
+	return maskSecretValue(config, path, prefix, nil)
+}
+
+func maskSecretValue(config map[string]any, path []string, prefix string, nameParts []string) error {
+	if len(path) == 0 || path[0] == "" {
+		return nil
+	}
+
+	key := path[0]
+	value, ok := config[key]
+	if !ok {
+		return nil
+	}
+
+	nextNameParts := appendNamePart(nameParts, key)
+	if len(path) == 1 {
+		varName := secretVariableName(prefix, strings.Join(nextNameParts, "."))
+		token, err := marshalToken(NewUnknown(WithVariableName(varName)))
+		if err != nil {
+			return err
+		}
+		config[key] = token
+		return nil
+	}
+
+	return maskNestedSecretValue(value, path[1:], prefix, nextNameParts)
+}
+
+func maskNestedSecretValue(value any, path []string, prefix string, nameParts []string) error {
+	switch v := value.(type) {
+	case []any:
+		for i, item := range v {
+			if err := maskNestedSecretValue(item, path, prefix, appendNamePart(nameParts, strconv.Itoa(i))); err != nil {
+				return err
+			}
+		}
+	case []map[string]any:
+		for i := range v {
+			if err := maskSecretValue(v[i], path, prefix, appendNamePart(nameParts, strconv.Itoa(i))); err != nil {
+				return err
+			}
+		}
+	case map[string]any:
+		return maskSecretValue(v, path, prefix, nameParts)
+	}
+	return nil
+}
+
+func appendNamePart(parts []string, part string) []string {
+	out := make([]string, 0, len(parts)+1)
+	out = append(out, parts...)
+	out = append(out, part)
+	return out
+}
+
+func setSecretValue(config map[string]any, path []string, replace func(any) any) {
+	if len(path) == 0 || path[0] == "" {
+		return
+	}
+
+	key := path[0]
+	value, ok := config[key]
+	if !ok {
+		return
+	}
+
+	if len(path) == 1 {
+		config[key] = replace(value)
+		return
+	}
+
+	setNestedSecretValue(value, path[1:], replace)
+}
+
+func setNestedSecretValue(value any, path []string, replace func(any) any) {
+	switch v := value.(type) {
+	case []any:
+		for _, item := range v {
+			setNestedSecretValue(item, path, replace)
+		}
+	case []map[string]any:
+		for i := range v {
+			setSecretValue(v[i], path, replace)
+		}
+	case map[string]any:
+		setSecretValue(v, path, replace)
+	}
+}
+
+func secretPathExists(config map[string]any, path []string) bool {
+	if len(path) == 0 || path[0] == "" {
+		return false
+	}
+
+	value, ok := config[path[0]]
+	if !ok {
+		return false
+	}
+
+	if len(path) == 1 {
+		return true
+	}
+
+	return nestedSecretPathExists(value, path[1:])
+}
+
+func nestedSecretPathExists(value any, path []string) bool {
+	switch v := value.(type) {
+	case []any:
+		for _, item := range v {
+			if nestedSecretPathExists(item, path) {
+				return true
+			}
+		}
+	case []map[string]any:
+		for i := range v {
+			if secretPathExists(v[i], path) {
+				return true
+			}
+		}
+	case map[string]any:
+		return secretPathExists(v, path)
+	}
+	return false
+}
+
+func cloneSecretConfig(config map[string]any) map[string]any {
+	out := make(map[string]any, len(config))
+	for key, value := range config {
+		out[key] = cloneSecretValue(value)
+	}
+	return out
+}
+
+func cloneSecretValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneSecretConfig(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = cloneSecretValue(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(v))
+		for i, item := range v {
+			out[i] = cloneSecretConfig(item)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func secretVariableName(prefix, key string) string {
+	key = strings.NewReplacer(".", "_", "-", "_").Replace(key)
+	return fmt.Sprintf("%s_%s", prefix, strings.ToUpper(key))
 }
 
 // marshalToken JSON-marshals a String to its export string form (variable
