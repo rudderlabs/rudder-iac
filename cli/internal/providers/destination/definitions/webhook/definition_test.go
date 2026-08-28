@@ -74,6 +74,10 @@ func TestWebhookConfigValidation(t *testing.T) {
 			{name: "localhost", value: "https://localhost:8080/rudder"},
 			{name: "localhost subdomain", value: "https://api.localhost/rudder"},
 			{name: "ngrok", value: "https://rudder.ngrok.io/rudder"},
+			{name: "localhost with a domain suffix", value: "https://localhost.example.com/rudder"},
+			{name: "ngrok labels followed by another domain", value: "https://foo.ngrok.io.evil.com/rudder"},
+			{name: "bare uppercase localhost has no tld", value: "https://LOCALHOST/rudder"},
+			{name: "single-digit port", value: "https://webhooks.example.com:7/rudder"},
 			{name: "deprecated env reference", value: "env.WEBHOOK_URL"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -99,6 +103,7 @@ func TestWebhookConfigValidation(t *testing.T) {
 			"https://a.b.ngrok.io/rudder",
 			"https://webhooks.example.com:8080/rudder",
 			"http://api.example.co.uk/rudder",
+			"https://notlocalhost.example.com/rudder",
 		} {
 			config := validMinimalConfig()
 			config["webhook_url"] = value
