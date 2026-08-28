@@ -21,5 +21,6 @@ spec:
     enable_install_attribution_tracking:
       android: true
       ios: false
-    event_filtering_blacklist:
-      - Password Reset
+    event_filtering:
+      blacklist:
+        - Password Reset

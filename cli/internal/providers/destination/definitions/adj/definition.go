@@ -58,6 +58,14 @@ type useNativeSDK struct {
 	Flutter       *bool `mapstructure:"flutter"`
 }
 
+// Nested event_filtering block, matching the fleet convention (braze,
+// facebook_pixel, ...). schema.json patterns each eventName the same way as
+// the mapping fields.
+type eventFiltering struct {
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
+}
+
 // adjustConfig is the local YAML config model. Field set mirrors terraform
 // destination_adjust mappings; validation constraints mirror schema.json.
 // app_token and delay use plain pattern= rather than dynamic_or_pattern: unlike
@@ -71,10 +79,8 @@ type adjustConfig struct {
 	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_params_keys" validate:"omitempty,dive"`
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`
 	UseNativeSDK                     *useNativeSDK                     `mapstructure:"use_native_sdk"`
-	// schema.json patterns each eventName the same way as the mapping fields.
-	EventFilteringWhitelist []string                 `mapstructure:"event_filtering_whitelist" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	EventFilteringBlacklist []string                 `mapstructure:"event_filtering_blacklist" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
+	EventFiltering                   *eventFiltering                   `mapstructure:"event_filtering"`
+	ConsentManagement                common.ConsentManagement          `mapstructure:"consent_management"`
 }
 
 // NewDefinition returns the Adjust destination definition.
@@ -113,11 +119,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useNativeSDK.iosSwift", "use_native_sdk.ios_swift"),
 		converter.Simple("useNativeSDK.unity", "use_native_sdk.unity"),
 		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
-		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
-		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering_blacklist"),
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
-			"event_filtering_whitelist": "whitelistedEvents",
-			"event_filtering_blacklist": "blacklistedEvents",
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)

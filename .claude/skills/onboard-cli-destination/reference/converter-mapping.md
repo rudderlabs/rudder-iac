@@ -46,14 +46,18 @@ Simple field:
 converter.Simple("prefix", "prefix")
 ```
 
-Whitelist/blacklist with discriminator (GA4-style):
+Whitelist/blacklist with discriminator (GA4-style). The local keys are the
+nested `event_filtering.{whitelist,blacklist}` block — the fleet convention —
+backed by a config struct whose two fields carry `excluded_with` on each other
+so both lists can never be set at once (the Discriminator ranges over a map, so
+with both set the derived `eventFilteringOption` would be non-deterministic):
 
 ```go
-converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
-converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering_blacklist"),
+converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
-    "event_filtering_whitelist": "whitelistedEvents",
-    "event_filtering_blacklist": "blacklistedEvents",
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
 }),
 ```
 

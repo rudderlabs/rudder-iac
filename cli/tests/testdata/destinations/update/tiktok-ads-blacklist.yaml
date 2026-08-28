@@ -14,8 +14,9 @@ spec:
     version: v2
     hash_user_properties: true
     send_custom_events: false
-    event_filtering_blacklist:
-      - Page Viewed
-      - Screen Viewed
+    event_filtering:
+      blacklist:
+        - Page Viewed
+        - Screen Viewed
     use_native_sdk:
       web: true
