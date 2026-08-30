@@ -2,11 +2,9 @@
   "config": {
     "apiKey": "rudderCliE2eAmKeyUpdated",
     "enableEnhancedUserOperations": false,
+    "eventFilteringOption": "disable",
     "mapDeviceBrand": false,
     "residencyServer": "standard",
-    "sdkVersion": {
-      "web": 2
-    },
     "trackAllPages": false,
     "trackCategorizedPages": true,
     "trackNamedPages": true,

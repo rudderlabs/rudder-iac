@@ -65,7 +65,30 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"use_user_defined_screen_event_name": false,
 		"residency_server":                   "standard",
 		"sdk_version":                        map[string]any{"web": float64(2)},
+		"track_session_events":               map[string]any{"web": false},
+		"auto_capture": map[string]any{
+			"page_views":               map[string]any{"web": false},
+			"page_url_enrichment":      map[string]any{"web": false},
+			"web_vitals":               map[string]any{"web": false},
+			"file_downloads":           map[string]any{"web": false},
+			"frustration_interactions": map[string]any{"web": false},
+			"network_tracking":         map[string]any{"web": false},
+			"element_interactions":     map[string]any{"web": false},
+			"form_interactions":        map[string]any{"web": false},
+		},
 	}, registered.ConfigDefaults())
+
+	// Nested defaults mirror the backend: filled only inside a present block,
+	// never materializing an absent one.
+	assert.NotContains(t,
+		registered.ApplyDefaults(map[string]any{"api_key": "amplitude-api-key"}),
+		"sdk_version")
+	assert.Equal(t,
+		map[string]any{"web": float64(2)},
+		registered.ApplyDefaults(map[string]any{
+			"api_key":     "amplitude-api-key",
+			"sdk_version": map[string]any{},
+		})["sdk_version"])
 
 	assert.Equal(t, map[string][]string{
 		"sdk_version/web":                               {"web"},

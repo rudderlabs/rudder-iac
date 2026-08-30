@@ -1,7 +1,6 @@
 package definitions
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
@@ -12,19 +11,17 @@ import (
 
 // configDefaultTag mirrors the `default` keyword in the destination's
 // integrations-config schema.json.
-const (
-	configDefaultTag     = "default"
-	configDefaultJSONTag = "default_json"
-)
+const configDefaultTag = "default"
 
 // buildConfigDefaults collects the declared defaults keyed by local config key,
 // typed to match what that key carries once decoded from YAML or converted from
 // an API response.
 //
-// Top-level fields only: a nested default has no unambiguous home when the
-// parent block itself is absent. For rare source-backed defaults that must
-// materialize with their parent block, definitions may declare default_json with
-// the exact local object default.
+// Nested config blocks are walked recursively: a `default` tag on an inner
+// field is collected as a nested map under the parent key. Nested defaults
+// follow the backend's JSON-Schema semantics — they fill in only when the
+// parent block itself is present, never materializing an absent block (see
+// ApplyDefaults).
 func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 	configType = derefType(configType)
 	fields := structFieldsByMapstructureTag(configType)
@@ -33,36 +30,31 @@ func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 	// Sorted so a definition with several bad tags always fails on the same one.
 	for _, key := range slices.Sorted(maps.Keys(fields)) {
 		field := fields[key]
-		_, hasScalarDefault := field.Tag.Lookup(configDefaultTag)
-		_, hasJSONDefault := field.Tag.Lookup(configDefaultJSONTag)
-		if hasScalarDefault && hasJSONDefault {
-			return nil, fmt.Errorf("config key %q cannot declare both default and default_json", key)
-		}
-
-		if raw, ok := field.Tag.Lookup(configDefaultTag); ok {
-			// A required key is always present, so its default could never apply.
-			if isRequiredField(field) {
-				return nil, fmt.Errorf("config key %q is required and cannot declare a default", key)
+		raw, ok := field.Tag.Lookup(configDefaultTag)
+		if !ok {
+			if derefType(field.Type).Kind() != reflect.Struct {
+				continue
 			}
-
-			value, err := parseDefaultValue(field, raw)
+			nested, err := buildConfigDefaults(field.Type)
 			if err != nil {
 				return nil, fmt.Errorf("config key %q: %w", key, err)
 			}
-			defaults[key] = value
+			if len(nested) > 0 {
+				defaults[key] = nested
+			}
+			continue
 		}
 
-		if raw, ok := field.Tag.Lookup(configDefaultJSONTag); ok {
-			if isRequiredField(field) {
-				return nil, fmt.Errorf("config key %q is required and cannot declare a default_json", key)
-			}
-
-			var value any
-			if err := json.Unmarshal([]byte(raw), &value); err != nil {
-				return nil, fmt.Errorf("config key %q: invalid default_json %q: %w", key, raw, err)
-			}
-			defaults[key] = value
+		// A required key is always present, so its default could never apply.
+		if isRequiredField(field) {
+			return nil, fmt.Errorf("config key %q is required and cannot declare a default", key)
 		}
+
+		value, err := parseDefaultValue(field, raw)
+		if err != nil {
+			return nil, fmt.Errorf("config key %q: %w", key, err)
+		}
+		defaults[key] = value
 	}
 
 	return defaults, nil
@@ -108,69 +100,54 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 
 // ApplyDefaults returns a copy of config with the declared defaults filled in
 // for omitted keys. A present key is never overwritten, so an explicit value
-// wins even when it equals the zero value.
+// wins even when it equals the zero value. Nested defaults fill in only inside
+// a block the spec already carries — an absent block stays absent, matching
+// how the backend's schema validation applies nested defaults.
 //
 // Local specs are enriched before they enter the resource graph: the backend
 // applies these same defaults when it persists a destination, so a spec that
 // omits one would otherwise diff forever against the remote state carrying it.
 func (d *RegisteredDefinition) ApplyDefaults(config map[string]any) map[string]any {
-	enriched := make(map[string]any, len(config)+len(d.configDefaults))
+	return applyDefaults(config, d.configDefaults)
+}
+
+func applyDefaults(config, defaults map[string]any) map[string]any {
+	enriched := make(map[string]any, len(config)+len(defaults))
 	maps.Copy(enriched, config)
 
-	for key, value := range d.configDefaults {
-		current, ok := enriched[key]
-		if !ok {
-			enriched[key] = cloneDefaultValue(value)
+	for key, value := range defaults {
+		nested, isNested := value.(map[string]any)
+		if !isNested {
+			if _, ok := enriched[key]; !ok {
+				enriched[key] = value
+			}
 			continue
 		}
-		enriched[key] = mergeDefaultValue(current, value)
+
+		current, ok := enriched[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		enriched[key] = applyDefaults(current, nested)
 	}
 
 	return enriched
 }
 
-// ConfigDefaults returns the declared defaults keyed by local config key.
+// ConfigDefaults returns the declared defaults keyed by local config key,
+// deep-copied so callers cannot mutate the registered nested defaults.
 func (d *RegisteredDefinition) ConfigDefaults() map[string]any {
-	out := make(map[string]any, len(d.configDefaults))
-	for key, value := range d.configDefaults {
-		out[key] = cloneDefaultValue(value)
-	}
-	return out
+	return cloneDefaults(d.configDefaults)
 }
 
-func mergeDefaultValue(current, defaults any) any {
-	currentMap, currentIsMap := current.(map[string]any)
-	defaultMap, defaultIsMap := defaults.(map[string]any)
-	if !currentIsMap || !defaultIsMap {
-		return current
-	}
-
-	merged := cloneDefaultValue(currentMap).(map[string]any)
-	for key, defaultValue := range defaultMap {
-		if currentValue, ok := merged[key]; ok {
-			merged[key] = mergeDefaultValue(currentValue, defaultValue)
+func cloneDefaults(defaults map[string]any) map[string]any {
+	out := make(map[string]any, len(defaults))
+	for key, value := range defaults {
+		if nested, ok := value.(map[string]any); ok {
+			out[key] = cloneDefaults(nested)
 			continue
 		}
-		merged[key] = cloneDefaultValue(defaultValue)
+		out[key] = value
 	}
-	return merged
-}
-
-func cloneDefaultValue(value any) any {
-	switch v := value.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for key, nested := range v {
-			out[key] = cloneDefaultValue(nested)
-		}
-		return out
-	case []any:
-		out := make([]any, len(v))
-		for i, nested := range v {
-			out[i] = cloneDefaultValue(nested)
-		}
-		return out
-	default:
-		return v
-	}
+	return out
 }

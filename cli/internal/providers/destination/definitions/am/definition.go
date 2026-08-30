@@ -66,7 +66,7 @@ type webBool struct {
 }
 
 type sdkVersion struct {
-	Web *int `mapstructure:"web" validate:"omitempty,oneof=1 2"`
+	Web *int `mapstructure:"web" validate:"omitempty,oneof=1 2" default:"2"`
 }
 
 type proxyServerURL struct {
@@ -96,7 +96,7 @@ type sdkBools struct {
 }
 
 type trackSessionEvents struct {
-	Web         *bool `mapstructure:"web"`
+	Web         *bool `mapstructure:"web" default:"false"`
 	Android     *bool `mapstructure:"android"`
 	IOS         *bool `mapstructure:"ios"`
 	ReactNative *bool `mapstructure:"react_native"`
@@ -109,15 +109,21 @@ type idfaBool struct {
 	Flutter     *bool `mapstructure:"flutter"`
 }
 
+// autoCaptureSetting carries the schema's per-capture web default, which the
+// shared webBool (defaultless) cannot.
+type autoCaptureSetting struct {
+	Web *bool `mapstructure:"web" default:"false"`
+}
+
 type autoCapture struct {
-	PageViews               *webBool `mapstructure:"page_views"`
-	PageURLEnrichment       *webBool `mapstructure:"page_url_enrichment"`
-	WebVitals               *webBool `mapstructure:"web_vitals"`
-	FileDownloads           *webBool `mapstructure:"file_downloads"`
-	FrustrationInteractions *webBool `mapstructure:"frustration_interactions"`
-	NetworkTracking         *webBool `mapstructure:"network_tracking"`
-	ElementInteractions     *webBool `mapstructure:"element_interactions"`
-	FormInteractions        *webBool `mapstructure:"form_interactions"`
+	PageViews               *autoCaptureSetting `mapstructure:"page_views"`
+	PageURLEnrichment       *autoCaptureSetting `mapstructure:"page_url_enrichment"`
+	WebVitals               *autoCaptureSetting `mapstructure:"web_vitals"`
+	FileDownloads           *autoCaptureSetting `mapstructure:"file_downloads"`
+	FrustrationInteractions *autoCaptureSetting `mapstructure:"frustration_interactions"`
+	NetworkTracking         *autoCaptureSetting `mapstructure:"network_tracking"`
+	ElementInteractions     *autoCaptureSetting `mapstructure:"element_interactions"`
+	FormInteractions        *autoCaptureSetting `mapstructure:"form_interactions"`
 }
 
 // amplitudeConfig is the local YAML config model. Field set ports terraform's
@@ -145,7 +151,7 @@ type amplitudeConfig struct {
 	UseUserDefinedScreenEventName    *bool                    `mapstructure:"use_user_defined_screen_event_name" default:"false"`
 	UserProvidedScreenEventString    string                   `mapstructure:"user_provided_screen_event_string" validate:"omitempty,dynamic_or_pattern=single_line_200"`
 	EventFiltering                   *eventFiltering          `mapstructure:"event_filtering"`
-	SDKVersion                       *sdkVersion              `mapstructure:"sdk_version" default_json:"{\"web\":2}"`
+	SDKVersion                       *sdkVersion              `mapstructure:"sdk_version"`
 	ProxyServerURL                   *proxyServerURL          `mapstructure:"proxy_server_url"`
 	PreferAnonymousIDForDeviceID     *webBool                 `mapstructure:"prefer_anonymous_id_for_device_id"`
 	DeviceIDFromURLParam             *webBool                 `mapstructure:"device_id_from_url_param"`
