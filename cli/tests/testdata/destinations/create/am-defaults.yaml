@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: am-defaults
+spec:
+  id: am-defaults
+  display_name: E2E Amplitude Defaults
+  type: am
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: rudderCliE2eAmDefaultsKey
+    track_session_events:
+      android: true
+    auto_capture:
+      page_views: {}

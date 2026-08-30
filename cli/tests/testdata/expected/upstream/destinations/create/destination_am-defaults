@@ -1,0 +1,32 @@
+{
+  "config": {
+    "apiKey": "rudderCliE2eAmDefaultsKey",
+    "enableEnhancedUserOperations": false,
+    "enablePageViewsAutoCapture": {
+      "web": false
+    },
+    "eventFilteringOption": "disable",
+    "mapDeviceBrand": false,
+    "residencyServer": "standard",
+    "trackAllPages": false,
+    "trackCategorizedPages": true,
+    "trackNamedPages": true,
+    "trackProductsOnce": false,
+    "trackRevenuePerProduct": false,
+    "trackSessionEvents": {
+      "android": true,
+      "web": false
+    },
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "am-defaults",
+  "id": "<ignored>",
+  "name": "E2E Amplitude Defaults",
+  "type": "AM",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
