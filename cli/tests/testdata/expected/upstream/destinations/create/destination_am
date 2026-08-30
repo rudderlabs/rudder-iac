@@ -9,7 +9,7 @@
       "web": true
     },
     "enableWebVitalsAutoCapture": {
-      "web": true
+      "web": false
     },
     "eventFilteringOption": "whitelistedEvents",
     "groupTypeTrait": "company",
@@ -26,7 +26,7 @@
     "trackRevenuePerProduct": false,
     "trackSessionEvents": {
       "android": false,
-      "web": true
+      "web": false
     },
     "traitsToIncrement": [
       {

@@ -18,10 +18,8 @@ const configDefaultTag = "default"
 // an API response.
 //
 // Nested config blocks are walked recursively: a `default` tag on an inner
-// field is collected as a nested map under the parent key. Nested defaults
-// follow the backend's JSON-Schema semantics — they fill in only when the
-// parent block itself is present, never materializing an absent block (see
-// ApplyDefaults).
+// field is collected as a nested map under the parent key (see ApplyDefaults
+// for how nested defaults apply).
 func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 	configType = derefType(configType)
 	fields := structFieldsByMapstructureTag(configType)

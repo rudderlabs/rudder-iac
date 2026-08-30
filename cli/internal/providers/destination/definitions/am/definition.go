@@ -109,8 +109,6 @@ type idfaBool struct {
 	Flutter     *bool `mapstructure:"flutter"`
 }
 
-// autoCaptureSetting carries the schema's per-capture web default, which the
-// shared webBool (defaultless) cannot.
 type autoCaptureSetting struct {
 	Web *bool `mapstructure:"web" default:"false"`
 }

@@ -21,10 +21,8 @@ spec:
     auto_capture:
       page_views:
         web: true
-      web_vitals:
-        web: true
+      web_vitals: {}
     track_session_events:
-      web: true
       android: false
     connection_mode:
       web: device

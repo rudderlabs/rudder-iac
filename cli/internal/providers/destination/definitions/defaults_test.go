@@ -128,7 +128,6 @@ func TestApplyDefaultsDoesNotMutateInput(t *testing.T) {
 func TestApplyDefaultsLeavesAbsentNestedBlockAbsent(t *testing.T) {
 	t.Parallel()
 
-	// Mirrors the backend: nested defaults never materialize their parent block.
 	registered := registeredWithConfig(t, func() any { return &nestedDefaultsTestConfig{} })
 
 	assert.Equal(t,

@@ -78,8 +78,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		},
 	}, registered.ConfigDefaults())
 
-	// Nested defaults mirror the backend: filled only inside a present block,
-	// never materializing an absent one.
 	assert.NotContains(t,
 		registered.ApplyDefaults(map[string]any{"api_key": "amplitude-api-key"}),
 		"sdk_version")
