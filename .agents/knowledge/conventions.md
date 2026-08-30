@@ -209,3 +209,11 @@
 - The lifecycle advisory's docs link is `migrationDocsUrl` on the wire, so `VersionInfo.MigrationDocsURL` carries `json:"migrationDocsUrl,omitempty"`. This supersedes the `migrationDocsURL` spelling first recorded under INT-6489, which has been corrected in place.
 - Go's `encoding/json` matches field names case-insensitively, so the wrong tag still decodes and a round-trip test stays green. What breaks is the published contract: the generated OpenAPI advertises a key no producer emits. Confirm a wire name against the producer, not against a passing test.
 - `VersionInfo` is response-only. `Create` and `Update` nil it on the copy they send, so a caller that reads a destination and hands it straight back never echoes the server's own advisory into a request body.
+
+## DEX-490 — Amplitude Config Surface And Sources
+<!-- ticket:DEX-490 -->
+- Amplitude should keep the broad mapped analytics source set, not the cloud-storage/event-stream-owned subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Amplitude models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even though Amplitude schema/db-config mention them, matching the current destination-definition policy for migrated consent management.
+- Amplitude local config should include terraform-mapped web-only fields even when schema/db-config do not list them, including `device_id_from_url_param`, `force_https`, `track_gclid`, `track_referrer`, and `save_params_referrer_once_per_session`; keep those fields web-gated and avoid inventing validation beyond their boolean shape.
+- Amplitude should model schema/db-config fields absent from Terraform mappings, including `enable_enhanced_user_operations`, using mechanical camelCase-to-snake_case local naming.
+- Nested schema defaults (`sdkVersion.web`, `trackSessionEvents.web`, the `enable*AutoCapture.web` family) are declared with `default` tags on the nested struct fields, not a whole-object `default_json` tag; ApplyDefaults merges them only into a block the spec already carries, matching backend AJV `useDefaults` behavior where an absent parent object stays absent.

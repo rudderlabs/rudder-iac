@@ -56,3 +56,8 @@
 - CI live E2E cleanup can still fail with connection support enabled if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`. Durable mitigation: live workspace cleanup should delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`, while production remote loading remains limited to external-ID-managed connections.
 - The lint workflow can fail before linting when `golangci/golangci-lint-action` config verification fetches the remote golangci-lint JSON schema and times out. Durable mitigation: set `verify: false` in the lint workflow while keeping the pinned golangci-lint run enabled.
 - HubSpot live destination create returns backend default `config.authorizationType = "newPrivateAppApi"` for `newApi` creates even though local YAML/definition should omit `authorization_type`. Durable mitigation: keep `authorization_type` out of local config while including `authorizationType: "newPrivateAppApi"` in the HS create upstream snapshot; update snapshots may omit it when the live update response omits it.
+
+## DEX-490 — Amplitude Event Filtering Snapshot Default
+<!-- ticket:DEX-490 -->
+- CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
+- Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
