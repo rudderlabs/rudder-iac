@@ -172,11 +172,12 @@ func TestCompareData_Secret(t *testing.T) {
 		assert.False(t, secretOnly)
 	})
 
-	t.Run("secret inside a slice re-applies every run, not classified secret-only, never leaks", func(t *testing.T) {
-		// Slices fall back to reflect.DeepEqual, so a secret nested inside one
-		// bypasses the secret case: an unknown remote never equals local, so it
-		// diffs (re-applies) on every run, but the diff is not flagged Secret.
-		// Format still masks, so the real value never leaks through the render path.
+	t.Run("secret inside a slice re-applies every run, classified secret-only, never leaks", func(t *testing.T) {
+		// Slices are compared member-wise, so a nested secret reaches the secret
+		// case like a map-nested one: an unknown remote always diffs (re-applies
+		// every run) but the diff is flagged SecretOnly, keeping non-merge imports
+		// unblocked. Format still masks, so the real value never leaks through the
+		// render path.
 		slices := map[string]struct{ local, remote any }{
 			"[]map[string]any": {
 				local:  []map[string]any{{"token": secret.New("hunter2")}},
@@ -197,14 +198,89 @@ func TestCompareData_Secret(t *testing.T) {
 						resources.ResourceData{"creds": tc.local},
 					)
 					require.Contains(t, diffs, "creds", "unknown remote must diff on run %d (re-applied every run)", run)
-					assert.False(t, diffs["creds"].SecretOnly, "slice-nested secret is not classified secret-only")
-					assert.False(t, secretOnly)
+					assert.True(t, diffs["creds"].SecretOnly, "slice-nested secret must classify secret-only")
+					assert.True(t, secretOnly)
 
 					rendered := fmt.Sprintf("%v -> %v", diffs["creds"].SourceValue, diffs["creds"].TargetValue)
 					assert.NotContains(t, rendered, "hunter2", "real secret value leaked through render path: %s", rendered)
 				}
 			})
 		}
+	})
+
+	t.Run("slice-nested secret with a real change in the same member is a real diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Trace", "to": secret.NewUnknown()}}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("slice-nested secret with a real change in a sibling member is a real diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{
+				map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")},
+				map[string]any{"from": "content-type", "to": "application/json"},
+			}},
+			resources.ResourceData{"headers": []any{
+				map[string]any{"from": "X-Api-Key", "to": secret.NewUnknown()},
+				map[string]any{"from": "content-type", "to": "text/plain"},
+			}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly, "a real change in one member makes the whole slice a real diff")
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("slice length mismatch is a real diff even with secrets", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{
+				map[string]any{"to": secret.New("hunter2")},
+				map[string]any{"to": secret.New("hunter3")},
+			}},
+			resources.ResourceData{"headers": []any{
+				map[string]any{"to": secret.NewUnknown()},
+			}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly, "adding or removing a member is genuine drift")
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("equal slices with equal known secrets do not diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+		)
+		assert.Empty(t, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("mixed slice with non-object members classifies the secret member", func(t *testing.T) {
+		// A scalar member blocks the []any → []map[string]any rewrite, so this
+		// pins the []any path: equal scalar members contribute no diff, and the
+		// secret-bearing member alone keeps the slice secret-only.
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"items": []any{"static", map[string]any{"to": secret.New("hunter2")}}},
+			resources.ResourceData{"items": []any{"static", map[string]any{"to": secret.NewUnknown()}}},
+		)
+		require.Contains(t, diffs, "items")
+		assert.True(t, diffs["items"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret present in only one side's member is secret-only", func(t *testing.T) {
+		// Presence-based wrapping omits keys the API strips: the remote member has
+		// no "to" at all. The member diff is still secret-driven, not drift.
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key"}}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.True(t, diffs["headers"].SecretOnly)
+		assert.True(t, secretOnly)
 	})
 
 	t.Run("pointer flavor mirrors value flavor", func(t *testing.T) {
