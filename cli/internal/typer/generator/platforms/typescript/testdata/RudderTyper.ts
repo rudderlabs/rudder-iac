@@ -617,13 +617,13 @@ export class RudderTyper {
         if (typeof groupIdOrTraits === "string") {
             this.analytics.group(
                 groupIdOrTraits,
-                traitsOrOptions as unknown as SDKIdentifyTraits,
+                (traitsOrOptions ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
             this.analytics.group(
-                groupIdOrTraits as unknown as SDKIdentifyTraits,
+                (groupIdOrTraits ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
             );
@@ -653,13 +653,13 @@ export class RudderTyper {
         if (typeof userIdOrTraits === "string") {
             this.analytics.identify(
                 userIdOrTraits,
-                traitsOrOptions as unknown as SDKIdentifyTraits,
+                (traitsOrOptions ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
             this.analytics.identify(
-                userIdOrTraits as unknown as SDKIdentifyTraits,
+                (userIdOrTraits ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
             );

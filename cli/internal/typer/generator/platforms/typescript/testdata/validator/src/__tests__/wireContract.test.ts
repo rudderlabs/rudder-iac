@@ -52,6 +52,32 @@ describe("wire contract: identify with identity_section context.traits", () => {
     expect(traitsOf(followUp)).toEqual({ email: "user@example.com", active: true });
   });
 
+  it("does not clear established traits when a later call omits them", async () => {
+    typer.identify("user-1", { email: "user@example.com", active: true });
+    (typer as unknown as { identify: (id: string) => void }).identify("user-1");
+    typer.trackUserSignedUp({ active: true });
+
+    const [, , followUp] = await interceptor.waitForEvents(3);
+
+    // identify("user-1") means "this is who the user is", not "forget what you
+    // knew about them". The JS SDK resets stored traits when the argument is
+    // undefined but merges when it is an object, so the generated call has to
+    // pass {} rather than nothing. v1 did this as `traits || {}`; v2 dropped it.
+    expect(traitsOf(followUp)).toEqual({ email: "user@example.com", active: true });
+  });
+
+  it("merges a partial later identify into the established traits", async () => {
+    typer.identify("user-1", { email: "user@example.com", active: true });
+    (typer as unknown as { identify: (id: string, t: unknown) => void }).identify("user-1", { active: false });
+    typer.trackUserSignedUp({ active: true });
+
+    const [, , followUp] = await interceptor.waitForEvents(3);
+
+    // Merging is the SDK's job, not the generated client's. Asserted here so a
+    // future change cannot quietly reimplement it in generated code.
+    expect(traitsOf(followUp)).toEqual({ email: "user@example.com", active: false });
+  });
+
   it("carries the traits on later events for the anonymous overload too", async () => {
     (typer as unknown as { identify: (t: unknown) => void }).identify({
       email: "anon@example.com",

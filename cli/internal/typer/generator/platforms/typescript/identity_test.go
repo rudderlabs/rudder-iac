@@ -68,14 +68,14 @@ func TestBuildIdentifyMethod_StrictCast(t *testing.T) {
 				Condition: `typeof userIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "userIdOrTraits"},
-					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					propsArg("%s as unknown as SDKIdentifyTraits", "userIdOrTraits"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "userIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -148,14 +148,14 @@ func TestBuildIdentifyMethod_ContextTraitsUsesSDKTraitsParam(t *testing.T) {
 			Condition: `typeof userIdOrTraits === "string"`,
 			SDKArguments: []TSSDKArgument{
 				{Value: "userIdOrTraits"},
-				propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+				propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				propsArg("%s as unknown as SDKIdentifyTraits", "userIdOrTraits"),
+				propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "userIdOrTraits"),
 				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
@@ -207,14 +207,14 @@ func TestBuildGroupMethod_EmitsOverloads(t *testing.T) {
 				Condition: `typeof groupIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "groupIdOrTraits"},
-					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					propsArg("%s as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -280,14 +280,14 @@ func TestBuildGroupMethod_ContextTraitsUsesSDKTraitsParam(t *testing.T) {
 			Condition: `typeof groupIdOrTraits === "string"`,
 			SDKArguments: []TSSDKArgument{
 				{Value: "groupIdOrTraits"},
-				propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+				propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				propsArg("%s as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
+				propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
 				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},

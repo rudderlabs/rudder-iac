@@ -1123,8 +1123,14 @@ func buildIdentityCallMethodNoTraits(spec identityCallSpec) *TSAnalyticsMethod {
 // to forward to either the with-ID overload or the anonymous overload at the
 // SDK level.
 func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
+	// `?? {}` guards a call that omits traits, e.g. identify("user-1"). The JS
+	// SDK resets stored traits when the argument is undefined or null, but
+	// merges when it is an object — so an empty object preserves what is
+	// already there while undefined silently wipes it. RudderTyper v1 emitted
+	// the same guard as `traits || {}`; v2 dropped it. Swift and Kotlin default
+	// to an empty collection and merge, so only this platform needs it.
 	traitsCast := func(argName string) TSSDKArgument {
-		return propsArg("%s as unknown as "+spec.SDKTraitsType, argName)
+		return propsArg("(%s ?? {}) as unknown as "+spec.SDKTraitsType, argName)
 	}
 
 	withID := TSDispatcherBranch{
