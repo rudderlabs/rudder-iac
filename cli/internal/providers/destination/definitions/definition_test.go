@@ -67,6 +67,38 @@ func TestLocalSourceTypeKeysEmpty(t *testing.T) {
 	assert.Nil(t, registered.LocalSourceTypeKeys())
 }
 
+func TestConnectionModeSourceTypeKeysDefaultToSupportedSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	def := GA4TestDefinition()
+	def.SourceTypes = []string{"web", "react_native", "amp"}
+	def.ConnectionModes = map[string][]string{
+		"web":          {"cloud"},
+		"react_native": {"cloud"},
+		"amp":          {"cloud"},
+	}
+
+	registered, err := newRegisteredDefinition(def)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"web", "react_native", "amp"}, registered.ConnectionModeSourceTypeKeys())
+}
+
+func TestConnectionModeSourceTypeKeysCanNarrowSupportedSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	def := GA4TestDefinition()
+	def.SourceTypes = []string{"web", "react_native", "amp"}
+	def.ConnectionModeSourceTypes = []string{"web", "react_native"}
+	def.ConnectionModes = map[string][]string{
+		"web":          {"cloud"},
+		"react_native": {"cloud"},
+	}
+
+	registered, err := newRegisteredDefinition(def)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"web", "react_native"}, registered.ConnectionModeSourceTypeKeys())
+}
+
 func TestNewRegisteredDefinitionMissingNewConfig(t *testing.T) {
 	t.Parallel()
 

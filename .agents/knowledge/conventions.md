@@ -217,3 +217,8 @@
 - Amplitude local config should include terraform-mapped web-only fields even when schema/db-config do not list them, including `device_id_from_url_param`, `force_https`, `track_gclid`, `track_referrer`, and `save_params_referrer_once_per_session`; keep those fields web-gated and avoid inventing validation beyond their boolean shape.
 - Amplitude should model schema/db-config fields absent from Terraform mappings, including `enable_enhanced_user_operations`, using mechanical camelCase-to-snake_case local naming.
 - Nested schema defaults (`sdkVersion.web`, `trackSessionEvents.web`, the `enable*AutoCapture.web` family) are declared with `default` tags on the nested struct fields, not a whole-object `default_json` tag; ApplyDefaults merges them only into a block the spec already carries, matching backend AJV `useDefaults` behavior where an absent parent object stays absent.
+
+## DEX-730 — Amplitude Connection Mode Source Scope
+<!-- ticket:DEX-730 -->
+- Amplitude should keep broad destination `SourceTypes` support, including `amp`, `warehouse`, and `shopify`, while rejecting those three keys under local `config.connection_mode`.
+- Do not remove `amp`, `warehouse`, or `shopify` from Amplitude destination metadata just to narrow connection-mode validation; use `ConnectionModeSourceTypes` for the narrower `connection_mode` key set.

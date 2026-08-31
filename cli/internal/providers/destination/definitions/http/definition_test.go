@@ -475,6 +475,51 @@ func TestHTTPConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	t.Run("event filtering whitelist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"whitelist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering blacklist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"blacklist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects invalid literal values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name  string
+			key   string
+			value string
+			path  string
+		}{
+			{name: "whitelist newline", key: "whitelist", value: "Order\nCompleted", path: "/event_filtering/whitelist/0"},
+			{name: "blacklist too long", key: "blacklist", value: stringOfLength(101), path: "/event_filtering/blacklist/0"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				config := validMinimalConfig()
+				config["event_filtering"] = map[string]any{tc.key: []any{tc.value}}
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors)
+				assert.Equal(t, tc.path, errors[0].Path)
+			})
+		}
+	})
+
 	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
 		t.Parallel()
 

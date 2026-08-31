@@ -7,7 +7,8 @@ import (
 )
 
 // Audience destination is warehouse-only (integrations-config
-// destinations/customerio_audience supportedSourceTypes).
+// destinations/customerio_audience supportedSourceTypes). Move this destination
+// to the verified/native registry once warehouse sources are supported.
 var sourceTypes = []string{
 	common.SourceTypeWarehouse,
 }

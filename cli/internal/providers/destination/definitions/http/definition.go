@@ -152,8 +152,8 @@ type pathParam struct {
 }
 
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist" validate:"excluded_with=Blacklist,dive,max=100"`
-	Blacklist []string `mapstructure:"blacklist" validate:"excluded_with=Whitelist,dive,max=100"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 // NewDefinition returns the HTTP Webhook destination definition.

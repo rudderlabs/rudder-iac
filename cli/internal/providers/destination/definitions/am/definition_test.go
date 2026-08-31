@@ -39,18 +39,24 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud", "device"},
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, "source type %s", sourceType)
+	}
+	assert.Equal(t, []string{
+		"android", "android_kotlin", "ios", "ios_swift", "web",
+		"unity", "cloud", "react_native", "flutter", "cordova",
+	}, registered.ConnectionModeSourceTypeKeys())
+
+	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+		_, err := registered.ConnectionModes(sourceType)
+		require.Error(t, err)
 	}
 
 	assert.Equal(t, map[string]any{
@@ -309,13 +315,10 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 				"ios":            "device",
 				"ios_swift":      "cloud",
 				"unity":          "cloud",
-				"amp":            "cloud",
 				"cloud":          "cloud",
-				"warehouse":      "cloud",
 				"react_native":   "device",
 				"flutter":        "device",
 				"cordova":        "cloud",
-				"shopify":        "cloud",
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -409,6 +412,19 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 		require.Len(t, errors, 1)
 		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects unsupported source keys without dropping source support", func(t *testing.T) {
+		t.Parallel()
+		for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+			config := validMinimal()
+			config["connection_mode"] = map[string]any{sourceType: "cloud"}
+
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors, sourceType)
+			assert.Equal(t, "/connection_mode/"+sourceType, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "not supported under connection_mode")
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -576,13 +592,10 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"ios": "device",
 					"ios_swift": "cloud",
 					"unity": "cloud",
-					"amp": "cloud",
 					"cloud": "cloud",
-					"warehouse": "cloud",
 					"react_native": "device",
 					"flutter": "device",
-					"cordova": "cloud",
-					"shopify": "cloud"
+					"cordova": "cloud"
 				},
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
@@ -684,13 +697,10 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"ios": "device",
 					"iosSwift": "cloud",
 					"unity": "cloud",
-					"amp": "cloud",
 					"cloud": "cloud",
-					"warehouse": "cloud",
 					"reactnative": "device",
 					"flutter": "device",
-					"cordova": "cloud",
-					"shopify": "cloud"
+					"cordova": "cloud"
 				},
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],

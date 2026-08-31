@@ -146,10 +146,13 @@ func (r *specSyntaxValidRule) unsupportedTypeMessage(destType string) string {
 // blocks (connection_mode, use_native_sdk, consent_management) that the
 // definition does not support — invalid regardless of project connections.
 func sourceTypeKeyResults(def *definitions.RegisteredDefinition, spec *DestinationSpec) []vrules.ValidationResult {
-	localKeys := def.LocalSourceTypeKeys()
-
 	var results []vrules.ValidationResult
 	for _, configKey := range def.SourceTypeConfigKeys() {
+		localKeys := def.LocalSourceTypeKeys()
+		if configKey == "connection_mode" {
+			localKeys = def.ConnectionModeSourceTypeKeys()
+		}
+
 		// Non-map shapes are owned by the config model validation.
 		block, ok := spec.Config[configKey].(map[string]any)
 		if !ok {

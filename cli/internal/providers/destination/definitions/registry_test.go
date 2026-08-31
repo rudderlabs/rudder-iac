@@ -56,7 +56,7 @@ func TestRegistryRejectsConnectionModeWithoutSourceType(t *testing.T) {
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `connection modes configured for unsupported source type "ios"`)
+	assert.Contains(t, err.Error(), `connection modes configured for unsupported connection_mode source type "ios"`)
 }
 
 func TestRegistryRejectsSourceTypeWithoutConnectionModes(t *testing.T) {
@@ -68,7 +68,7 @@ func TestRegistryRejectsSourceTypeWithoutConnectionModes(t *testing.T) {
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `source type "ios" has no connection modes`)
+	assert.Contains(t, err.Error(), `connection_mode source type "ios" has no connection modes`)
 }
 
 func TestRegistryRejectsMissingConnectionModes(t *testing.T) {
@@ -80,7 +80,31 @@ func TestRegistryRejectsMissingConnectionModes(t *testing.T) {
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `source type "web" has no connection modes`)
+	assert.Contains(t, err.Error(), `connection_mode source type "web" has no connection modes`)
+}
+
+func TestRegistryAllowsConnectionModeSubsetOfSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.SourceTypes = []string{"web", "amp"}
+	def.ConnectionModeSourceTypes = []string{"web"}
+	def.ConnectionModes = map[string][]string{"web": {"cloud"}}
+
+	require.NoError(t, registry.Register(def))
+}
+
+func TestRegistryRejectsConnectionModeSourceTypeOutsideSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionModeSourceTypes = []string{"web", "ios"}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection mode source type "ios" is not a supported source type`)
 }
 
 func TestRegistryRejectsSupportedSourcesValidationWithoutSourceType(t *testing.T) {

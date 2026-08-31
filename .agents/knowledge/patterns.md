@@ -197,3 +197,8 @@
 - For `bqstream`, `confluent_cloud`, and `googlesheets` connection-mode additions, E2E upstream snapshots may be updated mechanically from the existing converter mapping and snapshot conventions when no explicitly disposable live destination-enabled workspace is available.
 - Avoid live `RUN_DESTINATION_E2E` execution for these destination snapshot updates in autonomous environments unless disposable credentials are explicitly provided, because destination E2E mutates the configured workspace.
 - Renaming event-filter local keys to the nested block (adj, tiktok_ads, iterable) leaves expected upstream snapshots byte-identical: the API keys don't change, and the derived `eventFilteringOption` equals what the old fixtures set by hand — a built-in equivalence check when converting a definition.
+
+## DEX-730 — Connection Mode Source-Type Narrowing
+<!-- ticket:DEX-730 -->
+- Destination `connection_mode` validation/conversion should derive accepted source keys from `DestinationDefinition.ConnectionModeSourceTypes` when set, otherwise from `SourceTypes`.
+- Use `ConnectionModeSourceTypes` when a destination supports a source type generally but its `connectionMode` schema does not expose that source key; this keeps generic source-scoped config validation and converter mapping aligned without destination-specific validators.

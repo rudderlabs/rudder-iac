@@ -102,14 +102,24 @@ func validateConfigValidateFuncs(def *DestinationDefinition) error {
 }
 
 func validateConnectionModeSourceTypes(def *DestinationDefinition) error {
-	for _, sourceType := range slices.Sorted(maps.Keys(def.ConnectionModes)) {
-		if !slices.Contains(def.SourceTypes, sourceType) {
-			return fmt.Errorf("connection modes configured for unsupported source type %q", sourceType)
+	connectionModeSourceTypes := def.SourceTypes
+	if len(def.ConnectionModeSourceTypes) > 0 {
+		connectionModeSourceTypes = def.ConnectionModeSourceTypes
+		for _, sourceType := range connectionModeSourceTypes {
+			if !slices.Contains(def.SourceTypes, sourceType) {
+				return fmt.Errorf("connection mode source type %q is not a supported source type", sourceType)
+			}
 		}
 	}
-	for _, sourceType := range def.SourceTypes {
+
+	for _, sourceType := range slices.Sorted(maps.Keys(def.ConnectionModes)) {
+		if !slices.Contains(connectionModeSourceTypes, sourceType) {
+			return fmt.Errorf("connection modes configured for unsupported connection_mode source type %q", sourceType)
+		}
+	}
+	for _, sourceType := range connectionModeSourceTypes {
 		if _, ok := def.ConnectionModes[sourceType]; !ok {
-			return fmt.Errorf("source type %q has no connection modes", sourceType)
+			return fmt.Errorf("connection_mode source type %q has no connection modes", sourceType)
 		}
 	}
 	return nil

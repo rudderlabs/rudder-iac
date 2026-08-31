@@ -29,6 +29,10 @@ type DestinationDefinition struct {
 	NewConfig       func() any
 	SourceTypes     []string
 	ConnectionModes map[string][]string
+	// ConnectionModeSourceTypes narrows the source-type keys accepted under
+	// connection_mode when only a subset of the destination's supported source
+	// types models connectionMode config. When empty, SourceTypes is used.
+	ConnectionModeSourceTypes []string
 	// SupportedSourcesValidation lists, per local source type, the local config
 	// keys that must be present for a source of that type to connect (mirrors
 	// the backend's connect-time supportedSourcesValidation check). Source
@@ -93,6 +97,16 @@ func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 // LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.
 func (d *RegisteredDefinition) LocalSourceTypeKeys() []string {
 	return d.SupportedSourceTypes()
+}
+
+// ConnectionModeSourceTypeKeys returns keys allowed under connection_mode. Most
+// destinations use every supported source type; a few support broader source
+// metadata than their schema-declared connectionMode object.
+func (d *RegisteredDefinition) ConnectionModeSourceTypeKeys() []string {
+	if d.DestinationDefinition == nil || len(d.ConnectionModeSourceTypes) == 0 {
+		return d.SupportedSourceTypes()
+	}
+	return append([]string(nil), d.ConnectionModeSourceTypes...)
 }
 
 func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, error) {

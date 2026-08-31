@@ -40,6 +40,19 @@ var sourceTypes = []string{
 	common.SourceTypeShopify,
 }
 
+var connectionModeSourceTypes = []string{
+	common.SourceTypeAndroid,
+	common.SourceTypeAndroidKotlin,
+	common.SourceTypeIOS,
+	common.SourceTypeIOSSwift,
+	common.SourceTypeWeb,
+	common.SourceTypeUnity,
+	common.SourceTypeCloud,
+	common.SourceTypeReactNative,
+	common.SourceTypeFlutter,
+	common.SourceTypeCordova,
+}
+
 var connectionModes = map[string][]string{
 	common.SourceTypeAndroid:       {"cloud", "device"},
 	common.SourceTypeAndroidKotlin: {"cloud"},
@@ -47,13 +60,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type eventFiltering struct {
@@ -391,7 +401,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeFlutter,
 		),
 	}
-	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
+	properties = append(properties, common.ConnectionModeProperties(connectionModeSourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
@@ -403,7 +413,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &amplitudeConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:               append([]string(nil), sourceTypes...),
+		ConnectionModes:           connectionModes,
+		ConnectionModeSourceTypes: append([]string(nil), connectionModeSourceTypes...),
 	}
 }

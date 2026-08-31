@@ -14,13 +14,9 @@ import (
 // cannot be expressed as a static struct tag; it is a dynamic pass over the
 // raw config, mirroring validateConsentManagement in structure.
 //
-// Unlike consent_management, it does not itself reject an unsupported source
-// type: sourceTypeKeyResults (rule_spec_syntax_valid.go) already does that
-// generically for connection_mode, since the key was reserved for it before
-// any destination modeled a config field — see sourceTypeConfigKeys. Doing it
-// here too would just double-report through the rule pipeline. An unsupported
-// source type here simply has no allowed-values list to check against, so its
-// value is skipped rather than flagged as invalid.
+// Unlike consent_management's metadata, the valid source-type set can be
+// narrower than SupportedSourceTypes because some destinations support a source
+// generally while their schema-declared connectionMode object omits that key.
 //
 // Dynamic values get no exemption: schema.json declares connectionMode as a
 // plain enum per source type, and terraform's validators admit env./template
@@ -37,12 +33,20 @@ func (d *RegisteredDefinition) validateConnectionMode(config map[string]any) []C
 	}
 
 	for _, sourceType := range slices.Sorted(maps.Keys(connectionMode)) {
+		path := joinConfigPath("/connection_mode", sourceType)
+		if len(d.ConnectionModeSourceTypes) > 0 && !slices.Contains(d.ConnectionModeSourceTypeKeys(), sourceType) {
+			errors = append(errors, ConfigError{
+				Path:    path,
+				Message: fmt.Sprintf("source type '%s' is not supported under connection_mode", sourceType),
+			})
+			continue
+		}
+
 		allowed, err := d.ConnectionModes(sourceType)
 		if err != nil {
 			continue
 		}
 
-		path := joinConfigPath("/connection_mode", sourceType)
 		value, ok := connectionMode[sourceType].(string)
 		if !ok {
 			errors = append(errors, ConfigError{
