@@ -159,14 +159,14 @@ export class RudderTyper {
         if (typeof userIdOrTraits === "string") {
             this.analytics.identify(
                 userIdOrTraits,
-                undefined,
-                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject),
+                traitsOrOptions as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
             this.analytics.identify(
-                null,
-                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, userIdOrTraits as unknown as SDKApiObject),
+                userIdOrTraits as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
             );
         }
@@ -192,7 +192,7 @@ export class RudderTyper {
         );
     }
 
-    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
         const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
                 "platform": "typescript",
@@ -201,9 +201,6 @@ export class RudderTyper {
                 "trackingPlanVersion": 1,
             },
         };
-        if (contextTraits) {
-            rudderTyperContext["traits"] = contextTraits;
-        }
         return {
             ...(options ?? {}),
             context: {

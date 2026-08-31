@@ -885,8 +885,13 @@ func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 	}
 
 	ctx.UsesApiCallback = true
-	addDataToContext := rule.Section == plan.IdentitySectionContextTraits
 
+	// identity_section describes which part of the payload the plan validates,
+	// not how the data reaches the SDK. Traits always go through the SDK's
+	// traits parameter: that is what makes the SDK remember them for later
+	// events (identify) and what puts them in the field consumers read
+	// (group). Routing them through options.context instead loses both — see
+	// the wire-contract suite and DAW-3732.
 	traitsType := ""
 	if !isEmptySchema(&rule.Schema) {
 		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
@@ -894,9 +899,7 @@ func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 			return nil, err
 		}
 		traitsType = interfaceName
-		if !addDataToContext {
-			ctx.UsesSDKIdentifyTraits = true
-		}
+		ctx.UsesSDKIdentifyTraits = true
 	}
 
 	return buildIdentityCallMethod(identityCallSpec{
@@ -909,7 +912,6 @@ func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 		TraitsType:       traitsType,
 		SDKTraitsType:    sdkIdentifyTraitsAlias,
 		AllowAnonymous:   true,
-		AddDataToContext: addDataToContext,
 	}), nil
 }
 
@@ -982,8 +984,13 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 	}
 
 	ctx.UsesApiCallback = true
-	addDataToContext := rule.Section == plan.IdentitySectionContextTraits
 
+	// identity_section describes which part of the payload the plan validates,
+	// not how the data reaches the SDK. Traits always go through the SDK's
+	// traits parameter: that is what makes the SDK remember them for later
+	// events (identify) and what puts them in the field consumers read
+	// (group). Routing them through options.context instead loses both — see
+	// the wire-contract suite and DAW-3732.
 	traitsType := ""
 	if !isEmptySchema(&rule.Schema) {
 		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
@@ -991,9 +998,7 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 			return nil, err
 		}
 		traitsType = interfaceName
-		if !addDataToContext {
-			ctx.UsesSDKIdentifyTraits = true
-		}
+		ctx.UsesSDKIdentifyTraits = true
 	}
 
 	return buildIdentityCallMethod(identityCallSpec{
@@ -1006,7 +1011,6 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 		TraitsType:       traitsType,
 		SDKTraitsType:    sdkIdentifyTraitsAlias,
 		AllowAnonymous:   true,
-		AddDataToContext: addDataToContext,
 	}), nil
 }
 
@@ -1022,8 +1026,7 @@ type identityCallSpec struct {
 	IDArgName        string // "userIdOrTraits" — name of the union-typed impl param
 	TraitsType       string // generated interface name; empty if the rule has no traits
 	SDKTraitsType    string // SDK type alias to cast to (sdkIdentifyTraitsAlias)
-	AllowAnonymous   bool   // emit the second (no-ID) overload
-	AddDataToContext bool   // traits routed into options.context.traits instead of SDK traits param
+	AllowAnonymous bool // emit the second (no-ID) overload
 }
 
 // buildIdentityCallMethod constructs a TSAnalyticsMethod for identify/group.
@@ -1120,10 +1123,6 @@ func buildIdentityCallMethodNoTraits(spec identityCallSpec) *TSAnalyticsMethod {
 // to forward to either the with-ID overload or the anonymous overload at the
 // SDK level.
 func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
-	if spec.AddDataToContext {
-		return buildIdentityCallBranchesContextTraits(spec)
-	}
-
 	traitsCast := func(argName string) TSSDKArgument {
 		return propsArg("%s as unknown as "+spec.SDKTraitsType, argName)
 	}
@@ -1144,39 +1143,6 @@ func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 			SDKArguments: []TSSDKArgument{
 				traitsCast(spec.IDArgName),
 				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
-				{Value: "optionsOrCallback as ApiCallback | undefined"},
-			},
-		})
-	}
-	return branches
-}
-
-func buildIdentityCallBranchesContextTraits(spec identityCallSpec) []TSDispatcherBranch {
-	// The options argument differs per branch, so it is concatenated literally;
-	// only the traits expression is a format slot, since that is what the
-	// key-map wiring rewraps.
-	contextTraitsArg := func(optionsExpr, traitsExpr string) TSSDKArgument {
-		return propsArg(
-			"this.withRudderTyperContext("+optionsExpr+" as ApiOptions | undefined, %s as unknown as SDKApiObject)",
-			traitsExpr)
-	}
-
-	withID := TSDispatcherBranch{
-		Condition: fmt.Sprintf(`typeof %s === "string"`, spec.IDArgName),
-		SDKArguments: []TSSDKArgument{
-			{Value: spec.IDArgName},
-			{Value: "undefined"},
-			contextTraitsArg("optionsOrCallback", "traitsOrOptions"),
-			{Value: "callback"},
-		},
-	}
-
-	branches := []TSDispatcherBranch{withID}
-	if spec.AllowAnonymous {
-		branches = append(branches, TSDispatcherBranch{
-			SDKArguments: []TSSDKArgument{
-				{Value: "null"},
-				contextTraitsArg("traitsOrOptions", spec.IDArgName),
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		})

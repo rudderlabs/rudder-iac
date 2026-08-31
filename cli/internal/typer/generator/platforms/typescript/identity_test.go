@@ -125,7 +125,12 @@ func TestBuildIdentifyMethod_EmptySchema_NoTraitsType(t *testing.T) {
 	assert.True(t, ctx.UsesApiCallback)
 }
 
-func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
+// TestBuildIdentifyMethod_ContextTraitsUsesSDKTraitsParam pins the fix for
+// DAW-3732's second regression: identity_section describes which part of the
+// payload the plan validates, not how the data reaches the SDK. Routing traits
+// through options.context stopped the SDK persisting them, so every event after
+// the identify went out with empty context.traits.
+func TestBuildIdentifyMethod_ContextTraitsUsesSDKTraitsParam(t *testing.T) {
 	rule := &plan.EventRule{
 		Event:   plan.Event{EventType: plan.EventTypeIdentify, Description: "Identify with context traits"},
 		Section: plan.IdentitySectionContextTraits,
@@ -143,21 +148,21 @@ func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			Condition: `typeof userIdOrTraits === "string"`,
 			SDKArguments: []TSSDKArgument{
 				{Value: "userIdOrTraits"},
-				{Value: "undefined"},
-				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
+				propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				{Value: "null"},
-				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "userIdOrTraits"),
+				propsArg("%s as unknown as SDKIdentifyTraits", "userIdOrTraits"),
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
-	}, method.DispatcherBranches)
+	}, method.DispatcherBranches, "traits go through the SDK traits parameter, not options.context")
 
-	assert.False(t, ctx.UsesSDKIdentifyTraits)
+	assert.True(t, ctx.UsesSDKIdentifyTraits)
 }
 
 // ===== Group =====
@@ -255,10 +260,14 @@ func TestBuildGroupMethod_EmptySchema_OmitsTraitsType(t *testing.T) {
 	assert.True(t, ctx.UsesApiCallback)
 }
 
-func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
-	rule := groupRule("", plan.IdentitySectionContextTraits, plan.ObjectSchema{
+// TestBuildGroupMethod_ContextTraitsUsesSDKTraitsParam pins the group half of
+// the same fix. Routing group traits through options.context left the event's
+// `traits` field empty (the field the warehouse groups table reads) and merged
+// the group's traits into the user's, conflating two identity scopes.
+func TestBuildGroupMethod_ContextTraitsUsesSDKTraitsParam(t *testing.T) {
+	rule := groupRule("Group with context traits", plan.IdentitySectionContextTraits, plan.ObjectSchema{
 		Properties: map[string]plan.PropertySchema{
-			"tenant": {Property: plan.Property{Name: "tenant", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
+			"plan": {Property: plan.Property{Name: "plan", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
 		},
 	})
 
@@ -271,21 +280,21 @@ func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
 			Condition: `typeof groupIdOrTraits === "string"`,
 			SDKArguments: []TSSDKArgument{
 				{Value: "groupIdOrTraits"},
-				{Value: "undefined"},
-				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
+				propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+				{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 				{Value: "callback"},
 			},
 		},
 		{
 			SDKArguments: []TSSDKArgument{
-				{Value: "null"},
-				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "groupIdOrTraits"),
+				propsArg("%s as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
+				{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 				{Value: "optionsOrCallback as ApiCallback | undefined"},
 			},
 		},
-	}, method.DispatcherBranches)
+	}, method.DispatcherBranches, "traits go through the SDK traits parameter, not options.context")
 
-	assert.False(t, ctx.UsesSDKIdentifyTraits)
+	assert.True(t, ctx.UsesSDKIdentifyTraits)
 }
 
 // ===== Page =====
