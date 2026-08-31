@@ -27,11 +27,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_CONCURRENT_SYNCS",
 		},
 		{
-			name:     "transformations",
-			flagName: "transformations",
-			want:     "RUDDERSTACK_X_TRANSFORMATIONS",
-		},
-		{
 			name:     "eventRuleIncludes",
 			flagName: "eventRuleIncludes",
 			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
