@@ -7,8 +7,12 @@ import (
 )
 
 // Audience destination is warehouse-only (integrations-config
-// destinations/customerio_audience supportedSourceTypes). Move this destination
-// to the verified/native registry once warehouse sources are supported.
+// destinations/customerio_audience supportedSourceTypes), which makes it the
+// one definition that may declare warehouse: the CLI cannot produce that source
+// token yet, so no connection can exercise this destination end to end. That is
+// also why it stays in the unverified registry — promote it to the verified
+// block once warehouse sources are supported and the apply cycle can be proven
+// against a live stack.
 var sourceTypes = []string{
 	common.SourceTypeWarehouse,
 }

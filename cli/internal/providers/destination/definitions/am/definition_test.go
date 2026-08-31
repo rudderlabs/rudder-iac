@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -49,12 +49,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, "source type %s", sourceType)
 	}
-	assert.Equal(t, []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
-	}, registered.ConnectionModeSourceTypeKeys())
-
+	// Upstream lists amp, warehouse and shopify, but the CLI cannot produce
+	// those source tokens, so the definition does not advertise them.
 	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+		assert.NotContains(t, registered.SupportedSourceTypes(), sourceType)
 		_, err := registered.ConnectionModes(sourceType)
 		require.Error(t, err)
 	}
@@ -414,16 +412,19 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("connection_mode rejects unsupported source keys without dropping source support", func(t *testing.T) {
+	// The dropped source types are no longer part of any source-scoped block.
+	// consent_management rejects them here; connection_mode is rejected a layer
+	// up by sourceTypeKeyResults, which owns unsupported source keys for it.
+	t.Run("dropped source types rejected in consent_management", func(t *testing.T) {
 		t.Parallel()
 		for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
 			config := validMinimal()
-			config["connection_mode"] = map[string]any{sourceType: "cloud"}
+			config["consent_management"] = map[string]any{sourceType: []any{}}
 
 			errors := registered.ValidateConfig(config)
-			require.NotEmpty(t, errors, sourceType)
-			assert.Equal(t, "/connection_mode/"+sourceType, errors[0].Path)
-			assert.Contains(t, errors[0].Message, "not supported under connection_mode")
+			require.Len(t, errors, 1, sourceType)
+			assert.Equal(t, "/consent_management/"+sourceType, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "is not supported")
 		}
 	})
 
@@ -733,7 +734,7 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"shopify": [{"provider": "custom", "resolution_strategy": "or", "consents": ["marketing"]}]
+					"cordova": [{"provider": "custom", "resolution_strategy": "or", "consents": ["marketing"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -743,7 +744,7 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"shopify": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "marketing"}]}]
+					"cordova": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "marketing"}]}]
 				}
 			}`,
 		},

@@ -113,7 +113,7 @@ func TestDestinationConnectionModeIsConverted(t *testing.T) {
 				continue
 			}
 
-			for _, sourceType := range def.ConnectionModeSourceTypeKeys() {
+			for _, sourceType := range def.SupportedSourceTypes() {
 				modes, err := def.ConnectionModes(sourceType)
 				require.NoError(t, err)
 				require.NotEmpty(t, modes, "%s: no connection modes for %s", destType, sourceType)

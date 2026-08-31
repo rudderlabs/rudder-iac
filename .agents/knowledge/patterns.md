@@ -198,7 +198,7 @@
 - Avoid live `RUN_DESTINATION_E2E` execution for these destination snapshot updates in autonomous environments unless disposable credentials are explicitly provided, because destination E2E mutates the configured workspace.
 - Renaming event-filter local keys to the nested block (adj, tiktok_ads, iterable) leaves expected upstream snapshots byte-identical: the API keys don't change, and the derived `eventFilteringOption` equals what the old fixtures set by hand — a built-in equivalence check when converting a definition.
 
-## DEX-730 — Connection Mode Source-Type Narrowing
+## DEX-730 — Event-Filter Dynamic Values
 <!-- ticket:DEX-730 -->
-- Destination `connection_mode` validation/conversion should derive accepted source keys from `DestinationDefinition.ConnectionModeSourceTypes` when set, otherwise from `SourceTypes`.
-- Use `ConnectionModeSourceTypes` when a destination supports a source type generally but its `connectionMode` schema does not expose that source key; this keeps generic source-scoped config validation and converter mapping aligned without destination-specific validators.
+- An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as `dynamic_or_pattern=single_line_100`, never `max=100`. The `(^\{\{.*\|\|(.*)\}\}$)` branch upstream is what makes the value dynamic-capable, and the tag — not the regex — carries template support.
+- Dropping an unreachable source type can break test fixtures that used it incidentally (Amplitude's consent round-trip used `shopify` for its `custom` provider case); move that coverage to a kept source type rather than deleting the case.

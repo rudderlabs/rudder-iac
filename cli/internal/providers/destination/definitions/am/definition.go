@@ -23,24 +23,13 @@ func init() {
 	)
 }
 
-// Source types from integrations-config destinations/am/db-config.json.
+// Source types from integrations-config destinations/am/db-config.json, minus
+// amp, warehouse and shopify: the CLI maps those tokens but cannot produce
+// them, since an event stream source's type is constrained to the SDK
+// definitions and SourceTypeToken only reaches warehouse through a source
+// category the sole call site never sets. Declaring them would advertise
+// support no connection could ever match.
 var sourceTypes = []string{
-	common.SourceTypeAndroid,
-	common.SourceTypeAndroidKotlin,
-	common.SourceTypeIOS,
-	common.SourceTypeIOSSwift,
-	common.SourceTypeWeb,
-	common.SourceTypeUnity,
-	common.SourceTypeAMP,
-	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
-	common.SourceTypeReactNative,
-	common.SourceTypeFlutter,
-	common.SourceTypeCordova,
-	common.SourceTypeShopify,
-}
-
-var connectionModeSourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
 	common.SourceTypeIOS,
@@ -401,7 +390,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeFlutter,
 		),
 	}
-	properties = append(properties, common.ConnectionModeProperties(connectionModeSourceTypes)...)
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
@@ -413,8 +402,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &amplitudeConfig{}
 		},
-		SourceTypes:               append([]string(nil), sourceTypes...),
-		ConnectionModes:           connectionModes,
-		ConnectionModeSourceTypes: append([]string(nil), connectionModeSourceTypes...),
+		SourceTypes:     append([]string(nil), sourceTypes...),
+		ConnectionModes: connectionModes,
 	}
 }
