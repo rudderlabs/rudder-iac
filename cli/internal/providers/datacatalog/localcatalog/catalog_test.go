@@ -1474,6 +1474,49 @@ func TestDataCatalog_MigrateSpec(t *testing.T) {
 		assert.Equal(t, expected, migratedSpec)
 	})
 
+	t.Run("Migrates raw legacy tracking plan references to v1 references", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &specs.Spec{
+			Version: specs.SpecVersionV1,
+			Kind:    KindTrackingPlans,
+			Metadata: map[string]interface{}{
+				"name": "api_tracking",
+			},
+			Spec: map[string]interface{}{
+				"id":           "api_tracking",
+				"display_name": "API Tracking",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"type": "event_rule",
+						"id":   "signup_rule",
+						"event": map[string]interface{}{
+							"$ref": "#/events/api_tracking/user_signed_up",
+						},
+						"properties": []interface{}{
+							map[string]interface{}{
+								"$ref":     "#/properties/api_tracking/email",
+								"required": true,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dc := New()
+		migratedSpec, err := dc.MigrateSpec(spec)
+		require.NoError(t, err)
+
+		assert.Equal(t, KindTrackingPlansV1, migratedSpec.Kind)
+		rules := migratedSpec.Spec["rules"].([]interface{})
+		rule := rules[0].(map[string]interface{})
+		assert.Equal(t, "#event:user_signed_up", rule["event"])
+		properties := rule["properties"].([]interface{})
+		property := properties[0].(map[string]interface{})
+		assert.Equal(t, "#property:email", property["property"])
+	})
+
 	t.Run("Migrates import metadata from LocalID to URN format for properties", func(t *testing.T) {
 		t.Parallel()
 

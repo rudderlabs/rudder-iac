@@ -337,6 +337,10 @@ func (dc *DataCatalog) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 		return nil, fmt.Errorf("migrating import metadata to URN: %w", err)
 	}
 
+	if err := dc.transformReferencesInSpec(s.Spec); err != nil {
+		return nil, fmt.Errorf("processing references in spec: %w", err)
+	}
+
 	// Perform provider-specific spec transformations
 	var resourceSpec any
 	switch s.Kind {
