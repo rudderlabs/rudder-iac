@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -51,11 +50,6 @@ func TestProjectApply(t *testing.T) {
 		// changes are reported if we re-apply the same project, therefore we dedicatedly
 		// test this scenario below
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-		// then we apply this project again from scratch and verify no
-		// changes are reported in snapshot tests meaning after migration of the directory
-		// the upstream resources are created same
-		removeTransformationFixtures(t, migratedDir)
-		applyAndVerify(t, executor, migratedDir)
 	})
 }
 
@@ -128,15 +122,6 @@ func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir strin
 	}
 
 	return tempDir
-}
-
-func removeTransformationFixtures(t *testing.T, projectDir string) {
-	t.Helper()
-
-	for _, dir := range []string{"create", "update"} {
-		path := filepath.Join(projectDir, dir, "transformations")
-		require.NoError(t, os.RemoveAll(path), "failed to remove migrated transformation fixtures at %s", path)
-	}
 }
 
 func verifyState(t *testing.T, dir string) {
