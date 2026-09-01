@@ -16,10 +16,19 @@ import (
 )
 
 // webhookTestConfig is a minimal destination config model for the test
-// registry: two plain fields usable as connect-time required keys.
+// registry: two plain fields usable as connect-time required keys, plus the
+// connection_mode block that makes them reachable — required keys are looked
+// up by mode, so a definition whose config model cannot carry a declaration
+// could never have them checked.
 type webhookTestConfig struct {
-	WebhookURL string `mapstructure:"webhook_url"`
-	AuthToken  string `mapstructure:"auth_token"`
+	WebhookURL     string                `mapstructure:"webhook_url"`
+	AuthToken      string                `mapstructure:"auth_token"`
+	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
+}
+
+// barebonesTestConfig models neither settings block.
+type barebonesTestConfig struct {
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 // modeAwareUseNativeSDK mirrors the real definitions' native-SDK block: one
@@ -59,10 +68,11 @@ type multiModeTestConfig struct {
 // newTestRegistry registers four definitions, each shaped for one facet of the
 // checks:
 //
-//   - "webhook" has neither settings block, so the settings check never
-//     applies. Its connect-time required keys drive the V-C5 tests instead:
-//     web needs webhook_url and auth_token, android needs connection_mode,
-//     ios needs nothing.
+//   - "webhook" drives the V-C5 tests: web needs webhook_url and auth_token,
+//     android needs connection_mode, ios needs nothing. It models
+//     connection_mode so those keys are reachable at all.
+//   - "barebones" has neither settings block, so the settings check never
+//     applies.
 //   - "mode-aware" has both blocks, so either can satisfy the settings check.
 //     Its use_native_sdk names web, android and ios but not cloud, and only
 //     ios lists connection_mode as a required key.
@@ -121,6 +131,17 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		ConnectionModes: map[string][]string{
 			"web":     {"device"},
 			"android": {"cloud"},
+		},
+	}))
+
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "barebones",
+		Version:     1,
+		NewConfig:   func() any { return &barebonesTestConfig{} },
+		SourceTypes: []string{"web", "ios"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+			"ios": {"cloud"},
 		},
 	}))
 
@@ -504,11 +525,11 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
-	// connection_mode can be listed as a required key but can never be
-	// reported missing: the absence that would make it missing is the same
-	// absence that leaves the mode undeclared. Pinned so the day a definition
-	// lists it, the dead end is visible here rather than in a silent pass.
-	t.Run("connection_mode as a required key is never reported missing", func(t *testing.T) {
+	// connection_mode can be listed as a required key but V-C5 can never
+	// report it missing: the absence that would make it missing is the same
+	// absence that leaves the mode undeclared. The settings check reports it
+	// instead, so the author still gets exactly one actionable error.
+	t.Run("connection_mode as a required key is reported by the settings check", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -525,7 +546,10 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-droid", "dest-1")},
 		}
 
-		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 1)
+		assert.NotContains(t, results[0].Message, "missing fields required")
+		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
 	t.Run("connection_mode names the source type", func(t *testing.T) {
@@ -552,11 +576,13 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 	t.Run("source type without required config keys", func(t *testing.T) {
 		t.Parallel()
 
-		// ios has no supported-sources-validation entry, so an empty
-		// destination config is fine.
+		// ios has no supported-sources-validation entry, so declaring its mode
+		// is all the destination config needs.
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-ios", "ios", true)
-		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{})
+		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
+			"connection_mode": map[string]any{"ios": "cloud"},
+		})
 		addConnectionResource(graph, "conn-1",
 			resources.URN("src-ios", esSource.ResourceType),
 			resources.URN("dest-1", destination.DestinationResourceType),
@@ -731,11 +757,11 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 	t.Run("a destination declaring neither block asks for nothing", func(t *testing.T) {
 		t.Parallel()
 
-		// "webhook" declares neither settings block, so there is nowhere to
+		// "barebones" declares neither settings block, so there is nowhere to
 		// write the entry an error would ask for.
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-1", "ios", true)
-		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{})
+		addDestinationResource(graph, "dest-1", "barebones", true, map[string]any{})
 		addConnectionResource(graph, "conn-1",
 			resources.URN("src-1", esSource.ResourceType),
 			resources.URN("dest-1", destination.DestinationResourceType),
