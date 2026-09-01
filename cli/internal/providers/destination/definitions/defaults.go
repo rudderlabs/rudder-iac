@@ -17,8 +17,9 @@ const configDefaultTag = "default"
 // typed to match what that key carries once decoded from YAML or converted from
 // an API response.
 //
-// Top-level fields only: a nested default has no unambiguous home when the
-// parent block itself is absent.
+// Nested config blocks are walked recursively: a `default` tag on an inner
+// field is collected as a nested map under the parent key (see ApplyDefaults
+// for how nested defaults apply).
 func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 	configType = derefType(configType)
 	fields := structFieldsByMapstructureTag(configType)
@@ -29,6 +30,16 @@ func buildConfigDefaults(configType reflect.Type) (map[string]any, error) {
 		field := fields[key]
 		raw, ok := field.Tag.Lookup(configDefaultTag)
 		if !ok {
+			if derefType(field.Type).Kind() != reflect.Struct {
+				continue
+			}
+			nested, err := buildConfigDefaults(field.Type)
+			if err != nil {
+				return nil, fmt.Errorf("config key %q: %w", key, err)
+			}
+			if len(nested) > 0 {
+				defaults[key] = nested
+			}
 			continue
 		}
 
@@ -87,28 +98,54 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 
 // ApplyDefaults returns a copy of config with the declared defaults filled in
 // for omitted keys. A present key is never overwritten, so an explicit value
-// wins even when it equals the zero value.
+// wins even when it equals the zero value. Nested defaults fill in only inside
+// a block the spec already carries — an absent block stays absent, matching
+// how the backend's schema validation applies nested defaults.
 //
 // Local specs are enriched before they enter the resource graph: the backend
 // applies these same defaults when it persists a destination, so a spec that
 // omits one would otherwise diff forever against the remote state carrying it.
 func (d *RegisteredDefinition) ApplyDefaults(config map[string]any) map[string]any {
-	enriched := make(map[string]any, len(config)+len(d.configDefaults))
+	return applyDefaults(config, d.configDefaults)
+}
+
+func applyDefaults(config, defaults map[string]any) map[string]any {
+	enriched := make(map[string]any, len(config)+len(defaults))
 	maps.Copy(enriched, config)
 
-	for key, value := range d.configDefaults {
-		if _, ok := enriched[key]; !ok {
-			enriched[key] = value
+	for key, value := range defaults {
+		nested, isNested := value.(map[string]any)
+		if !isNested {
+			if _, ok := enriched[key]; !ok {
+				enriched[key] = value
+			}
+			continue
 		}
+
+		current, ok := enriched[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		enriched[key] = applyDefaults(current, nested)
 	}
 
 	return enriched
 }
 
-// ConfigDefaults returns the declared defaults keyed by local config key. The
-// values are scalars, so the shallow copy fully isolates callers.
+// ConfigDefaults returns the declared defaults keyed by local config key,
+// deep-copied so callers cannot mutate the registered nested defaults.
 func (d *RegisteredDefinition) ConfigDefaults() map[string]any {
-	out := make(map[string]any, len(d.configDefaults))
-	maps.Copy(out, d.configDefaults)
+	return cloneDefaults(d.configDefaults)
+}
+
+func cloneDefaults(defaults map[string]any) map[string]any {
+	out := make(map[string]any, len(defaults))
+	for key, value := range defaults {
+		if nested, ok := value.(map[string]any); ok {
+			out[key] = cloneDefaults(nested)
+			continue
+		}
+		out[key] = value
+	}
 	return out
 }

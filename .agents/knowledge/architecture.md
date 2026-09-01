@@ -239,3 +239,10 @@
 <!-- ticket:DEX-527 -->
 - Snowpipe Streaming models all 14 `destConfig.defaultConfig` keys, so nothing it owns is dropped when destination update replaces the whole config object; it needs no destination-specific preservation of unmodelled API keys.
 - The keys that are genuinely unmodelled by every destination are the legacy consent blocks `oneTrustCookieCategories` and `ketchConsentPurposes`: `common.Properties` maps consent management but not those two, so any destination carrying them upstream loses them on update. That is a cross-destination gap, not a Snowpipe one, and belongs in its own change rather than an opt-in flag on a single definition.
+
+## DEX-490 — Amplitude Destination Onboarding
+<!-- ticket:DEX-490 -->
+- Amplitude destination support is implemented as CLI destination type `am`, API type `AM`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/am`.
+- `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
+- Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.

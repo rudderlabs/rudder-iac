@@ -1,0 +1,24 @@
+{
+  "config": {
+    "apiKey": "rudderCliE2eAmKeyUpdated",
+    "enableEnhancedUserOperations": false,
+    "mapDeviceBrand": false,
+    "residencyServer": "standard",
+    "trackAllPages": false,
+    "trackCategorizedPages": true,
+    "trackNamedPages": true,
+    "trackProductsOnce": false,
+    "trackRevenuePerProduct": false,
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "am-minimal",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Amplitude Minimal Updated",
+  "type": "AM",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}
