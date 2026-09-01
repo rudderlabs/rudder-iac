@@ -217,3 +217,8 @@
 - Amplitude local config should include terraform-mapped web-only fields even when schema/db-config do not list them, including `device_id_from_url_param`, `force_https`, `track_gclid`, `track_referrer`, and `save_params_referrer_once_per_session`; keep those fields web-gated and avoid inventing validation beyond their boolean shape.
 - Amplitude should model schema/db-config fields absent from Terraform mappings, including `enable_enhanced_user_operations`, using mechanical camelCase-to-snake_case local naming.
 - Nested schema defaults (`sdkVersion.web`, `trackSessionEvents.web`, the `enable*AutoCapture.web` family) are declared with `default` tags on the nested struct fields, not a whole-object `default_json` tag; ApplyDefaults merges them only into a block the spec already carries, matching backend AJV `useDefaults` behavior where an absent parent object stays absent.
+
+## DEX-731 — Apply/Destroy E2E Safety
+<!-- ticket:DEX-731 -->
+- Avoid full live apply/destroy E2E validation in non-disposable autonomous environments because those flows can mutate or destroy the configured RudderStack workspace.
+- For sync-behavior changes without an explicitly disposable workspace, use compile-only E2E validation such as `go test ./cli/tests -run '^$'` as the safe substitute, alongside focused unit tests.

@@ -246,3 +246,8 @@
 - `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
 - Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.
+
+## DEX-731 — Concurrent Syncs GA
+<!-- ticket:DEX-731 -->
+- Apply and destroy project syncers should always be constructed with `syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer)`; concurrent sync execution is no longer gated by an experimental flag.
+- `concurrency.syncer` remains the main configuration tuning knob for sync parallelism after GA promotion; do not replace it with hard-coded concurrency or reintroduce a `concurrentSyncs` gate.

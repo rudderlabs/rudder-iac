@@ -12,8 +12,6 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// ConcurrentSyncs enables concurrent sync operations when applying changes
-	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// NestedDiffs enables detailed diff reports for nested structures
 	NestedDiffs bool `mapstructure:"nestedDiffs"`
 	// Transformations enables transformations provider and related features

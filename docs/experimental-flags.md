@@ -16,12 +16,11 @@ Add your flag to `cli/internal/config/experimental.go`:
 
 ```go
 type ExperimentalConfig struct {
-    // StatelessCLI enables stateless CLI mode, which does not depend on resource state being persisted across runs
-    StatelessCLI  bool `mapstructure:"statelessCLI"`
+    // Transformations enables transformations provider and related features
+    Transformations bool `mapstructure:"transformations"`
 
-    // ConcurrentSyncs enables concurrent sync operations when applying changes
-    ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
-
+    // EventRuleIncludes enables including event rules from other tracking plans
+    EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 }
 ```
 
@@ -84,10 +83,10 @@ Users can manage experimental flags through CLI commands:
 rudder-cli experimental list
 
 # Enable a flag
-rudder-cli experimental enable statelessCLI
+rudder-cli experimental enable transformations
 
 # Disable a flag
-rudder-cli experimental disable concurrentSyncs
+rudder-cli experimental disable eventRuleIncludes
 
 # Reset all flags to default (false)
 rudder-cli experimental reset
@@ -101,8 +100,8 @@ Flags are stored in `~/.rudder/config.json`:
 {
   "experimental": true,
   "flags": {
-    "statelessCLI": true,
-    "concurrentSyncs": false
+    "transformations": true,
+    "eventRuleIncludes": false
   }
 }
 ```
@@ -114,8 +113,8 @@ In order for them to be effective, the top-level `experimental` field must also 
 Flags can be set via environment variables using the `RUDDERSTACK_X_` prefix:
 
 ```bash
-export RUDDERSTACK_X_STATELESS_CLI=true
-export RUDDERSTACK_X_CONCURRENT_SYNCS=true
+export RUDDERSTACK_X_TRANSFORMATIONS=true
+export RUDDERSTACK_X_EVENT_RULE_INCLUDES=true
 rudder-cli apply
 ```
 
@@ -151,15 +150,15 @@ Experimental flag status is automatically included in all command telemetry. No 
 ### Struct Fields (camelCase)
 
 ```go
-StatelessCLI    bool `mapstructure:"statelessCLI"`
-ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
+Transformations    bool `mapstructure:"transformations"`
+EventRuleIncludes  bool `mapstructure:"eventRuleIncludes"`
 ```
 
 ### Environment Variables (UPPER_SNAKE_CASE)
 
 ```bash
-RUDDERSTACK_X_STATELESS_CLI=true
-RUDDERSTACK_X_CONCURRENT_SYNCS=true
+RUDDERSTACK_X_TRANSFORMATIONS=true
+RUDDERSTACK_X_EVENT_RULE_INCLUDES=true
 ```
 
 ## Common Pitfalls

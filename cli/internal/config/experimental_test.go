@@ -22,11 +22,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "concurrentSyncs",
-			flagName: "concurrentSyncs",
-			want:     "RUDDERSTACK_X_CONCURRENT_SYNCS",
-		},
-		{
 			name:     "transformations",
 			flagName: "transformations",
 			want:     "RUDDERSTACK_X_TRANSFORMATIONS",
