@@ -9,12 +9,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPlanReporter(t *testing.T) {
-	// Test default behavior (flat mode) with all resource types
+	// Test default behavior with all resource types
 	var buf bytes.Buffer
 
 	r := &planReporter{}
@@ -94,7 +93,7 @@ func TestPlanReporter(t *testing.T) {
 		"\n" +
 		"Updated resources:\n" +
 		"  - resource_type:resource4\n" +
-		"    - complex: map[a:1 b:2] => map[a:1 b:3]\n" +
+		"    - complex.b: 2 => 3\n" +
 		"    - name: old-name => new-name\n" +
 		"    - ref_ptr_changed: " + oldRefURN + " => " + newRefURN + "\n" +
 		"    - ref_ptr_nil_source: <nil> => " + newRefURN + "\n" +
@@ -102,7 +101,7 @@ func TestPlanReporter(t *testing.T) {
 		"    - ref_val_changed: " + oldRefURN + " => " + newRefURN + "\n" +
 		"    - size: 10 => 20\n" +
 		"  - resource_type:resource5\n" +
-		"    - items: [1 2 3] => [1 5 3]\n" +
+		"    - items[1]: 2 => 5\n" +
 		"\n" +
 		"Removed resources:\n" +
 		"  - resource_type:resource6\n" +
@@ -112,8 +111,6 @@ func TestPlanReporter(t *testing.T) {
 }
 
 func TestPlanReporter_NestedDiff(t *testing.T) {
-	enableNestedDiffs(t)
-
 	var buf bytes.Buffer
 
 	r := &planReporter{}
@@ -157,16 +154,20 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 					"config": {
 						Property: "config",
 						SourceValue: map[string]any{
+							"name": "old-config",
 							"servers": []any{
 								map[string]any{"host": "a.com", "port": 80},
 								map[string]any{"host": "b.com", "port": 443},
 							},
+							"settings": map[string]any{"retries": 2},
 						},
 						TargetValue: map[string]any{
+							"name": "new-config",
 							"servers": []any{
 								map[string]any{"host": "a.com", "port": 80},
 								map[string]any{"host": "b.com", "port": 8443},
 							},
+							"settings": map[string]any{"retries": 3},
 						},
 					},
 				},
@@ -217,7 +218,9 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
   - resource_type:with_arrays
     - items[1]: 2 => 5
   - resource_type:with_mixed_structures
+    - config.name: old-config => new-config
     - config.servers[1].port: 443 => 8443
+    - config.settings.retries: 2 => 3
   - resource_type:with_nested_maps
     - complex.b: 2 => 3
     - name: old-name => new-name
@@ -316,7 +319,6 @@ func TestRenderPropertyDiff_Secret(t *testing.T) {
 	// line is reserved for secret-only property diffs; a secret leaked here must
 	// still never show its real value.
 	t.Run("nested diff masks a secret leaf without leaking the value", func(t *testing.T) {
-		enableNestedDiffs(t)
 		localSecret, unknown := secret.New(real), secret.NewUnknown()
 		lines := renderPropertyDiff(differ.PropertyDiff{
 			Property:    "config",
@@ -352,16 +354,4 @@ func TestRenderDiff_SecretSections(t *testing.T) {
 	assert.Contains(t, out, "type:secret")
 	assert.Contains(t, out, "(secret, always re-applied)")
 	assert.NotContains(t, out, "sk_live_x")
-}
-
-func enableNestedDiffs(t *testing.T) {
-	t.Helper()
-
-	viper.Set("experimental", true)
-	viper.Set("flags.nestedDiffs", true)
-
-	t.Cleanup(func() {
-		viper.Set("experimental", false)
-		viper.Set("flags.nestedDiffs", false)
-	})
 }
