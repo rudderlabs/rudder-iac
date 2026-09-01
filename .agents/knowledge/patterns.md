@@ -201,4 +201,6 @@
 ## DEX-730 — Event-Filter Dynamic Values
 <!-- ticket:DEX-730 -->
 - An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as `dynamic_or_pattern=single_line_100`, never `max=100`. The `(^\{\{.*\|\|(.*)\}\}$)` branch upstream is what makes the value dynamic-capable, and the tag — not the regex — carries template support.
-- Dropping an unreachable source type can break test fixtures that used it incidentally (Amplitude's consent round-trip used `shopify` for its `custom` provider case); move that coverage to a kept source type rather than deleting the case.
+- Destination definitions can distinguish broad destination `SourceTypes` from the narrower source keys accepted under `config.connection_mode` via `DestinationDefinition.ConnectionModeSourceTypes`; when unset, connection-mode source keys default to `SourceTypes`.
+- Amplitude (`cli/internal/providers/destination/definitions/am`) keeps `amp`, `warehouse`, and `shopify` in `SourceTypes` for broad destination metadata/consent support, but excludes them from `ConnectionModeSourceTypes` so `connection_mode.amp`, `connection_mode.warehouse`, and `connection_mode.shopify` are rejected and no converter mappings are emitted for those keys.
+- Removing unsupported connection-mode source types from `SourceTypes` is the wrong fix for Amplitude because it would break broader destination/source support; narrow only the `connection_mode` surface.
