@@ -67,3 +67,8 @@
 - CI failed when the live destination E2E fixture `cli/tests/testdata/destinations/{create,update}/ga.yaml` set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`, but the test workspace did not create an account with that ID.
 - The observed `TestDestinationsApply` failure was `task: destination:ga failed: creating destination: http status code: 400 ... 'Account not found with given id in the workspace'`.
 - Durable mitigation: omit account-ID config from GA destination fixtures unless the referenced account is seeded or managed by the test setup; future destination E2E fixtures should only include account-ID fields with a real test prerequisite.
+
+## DEX-732 — Destination GA Fixture Account ID Failure
+<!-- ticket:DEX-732 -->
+- CI live destination E2E failed when the GA fixture set `config.rudder_delete_account_id` to dummy value `rudderCliE2eDeleteAccount`; the API maps it to `rudderDeleteAccountId` and rejects create with `400 ... 'Account not found with given id in the workspace'` after `TestDestinationsApply` has destroyed the workspace.
+- Durable mitigation: omit this optional field from live destination fixtures unless the test also provisions and resolves a real account ID in that workspace.
