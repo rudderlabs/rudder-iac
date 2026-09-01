@@ -317,12 +317,15 @@ func validateSourceTypeSettings(
 			return nil
 		}
 
-		raw, written := config[key]
+		raw := config[key]
 		block, isObject := raw.(map[string]any)
 
-		// Written but not an object: the destination config rule owns its
-		// shape, and there is no entry to read either way.
-		if written && !isObject {
+		// A non-nil value of the wrong type is the destination config rule's
+		// to report, so drop the block here. A written-but-null one is not:
+		// mapstructure decodes null into a nil field without complaint, so no
+		// rule would flag it, and it names no source type either — deferring
+		// it would hand the check off to nobody.
+		if raw != nil && !isObject {
 			continue
 		}
 		if _, found := block[sourceType]; found {

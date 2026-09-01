@@ -570,6 +570,45 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		}}, results)
 	})
 
+	t.Run("a block written with no value names nothing", func(t *testing.T) {
+		t.Parallel()
+
+		// `use_native_sdk:` with nothing under it decodes to a nil pointer, so
+		// no destination rule flags its shape and the block names no source
+		// type either. It has to stay a candidate: only a non-nil wrong-typed
+		// value is the destination config rule's to report.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "native-only", true, map[string]any{
+			"use_native_sdk": nil,
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("both blocks written with no value name nothing", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{
+			"connection_mode": nil,
+			"use_native_sdk":  nil,
+		})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' or 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
 	t.Run("a wrong-shaped block on its own is the destination rule's concern", func(t *testing.T) {
 		t.Parallel()
 
