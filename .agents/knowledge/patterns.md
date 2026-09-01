@@ -200,6 +200,6 @@
 
 ## DEX-736 — Legacy GA Destination E2E Account-Link Deferral
 <!-- ticket:DEX-736 -->
-- Legacy Google Analytics destination live E2E fixture/snapshot pairs for CLI type `ga` should stay omitted until account cross-link support can provide a real `rudderDeleteAccountId` account reference.
-- GA4 fixtures and the `cli/internal/providers/destination/definitions/ga` implementation remain in scope; do not remove GA runtime support or weaken GA validation just to make `TestDestinationsApply` runnable.
-- Removing both the GA fixture YAML and its expected upstream snapshot preserves `TestDestinationsApply` fixture/snapshot parity while deferring only the account-linked legacy GA live coverage.
+- Legacy Google Analytics (`type: ga`) E2E fixtures stay in place; only `rudder_delete_account_id` is dropped from them, because the upstream config API rejects an account id that is not a real account link in the workspace.
+- `RudderDeleteAccountID` is `omitempty` in the GA definition, so omitting it from a fixture keeps the spec valid and simply leaves `rudderDeleteAccountId` out of the upstream payload and its expected snapshot.
+- Prefer trimming the account-linked key over deleting whole fixture/snapshot pairs: it keeps `TestDestinationsApply` coverage for the rest of the legacy GA config surface while removing the only field that needs a cross-linked account.

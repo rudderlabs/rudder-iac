@@ -1,0 +1,116 @@
+{
+  "config": {
+    "anonymizeIp": false,
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "consentManagement": {
+      "androidKotlin": [
+        {
+          "provider": "ketch"
+        }
+      ],
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "contentGroupings": [
+      {
+        "from": "section",
+        "to": "contentGroup1"
+      }
+    ],
+    "customMappings": [
+      {
+        "from": "Order Completed",
+        "to": "purchase"
+      }
+    ],
+    "dimensions": [
+      {
+        "from": "plan",
+        "to": "dimension1"
+      }
+    ],
+    "disableMd5": true,
+    "domain": {
+      "web": "none"
+    },
+    "doubleClick": false,
+    "enableServerSideIdentify": true,
+    "enhancedEcommerce": false,
+    "enhancedLinkAttribution": false,
+    "eventFilteringOption": "blacklistedEvents",
+    "includeSearch": true,
+    "metrics": [
+      {
+        "from": "revenue",
+        "to": "metric1"
+      }
+    ],
+    "namedTracker": {
+      "web": false
+    },
+    "nonInteraction": true,
+    "optimize": {
+      "web": "OPT-E2EUPDATE"
+    },
+    "resetCustomDimensionsOnPage": {
+      "web": [
+        {
+          "resetCustomDimensionsOnPage": "dimension1"
+        }
+      ]
+    },
+    "sampleRate": {
+      "web": "100"
+    },
+    "sendUserId": false,
+    "serverSideIdentifyEventAction": "User Enriched",
+    "serverSideIdentifyEventCategory": "All",
+    "setAllMappedProps": {
+      "web": true
+    },
+    "siteSpeedSampleRate": {
+      "web": "10"
+    },
+    "trackCategorizedPages": {
+      "web": true
+    },
+    "trackNamedPages": {
+      "web": false
+    },
+    "trackingID": "UA-654321-2",
+    "useGoogleAmpClientId": {
+      "web": false
+    },
+    "useNativeSDK": {
+      "web": true
+    },
+    "useRichEventNames": {
+      "web": true
+    }
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "ga",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Google Analytics Updated",
+  "type": "GA",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}
