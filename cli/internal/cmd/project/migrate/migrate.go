@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/spf13/cobra"
 )
 
@@ -94,7 +95,8 @@ func loadRawMigrationProject(location string) (migrator.Project, error) {
 
 	parsedSpecs := make(map[string]*specs.Spec, len(rawSpecs))
 	for path, rawSpec := range rawSpecs {
-		parsed, err := rawSpec.Parse()
+		parseableRawSpec := &specs.RawSpec{Data: varsubst.QuoteTokensForYAMLParse(rawSpec.Data)}
+		parsed, err := parseableRawSpec.Parse()
 		if err != nil {
 			return nil, fmt.Errorf("parsing source spec %s: %w", path, err)
 		}

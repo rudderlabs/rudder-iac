@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,7 +61,6 @@ func TestMigrateTelemetryExtras(t *testing.T) {
 }
 
 func TestLoadRawMigrationProjectPreservesPlaceholders(t *testing.T) {
-	t.Setenv("RUDDER_ENV", "prod")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "source.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(`version: rudder/0.1
@@ -69,11 +69,44 @@ metadata:
   name: test_source
 spec:
   label: "prod-{{ .ENV }}"
+  port: {{ .DB_PORT | 5432 }}
+  hosts:
+    - {{ .DB_HOST }}
 `), 0644))
 
 	proj, err := loadRawMigrationProject(dir)
 	require.NoError(t, err)
 
 	require.Contains(t, proj.Specs(), path)
-	assert.Equal(t, "prod-{{ .ENV }}", proj.Specs()[path].Spec["label"])
+
+	spec := proj.Specs()[path]
+	assert.Equal(t, "prod-{{ .ENV }}", spec.Spec["label"])
+	assert.Equal(t, "{{ .DB_PORT | 5432 }}", spec.Spec["port"])
+	assert.Equal(t, []any{"{{ .DB_HOST }}"}, spec.Spec["hosts"])
+}
+
+func TestLoadRawMigrationProjectParsesFormatterOutput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "source.yaml")
+
+	formatted, err := formatter.YAMLFormatter{}.Format(&specs.Spec{
+		Version: specs.SpecVersionV0_1,
+		Kind:    "source",
+		Metadata: map[string]any{
+			"name": "test_source",
+		},
+		Spec: map[string]any{
+			"name": "{{ .API_TRACKING_NAME }}",
+		},
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(formatted), "name: {{ .API_TRACKING_NAME }}")
+
+	require.NoError(t, os.WriteFile(path, formatted, 0644))
+
+	proj, err := loadRawMigrationProject(dir)
+	require.NoError(t, err)
+
+	require.Contains(t, proj.Specs(), path)
+	assert.Equal(t, "{{ .API_TRACKING_NAME }}", proj.Specs()[path].Spec["name"])
 }

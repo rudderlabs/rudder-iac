@@ -50,6 +50,55 @@ func TestExtractVariableNames(t *testing.T) {
 	}
 }
 
+func TestQuoteTokensForYAMLParse(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "mapping scalar token quoted",
+			in:   `port: {{ .DB_PORT | 5432 }}`,
+			want: `port: "{{ .DB_PORT | 5432 }}"`,
+		},
+		{
+			name: "sequence item token quoted",
+			in:   "hosts:\n  - {{ .DB_HOST }}\n",
+			want: "hosts:\n  - \"{{ .DB_HOST }}\"\n",
+		},
+		{
+			name: "already quoted token unchanged",
+			in:   `password: "{{ .DB_PASSWORD }}"`,
+			want: `password: "{{ .DB_PASSWORD }}"`,
+		},
+		{
+			name: "embedded token unchanged",
+			in:   `url: "https://{{ .DB_HOST }}/orders"`,
+			want: `url: "https://{{ .DB_HOST }}/orders"`,
+		},
+		{
+			name: "comment token unchanged",
+			in:   `password: plain # {{ .DB_PASSWORD }}`,
+			want: `password: plain # {{ .DB_PASSWORD }}`,
+		},
+		{
+			name: "ui template unchanged",
+			in:   `password: {{ config.password || fallback }}`,
+			want: `password: {{ config.password || fallback }}`,
+		},
+		{
+			name: "trailing comment preserved",
+			in:   `password: {{ .DB_PASSWORD }} # injected by CI`,
+			want: `password: "{{ .DB_PASSWORD }}" # injected by CI`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, string(QuoteTokensForYAMLParse([]byte(tt.in))))
+		})
+	}
+}
+
 func TestUnquoteTokens(t *testing.T) {
 	tests := []struct {
 		name string
