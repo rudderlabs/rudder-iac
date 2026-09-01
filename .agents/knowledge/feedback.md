@@ -20,8 +20,8 @@
 
 ## DEX-499 — GCS Destination Gate Correction
 <!-- ticket:DEX-499 -->
-- Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available with `ExperimentalFlags.DestinationSupport` alone.
-- Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
+- Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available unconditionally.
+- Keep `s3` as the verified destination registered unconditionally; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
 
 ## DEX-731 — Experimental Flag Promotion Review Guidance

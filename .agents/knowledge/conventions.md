@@ -226,4 +226,4 @@
 ## DEX-732 — Removed Experimental Flag Coverage
 <!-- ticket:DEX-732 -->
 - When promoting an experimental flag to GA, keep an explicit negative config test for the removed flag name when there is precedent, as with the existing DataGraph removed-flag test.
-- For destination support GA, `destinationSupport` should be asserted as an invalid experimental option rather than only deleting its positive env-name table case, guarding against accidental flag reintroduction.
+- For destination support GA, the removed destination-support flag name should be asserted as an invalid experimental option rather than only deleting its positive env-name table case, guarding against accidental flag reintroduction.

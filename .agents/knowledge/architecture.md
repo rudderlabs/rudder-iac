@@ -101,49 +101,49 @@
 ## DEX-510 — HTTP Destination Registration Boundary
 <!-- ticket:DEX-510 -->
 - HTTP destination support is implemented as a destination-provider definition under `cli/internal/providers/destination/definitions/http`, with registry wiring in `cli/internal/app/dependencies.go`.
-- HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, matching the S3 destination gate.
+- HTTP is treated as an unverified destination: it should register only when `ExperimentalFlags.UnverifiedDestinations` is enabled; destination support itself is now GA.
 - HTTP destination identity is `Type: http`, API type `HTTP`, and version `1`; allowed source types are intentionally restricted to the CLI-owned event-stream set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) while upstream `amp`, `warehouse`, and `shopify` are excluded.
 
 ## DEX-608 — S3 Destination Verified Registry Promotion
 <!-- ticket:DEX-608 -->
-- S3 is a verified/native destination definition: `cli/internal/app/newDestinationRegistry` should register `s3.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
-- HTTP remains an unverified destination definition and still requires both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` before `http.NewDefinition()` is registered.
-- Destination registry flag-matrix expectations should reflect S3 as available with destination support alone, while enabling unverified destinations adds HTTP alongside S3.
+- S3 is a verified/native destination definition: `cli/internal/app/newDestinationRegistry` should register `s3.NewDefinition()` unconditionally, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- HTTP remains an unverified destination definition and still requires `ExperimentalFlags.UnverifiedDestinations` before `http.NewDefinition()` is registered.
+- Destination registry flag-matrix expectations should reflect S3 as always available, while enabling unverified destinations adds HTTP alongside S3.
 - This supersedes earlier destination-registry guidance that used S3 as an unverified peer example for HTTP; HTTP remains gated, but S3 no longer shares that gate.
 
 ## DEX-499 — GCS Destination Unverified Registry Placement
 <!-- ticket:DEX-499 -->
-- Every newly onboarded destination definition registers as unverified: it goes inside the `ExperimentalFlags.UnverifiedDestinations` block in `cli/internal/app/dependencies.go`, requiring both `DestinationSupport` and `UnverifiedDestinations`.
+- Every newly onboarded destination definition registers as unverified: it goes inside the `ExperimentalFlags.UnverifiedDestinations` block in `cli/internal/app/dependencies.go`; destination support itself is now GA.
 - GCS is treated as an unverified destination definition on that rule, alongside Attentive Tag, Customer.io Audience, HTTP, and RS.
-- S3 remains the verified/native cloud-storage destination registered with `ExperimentalFlags.DestinationSupport` alone; do not use S3's gate as the GCS registry precedent.
-- Promotion to the verified block is a separate, deliberate step once a definition has been verified against a live stack — never part of the onboarding change itself.
+- S3 remains the verified/native cloud-storage destination registered unconditionally; do not use S3 as the GCS registry precedent.
+- Promotion to the verified block is a separate, deliberate step once a definition has been verified against a live stack - never part of the onboarding change itself.
 
 ## DEX-498 — Facebook Conversions Destination Onboarding
 <!-- ticket:DEX-498 -->
-- `facebook_conversions` is treated as an unverified destination definition for registry wiring: register it only when destination support and unverified destinations are enabled, not with verified/native S3-style destination support alone.
+- `facebook_conversions` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled, not with verified/native S3-style registration.
 - `facebook_conversions` source-type support intentionally includes every db-config source type that has a destination common mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 
 ## DEX-505 — Google Pub/Sub Destination Onboarding
 <!-- ticket:DEX-505 -->
-- `googlepubsub` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `googlepubsub` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Google Pub/Sub uses CLI type `googlepubsub` for API type `GOOGLEPUBSUB`. Three names are in play — the integrations-config directory (`googlepubsub`), the terraform registration (`google_pubsub`), and the API type (`GOOGLEPUBSUB`) — and CLI resource identity resolves to `lowercase(APIType)`, keeping every definition's `Type` consistent with its `APIType`.
 - Google Pub/Sub follows the cloud-storage-style source-type boundary used by GCS/S3: retain the CLI-owned event-stream source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) with cloud connection mode, and exclude upstream `amp`, `warehouse`, and `shopify` until ownership/mapping is explicit.
 
 ## DEX-516 — Kinesis Destination Onboarding
 <!-- ticket:DEX-516 -->
-- `kinesis` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `kinesis` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Kinesis destination identity is CLI type `kinesis`, API type `KINESIS`, and version `1`.
 - Kinesis follows the cloud-storage-style source-type boundary used by GCS/S3/Google Pub/Sub: retain the CLI-owned event-stream source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) with cloud-only connection mode.
 - Kinesis secrets are local YAML config keys `access_key_id` and `access_key`.
 ## DEX-521 — Marketo Destination Onboarding
 <!-- ticket:DEX-521 -->
-- `marketo` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `marketo` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Marketo source-type support intentionally includes every integrations-config/db-config supported source type that has a CLI local mapping: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Marketo supports cloud connection mode for all retained source types.
 - Marketo does not need destination-specific gated key paths when all mapped API keys are already present in db-config `defaultConfig`.
 ## DEX-523 — Salesforce Destination Onboarding
 <!-- ticket:DEX-523 -->
-- `salesforce` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `salesforce` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Salesforce uses CLI type `salesforce`, API type `SALESFORCE`, and destination version `1`, even though upstream integrations metadata marks the classic Salesforce destination as deprecated in favor of Salesforce V2.
 - Salesforce source-type support intentionally preserves every upstream/catalog and Terraform-supported source type that the common destination mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`, all with cloud-only connection mode.
 
@@ -155,7 +155,7 @@
 
 ## DEX-677 — Confluent Cloud Destination Onboarding
 <!-- ticket:DEX-677 -->
-- `confluent_cloud` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `confluent_cloud` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Confluent Cloud destination support is implemented as a destination definition under `cli/internal/providers/destination/definitions/confluent_cloud`, with integrations-config left read-only for onboarding changes.
 - Confluent Cloud models schema-only common consent category/purpose surfaces as destination-specific local config blocks `one_trust_cookie_categories` and `ketch_consent_purposes`, using mechanical camelCase-to-snake_case naming and direct API-key mappings so update does not erase UI-set values.
 
@@ -170,40 +170,40 @@
 - BigQuery follows the broad warehouse source-type set from integrations-config `db-config.json`, not the narrowed cloud-storage/event-stream-owned source set: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, all cloud-only.
 ## DEX-520 — S3 Datalake Destination Onboarding
 <!-- ticket:DEX-520 -->
-- `s3_datalake` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `s3_datalake` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - S3 Datalake destination identity is CLI type `s3_datalake`, API type `S3_DATALAKE`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/s3_datalake` using Go package name `s3datalake`.
 - S3 Datalake config is intentionally modeled as flat local YAML, including auth/storage/sync/table-layout flags and consent management, so it maps directly to flat API keys and preserves schema/db-config keys that would otherwise be erased by whole-config destination updates.
 - Model schema/db-config keys without Terraform mappings for S3 Datalake instead of omitting them: `skip_tracks_table`, `skip_users_table`, `time_window_layout`, `underscore_divide_numbers`, `cleanup_object_storage_files`, and `allow_users_context_traits`.
 
 ## DEX-690 — Redshift Destination Re-Onboarding
 <!-- ticket:DEX-690 -->
-- Redshift destination support is implemented as local type `rs`, API type `RS`, and destination version `1`; it remains an unverified destination registered only when both destination support and unverified destinations are enabled.
+- Redshift destination support is implemented as local type `rs`, API type `RS`, and destination version `1`; it remains an unverified destination registered only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Redshift re-onboarding should model the full current RS db-config/defaultConfig surface in `cli/internal/providers/destination/definitions/rs`, including IAM auth fields, SSH fields, flat sync fields, object-storage auth/prefix/cleanup fields, warehouse skip/prefer/json/immutable fields, and consent mapping.
 - Redshift should not rely on framework-level unknown API config preservation: destination handler conversion only emits registered definition properties, so omitted Redshift config keys can be dropped during update/import.
 ## DEX-504 — Google Sheets Destination Onboarding
 <!-- ticket:DEX-504 -->
 - Google Sheets destination support is implemented as CLI destination type `googlesheets` for API type `GOOGLESHEETS` under `cli/internal/providers/destination/definitions/googlesheets`; Terraform's `google_sheets` registration name is not used for CLI resource identity.
-- `googlesheets` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `googlesheets` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 
 ## DEX-509 — Kafka Destination Onboarding
 <!-- ticket:DEX-509 -->
-- `kafka` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `kafka` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Kafka destination registry code order follows the explicit onboarding placement after Kinesis and before Marketo inside the unverified block, while exported/supported type lists may still be sorted lexicographically by implementation.
 
 ## DEX-487 — ActiveCampaign Destination Onboarding
 <!-- ticket:DEX-487 -->
 - ActiveCampaign destination support is implemented as CLI local type `active_campaign`, API type `ACTIVE_CAMPAIGN`, and destination version `1`.
-- `active_campaign` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `active_campaign` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - ActiveCampaign local config is intentionally flat: `api_url`, `api_key`, `actid`, `event_key`, plus shared `consent_management`; `connection_mode`, `use_native_sdk`, and legacy oneTrust/Ketch include-key blocks are not ordinary definition config fields.
 
 ## DEX-492 — Braze Destination Onboarding
 <!-- ticket:DEX-492 -->
-- `braze` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `braze` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Braze destination support is implemented as a CLI destination definition under `cli/internal/providers/destination/definitions/braze`, with integrations-config left read-only for onboarding changes.
 ## DEX-494 — Customer.io Destination Onboarding
 <!-- ticket:DEX-494 -->
 - Customer.io destination support is implemented as CLI local type `customerio`, API type `CUSTOMERIO`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/customerio`.
-- `customerio` is treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `customerio` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Customer.io source-type support intentionally keeps the broad mapped upstream set rather than the S3/GCS-style storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - Customer.io local config maps `site_id`, `api_key`, `device_token_event_name`, `datacenter`, SDK/device nested source blocks, `event_filtering` whitelist/blacklist discriminator, and shared `consent_management`; `use_native_sdk` remains a source-type config block rather than an ordinary gated property.
 
@@ -211,25 +211,25 @@
 <!-- ticket:DEX-508 -->
 - Intercom destination support is implemented as the legacy CLI destination type `intercom`, API type `INTERCOM`, and destination version `1`; do not substitute `intercom_v2` / `INTERCOM_V2` for this onboarding path.
 - The `INTERCOM_V2` contract remains excluded because it has no Terraform destination registration/mapping source and represents a separate OAuth/account-management contract.
-- `intercom` should be treated as an unverified destination definition for registry wiring: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `intercom` should be treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Intercom's modeled config surface includes `app_id`, `api_key`, `api_server`, `api_version`, `send_anonymous_id`, `update_last_request_at`, source-scoped `connection_mode`, source-scoped `use_native_sdk`, Android-only `mobile_api_key_android`, iOS-only `mobile_api_key_ios`, `event_filtering`, and shared `consent_management`; `api_key` is the sole db-config secret key.
 ## DEX-497 — Facebook Pixel Destination Onboarding
 <!-- ticket:DEX-497 -->
 - Facebook Pixel destination support is implemented as CLI local type `facebook_pixel`, API type `FACEBOOK_PIXEL`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/facebook_pixel`.
-- `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `facebook_pixel` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
 - Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
 
 ## DEX-518 — Qualtrics Destination Onboarding
 <!-- ticket:DEX-518 -->
 - Qualtrics destination support is implemented as CLI local type `qualtrics`, API type `QUALTRICS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/qualtrics`.
-- `qualtrics` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `qualtrics` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Qualtrics source-type support is intentionally narrow: only `web`, `android`, and `ios` are supported, all in device-only connection mode.
 
 ## DEX-719 — GCS Connection Mode Re-Onboarding
 <!-- ticket:DEX-719 -->
 - GCS is an existing destination definition, so connection-mode re-onboarding should update the existing GCS definition/tests/fixture-snapshot pairs rather than adding duplicate destination registry imports, app flag-matrix cases, or new definitions.
-- GCS remains an unverified destination in `cli/internal/app/dependencies.go`; keep registry gating under both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations`.
+- GCS remains an unverified destination in `cli/internal/app/dependencies.go`; keep registry gating under `ExperimentalFlags.UnverifiedDestinations`.
 - Integrations-config and Terraform remain read-only source-of-truth references for this re-onboarding path; the durable CLI-owned changes belong in `cli/internal/providers/destination/definitions/gcs` and destination E2E testdata.
 ## DEX-512 — LinkedIn Ads Destination Onboarding
 <!-- ticket:DEX-512 -->
@@ -243,7 +243,7 @@
 ## DEX-490 — Amplitude Destination Onboarding
 <!-- ticket:DEX-490 -->
 - Amplitude destination support is implemented as CLI destination type `am`, API type `AM`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/am`.
-- `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- `am` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
 - Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.
 
@@ -254,7 +254,7 @@
 
 ## DEX-732 — Destination Support General Availability Wiring
 <!-- ticket:DEX-732 -->
-- Destination support is now a default project/provider capability rather than an experimental feature: `cli/internal/config/experimental.go` should not define `DestinationSupport` / `destinationSupport`.
-- Dependency assembly in `cli/internal/app/dependencies.go` should always construct the destination provider and include it in the composite provider map, without a `DestinationSupport` guard.
+- Destination support is now a default project/provider capability rather than an experimental feature: `cli/internal/config/experimental.go` should not define a destination-support experimental flag.
+- Dependency assembly in `cli/internal/app/dependencies.go` should always construct the destination provider and include it in the composite provider map, without a removed-flag guard.
 - `newDestinationRegistry` should always register verified/native S3; `ExperimentalFlags.UnverifiedDestinations` remains the gate for unverified destination definitions.
-- This supersedes earlier destination-registry guidance that required both `DestinationSupport` and `UnverifiedDestinations` for unverified definitions: only `UnverifiedDestinations` remains as the experimental gate after destination support GA.
+- This supersedes earlier destination-registry guidance that required two destination gates for unverified definitions: only `UnverifiedDestinations` remains as the experimental gate after destination support GA.

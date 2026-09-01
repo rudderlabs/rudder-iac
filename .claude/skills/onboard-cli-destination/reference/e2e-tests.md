@@ -156,7 +156,7 @@ Prerequisites:
 
 - a valid RudderStack CLI config or `RUDDERSTACK_ACCESS_TOKEN` for the target
   stack;
-- destination support enabled for the stack;
+- destination APIs available for the stack;
 - unverified destinations enabled when any fixture uses an unverified type;
 - var substitution enabled (the test sets the CLI env flag for the process).
 
