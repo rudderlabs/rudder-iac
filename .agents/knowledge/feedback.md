@@ -29,3 +29,4 @@
 - For experimental-flag promotion PRs, keep the diff scoped to removing the flag gate and exact stale references; do not bundle unrelated E2E fixture/snapshot reductions or new migration rewrites into the same PR.
 - Preserve existing coverage during flag promotion unless the ticket explicitly asks to change it, because unrelated migration/E2E changes make the promotion harder to review and can reduce coverage.
 - Hidden `rudder-cli migrate` rewrites project files in place; when validating with variable substitution enabled, the migrated write path must preserve placeholder tokens and must not write resolved `RUDDER_*` or `--var-file` secret values back to disk.
+- Do not solve migrate placeholder preservation by reintroducing `migrator.WithWritePostprocessor` or a text-restoration pass; validate with substitution if needed, then write from original parsed specs so resolved secret values never enter formatted output.
