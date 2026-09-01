@@ -23,3 +23,9 @@
 - Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available with `ExperimentalFlags.DestinationSupport` alone.
 - Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
+
+## DEX-734 — Experimental Flag Promotion Review Scope
+<!-- ticket:DEX-734 -->
+- For experimental-flag promotion PRs, keep the diff scoped to removing the flag gate and exact stale references; do not bundle unrelated E2E fixture/snapshot reductions or new migration rewrites into the same PR.
+- Preserve existing coverage during flag promotion unless the ticket explicitly asks to change it, because unrelated migration/E2E changes make the promotion harder to review and can reduce coverage.
+- Hidden `rudder-cli migrate` rewrites project files in place; when validating with variable substitution enabled, the migrated write path must preserve placeholder tokens and must not write resolved `RUDDER_*` or `--var-file` secret values back to disk.

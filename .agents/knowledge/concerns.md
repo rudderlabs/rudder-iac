@@ -47,3 +47,8 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## DEX-734 — Variable Substitution Migration Secret Preservation
+<!-- ticket:DEX-734 -->
+- Hidden `rudder-cli migrate` rewrites project files in place, so validating specs with GA variable substitution creates a secret-leak risk if the write path serializes resolved values instead of the original placeholder tokens.
+- Durable mitigation: migration write logic must operate on original parsed specs or otherwise preserve `{{ .VAR }}` / `RUDDER_*` placeholders, never resolved secret values, when modifying files in place.
