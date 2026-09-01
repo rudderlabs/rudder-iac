@@ -7,7 +7,7 @@ match_behavior:
   # requires to connect in the connection_mode it declares for it (V-C5 —
   # skipped where no mode is declared, since which fields are required
   # depends on it) and, in connection_mode or use_native_sdk, an
-  # entry for that type (V-C6 — skipped where the config surface has neither
+  # entry for that type (V-C8 — skipped where the config surface has neither
   # block, or cannot name that source type in one), and a destination cannot
   # receive from both
   # event stream and rETL sources (V-E1 — cannot fire today: the edge scan

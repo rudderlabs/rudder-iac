@@ -20,7 +20,7 @@ import (
 // source–destination pair is connected only once (V-C3), the destination
 // definition supports the source's mapped type (V-C4), its config carries the
 // fields that type requires to connect (V-C5) and settings for that type
-// (V-C6), and the destination is not shared with a rETL source (V-E1).
+// (V-C8), and the destination is not shared with a rETL source (V-E1).
 func NewConnectionSemanticValidRule(registry *definitions.Registry) rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/connection/semantic-valid",
@@ -229,7 +229,7 @@ func validateDestinationHasOnlyEventStreamSources(edges []connectionEdge, index 
 // validateSourceTypeCompatibility checks V-C4 — the destination definition's
 // supported source types must include the source's mapped type. Once the type
 // is supported it also runs the two config checks that depend on it: V-C5, the
-// fields the definition requires for that type to connect, and V-C6, the
+// fields the definition requires for that type to connect, and V-C8, the
 // settings the destination declares for it.
 func validateSourceTypeCompatibility(
 	registry *definitions.Registry,
@@ -288,7 +288,7 @@ func validateSourceTypeCompatibility(
 	return append(results, validateSourceTypeSettings(registered, index, endpoints, token, destinationData.Config)...)
 }
 
-// validateSourceTypeSettings (V-C6): a destination declares its per-source
+// validateSourceTypeSettings (V-C8): a destination declares its per-source
 // settings in blocks keyed by source type — connection_mode and
 // use_native_sdk — so connecting a source needs an entry for its type in at
 // least one of them.
@@ -384,16 +384,16 @@ func missingRequiredConfigKeys(
 // supports, not the one a connection runs in, so inferring from a source type
 // that offers exactly one would tie this check's coverage to definition
 // metadata — a destination gaining a mode would switch it off silently.
+//
+// No guard on an undeclared mode: it reads as "", which no definition can list
+// as a mode, so the lookup misses and this source type requires nothing.
 func connectTimeRequiredKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
 	config map[string]any,
 ) []string {
 	block, _ := config["connection_mode"].(map[string]any)
-	mode, declared := block[sourceType].(string)
-	if !declared || mode == "" {
-		return nil
-	}
+	mode, _ := block[sourceType].(string)
 	return registered.ConnectionRequiredKeys(sourceType, mode)
 }
 
