@@ -2,12 +2,13 @@ package migrator
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -21,20 +22,35 @@ type Project interface {
 	Specs() map[string]*specs.Spec
 }
 
+type WritePostprocessor func(path string, data []byte) ([]byte, error)
+
+type Option func(*Migrator)
+
+func WithWritePostprocessor(p WritePostprocessor) Option {
+	return func(m *Migrator) {
+		m.writePostprocessor = p
+	}
+}
+
 // Migrator handles the migration of project specs from rudder/0.1 to rudder/1
 type Migrator struct {
-	project          Project
-	provider         provider.Provider
-	commonMigrations CommonMigrations
+	project            Project
+	provider           provider.Provider
+	commonMigrations   CommonMigrations
+	writePostprocessor WritePostprocessor
 }
 
 // New creates a new Migrator instance with common migrations
-func New(proj Project, p provider.Provider) *Migrator {
-	return &Migrator{
+func New(proj Project, p provider.Provider, opts ...Option) *Migrator {
+	m := &Migrator{
 		project:          proj,
 		provider:         p,
 		commonMigrations: GetCommonMigrations(),
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
 }
 
 // DisplayFilesToMigrate shows the list of files that will be migrated in a table
@@ -114,11 +130,19 @@ func (m *Migrator) WriteSpecs(migratedSpecs map[string]*specs.Spec) error {
 	formatters := formatter.Setup(&formatter.YAMLFormatter{})
 	for path, migratedSpec := range migratedSpecs {
 		migratorLog.Info("writing migrated file", "path", path)
-		entity := writer.FormattableEntity{
-			Content:      migratedSpec,
-			RelativePath: path,
+		formatted, err := formatters.Format(migratedSpec, filepath.Ext(path))
+		if err != nil {
+			return fmt.Errorf("formatting %s: %w", path, err)
 		}
-		if err := writer.OverwriteFile(formatters, entity); err != nil {
+
+		if m.writePostprocessor != nil {
+			formatted, err = m.writePostprocessor(path, formatted)
+			if err != nil {
+				return fmt.Errorf("postprocessing file %s: %w", path, err)
+			}
+		}
+
+		if err := os.WriteFile(path, formatted, 0644); err != nil {
 			return fmt.Errorf("writing file %s: %w", path, err)
 		}
 	}
