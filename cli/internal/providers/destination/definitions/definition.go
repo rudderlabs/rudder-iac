@@ -118,6 +118,22 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 	return append([]string(nil), sourceTypeConfigKeys...)
 }
 
+// AcceptsSourceTypeEntry reports whether the config model would accept an entry
+// for sourceType under the source-type-scoped block key. The two blocks are
+// shaped differently: connection_mode is an open map, so every source type
+// fits, while use_native_sdk is a struct naming one field per source type, so
+// only those do.
+func (d *RegisteredDefinition) AcceptsSourceTypeEntry(key, sourceType string) bool {
+	field, ok := structFieldsByMapstructureTag(d.configType)[key]
+	if !ok {
+		return false
+	}
+	if derefType(field.Type).Kind() == reflect.Map {
+		return true
+	}
+	return configStructHasKeyPath(d.configType, key+"."+sourceType)
+}
+
 // GatedKeyPaths returns local config keypaths (JSON pointer, e.g.
 // "/event_upload_period_millis") mapped to the source types entitled to use
 // them. Keypaths absent from the map are default keys, allowed for every
