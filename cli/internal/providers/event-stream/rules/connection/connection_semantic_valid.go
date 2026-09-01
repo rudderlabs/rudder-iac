@@ -352,8 +352,8 @@ func validateSourceTypeSettings(
 
 // missingRequiredConfigKeys returns the definition-required config keys for
 // the given source type that the destination's config does not carry. Required
-// keys depend on the connection mode as well as the source type, so a mode
-// that cannot be resolved yields no keys to check.
+// keys depend on the connection mode as well as the source type, so a source
+// type the spec declares no mode for yields no keys to check.
 func missingRequiredConfigKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -381,42 +381,28 @@ func missingRequiredConfigKeys(
 }
 
 // connectTimeRequiredKeys returns the config keys the definition requires for a
-// source of this type to connect, in the mode it connects in. Both config
-// checks read it: V-C5 to report the ones missing, V-C6 to defer to V-C5 on a
-// settings block V-C5 already covers. An unresolvable mode yields no keys.
+// source of this type to connect, in the mode the destination spec declares for
+// it. Both config checks read it: V-C5 to report the ones missing, V-C6 to
+// defer to V-C5 on a settings block V-C5 already covers.
+//
+// The spec is the only place that says which mode a connection uses: the
+// definition's ConnectionModes lists the modes a destination supports, not the
+// one a given connection runs in, so a source type offering exactly one mode is
+// still not a declaration. Inferring from it would tie this check's coverage to
+// definition metadata, where a destination gaining a mode would switch the
+// check off for that source type with nothing in the diff to say so. Without a
+// declaration there is nothing to require here; V-C6 reports its absence.
 func connectTimeRequiredKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
 	config map[string]any,
 ) []string {
-	mode, ok := connectionModeForSource(registered, sourceType, config)
-	if !ok {
+	block, _ := config["connection_mode"].(map[string]any)
+	mode, declared := block[sourceType].(string)
+	if !declared || mode == "" {
 		return nil
 	}
 	return registered.SupportedSourcesValidation(sourceType, mode)
-}
-
-// connectionModeForSource resolves the mode a source of this type connects in.
-// The destination spec declares it under connection_mode; when it does not, a
-// source type the definition offers a single mode for still resolves, since no
-// other mode could apply. Anything else is unresolvable — reporting the absent
-// declaration belongs to the source-type settings check, so this reports no
-// mode rather than guessing one.
-func connectionModeForSource(
-	registered *definitions.RegisteredDefinition,
-	sourceType string,
-	config map[string]any,
-) (string, bool) {
-	block, _ := config["connection_mode"].(map[string]any)
-	if mode, declared := block[sourceType].(string); declared && mode != "" {
-		return mode, true
-	}
-
-	modes, err := registered.ConnectionModes(sourceType)
-	if err != nil || len(modes) != 1 {
-		return "", false
-	}
-	return modes[0], true
 }
 
 // connectionEdge is one project connection reduced to its endpoint URNs.

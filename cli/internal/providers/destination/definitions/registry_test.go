@@ -88,7 +88,7 @@ func TestRegistryRejectsSupportedSourcesValidationWithoutSourceType(t *testing.T
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"ios": {"cloud": {"use_native_sdk"}}}
+	def.SupportedSourcesValidation = map[string]map[string][]string{"ios": {"cloud": {"webhook_url"}}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
@@ -345,9 +345,9 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	assert.Equal(t, []string{"cloud", "device", "hybrid"}, modes)
 
 	requiredKeys := registered.SupportedSourcesValidation("web", "cloud")
-	assert.Equal(t, []string{"use_native_sdk"}, requiredKeys)
+	assert.Equal(t, []string{"api_secret"}, requiredKeys)
 	requiredKeys[0] = "mutated"
-	assert.Equal(t, []string{"use_native_sdk"}, registered.SupportedSourcesValidation("web", "cloud"))
+	assert.Equal(t, []string{"api_secret"}, registered.SupportedSourcesValidation("web", "cloud"))
 	assert.Nil(t, registered.SupportedSourcesValidation("web", "device"), "a supported mode without an entry has no required keys")
 	assert.Nil(t, registered.SupportedSourcesValidation("android", "cloud"))
 
