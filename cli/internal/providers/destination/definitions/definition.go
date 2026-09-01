@@ -108,10 +108,11 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 }
 
 // SupportedSourcesValidation returns the local config keys that must be
-// present for the given source type to connect in the given connection mode.
-// A nil result means the pair has no connect-time required keys.
-func (d *RegisteredDefinition) SupportedSourcesValidation(sourceType, connectionMode string) []string {
-	fields, ok := d.DestinationDefinition.SupportedSourcesValidation[sourceType][connectionMode]
+// present for the given source type to connect in the given mode — one mode
+// value, not the connection_mode block that carries it. A nil result means the
+// pair has no connect-time required keys.
+func (d *RegisteredDefinition) SupportedSourcesValidation(sourceType, mode string) []string {
+	fields, ok := d.DestinationDefinition.SupportedSourcesValidation[sourceType][mode]
 	if !ok {
 		return nil
 	}
