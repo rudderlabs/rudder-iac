@@ -72,3 +72,5 @@
 - Durable mitigation: run provider migrations on the substituted/validated project so references convert to `#property:`, `#event:`, `#category:`, and `#custom-type:` forms, then restore only substitution placeholder scalar values in formatted output.
 - A full from-scratch live apply of the migrated project fixture is too heavy for the shared E2E workspace after variable substitution GA; it can leave catalog resources partially missing or orphaned and cause later destroy failures on custom type dependencies.
 - Durable mitigation: keep the stable migration assertion to applying the original project, migrating a copy, and dry-running the migrated update directory expecting no diff, rather than running a second destructive apply of the migrated copy.
+- Live project-apply upstream snapshot checks can read stale catalog state immediately after destroy/create in a shared CI workspace, such as seeing the create/update union instead of the create-only snapshot while a later update checkpoint passes after settling.
+- Durable mitigation: retry catalog-backed upstream snapshot verification briefly for eventual consistency before failing on the first read.
