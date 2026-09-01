@@ -250,5 +250,6 @@
 ## DEX-734 — Variable Substitution GA Wiring
 <!-- ticket:DEX-734 -->
 - Variable substitution is a default project capability rather than an experimental feature: `ExperimentalConfig.EnableVarSubstitution` should not exist, and `app.NewProjectOptions(varFiles)` should always build the substitutor for `--var-file` / `RUDDER_*` substitution.
+- `app.NewProjectOptions` should not keep an unused experimental-config compatibility parameter for variable substitution; apply, validate, migrate, and `cli/pkg/exp/project` call sites should pass only var files or nil.
 - Import scaffolding should always generate `secrets.vars.yaml` when exported specs contain `{{ .VAR }}` references; variable-file creation is no longer gated by experimental config.
 - `secret.WithVariableName` should always marshal variable references for secrets, so generated/imported YAML can rely on variable placeholders without requiring `RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION`.

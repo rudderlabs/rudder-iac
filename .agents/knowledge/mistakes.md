@@ -61,3 +61,8 @@
 <!-- ticket:DEX-490 -->
 - CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
 - Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
+
+## DEX-734 — GA Destination Fixture Account Foreign Key
+<!-- ticket:DEX-734 -->
+- CI live destination E2E failed when GA destination fixtures set `rudder_delete_account_id` to dummy external ID `rudderCliE2eDeleteAccount`; the API treats `rudderDeleteAccountId` as a foreign key to an account that must already exist in the target workspace.
+- Durable mitigation: keep optional GA `rudder_delete_account_id` out of live destination fixtures unless the test provisions or references a real account in that workspace.
