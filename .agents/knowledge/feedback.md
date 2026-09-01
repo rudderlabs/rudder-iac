@@ -33,3 +33,7 @@
 <!-- ticket:DEX-732 -->
 - When promoting or deleting an experimental flag, search and update hidden active contributor docs/runbooks as well as code and workflows; stale `.claude/skills/...` or `.agents/knowledge/...` guidance can keep instructing contributors to use removed config fields or env vars.
 - Keep experimental-flag promotion PRs narrowly scoped: do not bundle opportunistic E2E fixture or snapshot remediation, and split invalid live API fixture fixes such as provisioning real upstream IDs into separate tickets/PRs.
+
+## DEX-733 — Experimental Flag Promotion Cleanup
+<!-- ticket:DEX-733 -->
+- When promoting or deleting an experimental flag, update durable repo guidance that references the removed flag or environment variable so future work does not follow inert configuration advice.
