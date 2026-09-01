@@ -250,7 +250,10 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: sliceSecretOnly})
 			}
 		default:
-			if v1 != v2 {
+			// DeepEqual, not !=: member-wise slice comparison routes arbitrary
+			// values here, and == panics on uncomparable dynamic types (a typed
+			// slice, a map, a struct holding either) — even when they are equal.
+			if !reflect.DeepEqual(v1, v2) {
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 		}
@@ -304,10 +307,10 @@ func compareSlices(v1, v2 []any) (changed, secretOnly bool) {
 	return changed, changed && secretOnly
 }
 
-func toAnySlice(maps []map[string]any) []any {
-	out := make([]any, len(maps))
-	for i, m := range maps {
-		out[i] = m
+func toAnySlice(entries []map[string]any) []any {
+	out := make([]any, len(entries))
+	for i, entry := range entries {
+		out[i] = entry
 	}
 	return out
 }

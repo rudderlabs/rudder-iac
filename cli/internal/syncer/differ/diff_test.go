@@ -463,3 +463,73 @@ func TestComputeDiff_Secret(t *testing.T) {
 }
 
 func ptr(s secret.String) *secret.String { return &s }
+
+// Member-wise slice comparison routes arbitrary values through CompareData's
+// default branch, so that branch must tolerate every shape a resource can hold
+// — including types Go's == refuses to compare. The whole-slice reflect.DeepEqual
+// this replaced was shape-agnostic; these pin that the replacement still is.
+func TestCompareData_UncomparableValues(t *testing.T) {
+	shapes := map[string]struct{ equal, differing any }{
+		"typed slice":     {[]string{"a"}, []string{"b"}},
+		"typed map":       {map[string]string{"a": "1"}, map[string]string{"a": "2"}},
+		"struct w/ slice": {struct{ Tags []string }{[]string{"a"}}, struct{ Tags []string }{[]string{"b"}}},
+	}
+
+	for name, shape := range shapes {
+		t.Run(name+" — equal members do not diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"items": []any{shape.equal}},
+				resources.ResourceData{"items": []any{shape.equal}},
+			)
+			assert.Empty(t, diffs)
+		})
+
+		t.Run(name+" — differing members diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"items": []any{shape.equal}},
+				resources.ResourceData{"items": []any{shape.differing}},
+			)
+			assert.Contains(t, diffs, "items")
+		})
+
+		t.Run(name+" — equal at top level does not diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"item": shape.equal},
+				resources.ResourceData{"item": shape.equal},
+			)
+			assert.Empty(t, diffs)
+		})
+	}
+}
+
+// Member-wise comparison normalises each member the way the top level always
+// has, which settles two shapes the old whole-slice DeepEqual called drift.
+// Neither is a real config change, so neither should diff.
+func TestCompareData_SliceNormalisation(t *testing.T) {
+	t.Run("nil and empty []map[string]any are the same slice", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []map[string]any(nil)},
+			resources.ResourceData{"items": []map[string]any{}},
+		)
+		assert.Empty(t, diffs, "an absent list and an empty list are not drift")
+	})
+
+	t.Run("member container type alone is not a difference", func(t *testing.T) {
+		// The two decode paths flagged at datacatalog/state/trackingplan.go:672:
+		// state load yields []any-of-maps where catalog registration yields
+		// []map[string]any. Equal content, different container type.
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"events": []any{[]map[string]any{{"a": 1}}}},
+			resources.ResourceData{"events": []any{[]any{map[string]any{"a": 1}}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("member content differences still diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"events": []any{[]map[string]any{{"a": 1}}}},
+			resources.ResourceData{"events": []any{[]any{map[string]any{"a": 2}}}},
+		)
+		assert.Contains(t, diffs, "events")
+	})
+}
