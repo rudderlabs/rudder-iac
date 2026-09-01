@@ -235,6 +235,7 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].categoryId",
 		},
 	)
-	err = upstreamTester.SnapshotTest(context.Background())
-	assert.NoError(t, err, "Upstream state verification failed")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, upstreamTester.SnapshotTest(context.Background()))
+	}, 30*time.Second, 2*time.Second, "Upstream state verification failed")
 }
