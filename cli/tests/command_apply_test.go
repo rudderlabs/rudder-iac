@@ -26,15 +26,13 @@ func TestProjectApply(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
 
 	// The api_tracking event keeps its name and description as {{ .VAR }}
-	// placeholders resolved at apply time. The feature is gated, so both
-	// experimental switches must be on for substitution to run at all.
+	// placeholders resolved at apply time.
 	//   - API_TRACKING_DESCRIPTION comes from the var file only (no env var set).
 	//   - API_TRACKING_NAME is in both the var file and the env var below; the env
 	//     var wins, resolving to "API Tracking" (the var file value is ignored).
 	// Both resolve to the values already in the snapshots, so a precedence
 	// regression — env losing to the file — would fail the snapshot comparison.
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 
 	executor, err := NewCmdExecutor("")
@@ -123,8 +121,8 @@ func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir strin
 		out, err := exec.Command("cp", "-r", src, dst).CombinedOutput()
 		require.NoError(t, err, "Failed to copy %s to %s: %s", src, dst, string(out))
 
-		// migrate now substitutes {{ .VAR }} placeholders too (experimental flag is
-		// on for this test), so it needs the var file to resolve the file-only variable.
+		// migrate accepts the shared --var-file flag but writes the original
+		// placeholders back out so the follow-up apply dry-run can resolve them.
 		output, err := executor.Execute(cliBinPath, "migrate", "-l", dst, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Migration failed for %s: %s", dir, string(output))
 	}

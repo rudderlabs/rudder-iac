@@ -8,22 +8,11 @@ or a variable file.
 This keeps a single set of specs reusable across `dev`, `staging`, and `prod`, and keeps
 secrets out of version control.
 
-> **Status: experimental.** This feature is behind an experimental flag and is **off by
-> default**. When it is off, `{{ ... }}` in your specs is left untouched and `--var-file`
-> is ignored — behaviour is identical to before. See [Enabling the feature](#enabling-the-feature).
-
 ---
 
 ## Quick start
 
-1. **Enable the feature** (one-time setup):
-
-   ```bash
-   export RUDDERSTACK_CLI_EXPERIMENTAL=true
-   export RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION=true
-   ```
-
-2. **Add placeholders to your spec** (`specs/destination.yaml`):
+1. **Add placeholders to your spec** (`specs/destination.yaml`):
 
    ```yaml
    version: rudder/v0.1
@@ -38,7 +27,7 @@ secrets out of version control.
        password: "{{ .DB_PASSWORD }}"       # quote secrets and strings
    ```
 
-3. **Create a variable file** (`staging.vars.yaml`):
+2. **Create a variable file** (`staging.vars.yaml`):
 
    ```yaml
    DB_HOST: db.staging.example.com
@@ -46,7 +35,7 @@ secrets out of version control.
    DB_PASSWORD: super-secret-value
    ```
 
-4. **Apply with the variable file:**
+3. **Apply with the variable file:**
 
    ```bash
    rudder-cli apply --location ./specs --var-file staging.vars.yaml
@@ -54,45 +43,6 @@ secrets out of version control.
 
 That's it. The CLI replaces each `{{ .VAR }}` with its resolved value *before* the YAML is
 parsed, so the rest of the apply cycle sees fully-resolved specs.
-
----
-
-## Enabling the feature
-
-Variable substitution is an [experimental flag](../../../docs/experimental-flags.md) named
-`enableVarSubstitution`. Two things must be true for it to take effect: experimental mode must
-be on **and** the flag must be enabled.
-
-Pick whichever method fits your workflow.
-
-### Option A — Environment variables (great for CI)
-
-```bash
-export RUDDERSTACK_CLI_EXPERIMENTAL=true            # turn on experimental mode
-export RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION=true   # turn on this feature
-```
-
-### Option B — Config file (persistent, `~/.rudder/config.json`)
-
-```json
-{
-  "experimental": true,
-  "flags": {
-    "enableVarSubstitution": true
-  }
-}
-```
-
-The top-level `"experimental": true` is required — without it, all experimental flags are
-ignored.
-
-### Option C — CLI command
-
-Once experimental mode is on (Option A or B sets `experimental`), you can toggle the flag with:
-
-```bash
-rudder-cli experimental enable enableVarSubstitution
-```
 
 ---
 
@@ -219,10 +169,11 @@ The `--var-file` flag and substitution apply to:
 
 - `rudder-cli apply`
 - `rudder-cli validate`
+- `rudder-cli migrate`
 
-They are **not** available on `destroy`, `migrate`, or `import` (those commands either do not
-load local specs or are out of scope for this feature). Even without `--var-file`, `RUDDER_*`
-environment variables are always picked up by `apply` and `validate` when the feature is enabled.
+They are **not** available on `destroy` or `import` (those commands either do not load local specs
+or do not accept local var files). Even without `--var-file`, `RUDDER_*` environment variables are
+always picked up by commands that load project specs.
 
 ---
 
@@ -357,10 +308,10 @@ comment.
 Relative to the directory you run the command in (your current working directory). Absolute
 paths also work.
 
-**Q: I enabled the flag but nothing happens.**
-Make sure **both** the top-level experimental mode and the flag are on. With env vars that's
-`RUDDERSTACK_CLI_EXPERIMENTAL=true` **and** `RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION=true`. With
-the config file, `"experimental": true` **and** `"flags": { "enableVarSubstitution": true }`.
+**Q: My placeholder was not substituted.**
+Make sure it uses the dot-prefixed form (`{{ .DB_HOST }}`), the variable is defined without the
+`RUDDER_` prefix in var files, environment variables use the `RUDDER_` prefix, and any `--var-file`
+path points to a file ending in `.vars.yaml` or `.vars.yml`.
 
 **Q: An environment variable I set isn't being picked up.**
 It must be prefixed with `RUDDER_`. For `{{ .DB_HOST }}`, export `RUDDER_DB_HOST`. The prefix

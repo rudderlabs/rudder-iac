@@ -34,9 +34,8 @@ func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 	}
 
 	// Wire the same capabilities (e.g. variable substitution) that apply/validate
-	// use, gated by their experimental flags. With the flags off this is a no-op,
-	// so behaviour is unchanged for projects that don't use those features.
-	projectOpts, err := app.NewProjectOptions(config.GetConfig(), nil)
+	// use so programmatic project loading behaves like the CLI.
+	projectOpts, err := app.NewProjectOptions(nil)
 	if err != nil {
 		return nil, err
 	}

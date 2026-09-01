@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -189,22 +188,10 @@ func TestDiff(t *testing.T) {
 	}
 }
 
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
-}
-
 // With a variable name attached, the marshals emit the reference — that is the
 // whole point: the token must survive into exported YAML where a plain secret
 // would have been redacted into a useless literal.
 func TestWithVariableName_MarshalsVariableReference(t *testing.T) {
-	enableVarSubstitution(t)
 
 	s := NewUnknown(WithVariableName("BOOK_THE_HOBBIT_ACCESS_KEY"))
 
@@ -221,7 +208,6 @@ func TestWithVariableName_MarshalsVariableReference(t *testing.T) {
 // marshals and every formatting surface keeps masking — the real value must
 // never escape.
 func TestWithVariableName_NeverLeaksValue(t *testing.T) {
-	enableVarSubstitution(t)
 
 	s := New("hunter2-but-long", WithVariableName("ACCESS_KEY"))
 
@@ -233,21 +219,9 @@ func TestWithVariableName_NeverLeaksValue(t *testing.T) {
 	assert.Equal(t, "****long", s.String())
 }
 
-// With the gate off the option is a no-op, so the secret serializes as a
-// masked literal — the pre-scaffolding behaviour.
-func TestWithVariableName_GateOff(t *testing.T) {
-	s := NewUnknown(WithVariableName("ACCESS_KEY"))
-	assert.Equal(t, NewUnknown(), s)
-
-	jsonBytes, err := json.Marshal(s)
-	require.NoError(t, err)
-	assert.Equal(t, `"(unknown)"`, string(jsonBytes))
-}
-
 // Loading a spec value over a named secret produces a plain known secret; the
 // variable name only ever exists on the export path.
 func TestWithVariableName_UnmarshalResetsName(t *testing.T) {
-	enableVarSubstitution(t)
 
 	s := NewUnknown(WithVariableName("ACCESS_KEY"))
 	require.NoError(t, yaml.Unmarshal([]byte(`"real-value"`), &s))
@@ -260,7 +234,6 @@ func TestWithVariableName_UnmarshalResetsName(t *testing.T) {
 
 // The name is stored verbatim — validation happens at marshal time.
 func TestWithVariableName_UsedVerbatim(t *testing.T) {
-	enableVarSubstitution(t)
 
 	assert.Equal(t,
 		String{varName: "Book_Access_Key_2"},
@@ -272,7 +245,6 @@ func TestWithVariableName_UsedVerbatim(t *testing.T) {
 // bad name (derived from user-controlled external IDs) errors when the export
 // spec is generated — not two steps later when apply rejects the token.
 func TestWithVariableName_InvalidNameFailsMarshal(t *testing.T) {
-	enableVarSubstitution(t)
 
 	s := NewUnknown(WithVariableName("9-starts-with-digit"))
 

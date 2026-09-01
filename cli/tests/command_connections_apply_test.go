@@ -51,7 +51,6 @@ func TestConnectionsApply(t *testing.T) {
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

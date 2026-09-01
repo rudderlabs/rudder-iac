@@ -246,3 +246,9 @@
 - `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
 - Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.
+
+## DEX-734 — Variable Substitution GA Wiring
+<!-- ticket:DEX-734 -->
+- Variable substitution is a default project capability rather than an experimental feature: `ExperimentalConfig.EnableVarSubstitution` should not exist, and `app.NewProjectOptions(varFiles)` should always build the substitutor for `--var-file` / `RUDDER_*` substitution.
+- Import scaffolding should always generate `secrets.vars.yaml` when exported specs contain `{{ .VAR }}` references; variable-file creation is no longer gated by experimental config.
+- `secret.WithVariableName` should always marshal variable references for secrets, so generated/imported YAML can rely on variable placeholders without requiring `RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION`.

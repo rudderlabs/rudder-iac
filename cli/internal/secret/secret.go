@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"reflect"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"gopkg.in/yaml.v3"
 )
@@ -58,15 +57,11 @@ type Option func(*String)
 // bad name errors when the spec is generated rather than when apply later
 // rejects the malformed token.
 //
-// Scaffolding only works under the enableVarSubstitution experimental gate —
-// without substitution the reference could never be resolved on apply — so
-// with the gate off this option is a no-op and the secret exports as a masked
-// literal, the pre-scaffolding behaviour.
+// WithVariableName always attaches the name; substitution is available for all
+// project loads, and marshal-time validation fails fast if the name cannot form
+// a valid `{{ .VAR }}` reference.
 func WithVariableName(name string) Option {
 	return func(s *String) {
-		if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
-			return
-		}
 		s.varName = name
 	}
 }

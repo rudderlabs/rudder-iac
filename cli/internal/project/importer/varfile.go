@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -30,14 +29,9 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 `
 
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
-// variable referenced by the generated entities. Only active under the
-// enableVarSubstitution experimental gate — without substitution the
-// references could never be resolved on apply.
+// variable referenced by the generated entities. Import scaffolding always
+// writes secrets.vars.yaml when generated specs contain variable references.
 func scaffoldSecretsVarFile(ctx context.Context, baseDir string, entities []writer.FormattableEntity) (string, error) {
-	if !config.GetConfig().ExperimentalFlags.EnableVarSubstitution {
-		return "", nil
-	}
-
 	names := collectVariableNames(entities)
 	if len(names) == 0 {
 		return "", nil
