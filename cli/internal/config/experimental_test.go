@@ -105,6 +105,13 @@ func TestIsValidExperimentalFlag_RemovedDestinationFlag(t *testing.T) {
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
+func TestIsValidExperimentalFlag_ConnectionSupportRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "connection" + "Support"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestGetAvailableExperimentalFlags(t *testing.T) {
 	t.Parallel()
 

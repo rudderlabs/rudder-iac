@@ -261,6 +261,6 @@
 
 ## DEX-733 — Event Stream Connections GA Registry Safety
 <!-- ticket:DEX-733 -->
-- Event-stream connections are first-class provider capability after `connectionSupport` GA: connection kind/handler/rules should be registered by default rather than through an event-stream provider option.
+- Event-stream connections are first-class provider capability after DEX-733: connection kind/handler/rules should be registered by default rather than through an event-stream provider option.
 - `eventstream.New` should create a default empty destination definitions registry so unconditional connection semantic rules can call registry lookups safely even when tests or direct callers do not pass `WithDestinationRegistry`.
 - App dependency wiring still passes the real destination registry when destination support is configured; the provider-level empty registry is only the safe default that preserves no-definition behavior without a nil panic.
