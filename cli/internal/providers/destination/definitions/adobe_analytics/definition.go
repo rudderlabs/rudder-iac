@@ -23,6 +23,19 @@ func init() {
 		`\.ngrok\.io`,
 		"must be at most 100 characters and must not contain .ngrok.io",
 	)
+
+	// Same constraint, for the URL fields schema.json declares without the
+	// `{{ … || … }}` branch. `pattern=` alone does not keep dynamic values out:
+	// it only asks whether the value matches, and any single-line string under
+	// 100 characters does — so a template or an env. reference passes as an
+	// ordinary literal and reaches the backend unsubstituted. Rejecting the two
+	// prefixes is what actually holds these fields to a literal value.
+	funcs.NewPatternWithReject(
+		"adobe_analytics_url_static",
+		`^(.{0,100})$`,
+		`\.ngrok\.io|^\{\{|^env\.`,
+		"must be a literal value of at most 100 characters and must not contain .ngrok.io",
+	)
 }
 
 // Source types from integrations-config destinations/adobe_analytics/db-config.json
@@ -87,9 +100,9 @@ type adobeAnalyticsConfig struct {
 	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,dynamic_or_pattern=adobe_analytics_url"`
 	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,dynamic_or_pattern=single_line_300"`
 	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat" default:"true"`
-	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url"`
+	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
+	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
+	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
 	EventsToTypes                 []eventToTypeEntry       `mapstructure:"events_to_types" validate:"omitempty,dive"`
 	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,pattern=single_line_100"`
 	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id" default:"true"`

@@ -291,6 +291,56 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "ngrok")
 	})
 
+	// schema.json declares the {{ … || … }} branch only on tracking_server_url
+	// and tracking_server_secure_url, so the remaining URL fields must hold a
+	// literal. The shared length pattern alone would accept a template as an
+	// ordinary string, which is what adobe_analytics_url_static guards.
+	t.Run("static url fields reject dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, field := range []string{"heartbeat_tracking_server_url", "proxy_normal_url", "proxy_heartbeat_url"} {
+			for _, value := range []string{
+				`{{ .PROXY_URL || http://proxy.example.com }}`,
+				"{{ .PROXY_URL }}",
+				"env.PROXY_URL",
+			} {
+				config := map[string]any{"report_suite_ids": "rsid1", field: value}
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors, "%s=%s", field, value)
+				assert.Equal(t, "/"+field, errors[0].Path, value)
+			}
+		}
+	})
+
+	t.Run("static url fields accept literals and still reject ngrok", func(t *testing.T) {
+		t.Parallel()
+		for _, field := range []string{"heartbeat_tracking_server_url", "proxy_normal_url", "proxy_heartbeat_url"} {
+			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field:              "cdn.example.com/aa.js",
+			}), field)
+
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field:              "https://example.ngrok.io",
+			})
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "ngrok")
+		}
+	})
+
+	// The two fields schema.json does declare the branch for keep accepting it.
+	t.Run("tracking server urls still accept templates", func(t *testing.T) {
+		t.Parallel()
+		for _, field := range []string{"tracking_server_url", "tracking_server_secure_url"} {
+			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field:              `{{ .TRACKING_URL || adobe.example.com }}`,
+			}), field)
+		}
+	})
+
 	t.Run("tracking_server_url too long rejected", func(t *testing.T) {
 		t.Parallel()
 		long := make([]byte, 101)
