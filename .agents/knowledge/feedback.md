@@ -23,3 +23,8 @@
 - Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available with `ExperimentalFlags.DestinationSupport` alone.
 - Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
+
+## DEX-735 — Keep Unrelated Live Fixture Fixes Separate
+<!-- ticket:DEX-735 -->
+- Do not bundle live destination E2E fixture/snapshot changes into unrelated PRs; plan-rendering or other focused changes should leave destination fixture failures for a dedicated ticket/PR.
+- If a live backend fixture fails, decide whether to drop a field or seed backend data in a destination-focused change with destination-reviewer visibility.

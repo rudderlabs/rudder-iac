@@ -61,3 +61,8 @@
 <!-- ticket:DEX-490 -->
 - CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
 - Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
+
+## DEX-735 — Google Analytics Account Fixture CI Failure
+<!-- ticket:DEX-735 -->
+- CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
+- Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.
