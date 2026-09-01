@@ -50,29 +50,29 @@ func TestExtractVariableNames(t *testing.T) {
 	}
 }
 
-func TestQuoteTokensForYAMLParse(t *testing.T) {
+func TestMaskTokensForYAMLParse(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
 		want string
 	}{
 		{
-			name: "mapping scalar token quoted",
+			name: "mapping scalar token masked",
 			in:   `port: {{ .DB_PORT | 5432 }}`,
-			want: `port: "{{ .DB_PORT | 5432 }}"`,
+			want: `port: {{ .DB_PORT | 5432 }}`,
 		},
 		{
-			name: "sequence item token quoted",
+			name: "sequence item token masked",
 			in:   "hosts:\n  - {{ .DB_HOST }}\n",
-			want: "hosts:\n  - \"{{ .DB_HOST }}\"\n",
+			want: "hosts:\n  - {{ .DB_HOST }}\n",
 		},
 		{
-			name: "already quoted token unchanged",
+			name: "already quoted token masked",
 			in:   `password: "{{ .DB_PASSWORD }}"`,
 			want: `password: "{{ .DB_PASSWORD }}"`,
 		},
 		{
-			name: "embedded token unchanged",
+			name: "embedded token masked",
 			in:   `url: "https://{{ .DB_HOST }}/orders"`,
 			want: `url: "https://{{ .DB_HOST }}/orders"`,
 		},
@@ -89,12 +89,39 @@ func TestQuoteTokensForYAMLParse(t *testing.T) {
 		{
 			name: "trailing comment preserved",
 			in:   `password: {{ .DB_PASSWORD }} # injected by CI`,
-			want: `password: "{{ .DB_PASSWORD }}" # injected by CI`,
+			want: `password: {{ .DB_PASSWORD }} # injected by CI`,
+		},
+		{
+			name: "flow collection token masked",
+			in:   `tags: [{{ .A }}, {{ .B }}]`,
+			want: `tags: [{{ .A }}, {{ .B }}]`,
+		},
+		{
+			name: "block scalar token masked without added quotes",
+			in: "code: |\n" +
+				"  export function transformEvent(event) {\n" +
+				"    const cfg = {\n" +
+				"      endpoint: {{ .ENDPOINT }}\n" +
+				"    };\n" +
+				"    return event;\n" +
+				"  }\n",
+			want: "code: |\n" +
+				"  export function transformEvent(event) {\n" +
+				"    const cfg = {\n" +
+				"      endpoint: {{ .ENDPOINT }}\n" +
+				"    };\n" +
+				"    return event;\n" +
+				"  }\n",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, string(QuoteTokensForYAMLParse([]byte(tt.in))))
+			masked, mask := MaskTokensForYAMLParse([]byte(tt.in))
+			if tt.want == tt.in && tt.name != "comment token unchanged" && tt.name != "ui template unchanged" {
+				assert.NotEqual(t, tt.in, string(masked))
+			}
+			assert.Equal(t, tt.want, mask.RestoreString(string(masked)))
+			assert.False(t, mask.ContainsSentinel(mask.RestoreString(string(masked))))
 		})
 	}
 }

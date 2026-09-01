@@ -95,15 +95,98 @@ func loadRawMigrationProject(location string) (migrator.Project, error) {
 
 	parsedSpecs := make(map[string]*specs.Spec, len(rawSpecs))
 	for path, rawSpec := range rawSpecs {
-		parseableRawSpec := &specs.RawSpec{Data: varsubst.QuoteTokensForYAMLParse(rawSpec.Data)}
+		parseableData, mask := varsubst.MaskTokensForYAMLParse(rawSpec.Data)
+		parseableRawSpec := &specs.RawSpec{Data: parseableData}
 		parsed, err := parseableRawSpec.Parse()
 		if err != nil {
 			return nil, fmt.Errorf("parsing source spec %s: %w", path, err)
+		}
+		if err := restoreMaskedTokens(parsed, mask); err != nil {
+			return nil, fmt.Errorf("restoring variable placeholders in source spec %s: %w", path, err)
 		}
 		parsedSpecs[path] = parsed
 	}
 
 	return &rawMigrationProject{location: location, specs: parsedSpecs}, nil
+}
+
+func restoreMaskedTokens(spec *specs.Spec, mask varsubst.TokenMask) error {
+	var err error
+	spec.Version, err = restoreMaskedString(spec.Version, mask)
+	if err != nil {
+		return fmt.Errorf("restoring version: %w", err)
+	}
+	spec.Kind, err = restoreMaskedString(spec.Kind, mask)
+	if err != nil {
+		return fmt.Errorf("restoring kind: %w", err)
+	}
+
+	metadata, err := restoreMaskedValue(spec.Metadata, mask)
+	if err != nil {
+		return err
+	}
+	if restored, ok := metadata.(map[string]any); ok {
+		spec.Metadata = restored
+	}
+
+	specData, err := restoreMaskedValue(spec.Spec, mask)
+	if err != nil {
+		return err
+	}
+	if restored, ok := specData.(map[string]any); ok {
+		spec.Spec = restored
+	}
+
+	return nil
+}
+
+func restoreMaskedValue(value any, mask varsubst.TokenMask) (any, error) {
+	switch v := value.(type) {
+	case string:
+		restored, err := restoreMaskedString(v, mask)
+		if err != nil {
+			return nil, err
+		}
+		return restored, nil
+	case []any:
+		restored := make([]any, len(v))
+		for i, item := range v {
+			restoredItem, err := restoreMaskedValue(item, mask)
+			if err != nil {
+				return nil, fmt.Errorf("restoring list item %d: %w", i, err)
+			}
+			restored[i] = restoredItem
+		}
+		return restored, nil
+	case map[string]any:
+		restored := make(map[string]any, len(v))
+		for key, item := range v {
+			restoredKey := mask.RestoreString(key)
+			if mask.ContainsSentinel(restoredKey) {
+				return nil, fmt.Errorf("unrestored variable placeholder sentinel in key %q", restoredKey)
+			}
+			if _, exists := restored[restoredKey]; exists {
+				return nil, fmt.Errorf("restoring variable placeholder key %q creates a duplicate key", restoredKey)
+			}
+
+			restoredItem, err := restoreMaskedValue(item, mask)
+			if err != nil {
+				return nil, fmt.Errorf("restoring key %q: %w", restoredKey, err)
+			}
+			restored[restoredKey] = restoredItem
+		}
+		return restored, nil
+	default:
+		return value, nil
+	}
+}
+
+func restoreMaskedString(value string, mask varsubst.TokenMask) (string, error) {
+	restored := mask.RestoreString(value)
+	if mask.ContainsSentinel(restored) {
+		return "", fmt.Errorf("unrestored variable placeholder sentinel in value %q", restored)
+	}
+	return restored, nil
 }
 
 func (p *rawMigrationProject) Location() string {
