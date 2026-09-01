@@ -18,9 +18,9 @@ import (
 // NewConnectionSemanticValidRule validates cross-resource concerns for event
 // stream connections: both endpoints exist in the project (V-C1), a
 // source–destination pair is connected only once (V-C3), the destination
-// definition supports the source's mapped type (V-C4) and its config carries
-// the fields that type requires to connect (V-C5), and the destination is not
-// shared with a rETL source (V-E1).
+// definition supports the source's mapped type (V-C4), its config carries the
+// fields that type requires to connect (V-C5) and settings for that type
+// (V-C6), and the destination is not shared with a rETL source (V-E1).
 func NewConnectionSemanticValidRule(registry *definitions.Registry) rules.Rule {
 	return prules.NewTypedRule(
 		"event-stream/connection/semantic-valid",
@@ -227,9 +227,10 @@ func validateDestinationHasOnlyEventStreamSources(edges []connectionEdge, index 
 }
 
 // validateSourceTypeCompatibility checks V-C4 — the destination definition's
-// supported source types must include the source's mapped type — and, only
-// when the type is supported, V-C5 — the destination's config must carry
-// every field the definition requires for that source type to connect.
+// supported source types must include the source's mapped type. Once the type
+// is supported it also runs the two config checks that depend on it: V-C5, the
+// fields the definition requires for that type to connect, and V-C6, the
+// settings the destination declares for it.
 func validateSourceTypeCompatibility(
 	registry *definitions.Registry,
 	index int,
@@ -272,18 +273,81 @@ func validateSourceTypeCompatibility(
 		}}
 	}
 
+	var results []rules.ValidationResult
 	missing := missingRequiredConfigKeys(registered, token, destinationData.Config)
 	if len(missing) > 0 {
-		return []rules.ValidationResult{{
+		results = append(results, rules.ValidationResult{
 			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
 				"destination '%s' config is missing fields required to connect a '%s' source: %s",
 				endpoints.destinationID, token, strings.Join(missing, ", "),
 			),
-		}}
+		})
 	}
 
-	return nil
+	return append(results, validateSourceTypeSettings(registered, index, endpoints, token, destinationData.Config)...)
+}
+
+// validateSourceTypeSettings (V-C6): a destination declares its per-source
+// settings in blocks keyed by source type — connection_mode and
+// use_native_sdk — so connecting a source needs an entry for its type in at
+// least one of them.
+func validateSourceTypeSettings(
+	registered *definitions.RegisteredDefinition,
+	index int,
+	endpoints connectionEndpoints,
+	sourceType string,
+	config map[string]any,
+) []rules.ValidationResult {
+	required := registered.SupportedSourcesValidation(sourceType)
+
+	// Blocks that could hold the entry but do not, so the error names only the
+	// ones the author can actually write to.
+	var candidates []string
+
+	for _, key := range registered.SourceTypeConfigKeys() {
+		// Asking for an entry the config model would reject as an unknown
+		// field leaves an error nobody can clear.
+		if !registered.AcceptsSourceTypeEntry(key, sourceType) {
+			continue
+		}
+		// V-C5 already reports this key for this source type. One mistake,
+		// one error.
+		if slices.Contains(required, key) {
+			return nil
+		}
+
+		raw := config[key]
+		block, isObject := raw.(map[string]any)
+
+		// A non-nil value of the wrong type is the destination config rule's
+		// to report, so drop the block here. A written-but-null one is not:
+		// mapstructure decodes null into a nil field without complaint, so no
+		// rule would flag it, and it names no source type either — deferring
+		// it would hand the check off to nobody.
+		if raw != nil && !isObject {
+			continue
+		}
+		if _, found := block[sourceType]; found {
+			return nil
+		}
+		candidates = append(candidates, key)
+	}
+
+	// No block can name this source type — adj and posthog declare
+	// use_native_sdk as a closed struct and no connection_mode — so there is
+	// nowhere for the author to write the entry an error would ask for.
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	return []rules.ValidationResult{{
+		Reference: destinationRef(index),
+		Message: fmt.Sprintf(
+			"destination '%s' config has no '%s' entry for source type '%s'",
+			endpoints.destinationID, strings.Join(candidates, "' or '"), sourceType,
+		),
+	}}
 }
 
 // missingRequiredConfigKeys returns the definition-required config keys for
