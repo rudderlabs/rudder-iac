@@ -41,6 +41,11 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			flagName: "unverifiedDestinations",
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
 		},
+		{
+			name:     "lowercase",
+			flagName: "lowercase",
+			want:     "RUDDERSTACK_X_LOWERCASE",
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,6 +105,13 @@ func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
 	t.Parallel()
 
 	removedFlag := "data" + "Graph"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_TransformationsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "trans" + "formations"
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
