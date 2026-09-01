@@ -351,9 +351,7 @@ func validateSourceTypeSettings(
 }
 
 // missingRequiredConfigKeys returns the definition-required config keys for
-// the given source type that the destination's config does not carry. Required
-// keys depend on the connection mode as well as the source type, so a source
-// type the spec declares no mode for yields no keys to check.
+// the given source type that the destination's config does not carry.
 func missingRequiredConfigKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -380,18 +378,12 @@ func missingRequiredConfigKeys(
 	return missing
 }
 
-// connectTimeRequiredKeys returns the config keys the definition requires for a
-// source of this type to connect, in the mode the destination spec declares for
-// it. Both config checks read it: V-C5 to report the ones missing, V-C6 to
-// defer to V-C5 on a settings block V-C5 already covers.
-//
-// The spec is the only place that says which mode a connection uses: the
-// definition's ConnectionModes lists the modes a destination supports, not the
-// one a given connection runs in, so a source type offering exactly one mode is
-// still not a declaration. Inferring from it would tie this check's coverage to
-// definition metadata, where a destination gaining a mode would switch the
-// check off for that source type with nothing in the diff to say so. Without a
-// declaration there is nothing to require here; V-C6 reports its absence.
+// connectTimeRequiredKeys returns the keys the definition requires for a source
+// of this type to connect, in the mode the destination spec declares for it.
+// Only the spec can say: ConnectionModes lists the modes a destination
+// supports, not the one a connection runs in, so inferring from a source type
+// that offers exactly one would tie this check's coverage to definition
+// metadata — a destination gaining a mode would switch it off silently.
 func connectTimeRequiredKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,

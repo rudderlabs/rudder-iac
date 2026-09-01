@@ -58,9 +58,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"mobile_api_key_android": {"android"},
 		"mobile_api_key_ios":     {"ios"},
 	}, registered.GatedKeyPaths())
-	// A device-mode source needs app_id, a cloud-mode one api_key. Upstream's
-	// cloud branch omits android_kotlin, ios_swift and cloud, so those carry no
-	// entry rather than a guessed api_key.
 	assert.Equal(t, map[string]map[string][]string{
 		"android":      {"cloud": {"api_key"}, "device": {"app_id"}},
 		"ios":          {"cloud": {"api_key"}, "device": {"app_id"}},

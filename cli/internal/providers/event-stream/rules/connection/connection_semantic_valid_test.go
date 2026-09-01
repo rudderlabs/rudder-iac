@@ -17,9 +17,8 @@ import (
 
 // webhookTestConfig is a minimal destination config model for the test
 // registry: two plain fields usable as connect-time required keys, plus the
-// connection_mode block that makes them reachable — required keys are looked
-// up by mode, so a definition whose config model cannot carry a declaration
-// could never have them checked.
+// connection_mode block that makes them reachable — keys are looked up by the
+// mode a spec declares, which this model has to be able to carry.
 type webhookTestConfig struct {
 	WebhookURL     string                `mapstructure:"webhook_url"`
 	AuthToken      string                `mapstructure:"auth_token"`
@@ -145,9 +144,6 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		},
 	}))
 
-	// Mirrors intercom: a web source needs api_key in cloud mode and app_id in
-	// device mode, so the required keys cannot be resolved from the source type
-	// alone.
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "multimode",
 		Version:         1,
@@ -500,10 +496,9 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'web'")
 	})
 
-	// A source type the definition offers exactly one mode for is no
-	// exception: ConnectionModes says what the destination supports, not what
-	// this connection does, so the mode is still undeclared. One mistake, one
-	// error — only the settings check reports, where the fallback made both.
+	// A source type the definition offers exactly one mode for is no exception:
+	// ConnectionModes says what the destination supports, not what this
+	// connection does, so the mode is still undeclared.
 	t.Run("undeclared connection_mode on a single-mode source type is not checked", func(t *testing.T) {
 		t.Parallel()
 
@@ -525,10 +520,9 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
-	// connection_mode can be listed as a required key but V-C5 can never
-	// report it missing: the absence that would make it missing is the same
-	// absence that leaves the mode undeclared. The settings check reports it
-	// instead, so the author still gets exactly one actionable error.
+	// V-C5 can never report connection_mode missing: the absence that would
+	// make it missing is the same one that leaves the mode undeclared. The
+	// settings check reports it instead.
 	t.Run("connection_mode as a required key is reported by the settings check", func(t *testing.T) {
 		t.Parallel()
 
@@ -576,8 +570,7 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 	t.Run("source type without required config keys", func(t *testing.T) {
 		t.Parallel()
 
-		// ios has no supported-sources-validation entry, so declaring its mode
-		// is all the destination config needs.
+		// ios has no required keys, so declaring its mode is all the config needs.
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-ios", "ios", true)
 		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
@@ -821,8 +814,7 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 
 	// Deferring to V-C5 cannot help when the required key is connection_mode:
 	// V-C5 resolves the mode from the very entry whose absence is at issue, so
-	// it has no required keys and nothing to defer to. This check reports on
-	// its own — still one error, and the actionable one.
+	// there is nothing to defer to.
 	t.Run("a connection_mode required key does not silence this check", func(t *testing.T) {
 		t.Parallel()
 

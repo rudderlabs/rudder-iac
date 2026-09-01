@@ -29,16 +29,12 @@ type DestinationDefinition struct {
 	NewConfig       func() any
 	SourceTypes     []string
 	ConnectionModes map[string][]string
-	// ConnectionRequiredKeys lists, per local source type and connection
-	// mode, the local config keys that must be present for a source of that
-	// type to connect in that mode. It mirrors the backend's connect-time
-	// check, which is named supportedSourcesValidation there — a config-backend
-	// entity, not a db-config key, so do not go looking for one.
-	// Requiredness depends on both source type and mode: Braze
-	// needs rest_api_key from a cloud-mode source and app_key from a
-	// device-mode one. Derived from schema.json's connectionMode-conditioned
-	// configSchema.allOf branches; pairs without an entry have no connect-time
-	// required keys.
+	// ConnectionRequiredKeys lists, per local source type and connection mode,
+	// the local config keys a source of that type must carry to connect in that
+	// mode. Both dimensions matter: Braze needs rest_api_key from a cloud-mode
+	// source and app_key from a device-mode one. Derived from schema.json's
+	// connectionMode-conditioned configSchema.allOf branches; the backend calls
+	// its equivalent check supportedSourcesValidation.
 	ConnectionRequiredKeys map[string]map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
@@ -109,10 +105,8 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
-// ConnectionRequiredKeys returns the local config keys that must be
-// present for the given source type to connect in the given mode — one mode
-// value, not the connection_mode block that carries it. A nil result means the
-// pair has no connect-time required keys.
+// ConnectionRequiredKeys returns the keys the given source type must carry to
+// connect in the given mode. A nil result means the pair requires none.
 func (d *RegisteredDefinition) ConnectionRequiredKeys(sourceType, mode string) []string {
 	fields, ok := d.DestinationDefinition.ConnectionRequiredKeys[sourceType][mode]
 	if !ok {
