@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -309,6 +310,21 @@ func (h *HandlerImpl) splitConfig(data *AccountResource) (json.RawMessage, json.
 	keys, ok := registeredAccountSecretKeys[data.AccountDefinitionName]
 	if !ok {
 		return nil, nil, fmt.Errorf("unsupported account definition %q", data.AccountDefinitionName)
+	}
+
+	// The partition below matches top-level keys exactly, so a dotted key would
+	// leave its whole container — carrying the revealed plaintext — in options,
+	// the non-secret API field, while secretPayload stayed empty. The shared
+	// secret helpers do understand dotted paths (DEX-531); this split does not
+	// yet, and the registry turns control-plane-driven with DEX-467. Refuse
+	// before revealing anything.
+	for _, k := range keys {
+		if strings.Contains(k, ".") {
+			return nil, nil, fmt.Errorf(
+				"account definition %q declares nested secret key %q, which the account config split does not support",
+				data.AccountDefinitionName, k,
+			)
+		}
 	}
 
 	revealed := secret.RevealSecrets(data.Config, keys)
