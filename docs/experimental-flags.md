@@ -16,11 +16,8 @@ Add your flag to `cli/internal/config/experimental.go`:
 
 ```go
 type ExperimentalConfig struct {
-    // Transformations enables transformations provider and related features
-    Transformations bool `mapstructure:"transformations"`
-
-    // EventRuleIncludes enables including event rules from other tracking plans
-    EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
+    // YourNewFeature enables the new feature while it is being validated
+    YourNewFeature bool `mapstructure:"yourNewFeature"`
 }
 ```
 
@@ -150,15 +147,15 @@ Experimental flag status is automatically included in all command telemetry. No 
 ### Struct Fields (camelCase)
 
 ```go
-Transformations    bool `mapstructure:"transformations"`
-EventRuleIncludes  bool `mapstructure:"eventRuleIncludes"`
+YourNewFeature   bool `mapstructure:"yourNewFeature"`
+YourOtherFeature bool `mapstructure:"yourOtherFeature"`
 ```
 
 ### Environment Variables (UPPER_SNAKE_CASE)
 
 ```bash
-RUDDERSTACK_X_TRANSFORMATIONS=true
-RUDDERSTACK_X_EVENT_RULE_INCLUDES=true
+RUDDERSTACK_X_YOUR_NEW_FEATURE=true
+RUDDERSTACK_X_YOUR_OTHER_FEATURE=true
 ```
 
 ## Common Pitfalls

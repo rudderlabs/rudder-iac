@@ -62,11 +62,15 @@ func NewCmdDestroy() *cobra.Command {
 				}...)
 			}()
 
+			syncerConcurrency := config.GetConfig().Concurrency.Syncer
+			if syncerConcurrency < 1 {
+				return fmt.Errorf("concurrency.syncer must be at least 1, got %d", syncerConcurrency)
+			}
 			options := []syncer.Option{
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
-				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
+				syncer.WithConcurrency(syncerConcurrency),
 			}
 
 			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{}, options...)
