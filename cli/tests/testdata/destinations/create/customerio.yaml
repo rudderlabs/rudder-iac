@@ -31,3 +31,6 @@ spec:
       android: "10"
     background_queue_seconds_delay:
       android: "30"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

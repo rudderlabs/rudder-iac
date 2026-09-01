@@ -19,7 +19,7 @@
 
 ## INT-6489 — Destination Version Field Naming
 <!-- ticket:INT-6489 -->
-- Destination versioning fields follow the public API client convention of exported Go fields with camelCase JSON tags: `version`, `versionInfo`, `status`, `action`, `retirementDate`, and `migrationDocsURL`.
+- Destination versioning fields follow the public API client convention of exported Go fields with camelCase JSON tags: `version`, `versionInfo`, `status`, `action`, `retirementDate`, and `migrationDocsUrl`.
 - Optional destination version metadata uses pointer fields for optional date/URL values, matching `omitempty` semantics instead of inventing sentinel zero values.
 - `VersionInfo` is an exported `api/client` package type so callers can directly consume destination version status, action, retirement date, and migration docs URL metadata.
 
@@ -165,3 +165,55 @@
 - HubSpot models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even if upstream schema/db-config still mention their API keys, because re-sending legacy consent keys can cause non-converging applies after backend migration to `consentManagement`.
 - HubSpot local config should omit stale legacy auth fields `authorization_type` and `api_key`; current schema requires `accessToken` and `apiVersion`, so local YAML should model `access_token` as the only secret and require it with `api_version`.
 - HubSpot `lookup_field` remains required only for `api_version: newApi`, and `use_native_sdk.web` stays source-gated to `web`.
+
+## DEX-518 — Qualtrics Config Surface
+<!-- ticket:DEX-518 -->
+- Qualtrics `SecretKeys` should stay empty because integrations-config `db-config.json` `secretKeys` is authoritative for CLI write-only secret handling; Terraform `Sensitive` metadata and UI secret metadata do not by themselves make `project_id` a CLI secret placeholder.
+- Qualtrics `project_id` remains a normal required local config field, not a write-only secret field.
+- Qualtrics local `enable_generic_page_title.web` maps to API `enableGenericPageTitle.web`; do not use Terraform's flat `enable_generic_page_title` shape as the CLI YAML shape.
+- Omit `connection_mode` from Qualtrics local config because `schema.json` does not declare `connectionMode`, even though db-config destination config lists it per source.
+
+## DEX-719 — GCS Connection Mode Config Surface
+<!-- ticket:DEX-719 -->
+- GCS models schema-declared `connectionMode` as local YAML key `connection_mode` through the shared `common.ConnectionMode` / `common.ConnectionModeProperties(sourceTypes)` helpers.
+- Keep GCS on the CLI-owned event-stream source set from DEX-499 with cloud-only connection modes; do not broaden GCS source ownership while adding `connection_mode`.
+- GCS `connection_mode` validation should reject templates, empty strings, and non-cloud values via existing registered-definition connection-mode validation.
+## DEX-512 — LinkedIn Ads Destination Naming And Validation
+<!-- ticket:DEX-512 -->
+- LinkedIn Ads uses canonical CLI type `linkedin_ads`, derived by lowercasing API type `LINKEDIN_ADS`, even though the integrations-config source directory is named `linkedIn_ads`.
+- The LinkedIn Ads Go definition package uses `linkedinads`, keeping the package name idiomatic while preserving `linkedin_ads` as the CLI resource identity.
+- For LinkedIn Ads, model `hash_data` as a required pointer boolean: upstream schema requires `hashData`, and pointer optionality preserves absent versus explicit `false` so validation can reject omission while accepting explicit false.
+- Destination onboarding validation should follow upstream `schema.json` over Terraform-provider defaults; for `hash_data`, do not make the field optional solely because Terraform marks it optional with default `true`.
+## DEX-527 — Snowpipe Streaming Key Handling
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming `private_key` accepts Terraform-compatible raw key bodies in local YAML; local-to-API conversion should wrap non-PEM values as `-----BEGIN PRIVATE KEY-----\n<raw>\n-----END PRIVATE KEY-----`.
+- API-to-local conversion for Snowpipe Streaming `private_key` should return the API value unchanged so PEM payloads round-trip stably.
+- Keep this behavior in a Snowpipe Streaming destination-local converter property rather than changing generic secret conversion or validation behavior.
+
+## DEX-721 — Adjust And Facebook Conversions Default Corrections
+<!-- ticket:DEX-721 -->
+- Adjust should keep local config key `partner_params_keys` mapped to API `partnerParamsKeys`; do not rename it to Terraform's `partner_param_keys` spelling because that would break existing CLI YAML compatibility.
+- Adjust should add schema-derived default metadata only for modeled `environment`; do not add/default a direct `event_filtering_option` local key because event filtering is represented through discriminator-derived event filter arrays.
+- Facebook Conversions should add schema-derived top-level defaults for modeled optional fields `action_source`, `limited_data_usage`, `test_destination`, and `remove_external_id`.
+- Facebook Conversions should leave required credentials (`dataset_id`, `access_token`), array/nested keys, and `test_event_code` without default tags, and avoid tightening existing `dynamic_or_oneof` validation in default-only changes.
+
+## DEX-725 — Destination Connection Mode Config Surface
+<!-- ticket:DEX-725 -->
+- `bqstream`, `confluent_cloud`, and `googlesheets` model schema-declared `connectionMode` as local YAML key `connection_mode` through `common.ConnectionModeProperties(sourceTypes)`.
+- Adding `connection_mode` to those destinations should not change their existing `SourceTypes` or `ConnectionModes`; it only exposes the config key for the already-supported modes.
+- Event filtering always uses the nested local block `event_filtering.{whitelist,blacklist}` with `excluded_with` on both fields and a `Discriminator` deriving `eventFilteringOption` — never flat `event_filtering_*` local keys and never a user-set option field. When upstream scopes the keys per source type (iterable: `whitelistedEvents.web`, `eventFilteringOption.web`), keep the identical local block and express the scoping in the converters: `Gated` arrays with dotted API keys, Discriminator ungated (it has no local key; the lists it derives from carry the gate).
+- Per-definition pattern registrations (`funcs.NewPattern` / `NewPatternWithReject`) live in an `init()` inside `definition.go`, not a separate `patterns.go` (adobe_analytics was the one outlier and was folded in).
+
+## INT-7057 — Destination VersionInfo Wire Name
+<!-- ticket:INT-7057 -->
+- The lifecycle advisory's docs link is `migrationDocsUrl` on the wire, so `VersionInfo.MigrationDocsURL` carries `json:"migrationDocsUrl,omitempty"`. This supersedes the `migrationDocsURL` spelling first recorded under INT-6489, which has been corrected in place.
+- Go's `encoding/json` matches field names case-insensitively, so the wrong tag still decodes and a round-trip test stays green. What breaks is the published contract: the generated OpenAPI advertises a key no producer emits. Confirm a wire name against the producer, not against a passing test.
+- `VersionInfo` is response-only. `Create` and `Update` nil it on the copy they send, so a caller that reads a destination and hands it straight back never echoes the server's own advisory into a request body.
+
+## DEX-490 — Amplitude Config Surface And Sources
+<!-- ticket:DEX-490 -->
+- Amplitude should keep the broad mapped analytics source set, not the cloud-storage/event-stream-owned subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Amplitude models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even though Amplitude schema/db-config mention them, matching the current destination-definition policy for migrated consent management.
+- Amplitude local config should include terraform-mapped web-only fields even when schema/db-config do not list them, including `device_id_from_url_param`, `force_https`, `track_gclid`, `track_referrer`, and `save_params_referrer_once_per_session`; keep those fields web-gated and avoid inventing validation beyond their boolean shape.
+- Amplitude should model schema/db-config fields absent from Terraform mappings, including `enable_enhanced_user_operations`, using mechanical camelCase-to-snake_case local naming.
+- Nested schema defaults (`sdkVersion.web`, `trackSessionEvents.web`, the `enable*AutoCapture.web` family) are declared with `default` tags on the nested struct fields, not a whole-object `default_json` tag; ApplyDefaults merges them only into a block the spec already carries, matching backend AJV `useDefaults` behavior where an absent parent object stays absent.

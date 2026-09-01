@@ -46,16 +46,45 @@ Simple field:
 converter.Simple("prefix", "prefix")
 ```
 
-Whitelist/blacklist with discriminator (GA4-style):
+Whitelist/blacklist with discriminator (GA4-style). The local keys are the
+nested `event_filtering.{whitelist,blacklist}` block — the fleet convention —
+backed by a config struct whose two fields carry `excluded_with` on each other
+so both lists can never be set at once (the Discriminator ranges over a map, so
+with both set the derived `eventFilteringOption` would be non-deterministic):
 
 ```go
-converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
-converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering_blacklist"),
+converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
-    "event_filtering_whitelist": "whitelistedEvents",
-    "event_filtering_blacklist": "blacklistedEvents",
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
 }),
 ```
+
+When upstream scopes the same keys per source type (iterable declares
+`whitelistedEvents.web` / `eventFilteringOption.web`), keep the identical local
+`event_filtering` block and express the scoping in the converters instead:
+dotted API keys plus `Gated` on the two arrays. The Discriminator stays ungated
+— it has no local key, and the lists it derives from carry the gate:
+
+```go
+converter.Gated(
+    converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "event_filtering.whitelist"),
+    common.SourceTypeWeb,
+),
+converter.Gated(
+    converter.ArrayWithStrings("blacklistedEvents.web", "eventName", "event_filtering.blacklist"),
+    common.SourceTypeWeb,
+),
+converter.Discriminator("eventFilteringOption.web", converter.DiscriminatorValues{
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
+}),
+```
+
+Never model `eventFilteringOption` (scoped or not) as a user-set field — it is
+always derived, so the backend default applies and inconsistent states (option
+set with no list, or contradicting the list) stay unrepresentable.
 
 List of objects with field rename:
 
@@ -84,6 +113,7 @@ agree with what the YAML holds locally:
 | string list (`ArrayWithStrings` local side) | `[]string` |
 | object list | `[]struct{...}` with `mapstructure` tags per field, `validate:"omitempty,dive"` on the slice |
 | consent block | `common.ConsentManagement` tagged `mapstructure:"consent_management"` (mandatory type) |
+| connection mode block (see source-extraction.md) | `common.ConnectionMode` tagged `mapstructure:"connection_mode"` (mandatory type, same as consent; convention, not registry-enforced) |
 
 Unknown local keys are rejected by the validator automatically — the struct
 is the closed allowlist, so every mapped property needs a struct field.

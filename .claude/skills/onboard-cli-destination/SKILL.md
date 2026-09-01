@@ -129,19 +129,34 @@ Mechanical rules:
   a pattern, not a length limit (it forbids newlines) — reuse the shared
   `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
   reject templates too (see source-extraction.md "Enforcing regex patterns").
+- `schema.json` `default` keywords → `default:"…"` struct tags (see
+  source-extraction.md "Declaring defaults"). The backend applies these when it
+  persists a destination, so a spec that omits the key must still carry it or
+  every apply reports a phantom diff. **Never put a `default` on a field tagged
+  `validate:"required"`** — registration rejects it, since a key that is always
+  present can never take a default. `required_if` is fine.
 - `db-config.json` `secretKeys` → `SecretKeys` field, translated to snake_case
   local keys.
 - `db-config.json` `supportedSourceTypes` / `supportedConnectionModes` →
   `SourceTypes` / `ConnectionModes`, translated to CLI-local source types via
   [reference/source-type-mapping.md](reference/source-type-mapping.md).
-  Unmapped upstream types (e.g. `amp`, `shopify`, `warehouse` when not
-  CLI-owned): drop and flag in the final report — never guess.
-- `db-config.json` `supportedSourcesValidation` (when present and non-empty) →
-  `SupportedSourcesValidation`: keys translated to CLI-local source types via
-  the same mapping, values translated from API camelCase field names to
-  snake_case local keys. Drop entries whose source type was dropped from
-  `SourceTypes` and flag them in the final report. Most destinations have no
-  `supportedSourcesValidation` — omit the field then; never invent entries.
+  Drop and flag in the final report — never guess — both upstream types with no
+  row in that mapping (e.g. `tiktokAds`, `singer-*`) and the never-declared set
+  (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
+  reach.
+- `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
+  `SupportedSourcesValidation`, a
+  `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the
+  branch's `then.required` makes **required**, never optional ones. Source types
+  translated to CLI-local types via the same mapping, keys to snake_case.
+  **There is no `supportedSourcesValidation` key in db-config** — do not look
+  for one. A branch whose requiredness also depends on another config value
+  (Braze `usePlatformSpecificApiKeys`) has no room in this map: express the
+  whole branch as a `ConfigValidateFuncs` custom validator instead (see
+  source-extraction.md "Conditional requiredness"). See source-type-mapping.md
+  "Per-source-type connect-time required keys" for the recognised `if` shapes
+  and the full derivation; omit the field when no kept source type
+  contributes a key.
 - Source-type-gated keys: if a terraform-mapped property's API key is absent
   from `db-config.json` `destConfig.defaultConfig` but present under specific
   `destConfig.<sourceType>` lists, wrap the ported property in
@@ -154,6 +169,16 @@ Mechanical rules:
   `ConsentManagement common.ConsentManagement` field tagged
   `mapstructure:"consent_management"` to the config struct. The registry
   rejects any other type for that field.
+- Model `connection_mode` as real config **when `schema.json` declares a
+  `connectionMode` property**: append `common.ConnectionModeProperties(sourceTypes)...`
+  to properties and add a `ConnectionMode common.ConnectionMode` field tagged
+  `mapstructure:"connection_mode"`. Values are validated against this
+  destination's own `ConnectionModes` map (see source-extraction.md and
+  DEX-708's `ga4` pilot) — no per-destination enum to write.
+  When `schema.json` does not declare it, omit it — even though db-config's
+  `destConfig.<sourceType>` lists still name `connectionMode`, as they do for
+  every source type on `firebase`. Say so in a comment on the config struct,
+  or the omission reads as an oversight to the next reader.
 
 ### Step 5: Register in dependencies.go
 
@@ -195,8 +220,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
    `APIType`, `Version`, `SecretKeys()`, `SupportedSourceTypes()`,
    `ConnectionModes()` per source type, and `GetByAPIType` lookup. When the
    definition carries `SupportedSourcesValidation`, also assert
-   `SupportedSourcesValidation(sourceType)` per configured source type and
-   `Nil` for one source type without an entry. When the
+   `SupportedSourcesValidation(sourceType, connectionMode)` per configured
+   pair and `Nil` for one supported pair without an entry. When the
    definition has gated properties, also assert the full `GatedKeyPaths()`
    map with `assert.Equal` (JSON-pointer keypaths, e.g.
    `map[string][]string{"/mobile_api_key_android": {"android"}}`).
@@ -275,7 +300,8 @@ Final response must include:
 - E2E verification status: skip/compile result and whether the gated live run was
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
-  source types, dropped `supportedSourcesValidation` entries, upstream fields
+  source types, connectionMode-conditioned required keys that could not be
+  expressed in `SupportedSourcesValidation`, upstream fields
   intentionally omitted, and every `schema.json` key modelled without a
   terraform mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates
@@ -320,6 +346,13 @@ Final response must include:
   the nested `eventChannelWebhook` are absent from terraform, and leaving them
   out made the backend drop `incomingWebhooksType` between create and update —
   visible as a create/update snapshot mismatch in the gated e2e.
+- **A key the backend rewrites on write must NOT be modelled**, even though it
+  is in `schema.json`. `oneTrustCookieCategories` and `ketchConsentPurposes` are
+  the worked example: the backend converts them into `consentManagement`
+  entries and never stores the originals, so a definition that models them
+  reads back a different key than it wrote and diffs on every plan. This is the
+  one exception to "model every schema.json key" — there is nothing to erase,
+  because the key was never stored. See DEX-696 Discrepancy 3.
 - Terraform's `Negated` helper has no CLI converter equivalent; see
   converter-mapping.md before hand-rolling one.
 - Do not leave real `schema.json` / terraform regex constraints unenforced

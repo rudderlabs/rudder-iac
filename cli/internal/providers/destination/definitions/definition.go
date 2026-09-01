@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 var sourceTypeConfigKeys = []string{
@@ -35,6 +36,12 @@ type DestinationDefinition struct {
 	SupportedSourcesValidation map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
+	// ConfigValidateFuncs registers extra go-playground custom validate tags,
+	// scoped to this definition's config struct alone. Use it for
+	// destination-specific constraints a built-in cross-field tag cannot
+	// express (e.g. a condition keyed on a map entry), never for fleet-wide
+	// conventions.
+	ConfigValidateFuncs []rules.CustomValidateFunc
 }
 
 // ConfigError represents a single validation failure with a JSON-pointer path.
@@ -50,11 +57,15 @@ type RegisteredDefinition struct {
 	// keyPathSourceTypes is the reverse index of gated properties:
 	// local config keypath (JSON pointer) -> source types entitled to it.
 	keyPathSourceTypes map[string][]string
+	// configDefaults holds the config model's `default` tags keyed by local
+	// config key, applied to local specs via ApplyDefaults.
+	configDefaults map[string]any
 }
 
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
-	errors := validateConfigModel(config, d.configType, "")
-	return append(errors, d.validateConsentManagement(config)...)
+	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
+	errors = append(errors, d.validateConsentManagement(config)...)
+	return append(errors, d.validateConnectionMode(config)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {
@@ -107,6 +118,22 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 	return append([]string(nil), sourceTypeConfigKeys...)
 }
 
+// AcceptsSourceTypeEntry reports whether the config model would accept an entry
+// for sourceType under the source-type-scoped block key. The two blocks are
+// shaped differently: connection_mode is an open map, so every source type
+// fits, while use_native_sdk is a struct naming one field per source type, so
+// only those do.
+func (d *RegisteredDefinition) AcceptsSourceTypeEntry(key, sourceType string) bool {
+	field, ok := structFieldsByMapstructureTag(d.configType)[key]
+	if !ok {
+		return false
+	}
+	if derefType(field.Type).Kind() == reflect.Map {
+		return true
+	}
+	return configStructHasKeyPath(d.configType, key+"."+sourceType)
+}
+
 // GatedKeyPaths returns local config keypaths (JSON pointer, e.g.
 // "/event_upload_period_millis") mapped to the source types entitled to use
 // them. Keypaths absent from the map are default keys, allowed for every
@@ -143,6 +170,10 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating consent config model: %w", err)
 	}
 
+	if err := validateConnectionModeConfigModel(configType); err != nil {
+		return nil, fmt.Errorf("validating connection mode config model: %w", err)
+	}
+
 	if err := validateSupportedSourcesValidation(def, configType); err != nil {
 		return nil, fmt.Errorf("validating supported sources requirements: %w", err)
 	}
@@ -152,10 +183,16 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("building gated key paths: %w", err)
 	}
 
+	configDefaults, err := buildConfigDefaults(configType)
+	if err != nil {
+		return nil, fmt.Errorf("building config defaults: %w", err)
+	}
+
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
+		configDefaults:        configDefaults,
 	}, nil
 }
 
@@ -192,6 +229,18 @@ func validateConsentConfigModel(def *DestinationDefinition, configType reflect.T
 	}
 	if len(def.ConsentValidationOverrides) > 0 && !hasConsentField {
 		return fmt.Errorf("consent validation overrides require a common.ConsentManagement config field")
+	}
+	return nil
+}
+
+// validateConnectionModeConfigModel mirrors the consent type check. A bespoke
+// type here would silently opt out of validateConnectionMode's per-source-type
+// enum check — its type assertion would yield an empty map — so a mistyped
+// field surfaces at registration rather than as a decode error at apply time.
+func validateConnectionModeConfigModel(configType reflect.Type) error {
+	field, ok := structFieldsByMapstructureTag(configType)["connection_mode"]
+	if ok && derefType(field.Type) != reflect.TypeOf(common.ConnectionMode{}) {
+		return fmt.Errorf("connection_mode config field must use common.ConnectionMode")
 	}
 	return nil
 }

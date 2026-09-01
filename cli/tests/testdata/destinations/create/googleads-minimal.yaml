@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: googleads-minimal
+spec:
+  id: googleads-minimal
+  display_name: E2E Google Ads Minimal
+  type: googleads
+  enabled: true
+  definition_version: 1
+  config:
+    conversion_id: AW-111222333

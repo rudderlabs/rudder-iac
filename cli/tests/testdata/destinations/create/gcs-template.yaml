@@ -12,3 +12,5 @@ spec:
     bucket_name: '{{ config.bucketName || rudder-cli-e2e-gcs }}'
     prefix: '{{ config.prefix || rudder/gcs/ }}'
     credentials: '{{ .GCS_CREDENTIALS }}'
+    connection_mode:
+      web: cloud

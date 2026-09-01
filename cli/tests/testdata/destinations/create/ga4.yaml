@@ -25,6 +25,10 @@ spec:
       web: true
       android: false
       ios: false
+    connection_mode:
+      web: hybrid
+      android: cloud
+      unity: cloud
     capture_page_view:
       web: rs
     debug_view:

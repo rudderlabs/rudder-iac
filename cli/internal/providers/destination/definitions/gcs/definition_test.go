@@ -159,6 +159,10 @@ func TestGCSConfigValidation(t *testing.T) {
 			"bucket_name": "rudder-cli-e2e-gcs",
 			"prefix":      "rudder/gcs/",
 			"credentials": "{{ .GCS_CREDENTIALS }}",
+			"connection_mode": map[string]any{
+				"web":            "cloud",
+				"android_kotlin": "cloud",
+			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -166,6 +170,84 @@ func TestGCSConfigValidation(t *testing.T) {
 						"consents": []any{"analytics"},
 					},
 				},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects non-cloud values", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"device", "hybrid"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"bucket_name": "my-gcs-bucket",
+				"connection_mode": map[string]any{
+					"web": mode,
+				},
+			})
+			require.Len(t, errors, 1, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of", mode)
+		}
+	})
+
+	// connectionMode is a plain enum upstream — no template branch, unlike the
+	// pattern-validated fields — so a template is rejected rather than passed
+	// through as an opaque dynamic value.
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": "my-gcs-bucket",
+			"connection_mode": map[string]any{
+				"web": "{{ .GCS_CONNECTION_MODE || cloud }}",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// An explicit empty string is a real value, not an absent key — it must be
+	// rejected like any other invalid entry, since converter.Simple never skips
+	// zero values and would otherwise send an empty connectionMode.web upstream.
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": "my-gcs-bucket",
+			"connection_mode": map[string]any{
+				"web": "",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// A non-string value trips both the mapstructure decode error and
+	// validateConnectionMode's own type check, so the same path can be reported
+	// twice. consent_management's shape check has the same pre-existing behavior.
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": "my-gcs-bucket",
+			"connection_mode": map[string]any{
+				"web": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	// The framework's generic source-type-scoped-key check (not this definition's
+	// own validation) catches unsupported connection_mode source types in full
+	// project validation, so ValidateConfig skips unknown source-type values.
+	t.Run("connection_mode for an unsupported source type does not error here", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name": "my-gcs-bucket",
+			"connection_mode": map[string]any{
+				"warehouse": "cloud",
 			},
 		})
 		assert.Empty(t, errors)
@@ -228,16 +310,24 @@ func TestGCSConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "full TF fields",
+			Name: "full TF fields with connection mode",
 			LocalJSON: `{
 				"bucket_name": "my-gcs-bucket",
 				"prefix": "rudder/",
-				"credentials": "{\"type\":\"service_account\",\"project_id\":\"rudder-e2e\"}"
+				"credentials": "{\"type\":\"service_account\",\"project_id\":\"rudder-e2e\"}",
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"bucketName": "my-gcs-bucket",
 				"prefix": "rudder/",
-				"credentials": "{\"type\":\"service_account\",\"project_id\":\"rudder-e2e\"}"
+				"credentials": "{\"type\":\"service_account\",\"project_id\":\"rudder-e2e\"}",
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{

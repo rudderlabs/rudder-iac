@@ -24,6 +24,7 @@ type customerioAudienceConfig struct {
 	APIKey            string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
 	AppAPIKey         string                   `mapstructure:"app_api_key" validate:"required,min=1,max=100"`
 	Region            string                   `mapstructure:"region" validate:"required,dynamic_or_oneof=US EU"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -35,6 +36,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("appApiKey", "app_api_key"),
 		converter.Simple("region", "region"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

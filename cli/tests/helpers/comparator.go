@@ -83,10 +83,6 @@ func compareMaps(path string, actual, expected reflect.Value, ignore []string, e
 	actualMap := actual.Interface().(map[string]any)
 	expectedMap := expected.Interface().(map[string]any)
 
-	if len(actualMap) != len(expectedMap) {
-		errors = append(errors, fmt.Errorf("mismatch at path '%s': map key count differs, got %d keys, want %d keys", path, len(actualMap), len(expectedMap)))
-	}
-
 	for key, expectedValue := range expectedMap {
 		currentPath := buildPath(path, key)
 
@@ -99,11 +95,30 @@ func compareMaps(path string, actual, expected reflect.Value, ignore []string, e
 		errors = compareValues(currentPath, reflect.ValueOf(actualValue), reflect.ValueOf(expectedValue), ignore, errors)
 	}
 
+	// An ignored key is allowed to be *extra* in actual. The expectation file is the contract, so a
+	// field the API only returns for some resources (a conditional advisory, say) must not fail
+	// every snapshot recorded before it existed. A key the expectation does record stays required —
+	// ignoring it suppresses the value comparison, not the presence check.
+	extraIgnored := 0
 	for key := range actualMap {
-		_, exists := expectedMap[key]
-		if !exists {
-			errors = append(errors, fmt.Errorf("mismatch at path '%s': extra key '%s' in actual", path, key))
+		if _, exists := expectedMap[key]; exists {
+			continue
 		}
+		if slices.Contains(ignore, buildPath(path, key)) {
+			extraIgnored++
+			continue
+		}
+		errors = append(errors, fmt.Errorf("mismatch at path '%s': extra key '%s' in actual", path, key))
+	}
+
+	// Counted against the map sizes a developer actually sees while debugging a failed snapshot:
+	// the ignored extras are named in the message rather than silently subtracted from "got".
+	if len(actualMap)-extraIgnored != len(expectedMap) {
+		ignoredNote := ""
+		if extraIgnored > 0 {
+			ignoredNote = fmt.Sprintf(" (%d ignored)", extraIgnored)
+		}
+		errors = append(errors, fmt.Errorf("mismatch at path '%s': map key count differs, got %d keys%s, want %d keys", path, len(actualMap), ignoredNote, len(expectedMap)))
 	}
 
 	return errors

@@ -124,10 +124,11 @@ type httpConfig struct {
 	QueryParams       []queryParam             `mapstructure:"query_params" validate:"omitempty,dive"`
 	Headers           []header                 `mapstructure:"headers" validate:"omitempty,dive"`
 	PathParams        []pathParam              `mapstructure:"path_params" validate:"omitempty,dive"`
-	IsBatchingEnabled *bool                    `mapstructure:"is_batching_enabled"`
+	IsBatchingEnabled *bool                    `mapstructure:"is_batching_enabled" default:"false"`
 	MaxBatchSize      string                   `mapstructure:"max_batch_size" validate:"required_if=IsBatchingEnabled true,omitempty,pattern=http_max_batch_size"`
 	EventFiltering    *eventFiltering          `mapstructure:"event_filtering"`
-	IsDefaultMapping  *bool                    `mapstructure:"is_default_mapping"`
+	IsDefaultMapping  *bool                    `mapstructure:"is_default_mapping" default:"true"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -193,6 +194,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("isDefaultMapping", "is_default_mapping"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

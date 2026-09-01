@@ -7,6 +7,10 @@
   "type": "SNOWFLAKE",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "account": "rudder-cli-e2e.us-east-1",
     "allowUsersContextTraits": false,
     "database": "RUDDER_E2E",
@@ -26,7 +30,12 @@
     "useKeyPairAuth": false,
     "useRudderStorage": true,
     "user": "RUDDER_CLI_E2E",
-    "warehouse": "RUDDER_WH"
+    "warehouse": "RUDDER_WH",
+    "cloudProvider": "AWS",
+    "cleanupObjectStorageFiles": false,
+    "roleBasedAuth": true,
+    "enableSSE": false,
+    "useSASTokens": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

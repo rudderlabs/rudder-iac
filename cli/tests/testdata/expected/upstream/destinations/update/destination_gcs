@@ -9,6 +9,10 @@
   "config": {
     "bucketName": "rudder-cli-e2e-gcs",
     "prefix": "rudder/gcs/updated/",
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "consentManagement": {
       "web": [
         {

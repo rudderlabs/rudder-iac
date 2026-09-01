@@ -7,6 +7,10 @@
   "type": "KINESIS",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "region": "us-east-2",
     "stream": "rudder-cli-e2e-updated",
     "roleBasedAuth": false,

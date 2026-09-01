@@ -99,30 +99,30 @@ type snowflakeConfig struct {
 	SyncStartAt   string         `mapstructure:"sync_start_at" validate:"omitempty"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
-	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table"`
-	SkipUsersTable          *bool  `mapstructure:"skip_users_table"`
-	PreferAppend            *bool  `mapstructure:"prefer_append"`
-	ManualSync              *bool  `mapstructure:"manual_sync"`
+	SkipTracksTable         *bool  `mapstructure:"skip_tracks_table" default:"false"`
+	SkipUsersTable          *bool  `mapstructure:"skip_users_table" default:"true"`
+	PreferAppend            *bool  `mapstructure:"prefer_append" default:"true"`
+	ManualSync              *bool  `mapstructure:"manual_sync" default:"false"`
 	JSONPaths               string `mapstructure:"json_paths" validate:"omitempty"`
-	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers"`
-	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits"`
+	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
+	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
 
 	// Object-storage staging. Upstream keeps every provider's keys in the same
 	// flat object, so conditionals only validate the active provider; stale keys
 	// from another provider can still round-trip without erasure.
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
-	CloudProvider             string `mapstructure:"cloud_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=AWS GCP AZURE"`
+	CloudProvider             string `mapstructure:"cloud_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=AWS GCP AZURE" default:"AWS"`
 	Prefix                    string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files"`
+	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 	StorageIntegration        string `mapstructure:"storage_integration" validate:"required_unless=UseRudderStorage true CloudProvider AWS,omitempty,dynamic_or_pattern=single_line_100"`
 
 	// AWS
 	BucketName    string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
-	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth" default:"true"`
 	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,pattern=single_line_100"`
 	AccessKey     string `mapstructure:"access_key" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
-	EnableSSE     *bool  `mapstructure:"enable_sse"`
+	EnableSSE     *bool  `mapstructure:"enable_sse" default:"false"`
 
 	// GCP
 	Credentials string `mapstructure:"credentials" validate:"required_if=UseRudderStorage false CloudProvider GCP"`
@@ -131,9 +131,10 @@ type snowflakeConfig struct {
 	ContainerName string `mapstructure:"container_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=azure_container_name"`
 	AccountName   string `mapstructure:"account_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
 	AccountKey    string `mapstructure:"account_key" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens false,omitempty,dynamic_or_pattern=single_line_100"`
-	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
+	UseSASTokens  *bool  `mapstructure:"use_sas_tokens" default:"false"`
 	SASToken      string `mapstructure:"sas_token" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens true"`
 
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -179,6 +180,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useSASTokens", "use_sas_tokens"),
 		converter.Simple("sasToken", "sas_token"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

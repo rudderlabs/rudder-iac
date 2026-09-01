@@ -1,0 +1,64 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "adobe-analytics",
+  "name": "E2E Adobe Analytics Updated",
+  "type": "ADOBE_ANALYTICS",
+  "enabled": true,
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "contextDataMapping": [
+      {
+        "from": "source",
+        "to": "sourceName"
+      }
+    ],
+    "contextDataPrefix": "rudder2.",
+    "dropVisitorId": true,
+    "eVarMapping": [
+      {
+        "from": "tier",
+        "to": "2"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "heartbeatTrackingServerUrl": "heartbeat-updated.example.com",
+    "marketingCloudOrgId": "rudderCliE2eOrgIdUpdated",
+    "noFallbackVisitorId": false,
+    "preferVisitorId": false,
+    "productIdentifier": "id",
+    "reportSuiteIds": "rudderCliE2eRsidUpdated",
+    "sslHeartbeat": false,
+    "timestampOption": "enabled",
+    "timestampOptionalReporting": false,
+    "trackPageName": false,
+    "trackingServerSecureUrl": "secure-updated.example.com",
+    "trackingServerUrl": "metrics-updated.example.com",
+    "useNativeSDK": {
+      "web": false
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

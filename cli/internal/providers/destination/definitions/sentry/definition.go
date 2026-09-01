@@ -47,13 +47,14 @@ type sentryConfig struct {
 	Release               string                   `mapstructure:"release"`
 	ServerName            string                   `mapstructure:"server_name"`
 	Logger                string                   `mapstructure:"logger"`
-	DebugMode             *bool                    `mapstructure:"debug_mode"`
+	DebugMode             *bool                    `mapstructure:"debug_mode" default:"false"`
 	IgnoreErrors          []string                 `mapstructure:"ignore_errors" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	IncludePaths          []string                 `mapstructure:"include_paths" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 	AllowURLs             []string                 `mapstructure:"allow_urls" validate:"omitempty,dive,dynamic_or_pattern=sentry_url"`
 	DenyURLs              []string                 `mapstructure:"deny_urls" validate:"omitempty,dive,dynamic_or_pattern=sentry_url"`
 	EventFiltering        *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK          *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -81,6 +82,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

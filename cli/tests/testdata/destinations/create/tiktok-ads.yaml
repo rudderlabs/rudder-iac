@@ -17,8 +17,12 @@ spec:
     events_to_standard:
       - from: Order Completed
         to: CompletePayment
-    event_filtering_whitelist:
-      - Order Completed
-      - Product Added
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Added
     use_native_sdk:
       web: true
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

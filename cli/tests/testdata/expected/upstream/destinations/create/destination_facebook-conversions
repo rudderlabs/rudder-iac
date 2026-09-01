@@ -1,5 +1,9 @@
 {
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "actionSource": "website",
     "blacklistPiiProperties": [
       {

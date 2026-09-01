@@ -3,6 +3,8 @@
     "apiUrl": "https://webhooks.example.com/rudder/events",
     "auth": "bearerTokenAuth",
     "format": "XML",
+    "isBatchingEnabled": false,
+    "isDefaultMapping": true,
     "method": "POST",
     "xmlRootKey": "rudderEvent"
   },

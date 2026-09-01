@@ -28,8 +28,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native",
-		"flutter", "cordova", "shopify",
+		"unity", "cloud", "react_native",
+		"flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -144,16 +144,68 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "unknown config field")
 	})
 
-	t.Run("connection_mode rejected as unknown key", func(t *testing.T) {
+	t.Run("connection_mode accepts supported source modes", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
-		config["connection_mode"] = map[string]any{"web": "cloud"}
+		config["connection_mode"] = map[string]any{
+			"web":            "cloud",
+			"android_kotlin": "cloud",
+		}
+
+		errors := registered.ValidateConfig(config)
+
+		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects non-cloud values", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"device", "hybrid"} {
+			config := minimalConfig()
+			config["connection_mode"] = map[string]any{"web": mode}
+
+			errors := registered.ValidateConfig(config)
+
+			require.Len(t, errors, 1, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of", mode)
+		}
+	})
+
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["connection_mode"] = map[string]any{"web": "{{ .CONFLUENT_CLOUD_CONNECTION_MODE || cloud }}"}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["connection_mode"] = map[string]any{"web": ""}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["connection_mode"] = map[string]any{"web": true}
 
 		errors := registered.ValidateConfig(config)
 
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	t.Run("valid minimal config", func(t *testing.T) {
@@ -172,6 +224,10 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 			"topic":            "rudder-cli-events",
 			"api_key":          "{{ .CONFLUENT_CLOUD_API_KEY }}",
 			"api_secret":       "{{ .CONFLUENT_CLOUD_API_SECRET }}",
+			"connection_mode": map[string]any{
+				"web":            "cloud",
+				"android_kotlin": "cloud",
+			},
 		})
 
 		assert.Empty(t, errors)
@@ -180,6 +236,10 @@ func TestConfluentCloudConfigValidation(t *testing.T) {
 	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
+		config["connection_mode"] = map[string]any{
+			"web":            "cloud",
+			"android_kotlin": "cloud",
+		}
 		config["consent_management"] = map[string]any{
 			"android_kotlin": []any{
 				map[string]any{
@@ -281,6 +341,29 @@ func TestConfluentCloudConversionRoundTrip(t *testing.T) {
 				"topic": "rudder-cli-e2e",
 				"apiKey": "confluent-cloud-api-key",
 				"apiSecret": "confluent-cloud-api-secret"
+			}`,
+		},
+		{
+			Name: "connection mode source boundary mappings",
+			LocalJSON: `{
+				"bootstrap_server": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
+				"topic": "rudder-cli-e2e",
+				"api_key": "confluent-cloud-api-key",
+				"api_secret": "confluent-cloud-api-secret",
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
+			}`,
+			APIJSON: `{
+				"bootstrapServer": "pkc-00000.us-central1.gcp.confluent.cloud:9092",
+				"topic": "rudder-cli-e2e",
+				"apiKey": "confluent-cloud-api-key",
+				"apiSecret": "confluent-cloud-api-secret",
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{

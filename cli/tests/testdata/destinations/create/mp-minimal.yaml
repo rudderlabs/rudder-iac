@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: mp-minimal
+spec:
+  id: mp-minimal
+  display_name: E2E Mixpanel Minimal
+  type: mp
+  enabled: true
+  definition_version: 1
+  config:
+    token: "{{ .MP_TOKEN }}"
+    data_residency: us
+    identity_merge_api: simplified

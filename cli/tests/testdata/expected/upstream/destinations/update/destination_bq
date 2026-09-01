@@ -7,6 +7,10 @@
   "type": "BQ",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "allowUsersContextTraits": false,
     "bucketName": "rudder-cli-e2e-bq-updated",
     "cleanupObjectStorageFiles": false,

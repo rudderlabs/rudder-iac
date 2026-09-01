@@ -7,6 +7,10 @@
   "type": "ZENDESK",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "email": "rudder-cli-e2e@example.com",
     "domain": "rudder-cli-e2e-updated",
     "sourceName": "rudder-updated",

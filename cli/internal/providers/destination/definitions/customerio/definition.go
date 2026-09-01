@@ -34,10 +34,18 @@ var connectionModes = map[string][]string{
 }
 
 type customerioConfig struct {
-	SiteID                      string                   `mapstructure:"site_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	APIKey                      string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
-	DeviceTokenEventName        string                   `mapstructure:"device_token_event_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Datacenter                  string                   `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
+	SiteID               string `mapstructure:"site_id" validate:"required,dynamic_or_pattern=single_line_100"`
+	APIKey               string `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
+	DeviceTokenEventName string `mapstructure:"device_token_event_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	Datacenter           string `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
+	// The v2 API path: both keys are declared by schema.json and db-config, and
+	// were unmodelled, so update erased whatever the UI had set.
+	// Since integrations-config #2661 the backend persists api_version, applying
+	// the schema default "v1" when the key is absent (the destinations e2e caught
+	// the extra key upstream). Declare the same default so a spec omitting it
+	// matches what the backend stores instead of diffing on every apply.
+	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2" default:"v1"`
+	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"required_if=APIVersion v2,omitempty,oneof=id email phone cio_id"`
 	UseNativeSDK                *sdkSourceBools          `mapstructure:"use_native_sdk"`
 	SendPageNameInSDK           *webBool                 `mapstructure:"send_page_name_in_sdk"`
 	DataUseInApp                *webBool                 `mapstructure:"data_use_in_app"`
@@ -45,6 +53,7 @@ type customerioConfig struct {
 	BackgroundQueueMinTasks     *androidString           `mapstructure:"background_queue_min_number_of_tasks"`
 	BackgroundQueueSecondsDelay *androidString           `mapstructure:"background_queue_seconds_delay"`
 	EventFiltering              *eventFiltering          `mapstructure:"event_filtering"`
+	ConnectionMode              common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement           common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -79,6 +88,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("apiKey", "api_key"),
 		converter.Simple("deviceTokenEventName", "device_token_event_name"),
 		converter.Simple("datacenter", "datacenter"),
+		converter.Simple("apiVersion", "api_version"),
+		converter.Simple("userIdIdentifierType", "user_id_identifier_type"),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
@@ -113,6 +124,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

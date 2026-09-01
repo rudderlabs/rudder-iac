@@ -3,8 +3,11 @@ match_behavior:
   # Cross-resource checks over the project graph: both endpoint refs must
   # resolve to project resources (V-C1), a source-destination pair can only be
   # connected once (V-C3), the destination definition must support the
-  # source's mapped type (V-C4) and its config must carry the fields that type
-  # requires to connect (V-C5), and a destination cannot receive from both
+  # source's mapped type (V-C4), its config must carry the fields that type
+  # requires to connect (V-C5) and, in connection_mode or use_native_sdk, an
+  # entry for that type (V-C6 — skipped where the config surface has neither
+  # block, or cannot name that source type in one), and a destination cannot
+  # receive from both
   # event stream and rETL sources (V-E1 — cannot fire today: the edge scan
   # covers only event stream connections, so it starts firing once the
   # retl-connections kind lands and its connections are folded into
@@ -42,6 +45,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -71,6 +76,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -140,6 +147,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -203,6 +212,51 @@ match_behavior:
             reference: "/spec/connections/0/destination"
             severity: "error"
             message_contains: "does not support source 'my-python-source'"
+      - example_id: "es-connection-semantic-missing-connection-mode"
+        title: "Destination declaring no settings for the source's type"
+        description: "S3 has a connection_mode block and no use_native_sdk block, and its connection_mode names android only. The connecting JavaScript source maps to the web source type."
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: true
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  android: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "has no 'connection_mode' entry for source type 'web'"
       - example_id: "es-connection-semantic-missing-required-config"
         title: "Destination config missing a field the source type requires to connect"
         description: "The WEBHOOK definition here requires webhook_url in the destination config before a web source may connect; the config omits it."

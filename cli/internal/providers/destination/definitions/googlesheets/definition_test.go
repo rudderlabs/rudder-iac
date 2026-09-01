@@ -27,8 +27,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -142,7 +142,75 @@ func TestGoogleSheetsConfigValidation(t *testing.T) {
 				map[string]any{"from": "event", "to": "Event Name"},
 				map[string]any{"from": "properties.revenue", "to": "Revenue"},
 			},
+			"connection_mode": map[string]any{
+				"web":            "cloud",
+				"android_kotlin": "cloud",
+			},
 		}))
+	})
+
+	t.Run("connection_mode accepts supported source modes", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{
+			"web":            "cloud",
+			"android_kotlin": "cloud",
+		}
+
+		errors := registered.ValidateConfig(config)
+
+		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects non-cloud values", func(t *testing.T) {
+		t.Parallel()
+		for _, mode := range []string{"device", "hybrid"} {
+			config := validMinimalConfig()
+			config["connection_mode"] = map[string]any{"web": mode}
+
+			errors := registered.ValidateConfig(config)
+
+			require.Len(t, errors, 1, mode)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, mode)
+			assert.Contains(t, errors[0].Message, "must be one of", mode)
+		}
+	})
+
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": "{{ .GOOGLESHEETS_CONNECTION_MODE || cloud }}"}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": ""}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"web": true}
+
+		errors := registered.ValidateConfig(config)
+
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -231,7 +299,7 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "full mappings",
+			Name: "full mappings with connection mode",
 			LocalJSON: `{
 				"credentials": "secret-value",
 				"sheet_id": "sheet-123",
@@ -239,7 +307,11 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 				"event_key_map": [
 					{"from": "properties.product_name", "to": "Product Name"},
 					{"from": "properties.revenue", "to": "Revenue"}
-				]
+				],
+				"connection_mode": {
+					"web": "cloud",
+					"android_kotlin": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"credentials": "secret-value",
@@ -248,7 +320,11 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 				"eventKeyMap": [
 					{"from": "properties.product_name", "to": "Product Name"},
 					{"from": "properties.revenue", "to": "Revenue"}
-				]
+				],
+				"connectionMode": {
+					"web": "cloud",
+					"androidKotlin": "cloud"
+				}
 			}`,
 		},
 		{
@@ -262,8 +338,7 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 				],
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
-					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"react_native": [{"provider": "iubenda"}]
 				}
 			}`,
 			APIJSON: `{
@@ -275,8 +350,7 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 				],
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
-					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "ketch"}]
+					"reactnative": [{"provider": "iubenda"}]
 				}
 			}`,
 		},
@@ -303,6 +377,10 @@ func validFullConfig() map[string]any {
 			map[string]any{"from": "userId", "to": "User ID"},
 			map[string]any{"from": "properties.product_name", "to": "Product Name"},
 			map[string]any{"from": "properties.revenue", "to": "Revenue"},
+		},
+		"connection_mode": map[string]any{
+			"web":            "cloud",
+			"android_kotlin": "cloud",
 		},
 		"consent_management": map[string]any{
 			"web": []any{

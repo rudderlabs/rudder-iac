@@ -40,8 +40,30 @@ type adjustMapping struct {
 }
 
 type enableInstallAttributionTracking struct {
-	Android *bool `mapstructure:"android"`
-	IOS     *bool `mapstructure:"ios"`
+	Android       *bool `mapstructure:"android"`
+	AndroidKotlin *bool `mapstructure:"android_kotlin"`
+	IOS           *bool `mapstructure:"ios"`
+	IOSSwift      *bool `mapstructure:"ios_swift"`
+}
+
+// Sub-key set mirrors schema.json; db-config lists the same six source types
+// under destConfig. Not gated, following the source-type block convention
+// use_native_sdk shares with consent_management and connection_mode.
+type useNativeSDK struct {
+	Android       *bool `mapstructure:"android"`
+	AndroidKotlin *bool `mapstructure:"android_kotlin"`
+	IOS           *bool `mapstructure:"ios"`
+	IOSSwift      *bool `mapstructure:"ios_swift"`
+	Unity         *bool `mapstructure:"unity"`
+	Flutter       *bool `mapstructure:"flutter"`
+}
+
+// Nested event_filtering block, matching the fleet convention (braze,
+// facebook_pixel, ...). schema.json patterns each eventName the same way as
+// the mapping fields.
+type eventFiltering struct {
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
 // adjustConfig is the local YAML config model. Field set mirrors terraform
@@ -52,14 +74,13 @@ type enableInstallAttributionTracking struct {
 type adjustConfig struct {
 	AppToken                         string                            `mapstructure:"app_token" validate:"required,pattern=single_line_100"`
 	Delay                            string                            `mapstructure:"delay" validate:"omitempty,pattern=single_line_100"`
-	Environment                      *bool                             `mapstructure:"environment"`
+	Environment                      *bool                             `mapstructure:"environment" default:"false"`
 	CustomMappings                   []adjustMapping                   `mapstructure:"custom_mappings" validate:"omitempty,dive"`
 	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_params_keys" validate:"omitempty,dive"`
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`
-	// schema.json patterns each eventName the same way as the mapping fields.
-	EventFilteringWhitelist []string                 `mapstructure:"event_filtering_whitelist" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	EventFilteringBlacklist []string                 `mapstructure:"event_filtering_blacklist" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
+	UseNativeSDK                     *useNativeSDK                     `mapstructure:"use_native_sdk"`
+	EventFiltering                   *eventFiltering                   `mapstructure:"event_filtering"`
+	ConsentManagement                common.ConsentManagement          `mapstructure:"consent_management"`
 }
 
 // NewDefinition returns the Adjust destination definition.
@@ -78,17 +99,31 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Gated(
 			converter.Simple("enableInstallAttributionTracking.android", "enable_install_attribution_tracking.android"),
-			common.SourceTypeAndroid, common.SourceTypeAndroidKotlin,
+			common.SourceTypeAndroid,
+		),
+		converter.Gated(
+			converter.Simple("enableInstallAttributionTracking.androidKotlin", "enable_install_attribution_tracking.android_kotlin"),
+			common.SourceTypeAndroidKotlin,
 		),
 		converter.Gated(
 			converter.Simple("enableInstallAttributionTracking.ios", "enable_install_attribution_tracking.ios"),
-			common.SourceTypeIOS, common.SourceTypeIOSSwift,
+			common.SourceTypeIOS,
 		),
-		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering_whitelist"),
-		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering_blacklist"),
+		converter.Gated(
+			converter.Simple("enableInstallAttributionTracking.iosSwift", "enable_install_attribution_tracking.ios_swift"),
+			common.SourceTypeIOSSwift,
+		),
+		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
+		converter.Simple("useNativeSDK.androidKotlin", "use_native_sdk.android_kotlin"),
+		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
+		converter.Simple("useNativeSDK.iosSwift", "use_native_sdk.ios_swift"),
+		converter.Simple("useNativeSDK.unity", "use_native_sdk.unity"),
+		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
-			"event_filtering_whitelist": "whitelistedEvents",
-			"event_filtering_blacklist": "blacklistedEvents",
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
 	properties = append(properties, common.Properties(sourceTypes)...)

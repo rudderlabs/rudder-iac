@@ -1,0 +1,39 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: mp
+spec:
+  id: mp
+  display_name: E2E Mixpanel Updated
+  type: mp
+  enabled: true
+  definition_version: 1
+  config:
+    token: "{{ .MP_TOKEN }}"
+    data_residency: eu
+    identity_merge_api: original
+    user_deletion_api: engage
+    service_account_user_name: rudderCliE2eServiceUserUpdated
+    service_account_secret: "{{ .MP_SERVICE_ACCOUNT_SECRET }}"
+    project_id: rudderCliE2eProjectUpdated
+    strict_mode: false
+    people: false
+    set_all_traits_by_default: true
+    persistence_type: cookie
+    persistence_name: rudderCliE2eCookieUpdated
+    secure_cookie: false
+    session_replay_percentage:
+      web: "50"
+    use_native_sdk:
+      web: false
+    connection_mode:
+      web: cloud
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics

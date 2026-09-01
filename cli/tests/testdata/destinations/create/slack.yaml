@@ -10,3 +10,6 @@ spec:
   definition_version: 1
   config:
     webhook_url: https://hooks.slack.com/services/T000/B000/example
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

@@ -60,14 +60,14 @@ func TestGatedKeyPathsNestedKey(t *testing.T) {
 
 	def := GA4TestDefinition()
 	def.Properties = []converter.ConfigProperty{
-		converter.Gated(converter.Simple("connectionMode.web", "connection_mode.web"), "web"),
+		converter.Gated(converter.Simple("nestedBlock.web", "nested_block.web"), "web"),
 	}
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string][]string{
-		"connection_mode/web": {"web"},
+		"nested_block/web": {"web"},
 	}, registered.GatedKeyPaths())
 }
 

@@ -1,0 +1,504 @@
+package googleads_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+)
+
+func TestNewDefinitionMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(googleads.NewDefinition()))
+
+	registered, err := registry.Get("googleads", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, "googleads", registered.Type)
+	assert.Equal(t, "GOOGLEADS", registered.APIType)
+	assert.Equal(t, int64(1), registered.Version)
+	assert.Equal(t, []string{}, registered.SecretKeys())
+
+	expectedSourceTypes := []string{"web"}
+	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	modes, err := registered.ConnectionModes("web")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"device"}, modes)
+
+	assert.Empty(t, registered.GatedKeyPaths())
+
+	byAPI, err := registry.GetByAPIType("GOOGLEADS", 1)
+	require.NoError(t, err)
+	assert.Equal(t, registered, byAPI)
+}
+
+func TestGoogleAdsConfigValidation(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(googleads.NewDefinition()))
+	registered, err := registry.Get("googleads", 1)
+	require.NoError(t, err)
+
+	t.Run("missing conversion_id", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/conversion_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	t.Run("invalid conversion_id rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "123456789",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/conversion_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be a Google Ads conversion ID starting with AW-")
+	})
+
+	t.Run("env-style conversion_id rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "env.CONVERSION_ID",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/conversion_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be a Google Ads conversion ID starting with AW-")
+	})
+
+	t.Run("valid minimal config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("valid full config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"page_load_conversions": []any{
+				map[string]any{"label": "page-label", "name": "home"},
+			},
+			"click_event_conversions": []any{
+				map[string]any{"label": "click-label", "name": "Purchase"},
+			},
+			"default_page_conversion": "default-label",
+			"dynamic_remarketing": map[string]any{
+				"web": true,
+			},
+			"conversion_linker":          true,
+			"send_page_view":             true,
+			"disable_ad_personalization": true,
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Product Viewed", "Order Completed"},
+			},
+			"use_native_sdk": map[string]any{
+				"web": true,
+			},
+			"consent_management": map[string]any{
+				"web": []any{
+					map[string]any{
+						"provider": "oneTrust",
+						"consents": []any{"analytics"},
+					},
+				},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("valid example yaml config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"page_load_conversions": []any{
+				map[string]any{"label": "abcDEF123", "name": "home"},
+			},
+			"click_event_conversions": []any{
+				map[string]any{"label": "xyzABC456", "name": "Purchase"},
+			},
+			"default_page_conversion": "defaultLabel",
+			"dynamic_remarketing": map[string]any{
+				"web": true,
+			},
+			"conversion_linker":          true,
+			"send_page_view":             true,
+			"disable_ad_personalization": false,
+			"event_filtering": map[string]any{
+				"blacklist": []any{"Application Opened"},
+			},
+			"use_native_sdk": map[string]any{
+				"web": true,
+			},
+			"consent_management": map[string]any{
+				"web": []any{
+					map[string]any{
+						"provider":            "oneTrust",
+						"resolution_strategy": "and",
+						"consents":            []any{"analytics", "marketing"},
+					},
+				},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	// schema.json marks neither conversion field required, so a partial entry is
+	// valid upstream and must stay valid here.
+	t.Run("page_load_conversions entry without label accepted", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"page_load_conversions": []any{
+				map[string]any{"name": "home"},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("page_load_conversions label rejects line break", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"page_load_conversions": []any{
+				map[string]any{"label": "lab\nel", "name": "home"},
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/page_load_conversions/0/label", errors[0].Path)
+	})
+
+	t.Run("conversion_id accepts template", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "{{ .googleads.conversionID || \"AW-123456789\" }}",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("sdk_base_url accepts a domain and rejects a bare host", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"sdk_base_url":  "https://cdn.example.com/gtag",
+		}))
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"sdk_base_url":  "localhost",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sdk_base_url", errors[0].Path)
+	})
+
+	t.Run("sdk_base_url rejects a value over 500 characters", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"sdk_base_url":  "https://cdn.example.com/" + strings.Repeat("a", 500),
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sdk_base_url", errors[0].Path)
+	})
+
+	t.Run("event_mapping_from_config rejects an unknown target event", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"event_mapping_from_config": []any{
+				map[string]any{"from": "Order Completed", "to": "NotAGoogleEvent"},
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/event_mapping_from_config/0/to", errors[0].Path)
+	})
+
+	t.Run("conversion and dynamic remarketing tracking keys accepted", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id":                               "AW-123456789",
+			"v2":                                          true,
+			"allow_identify":                              true,
+			"allow_enhanced_conversions":                  true,
+			"enable_conversion_label":                     true,
+			"track_conversions":                           true,
+			"enable_conversion_events_filtering":          true,
+			"events_to_track_conversions":                 []any{"Order Completed"},
+			"track_dynamic_remarketing":                   true,
+			"enable_dynamic_remarketing_events_filtering": true,
+			"events_to_track_dynamic_remarketing":         []any{"Product Viewed"},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("whitelist and blacklist are mutually exclusive", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed"},
+				"blacklist": []any{"Application Opened"},
+			},
+		})
+		require.NotEmpty(t, errors)
+	})
+
+	t.Run("unknown key rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"not_a_field":   true,
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/not_a_field", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
+	})
+
+	t.Run("unsupported consent source rejected", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"consent_management": map[string]any{
+				"android": []any{},
+			},
+		})
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/android", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'android' is not supported")
+	})
+
+	t.Run("invalid consent provider rejected", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"consent_management": map[string]any{
+				"web": []any{
+					map[string]any{"provider": "unknown"},
+				},
+			},
+		})
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/web/0/provider", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "'provider' must be one of")
+	})
+}
+
+func TestGoogleAdsDefaultsAndConnectionMode(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(googleads.NewDefinition()))
+	registered, err := registry.Get("googleads", 1)
+	require.NoError(t, err)
+
+	// schema.json defaults these; two of them (enable_*_events_filtering) are
+	// declared inside allOf branches, which the skill treats as belonging to
+	// the top-level key. eventFilteringOption is Discriminator-derived and has
+	// no local key to tag.
+	assert.Equal(t, map[string]any{
+		"v2":                                          true,
+		"allow_identify":                              false,
+		"conversion_linker":                           true,
+		"send_page_view":                              true,
+		"disable_ad_personalization":                  false,
+		"enable_conversion_label":                     false,
+		"allow_enhanced_conversions":                  false,
+		"track_conversions":                           true,
+		"track_dynamic_remarketing":                   false,
+		"enable_conversion_events_filtering":          false,
+		"enable_dynamic_remarketing_events_filtering": false,
+	}, registered.ApplyDefaults(map[string]any{}))
+
+	// db-config allows web device only.
+	assert.Empty(t, registered.ValidateConfig(map[string]any{
+		"conversion_id":   "AW-123456789",
+		"connection_mode": map[string]any{"web": "device"},
+	}))
+
+	errors := registered.ValidateConfig(map[string]any{
+		"conversion_id":   "AW-123456789",
+		"connection_mode": map[string]any{"web": "cloud"},
+	})
+	require.NotEmpty(t, errors)
+	assert.Equal(t, "/connection_mode/web", errors[0].Path)
+	assert.Contains(t, errors[0].Message, "must be one of")
+}
+
+func TestGoogleAdsConversionRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	def := googleads.NewDefinition()
+	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
+		{
+			Name: "minimal conversion id only",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789"
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789"
+			}`,
+		},
+		{
+			Name: "full TF fields with whitelist",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789",
+				"page_load_conversions": [
+					{"label": "page-label", "name": "home"}
+				],
+				"click_event_conversions": [
+					{"label": "click-label", "name": "Purchase"}
+				],
+				"default_page_conversion": "default-label",
+				"dynamic_remarketing": {"web": true},
+				"conversion_linker": true,
+				"send_page_view": true,
+				"disable_ad_personalization": true,
+				"event_filtering": {
+					"whitelist": ["Product Viewed", "Order Completed"]
+				},
+				"use_native_sdk": {"web": true}
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789",
+				"pageLoadConversions": [
+					{"conversionLabel": "page-label", "name": "home"}
+				],
+				"clickEventConversions": [
+					{"conversionLabel": "click-label", "name": "Purchase"}
+				],
+				"defaultPageConversion": "default-label",
+				"dynamicRemarketing": {"web": true},
+				"conversionLinker": true,
+				"sendPageView": true,
+				"disableAdPersonalization": true,
+				"whitelistedEvents": [
+					{"eventName": "Product Viewed"},
+					{"eventName": "Order Completed"}
+				],
+				"eventFilteringOption": "whitelistedEvents",
+				"useNativeSDK": {"web": true}
+			}`,
+		},
+		{
+			Name: "event filtering blacklist reshape",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789",
+				"event_filtering": {
+					"blacklist": ["Application Opened"]
+				}
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789",
+				"blacklistedEvents": [
+					{"eventName": "Application Opened"}
+				],
+				"eventFilteringOption": "blacklistedEvents"
+			}`,
+		},
+		{
+			Name: "conversion arrays reshape",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789",
+				"page_load_conversions": [
+					{"label": "lbl1", "name": "Page Viewed"}
+				],
+				"click_event_conversions": [
+					{"label": "lbl2", "name": "Signed Up"}
+				]
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789",
+				"pageLoadConversions": [
+					{"conversionLabel": "lbl1", "name": "Page Viewed"}
+				],
+				"clickEventConversions": [
+					{"conversionLabel": "lbl2", "name": "Signed Up"}
+				]
+			}`,
+		},
+		{
+			Name: "keys absent from terraform round-trip",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789",
+				"v2": true,
+				"allow_identify": true,
+				"sdk_base_url": "https://cdn.example.com/gtag",
+				"allow_enhanced_conversions": true,
+				"enable_conversion_label": false,
+				"track_conversions": true,
+				"enable_conversion_events_filtering": true,
+				"events_to_track_conversions": ["Order Completed"],
+				"track_dynamic_remarketing": true,
+				"enable_dynamic_remarketing_events_filtering": true,
+				"events_to_track_dynamic_remarketing": ["Product Viewed"],
+				"event_mapping_from_config": [
+					{"from": "Order Completed", "to": "purchase"},
+					{"from": "Product Added", "to": "AddToCart"}
+				]
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789",
+				"v2": true,
+				"allowIdentify": true,
+				"sdkBaseUrl": "https://cdn.example.com/gtag",
+				"allowEnhancedConversions": true,
+				"enableConversionLabel": false,
+				"trackConversions": true,
+				"enableConversionEventsFiltering": true,
+				"eventsToTrackConversions": [{"eventName": "Order Completed"}],
+				"trackDynamicRemarketing": true,
+				"enableDynamicRemarketingEventsFiltering": true,
+				"eventsToTrackDynamicRemarketing": [{"eventName": "Product Viewed"}],
+				"eventMappingFromConfig": [
+					{"from": "Order Completed", "to": "purchase"},
+					{"from": "Product Added", "to": "AddToCart"}
+				]
+			}`,
+		},
+		{
+			Name: "consent for web",
+			LocalJSON: `{
+				"conversion_id": "AW-123456789",
+				"consent_management": {
+					"web": [
+						{
+							"provider": "oneTrust",
+							"resolution_strategy": "and",
+							"consents": ["analytics", "marketing"]
+						}
+					]
+				}
+			}`,
+			APIJSON: `{
+				"conversionID": "AW-123456789",
+				"consentManagement": {
+					"web": [
+						{
+							"provider": "oneTrust",
+							"resolutionStrategy": "and",
+							"consents": [
+								{"consent": "analytics"},
+								{"consent": "marketing"}
+							]
+						}
+					]
+				}
+			}`,
+		},
+	})
+}

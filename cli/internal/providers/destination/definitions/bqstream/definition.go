@@ -35,14 +35,15 @@ var connectionModes = map[string][]string{
 }
 
 // bqstreamConfig is the local YAML config model. Field set mirrors
-// integrations-config destinations/bqstream defaultConfig; validation
-// constraints mirror schema.json required fields.
+// integrations-config destinations/bqstream defaultConfig plus schema-declared
+// source-scoped config such as connectionMode, exposed locally as connection_mode.
 type bqstreamConfig struct {
 	ProjectID         string                   `mapstructure:"project_id" validate:"required"`
 	DatasetID         string                   `mapstructure:"dataset_id" validate:"required"`
 	TableID           string                   `mapstructure:"table_id" validate:"required"`
 	InsertID          string                   `mapstructure:"insert_id"`
 	Credentials       string                   `mapstructure:"credentials" validate:"required"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -55,6 +56,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("insertId", "insert_id"),
 		converter.Simple("credentials", "credentials"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

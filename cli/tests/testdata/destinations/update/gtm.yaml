@@ -25,3 +25,5 @@ spec:
           consents:
             - analytics
             - marketing
+    connection_mode:
+      web: device

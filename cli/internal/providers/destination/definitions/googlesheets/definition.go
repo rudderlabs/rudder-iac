@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,24 +27,23 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // googleSheetsConfig is the local YAML config model. Field set mirrors the
-// integrations-config destinations/googlesheets defaultConfig; validation
-// constraints mirror schema.json, with required nested event mappings from the
-// Google Sheets UI/Terraform contract.
+// integrations-config destinations/googlesheets defaultConfig plus schema-declared
+// source-scoped config such as connectionMode, exposed locally as connection_mode.
+// Validation constraints mirror schema.json, with required nested event mappings
+// from the Google Sheets UI/Terraform contract.
 type googleSheetsConfig struct {
 	Credentials       string                   `mapstructure:"credentials" validate:"required"`
 	SheetID           string                   `mapstructure:"sheet_id" validate:"required"`
 	SheetName         string                   `mapstructure:"sheet_name" validate:"required"`
 	EventKeyMap       []eventKeyMapping        `mapstructure:"event_key_map" validate:"required,dive"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -72,6 +68,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

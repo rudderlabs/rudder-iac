@@ -1,0 +1,38 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: adobe-analytics
+spec:
+  id: adobe-analytics
+  display_name: E2E Adobe Analytics
+  type: adobe_analytics
+  enabled: true
+  definition_version: 1
+  config:
+    report_suite_ids: rudderCliE2eRsid
+    tracking_server_url: metrics.example.com
+    tracking_server_secure_url: secure.example.com
+    ssl_heartbeat: true
+    heartbeat_tracking_server_url: heartbeat.example.com
+    marketing_cloud_org_id: rudderCliE2eOrgId
+    drop_visitor_id: false
+    timestamp_option: hybrid
+    timestamp_optional_reporting: true
+    prefer_visitor_id: true
+    track_page_name: true
+    context_data_prefix: "rudder."
+    product_identifier: sku
+    e_var_mapping:
+      - from: plan
+        to: "1"
+    context_data_mapping:
+      - from: campaign
+        to: campaignName
+    use_native_sdk:
+      web: true
+    connection_mode:
+      web: device
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed

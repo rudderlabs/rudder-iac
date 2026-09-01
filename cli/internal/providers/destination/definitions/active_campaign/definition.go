@@ -63,6 +63,7 @@ type activeCampaignConfig struct {
 	ActID             string                   `mapstructure:"actid" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventKey          string                   `mapstructure:"event_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -75,6 +76,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("eventKey", "event_key"),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

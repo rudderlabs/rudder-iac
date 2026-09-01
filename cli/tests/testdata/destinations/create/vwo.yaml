@@ -1,0 +1,26 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: vwo
+spec:
+  id: vwo
+  display_name: E2E VWO
+  type: vwo
+  enabled: true
+  definition_version: 1
+  config:
+    account_id: rudderCliE2eAccount
+    is_spa: true
+    send_experiment_track: true
+    send_experiment_identify: false
+    library_tolerance: "2000"
+    settings_tolerance: "2000"
+    use_existing_jquery: false
+    use_native_sdk:
+      web: true
+    connection_mode:
+      web: device
+    event_filtering:
+      whitelist:
+        - Order Completed
+        - Product Viewed

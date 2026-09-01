@@ -1,0 +1,42 @@
+{
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "brandId": "rudderCliE2eFullBrandUpdated",
+    "consentManagement": {
+      "web": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "enableGenericPageTitle": {
+      "web": false
+    },
+    "eventFilteringOption": "blacklistedEvents",
+    "projectId": "rudderCliE2eFullProjectUpdated",
+    "useNativeSDK": {
+      "android": true,
+      "ios": true,
+      "web": false
+    }
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "qualtrics",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Qualtrics Updated",
+  "type": "QUALTRICS",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

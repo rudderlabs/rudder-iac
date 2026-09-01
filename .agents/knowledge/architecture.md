@@ -219,3 +219,30 @@
 - `facebook_pixel` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Facebook Pixel uses broad Facebook source types: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`; `web` supports both cloud and device modes while every other source type is cloud-only.
 - Facebook Pixel `SecretKeys` contains local `access_token`, following db-config `accessToken` secret metadata even though `schema.json` omits that field.
+
+## DEX-518 — Qualtrics Destination Onboarding
+<!-- ticket:DEX-518 -->
+- Qualtrics destination support is implemented as CLI local type `qualtrics`, API type `QUALTRICS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/qualtrics`.
+- `qualtrics` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Qualtrics source-type support is intentionally narrow: only `web`, `android`, and `ios` are supported, all in device-only connection mode.
+
+## DEX-719 — GCS Connection Mode Re-Onboarding
+<!-- ticket:DEX-719 -->
+- GCS is an existing destination definition, so connection-mode re-onboarding should update the existing GCS definition/tests/fixture-snapshot pairs rather than adding duplicate destination registry imports, app flag-matrix cases, or new definitions.
+- GCS remains an unverified destination in `cli/internal/app/dependencies.go`; keep registry gating under both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations`.
+- Integrations-config and Terraform remain read-only source-of-truth references for this re-onboarding path; the durable CLI-owned changes belong in `cli/internal/providers/destination/definitions/gcs` and destination E2E testdata.
+## DEX-512 — LinkedIn Ads Destination Onboarding
+<!-- ticket:DEX-512 -->
+- `linkedin_ads` follows ads-destination source-type precedent, closer to Facebook Conversions than cloud-storage destinations: include every upstream db-config source type with a destination common mapping (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) instead of trimming to the CLI-owned event-stream subset.
+- LinkedIn Ads supported source connection modes are cloud-only for all retained source types, matching the linkedIn_ads db-config contract.
+## DEX-527 — Snowpipe Streaming Models Its Whole Config Surface
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming models all 14 `destConfig.defaultConfig` keys, so nothing it owns is dropped when destination update replaces the whole config object; it needs no destination-specific preservation of unmodelled API keys.
+- The keys that are genuinely unmodelled by every destination are the legacy consent blocks `oneTrustCookieCategories` and `ketchConsentPurposes`: `common.Properties` maps consent management but not those two, so any destination carrying them upstream loses them on update. That is a cross-destination gap, not a Snowpipe one, and belongs in its own change rather than an opt-in flag on a single definition.
+
+## DEX-490 — Amplitude Destination Onboarding
+<!-- ticket:DEX-490 -->
+- Amplitude destination support is implemented as CLI destination type `am`, API type `AM`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/am`.
+- `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
+- Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.

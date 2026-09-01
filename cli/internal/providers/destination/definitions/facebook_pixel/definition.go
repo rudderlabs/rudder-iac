@@ -1,9 +1,14 @@
 package facebookpixel
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 // Source types from integrations-config destinations/facebook_pixel/db-config.json.
@@ -70,15 +75,15 @@ type legacyConversionPixelMapping struct {
 // validation constraints mirror schema.json where present.
 type facebookPixelConfig struct {
 	PixelID                 string                   `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	AccessToken             string                   `mapstructure:"access_token" validate:"omitempty,dynamic_or_pattern=single_line_300"`
-	StandardPageCall        *bool                    `mapstructure:"standard_page_call"`
-	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price"`
-	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping"`
-	LimitedDataUsage        *bool                    `mapstructure:"limited_data_usage"`
-	TestDestination         *bool                    `mapstructure:"test_destination"`
+	AccessToken             string                   `mapstructure:"access_token" validate:"facebook_pixel_access_token_required,omitempty,dynamic_or_pattern=single_line_300"`
+	StandardPageCall        *bool                    `mapstructure:"standard_page_call" default:"false"`
+	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price" default:"properties.price"`
+	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping" default:"false"`
+	LimitedDataUsage        *bool                    `mapstructure:"limited_data_usage" default:"false"`
+	TestDestination         *bool                    `mapstructure:"test_destination" default:"false"`
 	TestEventCode           string                   `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	RemoveExternalID        *bool                    `mapstructure:"remove_external_id"`
-	UseUpdatedMapping       *bool                    `mapstructure:"use_updated_mapping"`
+	RemoveExternalID        *bool                    `mapstructure:"remove_external_id" default:"false"`
+	UseUpdatedMapping       *bool                    `mapstructure:"use_updated_mapping" default:"false"`
 	EventsToEvents          []eventMapping           `mapstructure:"events_to_events" validate:"omitempty,dive"`
 	BlacklistPIIProperties  []piiDenylistEntry       `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
 	WhitelistPIIProperties  []piiAllowlistEntry      `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`
@@ -86,7 +91,39 @@ type facebookPixelConfig struct {
 	UseNativeSDK            webBool                  `mapstructure:"use_native_sdk"`
 	AutoConfig              webBool                  `mapstructure:"auto_config"`
 	LegacyConversionPixelID legacyConversionPixelID  `mapstructure:"legacy_conversion_pixel_id"`
+	ConnectionMode          common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
+}
+
+// schema.json requires accessToken unless connection_mode.web is device: the
+// server-side conversions API needs a token, the pure device-mode pixel does
+// not. The condition is keyed on a map entry, which required_if cannot resolve,
+// so it reads the sibling off FieldLevel.Parent(). The tag precedes omitempty,
+// which would otherwise short-circuit it on the empty value being rejected.
+func accessTokenConditional(fl validator.FieldLevel) bool {
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	field := parent.FieldByName("ConnectionMode")
+	if !field.IsValid() {
+		return true
+	}
+	connectionMode, _ := field.Interface().(common.ConnectionMode)
+
+	// The schema branch is not-wrapped over "connectionMode present AND, if web
+	// is set, web is device". JSON Schema `properties` constrains only keys that
+	// are present, so an absent web key satisfies it vacuously: a config with
+	// connection_mode {android: cloud} needs no token, while an absent
+	// connection_mode does.
+	if connectionMode != nil {
+		web, ok := connectionMode["web"]
+		if !ok || web == "device" {
+			return true
+		}
+	}
+	return fl.Field().String() != ""
 }
 
 // NewDefinition returns the Facebook Pixel destination definition.
@@ -132,6 +169,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
@@ -139,6 +177,9 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "FACEBOOK_PIXEL",
 		Version:    1,
 		Properties: properties,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "facebook_pixel_access_token_required", Func: accessTokenConditional},
+		},
 		SecretKeys: []string{"access_token"},
 		NewConfig: func() any {
 			return &facebookPixelConfig{}

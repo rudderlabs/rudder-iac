@@ -138,6 +138,103 @@ func TestCompareStates(t *testing.T) {
 				"mismatch at path '': extra key 'extraKey' in actual",
 			},
 		},
+		{
+			// A conditional response field (destinations get a versionInfo advisory only once
+			// their stored major falls behind current) must not fail every snapshot recorded
+			// before it existed.
+			name:     "an ignored key that is extra in actual is not a comparison error",
+			expected: expected,
+			actual: map[string]any{
+				"id":   "public_api_request",
+				"type": "event",
+				"input": map[string]any{
+					"categoryId":  nil,
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"name":        "Public API Requested",
+				},
+				"output": map[string]any{
+					"categoryId":  nil,
+					"createdAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"id":          "ev_2tFXvEpGOcjHChUcwyyyyyyy",
+					"name":        "Public API Requested",
+					"updatedAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+					"workspaceId": "2fmqH5sdM4QJocMlxxxxxxxx",
+				},
+				"dependencies": nil,
+				"versionInfo":  map[string]any{"status": "supported", "action": "upgrade_recommended"},
+			},
+			ignore: []string{"versionInfo"},
+		},
+		{
+			// The other direction stays strict: ignoring a key drops its value comparison, not
+			// the presence check, so a key the snapshot records must still come back.
+			name:     "an ignored key recorded in expected must still be returned",
+			expected: expected,
+			actual: map[string]any{
+				"id":   "public_api_request",
+				"type": "event",
+				"input": map[string]any{
+					"categoryId":  nil,
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"name":        "Public API Requested",
+				},
+				"output": map[string]any{
+					"categoryId":  nil,
+					"createdAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"id":          "ev_2tFXvEpGOcjHChUcwyyyyyyy",
+					"name":        "Public API Requested",
+					"updatedAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+				},
+				"dependencies": nil,
+			},
+			ignore:    []string{"output.workspaceId"},
+			expectErr: true,
+			errMsg: []string{
+				"mismatch at path 'output': map key count differs, got 7 keys, want 8 keys",
+				"mismatch at path 'output': missing key 'workspaceId' in actual",
+			},
+		},
+		{
+			// "got" is the size of the map as it stands, so it matches what a developer sees
+			// while debugging; the ignored extras are named rather than subtracted from it.
+			name:     "the key count names the ignored extras instead of subtracting them",
+			expected: expected,
+			actual: map[string]any{
+				"id":   "public_api_request",
+				"type": "event",
+				"input": map[string]any{
+					"categoryId":  nil,
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"name":        "Public API Requested",
+				},
+				"output": map[string]any{
+					"categoryId":  nil,
+					"createdAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+					"description": "This event is triggered everytime a public API is requested",
+					"eventType":   "track",
+					"id":          "ev_2tFXvEpGOcjHChUcwyyyyyyy",
+					"name":        "Public API Requested",
+					"updatedAt":   "2025-02-19 07:10:24.15 +0000 UTC",
+					"workspaceId": "2fmqH5sdM4QJocMlxxxxxxxx",
+				},
+				"dependencies": nil,
+				"versionInfo":  map[string]any{"status": "supported"},
+				"extraKey":     "extraValue",
+			},
+			ignore:    []string{"versionInfo"},
+			expectErr: true,
+			errMsg: []string{
+				"mismatch at path '': map key count differs, got 7 keys (1 ignored), want 5 keys",
+				"mismatch at path '': extra key 'extraKey' in actual",
+			},
+		},
 	}
 
 	for _, tt := range tests {

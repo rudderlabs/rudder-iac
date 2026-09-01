@@ -21,3 +21,6 @@ spec:
     convert_to_avro: false
     enable_multi_topic: false
     use_ssh: false
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

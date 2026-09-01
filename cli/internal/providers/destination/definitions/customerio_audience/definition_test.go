@@ -147,20 +147,33 @@ func TestCustomerioAudienceConfigValidation(t *testing.T) {
 
 	// connection_mode is definition-level metadata (ConnectionModes), never a
 	// user-settable config key — the same treatment every other definition gives it.
-	t.Run("connection_mode rejected as unknown key", func(t *testing.T) {
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"site_id":     "site-id-1",
-			"api_key":     "api-key-1",
-			"app_api_key": "app-api-key-1",
-			"region":      "US",
-			"connection_mode": map[string]any{
-				"warehouse": "cloud",
-			},
+			"connection_mode": map[string]any{"warehouse": "cloud"},
 		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/warehouse", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"warehouse": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/warehouse" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/warehouse to be rejected")
 	})
 
 	t.Run("valid minimal config", func(t *testing.T) {

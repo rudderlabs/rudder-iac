@@ -1,0 +1,33 @@
+{
+  "config": {
+    "consolidatedPageCalls": true,
+    "crossSubdomainCookie": false,
+    "dataResidency": "eu",
+    "dropTraitsInTrackEvent": false,
+    "identityMergeApi": "original",
+    "ignoreDnt": false,
+    "people": false,
+    "persistenceType": "cookie",
+    "secureCookie": false,
+    "setAllTraitsByDefault": false,
+    "strictMode": false,
+    "token": "mpTokenXXXXXXXXXXXXXXXXXXXXXX",
+    "trackCategorizedPages": false,
+    "trackNamedPages": false,
+    "useNewMapping": false,
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false,
+    "userDefinedPageEventTemplate": "Viewed {{ category }} {{ name }} page",
+    "userDefinedScreenEventTemplate": "Viewed {{ category }} {{ name }} screen",
+    "userDeletionApi": "engage"
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "mp-minimal",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Mixpanel Minimal Updated",
+  "type": "MP",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

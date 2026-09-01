@@ -18,7 +18,14 @@
     "sslMode": "disable",
     "syncFrequency": "360",
     "useRudderStorage": false,
-    "user": "rudder"
+    "user": "rudder",
+    "useSSH": false,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "preferAppend": true,
+    "allowUsersContextTraits": false,
+    "underscoreDivideNumbers": false,
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

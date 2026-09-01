@@ -121,15 +121,15 @@ func TestClientDestinationsGet(t *testing.T) {
 					"type": "some-type",
 					"externalId": "some-external-id",
 					"config": {"key1": "val1"},
-					"version": 2,
+					"version": 1,
 					"versionInfo": {
-						"status": "deprecated",
-						"action": "upgrade",
+						"status": "supported",
+						"action": "upgrade_recommended",
 						"retirementDate": "2026-12-31",
-						"migrationDocsURL": "https://docs.example.com/destinations/migration"
+						"migrationDocsUrl": "https://docs.example.com/destinations/migration"
 					},
 					"createdAt": "2020-01-01T01:01:01Z",
-					"updatedAt": "2020-01-02T01:01:01Z"	
+					"updatedAt": "2020-01-02T01:01:01Z"
 				}
 			}`,
 		},
@@ -148,10 +148,16 @@ func TestClientDestinationsGet(t *testing.T) {
 		Name:       "some-name",
 		Type:       "some-type",
 		ExternalID: "some-external-id",
-		Version:    2,
-		Config:     []byte(`{"key1": "val1"}`),
-		CreatedAt:  lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
-		UpdatedAt:  lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
+		Version:    1,
+		VersionInfo: &client.VersionInfo{
+			Status:           "supported",
+			Action:           "upgrade_recommended",
+			RetirementDate:   lo.ToPtr("2026-12-31"),
+			MigrationDocsURL: lo.ToPtr("https://docs.example.com/destinations/migration"),
+		},
+		Config:    []byte(`{"key1": "val1"}`),
+		CreatedAt: lo.ToPtr(time.Date(2020, 1, 1, 1, 1, 1, 0, time.UTC)),
+		UpdatedAt: lo.ToPtr(time.Date(2020, 1, 2, 1, 1, 1, 0, time.UTC)),
 	}, destination)
 
 	httpClient.AssertNumberOfCalls()
@@ -190,6 +196,60 @@ func TestClientDestinationsGetWithoutVersionInfo(t *testing.T) {
 		Type:   "some-type",
 		Config: []byte(`{"key1": "val1"}`),
 	}, destination)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDestinationsUpdateOmitsVersionInfo(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				// versionInfo is response-only: reading a destination and handing it straight back
+				// to Update must not echo the server's own advisory into the request body.
+				return testutils.ValidateRequest(t, req, "PUT", "https://api.rudderstack.com/v2/destinations/some-id", `{
+					"name": "some-name",
+					"type": "some-type",
+					"version": 1,
+					"enabled": true,
+					"config": { "key1": "val1" }
+				}`)
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"destination": {
+					"id": "some-id",
+					"name": "some-name",
+					"type": "some-type",
+					"config": {"key1": "val1"}
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	input := &client.Destination{
+		ID:        "some-id",
+		Name:      "some-name",
+		Type:      "some-type",
+		Version:   1,
+		IsEnabled: true,
+		Config:    json.RawMessage([]byte(`{"key1": "val1"}`)),
+		VersionInfo: &client.VersionInfo{
+			Status: "supported",
+			Action: "upgrade_recommended",
+		},
+	}
+
+	_, err = c.Destinations.Update(ctx, input)
+	require.NoError(t, err)
+	// the caller's struct is copied, never mutated
+	assert.NotNil(t, input.VersionInfo)
 
 	httpClient.AssertNumberOfCalls()
 }

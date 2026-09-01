@@ -21,5 +21,6 @@ spec:
     enable_install_attribution_tracking:
       android: false
       ios: true
-    event_filtering_whitelist:
-      - Order Completed
+    event_filtering:
+      whitelist:
+        - Order Completed

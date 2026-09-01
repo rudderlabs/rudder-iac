@@ -1,6 +1,7 @@
 package ga4_test
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -118,30 +119,78 @@ func TestGA4ConfigValidation(t *testing.T) {
 		}))
 	})
 
-	// schema.json constrains sdkBaseUrl under typesOfClient=gtag >
-	// connectionMode.web=device; the branch left it entirely unvalidated.
-	t.Run("sdk_base_url pattern enforced", func(t *testing.T) {
+	// schema.json only constrains sdk_base_url's format under client_type=gtag
+	// AND connection_mode.web=device. Now that connection_mode is real config
+	// (DEX-708), sdkBaseURLConditional reads both sibling fields and applies
+	// the pattern only inside that branch, instead of unconditionally.
+	t.Run("sdk_base_url pattern enforced when gtag and device", func(t *testing.T) {
 		t.Parallel()
 
 		for _, url := range []string{"nodots", "https://foo.ngrok.io", "foo.ngrok.io/gtm"} {
 			errors := registered.ValidateConfig(map[string]any{
-				"api_secret":     "secret",
-				"client_type":    "gtag",
-				"measurement_id": "G-XXXXXXXXXX",
-				"sdk_base_url":   url,
+				"api_secret":      "secret",
+				"client_type":     "gtag",
+				"measurement_id":  "G-XXXXXXXXXX",
+				"connection_mode": map[string]any{"web": "device"},
+				"sdk_base_url":    url,
 			})
 			require.NotEmpty(t, errors, url)
 			assert.Equal(t, "/sdk_base_url", errors[0].Path)
 		}
 
-		for _, url := range []string{"https://www.googletagmanager.com", "www.googletagmanager.com", ""} {
+		for _, url := range []string{
+			"https://www.googletagmanager.com",
+			"www.googletagmanager.com",
+			"",
+			"{{ sdkBaseUrl || https://www.googletagmanager.com }}",
+		} {
 			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"api_secret":      "secret",
+				"client_type":     "gtag",
+				"measurement_id":  "G-XXXXXXXXXX",
+				"connection_mode": map[string]any{"web": "device"},
+				"sdk_base_url":    url,
+			}), url)
+		}
+	})
+
+	t.Run("sdk_base_url unconstrained outside gtag+device", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name   string
+			config map[string]any
+		}{
+			{
+				name: "connection_mode.web not device",
+				config: map[string]any{
+					"connection_mode": map[string]any{"web": "cloud"},
+				},
+			},
+			{
+				name:   "connection_mode not set at all",
+				config: map[string]any{},
+			},
+		}
+		for _, tc := range cases {
+			config := map[string]any{
 				"api_secret":     "secret",
 				"client_type":    "gtag",
 				"measurement_id": "G-XXXXXXXXXX",
-				"sdk_base_url":   url,
-			}), url)
+				"sdk_base_url":   "not a domain url with spaces!!",
+			}
+			maps.Copy(config, tc.config)
+			assert.Empty(t, registered.ValidateConfig(config), tc.name)
 		}
+
+		// client_type=firebase never satisfies the gtag half of the condition.
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_secret":      "secret",
+			"client_type":     "firebase",
+			"firebase_app_id": "1:123:android:abc",
+			"connection_mode": map[string]any{"web": "device"},
+			"sdk_base_url":    "not a domain url with spaces!!",
+		}))
 	})
 
 	// Terraform maps blockPageViewEvent and sendUserId, but neither appears in
@@ -199,15 +248,34 @@ func TestGA4ConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
+	// Plain oneof, not dynamic_or_oneof: schema.json states these as exact-match
+	// enums with no template branch, so a template is rejected like any other
+	// value outside the enum.
 	t.Run("invalid client_type rejected", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"api_secret":     "secret",
-			"client_type":    "other",
-			"measurement_id": "G-XXXXXXXXXX",
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/client_type", errors[0].Path)
+		for _, clientType := range []string{"other", "{{ config.clientType || gtag }}", "env.CLIENT_TYPE"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":     "secret",
+				"client_type":    clientType,
+				"measurement_id": "G-XXXXXXXXXX",
+			})
+			require.NotEmpty(t, errors, clientType)
+			assert.Equal(t, "/client_type", errors[0].Path, clientType)
+		}
+	})
+
+	t.Run("invalid capture_page_view.web rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{"other", "{{ config.capturePageView || rs }}", "env.CAPTURE_PAGE_VIEW"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_secret":        "secret",
+				"client_type":       "gtag",
+				"measurement_id":    "G-XXXXXXXXXX",
+				"capture_page_view": map[string]any{"web": value},
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/capture_page_view/web", errors[0].Path, value)
+		}
 	})
 
 	t.Run("valid minimal gtag", func(t *testing.T) {
@@ -246,6 +314,11 @@ func TestGA4ConfigValidation(t *testing.T) {
 			},
 			"use_native_sdk": map[string]any{
 				"web": true,
+			},
+			"connection_mode": map[string]any{
+				"web":     "hybrid",
+				"android": "device",
+				"unity":   "cloud",
 			},
 			"capture_page_view": map[string]any{
 				"web": "rs",
@@ -332,6 +405,96 @@ func TestGA4ConfigValidation(t *testing.T) {
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/capture_page_view/web", errors[0].Path)
 	})
+
+	t.Run("connection_mode value validated per source type", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web":   "hybrid",
+				"unity": "hybrid", // unity only allows cloud
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// connectionMode is a plain enum upstream — no template branch, unlike the
+	// pattern-validated fields — so a template is rejected rather than passed
+	// through as an opaque dynamic value.
+	t.Run("connection_mode rejects a template", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"unity": "{{ .GA4_CONNECTION_MODE || cloud }}",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// An explicit empty string is a real value, not an absent key — it must be
+	// rejected like any other invalid entry, since converter.Simple never skips
+	// zero values (see converter-mapping.md) and would otherwise send an empty
+	// connectionMode.web upstream unvalidated.
+	t.Run("connection_mode rejects an empty string", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web": "",
+			},
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/connection_mode/web", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// A non-string value trips both the mapstructure decode error and
+	// validateConnectionMode's own type check, so the same path is reported
+	// twice. consent_management's shape check has the same pre-existing
+	// duplication; not something to fix here.
+	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"web": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	// The framework's generic source-type-scoped-key check (not this
+	// definition's own validation) is what catches this — connection_mode was
+	// reserved for it before any destination modeled a config field for it.
+	// See rule_spec_syntax_valid_test.go's coverage of this path.
+	t.Run("connection_mode for an unsupported source type does not error here", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_secret":     "secret",
+			"client_type":    "gtag",
+			"measurement_id": "G-XXXXXXXXXX",
+			"connection_mode": map[string]any{
+				"warehouse": "cloud",
+			},
+		})
+		assert.Empty(t, errors)
+	})
 }
 
 func TestGA4ConversionRoundTrip(t *testing.T) {
@@ -374,6 +537,10 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 					"android": true,
 					"ios": false
 				},
+				"connection_mode": {
+					"web": "hybrid",
+					"android": "device"
+				},
 				"capture_page_view": {"web": "rs"},
 				"debug_view": {"web": true},
 				"override_client_and_session_ids": {"web": true},
@@ -401,6 +568,10 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 					"web": true,
 					"android": true,
 					"ios": false
+				},
+				"connectionMode": {
+					"web": "hybrid",
+					"android": "device"
 				},
 				"capturePageView": {"web": "rs"},
 				"debugView": {"web": true},

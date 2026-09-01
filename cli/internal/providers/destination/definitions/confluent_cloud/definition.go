@@ -14,13 +14,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -30,23 +27,21 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 // confluentCloudConfig is the local YAML config model. Field set mirrors
 // integrations-config destinations/confluent_cloud schema/defaultConfig;
-// validations mirror schema.json.
+// validations mirror schema.json, including source-scoped connection_mode.
 type confluentCloudConfig struct {
 	BootstrapServer   string                   `mapstructure:"bootstrap_server" validate:"required,pattern=single_line_100"`
 	Topic             string                   `mapstructure:"topic" validate:"required,pattern=single_line_100"`
 	APIKey            string                   `mapstructure:"api_key" validate:"required,pattern=single_line_100"`
 	APISecret         string                   `mapstructure:"api_secret" validate:"required,pattern=single_line_100"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -58,6 +53,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("apiKey", "api_key"),
 		converter.Simple("apiSecret", "api_secret"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

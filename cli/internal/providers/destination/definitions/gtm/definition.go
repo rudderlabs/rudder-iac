@@ -50,6 +50,7 @@ type gtmConfig struct {
 	AuthorizationToken string                   `mapstructure:"authorization_token" validate:"omitempty,pattern=single_line_100"`
 	EventFiltering     *eventFilteringConfig    `mapstructure:"event_filtering"`
 	UseNativeSDK       *useNativeSDKConfig      `mapstructure:"use_native_sdk"`
+	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -70,6 +71,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		}),
 		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

@@ -7,8 +7,13 @@
   "type": "CUSTOMERIO",
   "enabled": true,
   "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
     "siteID": "rudderCliE2eSiteId",
     "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
+    "apiVersion": "v1",
     "datacenter": "US",
     "deviceTokenEventName": "Device Token Registered",
     "whitelistedEvents": [

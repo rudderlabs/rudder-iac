@@ -1,0 +1,19 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "vwo-minimal",
+  "name": "E2E VWO Minimal",
+  "type": "VWO",
+  "enabled": true,
+  "config": {
+    "accountId": "rudderCliE2eMinimal",
+    "isSPA": false,
+    "sendExperimentTrack": false,
+    "sendExperimentIdentify": false,
+    "useExistingJquery": false,
+    "eventFilteringOption": "disable"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
