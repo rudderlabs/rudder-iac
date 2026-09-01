@@ -59,6 +59,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"legacy_conversion_pixel_id/web": {"web"},
 	}, registered.GatedKeyPaths())
 
+	for _, sourceType := range expectedSourceTypes {
+		assert.Equal(t, []string{"access_token"}, registered.ConnectionRequiredKeys(sourceType, "cloud"), sourceType)
+	}
+	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"))
+
 	byAPI, err := registry.GetByAPIType("FACEBOOK_PIXEL", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
