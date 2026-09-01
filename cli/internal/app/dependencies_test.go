@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestComposeProvidersIncludesDataGraph(t *testing.T) {
+func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 	c, err := client.New("test-token")
@@ -23,10 +23,12 @@ func TestComposeProvidersIncludesDataGraph(t *testing.T) {
 	composite, providers, err := composeProviders(c)
 	require.NoError(t, err)
 	require.NotNil(t, providers.DataGraph)
+	require.NotNil(t, providers.Destination)
 
 	cp, ok := composite.(*provider.CompositeProvider)
 	require.True(t, ok)
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
+	assert.Same(t, providers.Destination, cp.Providers["destination"])
 }
 
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
@@ -34,31 +36,16 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 
 	cases := []struct {
 		name                   string
-		destinationSupport     bool
 		unverifiedDestinations bool
 		wantTypes              []string
 	}{
 		{
-			name:                   "both flags disabled",
-			destinationSupport:     false,
-			unverifiedDestinations: false,
-			wantTypes:              []string{},
-		},
-		{
-			name:                   "destinationSupport off ignores unverifiedDestinations",
-			destinationSupport:     false,
-			unverifiedDestinations: true,
-			wantTypes:              []string{},
-		},
-		{
-			name:                   "destinationSupport on without unverifiedDestinations",
-			destinationSupport:     true,
+			name:                   "unverifiedDestinations disabled registers verified destinations",
 			unverifiedDestinations: false,
 			wantTypes:              []string{"s3"},
 		},
 		{
-			name:                   "both flags enabled registers verified and unverified destinations",
-			destinationSupport:     true,
+			name:                   "unverifiedDestinations enabled registers verified and unverified destinations",
 			unverifiedDestinations: true,
 			wantTypes:              []string{"active_campaign", "adj", "adobe_analytics", "am", "attentive_tag", "bq", "bqstream", "braze", "confluent_cloud", "customerio", "customerio_audience", "facebook_conversions", "facebook_pixel", "firebase", "ga", "ga4", "gcs", "googleads", "googlepubsub", "googlesheets", "gtm", "hs", "http", "intercom", "iterable", "kafka", "kinesis", "linkedin_ads", "linkedin_insight_tag", "marketo", "mp", "postgres", "posthog", "qualtrics", "redis", "rs", "s3", "s3_datalake", "salesforce", "sentry", "slack", "snowflake", "snowpipe_streaming", "statsig", "tiktok_ads", "vwo", "zendesk"},
 		},
@@ -70,7 +57,6 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 
 			cfg := config.Config{
 				ExperimentalFlags: config.ExperimentalConfig{
-					DestinationSupport:     tc.destinationSupport,
 					UnverifiedDestinations: tc.unverifiedDestinations,
 				},
 			}
@@ -91,7 +77,6 @@ func TestDestinationConnectionModeIsConverted(t *testing.T) {
 
 	cfg := config.Config{
 		ExperimentalFlags: config.ExperimentalConfig{
-			DestinationSupport:     true,
 			UnverifiedDestinations: true,
 		},
 	}

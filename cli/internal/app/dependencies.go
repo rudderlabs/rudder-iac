@@ -248,10 +248,8 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	// Built ahead of the event-stream provider, whose connection semantic
-	// rules read destination definitions. newDestinationRegistry registers no
-	// definitions unless DestinationSupport is on, so with the flag off both
-	// providers share an empty registry and the definition-backed connection
-	// checks quietly find nothing to validate against.
+	// rules read destination definitions. Sharing one populated registry keeps
+	// connection checks aligned with the destination provider's validation.
 	destRegistry, err := newDestinationRegistry(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
@@ -268,6 +266,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
+	dp := destProvider.NewProvider(c, destRegistry)
 
 	providers := &Providers{
 		DataCatalog:     dcp,
@@ -276,6 +275,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
+		Destination:     dp,
 	}
 
 	providerMap := map[string]provider.Provider{
@@ -284,14 +284,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		"eventstream":     esp,
 		"transformations": trp,
 		"datagraph":       dgp,
-	}
-
-	if cfg.ExperimentalFlags.DestinationSupport {
-		dp := destProvider.NewProvider(c, destRegistry)
-
-		providerMap["destination"] = dp
-		providers.Destination = dp
-
+		"destination":     dp,
 	}
 
 	if cfg.ExperimentalFlags.AccountSupport {
@@ -305,13 +298,10 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 }
 
 // newDestinationRegistry builds the destination definition registry.
-// DestinationSupport must be on before any definitions are registered.
-// Unverified definitions additionally require UnverifiedDestinations.
+// Verified definitions are always registered; unverified definitions still
+// require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
-	if !cfg.ExperimentalFlags.DestinationSupport {
-		return registry, nil
-	}
 
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)

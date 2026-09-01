@@ -251,3 +251,10 @@
 <!-- ticket:DEX-731 -->
 - Apply and destroy project syncers should always be constructed with `syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer)`; concurrent sync execution is no longer gated by an experimental flag.
 - `concurrency.syncer` remains the main configuration tuning knob for sync parallelism after GA promotion; do not replace it with hard-coded concurrency or reintroduce a `concurrentSyncs` gate.
+
+## DEX-732 — Destination Support General Availability Wiring
+<!-- ticket:DEX-732 -->
+- Destination support is now a default project/provider capability rather than an experimental feature: `cli/internal/config/experimental.go` should not define `DestinationSupport` / `destinationSupport`.
+- Dependency assembly in `cli/internal/app/dependencies.go` should always construct the destination provider and include it in the composite provider map, without a `DestinationSupport` guard.
+- `newDestinationRegistry` should always register verified/native S3; `ExperimentalFlags.UnverifiedDestinations` remains the gate for unverified destination definitions.
+- This supersedes earlier destination-registry guidance that required both `DestinationSupport` and `UnverifiedDestinations` for unverified definitions: only `UnverifiedDestinations` remains as the experimental gate after destination support GA.
