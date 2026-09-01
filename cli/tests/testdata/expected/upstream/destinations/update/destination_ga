@@ -75,6 +75,7 @@
         }
       ]
     },
+    "rudderDeleteAccountId": "rudderCliE2eDeleteAccount",
     "sampleRate": {
       "web": "100"
     },

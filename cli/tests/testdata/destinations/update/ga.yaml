@@ -10,6 +10,7 @@ spec:
   definition_version: 1
   config:
     tracking_id: UA-654321-2
+    rudder_delete_account_id: rudderCliE2eDeleteAccount
     double_click: false
     enhanced_link_attribution: false
     include_search: true
