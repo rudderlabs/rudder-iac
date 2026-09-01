@@ -334,10 +334,9 @@ func validateSourceTypeSettings(
 		candidates = append(candidates, key)
 	}
 
-	// This condition is only reached when neither connection_mode nor use_native_sdk is declared for the source type in the destination config.
-	// TODO: delete this exemption once bqstream, confluent_cloud and
-	// googlesheets declare connection_mode. They are the only destinations
-	// that declare neither use_native_sdk or connection_mode.
+	// No block can name this source type — adj and posthog declare
+	// use_native_sdk as a closed struct and no connection_mode — so there is
+	// nowhere for the author to write the entry an error would ask for.
 	if len(candidates) == 0 {
 		return nil
 	}

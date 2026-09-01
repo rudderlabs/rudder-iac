@@ -627,16 +627,11 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
 	})
 
-	t.Run("a destination with no settings block is exempt", func(t *testing.T) {
+	t.Run("a destination declaring neither block asks for nothing", func(t *testing.T) {
 		t.Parallel()
 
-		// bqstream, confluent_cloud and googlesheets advertise connection modes
-		// as metadata but declare neither settings block, so nothing an author
-		// could write would clear the error this exemption suppresses.
-		// "webhook" stands in for that shape.
-		//
-		// Delete this subtest along with the exemption once those three
-		// declare connection_mode.
+		// "webhook" declares neither settings block, so there is nowhere to
+		// write the entry an error would ask for.
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-1", "ios", true)
 		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{})
