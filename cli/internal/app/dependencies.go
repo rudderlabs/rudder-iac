@@ -259,9 +259,6 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 
 	esOpts := []esProvider.Option{esProvider.WithDestinationRegistry(destRegistry)}
-	if cfg.ExperimentalFlags.ConnectionSupport {
-		esOpts = append(esOpts, esProvider.WithConnectionSupport())
-	}
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esOpts...)
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)

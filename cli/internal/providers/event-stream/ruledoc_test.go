@@ -15,7 +15,7 @@ import (
 // docs generator together with its live rules, asserting every rule resolves
 // and passes the DocumentedRules validation invariants.
 func TestProviderRuleDocs(t *testing.T) {
-	p := eventstream.New(source.NewMockSourceClient(), eventstream.WithConnectionSupport(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
+	p := eventstream.New(source.NewMockSourceClient(), eventstream.WithDestinationRegistry(definitions.NewRegistry()))
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()

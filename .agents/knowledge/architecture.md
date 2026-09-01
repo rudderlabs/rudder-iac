@@ -258,3 +258,9 @@
 - Dependency assembly in `cli/internal/app/dependencies.go` should always construct the destination provider and include it in the composite provider map, without a removed-flag guard.
 - `newDestinationRegistry` should always register verified/native S3; `ExperimentalFlags.UnverifiedDestinations` remains the gate for unverified destination definitions.
 - This supersedes earlier destination-registry guidance that required two destination gates for unverified definitions: only `UnverifiedDestinations` remains as the experimental gate after destination support GA.
+
+## DEX-733 — Event Stream Connections GA Registry Safety
+<!-- ticket:DEX-733 -->
+- Event-stream connections are first-class provider capability after `connectionSupport` GA: connection kind/handler/rules should be registered by default rather than through an event-stream provider option.
+- `eventstream.New` should create a default empty destination definitions registry so unconditional connection semantic rules can call registry lookups safely even when tests or direct callers do not pass `WithDestinationRegistry`.
+- App dependency wiring still passes the real destination registry when destination support is configured; the provider-level empty registry is only the safe default that preserves no-definition behavior without a nil panic.
