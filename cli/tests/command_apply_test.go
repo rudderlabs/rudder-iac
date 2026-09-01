@@ -2,7 +2,6 @@ package tests
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -51,10 +50,6 @@ func TestProjectApply(t *testing.T) {
 		// changes are reported if we re-apply the same project, therefore we dedicatedly
 		// test this scenario below
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-		// Transformation specs in this fixture are already rudder/v1, so they are
-		// covered by the non-migrated project pass above. Keep the from-scratch
-		// migrated apply focused on the legacy catalog specs that migrate rewrites.
-		removeTransformationFixtures(t, migratedDir)
 		// then we apply this project again from scratch and verify no
 		// changes are reported in snapshot tests meaning after migration of the directory
 		// the upstream resources are created same
@@ -126,21 +121,11 @@ func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir strin
 		out, err := exec.Command("cp", "-r", src, dst).CombinedOutput()
 		require.NoError(t, err, "Failed to copy %s to %s: %s", src, dst, string(out))
 
-		// migrate accepts the shared --var-file flag but writes the original
-		// placeholders back out so the follow-up apply dry-run can resolve them.
 		output, err := executor.Execute(cliBinPath, "migrate", "-l", dst, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Migration failed for %s: %s", dir, string(output))
 	}
 
 	return tempDir
-}
-
-func removeTransformationFixtures(t *testing.T, projectDir string) {
-	t.Helper()
-
-	for _, dir := range []string{"create", "update"} {
-		require.NoError(t, os.RemoveAll(filepath.Join(projectDir, dir, "transformations")))
-	}
 }
 
 func verifyState(t *testing.T, dir string) {

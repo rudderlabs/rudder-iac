@@ -172,8 +172,9 @@ The `--var-file` flag and substitution apply to:
 - `rudder-cli migrate`
 
 They are **not** available on `destroy` or `import` (those commands either do not load local specs
-or do not accept local var files). Even without `--var-file`, `RUDDER_*` environment variables are
-always picked up by commands that load project specs.
+or do not accept local var files). `migrate` accepts `--var-file` for pre-migration validation, but
+writes raw placeholders back to disk instead of resolved values. Even without `--var-file`,
+`RUDDER_*` environment variables are always picked up by commands that load project specs.
 
 ---
 
@@ -244,7 +245,8 @@ variable a value (env var or var file) or add an inline default: `{{ .VAR | fall
 
 **Q: How do I write a literal `{{ .X }}` that should *not* be substituted?**
 There is currently **no escape syntax** for a dot-prefixed token. Any `{{ .NAME }}`-shaped
-token outside a comment is treated as a variable. The only built-in exception is YAML
+token outside a comment is treated as a variable, and there is no flag to disable this now that
+substitution is GA. The only built-in exception is YAML
 comments — a token after an unquoted `#` is left untouched:
 
 ```yaml

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **varsubst:** promote variable substitution to GA. `rudder-cli apply` and `rudder-cli validate` now always resolve `{{ .VAR }}` placeholders from `RUDDER_*` environment variables and `--var-file` inputs without the old experimental opt-in. Because dot-prefixed placeholders are now always active and there is no literal escape syntax, undefined `{{ .VAR }}` tokens in specs fail before apply/validate continues.
+
 ## [0.24.0](https://github.com/rudderlabs/rudder-iac/compare/v0.23.0...v0.24.0) (2026-08-21)
 
 

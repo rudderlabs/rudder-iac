@@ -2,14 +2,12 @@ package migrator
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
@@ -18,35 +16,25 @@ var (
 	migratorLog = logger.New("migrator")
 )
 
-// Migrator handles the migration of project specs from rudder/0.1 to rudder/1
-type Migrator struct {
-	project          project.Project
-	provider         provider.Provider
-	commonMigrations CommonMigrations
-	postprocessWrite func(path string, data []byte) ([]byte, error)
+type Project interface {
+	Location() string
+	Specs() map[string]*specs.Spec
 }
 
-// Option configures optional migrator behavior.
-type Option func(*Migrator)
-
-// WithWritePostprocessor rewrites formatted bytes before they are written.
-func WithWritePostprocessor(postprocess func(path string, data []byte) ([]byte, error)) Option {
-	return func(m *Migrator) {
-		m.postprocessWrite = postprocess
-	}
+// Migrator handles the migration of project specs from rudder/0.1 to rudder/1
+type Migrator struct {
+	project          Project
+	provider         provider.Provider
+	commonMigrations CommonMigrations
 }
 
 // New creates a new Migrator instance with common migrations
-func New(proj project.Project, p provider.Provider, opts ...Option) *Migrator {
-	m := &Migrator{
+func New(proj Project, p provider.Provider) *Migrator {
+	return &Migrator{
 		project:          proj,
 		provider:         p,
 		commonMigrations: GetCommonMigrations(),
 	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
 }
 
 // DisplayFilesToMigrate shows the list of files that will be migrated in a table
@@ -126,17 +114,11 @@ func (m *Migrator) WriteSpecs(migratedSpecs map[string]*specs.Spec) error {
 	formatters := formatter.Setup(&formatter.YAMLFormatter{})
 	for path, migratedSpec := range migratedSpecs {
 		migratorLog.Info("writing migrated file", "path", path)
-		formatted, err := formatters.Format(migratedSpec, filepath.Ext(path))
-		if err != nil {
-			return fmt.Errorf("formatting %s: %w", path, err)
+		entity := writer.FormattableEntity{
+			Content:      migratedSpec,
+			RelativePath: path,
 		}
-		if m.postprocessWrite != nil {
-			formatted, err = m.postprocessWrite(path, formatted)
-			if err != nil {
-				return fmt.Errorf("post-processing file %s: %w", path, err)
-			}
-		}
-		if err := os.WriteFile(path, formatted, 0644); err != nil {
+		if err := writer.OverwriteFile(formatters, entity); err != nil {
 			return fmt.Errorf("writing file %s: %w", path, err)
 		}
 	}

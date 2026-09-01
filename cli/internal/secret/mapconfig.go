@@ -86,10 +86,9 @@ func RevealSecrets(config map[string]any, secretKeys []string) map[string]any {
 	return out
 }
 
-// MaskSecrets replaces each listed secret key present in config with a masked
-// token derived from externalID — a "{{ .VAR }}" reference under the variable
-// substitution gate, otherwise a masked literal. Only keys present in config are
-// touched; absent secrets are not invented.
+// MaskSecrets replaces each listed secret key present in config with a
+// "{{ .VAR }}" reference derived from externalID. Only keys present in config
+// are touched; absent secrets are not invented.
 func MaskSecrets(config map[string]any, externalID string, secretKeys []string) error {
 	if config == nil || len(secretKeys) == 0 {
 		return nil

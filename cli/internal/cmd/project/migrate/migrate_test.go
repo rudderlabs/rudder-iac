@@ -1,6 +1,8 @@
 package migrate
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -57,28 +59,21 @@ func TestMigrateTelemetryExtras(t *testing.T) {
 	}
 }
 
-func TestRestorePlaceholderScalars(t *testing.T) {
-	t.Parallel()
+func TestLoadRawMigrationProjectPreservesPlaceholders(t *testing.T) {
+	t.Setenv("RUDDER_ENV", "prod")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "source.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`version: rudder/0.1
+kind: source
+metadata:
+  name: test_source
+spec:
+  label: "prod-{{ .ENV }}"
+`), 0644))
 
-	input := []byte(`spec:
-  port: 5432
-  enabled: true
-  default_port: 5432
-  name: "warehouse"
-  description: "keep me"
-`)
+	proj, err := loadRawMigrationProject(dir)
+	require.NoError(t, err)
 
-	got := restorePlaceholderScalars(input, []placeholderReplacement{
-		{token: "{{ .DB_PORT }}", key: "port", scalarForms: []string{"5432", `"5432"`}},
-		{token: "{{ .ENABLED }}", key: "enabled", scalarForms: []string{"true", `"true"`}},
-		{token: "{{ .NAME }}", key: "name", scalarForms: []string{"warehouse", `"warehouse"`}},
-	})
-
-	assert.Equal(t, `spec:
-  port: {{ .DB_PORT }}
-  enabled: {{ .ENABLED }}
-  default_port: 5432
-  name: {{ .NAME }}
-  description: "keep me"
-`, string(got))
+	require.Contains(t, proj.Specs(), path)
+	assert.Equal(t, "prod-{{ .ENV }}", proj.Specs()[path].Spec["label"])
 }
