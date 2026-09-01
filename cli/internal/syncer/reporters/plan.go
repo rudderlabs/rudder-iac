@@ -163,9 +163,8 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 
 	valueDiffs := ComputeNestedDiffs(diff.SourceValue, diff.TargetValue)
 
-	// If no diffs found (values are equal), return empty
 	if len(valueDiffs) == 0 {
-		return []string{}
+		return []string{formattedLine(diff.Property, ValuePair{Source: diff.SourceValue, Target: diff.TargetValue})}
 	}
 
 	// If only one diff and it's at the root level (empty path), use single-line behavior.

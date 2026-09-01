@@ -250,6 +250,38 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 	assert.Equal(t, expectedOutput, output)
 }
 
+func TestPlanReporter_NilPresenceDiff(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := &planReporter{}
+	r.SetWriter(&buf)
+
+	diff := &differ.Diff{
+		UpdatedResources: map[string]differ.ResourceDiff{
+			"resource_type:with_nil_presence_diff": {
+				URN: "resource_type:with_nil_presence_diff",
+				Diffs: map[string]differ.PropertyDiff{
+					"optional": {
+						Property:    "optional",
+						SourceValue: nil,
+						TargetValue: nil,
+					},
+				},
+			},
+		},
+	}
+
+	r.ReportPlan(&planner.Plan{Diff: diff})
+
+	expectedOutput := `Updated resources:
+  - resource_type:with_nil_presence_diff
+    - optional: <nil> => <nil>
+
+`
+
+	assert.Equal(t, expectedOutput, buf.String())
+}
+
 func TestPrintablePropertyRef(t *testing.T) {
 	urn := "data-graph:my-graph"
 

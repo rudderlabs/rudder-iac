@@ -201,4 +201,4 @@
 ## DEX-735 — Plan Nested Diff Rendering GA
 <!-- ticket:DEX-735 -->
 - Plan output now renders per-field nested diffs unconditionally via the nested diff renderer rather than behind `ExperimentalConfig.NestedDiffs`.
-- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar changes still keep their single-line behavior.
+- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar/nil/non-decomposable changes still keep their single-line behavior.
