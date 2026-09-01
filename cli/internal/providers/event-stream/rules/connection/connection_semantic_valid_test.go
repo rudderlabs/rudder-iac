@@ -98,7 +98,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"android": {"cloud"},
 			"ios":     {"cloud"},
 		},
-		SupportedSourcesValidation: map[string]map[string][]string{
+		ConnectionRequiredKeys: map[string]map[string][]string{
 			"web":     {"cloud": {"webhook_url", "auth_token"}},
 			"android": {"cloud": {"connection_mode"}},
 		},
@@ -119,7 +119,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"ios":     {"cloud"},
 			"cloud":   {"cloud"},
 		},
-		SupportedSourcesValidation: map[string]map[string][]string{
+		ConnectionRequiredKeys: map[string]map[string][]string{
 			"ios": {"cloud": {"connection_mode"}},
 		},
 	}))
@@ -154,7 +154,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		NewConfig:       func() any { return &multiModeTestConfig{} },
 		SourceTypes:     []string{"web", "android"},
 		ConnectionModes: map[string][]string{"web": {"cloud", "device"}, "android": {"cloud"}},
-		SupportedSourcesValidation: map[string]map[string][]string{
+		ConnectionRequiredKeys: map[string]map[string][]string{
 			"web":     {"cloud": {"api_key"}, "device": {"app_id"}},
 			"android": {"cloud": {"api_key"}},
 		},

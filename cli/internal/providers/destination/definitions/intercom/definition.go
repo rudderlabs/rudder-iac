@@ -142,7 +142,7 @@ var (
 // cloud-mode one needs apiKey. Upstream's cloud branch omits androidKotlin,
 // iosSwift and cloud, which this definition supports in cloud mode, so those
 // source types get no entry rather than a guessed api_key.
-var supportedSourcesValidation = map[string]map[string][]string{
+var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeAndroid:     {"cloud": {"api_key"}, "device": {"app_id"}},
 	common.SourceTypeIOS:         {"cloud": {"api_key"}, "device": {"app_id"}},
 	common.SourceTypeWeb:         {"cloud": {"api_key"}, "device": {"app_id"}},
@@ -195,8 +195,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &intercomConfig{}
 		},
-		SourceTypes:                append([]string(nil), sourceTypes...),
-		ConnectionModes:            connectionModes,
-		SupportedSourcesValidation: supportedSourcesValidation,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }

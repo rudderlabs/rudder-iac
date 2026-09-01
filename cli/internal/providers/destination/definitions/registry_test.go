@@ -83,64 +83,64 @@ func TestRegistryRejectsMissingConnectionModes(t *testing.T) {
 	assert.Contains(t, err.Error(), `source type "web" has no connection modes`)
 }
 
-func TestRegistryRejectsSupportedSourcesValidationWithoutSourceType(t *testing.T) {
+func TestRegistryRejectsConnectionRequiredKeysWithoutSourceType(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"ios": {"cloud": {"webhook_url"}}}
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"ios": {"cloud": {"webhook_url"}}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `supported sources validation configured for unsupported source type "ios"`)
+	assert.Contains(t, err.Error(), `connection required keys configured for unsupported source type "ios"`)
 }
 
-func TestRegistryRejectsSupportedSourcesValidationWithoutKeys(t *testing.T) {
+func TestRegistryRejectsConnectionRequiredKeysWithoutKeys(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"web": {"cloud": {}}}
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"cloud": {}}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `supported sources validation for source type "web" in mode "cloud" has no required config keys`)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" in mode "cloud" are empty`)
 }
 
-func TestRegistryRejectsSupportedSourcesValidationUnsupportedMode(t *testing.T) {
+func TestRegistryRejectsConnectionRequiredKeysUnsupportedMode(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"web": {"device": {"webhook_url"}}}
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"device": {"webhook_url"}}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `supported sources validation for source type "web" references unsupported connection mode "device"`)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" reference unsupported connection mode "device"`)
 }
 
-func TestRegistryRejectsSupportedSourcesValidationWithoutModes(t *testing.T) {
+func TestRegistryRejectsConnectionRequiredKeysWithoutModes(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"web": {}}
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `supported sources validation for source type "web" has no connection modes`)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" list no connection modes`)
 }
 
-func TestRegistryRejectsSupportedSourcesValidationUnknownKey(t *testing.T) {
+func TestRegistryRejectsConnectionRequiredKeysUnknownKey(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
 	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
-	def.SupportedSourcesValidation = map[string]map[string][]string{"web": {"cloud": {"webhook_url", "no_such_key"}}}
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"cloud": {"webhook_url", "no_such_key"}}}
 
 	err := registry.Register(def)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `supported sources validation for source type "web" in mode "cloud" references unknown config key "no_such_key"`)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" in mode "cloud" reference unknown config key "no_such_key"`)
 }
 
 func TestRegistryRejectsConsentOverrideWithoutSourceType(t *testing.T) {
@@ -344,12 +344,12 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"cloud", "device", "hybrid"}, modes)
 
-	requiredKeys := registered.SupportedSourcesValidation("web", "cloud")
+	requiredKeys := registered.ConnectionRequiredKeys("web", "cloud")
 	assert.Equal(t, []string{"api_secret"}, requiredKeys)
 	requiredKeys[0] = "mutated"
-	assert.Equal(t, []string{"api_secret"}, registered.SupportedSourcesValidation("web", "cloud"))
-	assert.Nil(t, registered.SupportedSourcesValidation("web", "device"), "a supported mode without an entry has no required keys")
-	assert.Nil(t, registered.SupportedSourcesValidation("android", "cloud"))
+	assert.Equal(t, []string{"api_secret"}, registered.ConnectionRequiredKeys("web", "cloud"))
+	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"), "a supported mode without an entry has no required keys")
+	assert.Nil(t, registered.ConnectionRequiredKeys("android", "cloud"))
 
 	assert.Equal(t, []string{"connection_mode", "use_native_sdk"}, registered.SourceTypeConfigKeys())
 

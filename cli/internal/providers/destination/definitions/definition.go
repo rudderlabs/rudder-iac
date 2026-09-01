@@ -29,15 +29,17 @@ type DestinationDefinition struct {
 	NewConfig       func() any
 	SourceTypes     []string
 	ConnectionModes map[string][]string
-	// SupportedSourcesValidation lists, per local source type and connection
+	// ConnectionRequiredKeys lists, per local source type and connection
 	// mode, the local config keys that must be present for a source of that
-	// type to connect in that mode (mirrors the backend's connect-time
-	// supportedSourcesValidation check). Requiredness depends on both: Braze
+	// type to connect in that mode. It mirrors the backend's connect-time
+	// check, which is named supportedSourcesValidation there — a config-backend
+	// entity, not a db-config key, so do not go looking for one.
+	// Requiredness depends on both source type and mode: Braze
 	// needs rest_api_key from a cloud-mode source and app_key from a
 	// device-mode one. Derived from schema.json's connectionMode-conditioned
 	// configSchema.allOf branches; pairs without an entry have no connect-time
 	// required keys.
-	SupportedSourcesValidation map[string]map[string][]string
+	ConnectionRequiredKeys map[string]map[string][]string
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 	// ConfigValidateFuncs registers extra go-playground custom validate tags,
@@ -107,12 +109,12 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
-// SupportedSourcesValidation returns the local config keys that must be
+// ConnectionRequiredKeys returns the local config keys that must be
 // present for the given source type to connect in the given mode — one mode
 // value, not the connection_mode block that carries it. A nil result means the
 // pair has no connect-time required keys.
-func (d *RegisteredDefinition) SupportedSourcesValidation(sourceType, mode string) []string {
-	fields, ok := d.DestinationDefinition.SupportedSourcesValidation[sourceType][mode]
+func (d *RegisteredDefinition) ConnectionRequiredKeys(sourceType, mode string) []string {
+	fields, ok := d.DestinationDefinition.ConnectionRequiredKeys[sourceType][mode]
 	if !ok {
 		return nil
 	}
@@ -179,8 +181,8 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating connection mode config model: %w", err)
 	}
 
-	if err := validateSupportedSourcesValidation(def, configType); err != nil {
-		return nil, fmt.Errorf("validating supported sources requirements: %w", err)
+	if err := validateConnectionRequiredKeys(def, configType); err != nil {
+		return nil, fmt.Errorf("validating connection required keys: %w", err)
 	}
 
 	keyPathSourceTypes, err := buildGatedKeyPaths(def, configType)
@@ -201,38 +203,38 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 	}, nil
 }
 
-// validateSupportedSourcesValidation rejects entries for source types outside
+// validateConnectionRequiredKeys rejects entries for source types outside
 // SourceTypes, connection modes outside that source type's ConnectionModes,
 // and required keys outside the local config surface (the config struct plus
 // the source-type block keys) — the config model is a closed allowlist, so an
 // unknown required key could never be satisfied.
-func validateSupportedSourcesValidation(def *DestinationDefinition, configType reflect.Type) error {
+func validateConnectionRequiredKeys(def *DestinationDefinition, configType reflect.Type) error {
 	configFields := structFieldsByMapstructureTag(configType)
 
-	for _, sourceType := range slices.Sorted(maps.Keys(def.SupportedSourcesValidation)) {
+	for _, sourceType := range slices.Sorted(maps.Keys(def.ConnectionRequiredKeys)) {
 		if !slices.Contains(def.SourceTypes, sourceType) {
-			return fmt.Errorf("supported sources validation configured for unsupported source type %q", sourceType)
+			return fmt.Errorf("connection required keys configured for unsupported source type %q", sourceType)
 		}
 
-		byMode := def.SupportedSourcesValidation[sourceType]
+		byMode := def.ConnectionRequiredKeys[sourceType]
 		if len(byMode) == 0 {
-			return fmt.Errorf("supported sources validation for source type %q has no connection modes", sourceType)
+			return fmt.Errorf("connection required keys for source type %q list no connection modes", sourceType)
 		}
 
 		for _, mode := range slices.Sorted(maps.Keys(byMode)) {
 			if !slices.Contains(def.ConnectionModes[sourceType], mode) {
-				return fmt.Errorf("supported sources validation for source type %q references unsupported connection mode %q", sourceType, mode)
+				return fmt.Errorf("connection required keys for source type %q reference unsupported connection mode %q", sourceType, mode)
 			}
 
 			requiredKeys := byMode[mode]
 			if len(requiredKeys) == 0 {
-				return fmt.Errorf("supported sources validation for source type %q in mode %q has no required config keys", sourceType, mode)
+				return fmt.Errorf("connection required keys for source type %q in mode %q are empty", sourceType, mode)
 			}
 			for _, key := range requiredKeys {
 				if _, ok := configFields[key]; ok || slices.Contains(sourceTypeConfigKeys, key) {
 					continue
 				}
-				return fmt.Errorf("supported sources validation for source type %q in mode %q references unknown config key %q", sourceType, mode, key)
+				return fmt.Errorf("connection required keys for source type %q in mode %q reference unknown config key %q", sourceType, mode, key)
 			}
 		}
 	}

@@ -402,7 +402,7 @@ func connectTimeRequiredKeys(
 	if !declared || mode == "" {
 		return nil
 	}
-	return registered.SupportedSourcesValidation(sourceType, mode)
+	return registered.ConnectionRequiredKeys(sourceType, mode)
 }
 
 // connectionEdge is one project connection reduced to its endpoint URNs.

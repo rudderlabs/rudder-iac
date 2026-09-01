@@ -30,7 +30,7 @@ func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinit
 	def.NewConfig = newConfig
 	// These stubs replace GA4's config surface, so scope the definition's
 	// connect-time required keys down to what they model.
-	def.SupportedSourcesValidation = nil
+	def.ConnectionRequiredKeys = nil
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			def.NewConfig = tc.newConfig
 			// These stubs replace GA4's config surface, so scope the
 			// definition's connect-time required keys down to what they model.
-			def.SupportedSourcesValidation = nil
+			def.ConnectionRequiredKeys = nil
 
 			_, err := newRegisteredDefinition(def)
 			require.Error(t, err)

@@ -178,7 +178,7 @@ func platformKeyConditional(sources []string) validator.Func {
 // The branches gated on usePlatformSpecificApiKeys (appKey, androidApiKey,
 // iOSApiKey, webApiKey) are deliberately absent: their requiredness depends on
 // another config value as well as the mode, which this map cannot express.
-var supportedSourcesValidation = map[string]map[string][]string{
+var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeAndroid:       {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
 	common.SourceTypeAndroidKotlin: {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
 	common.SourceTypeIOS:           {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
@@ -257,8 +257,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &brazeConfig{}
 		},
-		SourceTypes:                append([]string(nil), sourceTypes...),
-		ConnectionModes:            connectionModes,
-		SupportedSourcesValidation: supportedSourcesValidation,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }

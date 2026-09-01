@@ -69,10 +69,10 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native": {"cloud": {"api_key"}},
 		"flutter":      {"cloud": {"api_key"}},
 		"cordova":      {"cloud": {"api_key"}},
-	}, intercom.NewDefinition().SupportedSourcesValidation)
-	assert.Equal(t, []string{"app_id"}, registered.SupportedSourcesValidation("web", "device"))
-	assert.Equal(t, []string{"api_key"}, registered.SupportedSourcesValidation("web", "cloud"))
-	assert.Nil(t, registered.SupportedSourcesValidation("android_kotlin", "cloud"), "upstream gap: no entry rather than a guess")
+	}, intercom.NewDefinition().ConnectionRequiredKeys)
+	assert.Equal(t, []string{"app_id"}, registered.ConnectionRequiredKeys("web", "device"))
+	assert.Equal(t, []string{"api_key"}, registered.ConnectionRequiredKeys("web", "cloud"))
+	assert.Nil(t, registered.ConnectionRequiredKeys("android_kotlin", "cloud"), "upstream gap: no entry rather than a guess")
 
 	byAPI, err := registry.GetByAPIType("INTERCOM", 1)
 	require.NoError(t, err)

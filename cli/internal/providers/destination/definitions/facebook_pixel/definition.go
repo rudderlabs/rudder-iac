@@ -129,7 +129,7 @@ func accessTokenConditional(fl validator.FieldLevel) bool {
 // Connect-time required keys, derived from schema.json's single
 // connectionMode-gated branch: accessToken is required unless web runs in
 // device mode, so every supported pair carries it except (web, device).
-var supportedSourcesValidation = map[string]map[string][]string{
+var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeAndroid:       {"cloud": {"access_token"}},
 	common.SourceTypeAndroidKotlin: {"cloud": {"access_token"}},
 	common.SourceTypeIOS:           {"cloud": {"access_token"}},
@@ -200,8 +200,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &facebookPixelConfig{}
 		},
-		SourceTypes:                append([]string(nil), sourceTypes...),
-		ConnectionModes:            connectionModes,
-		SupportedSourcesValidation: supportedSourcesValidation,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }
