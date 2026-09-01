@@ -2,6 +2,7 @@ package secret
 
 import (
 	"encoding/json"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -79,12 +80,8 @@ func TestMapConfigNestedSecretPathsDoNotInventAbsentSecrets(t *testing.T) {
 		"headers": []any{map[string]any{"from": "X-Trace"}},
 	}
 
-	WrapKnownSecrets(config, []string{"headers.to"})
-	assert.Equal(t, want, config)
-
-	WrapUnknownSecrets(config, []string{"headers.to"})
-	assert.Equal(t, want, config)
-
+	assert.Equal(t, want, WrapKnownSecrets(config, []string{"headers.to"}))
+	assert.Equal(t, want, WrapUnknownSecrets(config, []string{"headers.to"}))
 	assert.Equal(t, want, RevealSecrets(config, []string{"headers.to"}))
 
 	require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
@@ -138,7 +135,7 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 			},
 		}
 
-		WrapKnownSecrets(config, []string{"headers.to"})
+		config = WrapKnownSecrets(config, []string{"headers.to"})
 		wantWrapped := map[string]any{
 			"headers": []map[string]any{
 				{"from": "X-Api-Key", "to": knownSecret("typed-secret-one")},
@@ -178,7 +175,7 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 			},
 		}
 
-		WrapKnownSecrets(config, []string{"a.b.c"})
+		config = WrapKnownSecrets(config, []string{"a.b.c"})
 		assert.Equal(t, map[string]any{
 			"a": []any{
 				map[string]any{"b": []any{
@@ -219,10 +216,10 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 		}
 
 		for _, key := range []string{"", ".", "headers.", ".to", "headers..to"} {
-			WrapKnownSecrets(config, []string{key})
-			WrapUnknownSecrets(config, []string{key})
-			require.NoError(t, MaskSecrets(config, "webhook-prod", []string{key}))
+			assert.Equal(t, want, WrapKnownSecrets(config, []string{key}), key)
+			assert.Equal(t, want, WrapUnknownSecrets(config, []string{key}), key)
 			assert.Equal(t, want, RevealSecrets(config, []string{key}), key)
+			require.NoError(t, MaskSecrets(config, "webhook-prod", []string{key}))
 			assert.Equal(t, want, config, "even a literal empty key is never resolved: %q", key)
 		}
 	})
@@ -231,8 +228,7 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 		config := map[string]any{"headers.to": "flat-secret"}
 		want := map[string]any{"headers.to": "flat-secret"}
 
-		WrapKnownSecrets(config, []string{"headers.to"})
-		assert.Equal(t, want, config, "a dotted key is a path, never a literal lookup")
+		assert.Equal(t, want, WrapKnownSecrets(config, []string{"headers.to"}), "a dotted key is a path, never a literal lookup")
 
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
 		assert.Equal(t, want, config)
@@ -247,7 +243,7 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 			},
 		}
 
-		WrapKnownSecrets(config, []string{"headers.to"})
+		config = WrapKnownSecrets(config, []string{"headers.to"})
 		assert.Equal(t, map[string]any{
 			"headers": []any{
 				"not-an-object",
@@ -265,5 +261,106 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 				42,
 			},
 		}, config)
+	})
+}
+
+// Callers reach these helpers through a shallow copy of the parsed spec
+// (destination's ApplyDefaults uses maps.Copy). A flat key only ever wrote the
+// copied top-level map, so the caller was safe by accident; a nested path walks
+// into inner containers the shallow copy still shares. The producing helpers
+// therefore copy rather than mutate — the caller's spec must survive intact.
+func TestMapConfigHelpersDoNotMutateCallerConfig(t *testing.T) {
+	// specConfig stands in for the caller's parsed spec; shallowCopy is what
+	// ApplyDefaults hands the helpers.
+	newSpecConfig := func() map[string]any {
+		return map[string]any{
+			"api_key": "flat-secret",
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": "nested-secret"}},
+			"auth":    map[string]any{"token": "map-secret"},
+		}
+	}
+	shallowCopy := func(in map[string]any) map[string]any {
+		out := make(map[string]any, len(in))
+		maps.Copy(out, in)
+		return out
+	}
+	keys := []string{"api_key", "headers.to", "auth.token"}
+
+	assertSpecIntact := func(t *testing.T, specConfig map[string]any) {
+		t.Helper()
+		assert.Equal(t, newSpecConfig(), specConfig, "caller's spec config must be untouched")
+	}
+
+	t.Run("WrapKnownSecrets", func(t *testing.T) {
+		specConfig := newSpecConfig()
+		wrapped := WrapKnownSecrets(shallowCopy(specConfig), keys)
+
+		assertSpecIntact(t, specConfig)
+		assert.Equal(t, map[string]any{
+			"api_key": knownSecret("flat-secret"),
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": knownSecret("nested-secret")}},
+			"auth":    map[string]any{"token": knownSecret("map-secret")},
+		}, wrapped)
+	})
+
+	t.Run("WrapUnknownSecrets", func(t *testing.T) {
+		specConfig := newSpecConfig()
+		wrapped := WrapUnknownSecrets(shallowCopy(specConfig), keys)
+
+		assertSpecIntact(t, specConfig)
+		assert.Equal(t, map[string]any{
+			"api_key": unknownSecret(),
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": unknownSecret()}},
+			"auth":    map[string]any{"token": unknownSecret()},
+		}, wrapped)
+	})
+
+	t.Run("RevealSecrets", func(t *testing.T) {
+		var (
+			specConfig = WrapKnownSecrets(newSpecConfig(), keys)
+			before     = WrapKnownSecrets(newSpecConfig(), keys)
+		)
+
+		revealed := RevealSecrets(shallowCopy(specConfig), keys)
+
+		assert.Equal(t, before, specConfig, "caller's config must be untouched")
+		assert.Equal(t, newSpecConfig(), revealed)
+	})
+
+	// MaskSecrets is the one in-place helper — it returns an error, not a config.
+	// Both call sites build the map themselves (apiConfigToLocal / unmarshalOptions)
+	// and already mutate it via pruneEmptyValues, so in-place is the contract.
+	t.Run("MaskSecrets mutates in place by contract", func(t *testing.T) {
+		enableVarSubstitution(t)
+		config := newSpecConfig()
+		require.NoError(t, MaskSecrets(config, "webhook-prod", keys))
+
+		assert.Equal(t, map[string]any{
+			"api_key": "{{ .WEBHOOK_PROD_API_KEY }}",
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": "{{ .WEBHOOK_PROD_HEADERS_0_TO }}"}},
+			"auth":    map[string]any{"token": "{{ .WEBHOOK_PROD_AUTH_TOKEN }}"},
+		}, config)
+	})
+}
+
+// The variable name for a flat key is exactly what it was before dotted paths
+// existed: prefix + "_" + upper(key), with no character folding beyond the
+// externalID's own kebab-to-underscore. Folding "-" in the key as well would
+// turn a loud marshal-time grammar error into a silent rename, and would make
+// "api-key" and "api_key" collide on one variable.
+func TestMapConfigMaskVariableNameGrammar(t *testing.T) {
+	enableVarSubstitution(t)
+
+	t.Run("flat key keeps the pre-existing name", func(t *testing.T) {
+		config := map[string]any{"api_secret": "s"}
+		require.NoError(t, MaskSecrets(config, "my-dest", []string{"api_secret"}))
+		assert.Equal(t, map[string]any{"api_secret": "{{ .MY_DEST_API_SECRET }}"}, config)
+	})
+
+	t.Run("a dash in the key fails at marshal, not silently renames", func(t *testing.T) {
+		config := map[string]any{"api-secret": "s"}
+		err := MaskSecrets(config, "my-dest", []string{"api-secret"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not satisfy the variable grammar")
 	})
 }
