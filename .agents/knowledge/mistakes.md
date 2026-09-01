@@ -66,3 +66,5 @@
 <!-- ticket:DEX-734 -->
 - CI live destination E2E failed when GA destination fixtures set `rudder_delete_account_id` to dummy external ID `rudderCliE2eDeleteAccount`; the API treats `rudderDeleteAccountId` as a foreign key to an account that must already exist in the target workspace.
 - Durable mitigation: keep optional GA `rudder_delete_account_id` out of live destination fixtures unless the test provisions or references a real account in that workspace.
+- CI live `TestProjectApply` failed in the `rudder/v1 specs after migration` path when a migrated-from-scratch run tried to recreate/update transformation fixtures already expressed as rudder/v1 and outside the migration target, surfacing a transformation update HTTP 400/internal-server-error and later dry-run code diffs instead of `No changes to apply`.
+- Durable mitigation: keep migration E2E coverage focused on legacy catalog specs after the full migrated-update no-diff check; do not run a second live transformation create/update cycle solely to validate catalog migration.
