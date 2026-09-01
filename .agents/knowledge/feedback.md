@@ -28,3 +28,8 @@
 <!-- ticket:DEX-731 -->
 - In `docs/experimental-flags.md`, examples under "Adding a New Experimental Flag" should use placeholder flag names such as `YourNewFeature` instead of real experimental flags, so future flag promotions do not require guide rewrites.
 - When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active; either preserve compatibility by clamping intentionally or return an error that names the exact config key, such as `concurrency.syncer`, so users can fix their config.
+
+## DEX-732 — Experimental Flag Promotion Scope
+<!-- ticket:DEX-732 -->
+- When promoting or deleting an experimental flag, search and update hidden active contributor docs/runbooks as well as code and workflows; stale `.claude/skills/...` or `.agents/knowledge/...` guidance can keep instructing contributors to use removed config fields or env vars.
+- Keep experimental-flag promotion PRs narrowly scoped: do not bundle opportunistic E2E fixture or snapshot remediation, and split invalid live API fixture fixes such as provisioning real upstream IDs into separate tickets/PRs.
