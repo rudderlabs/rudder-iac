@@ -72,3 +72,13 @@
 <!-- ticket:DEX-732 -->
 - CI live destination E2E failed when the GA fixture set `config.rudder_delete_account_id` to dummy value `rudderCliE2eDeleteAccount`; the API maps it to `rudderDeleteAccountId` and rejects create with `400 ... 'Account not found with given id in the workspace'` after `TestDestinationsApply` has destroyed the workspace.
 - Durable mitigation: omit this optional field from live destination fixtures unless the test also provisions and resolves a real account ID in that workspace.
+
+## DEX-730 — GA Delete Account Fixture Requires Real Account
+<!-- ticket:DEX-730 -->
+- CI failed in `TestDestinationsApply` when the GA destination live E2E fixture set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`; the backend validates `rudderDeleteAccountId` against workspace accounts and returned HTTP 400 `Account not found with given id in the workspace` during `destination:ga` creation.
+- Durable mitigation: keep workspace-specific GA delete-account IDs out of live destination fixtures unless the referenced account is provisioned for that CI workspace; rely on unit conversion tests for this field or inject a real workspace account ID explicitly.
+
+## DEX-531 — Webhook Header Secret Placeholder CI Failure
+<!-- ticket:DEX-531 -->
+- CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
+- Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.

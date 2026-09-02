@@ -7,7 +7,12 @@ import (
 )
 
 // Audience destination is warehouse-only (integrations-config
-// destinations/customerio_audience supportedSourceTypes).
+// destinations/customerio_audience supportedSourceTypes), which makes it the
+// one definition that may declare warehouse: the CLI cannot produce that source
+// token yet, so no connection can exercise this destination end to end. That is
+// also why it stays in the unverified registry — promote it to the verified
+// block once warehouse sources are supported and the apply cycle can be proven
+// against a live stack.
 var sourceTypes = []string{
 	common.SourceTypeWarehouse,
 }
@@ -20,10 +25,10 @@ var connectionModes = map[string][]string{
 // integrations-config destinations/customerio_audience defaultConfig;
 // validation constraints mirror overlapping schema.json rules.
 type customerioAudienceConfig struct {
-	SiteID            string                   `mapstructure:"site_id" validate:"required,min=1,max=100"`
-	APIKey            string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
-	AppAPIKey         string                   `mapstructure:"app_api_key" validate:"required,min=1,max=100"`
-	Region            string                   `mapstructure:"region" validate:"required,dynamic_or_oneof=US EU"`
+	SiteID            string                   `mapstructure:"site_id" validate:"required,pattern=single_line_100"`
+	APIKey            string                   `mapstructure:"api_key" validate:"required,pattern=single_line_100"`
+	AppAPIKey         string                   `mapstructure:"app_api_key" validate:"required,pattern=single_line_100"`
+	Region            string                   `mapstructure:"region" validate:"required,oneof=US EU"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

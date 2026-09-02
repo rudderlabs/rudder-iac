@@ -50,8 +50,8 @@ var connectionModes = map[string][]string{
 type intercomConfig struct {
 	AppID               *string                  `mapstructure:"app_id" validate:"intercom_app_id_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
 	APIKey              *string                  `mapstructure:"api_key" validate:"intercom_api_key_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
-	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,dynamic_or_oneof=standard eu au" default:"standard"`
-	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,dynamic_or_oneof=v1 v2" default:"v2"`
+	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,oneof=standard eu au" default:"standard"`
+	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2" default:"v2"`
 	SendAnonymousID     *bool                    `mapstructure:"send_anonymous_id" default:"false"`
 	UpdateLastRequestAt *bool                    `mapstructure:"update_last_request_at" default:"true"`
 	MobileAPIKeyAndroid string                   `mapstructure:"mobile_api_key_android" validate:"omitempty,dynamic_or_pattern=single_line_100"`
@@ -137,6 +137,21 @@ var (
 	}
 )
 
+// Connect-time required keys, derived from schema.json's two
+// connectionMode-gated branches: a device-mode source needs appId, a
+// cloud-mode one needs apiKey. Upstream's cloud branch omits androidKotlin,
+// iosSwift and cloud, which this definition supports in cloud mode, so those
+// source types get no entry rather than a guessed api_key.
+var connectionRequiredKeys = map[string]map[string][]string{
+	common.SourceTypeAndroid:     {"cloud": {"api_key"}, "device": {"app_id"}},
+	common.SourceTypeIOS:         {"cloud": {"api_key"}, "device": {"app_id"}},
+	common.SourceTypeWeb:         {"cloud": {"api_key"}, "device": {"app_id"}},
+	common.SourceTypeUnity:       {"cloud": {"api_key"}},
+	common.SourceTypeReactNative: {"cloud": {"api_key"}},
+	common.SourceTypeFlutter:     {"cloud": {"api_key"}},
+	common.SourceTypeCordova:     {"cloud": {"api_key"}},
+}
+
 // NewDefinition returns the Intercom destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
@@ -180,7 +195,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &intercomConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }

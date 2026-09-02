@@ -121,7 +121,7 @@ type webBool struct {
 }
 
 type webCapturePageView struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=rs gtag"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=rs gtag" default:"rs"`
 }
 
 // ga4Config is the local YAML config model. Field set mirrors terraform-provider

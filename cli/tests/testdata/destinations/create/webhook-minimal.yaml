@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: webhook-minimal
+spec:
+  id: webhook-minimal
+  display_name: E2E Webhook Minimal
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://minimal.example.com/rudder
