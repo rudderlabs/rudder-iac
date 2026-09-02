@@ -1,6 +1,7 @@
 package s3_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -160,6 +161,53 @@ func TestS3ConfigValidation(t *testing.T) {
 			"bucket_name":     "my-bucket",
 			"role_based_auth": true,
 			"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+		})
+		assert.Empty(t, errors)
+	})
+
+	// schema.json states these as ^(.{0,100})$ patterns, not length keywords:
+	// the bound forbids line breaks as well as overlong values.
+	t.Run("string fields reject line breaks and overlong values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"bucket_name", "prefix", "iam_role_arn"} {
+			for _, value := range []string{"bad\nvalue", strings.Repeat("a", 101)} {
+				cfg := map[string]any{
+					"bucket_name":     "my-bucket",
+					"role_based_auth": true,
+					"iam_role_arn":    "arn:aws:iam::123456789012:role/S3Access",
+				}
+				cfg[field] = value
+
+				errors := registered.ValidateConfig(cfg)
+				require.NotEmpty(t, errors, "%s=%q", field, value)
+				assert.Equal(t, "/"+field, errors[0].Path)
+			}
+		}
+
+		for _, field := range []string{"access_key_id", "access_key"} {
+			cfg := map[string]any{
+				"bucket_name":     "my-bucket",
+				"role_based_auth": false,
+				"access_key_id":   "AKIAIOSFODNN7EXAMPLE",
+				"access_key":      "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			}
+			cfg[field] = "bad\nvalue"
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+		}
+	})
+
+	t.Run("string fields accept ui templates", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"bucket_name":     "{{ config.bucket || " + strings.Repeat("a", 150) + " }}",
+			"prefix":          "{{ config.prefix || " + strings.Repeat("a", 150) + " }}",
+			"role_based_auth": true,
+			"iam_role_arn":    "{{ config.roleArn || " + strings.Repeat("a", 150) + " }}",
 		})
 		assert.Empty(t, errors)
 	})

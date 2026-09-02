@@ -67,7 +67,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"track_products_once":                false,
 		"track_revenue_per_product":          false,
 		"use_user_defined_screen_event_name": false,
-		"residency_server":                   "standard",
 		"sdk_version":                        map[string]any{"web": float64(2)},
 		"track_session_events":               map[string]any{"web": false},
 		"auto_capture": map[string]any{
@@ -173,8 +172,22 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 	t.Run("defaulted minimal config is valid", func(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, registered.ValidateConfig(registered.ApplyDefaults(map[string]any{
-			"api_key": "amplitude-api-key",
+			"api_key":          "amplitude-api-key",
+			"residency_server": "standard",
 		})))
+	})
+
+	// schema.json lists residencyServer in `required` as well as giving it a
+	// default, so a spec must state it: the tag combination is rejected at
+	// registration, and required is the side that cannot silently diverge.
+	t.Run("missing residency_server rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "amplitude-api-key",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/residency_server", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
 	})
 
 	t.Run("invalid api_key pattern rejected", func(t *testing.T) {

@@ -25,10 +25,10 @@ var connectionModes = map[string][]string{
 // integrations-config destinations/customerio_audience defaultConfig;
 // validation constraints mirror overlapping schema.json rules.
 type customerioAudienceConfig struct {
-	SiteID            string                   `mapstructure:"site_id" validate:"required,min=1,max=100"`
-	APIKey            string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
-	AppAPIKey         string                   `mapstructure:"app_api_key" validate:"required,min=1,max=100"`
-	Region            string                   `mapstructure:"region" validate:"required,dynamic_or_oneof=US EU"`
+	SiteID            string                   `mapstructure:"site_id" validate:"required,pattern=single_line_100"`
+	APIKey            string                   `mapstructure:"api_key" validate:"required,pattern=single_line_100"`
+	AppAPIKey         string                   `mapstructure:"app_api_key" validate:"required,pattern=single_line_100"`
+	Region            string                   `mapstructure:"region" validate:"required,oneof=US EU"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }

@@ -171,7 +171,7 @@ type amplitudeConfig struct {
 	UseNativeSDK                     *sdkBools                `mapstructure:"use_native_sdk"`
 	ConnectionMode                   common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement                common.ConsentManagement `mapstructure:"consent_management"`
-	ResidencyServer                  string                   `mapstructure:"residency_server" validate:"omitempty,oneof=standard EU" default:"standard"`
+	ResidencyServer                  string                   `mapstructure:"residency_server" validate:"required,oneof=standard EU"`
 }
 
 // NewDefinition returns the Amplitude destination definition.

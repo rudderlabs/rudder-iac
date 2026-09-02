@@ -1,6 +1,7 @@
 package adobeanalytics_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,16 +136,10 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 				map[string]any{"from": "path", "to": "1"},
 			},
 			"list_mapping": []any{
-				map[string]any{"from": "tags", "to": "1"},
-			},
-			"list_delimiter": []any{
-				map[string]any{"from": "tags", "to": ","},
+				map[string]any{"from": "tags", "to": "1", "delimiter": ","},
 			},
 			"custom_props_mapping": []any{
-				map[string]any{"from": "plan", "to": "1"},
-			},
-			"props_delimiter": []any{
-				map[string]any{"from": "plan", "to": "|"},
+				map[string]any{"from": "plan", "to": "1", "delimiter": "|"},
 			},
 			"event_merch_event_to_adobe_event": []any{
 				map[string]any{"from": "Order Completed", "to": "purchase"},
@@ -253,17 +248,70 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/events_to_types/0/to", errors[0].Path)
 	})
 
-	t.Run("invalid list_delimiter to rejected", func(t *testing.T) {
+	// Only trackingServerUrl, trackingServerSecureUrl and reportSuiteIds declare a
+	// {{ … || … }} branch in adobe's schema.json. Without it a template is just a
+	// literal, so it must meet the real bound instead of bypassing it — which is
+	// exactly what upstream's own ^(.{0,100})$ does.
+	t.Run("fields without a template branch measure template text", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"report_suite_ids": "rsid1",
-			"list_delimiter": []any{
-				map[string]any{"from": "tags", "to": "#"},
-			},
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/list_delimiter/0/to", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "must be one of")
+		long := "{{ config.value || " + strings.Repeat("a", 150) + " }}"
+		for _, tc := range []struct {
+			field string
+			value any
+			path  string
+		}{
+			{field: "event_merch_properties", value: []any{long}, path: "/event_merch_properties/0"},
+			{field: "product_merch_properties", value: []any{long}, path: "/product_merch_properties/0"},
+			{field: "events_to_types", value: []any{map[string]any{"from": long, "to": "initHeartbeat"}}, path: "/events_to_types/0/from"},
+			{field: "list_mapping", value: []any{map[string]any{"from": long, "to": "1"}}, path: "/list_mapping/0/from"},
+			{field: "event_filtering", value: map[string]any{"whitelist": []any{long}}, path: "/event_filtering/whitelist/0"},
+			{field: "event_filtering", value: map[string]any{"blacklist": []any{long}}, path: "/event_filtering/blacklist/0"},
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				tc.field:           tc.value,
+			})
+			require.NotEmpty(t, errors, tc.field)
+			assert.Equal(t, tc.path, errors[0].Path)
+		}
+	})
+
+	// report_suite_ids does declare the branch, so its template is not measured.
+	t.Run("report_suite_ids accepts an overlong template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"report_suite_ids": "{{ config.reportSuiteIds || " + strings.Repeat("a", 400) + " }}",
+		}))
+	})
+
+	t.Run("invalid mapping delimiter rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, field := range []string{"list_mapping", "custom_props_mapping"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field: []any{
+					map[string]any{"from": "tags", "to": "1", "delimiter": "#"},
+				},
+			})
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field+"/0/delimiter", errors[0].Path)
+			assert.Contains(t, errors[0].Message, "must be one of")
+		}
+	})
+
+	// schema.json lists "" alongside the five separators, and omitempty covers it.
+	t.Run("mapping delimiter is optional", func(t *testing.T) {
+		t.Parallel()
+		for _, delimiter := range []any{nil, ""} {
+			entry := map[string]any{"from": "tags", "to": "1"}
+			if delimiter != nil {
+				entry["delimiter"] = delimiter
+			}
+			assert.Empty(t, registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				"list_mapping":     []any{entry},
+			}), delimiter)
+		}
 	})
 
 	t.Run("report_suite_ids max length rejected", func(t *testing.T) {
@@ -517,16 +565,10 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 					{"from": "path", "to": "1"}
 				],
 				"list_mapping": [
-					{"from": "tags", "to": "1"}
-				],
-				"list_delimiter": [
-					{"from": "tags", "to": ","}
+					{"from": "tags", "to": "1", "delimiter": ","}
 				],
 				"custom_props_mapping": [
-					{"from": "plan", "to": "1"}
-				],
-				"props_delimiter": [
-					{"from": "plan", "to": "|"}
+					{"from": "plan", "to": "1", "delimiter": "|"}
 				],
 				"event_merch_event_to_adobe_event": [
 					{"from": "Order Completed", "to": "purchase"}
@@ -584,16 +626,10 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 					{"from": "path", "to": "1"}
 				],
 				"listMapping": [
-					{"from": "tags", "to": "1"}
-				],
-				"listDelimiter": [
-					{"from": "tags", "to": ","}
+					{"from": "tags", "to": "1", "delimiter": ","}
 				],
 				"customPropsMapping": [
-					{"from": "plan", "to": "1"}
-				],
-				"propsDelimiter": [
-					{"from": "plan", "to": "|"}
+					{"from": "plan", "to": "1", "delimiter": "|"}
 				],
 				"eventMerchEventToAdobeEvent": [
 					{"from": "Order Completed", "to": "purchase"}

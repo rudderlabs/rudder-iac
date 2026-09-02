@@ -25,6 +25,10 @@ const (
 	httpPathParamPattern             = `^(?:` + httpJSONPathPattern + `/?|` + httpValueSegmentPattern + `/?)$`
 	httpAuthHeaderNamePattern        = `^\S{1,100}$`
 	httpMaxBatchSizePattern          = `^([1-9][0-9]{0,1}|100)$`
+	// Go RE2 caps a repeat count at 1000, so the bearer token's 1..2048 bound is
+	// split across groups; the total stays 1 minimum, 2048 maximum.
+	httpSingleLine1To100Pattern  = `^(.{1,100})$`
+	httpSingleLine1To2048Pattern = `^(.{1,1000})(.{0,1000})(.{0,48})$`
 )
 
 func init() {
@@ -69,6 +73,18 @@ func init() {
 		httpPathParamPattern,
 		"must be a JSONPath expression or path token up to 100 characters",
 	)
+	// Credential fields: schema.json states these as patterns, so the bound
+	// forbids line breaks as well as capping length.
+	funcs.NewPattern(
+		"http_single_line_1_100",
+		httpSingleLine1To100Pattern,
+		"must be 1-100 characters and must not contain line breaks",
+	)
+	funcs.NewPattern(
+		"http_single_line_1_2048",
+		httpSingleLine1To2048Pattern,
+		"must be 1-2048 characters and must not contain line breaks",
+	)
 	funcs.NewPattern(
 		"http_api_key_name",
 		httpAuthHeaderNamePattern,
@@ -111,15 +127,15 @@ var connectionModes = map[string][]string{
 
 type httpConfig struct {
 	APIURL            string                   `mapstructure:"api_url" validate:"required,pattern=http_api_url"`
-	Auth              string                   `mapstructure:"auth" validate:"required,dynamic_or_oneof=noAuth basicAuth bearerTokenAuth apiKeyAuth"`
-	Username          string                   `mapstructure:"username" validate:"required_if=Auth basicAuth,omitempty,min=1,max=100"`
-	Password          string                   `mapstructure:"password" validate:"required_if=Auth basicAuth,omitempty,max=100"`
-	BearerToken       string                   `mapstructure:"bearer_token" validate:"required_if=Auth bearerTokenAuth,omitempty,min=1,max=255"`
+	Auth              string                   `mapstructure:"auth" validate:"required,oneof=noAuth basicAuth bearerTokenAuth apiKeyAuth"`
+	Username          string                   `mapstructure:"username" validate:"required_if=Auth basicAuth,omitempty,pattern=http_single_line_1_100"`
+	Password          string                   `mapstructure:"password" validate:"required_if=Auth basicAuth,omitempty,pattern=single_line_100"`
+	BearerToken       string                   `mapstructure:"bearer_token" validate:"required_if=Auth bearerTokenAuth,omitempty,pattern=http_single_line_1_2048"`
 	APIKeyName        string                   `mapstructure:"api_key_name" validate:"required_if=Auth apiKeyAuth,omitempty,pattern=http_api_key_name"`
-	APIKeyValue       string                   `mapstructure:"api_key_value" validate:"required_if=Auth apiKeyAuth,omitempty,min=1,max=100"`
-	XMLRootKey        string                   `mapstructure:"xml_root_key" validate:"omitempty,max=100"`
-	Method            string                   `mapstructure:"method" validate:"required,dynamic_or_oneof=POST PUT PATCH GET DELETE"`
-	Format            string                   `mapstructure:"format" validate:"required,dynamic_or_oneof=JSON XML FORM"`
+	APIKeyValue       string                   `mapstructure:"api_key_value" validate:"required_if=Auth apiKeyAuth,omitempty,pattern=http_single_line_1_100"`
+	XMLRootKey        string                   `mapstructure:"xml_root_key" validate:"omitempty,pattern=single_line_100"`
+	Method            string                   `mapstructure:"method" validate:"required,oneof=POST PUT PATCH GET DELETE"`
+	Format            string                   `mapstructure:"format" validate:"required,oneof=JSON XML FORM"`
 	PropertiesMapping []propertiesMapping      `mapstructure:"properties_mapping" validate:"omitempty,dive"`
 	QueryParams       []queryParam             `mapstructure:"query_params" validate:"omitempty,dive"`
 	Headers           []header                 `mapstructure:"headers" validate:"omitempty,dive"`

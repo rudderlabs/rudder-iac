@@ -61,10 +61,6 @@ type webBool struct {
 	Web *bool `mapstructure:"web"`
 }
 
-type legacyConversionPixelID struct {
-	Web []legacyConversionPixelMapping `mapstructure:"web" validate:"omitempty,dive"`
-}
-
 type legacyConversionPixelMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_pattern=single_line_100"`
@@ -74,25 +70,25 @@ type legacyConversionPixelMapping struct {
 // integrations-config destinations/facebook_pixel schema/defaultConfig;
 // validation constraints mirror schema.json where present.
 type facebookPixelConfig struct {
-	PixelID                 string                   `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	AccessToken             string                   `mapstructure:"access_token" validate:"facebook_pixel_access_token_required,omitempty,dynamic_or_pattern=single_line_300"`
-	StandardPageCall        *bool                    `mapstructure:"standard_page_call" default:"false"`
-	ValueFieldIdentifier    string                   `mapstructure:"value_field_identifier" validate:"omitempty,dynamic_or_oneof=properties.value properties.price" default:"properties.price"`
-	AdvancedMapping         *bool                    `mapstructure:"advanced_mapping" default:"false"`
-	LimitedDataUsage        *bool                    `mapstructure:"limited_data_usage" default:"false"`
-	TestDestination         *bool                    `mapstructure:"test_destination" default:"false"`
-	TestEventCode           string                   `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	RemoveExternalID        *bool                    `mapstructure:"remove_external_id" default:"false"`
-	UseUpdatedMapping       *bool                    `mapstructure:"use_updated_mapping" default:"false"`
-	EventsToEvents          []eventMapping           `mapstructure:"events_to_events" validate:"omitempty,dive"`
-	BlacklistPIIProperties  []piiDenylistEntry       `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
-	WhitelistPIIProperties  []piiAllowlistEntry      `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`
-	EventFiltering          *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK            webBool                  `mapstructure:"use_native_sdk"`
-	AutoConfig              webBool                  `mapstructure:"auto_config"`
-	LegacyConversionPixelID legacyConversionPixelID  `mapstructure:"legacy_conversion_pixel_id"`
-	ConnectionMode          common.ConnectionMode    `mapstructure:"connection_mode"`
-	ConsentManagement       common.ConsentManagement `mapstructure:"consent_management"`
+	PixelID                 string                         `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
+	AccessToken             string                         `mapstructure:"access_token" validate:"facebook_pixel_access_token_required,omitempty,dynamic_or_pattern=single_line_300"`
+	StandardPageCall        *bool                          `mapstructure:"standard_page_call" default:"false"`
+	ValueFieldIdentifier    string                         `mapstructure:"value_field_identifier" validate:"omitempty,oneof=properties.value properties.price" default:"properties.price"`
+	AdvancedMapping         *bool                          `mapstructure:"advanced_mapping" default:"false"`
+	LimitedDataUsage        *bool                          `mapstructure:"limited_data_usage" default:"false"`
+	TestDestination         *bool                          `mapstructure:"test_destination" default:"false"`
+	TestEventCode           string                         `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	RemoveExternalID        *bool                          `mapstructure:"remove_external_id" default:"false"`
+	UseUpdatedMapping       *bool                          `mapstructure:"use_updated_mapping" default:"false"`
+	EventsToEvents          []eventMapping                 `mapstructure:"events_to_events" validate:"omitempty,dive"`
+	BlacklistPIIProperties  []piiDenylistEntry             `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
+	WhitelistPIIProperties  []piiAllowlistEntry            `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`
+	EventFiltering          *eventFiltering                `mapstructure:"event_filtering"`
+	UseNativeSDK            webBool                        `mapstructure:"use_native_sdk"`
+	AutoConfig              webBool                        `mapstructure:"auto_config"`
+	LegacyConversionPixelID []legacyConversionPixelMapping `mapstructure:"legacy_conversion_pixel_id" validate:"omitempty,dive"`
+	ConnectionMode          common.ConnectionMode          `mapstructure:"connection_mode"`
+	ConsentManagement       common.ConsentManagement       `mapstructure:"consent_management"`
 }
 
 // schema.json requires accessToken unless connection_mode.web is device: the
@@ -162,7 +158,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			common.SourceTypeWeb,
 		),
 		converter.Gated(
-			converter.ArrayWithObjects("legacyConversionPixelId.web", "legacy_conversion_pixel_id.web", map[string]any{
+			converter.ArrayWithObjects("legacyConversionPixelId.web", "legacy_conversion_pixel_id", map[string]any{
 				"from": "from",
 				"to":   "to",
 			}),

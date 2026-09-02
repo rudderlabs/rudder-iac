@@ -111,6 +111,11 @@ func TestIntercomConfigValidation(t *testing.T) {
 		}{
 			{key: "api_server", value: "emea", path: "/api_server"},
 			{key: "api_version", value: "v3", path: "/api_version"},
+			// schema.json declares both as plain enums with no {{ … || … }}
+			// branch, so a templated value would be stored verbatim and
+			// rejected by the backend.
+			{key: "api_server", value: `{{ .API_SERVER || standard }}`, path: "/api_server"},
+			{key: "api_version", value: "env.API_VERSION", path: "/api_version"},
 		} {
 			t.Run(tc.key, func(t *testing.T) {
 				t.Parallel()

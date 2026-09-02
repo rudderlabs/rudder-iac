@@ -19,6 +19,7 @@ spec:
     enhanced_ecommerce: true
     non_interaction: false
     send_user_id: true
+    enable_server_side_identify: true
     server_side_identify:
       event_category: All
       event_action: User Enriched

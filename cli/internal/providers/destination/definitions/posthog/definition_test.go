@@ -130,6 +130,45 @@ func TestPosthogConfigValidation(t *testing.T) {
 		assert.Equal(t, "/person_profiles/web", errors[0].Path)
 	})
 
+	// schema.json declares the enum with no {{ … || … }} branch, so a templated
+	// value would be stored verbatim and rejected by the backend.
+	t.Run("person_profiles rejects dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{`{{ .PROFILES || always }}`, "env.PROFILES"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key":         "phc_test_key",
+				"person_profiles": map[string]any{"web": value},
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/person_profiles/web", errors[0].Path)
+		}
+	})
+
+	// The backend applies personProfiles.web's default when the block is present,
+	// so a spec carrying the block without the key must be enriched or it diffs
+	// forever. An absent block stays absent, matching AJV.
+	t.Run("person_profiles web default applies inside a present block", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t,
+			map[string]any{"web": "always"},
+			registered.ApplyDefaults(map[string]any{
+				"api_key":         "phc_test_key",
+				"person_profiles": map[string]any{},
+			})["person_profiles"])
+
+		assert.NotContains(t,
+			registered.ApplyDefaults(map[string]any{"api_key": "phc_test_key"}),
+			"person_profiles")
+
+		assert.Equal(t,
+			map[string]any{"web": "identified_only"},
+			registered.ApplyDefaults(map[string]any{
+				"api_key":         "phc_test_key",
+				"person_profiles": map[string]any{"web": "identified_only"},
+			})["person_profiles"], "an explicit value is never overwritten")
+	})
+
 	t.Run("xhr_headers value too long rejected", func(t *testing.T) {
 		t.Parallel()
 		longValue := make([]byte, 101)
