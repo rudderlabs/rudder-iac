@@ -14,8 +14,6 @@ import (
 type ExperimentalConfig struct {
 	// ConcurrentSyncs enables concurrent sync operations when applying changes
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
-	// Transformations enables transformations provider and related features
-	Transformations bool `mapstructure:"transformations"`
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
