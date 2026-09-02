@@ -58,20 +58,20 @@ type webStringList struct {
 // derived option — with the web scoping expressed in the converters (Gated)
 // instead of in the local key names.
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
-	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,pattern=single_line_100"`
 }
 
 type webInitIdentifier struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=email userId"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=email userId" default:"email"`
 }
 
 type webHandleLinks struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=open-all-new-tab open-all-same-tab external-new-tab"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=open-all-new-tab open-all-same-tab external-new-tab" default:"open-all-new-tab"`
 }
 
 type webCloseButtonPosition struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=top-right top-left"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=top-right top-left" default:"top-right"`
 }
 
 // iterableConfig is the local YAML config model. Field set mirrors terraform

@@ -41,16 +41,16 @@ var connectionModes = map[string][]string{
 // constraints mirror overlapping schema.json rules plus explicit auth-mode
 // mutual exclusion (role ARN vs access keys).
 type s3Config struct {
-	BucketName    string `mapstructure:"bucket_name" validate:"required,min=1,max=100"`
-	Prefix        string `mapstructure:"prefix" validate:"omitempty,max=100"`
+	BucketName    string `mapstructure:"bucket_name" validate:"required,dynamic_or_pattern=single_line_100"`
+	Prefix        string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required"`
 	// IAM role ARN is required when role-based auth is on; forbidden when off.
-	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,max=100"`
+	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	// Access keys are required for key-based auth and forbidden when role-based
 	// auth is on. Import/export never invents these secrets — users must supply
 	// them (e.g. via {{ .VAR }} + a var file) when role_based_auth is false.
-	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,max=100"`
-	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,max=100"`
+	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
+	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	EnableSSE         *bool                    `mapstructure:"enable_sse" default:"false"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
