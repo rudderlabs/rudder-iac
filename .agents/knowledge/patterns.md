@@ -210,3 +210,9 @@
 - Legacy Google Analytics (`type: ga`) E2E fixtures stay in place; only `rudder_delete_account_id` is dropped from them, because the upstream config API rejects an account id that is not a real account link in the workspace.
 - `RudderDeleteAccountID` is `omitempty` in the GA definition, so omitting it from a fixture keeps the spec valid and simply leaves `rudderDeleteAccountId` out of the upstream payload and its expected snapshot.
 - Prefer trimming the account-linked key over deleting whole fixture/snapshot pairs: it keeps `TestDestinationsApply` coverage for the rest of the legacy GA config surface while removing the only field that needs a cross-linked account.
+
+## DEX-531 — Webhook Dotted Secret Paths
+<!-- ticket:DEX-531 -->
+- Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
+- Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
+- Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
