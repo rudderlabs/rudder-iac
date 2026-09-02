@@ -16,8 +16,6 @@ type ExperimentalConfig struct {
 	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// NestedDiffs enables detailed diff reports for nested structures
 	NestedDiffs bool `mapstructure:"nestedDiffs"`
-	// Transformations enables transformations provider and related features
-	Transformations bool `mapstructure:"transformations"`
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars

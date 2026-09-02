@@ -23,11 +23,9 @@ const concurrencyForTest = 1
 var varFilePath = filepath.Join("testdata", "project", "substitution.vars.yaml")
 
 func TestProjectApply(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
-
 	// The api_tracking event keeps its name and description as {{ .VAR }}
-	// placeholders resolved at apply time. The feature is gated, so both
-	// experimental switches must be on for substitution to run at all.
+	// placeholders resolved at apply time. The feature is gated, so the
+	// umbrella experimental switch and substitution flag must be on.
 	//   - API_TRACKING_DESCRIPTION comes from the var file only (no env var set).
 	//   - API_TRACKING_NAME is in both the var file and the env var below; the env
 	//     var wins, resolving to "API Tracking" (the var file value is ignored).
