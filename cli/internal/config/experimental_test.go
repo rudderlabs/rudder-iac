@@ -108,6 +108,13 @@ func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
+func TestIsValidExperimentalFlag_EnableVarSubstitutionRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "enableVar" + "Substitution"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestGetAvailableExperimentalFlags(t *testing.T) {
 	t.Parallel()
 
