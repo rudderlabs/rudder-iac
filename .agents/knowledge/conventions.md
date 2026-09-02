@@ -222,3 +222,8 @@
 <!-- ticket:DEX-731 -->
 - Avoid full live apply/destroy E2E validation in non-disposable autonomous environments because those flows can mutate or destroy the configured RudderStack workspace.
 - For sync-behavior changes without an explicitly disposable workspace, use compile-only E2E validation such as `go test ./cli/tests -run '^$'` as the safe substitute, alongside focused unit tests.
+
+## DEX-730 — Amplitude Source Scope
+<!-- ticket:DEX-730 -->
+- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
+- A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.

@@ -244,10 +244,21 @@
 <!-- ticket:DEX-490 -->
 - Amplitude destination support is implemented as CLI destination type `am`, API type `AM`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/am`.
 - `am` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
-- Amplitude retains the broad mapped analytics source set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`) rather than the narrowed event-stream-owned set used by storage-like destinations.
+- Amplitude declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them (DEX-730).
 - Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.
 
 ## DEX-731 — Concurrent Syncs GA
 <!-- ticket:DEX-731 -->
 - Apply and destroy project syncers should always be constructed with `syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer)`; concurrent sync execution is no longer gated by an experimental flag.
 - `concurrency.syncer` remains the main configuration tuning knob for sync parallelism after GA promotion; do not replace it with hard-coded concurrency or reintroduce a `concurrentSyncs` gate.
+
+## DEX-730 — Never-Declared Source Types
+<!-- ticket:DEX-730 -->
+- `amp`, `shopify`, `warehouse` and `cloud_source` are never declared in a definition's `SourceTypes`, even when db-config lists them: an event stream source's `type` is constrained to the SDK definitions, and `SourceTypeToken` reaches `warehouse`/`cloud_source` only through a source category the sole call site never sets. A definition declaring them advertises support no connection could match.
+- `customerio_audience` is the one exception, since `warehouse` is its only source type; it stays in the unverified registry until warehouse sources are supported.
+
+## DEX-531 — Webhook Destination Onboarding
+<!-- ticket:DEX-531 -->
+- Webhook declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them, per DEX-730's never-declared rule.
+- Webhook supports cloud-only connection mode for all retained source types.
+- Do not narrow webhook further to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.

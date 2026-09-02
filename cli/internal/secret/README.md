@@ -134,6 +134,8 @@ func apiKeyVarName(externalID string) string {
 
 Derive the name from what identifies the resource — resource type, external ID, field name — so it stays the same across re-imports. Names must match `^[A-Za-z_][A-Za-z0-9_]*$`, so fold kebab-case IDs to underscores as above. A name outside that grammar fails when the spec is generated (at marshal time), not two steps later when apply rejects the malformed token.
 
+For a secret nested inside a slice, the generated name carries the member's position (`{{ .WEBHOOK_PROD_HEADERS_0_TO }}`), since each member needs its own variable. Position is the only thing distinguishing them, so reordering the slice renames the variables and stale var file entries stop resolving — re-import after a reorder and update the var file to match.
+
 The generated spec then carries the reference:
 
 ```yaml

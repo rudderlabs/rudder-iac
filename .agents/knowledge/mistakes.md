@@ -67,3 +67,13 @@
 - CI failed when the live destination E2E fixture `cli/tests/testdata/destinations/{create,update}/ga.yaml` set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`, but the test workspace did not create an account with that ID.
 - The observed `TestDestinationsApply` failure was `task: destination:ga failed: creating destination: http status code: 400 ... 'Account not found with given id in the workspace'`.
 - Durable mitigation: omit account-ID config from GA destination fixtures unless the referenced account is seeded or managed by the test setup; future destination E2E fixtures should only include account-ID fields with a real test prerequisite.
+
+## DEX-730 — GA Delete Account Fixture Requires Real Account
+<!-- ticket:DEX-730 -->
+- CI failed in `TestDestinationsApply` when the GA destination live E2E fixture set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`; the backend validates `rudderDeleteAccountId` against workspace accounts and returned HTTP 400 `Account not found with given id in the workspace` during `destination:ga` creation.
+- Durable mitigation: keep workspace-specific GA delete-account IDs out of live destination fixtures unless the referenced account is provisioned for that CI workspace; rely on unit conversion tests for this field or inject a real workspace account ID explicitly.
+
+## DEX-531 — Webhook Header Secret Placeholder CI Failure
+<!-- ticket:DEX-531 -->
+- CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
+- Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.

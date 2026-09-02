@@ -115,7 +115,7 @@ type rsConfig struct {
 	// presence when SSH is enabled but declares no literal pattern.
 	SSHPublicKey string `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true"`
 
-	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
+	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
