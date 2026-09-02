@@ -50,8 +50,8 @@ var connectionModes = map[string][]string{
 type intercomConfig struct {
 	AppID               *string                  `mapstructure:"app_id" validate:"intercom_app_id_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
 	APIKey              *string                  `mapstructure:"api_key" validate:"intercom_api_key_required,omitempty,dynamic_or_pattern=intercom_single_line_1_100"`
-	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,dynamic_or_oneof=standard eu au" default:"standard"`
-	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,dynamic_or_oneof=v1 v2" default:"v2"`
+	APIServer           string                   `mapstructure:"api_server" validate:"omitempty,oneof=standard eu au" default:"standard"`
+	APIVersion          string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2" default:"v2"`
 	SendAnonymousID     *bool                    `mapstructure:"send_anonymous_id" default:"false"`
 	UpdateLastRequestAt *bool                    `mapstructure:"update_last_request_at" default:"true"`
 	MobileAPIKeyAndroid string                   `mapstructure:"mobile_api_key_android" validate:"omitempty,dynamic_or_pattern=single_line_100"`

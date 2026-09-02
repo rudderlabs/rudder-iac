@@ -63,6 +63,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
 	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -452,6 +453,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(vwo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering vwo destination definition: %w", err)
+		}
+		if err := registry.Register(webhook.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering webhook destination definition: %w", err)
 		}
 		if err := registry.Register(zendesk.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering zendesk destination definition: %w", err)
