@@ -55,9 +55,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.Equal(t, map[string][]string{
-		"auto_config/web":                {"web"},
-		"legacy_conversion_pixel_id/web": {"web"},
+		"auto_config/web":            {"web"},
+		"legacy_conversion_pixel_id": {"web"},
 	}, registered.GatedKeyPaths())
+
+	for _, sourceType := range expectedSourceTypes {
+		assert.Equal(t, []string{"access_token"}, registered.ConnectionRequiredKeys(sourceType, "cloud"), sourceType)
+	}
+	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"))
 
 	byAPI, err := registry.GetByAPIType("FACEBOOK_PIXEL", 1)
 	require.NoError(t, err)
@@ -94,14 +99,23 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("value_field_identifier accepts dynamic values", func(t *testing.T) {
+	// schema.json declares a plain enum with no {{ … || … }} branch, so a
+	// templated value would be stored verbatim and rejected by the backend.
+	t.Run("value_field_identifier rejects dynamic values", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"pixel_id":               "pixel-1",
-			"access_token":           "fbAccessToken",
-			"value_field_identifier": "{{ .FACEBOOK_VALUE_FIELD_IDENTIFIER }}",
-		})
-		assert.Empty(t, errors)
+		for _, value := range []string{
+			"{{ .FACEBOOK_VALUE_FIELD_IDENTIFIER }}",
+			`{{ .FACEBOOK_VALUE_FIELD_IDENTIFIER || properties.value }}`,
+			"env.FACEBOOK_VALUE_FIELD_IDENTIFIER",
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"pixel_id":               "pixel-1",
+				"access_token":           "fbAccessToken",
+				"value_field_identifier": value,
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/value_field_identifier", errors[0].Path)
+		}
 	})
 
 	t.Run("invalid mapped event target", func(t *testing.T) {
@@ -157,16 +171,6 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 					"ios": true,
 				},
 				path: "/auto_config/ios",
-			},
-			{
-				name: "legacy_conversion_pixel_id",
-				key:  "legacy_conversion_pixel_id",
-				config: map[string]any{
-					"android": []any{
-						map[string]any{"from": "Signup", "to": "1234567890"},
-					},
-				},
-				path: "/legacy_conversion_pixel_id/android",
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
@@ -475,12 +479,10 @@ func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 				"pixel_id": "pixel-1",
 				"use_native_sdk": {"web": true},
 				"auto_config": {"web": false},
-				"legacy_conversion_pixel_id": {
-					"web": [
-						{"from": "Signup", "to": "1234567890"},
-						{"from": "Purchase", "to": "0987654321"}
-					]
-				}
+				"legacy_conversion_pixel_id": [
+					{"from": "Signup", "to": "1234567890"},
+					{"from": "Purchase", "to": "0987654321"}
+				]
 			}`,
 			APIJSON: `{
 				"pixelId": "pixel-1",
@@ -635,27 +637,23 @@ func patternFieldCases(value string) []patternFieldCase {
 		},
 		{
 			name: "legacy conversion event",
-			path: "/legacy_conversion_pixel_id/web/0/from",
+			path: "/legacy_conversion_pixel_id/0/from",
 			config: map[string]any{
 				"pixel_id":     "pixel-1",
 				"access_token": "fbAccessToken",
-				"legacy_conversion_pixel_id": map[string]any{
-					"web": []any{
-						map[string]any{"from": value, "to": "1234567890"},
-					},
+				"legacy_conversion_pixel_id": []any{
+					map[string]any{"from": value, "to": "1234567890"},
 				},
 			},
 		},
 		{
 			name: "legacy conversion pixel id",
-			path: "/legacy_conversion_pixel_id/web/0/to",
+			path: "/legacy_conversion_pixel_id/0/to",
 			config: map[string]any{
 				"pixel_id":     "pixel-1",
 				"access_token": "fbAccessToken",
-				"legacy_conversion_pixel_id": map[string]any{
-					"web": []any{
-						map[string]any{"from": "Signup", "to": value},
-					},
+				"legacy_conversion_pixel_id": []any{
+					map[string]any{"from": "Signup", "to": value},
 				},
 			},
 		},
@@ -716,11 +714,9 @@ func validWebDeviceConfig() map[string]any {
 		"auto_config": map[string]any{
 			"web": false,
 		},
-		"legacy_conversion_pixel_id": map[string]any{
-			"web": []any{
-				map[string]any{"from": "Signup", "to": "1234567890"},
-				map[string]any{"from": "Purchase", "to": "0987654321"},
-			},
+		"legacy_conversion_pixel_id": []any{
+			map[string]any{"from": "Signup", "to": "1234567890"},
+			map[string]any{"from": "Purchase", "to": "0987654321"},
 		},
 	}
 }
@@ -756,10 +752,8 @@ func exampleYAMLConfig() map[string]any {
 		"auto_config": map[string]any{
 			"web": false,
 		},
-		"legacy_conversion_pixel_id": map[string]any{
-			"web": []any{
-				map[string]any{"from": "Signup", "to": "123456789012345"},
-			},
+		"legacy_conversion_pixel_id": []any{
+			map[string]any{"from": "Signup", "to": "123456789012345"},
 		},
 		"consent_management": map[string]any{
 			"android_kotlin": []any{

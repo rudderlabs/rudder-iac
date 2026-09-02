@@ -62,22 +62,22 @@ type excludeWindow struct {
 // warehouse config is flat except excludeWindow; terraform's sync list is a
 // provider-specific artifact.
 type bqConfig struct {
-	Project     string `mapstructure:"project" validate:"required,dynamic_or_pattern=single_line_100"`
-	Location    string `mapstructure:"location" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	BucketName  string `mapstructure:"bucket_name" validate:"required,dynamic_or_pattern=bq_bucket_name"`
-	Prefix      string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Namespace   string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=bq_namespace"`
+	Project     string `mapstructure:"project" validate:"required,pattern=single_line_100"`
+	Location    string `mapstructure:"location" validate:"omitempty,pattern=single_line_100"`
+	BucketName  string `mapstructure:"bucket_name" validate:"required,pattern=bq_bucket_name"`
+	Prefix      string `mapstructure:"prefix" validate:"omitempty,pattern=single_line_100"`
+	Namespace   string `mapstructure:"namespace" validate:"omitempty,pattern=bq_namespace"`
 	Credentials string `mapstructure:"credentials" validate:"required"`
 
-	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
+	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
 	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table" default:"false"`
 	SkipViews                 *bool                    `mapstructure:"skip_views" default:"false"`
 	SkipUsersTable            *bool                    `mapstructure:"skip_users_table" default:"true"`
-	PartitionColumn           string                   `mapstructure:"partition_column" validate:"omitempty,dynamic_or_oneof=_PARTITIONTIME loaded_at received_at timestamp sent_at original_timestamp" default:"_PARTITIONTIME"`
-	PartitionType             string                   `mapstructure:"partition_type" validate:"omitempty,dynamic_or_oneof=hour day" default:"day"`
+	PartitionColumn           string                   `mapstructure:"partition_column" validate:"omitempty,oneof=_PARTITIONTIME loaded_at received_at timestamp sent_at original_timestamp" default:"_PARTITIONTIME"`
+	PartitionType             string                   `mapstructure:"partition_type" validate:"omitempty,oneof=hour day" default:"day"`
 	JSONPaths                 string                   `mapstructure:"json_paths"`
 	CleanupObjectStorageFiles *bool                    `mapstructure:"cleanup_object_storage_files" default:"false"`
 	UnderscoreDivideNumbers   *bool                    `mapstructure:"underscore_divide_numbers" default:"false"`

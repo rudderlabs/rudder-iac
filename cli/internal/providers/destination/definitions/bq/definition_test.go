@@ -228,14 +228,44 @@ func TestBQConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("pattern fields accept ui templates", func(t *testing.T) {
+	// No bq property declares a {{ … || … }} branch in schema.json — every pattern
+	// is (^env[.]…)|<real>. Dropping dynamic_or_pattern means template text is now
+	// measured against the real constraint instead of bypassing it, which is what
+	// upstream does: its own ^(.{1,100})$ rejects an over-long template.
+	t.Run("length-bounded fields measure template text", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalConfig())
-		cfg["project"] = "{{ config.project || " + strings.Repeat("a", 150) + " }}"
-		cfg["bucket_name"] = "{{ config.bucketName || rudder-google-bucket }}"
-		cfg["namespace"] = "{{ config.namespace || pg_events }}"
-		cfg["partition_column"] = "{{ config.partitionColumn || message_id }}"
-		assert.Empty(t, registered.ValidateConfig(cfg))
+		for _, field := range []string{"project", "location", "prefix"} {
+			cfg := copyConfig(minimalConfig())
+			cfg[field] = "{{ config." + field + " || " + strings.Repeat("a", 150) + " }}"
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+		}
+	})
+
+	// Fields whose real constraint has a shape, not just a length, reject a
+	// template outright — again matching upstream.
+	t.Run("shape-constrained fields reject dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			field string
+			value string
+		}{
+			{field: "bucket_name", value: `{{ config.bucketName || rudder-google-bucket }}`},
+			{field: "bucket_name", value: "env.BQ_BUCKET"},
+			{field: "partition_column", value: `{{ config.partitionColumn || loaded_at }}`},
+			{field: "partition_column", value: "env.BQ_PARTITION_COLUMN"},
+			{field: "partition_type", value: `{{ config.partitionType || day }}`},
+			{field: "partition_type", value: "env.BQ_PARTITION_TYPE"},
+		} {
+			cfg := copyConfig(minimalConfig())
+			cfg[tc.field] = tc.value
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, "%s=%s", tc.field, tc.value)
+			assert.Equal(t, "/"+tc.field, errors[0].Path, tc.value)
+		}
 	})
 
 	t.Run("sync and exclude window times follow schema string shape", func(t *testing.T) {
