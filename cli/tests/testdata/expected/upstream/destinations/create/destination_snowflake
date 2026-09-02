@@ -33,7 +33,6 @@
     "warehouse": "RUDDER_WH",
     "cloudProvider": "AWS",
     "cleanupObjectStorageFiles": false,
-    "roleBasedAuth": true,
     "enableSSE": false,
     "useSASTokens": false
   },

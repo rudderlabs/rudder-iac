@@ -254,6 +254,23 @@ func TestHTTPConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
+	// schema.json declares all three as plain enums with no {{ … || … }} branch,
+	// so a templated value would be stored verbatim and rejected by the backend.
+	t.Run("auth method and format reject dynamic values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"auth", "method", "format"} {
+			for _, value := range []string{`{{ .VALUE || noAuth }}`, "env.VALUE"} {
+				config := validMinimalConfig()
+				config[field] = value
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors, "%s=%s", field, value)
+				assert.Equal(t, "/"+field, errors[0].Path)
+			}
+		}
+	})
+
 	t.Run("valid basicAuth", func(t *testing.T) {
 		t.Parallel()
 
@@ -395,6 +412,74 @@ func TestHTTPConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	// schema.json states these as patterns, not length keywords, so the bound
+	// forbids line breaks as well as overlong values.
+	t.Run("credential fields reject line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			auth  string
+			field string
+		}{
+			{auth: "basicAuth", field: "username"},
+			{auth: "basicAuth", field: "password"},
+			{auth: "bearerTokenAuth", field: "bearer_token"},
+			{auth: "apiKeyAuth", field: "api_key_value"},
+		} {
+			config := validMinimalConfig()
+			config["auth"] = tc.auth
+			switch tc.auth {
+			case "basicAuth":
+				config["username"] = "rudder"
+				config["password"] = "s3cret"
+			case "bearerTokenAuth":
+				config["bearer_token"] = "token"
+			case "apiKeyAuth":
+				config["api_key_name"] = "X-Api-Key"
+				config["api_key_value"] = "value"
+			}
+			config[tc.field] = "bad\nvalue"
+
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors, tc.field)
+			assert.Equal(t, "/"+tc.field, errors[0].Path)
+		}
+
+		config := validMinimalConfig()
+		config["format"] = "XML"
+		config["xml_root_key"] = "bad\nvalue"
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/xml_root_key", errors[0].Path)
+	})
+
+	// schema.json allows up to 2048 for bearerToken; the CLI previously capped
+	// it at 255, which rejects an ordinary JWT.
+	t.Run("bearer_token length follows schema bounds", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			length int
+			valid  bool
+		}{
+			{length: 256, valid: true},
+			{length: 2048, valid: true},
+			{length: 2049, valid: false},
+		} {
+			config := validMinimalConfig()
+			config["auth"] = "bearerTokenAuth"
+			config["bearer_token"] = stringOfLength(tc.length)
+
+			errors := registered.ValidateConfig(config)
+			if tc.valid {
+				assert.Empty(t, errors, "length %d", tc.length)
+				continue
+			}
+			require.NotEmpty(t, errors, "length %d", tc.length)
+			assert.Equal(t, "/bearer_token", errors[0].Path)
+		}
+	})
+
 	t.Run("xml_root_key length rejected", func(t *testing.T) {
 		t.Parallel()
 
@@ -473,6 +558,51 @@ func TestHTTPConfigValidation(t *testing.T) {
 
 		errors := registered.ValidateConfig(config)
 		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering whitelist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"whitelist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering blacklist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"blacklist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects invalid literal values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name  string
+			key   string
+			value string
+			path  string
+		}{
+			{name: "whitelist newline", key: "whitelist", value: "Order\nCompleted", path: "/event_filtering/whitelist/0"},
+			{name: "blacklist too long", key: "blacklist", value: stringOfLength(101), path: "/event_filtering/blacklist/0"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				config := validMinimalConfig()
+				config["event_filtering"] = map[string]any{tc.key: []any{tc.value}}
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors)
+				assert.Equal(t, tc.path, errors[0].Path)
+			})
+		}
 	})
 
 	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {

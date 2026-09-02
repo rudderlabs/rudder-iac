@@ -10,6 +10,14 @@ import (
 const (
 	slackWebhookPattern       = `^(.{0,100})$`
 	slackWebhookRejectPattern = `\.ngrok\.io`
+
+	// Event names double as user-supplied regexes (see the regex flag alongside
+	// them), so schema.json guards them against catastrophic backtracking with
+	// ^(?!.*\([^()]*(?:[*+{]|\|)[^()]*\)\s*[*+{?])(.{0,100})$. RE2 has no
+	// lookahead, so the guard becomes a reject pattern: a parenthesised group
+	// containing * + { or |, followed by a quantifier.
+	slackEventNamePattern       = `^(.{0,100})$`
+	slackEventNameRejectPattern = `\([^()]*(?:[*+{]|\|)[^()]*\)\s*[*+{?]`
 )
 
 func init() {
@@ -18,6 +26,13 @@ func init() {
 		slackWebhookPattern,
 		slackWebhookRejectPattern,
 		"must be at most 100 characters, must not contain line breaks, and must not use ngrok",
+	)
+
+	funcs.NewPatternWithReject(
+		"slack_event_name",
+		slackEventNamePattern,
+		slackEventNameRejectPattern,
+		"must be at most 100 characters and must not use a quantified group such as (a|b)+",
 	)
 }
 
@@ -52,27 +67,27 @@ var connectionModes = map[string][]string{
 // Slack destination surface; validation constraints mirror schema.json for those
 // mapped fields.
 type slackConfig struct {
-	WebhookURL               string                   `mapstructure:"webhook_url" validate:"required,dynamic_or_pattern=slack_webhook_url"`
-	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,dynamic_or_oneof=legacy modern" default:"legacy"`
-	IdentifyTemplate         string                   `mapstructure:"identify_template" validate:"omitempty,dynamic_or_pattern=single_line_1000"`
+	WebhookURL               string                   `mapstructure:"webhook_url" validate:"required,pattern=slack_webhook_url"`
+	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,oneof=legacy modern" default:"legacy"`
+	IdentifyTemplate         string                   `mapstructure:"identify_template" validate:"omitempty,pattern=single_line_1000"`
 	EventChannelSettings     []eventChannelSetting    `mapstructure:"event_channel_settings" validate:"omitempty,dive"`
 	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
-	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
-	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,pattern=single_line_100"`
+	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,pattern=single_line_100"`
 	ConnectionMode           common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement        common.ConsentManagement `mapstructure:"consent_management"`
 }
 
 type eventChannelSetting struct {
-	Name    string `mapstructure:"name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Channel string `mapstructure:"channel" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Webhook string `mapstructure:"webhook" validate:"omitempty,dynamic_or_pattern=slack_webhook_url"`
+	Name    string `mapstructure:"name" validate:"omitempty,pattern=slack_event_name"`
+	Channel string `mapstructure:"channel" validate:"omitempty,pattern=single_line_100"`
+	Webhook string `mapstructure:"webhook" validate:"omitempty,pattern=slack_webhook_url"`
 	Regex   *bool  `mapstructure:"regex"`
 }
 
 type eventTemplateSetting struct {
-	Name     string `mapstructure:"name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Template string `mapstructure:"template" validate:"omitempty,dynamic_or_pattern=single_line_1000"`
+	Name     string `mapstructure:"name" validate:"omitempty,pattern=slack_event_name"`
+	Template string `mapstructure:"template" validate:"omitempty,pattern=single_line_1000"`
 	Regex    *bool  `mapstructure:"regex"`
 }
 

@@ -139,30 +139,119 @@ func TestSlackConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("template fields accept UI templates", func(t *testing.T) {
+	// No slack property declares a {{ … || … }} branch in schema.json — every
+	// pattern is the bare constraint — so template text is an ordinary literal
+	// that must meet the bound rather than bypassing it.
+	t.Run("template text is measured against the real bound", func(t *testing.T) {
 		t.Parallel()
 
-		errors := registered.ValidateConfig(map[string]any{
-			"webhook_url":       "{{ config.webhookUrl || https://hooks.slack.com/services/T000/B000/example }}",
-			"identify_template": "{{ message.traits || " + strings.Repeat("x", 1100) + " }}",
-			"event_channel_settings": []any{
-				map[string]any{
-					"name":    "{{ message.event || " + strings.Repeat("x", 150) + " }}",
-					"channel": "{{ message.channel || " + strings.Repeat("x", 150) + " }}",
-					"regex":   true,
-				},
-			},
-			"event_template_settings": []any{
-				map[string]any{
-					"name":     "{{ message.event || Product Viewed }}",
-					"template": "{{ message.properties || " + strings.Repeat("x", 1100) + " }}",
-					"regex":    false,
-				},
-			},
-			"whitelisted_trait_settings": []any{"{{ message.trait || " + strings.Repeat("x", 150) + " }}"},
-		})
+		long100 := "{{ message.value || " + strings.Repeat("x", 150) + " }}"
+		long1000 := "{{ message.value || " + strings.Repeat("x", 1100) + " }}"
 
-		assert.Empty(t, errors)
+		for _, tc := range []struct {
+			name   string
+			config map[string]any
+			path   string
+		}{
+			{
+				name:   "webhook_url",
+				config: map[string]any{"webhook_url": long100},
+				path:   "/webhook_url",
+			},
+			{
+				name:   "identify_template",
+				config: map[string]any{"webhook_url": "https://hooks.slack.com/services/T000/B000/x", "identify_template": long1000},
+				path:   "/identify_template",
+			},
+			{
+				name: "event_channel_settings.channel",
+				config: map[string]any{
+					"webhook_url":            "https://hooks.slack.com/services/T000/B000/x",
+					"event_channel_settings": []any{map[string]any{"name": "Order Completed", "channel": long100}},
+				},
+				path: "/event_channel_settings/0/channel",
+			},
+			{
+				name: "event_template_settings.template",
+				config: map[string]any{
+					"webhook_url":             "https://hooks.slack.com/services/T000/B000/x",
+					"event_template_settings": []any{map[string]any{"name": "Order Completed", "template": long1000}},
+				},
+				path: "/event_template_settings/0/template",
+			},
+			{
+				name: "whitelisted_trait_settings",
+				config: map[string]any{
+					"webhook_url":                "https://hooks.slack.com/services/T000/B000/x",
+					"whitelisted_trait_settings": []any{long100},
+				},
+				path: "/whitelisted_trait_settings/0",
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				errors := registered.ValidateConfig(tc.config)
+				require.NotEmpty(t, errors)
+				assert.Equal(t, tc.path, errors[0].Path)
+			})
+		}
+	})
+
+	// A template short enough to satisfy the bound still passes, as a literal —
+	// upstream's own ^(.{0,100})$ accepts it too, so this is not a divergence.
+	t.Run("template text within the bound passes as a literal", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"webhook_url":       `{{ config.webhookUrl || https://hooks.slack.com/x }}`,
+			"identify_template": `{{ message.traits || New user }}`,
+		}))
+	})
+
+	// Event names double as user-supplied regexes (hence the sibling regex flag),
+	// so schema.json guards them against catastrophic backtracking: a
+	// parenthesised group containing * + { or |, followed by a quantifier.
+	t.Run("event names reject quantified groups", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"event_channel_settings", "event_template_settings"} {
+			for _, name := range []string{
+				"(a|b)+",
+				"(a*)*",
+				"(ab|cd){2}",
+				"Order (Completed|Placed)+",
+				"prefix (x|y)+ suffix",
+				"x(a{2})?",
+			} {
+				config := validMinimalConfig()
+				config[field] = []any{map[string]any{"name": name}}
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors, "%s=%s", field, name)
+				assert.Equal(t, "/"+field+"/0/name", errors[0].Path, name)
+			}
+		}
+	})
+
+	// The guard is narrow: a group only trips it when it holds a metacharacter
+	// and is quantified, so ordinary names and plain regexes stay valid.
+	t.Run("event names accept plain values and unquantified groups", func(t *testing.T) {
+		t.Parallel()
+
+		for _, name := range []string{
+			"Order Completed",
+			"Order (Completed|Placed)",
+			"(abc)+",
+			"a|b",
+			"a+b",
+			"[0-9]+",
+			"^Order.*",
+		} {
+			config := validMinimalConfig()
+			config["event_channel_settings"] = []any{map[string]any{"name": name}}
+
+			assert.Empty(t, registered.ValidateConfig(config), name)
+		}
 	})
 
 	t.Run("deprecated env references get no template exemption", func(t *testing.T) {

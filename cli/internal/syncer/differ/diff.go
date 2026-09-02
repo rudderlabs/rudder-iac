@@ -226,15 +226,13 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: true})
 			}
 
-		// TODO: a secret.String nested inside a slice (same for []any below) is
-		// compared whole via reflect.DeepEqual, so it bypasses the secret case
-		// above — it still re-applies every run but isn't flagged SecretOnly, so it
-		// renders as a normal masked update rather than under "always re-applied".
-		// No value leaks (Format masks). Extend secret-awareness to slices.
+		// Slices are compared member-wise (like nested maps) so a secret nested
+		// inside one still reaches the secret case above and keeps its SecretOnly
+		// classification — a whole-slice DeepEqual would lose it.
 		case []map[string]any:
 			v2Typed := v2.([]map[string]any)
-			if !reflect.DeepEqual(v1Typed, v2Typed) {
-				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
+			if changed, sliceSecretOnly := compareSlices(toAnySlice(v1Typed), toAnySlice(v2Typed)); changed {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: sliceSecretOnly})
 			}
 
 		case map[string]any:
@@ -248,11 +246,14 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 			}
 		case []any:
 			v2Typed := v2.([]any)
-			if !reflect.DeepEqual(v1Typed, v2Typed) {
-				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
+			if changed, sliceSecretOnly := compareSlices(v1Typed, v2Typed); changed {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: sliceSecretOnly})
 			}
 		default:
-			if v1 != v2 {
+			// DeepEqual, not !=: member-wise slice comparison routes arbitrary
+			// values here, and == panics on uncomparable dynamic types (a typed
+			// slice, a map, a struct holding either) — even when they are equal.
+			if !reflect.DeepEqual(v1, v2) {
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 		}
@@ -280,6 +281,38 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 	// secretDiffs == len(diffs) means every recorded diff is secret-driven; the
 	// > 0 guard keeps an empty diff set from counting as secret-only.
 	return diffs, secretDiffs > 0 && secretDiffs == len(diffs)
+}
+
+// compareSlices compares two slices member-wise, pairing members by position.
+// Each pair goes through CompareData under a synthetic key, reusing the full
+// comparison semantics (pointers, secrets, nested containers). The slice is
+// secret-only when every differing member is; a length mismatch is genuine
+// drift, since adding or removing a member is a real change.
+func compareSlices(v1, v2 []any) (changed, secretOnly bool) {
+	if len(v1) != len(v2) {
+		return true, false
+	}
+	secretOnly = true
+	for i := range v1 {
+		subDiffs, subSecretOnly := CompareData(
+			resources.ResourceData{"member": v1[i]},
+			resources.ResourceData{"member": v2[i]},
+		)
+		if len(subDiffs) == 0 {
+			continue
+		}
+		changed = true
+		secretOnly = secretOnly && subSecretOnly
+	}
+	return changed, changed && secretOnly
+}
+
+func toAnySlice(entries []map[string]any) []any {
+	out := make([]any, len(entries))
+	for i, entry := range entries {
+		out[i] = entry
+	}
+	return out
 }
 
 // rewrite []any ->  map[string]any if possible

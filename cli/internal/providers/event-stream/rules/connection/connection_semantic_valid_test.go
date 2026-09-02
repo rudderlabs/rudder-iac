@@ -6,6 +6,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -15,15 +16,69 @@ import (
 )
 
 // webhookTestConfig is a minimal destination config model for the test
-// registry: one plain field usable as a connect-time required key.
+// registry: two plain fields usable as connect-time required keys, plus the
+// connection_mode block that makes them reachable — keys are looked up by the
+// mode a spec declares, which this model has to be able to carry.
 type webhookTestConfig struct {
-	WebhookURL string `mapstructure:"webhook_url"`
+	WebhookURL     string                `mapstructure:"webhook_url"`
+	AuthToken      string                `mapstructure:"auth_token"`
+	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// newTestRegistry registers one "webhook" definition supporting web, android,
-// and ios sources. Connecting a web source requires the webhook_url config
-// field and a use_native_sdk entry for web; connecting an android source
-// requires a connection_mode entry for android; ios has no required keys.
+// barebonesTestConfig models neither settings block.
+type barebonesTestConfig struct {
+	Endpoint string `mapstructure:"endpoint"`
+}
+
+// modeAwareUseNativeSDK mirrors the real definitions' native-SDK block: one
+// field per source type, so a type it does not name has nowhere to sit.
+type modeAwareUseNativeSDK struct {
+	Web     *bool `mapstructure:"web"`
+	Android *bool `mapstructure:"android"`
+	IOS     *bool `mapstructure:"ios"`
+}
+
+// nativeOnlyUseNativeSDK names web alone.
+type nativeOnlyUseNativeSDK struct {
+	Web *bool `mapstructure:"web"`
+}
+
+// nativeOnlyTestConfig carries use_native_sdk and no connection_mode.
+type nativeOnlyTestConfig struct {
+	Endpoint     string                  `mapstructure:"endpoint"`
+	UseNativeSDK *nativeOnlyUseNativeSDK `mapstructure:"use_native_sdk"`
+}
+
+// modeAwareTestConfig carries both settings blocks.
+type modeAwareTestConfig struct {
+	Endpoint       string                 `mapstructure:"endpoint"`
+	ConnectionMode common.ConnectionMode  `mapstructure:"connection_mode"`
+	UseNativeSDK   *modeAwareUseNativeSDK `mapstructure:"use_native_sdk"`
+}
+
+// multiModeTestConfig backs a definition whose web source type supports more
+// than one connection mode, so required keys differ by mode.
+type multiModeTestConfig struct {
+	AppID          string                `mapstructure:"app_id"`
+	APIKey         string                `mapstructure:"api_key"`
+	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
+}
+
+// newTestRegistry registers four definitions, each shaped for one facet of the
+// checks:
+//
+//   - "webhook" drives the V-C5 tests: web needs webhook_url and auth_token,
+//     android needs connection_mode, ios needs nothing. It models
+//     connection_mode so those keys are reachable at all.
+//   - "barebones" has neither settings block, so the settings check never
+//     applies.
+//   - "mode-aware" has both blocks, so either can satisfy the settings check.
+//     Its use_native_sdk names web, android and ios but not cloud, and only
+//     ios lists connection_mode as a required key.
+//   - "native-only" has use_native_sdk alone, naming web but not android.
+//   - "multimode" mirrors intercom: a web source needs api_key in cloud mode
+//     and app_id in device mode, so required keys cannot be resolved from the
+//     source type alone.
 func newTestRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
@@ -42,9 +97,62 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"android": {"cloud"},
 			"ios":     {"cloud"},
 		},
-		SupportedSourcesValidation: map[string][]string{
-			"web":     {"webhook_url", "use_native_sdk"},
-			"android": {"connection_mode"},
+		ConnectionRequiredKeys: map[string]map[string][]string{
+			"web":     {"cloud": {"webhook_url", "auth_token"}},
+			"android": {"cloud": {"connection_mode"}},
+		},
+	}))
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:      "mode-aware",
+		Version:   1,
+		NewConfig: func() any { return &modeAwareTestConfig{} },
+		SourceTypes: []string{
+			"web",
+			"android",
+			"ios",
+			"cloud",
+		},
+		ConnectionModes: map[string][]string{
+			"web":     {"cloud", "device"},
+			"android": {"cloud"},
+			"ios":     {"cloud"},
+			"cloud":   {"cloud"},
+		},
+		ConnectionRequiredKeys: map[string]map[string][]string{
+			"ios": {"cloud": {"connection_mode"}},
+		},
+	}))
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "native-only",
+		Version:     1,
+		NewConfig:   func() any { return &nativeOnlyTestConfig{} },
+		SourceTypes: []string{"web", "android"},
+		ConnectionModes: map[string][]string{
+			"web":     {"device"},
+			"android": {"cloud"},
+		},
+	}))
+
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "barebones",
+		Version:     1,
+		NewConfig:   func() any { return &barebonesTestConfig{} },
+		SourceTypes: []string{"web", "ios"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+			"ios": {"cloud"},
+		},
+	}))
+
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:            "multimode",
+		Version:         1,
+		NewConfig:       func() any { return &multiModeTestConfig{} },
+		SourceTypes:     []string{"web", "android"},
+		ConnectionModes: map[string][]string{"web": {"cloud", "device"}, "android": {"cloud"}},
+		ConnectionRequiredKeys: map[string]map[string][]string{
+			"web":     {"cloud": {"api_key"}, "device": {"app_id"}},
+			"android": {"cloud": {"api_key"}},
 		},
 	}))
 	return registry
@@ -93,8 +201,9 @@ func compatibleGraph() *resources.Graph {
 	graph := resources.NewGraph()
 	addSourceResource(graph, "src-1", "javascript", true)
 	addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
-		"webhook_url":    "https://example.com/hook",
-		"use_native_sdk": map[string]any{"web": true},
+		"webhook_url":     "https://example.com/hook",
+		"auth_token":      "token-1",
+		"connection_mode": map[string]any{"web": "cloud"},
 	})
 	addConnectionResource(graph, "conn-1",
 		resources.URN("src-1", esSource.ResourceType),
@@ -243,8 +352,9 @@ func TestConnectionSemanticValid_PairUniqueness(t *testing.T) {
 
 		graph := compatibleGraph()
 		addDestinationResource(graph, "dest-2", "webhook", true, map[string]any{
-			"webhook_url":    "https://example.com/hook2",
-			"use_native_sdk": map[string]any{"web": true},
+			"webhook_url":     "https://example.com/hook2",
+			"auth_token":      "token-2",
+			"connection_mode": map[string]any{"web": "cloud"},
 		})
 		addConnectionResource(graph, "conn-2",
 			resources.URN("src-1", esSource.ResourceType),
@@ -297,7 +407,9 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-1", "javascript", true)
-		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{})
+		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
 		addConnectionResource(graph, "conn-1",
 			resources.URN("src-1", esSource.ResourceType),
 			resources.URN("dest-1", destination.DestinationResourceType),
@@ -312,17 +424,40 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Equal(t, "/connections/0/destination", results[0].Reference)
 		assert.Contains(t, results[0].Message, "destination 'dest-1' config is missing fields required to connect a 'web' source")
 		assert.Contains(t, results[0].Message, "webhook_url")
-		assert.Contains(t, results[0].Message, "use_native_sdk.web")
+		assert.Contains(t, results[0].Message, "auth_token")
 	})
 
-	t.Run("source-type-scoped key present for another type only", func(t *testing.T) {
+	t.Run("declared connection_mode selects that mode's required keys", func(t *testing.T) {
+		t.Parallel()
+
+		// app_id satisfies device mode; the cloud-mode key api_key is absent
+		// and must not be demanded.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{
+			"app_id":          "intercom-app",
+			"connection_mode": map[string]any{"web": "device"},
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("the other mode's key does not satisfy the declared mode", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-1", "javascript", true)
-		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
-			"webhook_url":    "https://example.com/hook",
-			"use_native_sdk": map[string]any{"android": true},
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{
+			"app_id":          "intercom-app",
+			"connection_mode": map[string]any{"web": "cloud"},
 		})
 		addConnectionResource(graph, "conn-1",
 			resources.URN("src-1", esSource.ResourceType),
@@ -335,11 +470,60 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		results := validateConnectionsSemantic(registry, spec, graph)
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "use_native_sdk.web")
-		assert.NotContains(t, results[0].Message, "webhook_url")
+		assert.Contains(t, results[0].Message, "destination 'dest-1' config is missing fields required to connect a 'web' source")
+		assert.Contains(t, results[0].Message, "api_key")
 	})
 
-	t.Run("missing connection_mode entry for the source type", func(t *testing.T) {
+	// Without a declared mode there are no required keys to look up, so V-C5
+	// stays silent; the settings check reports the absent declaration.
+	t.Run("undeclared connection_mode on a multi-mode source type is not checked", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 1)
+		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'web'")
+	})
+
+	// A source type the definition offers exactly one mode for is no exception:
+	// ConnectionModes says what the destination supports, not what this
+	// connection does, so the mode is still undeclared.
+	t.Run("undeclared connection_mode on a single-mode source type is not checked", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "android", true)
+		addDestinationResource(graph, "dest-1", "multimode", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+		}
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		require.Len(t, results, 1)
+		assert.NotContains(t, results[0].Message, "api_key")
+		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
+	})
+
+	// V-C5 can never report connection_mode missing: the absence that would
+	// make it missing is the same one that leaves the mode undeclared. The
+	// settings check reports it instead.
+	t.Run("connection_mode as a required key is reported by the settings check", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -358,12 +542,11 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		results := validateConnectionsSemantic(registry, spec, graph)
 		require.Len(t, results, 1)
-		assert.Equal(t, "/connections/0/destination", results[0].Reference)
-		assert.Contains(t, results[0].Message, "destination 'dest-1' config is missing fields required to connect a 'android' source")
-		assert.Contains(t, results[0].Message, "connection_mode.android")
+		assert.NotContains(t, results[0].Message, "missing fields required")
+		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
-	t.Run("connection_mode entry present for the source type", func(t *testing.T) {
+	t.Run("connection_mode names the source type", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -387,11 +570,12 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 	t.Run("source type without required config keys", func(t *testing.T) {
 		t.Parallel()
 
-		// ios has no supported-sources-validation entry, so an empty
-		// destination config is fine.
+		// ios has no required keys, so declaring its mode is all the config needs.
 		graph := resources.NewGraph()
 		addSourceResource(graph, "src-ios", "ios", true)
-		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{})
+		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
+			"connection_mode": map[string]any{"ios": "cloud"},
+		})
 		addConnectionResource(graph, "conn-1",
 			resources.URN("src-ios", esSource.ResourceType),
 			resources.URN("dest-1", destination.DestinationResourceType),
@@ -422,6 +606,225 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		results := validateConnectionsSemantic(registry, spec, graph)
 		assert.Empty(t, results)
+	})
+}
+
+func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
+	t.Parallel()
+
+	registry := newTestRegistry(t)
+
+	// modeAwareGraph wires a source of the given type to a "mode-aware"
+	// destination with the given config.
+	modeAwareGraph := func(sourceType string, config map[string]any) *resources.Graph {
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", sourceType, true)
+		addDestinationResource(graph, "dest-1", "mode-aware", true, config)
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+		return graph
+	}
+
+	spec := esConnection.ConnectionsSpec{
+		Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
+	}
+
+	t.Run("no settings block is set", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{"endpoint": "https://example.com"})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' or 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("both blocks set, neither names the source type", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{
+			"connection_mode": map[string]any{"android": "cloud"},
+			"use_native_sdk":  map[string]any{"android": true},
+		})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' or 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("connection_mode entry present for the source type", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("use_native_sdk alone names the source type", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{
+			"use_native_sdk": map[string]any{"web": true},
+		})
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("a wrong-shaped block drops out, the other is still checked", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{"connection_mode": "device"})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("a block written with no value names nothing", func(t *testing.T) {
+		t.Parallel()
+
+		// `use_native_sdk:` with nothing under it decodes to a nil pointer, so
+		// no destination rule flags its shape and the block names no source
+		// type either. It has to stay a candidate: only a non-nil wrong-typed
+		// value is the destination config rule's to report.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "native-only", true, map[string]any{
+			"use_native_sdk": nil,
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("both blocks written with no value name nothing", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("javascript", map[string]any{
+			"connection_mode": nil,
+			"use_native_sdk":  nil,
+		})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' or 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("a wrong-shaped block on its own is the destination rule's concern", func(t *testing.T) {
+		t.Parallel()
+
+		// With use_native_sdk written but not an object, no candidate is left
+		// to report against; its shape is the destination rule's to flag.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "native-only", true, map[string]any{
+			"use_native_sdk": "yes",
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("a destination declaring neither block asks for nothing", func(t *testing.T) {
+		t.Parallel()
+
+		// "barebones" declares neither settings block, so there is nowhere to
+		// write the entry an error would ask for.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "ios", true)
+		addDestinationResource(graph, "dest-1", "barebones", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("a block that cannot name the source type is not demanded", func(t *testing.T) {
+		t.Parallel()
+
+		// "native-only" names web alone, so an android source has nowhere to
+		// put an entry: the config model rejects use_native_sdk.android as an
+		// unknown field.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "android", true)
+		addDestinationResource(graph, "dest-1", "native-only", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
+
+	t.Run("a block that can name the source type is demanded", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-1", "javascript", true)
+		addDestinationResource(graph, "dest-1", "native-only", true, map[string]any{})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-1", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'use_native_sdk' entry for source type 'web'",
+		}}, results)
+	})
+
+	t.Run("the error names only the blocks that could hold the entry", func(t *testing.T) {
+		t.Parallel()
+
+		// A cloud source fits connection_mode's open map but has no field in
+		// use_native_sdk, so only connection_mode is named.
+		graph := modeAwareGraph("python", map[string]any{})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'cloud'",
+		}}, results)
+	})
+
+	// Deferring to V-C5 cannot help when the required key is connection_mode:
+	// V-C5 resolves the mode from the very entry whose absence is at issue, so
+	// there is nothing to defer to.
+	t.Run("a connection_mode required key does not silence this check", func(t *testing.T) {
+		t.Parallel()
+
+		graph := modeAwareGraph("ios", map[string]any{})
+
+		results := validateConnectionsSemantic(registry, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   "destination 'dest-1' config has no 'connection_mode' or 'use_native_sdk' entry for source type 'ios'",
+		}}, results)
 	})
 }
 
