@@ -10,7 +10,6 @@ spec:
   definition_version: 1
   config:
     tracking_id: UA-123456-1
-    rudder_delete_account_id: rudderCliE2eDeleteAccount
     double_click: true
     enhanced_link_attribution: true
     include_search: false
@@ -19,6 +18,7 @@ spec:
     enhanced_ecommerce: true
     non_interaction: false
     send_user_id: true
+    enable_server_side_identify: true
     server_side_identify:
       event_category: All
       event_action: User Enriched

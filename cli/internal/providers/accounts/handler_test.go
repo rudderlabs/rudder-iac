@@ -261,3 +261,40 @@ func TestToExportSpecMap_UnsupportedDefinition(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported definition")
 }
+
+// splitConfig partitions the top-level config by exact key, so a nested secret
+// key would leave its container — holding the revealed plaintext — in the
+// non-secret options payload. The split must refuse rather than leak.
+func TestSplitConfig_RejectsNestedSecretKey(t *testing.T) {
+	const definition = "SOURCE_NESTED_TEST"
+	registeredAccountSecretKeys[definition] = []string{"headers.to"}
+	t.Cleanup(func() { delete(registeredAccountSecretKeys, definition) })
+
+	s := secret.New("plaintext-that-must-not-leak")
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), &AccountResource{
+		ID:                    "nested",
+		Name:                  "nested",
+		AccountDefinitionName: definition,
+		Config: map[string]any{
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": &s}},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `nested secret key "headers.to"`)
+	assert.Nil(t, m.created, "nothing may reach the API")
+}
+
+// The guard above is the backstop; this is the early warning. Every registered
+// account secret key must be a top-level key until splitConfig and the seeding
+// loops in MapRemoteToState/toExportSpecMap become path-aware.
+func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
+	for definition, keys := range registeredAccountSecretKeys {
+		for _, key := range keys {
+			assert.NotContains(t, key, ".",
+				"definition %q: the accounts config split does not support nested secret keys yet", definition)
+		}
+	}
+}

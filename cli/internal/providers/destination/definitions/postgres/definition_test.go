@@ -387,13 +387,127 @@ func TestPostgresConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("pattern fields accept ui templates", func(t *testing.T) {
+	// No postgres property declares a {{ … || … }} branch in schema.json — every
+	// pattern is (^env[.]…)|<real> — so template text is an ordinary literal and
+	// must meet the real constraint rather than bypassing it.
+	t.Run("pattern fields measure template text", func(t *testing.T) {
 		t.Parallel()
-		cfg := copyConfig(minimalConfig())
-		cfg["host"] = "{{ config.host || " + strings.Repeat("a", 250) + " }}"
-		cfg["namespace"] = "{{ config.namespace || pg_events }}"
-		cfg["database"] = "{{ config.database || " + strings.Repeat("a", 150) + " }}"
-		assert.Empty(t, registered.ValidateConfig(cfg))
+		for _, tc := range []struct {
+			field string
+			value string
+		}{
+			{field: "host", value: "{{ config.host || " + strings.Repeat("a", 250) + " }}"},
+			{field: "database", value: "{{ config.database || " + strings.Repeat("a", 150) + " }}"},
+			{field: "user", value: "{{ config.user || " + strings.Repeat("a", 150) + " }}"},
+			// namespace's reject pattern fires on the pg_ prefix in the fallback.
+			{field: "namespace", value: "{{ config.namespace || " + strings.Repeat("a", 100) + " }}"},
+		} {
+			cfg := copyConfig(minimalConfig())
+			cfg[tc.field] = tc.value
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, tc.field)
+			assert.Equal(t, "/"+tc.field, errors[0].Path)
+		}
+	})
+
+	// Enum fields reject templates outright, since the shape excludes them.
+	t.Run("enum fields reject dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			field string
+			value string
+		}{
+			{field: "ssl_mode", value: `{{ config.sslMode || disable }}`},
+			{field: "ssl_mode", value: "env.POSTGRES_SSL_MODE"},
+			{field: "bucket_provider", value: `{{ config.bucketProvider || S3 }}`},
+			{field: "sync_frequency", value: "env.POSTGRES_SYNC_FREQUENCY"},
+		} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg[tc.field] = tc.value
+
+			errors := registered.ValidateConfig(cfg)
+			require.NotEmpty(t, errors, "%s=%s", tc.field, tc.value)
+			assert.Equal(t, "/"+tc.field, errors[0].Path, tc.value)
+		}
+	})
+
+	// schema.json states a different bucketName rule per bucketProvider branch:
+	// S3 bans xn-- and consecutive dots, GCS bans goog/google and allows
+	// underscores, MinIO carries only the IP-address rule.
+	t.Run("bucket_name follows the provider's own rules", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := func(provider, bucket string) map[string]any {
+			c := copyConfig(minimalConfig())
+			c["use_rudder_storage"] = false
+			c["bucket_provider"] = provider
+			c["bucket_name"] = bucket
+			switch provider {
+			case "GCS":
+				c["credentials"] = "{}"
+			case "MINIO":
+				c["end_point"] = "minio.example.com:9000"
+				c["access_key_id"] = "minio-access"
+				c["secret_access_key"] = "minio-secret"
+				c["use_ssl"] = true
+			}
+			return c
+		}
+
+		// Underscore is legal for GCS only; xn-- and consecutive dots are banned
+		// on S3 but not MinIO.
+		assert.Empty(t, registered.ValidateConfig(cfg("GCS", "rudder_bucket")), "gcs underscore")
+		assertHasPath(t, registered.ValidateConfig(cfg("S3", "rudder_bucket")), "/bucket_name")
+		assertHasPath(t, registered.ValidateConfig(cfg("S3", "xn--bucket")), "/bucket_name")
+		assertHasPath(t, registered.ValidateConfig(cfg("GCS", "googbucket")), "/bucket_name")
+		assertHasPath(t, registered.ValidateConfig(cfg("GCS", "my-google-bucket")), "/bucket_name")
+		assert.Empty(t, registered.ValidateConfig(cfg("MINIO", "xn--bucket")), "minio has no xn-- rule")
+
+		// Shared across all three providers.
+		for _, provider := range []string{"S3", "GCS", "MINIO"} {
+			assert.Empty(t, registered.ValidateConfig(cfg(provider, "rudder-bucket")), provider)
+			assertHasPath(t, registered.ValidateConfig(cfg(provider, "192.168.0.1")), "/bucket_name")
+			assertHasPath(t, registered.ValidateConfig(cfg(provider, "Rudder-Bucket")), "/bucket_name")
+		}
+	})
+
+	t.Run("container_name follows azure naming rules", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := func(container string) map[string]any {
+			c := copyConfig(minimalConfig())
+			c["use_rudder_storage"] = false
+			c["bucket_provider"] = "AZURE_BLOB"
+			c["account_name"] = "rudderaccount"
+			c["container_name"] = container
+			return c
+		}
+
+		assert.Empty(t, registered.ValidateConfig(cfg("rudder-logs")))
+		for _, invalid := range []string{"ab", "Rudder-Logs", "rudder--logs", "rudder_logs", strings.Repeat("a", 64)} {
+			assertHasPath(t, registered.ValidateConfig(cfg(invalid)), "/container_name")
+		}
+	})
+
+	t.Run("end_point rejects ngrok hosts", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := func(endpoint string) map[string]any {
+			c := copyConfig(minimalConfig())
+			c["use_rudder_storage"] = false
+			c["bucket_provider"] = "MINIO"
+			c["bucket_name"] = "rudder-bucket"
+			c["access_key_id"] = "minio-access"
+			c["secret_access_key"] = "minio-secret"
+			c["use_ssl"] = true
+			c["end_point"] = endpoint
+			return c
+		}
+
+		assert.Empty(t, registered.ValidateConfig(cfg("minio.example.com:9000")))
+		assertHasPath(t, registered.ValidateConfig(cfg("https://foo.ngrok.io")), "/end_point")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {

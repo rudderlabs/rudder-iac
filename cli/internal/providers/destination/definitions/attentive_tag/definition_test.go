@@ -99,13 +99,34 @@ func TestAttentiveTagConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	t.Run("api_key rejects values over 100 characters", func(t *testing.T) {
+	// schema.json states api_key as ^(.{1,100})$, a pattern rather than a length
+	// keyword, so the bound forbids line breaks as well as overlong values.
+	t.Run("api_key rejects overlong values and line breaks", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"api_key": strings.Repeat("a", 101),
-		})
-		require.Len(t, errors, 1)
-		assert.Equal(t, "/api_key", errors[0].Path)
+		for _, value := range []string{strings.Repeat("a", 101), "bad\nvalue"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key": value,
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/api_key", errors[0].Path)
+		}
+	})
+
+	// Unlike sign_up_source_id, schema.json declares the {{ … || … }} branch for
+	// api_key, so a template is accepted and not measured against the bound.
+	t.Run("api_key accepts a ui template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_key": "{{ config.apiKey || " + strings.Repeat("a", 150) + " }}",
+		}))
+	})
+
+	t.Run("sign_up_source_id accepts a ui template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_key":           "test-api-key",
+			"sign_up_source_id": "{{ config.signUpSourceId || 123 }}",
+		}))
 	})
 
 	t.Run("sign_up_source_id rejects non-digits", func(t *testing.T) {
@@ -122,12 +143,15 @@ func TestAttentiveTagConfigValidation(t *testing.T) {
 	t.Run("sign_up_source_id rejects dynamic values", func(t *testing.T) {
 		t.Parallel()
 
+		// The UI template form moved to its own accepting case: schema.json
+		// declares that branch. env.VAR stays rejected because the CLI never
+		// honours the deprecated form, and {{ .VAR }} because var substitution
+		// resolves it before validation — one still present is a mistake.
 		cases := []struct {
 			name  string
 			value string
 		}{
 			{name: "env reference", value: "env.SIGN_UP_SOURCE_ID"},
-			{name: "ui template", value: "{{ config.signUpSourceId || 123 }}"},
 			{name: "iac variable", value: "{{ .SIGN_UP_SOURCE_ID }}"},
 		}
 		for _, tc := range cases {

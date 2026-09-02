@@ -35,9 +35,8 @@ spec:
     auto_config:
       web: false
     legacy_conversion_pixel_id:
-      web:
-        - from: Product Viewed
-          to: "1111111111"
+      - from: Product Viewed
+        to: "1111111111"
     consent_management:
       web:
         - provider: oneTrust

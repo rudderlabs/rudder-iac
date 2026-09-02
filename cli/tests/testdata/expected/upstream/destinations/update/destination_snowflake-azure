@@ -28,7 +28,6 @@
     "storageIntegration": "RUDDER_AZURE_INTEGRATION",
     "accountName": "ruddercliE2e",
     "useSASTokens": false,
-    "roleBasedAuth": true,
     "enableSSE": false
   },
   "createdAt": "<ignored>",
