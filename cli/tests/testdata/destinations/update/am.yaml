@@ -1,0 +1,36 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: am
+spec:
+  id: am
+  display_name: E2E Amplitude Updated
+  type: am
+  enabled: true
+  definition_version: 1
+  config:
+    api_key: rudderCliE2eAmFullKeyUpdated
+    residency_server: standard
+    group_type_trait: org
+    group_value_trait: orgId
+    track_all_pages: false
+    track_categorized_pages: true
+    traits_to_increment:
+      - logins
+      - sessions
+    version_name: "2.0.0"
+    sdk_version:
+      web: 1
+    auto_capture:
+      page_views:
+        web: false
+      form_interactions:
+        web: true
+    track_session_events:
+      web: false
+      android: true
+    connection_mode:
+      web: cloud
+    event_filtering:
+      blacklist:
+        - Application Opened

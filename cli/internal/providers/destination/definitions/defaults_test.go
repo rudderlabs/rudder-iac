@@ -16,11 +16,21 @@ type defaultsTestConfig struct {
 	BatchSize     int    `mapstructure:"batch_size" default:"100"`
 }
 
+type nestedDefaultsTestConfig struct {
+	APISecret  string `mapstructure:"api_secret" validate:"required"`
+	SDKVersion *struct {
+		Web *int `mapstructure:"web" default:"2"`
+	} `mapstructure:"sdk_version"`
+}
+
 func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinition {
 	t.Helper()
 
 	def := GA4TestDefinition()
 	def.NewConfig = newConfig
+	// These stubs replace GA4's config surface; scope its required keys to match.
+	def.ConnectionRequiredKeys = nil
+
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
 	return registered
@@ -53,6 +63,19 @@ func TestConfigDefaultsReturnsCopy(t *testing.T) {
 		"debug_mode":   false,
 		"send_user_id": true,
 		"batch_size":   float64(100),
+	}, registered.ConfigDefaults())
+}
+
+func TestConfigDefaultsReturnsDeepCopy(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &nestedDefaultsTestConfig{} })
+
+	mutated := registered.ConfigDefaults()
+	mutated["sdk_version"].(map[string]any)["web"] = float64(1)
+
+	assert.Equal(t, map[string]any{
+		"sdk_version": map[string]any{"web": float64(2)},
 	}, registered.ConfigDefaults())
 }
 
@@ -103,6 +126,45 @@ func TestApplyDefaultsDoesNotMutateInput(t *testing.T) {
 	registered.ApplyDefaults(config)
 
 	assert.Equal(t, map[string]any{"api_secret": "secret"}, config)
+}
+
+func TestApplyDefaultsLeavesAbsentNestedBlockAbsent(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &nestedDefaultsTestConfig{} })
+
+	assert.Equal(t,
+		map[string]any{"api_secret": "secret"},
+		registered.ApplyDefaults(map[string]any{"api_secret": "secret"}),
+	)
+}
+
+func TestApplyDefaultsKeepsExplicitNestedValue(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &nestedDefaultsTestConfig{} })
+
+	assert.Equal(t, map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": 1},
+	}, registered.ApplyDefaults(map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": 1},
+	}))
+}
+
+func TestApplyDefaultsFillsPresentNestedBlock(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any { return &nestedDefaultsTestConfig{} })
+
+	assert.Equal(t, map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{"web": float64(2)},
+	}, registered.ApplyDefaults(map[string]any{
+		"api_secret":  "secret",
+		"sdk_version": map[string]any{},
+	}))
 }
 
 func TestApplyDefaultsWithoutDeclaredDefaults(t *testing.T) {
@@ -163,6 +225,28 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			wantErr: `config key "batch_size": invalid integer default "1.5"`,
 		},
 		{
+			name: "invalid default on a nested field",
+			newConfig: func() any {
+				return &struct {
+					SDKVersion *struct {
+						Web int `mapstructure:"web" default:"latest"`
+					} `mapstructure:"sdk_version"`
+				}{}
+			},
+			wantErr: `config key "sdk_version": config key "web": invalid integer default "latest"`,
+		},
+		{
+			name: "default on a required nested field",
+			newConfig: func() any {
+				return &struct {
+					SDKVersion *struct {
+						Web int `mapstructure:"web" validate:"required" default:"2"`
+					} `mapstructure:"sdk_version"`
+				}{}
+			},
+			wantErr: `config key "sdk_version": config key "web" is required and cannot declare a default`,
+		},
+		{
 			// Unimplemented: no upstream schema defaults these types.
 			name: "unsigned field kind",
 			newConfig: func() any {
@@ -198,9 +282,8 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 
 			def := GA4TestDefinition()
 			def.NewConfig = tc.newConfig
-			// These stubs drop GA4's consent/source-type fields, so scope the
-			// definition down to what they model.
-			def.SupportedSourcesValidation = nil
+			// These stubs replace GA4's config surface; scope its required keys to match.
+			def.ConnectionRequiredKeys = nil
 
 			_, err := newRegisteredDefinition(def)
 			require.Error(t, err)

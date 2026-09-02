@@ -145,7 +145,7 @@ Mechanical rules:
   (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
   reach.
 - `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
-  `SupportedSourcesValidation`, a
+  `ConnectionRequiredKeys`, a
   `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the
   branch's `then.required` makes **required**, never optional ones. Source types
   translated to CLI-local types via the same mapping, keys to snake_case.
@@ -219,8 +219,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 1. `TestNewDefinitionMetadata` — register in fresh registry, assert `Type`,
    `APIType`, `Version`, `SecretKeys()`, `SupportedSourceTypes()`,
    `ConnectionModes()` per source type, and `GetByAPIType` lookup. When the
-   definition carries `SupportedSourcesValidation`, also assert
-   `SupportedSourcesValidation(sourceType, connectionMode)` per configured
+   definition carries `ConnectionRequiredKeys`, also assert
+   `ConnectionRequiredKeys(sourceType, mode)` per configured
    pair and `Nil` for one supported pair without an entry. When the
    definition has gated properties, also assert the full `GatedKeyPaths()`
    map with `assert.Equal` (JSON-pointer keypaths, e.g.
@@ -301,7 +301,7 @@ Final response must include:
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
   source types, connectionMode-conditioned required keys that could not be
-  expressed in `SupportedSourcesValidation`, upstream fields
+  expressed in `ConnectionRequiredKeys`, upstream fields
   intentionally omitted, and every `schema.json` key modelled without a
   terraform mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates

@@ -56,3 +56,13 @@
 - CI live E2E cleanup can still fail with connection support enabled if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`. Durable mitigation: live workspace cleanup should delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`, while production remote loading remains limited to external-ID-managed connections.
 - The lint workflow can fail before linting when `golangci/golangci-lint-action` config verification fetches the remote golangci-lint JSON schema and times out. Durable mitigation: set `verify: false` in the lint workflow while keeping the pinned golangci-lint run enabled.
 - HubSpot live destination create returns backend default `config.authorizationType = "newPrivateAppApi"` for `newApi` creates even though local YAML/definition should omit `authorization_type`. Durable mitigation: keep `authorization_type` out of local config while including `authorizationType: "newPrivateAppApi"` in the HS create upstream snapshot; update snapshots may omit it when the live update response omits it.
+
+## DEX-490 — Amplitude Event Filtering Snapshot Default
+<!-- ticket:DEX-490 -->
+- CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
+- Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
+
+## DEX-730 — GA Delete Account Fixture Requires Real Account
+<!-- ticket:DEX-730 -->
+- CI failed in `TestDestinationsApply` when the GA destination live E2E fixture set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`; the backend validates `rudderDeleteAccountId` against workspace accounts and returned HTTP 400 `Account not found with given id in the workspace` during `destination:ga` creation.
+- Durable mitigation: keep workspace-specific GA delete-account IDs out of live destination fixtures unless the referenced account is provisioned for that CI workspace; rely on unit conversion tests for this field or inject a real workspace account ID explicitly.

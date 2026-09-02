@@ -20,6 +20,7 @@ import (
 	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
 	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
@@ -325,6 +326,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(adobeanalytics.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering adobe_analytics destination definition: %w", err)
+		}
+		if err := registry.Register(am.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering am destination definition: %w", err)
 		}
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)

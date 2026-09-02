@@ -39,7 +39,7 @@ var connectionModes = map[string][]string{
 type facebookConversionsConfig struct {
 	DatasetID              string                   `mapstructure:"dataset_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	AccessToken            string                   `mapstructure:"access_token" validate:"required,dynamic_or_pattern=single_line_500"`
-	ActionSource           string                   `mapstructure:"action_source" validate:"omitempty,dynamic_or_oneof=website email app phone_call chat physical_store system_generated other" default:"website"`
+	ActionSource           string                   `mapstructure:"action_source" validate:"omitempty,oneof=website email app phone_call chat physical_store system_generated other" default:"website"`
 	LimitedDataUsage       *bool                    `mapstructure:"limited_data_usage" default:"false"`
 	TestDestination        *bool                    `mapstructure:"test_destination" default:"false"`
 	TestEventCode          string                   `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
