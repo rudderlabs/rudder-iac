@@ -57,7 +57,6 @@ func TestMapConfigNestedSecretPaths(t *testing.T) {
 		"webhook_url": "https://webhooks.example.com/rudder",
 	}, unknown)
 
-	enableVarSubstitution(t)
 	require.NoError(t, MaskSecrets(unknown, "webhook-prod", []string{"headers.to"}))
 	assert.Equal(t, map[string]any{
 		"headers": []any{
@@ -119,7 +118,6 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 			"webhook_url": "https://webhooks.example.com/rudder",
 		}, unknown)
 
-		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(unknown, "webhook-prod", []string{"auth.token"}))
 		assert.Equal(t, map[string]any{
 			"auth":        map[string]any{"token": "{{ .WEBHOOK_PROD_AUTH_TOKEN }}", "kind": "bearer"},
@@ -153,7 +151,6 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 		}, revealed)
 		assert.Equal(t, wantWrapped, config, "RevealSecrets must not mutate caller config")
 
-		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
 		assert.Equal(t, map[string]any{
 			"headers": []map[string]any{
@@ -186,7 +183,6 @@ func TestMapConfigMapAndSliceContainerShapes(t *testing.T) {
 			},
 		}, config)
 
-		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"a.b.c"}))
 		assert.Equal(t, map[string]any{
 			"a": []any{
@@ -252,7 +248,6 @@ func TestMapConfigSecretPathShapes(t *testing.T) {
 			},
 		}, config)
 
-		enableVarSubstitution(t)
 		require.NoError(t, MaskSecrets(config, "webhook-prod", []string{"headers.to"}))
 		assert.Equal(t, map[string]any{
 			"headers": []any{
@@ -331,7 +326,6 @@ func TestMapConfigHelpersDoNotMutateCallerConfig(t *testing.T) {
 	// Both call sites build the map themselves (apiConfigToLocal / unmarshalOptions)
 	// and already mutate it via pruneEmptyValues, so in-place is the contract.
 	t.Run("MaskSecrets mutates in place by contract", func(t *testing.T) {
-		enableVarSubstitution(t)
 		config := newSpecConfig()
 		require.NoError(t, MaskSecrets(config, "webhook-prod", keys))
 
@@ -349,8 +343,6 @@ func TestMapConfigHelpersDoNotMutateCallerConfig(t *testing.T) {
 // turn a loud marshal-time grammar error into a silent rename, and would make
 // "api-key" and "api_key" collide on one variable.
 func TestMapConfigMaskVariableNameGrammar(t *testing.T) {
-	enableVarSubstitution(t)
-
 	t.Run("flat key keeps the pre-existing name", func(t *testing.T) {
 		config := map[string]any{"api_secret": "s"}
 		require.NoError(t, MaskSecrets(config, "my-dest", []string{"api_secret"}))

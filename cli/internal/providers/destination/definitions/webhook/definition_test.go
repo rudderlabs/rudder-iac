@@ -11,7 +11,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -390,7 +389,6 @@ func TestWebhookHeaderSecretsAreWrappedRevealedAndMasked(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, remoteSecret.IsUnknown())
 
-	enableVarSubstitution(t)
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{"webhook-production": remote}, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, entities, 1)
@@ -460,15 +458,4 @@ func exampleConfig() map[string]any {
 
 func stringOfLength(n int) string {
 	return fmt.Sprintf("%*s", n, "")
-}
-
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
 }
