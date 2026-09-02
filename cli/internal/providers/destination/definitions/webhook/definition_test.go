@@ -32,8 +32,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
-		"android", "android_kotlin", "ios", "ios_swift", "web", "unity", "amp",
-		"cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
+		"cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -41,6 +41,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
+	}
+
+	// Upstream lists amp, warehouse and shopify, but the CLI cannot produce those
+	// source tokens, so the definition does not advertise them.
+	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+		assert.NotContains(t, registered.SupportedSourceTypes(), sourceType)
+		_, err := registered.ConnectionModes(sourceType)
+		require.Error(t, err)
 	}
 
 	byAPI, err := registry.GetByAPIType("WEBHOOK", 1)
@@ -314,7 +322,7 @@ func TestWebhookConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
+					"cordova": [{"provider": "custom", "resolution_strategy": "or", "consents": ["analytics"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -323,7 +331,7 @@ func TestWebhookConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"warehouse": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}]
+					"cordova": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "analytics"}]}]
 				}
 			}`,
 		},

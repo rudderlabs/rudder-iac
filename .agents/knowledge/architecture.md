@@ -254,6 +254,6 @@
 
 ## DEX-531 — Webhook Destination Onboarding
 <!-- ticket:DEX-531 -->
-- Webhook destination source-type support intentionally keeps the full integrations-config/db-config set that the common source-type mapper supports: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
+- Webhook declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them, per DEX-730's never-declared rule.
 - Webhook supports cloud-only connection mode for all retained source types.
-- Do not narrow webhook to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
+- Do not narrow webhook further to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
