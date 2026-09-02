@@ -200,5 +200,13 @@
 
 ## DEX-730 — Event-Filter Dynamic Values
 <!-- ticket:DEX-730 -->
-- An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as `dynamic_or_pattern=single_line_100`, never `max=100`. The `(^\{\{.*\|\|(.*)\}\}$)` branch upstream is what makes the value dynamic-capable, and the tag — not the regex — carries template support.
+- An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as a `single_line_100` pattern tag, never `max=100`.
+- Pick `dynamic_or_pattern` vs plain `pattern` from the property itself: only when schema.json declares the `(^\{\{.*\|\|(.*)\}\}$)` branch does the field accept templates. Whole destinations often declare none (bq, postgres, slack, adobe_analytics), and the split can differ per key inside one destination (attentive_tag has it, adobe has it on three URL fields only). The tag — never the regex — carries template support.
+- Dropping `dynamic_or_pattern` rarely makes a field reject templates outright: a permissive `.{0,N}` accepts template text as an ordinary literal, exactly as upstream does. What changes is that the text is now measured against the bound instead of bypassing it — so assert length, not rejection, unless the pattern's shape excludes `{{`.
 - Dropping an unreachable source type can break test fixtures that used it incidentally (Amplitude's consent round-trip used `shopify` for its `custom` provider case); move that coverage to a kept source type rather than deleting the case.
+
+## DEX-736 — Legacy GA Destination E2E Account-Link Deferral
+<!-- ticket:DEX-736 -->
+- Legacy Google Analytics (`type: ga`) E2E fixtures stay in place; only `rudder_delete_account_id` is dropped from them, because the upstream config API rejects an account id that is not a real account link in the workspace.
+- `RudderDeleteAccountID` is `omitempty` in the GA definition, so omitting it from a fixture keeps the spec valid and simply leaves `rudderDeleteAccountId` out of the upstream payload and its expected snapshot.
+- Prefer trimming the account-linked key over deleting whole fixture/snapshot pairs: it keeps `TestDestinationsApply` coverage for the rest of the legacy GA config surface while removing the only field that needs a cross-linked account.

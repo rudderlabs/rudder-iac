@@ -122,6 +122,22 @@ func accessTokenConditional(fl validator.FieldLevel) bool {
 	return fl.Field().String() != ""
 }
 
+// Connect-time required keys, derived from schema.json's single
+// connectionMode-gated branch: accessToken is required unless web runs in
+// device mode, so every supported pair carries it except (web, device).
+var connectionRequiredKeys = map[string]map[string][]string{
+	common.SourceTypeAndroid:       {"cloud": {"access_token"}},
+	common.SourceTypeAndroidKotlin: {"cloud": {"access_token"}},
+	common.SourceTypeIOS:           {"cloud": {"access_token"}},
+	common.SourceTypeIOSSwift:      {"cloud": {"access_token"}},
+	common.SourceTypeWeb:           {"cloud": {"access_token"}},
+	common.SourceTypeUnity:         {"cloud": {"access_token"}},
+	common.SourceTypeReactNative:   {"cloud": {"access_token"}},
+	common.SourceTypeFlutter:       {"cloud": {"access_token"}},
+	common.SourceTypeCordova:       {"cloud": {"access_token"}},
+	common.SourceTypeCloud:         {"cloud": {"access_token"}},
+}
+
 // NewDefinition returns the Facebook Pixel destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
@@ -180,7 +196,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &facebookPixelConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }

@@ -58,7 +58,18 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"mobile_api_key_android": {"android"},
 		"mobile_api_key_ios":     {"ios"},
 	}, registered.GatedKeyPaths())
-	assert.Nil(t, registered.SupportedSourcesValidation("web"))
+	assert.Equal(t, map[string]map[string][]string{
+		"android":      {"cloud": {"api_key"}, "device": {"app_id"}},
+		"ios":          {"cloud": {"api_key"}, "device": {"app_id"}},
+		"web":          {"cloud": {"api_key"}, "device": {"app_id"}},
+		"unity":        {"cloud": {"api_key"}},
+		"react_native": {"cloud": {"api_key"}},
+		"flutter":      {"cloud": {"api_key"}},
+		"cordova":      {"cloud": {"api_key"}},
+	}, intercom.NewDefinition().ConnectionRequiredKeys)
+	assert.Equal(t, []string{"app_id"}, registered.ConnectionRequiredKeys("web", "device"))
+	assert.Equal(t, []string{"api_key"}, registered.ConnectionRequiredKeys("web", "cloud"))
+	assert.Nil(t, registered.ConnectionRequiredKeys("android_kotlin", "cloud"), "upstream gap: no entry rather than a guess")
 
 	byAPI, err := registry.GetByAPIType("INTERCOM", 1)
 	require.NoError(t, err)
