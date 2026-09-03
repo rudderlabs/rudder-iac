@@ -10,7 +10,10 @@
     "bucketName": "rudder-cli-e2e",
     "prefix": "rudder/",
     "roleBasedAuth": false,
-    "enableSSE": false
+    "enableSSE": false,
+    "connectionMode": {
+      "android": "cloud"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
