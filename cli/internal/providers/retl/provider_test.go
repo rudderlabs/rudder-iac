@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connections"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -31,6 +32,10 @@ type mockRETLStore struct {
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
+	// Connection operations. The embedded RETLStore interface is nil, so any
+	// provider method that fans out across handlers panics unless the
+	// connection handler's calls are stubbed here too.
+	listConnectionsFunc func(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -71,6 +76,13 @@ func (m *mockRETLStore) ListRetlSources(ctx context.Context, opts ...retlClient.
 		return m.listRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{}, nil
+}
+
+func (m *mockRETLStore) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if m.listConnectionsFunc != nil {
+		return m.listConnectionsFunc(ctx, req)
+	}
+	return &retlClient.RETLConnectionsPage{}, nil
 }
 
 // Preview methods
@@ -174,6 +186,7 @@ func TestProvider(t *testing.T) {
 		// project pin rudder/0.1 on a new kind, which is a breaking change to
 		// withdraw once anyone relies on it.
 		want = append(want, prules.V1VersionPatterns(table.ResourceKind)...)
+		want = append(want, prules.V1VersionPatterns(connections.ResourceKind)...)
 
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})

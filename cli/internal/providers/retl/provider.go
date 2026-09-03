@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connections"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
@@ -43,14 +44,16 @@ func New(client retlClient.RETLStore) *Provider {
 		client:   client,
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
-			"retl-source-sql-model": sqlmodel.ResourceType,
-			table.ResourceKind:      table.ResourceType,
+			"retl-source-sql-model":  sqlmodel.ResourceType,
+			table.ResourceKind:       table.ResourceType,
+			connections.ResourceKind: connections.ResourceType,
 		},
 	}
 
 	// Register handlers
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 	p.handlers[table.ResourceType] = table.NewHandler(client, importDir)
+	p.handlers[connections.ResourceType] = connections.NewHandler(client)
 
 	return p
 }
@@ -81,7 +84,8 @@ func (p *Provider) SupportedKinds() []string {
 // absent deliberately: it shipped on rudder/0.1 and has existing users, so its
 // legacy support is permanent.
 var kindsWithoutLegacyVersions = map[string]struct{}{
-	table.ResourceKind: {},
+	table.ResourceKind:       {},
+	connections.ResourceKind: {},
 }
 
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
