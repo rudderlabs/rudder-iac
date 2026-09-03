@@ -222,3 +222,9 @@
 <!-- ticket:DEX-730 -->
 - Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
 - A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.
+
+## DEX-746 — Facebook Conversions Validation Surface
+<!-- ticket:DEX-746 -->
+- Keep `facebook_conversions` nested array item fields optional when integrations-config `schema.json` does not mark them required, even if Terraform marks analogous fields required; this applies to `events_to_events.from`, `events_to_events.to`, `blacklist_pii_properties.property`, `blacklist_pii_properties.hash`, and `whitelist_pii_properties.property`.
+- For `facebook_conversions` event mapping targets, validate `events_to_events.to` with plain `oneof` rather than `dynamic_or_oneof`: schema declares an enum that includes the empty string and does not declare a template/env branch, so an explicit empty target is valid but dynamic values are not.
+- For `facebook_conversions`, prefer integrations-config `schema.json` as the validation source of truth over Terraform-required nested-field metadata when the two disagree.

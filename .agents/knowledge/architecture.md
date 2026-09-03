@@ -257,3 +257,9 @@
 - Webhook declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them, per DEX-730's never-declared rule.
 - Webhook supports cloud-only connection mode for all retained source types.
 - Do not narrow webhook further to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
+
+## DEX-746 — Facebook Conversions Source Scope
+<!-- ticket:DEX-746 -->
+- `facebook_conversions` follows the DEX-730 never-declared source-type rule: keep only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, and `cordova`) and drop upstream db-config-only `amp`, `warehouse`, and `shopify`.
+- Scope `facebook_conversions` connection-mode and consent-management surfaces to the retained source types only, so source-scoped config does not advertise unreachable source categories.
+- This newer source-scope decision supersedes older DEX-498 guidance that listed broad Facebook Conversions source types.
