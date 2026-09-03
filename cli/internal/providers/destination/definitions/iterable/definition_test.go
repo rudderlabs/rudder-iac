@@ -1,6 +1,7 @@
 package iterable_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -144,6 +145,43 @@ func TestIterableConfigValidation(t *testing.T) {
 		assert.Equal(t, "/close_button_position/web", errors[0].Path)
 	})
 
+	// schema.json gives each of these web enums a default and the backend applies
+	// it on persist, so a spec carrying the block without the key must be
+	// enriched or it diffs forever. An absent block stays absent, matching AJV.
+	t.Run("web enum defaults apply inside a present block", func(t *testing.T) {
+		t.Parallel()
+
+		base := map[string]any{"api_key": "iterable-api-key", "data_center": "USDC"}
+		for _, tc := range []struct {
+			key  string
+			want string
+		}{
+			{key: "initialisation_identifier", want: "email"},
+			{key: "handle_links", want: "open-all-new-tab"},
+			{key: "close_button_position", want: "top-right"},
+		} {
+			present := map[string]any{}
+			for k, v := range base {
+				present[k] = v
+			}
+			present[tc.key] = map[string]any{}
+			assert.Equal(t, map[string]any{"web": tc.want},
+				registered.ApplyDefaults(present)[tc.key], tc.key)
+
+			assert.NotContains(t, registered.ApplyDefaults(base), tc.key,
+				"an absent block must stay absent: %s", tc.key)
+		}
+
+		// An explicit value is never overwritten.
+		explicit := map[string]any{
+			"api_key":      "iterable-api-key",
+			"data_center":  "USDC",
+			"handle_links": map[string]any{"web": "open-all-same-tab"},
+		}
+		assert.Equal(t, map[string]any{"web": "open-all-same-tab"},
+			registered.ApplyDefaults(explicit)["handle_links"])
+	})
+
 	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
@@ -203,6 +241,23 @@ func TestIterableConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	// iterable and adobe_analytics are the only two destinations whose
+	// whitelistedEvents/blacklistedEvents carry no {{ … || … }} branch upstream,
+	// so template text is an ordinary literal measured against the bound.
+	t.Run("event filtering measures template text", func(t *testing.T) {
+		t.Parallel()
+		long := "{{ config.event || " + strings.Repeat("a", 150) + " }}"
+		for _, key := range []string{"whitelist", "blacklist"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key":         "iterable-api-key",
+				"data_center":     "USDC",
+				"event_filtering": map[string]any{key: []any{long}},
+			})
+			require.NotEmpty(t, errors, key)
+			assert.Equal(t, "/event_filtering/"+key+"/0", errors[0].Path)
+		}
 	})
 
 	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {

@@ -58,8 +58,6 @@ ORDERS_HOOK_API_KEY: sk-live-abc123xyz
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-(Substitution requires the `enableVarSubstitution` experimental flag.)
-
 Substitution rewrites the raw spec bytes before parsing, so by the time your handler sees the spec, `apiKey` holds the real value as a bare string. No decoder setup is needed — `secret.String` knows how to decode itself from a bare string in YAML, JSON, and mapstructure, so `BaseHandler.LoadSpec` just works.
 
 ### 2. Resource (RawData) struct: use `*secret.String` (a pointer)
@@ -134,6 +132,8 @@ func apiKeyVarName(externalID string) string {
 
 Derive the name from what identifies the resource — resource type, external ID, field name — so it stays the same across re-imports. Names must match `^[A-Za-z_][A-Za-z0-9_]*$`, so fold kebab-case IDs to underscores as above. A name outside that grammar fails when the spec is generated (at marshal time), not two steps later when apply rejects the malformed token.
 
+For a secret nested inside a slice, the generated name carries the member's position (`{{ .WEBHOOK_PROD_HEADERS_0_TO }}`), since each member needs its own variable. Position is the only thing distinguishing them, so reordering the slice renames the variables and stale var file entries stop resolving — re-import after a reorder and update the var file to match.
+
 The generated spec then carries the reference:
 
 ```yaml
@@ -159,8 +159,6 @@ rudder-cli apply --var-file secrets.vars.yaml
 ```
 
 Values can also come from environment variables with the `RUDDER_` prefix (e.g. `RUDDER_WEBHOOK_ORDERS_HOOK_API_KEY`); environment variables take priority over var files.
-
-Note: all of this — `WithVariableName`, the `{{ .VAR }}` output, the var file — only happens when the `enableVarSubstitution` experimental flag is on. With the flag off, `WithVariableName` is a no-op and the secret exports as a masked literal (the pre-scaffolding behaviour).
 
 ## API summary
 
@@ -192,7 +190,7 @@ Spec structs are decoded once from YAML, where a value works fine. Resource stru
 No. `secret.String` implements `UnmarshalYAML`, `UnmarshalJSON`, and `UnmarshalMapstructure`, so every existing decode path in the codebase accepts it without extra wiring.
 
 **What does the user actually write in their YAML?**
-A substitution reference (`apiKey: "{{ .MY_KEY }}"`) — never the value in plain text, since specs are committed to version control. The real value is resolved at load time from a `RUDDER_`-prefixed environment variable (`RUDDER_MY_KEY`) or a var file passed with `--var-file`. Substitution requires the `enableVarSubstitution` experimental flag.
+A substitution reference (`apiKey: "{{ .MY_KEY }}"`) — never the value in plain text, since specs are committed to version control. The real value is resolved at load time from a `RUDDER_`-prefixed environment variable (`RUDDER_MY_KEY`) or a var file passed with `--var-file`.
 
 **What does `Reveal()` return on an unknown secret?**
 The empty string — there is no real value to reveal. Use `IsUnknown()` to tell "no secret" apart from "a secret we cannot see".
@@ -201,7 +199,7 @@ The empty string — there is no real value to reveal. Use `IsUnknown()` to tell
 Check `IsZero()` before including the field in a request. `secret.New("")` equals the zero value, so an empty secret is treated the same as "unset".
 
 **Why did my export emit `****3xyz` instead of `{{ .VAR }}`?**
-Either no variable name was attached (`MapRemoteToSpec` did not use `WithVariableName`), or the `enableVarSubstitution` experimental flag is off — the option is a no-op without it, since a reference could never be resolved on apply.
+No variable name was attached (`MapRemoteToSpec` did not use `WithVariableName`).
 
 **Why did export fail with "does not satisfy the variable grammar"?**
 The name passed to `WithVariableName` does not match `^[A-Za-z_][A-Za-z0-9_]*$`. Names often derive from user-controlled external IDs, so sanitize them (e.g. uppercase and replace `-` with `_`) before attaching.

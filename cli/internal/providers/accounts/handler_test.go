@@ -7,23 +7,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// enableVarSubstitution turns on the experimental gate that makes exported
-// secrets serialize as "{{ .VAR }}" references instead of masked literals.
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
-}
 
 // mockStore records the last request seen by each verb and returns canned data.
 type mockStore struct {
@@ -213,7 +199,6 @@ func bqRemote(externalID string, opts string) *RemoteAccount {
 // user fills via a var file — the API never returns the value, so a masked
 // literal would be useless. Non-secret options pass through verbatim.
 func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
-	enableVarSubstitution(t)
 	h := &HandlerImpl{store: &mockStore{}}
 
 	specMap, err := h.toExportSpecMap("prod-analytics-bq", bqRemote("prod-analytics-bq", `{"project":"acme","location":"US"}`))
@@ -232,7 +217,6 @@ func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
 // never carry a raw secret. Even a value the API happened to echo back stays
 // masked.
 func TestFormatForExport_NeverLeaksSecret(t *testing.T) {
-	enableVarSubstitution(t)
 	h := &HandlerImpl{store: &mockStore{}}
 
 	entities, entries, err := h.FormatForExport(
@@ -260,4 +244,41 @@ func TestToExportSpecMap_UnsupportedDefinition(t *testing.T) {
 	_, err := h.toExportSpecMap("x", &RemoteAccount{Account: acc})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported definition")
+}
+
+// splitConfig partitions the top-level config by exact key, so a nested secret
+// key would leave its container — holding the revealed plaintext — in the
+// non-secret options payload. The split must refuse rather than leak.
+func TestSplitConfig_RejectsNestedSecretKey(t *testing.T) {
+	const definition = "SOURCE_NESTED_TEST"
+	registeredAccountSecretKeys[definition] = []string{"headers.to"}
+	t.Cleanup(func() { delete(registeredAccountSecretKeys, definition) })
+
+	s := secret.New("plaintext-that-must-not-leak")
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), &AccountResource{
+		ID:                    "nested",
+		Name:                  "nested",
+		AccountDefinitionName: definition,
+		Config: map[string]any{
+			"headers": []any{map[string]any{"from": "X-Api-Key", "to": &s}},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `nested secret key "headers.to"`)
+	assert.Nil(t, m.created, "nothing may reach the API")
+}
+
+// The guard above is the backstop; this is the early warning. Every registered
+// account secret key must be a top-level key until splitConfig and the seeding
+// loops in MapRemoteToState/toExportSpecMap become path-aware.
+func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
+	for definition, keys := range registeredAccountSecretKeys {
+		for _, key := range keys {
+			assert.NotContains(t, key, ".",
+				"definition %q: the accounts config split does not support nested secret keys yet", definition)
+		}
+	}
 }

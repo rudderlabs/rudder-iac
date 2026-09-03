@@ -68,7 +68,7 @@ var connectionModes = map[string][]string{
 // Terraform's sync block is a provider-local shape.
 type s3DatalakeConfig struct {
 	BucketName string `mapstructure:"bucket_name" validate:"required,dynamic_or_pattern=s3_datalake_bucket_name"`
-	UseGlue    *bool  `mapstructure:"use_glue" validate:"required"`
+	UseGlue    *bool  `mapstructure:"use_glue" default:"false"`
 	Region     string `mapstructure:"region" validate:"required_if=UseGlue true"`
 	Prefix     string `mapstructure:"prefix"`
 	Namespace  string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=s3_datalake_namespace"`
@@ -85,7 +85,7 @@ type s3DatalakeConfig struct {
 
 	// schema.json requires only bucketName, so sync_frequency is optional here
 	// even though sibling warehouse destinations mark it required.
-	SyncFrequency string `mapstructure:"sync_frequency" validate:"omitempty,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440" default:"180"`
+	SyncFrequency string `mapstructure:"sync_frequency" validate:"omitempty,oneof=5 10 15 30 60 180 360 720 1440" default:"180"`
 	SyncStartAt   string `mapstructure:"sync_start_at"`
 
 	SkipTracksTable           *bool                    `mapstructure:"skip_tracks_table" default:"false"`

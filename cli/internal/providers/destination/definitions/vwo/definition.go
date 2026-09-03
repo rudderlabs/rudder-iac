@@ -28,10 +28,7 @@ type useNativeSDKConfig struct {
 // vwoConfig is the local YAML config model. Field set mirrors the
 // terraform-provider VWO mapping contract plus shared source-scoped settings.
 type vwoConfig struct {
-	AccountID string `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
-	// schema.json defaults these four to false. The backend fills them in on
-	// create but not on update, so declaring them keeps a spec that omits them
-	// from diffing forever against the stored config.
+	AccountID              string                   `mapstructure:"account_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	IsSPA                  *bool                    `mapstructure:"is_spa" default:"false"`
 	SendExperimentTrack    *bool                    `mapstructure:"send_experiment_track" default:"false"`
 	SendExperimentIdentify *bool                    `mapstructure:"send_experiment_identify" default:"false"`

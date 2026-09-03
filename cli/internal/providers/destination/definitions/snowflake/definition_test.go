@@ -189,6 +189,8 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			switch provider {
 			case "AWS":
 				cfg["bucket_name"] = "rudder-bucket"
+				cfg["role_based_auth"] = true
+				cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
 			case "GCP":
 				cfg["bucket_name"] = "rudder-gcs"
 				cfg["storage_integration"] = "RUDDER_GCS"
@@ -226,14 +228,56 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assertHasPath(t, registered.ValidateConfig(cfg), "/bucket_name")
 	})
 
-	t.Run("aws omitted role selector uses backend default", func(t *testing.T) {
+	// role_based_auth decides whether iam_role_arn or the access keys are the
+	// required shape, so leaving it out would pick IAM-role auth silently.
+	t.Run("aws requires the role selector to be stated", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AWS"
 		cfg["bucket_name"] = "rudder-bucket"
 
-		assert.Empty(t, registered.ValidateConfig(cfg))
+		assertHasPath(t, registered.ValidateConfig(cfg), "/role_based_auth")
+	})
+
+	// schema.json declares roleBasedAuth only inside the AWS branch, so the other
+	// providers must not be made to carry an AWS-only flag.
+	t.Run("role selector not required outside the aws branch", func(t *testing.T) {
+		t.Parallel()
+
+		gcp := copyConfig(minimalConfig())
+		gcp["use_rudder_storage"] = false
+		gcp["cloud_provider"] = "GCP"
+		gcp["bucket_name"] = "rudder-gcs"
+		gcp["storage_integration"] = "RUDDER_GCS"
+		gcp["credentials"] = "{}"
+		assert.Empty(t, registered.ValidateConfig(gcp))
+
+		azure := copyConfig(minimalConfig())
+		azure["use_rudder_storage"] = false
+		azure["cloud_provider"] = "AZURE"
+		azure["container_name"] = "rudder-logs"
+		azure["storage_integration"] = "RUDDER_AZURE"
+		azure["account_name"] = "rudderaccount"
+		azure["account_key"] = "azure-account-key"
+		assert.Empty(t, registered.ValidateConfig(azure))
+
+		rudderStorage := copyConfig(minimalConfig())
+		rudderStorage["use_rudder_storage"] = true
+		assert.Empty(t, registered.ValidateConfig(rudderStorage))
+	})
+
+	// schema.json declares cloudProvider as a plain enum with no template branch,
+	// so a dynamic value would be stored verbatim and rejected by the backend.
+	t.Run("cloud provider rejects dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{`{{ .CLOUD_PROVIDER || AWS }}`, "env.CLOUD_PROVIDER"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["cloud_provider"] = value
+
+			assertHasPath(t, registered.ValidateConfig(cfg), "/cloud_provider")
+		}
 	})
 
 	t.Run("aws explicit role auth requires iam role arn", func(t *testing.T) {
@@ -381,6 +425,110 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg := copyConfig(minimalConfig())
 		cfg["container_name"] = "rudder-cli-e2e"
 		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	// schema.json redeclares bucketName inside each provider branch with a
+	// different pattern; the rules genuinely differ (GCS allows underscores,
+	// S3 does not; GCS bans goog/google, S3 bans xn--).
+	t.Run("bucket name follows the aws rules under cloud_provider AWS", func(t *testing.T) {
+		t.Parallel()
+
+		awsConfig := func(bucket string) map[string]any {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["cloud_provider"] = "AWS"
+			cfg["role_based_auth"] = true
+			cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
+			cfg["bucket_name"] = bucket
+			return cfg
+		}
+
+		for _, valid := range []string{"rudder-bucket", "rudder.bucket-1", "ab1"} {
+			assert.Empty(t, registered.ValidateConfig(awsConfig(valid)), valid)
+		}
+
+		for _, invalid := range []string{
+			"xn--bucket",     // punycode prefix
+			"rudder..bucket", // consecutive dots
+			"192.168.0.1",    // IP address
+			"Rudder-Bucket",  // uppercase
+			"rudder_bucket",  // underscore is GCS-only
+			"-rudder",        // must start alphanumeric
+			"ab",             // too short
+		} {
+			assertHasPath(t, registered.ValidateConfig(awsConfig(invalid)), "/bucket_name")
+		}
+	})
+
+	t.Run("bucket name follows the gcs rules under cloud_provider GCP", func(t *testing.T) {
+		t.Parallel()
+
+		gcpConfig := func(bucket string) map[string]any {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["cloud_provider"] = "GCP"
+			cfg["storage_integration"] = "RUDDER_GCS"
+			cfg["credentials"] = "{}"
+			cfg["bucket_name"] = bucket
+			return cfg
+		}
+
+		// Underscores are legal for GCS and rejected by the S3 rule above.
+		for _, valid := range []string{"rudder-bucket", "rudder_bucket", "rudder.bucket"} {
+			assert.Empty(t, registered.ValidateConfig(gcpConfig(valid)), valid)
+		}
+
+		for _, invalid := range []string{
+			"googbucket",       // goog prefix
+			"my-google-bucket", // contains google
+			"rudder..bucket",   // consecutive dots
+			"192.168.0.1",      // IP address
+			"Rudder-Bucket",    // uppercase
+		} {
+			assertHasPath(t, registered.ValidateConfig(gcpConfig(invalid)), "/bucket_name")
+		}
+	})
+
+	// Both branches are gated on useRudderStorage=false, and AZURE stages into
+	// container_name, so outside those cases upstream constrains bucket_name no
+	// further than the baseline single-line rule.
+	t.Run("bucket name provider rules do not apply outside their branch", func(t *testing.T) {
+		t.Parallel()
+
+		// A name the S3 rule would reject, on a provider that has no rule.
+		azure := copyConfig(minimalConfig())
+		azure["use_rudder_storage"] = false
+		azure["cloud_provider"] = "AZURE"
+		azure["container_name"] = "rudder-logs"
+		azure["storage_integration"] = "RUDDER_AZURE"
+		azure["account_name"] = "rudderaccount"
+		azure["account_key"] = "azure-account-key"
+		azure["bucket_name"] = "Stale_Bucket.From..AWS"
+		assert.Empty(t, registered.ValidateConfig(azure), "a stale bucket name must round-trip rather than error")
+
+		rudderStorage := copyConfig(minimalConfig())
+		rudderStorage["bucket_name"] = "Stale_Bucket.From..AWS"
+		assert.Empty(t, registered.ValidateConfig(rudderStorage))
+	})
+
+	t.Run("bucket name accepts templates in every branch", func(t *testing.T) {
+		t.Parallel()
+
+		for _, provider := range []string{"AWS", "GCP"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["use_rudder_storage"] = false
+			cfg["cloud_provider"] = provider
+			cfg["bucket_name"] = `{{ .BUCKET_NAME || rudder-bucket }}`
+			switch provider {
+			case "AWS":
+				cfg["role_based_auth"] = true
+				cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
+			case "GCP":
+				cfg["storage_integration"] = "RUDDER_GCS"
+				cfg["credentials"] = "{}"
+			}
+			assert.Empty(t, registered.ValidateConfig(cfg), provider)
+		}
 	})
 
 	t.Run("single line fields reject line breaks", func(t *testing.T) {

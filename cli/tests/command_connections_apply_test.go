@@ -69,7 +69,6 @@ func TestConnectionsApply(t *testing.T) {
 	// registered without the flag, models connection_mode alone.
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

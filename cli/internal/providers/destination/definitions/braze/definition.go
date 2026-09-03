@@ -170,6 +170,27 @@ func platformKeyConditional(sources []string) validator.Func {
 	}
 }
 
+// Connect-time required keys, derived from schema.json's connectionMode-gated
+// configSchema.allOf branches: restApiKey is required wherever Braze talks to
+// the API itself — every cloud-mode source, plus the hybrid modes that still
+// route server-side. Device-mode sources need no entry here.
+//
+// The branches gated on usePlatformSpecificApiKeys (appKey, androidApiKey,
+// iOSApiKey, webApiKey) are deliberately absent: their requiredness depends on
+// another config value as well as the mode, which this map cannot express.
+var connectionRequiredKeys = map[string]map[string][]string{
+	common.SourceTypeAndroid:       {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
+	common.SourceTypeAndroidKotlin: {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
+	common.SourceTypeIOS:           {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
+	common.SourceTypeIOSSwift:      {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
+	common.SourceTypeWeb:           {"cloud": {"rest_api_key"}, "hybrid": {"rest_api_key"}},
+	common.SourceTypeUnity:         {"cloud": {"rest_api_key"}},
+	common.SourceTypeReactNative:   {"cloud": {"rest_api_key"}},
+	common.SourceTypeFlutter:       {"cloud": {"rest_api_key"}},
+	common.SourceTypeCordova:       {"cloud": {"rest_api_key"}},
+	common.SourceTypeCloud:         {"cloud": {"rest_api_key"}},
+}
+
 // NewDefinition returns the Braze destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
@@ -236,7 +257,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &brazeConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }
