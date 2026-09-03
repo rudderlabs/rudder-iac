@@ -148,6 +148,38 @@ func TestArrayWithStrings(t *testing.T) {
 	assert.JSONEq(t, `{ "event_filtering": { "whitelist": [ "a", "b" ] } }`, s)
 }
 
+func TestGroupedEventFilteringCanMapToWebScopedAPIKeys(t *testing.T) {
+	t.Parallel()
+
+	props := []converter.ConfigProperty{
+		converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "event_filtering.whitelist"),
+		converter.Discriminator("eventFilteringOption.web", converter.DiscriminatorValues{
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
+		}),
+	}
+
+	local := map[string]any{
+		"event_filtering": map[string]any{
+			"whitelist": []any{"a", "b"},
+		},
+	}
+
+	api, err := converter.LocalToAPI(props, local)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"eventFilteringOption": map[string]any{"web": "whitelistedEvents"},
+		"whitelistedEvents": map[string]any{"web": []any{
+			map[string]any{"eventName": "a"},
+			map[string]any{"eventName": "b"},
+		}},
+	}, api)
+
+	back, err := converter.APIToLocal(props, api)
+	require.NoError(t, err)
+	assert.Equal(t, local, back)
+}
+
 func TestArrayWithObjects(t *testing.T) {
 	t.Parallel()
 
