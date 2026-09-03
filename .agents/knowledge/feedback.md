@@ -37,3 +37,8 @@
 ## DEX-733 — Experimental Flag Promotion Cleanup
 <!-- ticket:DEX-733 -->
 - When promoting or deleting an experimental flag, update durable repo guidance that references the removed flag or environment variable so future work does not follow inert configuration advice.
+
+## DEX-728 — Experimental Flag Removal Regression Coverage
+<!-- ticket:DEX-728 -->
+- When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.
+- Do not remove useful `TestGetEnvironmentVariableName` table coverage solely because the input no longer corresponds to a live `ExperimentalConfig` flag; `GetEnvironmentVariableName` is a pure string transform, so keep a single-token lowercase input case to cover the no-substitution branch.
