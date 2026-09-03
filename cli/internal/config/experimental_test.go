@@ -22,11 +22,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "transformations",
-			flagName: "transformations",
-			want:     "RUDDERSTACK_X_TRANSFORMATIONS",
-		},
-		{
 			name:     "eventRuleIncludes",
 			flagName: "eventRuleIncludes",
 			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
@@ -40,6 +35,11 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			name:     "unverifiedDestinations",
 			flagName: "unverifiedDestinations",
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
+		},
+		{
+			name:     "lowercase",
+			flagName: "lowercase",
+			want:     "RUDDERSTACK_X_LOWERCASE",
 		},
 	}
 
@@ -100,6 +100,13 @@ func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
 	t.Parallel()
 
 	removedFlag := "data" + "Graph"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_TransformationsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "trans" + "formations"
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 

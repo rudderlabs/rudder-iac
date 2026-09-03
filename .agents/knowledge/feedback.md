@@ -28,3 +28,8 @@
 <!-- ticket:DEX-731 -->
 - In `docs/experimental-flags.md`, examples under "Adding a New Experimental Flag" should use placeholder flag names such as `YourNewFeature` instead of real experimental flags, so future flag promotions do not require guide rewrites.
 - When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active; either preserve compatibility by clamping intentionally or return an error that names the exact config key, such as `concurrency.syncer`, so users can fix their config.
+
+## DEX-728 — Experimental Flag Removal Regression Coverage
+<!-- ticket:DEX-728 -->
+- When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.
+- Do not remove useful `TestGetEnvironmentVariableName` table coverage solely because the input no longer corresponds to a live `ExperimentalConfig` flag; `GetEnvironmentVariableName` is a pure string transform, so keep a single-token lowercase input case to cover the no-substitution branch.
