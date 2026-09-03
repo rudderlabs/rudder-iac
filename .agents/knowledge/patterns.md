@@ -226,4 +226,4 @@
 ## DEX-747 — Account-Linked Destination E2E Deferral
 <!-- ticket:DEX-747 -->
 - Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
-- Dummy `rudderAccountId` fixtures would fail live `TestDestinationsApply` before snapshot comparison, so autonomous coverage should rely on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
+- Dummy `rudderAccountId` fixtures fail live `TestDestinationsApply` before snapshot comparison — verified against the dev stack, which rejects the create with `http status code: 400 … 'Account not found with given id in the workspace'`, the same failure the legacy GA `rudderDeleteAccountId` fixture hit (DEX-736). Autonomous coverage therefore relies on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.

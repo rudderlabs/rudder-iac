@@ -44,13 +44,6 @@ type eventNameMapping struct {
 	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 }
 
-// oneTrustCookieCategories and ketchConsentPurposes are deliberately absent:
-// the backend migrates them into consentManagement on write and never returns
-// them, so modelling them makes every plan diff. See DEX-696 Discrepancy 3.
-//
-// googleAdwordsOfflineConversionsConfig is the local YAML config model. Field
-// set mirrors integrations-config destinations/google_adwords_offline_conversions
-// defaultConfig; validation constraints mirror schema.json.
 type googleAdwordsOfflineConversionsConfig struct {
 	RudderAccountID                       string                         `mapstructure:"rudder_account_id" validate:"required"`
 	CustomerID                            string                         `mapstructure:"customer_id" validate:"required,dynamic_or_pattern=single_line_100"`
