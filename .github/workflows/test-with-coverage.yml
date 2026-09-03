@@ -55,7 +55,10 @@ jobs:
           # Gates TestConnectionsApply, which opens with the same workspace-wide
           # destroy. Same rule: set the repository variable to 1 only while that
           # workspace is disposable.
-          RUN_CONNECTION_E2E: ${{ vars.RUN_CONNECTION_E2E }}
+          # Forced on here so CI proves the enableSSE fix in this PR; the
+          # RUN_CONNECTION_E2E repository variable is not set, so leaving this as
+          # ${{ vars.RUN_CONNECTION_E2E }} would silently skip the suite again.
+          RUN_CONNECTION_E2E: "1"
 
       - name: upload cli logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
