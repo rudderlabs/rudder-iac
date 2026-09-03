@@ -263,3 +263,9 @@
 - `bingads_offline_conversions` destination support is implemented as CLI destination type `bingads_offline_conversions`, API type `BINGADS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/bingads_offline_conversions` using Go package name `bingadsofflineconversions`.
 - `bingads_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, not with destination support alone.
 - Bing Ads Offline Conversions is a warehouse-only/account-linked destination: it may declare `common.SourceTypeWarehouse` only because integrations-config has no event-stream source types for it, and it should remain unverified until warehouse/account-linked apply flows are proven live.
+
+## DEX-747 — Google Ads Offline Conversions Destination Onboarding
+<!-- ticket:DEX-747 -->
+- Google Ads Offline Conversions destination support is implemented as local type `google_adwords_offline_conversions`, API type `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/google_adwords_offline_conversions` with Go package name `googleadwordsofflineconversions`.
+- `google_adwords_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Google Ads Offline Conversions has no CLI secret keys and declares only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`) with cloud-only connection mode.

@@ -222,3 +222,8 @@
 - Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.
 - Do not use dummy `rudder_account_id` values for live destination fixtures: it is an OAuth account-management foreign key and placeholder values fail live apply, matching the account-linked destination precedent from LinkedIn Ads and GA delete-account fixtures.
 - Until live account-linked fixtures are runnable, rely on definition/unit coverage for example config and conversion behavior plus compile-only `TestDestinationsApply` validation in autonomous environments.
+
+## DEX-747 — Account-Linked Destination E2E Deferral
+<!-- ticket:DEX-747 -->
+- Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
+- Dummy `rudderAccountId` fixtures would fail live `TestDestinationsApply` before snapshot comparison, so autonomous coverage should rely on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
