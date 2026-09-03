@@ -254,6 +254,37 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 
 	// schema.json declares roleBasedAuth only inside the AWS branch, so the other
 	// providers must not be made to carry an AWS-only flag.
+	// An explicit false is a stated selector, not an absent one. go-playground
+	// dereferences a non-nil *bool before the validator sees it, so false and
+	// "missing" both look zero unless the pointer kind is checked — the live e2e
+	// caught this on the s3-keys fixture.
+	t.Run("aws accepts an explicit false role selector", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		setStorage(cfg, "s3", "role_based_auth", false)
+		setStorage(cfg, "s3", "access_key_id", "AKIAIOSFODNN7EXAMPLE")
+		setStorage(cfg, "s3", "access_key", "wJalrXUtnFEMI/K7MDENG")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("azure accepts an explicit false sas selector", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+		cfg["storage_integration"] = "RUDDER_AZURE"
+		setStorage(cfg, "azure", "container_name", "rudder-logs")
+		setStorage(cfg, "azure", "account_name", "rudderaccount")
+		setStorage(cfg, "azure", "use_sas_tokens", false)
+		setStorage(cfg, "azure", "account_key", "azure-account-key")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
 	t.Run("role selector not required outside the aws branch", func(t *testing.T) {
 		t.Parallel()
 

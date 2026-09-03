@@ -190,12 +190,20 @@ func storageBranchActive(fl validator.FieldLevel, provider string) bool {
 	return cloudProviderField.String() == provider
 }
 
+// storageFieldIsSet reports whether the spec states a value. go-playground
+// dereferences a non-nil pointer before calling the validator, so a *bool only
+// arrives as a pointer when it is nil (via CallEvenIfNull): an explicit false
+// reaches here as bool(false) and must count as stated, not as absent.
 func storageFieldIsSet(fl validator.FieldLevel) bool {
 	field := fl.Field()
-	if field.Kind() == reflect.Pointer {
+	switch field.Kind() {
+	case reflect.Pointer:
 		return !field.IsNil()
+	case reflect.Bool:
+		return true
+	default:
+		return !field.IsZero()
 	}
-	return !field.IsZero()
 }
 
 // requiredForProvider makes a field required whenever its provider branch is
