@@ -17,6 +17,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -43,11 +44,13 @@ func New(client retlClient.RETLStore) *Provider {
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
 			"retl-source-sql-model": sqlmodel.ResourceType,
+			table.ResourceKind:      table.ResourceType,
 		},
 	}
 
 	// Register handlers
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
+	p.handlers[table.ResourceType] = table.NewHandler(client, importDir)
 
 	return p
 }
@@ -73,10 +76,20 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns. retl-source-sql-model is
+// absent deliberately: it shipped on rudder/0.1 and has existing users, so its
+// legacy support is permanent.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	table.ResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -94,7 +107,7 @@ func (p *Provider) SupportedTypes() []string {
 // ResourceMatchers overrides the EmptyProvider default to opt into import
 // --merge smart linking for SQL models.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sqlmodel.Matcher()}
+	return []importmatcher.Matcher{sqlmodel.Matcher(), table.Matcher()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {

@@ -16,6 +16,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -162,10 +163,18 @@ func TestProvider(t *testing.T) {
 		t.Parallel()
 
 		p := retl.New(newDefaultMockClient())
-		kind := "retl-source-sql-model"
+
 		var want []vrules.MatchPattern
-		want = append(want, prules.LegacyVersionPatterns(kind)...)
-		want = append(want, prules.V1VersionPatterns(kind)...)
+		// retl-source-sql-model shipped on rudder/0.1 and has existing users, so
+		// it matches legacy and v1 patterns both.
+		want = append(want, prules.LegacyVersionPatterns("retl-source-sql-model")...)
+		want = append(want, prules.V1VersionPatterns("retl-source-sql-model")...)
+		// retl-source-table was introduced after legacy versions were retired, so
+		// it must match v1 only. Registering legacy patterns for it would let a
+		// project pin rudder/0.1 on a new kind, which is a breaking change to
+		// withdraw once anyone relies on it.
+		want = append(want, prules.V1VersionPatterns(table.ResourceKind)...)
+
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
@@ -683,6 +692,13 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 			if hasExternalID == nil || !*hasExternalID {
 				return nil, fmt.Errorf("expected hasExternalID=true filter")
 			}
+			// Honour the sourceType filter the way the API does. Every handler
+			// in the provider calls this, so a mock that ignores the filter
+			// hands one type's sources to another type's handler — and
+			// DecodeConfig is lenient enough not to reject them.
+			if resolved.SourceType != string(retlClient.ModelSourceType) {
+				return &retlClient.RETLSources{}, nil
+			}
 			return &retlClient.RETLSources{
 				Data: []retlClient.RETLSource{
 					{
@@ -1152,6 +1168,9 @@ func TestProviderResourceMatchers(t *testing.T) {
 
 	matchers := p.ResourceMatchers()
 
-	require.Len(t, matchers, 1)
+	// Order matters: source matchers must precede any connection matcher, so a
+	// connection's source reference resolves against matches already recorded.
+	require.Len(t, matchers, 2)
 	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
+	assert.Equal(t, table.ResourceType, matchers[1].ResourceType)
 }
