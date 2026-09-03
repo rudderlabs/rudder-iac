@@ -33,3 +33,8 @@
 <!-- ticket:DEX-732 -->
 - When promoting or deleting an experimental flag, search and update hidden active contributor docs/runbooks as well as code and workflows; stale `.claude/skills/...` or `.agents/knowledge/...` guidance can keep instructing contributors to use removed config fields or env vars.
 - Keep experimental-flag promotion PRs narrowly scoped: do not bundle opportunistic E2E fixture or snapshot remediation, and split invalid live API fixture fixes such as provisioning real upstream IDs into separate tickets/PRs.
+
+## DEX-728 — Experimental Flag Removal Regression Coverage
+<!-- ticket:DEX-728 -->
+- When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.
+- Do not remove useful `TestGetEnvironmentVariableName` table coverage solely because the input no longer corresponds to a live `ExperimentalConfig` flag; `GetEnvironmentVariableName` is a pure string transform, so keep a single-token lowercase input case to cover the no-substitution branch.
