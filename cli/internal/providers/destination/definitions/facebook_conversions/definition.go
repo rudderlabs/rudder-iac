@@ -6,7 +6,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-// Source types from integrations-config destinations/facebook_conversions/db-config.json.
+// Source types from integrations-config destinations/facebook_conversions/db-config.json,
+// filtered to the event-stream source types the CLI can declare.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -53,7 +54,7 @@ type facebookConversionsConfig struct {
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof=ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
 }
 
 type piiDenylistEntry struct {

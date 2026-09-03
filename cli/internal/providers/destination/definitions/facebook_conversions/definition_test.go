@@ -164,6 +164,37 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
+	t.Run("mapped event target rejects dynamic values", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{
+			"{{ .FACEBOOK_EVENT_TO }}",
+			`{{ .FACEBOOK_EVENT_TO || Purchase }}`,
+			"env.FACEBOOK_EVENT_TO",
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"dataset_id":   "dataset-1",
+				"access_token": "access-token-1",
+				"events_to_events": []any{
+					map[string]any{"from": "Signed Up", "to": value},
+				},
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/events_to_events/0/to", errors[0].Path)
+		}
+	})
+
+	t.Run("mapped event target accepts empty value", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"dataset_id":   "dataset-1",
+			"access_token": "access-token-1",
+			"events_to_events": []any{
+				map[string]any{"from": "Signed Up", "to": ""},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
 	t.Run("required strings reject empty values", func(t *testing.T) {
 		t.Parallel()
 
@@ -239,6 +270,24 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(validFullConfig())
+		assert.Empty(t, errors)
+	})
+
+	t.Run("nested array item fields follow schema optionality", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"dataset_id":   "dataset-1",
+			"access_token": "access-token-1",
+			"events_to_events": []any{
+				map[string]any{},
+			},
+			"blacklist_pii_properties": []any{
+				map[string]any{},
+			},
+			"whitelist_pii_properties": []any{
+				map[string]any{},
+			},
+		})
 		assert.Empty(t, errors)
 	})
 
