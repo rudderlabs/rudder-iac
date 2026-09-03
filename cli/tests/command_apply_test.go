@@ -23,8 +23,6 @@ const concurrencyForTest = 1
 var varFilePath = filepath.Join("testdata", "project", "substitution.vars.yaml")
 
 func TestProjectApply(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
-
 	// The api_tracking event keeps its name and description as {{ .VAR }}
 	// placeholders resolved at apply time.
 	//   - API_TRACKING_DESCRIPTION comes from the var file only (no env var set).
