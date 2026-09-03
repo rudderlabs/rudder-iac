@@ -9,6 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
+    api_version: v1
     site_id: rudderCliE2eSiteId
     api_key: "{{ .CUSTOMERIO_API_KEY }}"
     datacenter: US
