@@ -135,6 +135,105 @@ type excludeWindow struct {
 // destination still sends bucketName and iamRoleARN). Terraform groups them into
 // s3/gcp/azure blocks, but that shape cannot represent such a payload — and the
 // s3 definition, the verified reference, is flat for the same reason.
+// Provider-scoped object-storage settings. The grouping mirrors terraform's
+// s3/gcp/azure blocks, but only for keys upstream declares in exactly one
+// provider branch. bucketName (AWS+GCP) and storageIntegration (all three) stay
+// top level: a shared key cannot sit in one group without a Conditional to pick
+// the branch, and that Conditional is what silently dropped keys the last time
+// this shape was attempted.
+//
+// Grouping also lets the branch-scoped defaults land correctly. schema.json
+// declares roleBasedAuth, enableSSE and useSASTokens inside their provider's
+// if/then branch, so AJV applies them only when that branch is active; a nested
+// default applies only inside a block the spec carries, which matches.
+type s3Storage struct {
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"snowflake_s3_required"`
+	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"snowflake_s3_role_required,omitempty,dynamic_or_pattern=single_line_100"`
+	AccessKeyID   string `mapstructure:"access_key_id" validate:"snowflake_s3_key_required,omitempty,pattern=single_line_100"`
+	AccessKey     string `mapstructure:"access_key" validate:"snowflake_s3_key_required,omitempty,dynamic_or_pattern=single_line_100"`
+	EnableSSE     *bool  `mapstructure:"enable_sse" default:"false"`
+}
+
+type gcpStorage struct {
+	Credentials string `mapstructure:"credentials" validate:"snowflake_gcp_required"`
+}
+
+type azureStorage struct {
+	ContainerName string `mapstructure:"container_name" validate:"snowflake_azure_required,omitempty,dynamic_or_pattern=azure_container_name"`
+	AccountName   string `mapstructure:"account_name" validate:"snowflake_azure_required,omitempty,dynamic_or_pattern=single_line_100"`
+	AccountKey    string `mapstructure:"account_key" validate:"snowflake_azure_key_required,omitempty,dynamic_or_pattern=single_line_100"`
+	UseSASTokens  *bool  `mapstructure:"use_sas_tokens" default:"false"`
+	SASToken      string `mapstructure:"sas_token" validate:"snowflake_azure_sas_required"`
+}
+
+// storageBranchActive reports whether upstream's if/then branch for provider is
+// in force. Every storage branch is gated on useRudderStorage=false plus the
+// matching cloudProvider, and both live on the root config — required_if cannot
+// see them from inside a nested struct (it silently passes instead of erroring),
+// so these conditions are read off FieldLevel.Top().
+func storageBranchActive(fl validator.FieldLevel, provider string) bool {
+	top := fl.Top()
+	for top.Kind() == reflect.Pointer {
+		top = top.Elem()
+	}
+
+	useRudderStorageField := top.FieldByName("UseRudderStorage")
+	cloudProviderField := top.FieldByName("CloudProvider")
+	if !useRudderStorageField.IsValid() || !cloudProviderField.IsValid() {
+		return false
+	}
+
+	useRudderStorage, _ := useRudderStorageField.Interface().(*bool)
+	if useRudderStorage == nil || *useRudderStorage {
+		return false
+	}
+	return cloudProviderField.String() == provider
+}
+
+func storageFieldIsSet(fl validator.FieldLevel) bool {
+	field := fl.Field()
+	if field.Kind() == reflect.Pointer {
+		return !field.IsNil()
+	}
+	return !field.IsZero()
+}
+
+// requiredForProvider makes a field required whenever its provider branch is
+// active, mirroring that branch's then.required list.
+func requiredForProvider(provider string) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		if !storageBranchActive(fl, provider) {
+			return true
+		}
+		return storageFieldIsSet(fl)
+	}
+}
+
+// requiredForProviderWhen adds the sibling-flag condition upstream expresses as
+// an anyOf inside the branch (roleBasedAuth picks IAM role vs access keys,
+// useSASTokens picks SAS token vs account key).
+func requiredForProviderWhen(provider, flagField string, want bool) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		if !storageBranchActive(fl, provider) {
+			return true
+		}
+
+		parent := fl.Parent()
+		for parent.Kind() == reflect.Pointer {
+			parent = parent.Elem()
+		}
+		field := parent.FieldByName(flagField)
+		if !field.IsValid() {
+			return true
+		}
+		flag, _ := field.Interface().(*bool)
+		if flag == nil || *flag != want {
+			return true
+		}
+		return storageFieldIsSet(fl)
+	}
+}
+
 type snowflakeConfig struct {
 	Account   string `mapstructure:"account" validate:"required,dynamic_or_pattern=single_line_100"`
 	Database  string `mapstructure:"database" validate:"required,dynamic_or_pattern=single_line_100"`
@@ -172,23 +271,13 @@ type snowflakeConfig struct {
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 	StorageIntegration        string `mapstructure:"storage_integration" validate:"required_unless=UseRudderStorage true CloudProvider AWS,omitempty,dynamic_or_pattern=single_line_100"`
 
-	// AWS
-	BucketName    string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100,snowflake_bucket_name"`
-	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required_if=UseRudderStorage false CloudProvider AWS"`
-	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
-	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,pattern=single_line_100"`
-	AccessKey     string `mapstructure:"access_key" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
-	EnableSSE     *bool  `mapstructure:"enable_sse" default:"false"`
+	// Shared across provider branches upstream, so they stay top level:
+	// bucketName is declared by AWS and GCP, storageIntegration by all three.
+	BucketName string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100,snowflake_bucket_name"`
 
-	// GCP
-	Credentials string `mapstructure:"credentials" validate:"required_if=UseRudderStorage false CloudProvider GCP"`
-
-	// Azure
-	ContainerName string `mapstructure:"container_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=azure_container_name"`
-	AccountName   string `mapstructure:"account_name" validate:"required_if=UseRudderStorage false CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
-	AccountKey    string `mapstructure:"account_key" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens false,omitempty,dynamic_or_pattern=single_line_100"`
-	UseSASTokens  *bool  `mapstructure:"use_sas_tokens" default:"false"`
-	SASToken      string `mapstructure:"sas_token" validate:"required_if=UseRudderStorage false CloudProvider AZURE UseSASTokens true"`
+	S3    s3Storage    `mapstructure:"s3"`
+	GCP   gcpStorage   `mapstructure:"gcp"`
+	Azure azureStorage `mapstructure:"azure"`
 
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
@@ -224,17 +313,17 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("cleanupObjectStorageFiles", "cleanup_object_storage_files"),
 		converter.Simple("storageIntegration", "storage_integration"),
 		converter.Simple("bucketName", "bucket_name"),
-		converter.Simple("roleBasedAuth", "role_based_auth"),
-		converter.Simple("iamRoleARN", "iam_role_arn"),
-		converter.Simple("accessKeyID", "access_key_id"),
-		converter.Simple("accessKey", "access_key"),
-		converter.Simple("enableSSE", "enable_sse"),
-		converter.Simple("credentials", "credentials"),
-		converter.Simple("containerName", "container_name"),
-		converter.Simple("accountName", "account_name"),
-		converter.Simple("accountKey", "account_key"),
-		converter.Simple("useSASTokens", "use_sas_tokens"),
-		converter.Simple("sasToken", "sas_token"),
+		converter.Simple("roleBasedAuth", "s3.role_based_auth"),
+		converter.Simple("iamRoleARN", "s3.iam_role_arn"),
+		converter.Simple("accessKeyID", "s3.access_key_id"),
+		converter.Simple("accessKey", "s3.access_key"),
+		converter.Simple("enableSSE", "s3.enable_sse"),
+		converter.Simple("credentials", "gcp.credentials"),
+		converter.Simple("containerName", "azure.container_name"),
+		converter.Simple("accountName", "azure.account_name"),
+		converter.Simple("accountKey", "azure.account_key"),
+		converter.Simple("useSASTokens", "azure.use_sas_tokens"),
+		converter.Simple("sasToken", "azure.sas_token"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
@@ -250,11 +339,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"password",
 			"private_key",
 			"private_key_passphrase",
-			"access_key_id",
-			"access_key",
-			"account_key",
-			"sas_token",
-			"credentials",
+			"s3.access_key_id",
+			"s3.access_key",
+			"azure.account_key",
+			"azure.sas_token",
+			"gcp.credentials",
 		},
 		NewConfig: func() any {
 			return &snowflakeConfig{}
@@ -263,6 +352,13 @@ func NewDefinition() *definitions.DestinationDefinition {
 		ConnectionModes: connectionModes,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "snowflake_bucket_name", Func: bucketNameConditional},
+			{Tag: "snowflake_s3_required", Func: requiredForProvider("AWS"), CallEvenIfNull: true},
+			{Tag: "snowflake_s3_role_required", Func: requiredForProviderWhen("AWS", "RoleBasedAuth", true)},
+			{Tag: "snowflake_s3_key_required", Func: requiredForProviderWhen("AWS", "RoleBasedAuth", false)},
+			{Tag: "snowflake_gcp_required", Func: requiredForProvider("GCP")},
+			{Tag: "snowflake_azure_required", Func: requiredForProvider("AZURE")},
+			{Tag: "snowflake_azure_key_required", Func: requiredForProviderWhen("AZURE", "UseSASTokens", false)},
+			{Tag: "snowflake_azure_sas_required", Func: requiredForProviderWhen("AZURE", "UseSASTokens", true)},
 		},
 	}
 }
