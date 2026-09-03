@@ -216,3 +216,9 @@
 - Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
 - Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
 - Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
+
+## DEX-745 — Bing Ads Offline Conversions E2E Deferral
+<!-- ticket:DEX-745 -->
+- Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.
+- Do not use dummy `rudder_account_id` values for live destination fixtures: it is an OAuth account-management foreign key and placeholder values fail live apply, matching the account-linked destination precedent from LinkedIn Ads and GA delete-account fixtures.
+- Until live account-linked fixtures are runnable, rely on definition/unit coverage for example config and conversion behavior plus compile-only `TestDestinationsApply` validation in autonomous environments.

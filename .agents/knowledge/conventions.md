@@ -222,3 +222,9 @@
 <!-- ticket:DEX-730 -->
 - Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
 - A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.
+
+## DEX-745 — Bing Ads Offline Conversions Config Surface
+<!-- ticket:DEX-745 -->
+- Bing Ads Offline Conversions local config is `rudder_account_id`, `customer_account_id`, `customer_id`, `is_hash_required` with default `false`, `connection_mode`, and shared `consent_management`; legacy `one_trust_cookie_categories` and `ketch_consent_purposes` remain unmodelled and unknown.
+- Use a destination-local named pattern for numeric Bing Ads IDs because no existing production named pattern enforces digits-only; schema patterns for `customerAccountId` and `customerId` reduce to `^[0-9]+$`, with template support expressed by the `dynamic_or_pattern` validation tag.
+- Keep Bing Ads Offline Conversions as an unverified warehouse-only destination, alongside `customerio_audience`, rather than broadening it to event-stream source types or treating placeholder account IDs as valid live fixtures.

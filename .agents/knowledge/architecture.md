@@ -257,3 +257,9 @@
 - Webhook declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them, per DEX-730's never-declared rule.
 - Webhook supports cloud-only connection mode for all retained source types.
 - Do not narrow webhook further to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
+
+## DEX-745 — Bing Ads Offline Conversions Destination Onboarding
+<!-- ticket:DEX-745 -->
+- `bingads_offline_conversions` destination support is implemented as CLI destination type `bingads_offline_conversions`, API type `BINGADS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/bingads_offline_conversions` using Go package name `bingadsofflineconversions`.
+- `bingads_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, not with destination support alone.
+- Bing Ads Offline Conversions is a warehouse-only/account-linked destination: it may declare `common.SourceTypeWarehouse` only because integrations-config has no event-stream source types for it, and it should remain unverified until warehouse/account-linked apply flows are proven live.
