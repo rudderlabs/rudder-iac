@@ -22,6 +22,7 @@ import (
 	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
+	bingadsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
@@ -333,6 +334,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+		}
+		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
 		}
 		if err := registry.Register(bq.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bq destination definition: %w", err)
