@@ -12,8 +12,9 @@ import (
 // Connection rules are registered unconditionally now that connection support
 // is GA, so NewConnectionSemanticValidRule always captures destinationRegistry.
 // It constructs fine with a nil registry and only panics later, inside
-// registry.Get during validate, so keep the nil case unrepresentable: New
-// defaults the field and WithDestinationRegistry refuses to clear it.
+// registry.Get during validate. Pin both halves of the guard that keeps that
+// unreachable through the constructor: New defaults the field, and
+// WithDestinationRegistry refuses to clear it.
 func TestNewAlwaysHasDestinationRegistry(t *testing.T) {
 	t.Parallel()
 

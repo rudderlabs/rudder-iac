@@ -66,9 +66,11 @@ type Option func(*Provider)
 
 // WithDestinationRegistry supplies the destination definitions that back the
 // connection semantic rules' source-type compatibility checks. A nil registry
-// is ignored so the empty default in New always stands: connection rules are
-// registered unconditionally now, and registry.Get dereferences the receiver's
-// map, so a nil registry would panic mid-validate rather than fail to build.
+// is ignored so this option cannot clear the empty default New installs:
+// connection rules are registered unconditionally now, and registry.Get
+// indexes a map on its receiver, so a nil registry constructs fine and only
+// panics later, mid-validate. This narrows the option, not the whole type —
+// a zero Provider built inside the package still has the hazard.
 func WithDestinationRegistry(registry *definitions.Registry) Option {
 	return func(p *Provider) {
 		if registry == nil {
