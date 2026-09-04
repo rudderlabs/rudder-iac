@@ -129,6 +129,13 @@ func TestIsValidExperimentalFlag_EnableVarSubstitutionRemoved(t *testing.T) {
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
+func TestIsValidExperimentalFlag_AccountSupportRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "account" + "Support"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestGetAvailableExperimentalFlags(t *testing.T) {
 	t.Parallel()
 

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestComposeProvidersIncludesDataGraph(t *testing.T) {
+func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 	c, err := client.New("test-token")
@@ -23,10 +23,12 @@ func TestComposeProvidersIncludesDataGraph(t *testing.T) {
 	composite, providers, err := composeProviders(c)
 	require.NoError(t, err)
 	require.NotNil(t, providers.DataGraph)
+	require.NotNil(t, providers.Account)
 
 	cp, ok := composite.(*provider.CompositeProvider)
 	require.True(t, ok)
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
+	assert.Same(t, providers.Account, cp.Providers["account"])
 }
 
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {

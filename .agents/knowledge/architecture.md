@@ -282,3 +282,9 @@
 - `bqstream` no longer requires `ExperimentalFlags.UnverifiedDestinations`; the unverified gate should remain reserved for destinations that have not completed verification.
 - Do not also register `bqstream` in the unverified block; when both destination flags are enabled, duplicate registry registration would make registry construction fail.
 - Destination E2E fixtures still enable `UnverifiedDestinations` because the shared fixture set contains other unverified destinations; do not infer the live E2E gate from bqstream's verified registry status.
+
+## DEX-808 — Account Support General Availability Wiring
+<!-- ticket:DEX-808 -->
+- Account support is a default provider capability rather than an experimental feature: `cli/internal/config/experimental.go` should not define `AccountSupport` / `accountSupport`.
+- `setupProviders` in `cli/internal/app/dependencies.go` should always construct the accounts provider and include it in both `Providers.Account` and the composite provider map under `"account"`, without a flag guard.
+- The `gen-rule-docs` workflow no longer needs `RUDDERSTACK_X_ACCOUNT_SUPPORT`; account rule fragments are part of the default rule set, so catalog drift checks cover them without opt-in.

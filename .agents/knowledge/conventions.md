@@ -233,3 +233,7 @@
 <!-- ticket:DEX-747 -->
 - For `events_to_offline_conversions_type_mapping[].to`, follow integrations-config `schema.json` over Terraform: the property is optional and the schema enum includes an empty string, so use `omitempty,oneof=click call store` to allow omitted/empty values while rejecting unknown non-empty values.
 - Google Ads Offline Conversions pattern-validated single-line fields should use shared `dynamic_or_pattern=single_line_100` for schema constraints like `^(.{0,100})$` or `^(.{1,100})$`; do not add a destination-local reject just to block `env.*` literals, because that would be stricter than existing broad single-line destination fields.
+
+## DEX-808 — Removed Experimental Flag Coverage
+<!-- ticket:DEX-808 -->
+- `accountSupport` should be asserted as an invalid experimental option in `cli/internal/config/experimental_test.go`, following the existing `dataGraph` / `localTyper` removed-flag precedent, so the flag cannot be silently reintroduced.

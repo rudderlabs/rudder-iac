@@ -47,9 +47,6 @@ jobs:
         env:
           RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL || 'true' }}
           RUDDERSTACK_X_DESTINATION_SUPPORT: ${{ vars.RUDDERSTACK_X_DESTINATION_SUPPORT || 'true' }}
-          # Account provider is gated too — enable it so the account docs fragments
-          # (duplicate-urn / metadata-syntax-valid coverage) match the live rule set.
-          RUDDERSTACK_X_ACCOUNT_SUPPORT: ${{ vars.RUDDERSTACK_X_ACCOUNT_SUPPORT || 'true' }}
           # Same for the event-stream-connections kind.
           RUDDERSTACK_X_CONNECTION_SUPPORT: ${{ vars.RUDDERSTACK_X_CONNECTION_SUPPORT || 'true' }}
 
