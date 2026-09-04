@@ -26,6 +26,11 @@ type Diagnostic struct {
 	// File is the absolute path to the spec file where the issue was found
 	File string
 
+	// Kind is the resource kind of the spec the issue was found in (e.g.
+	// "properties", "events", "import-manifest"). Empty when the spec could not
+	// be parsed far enough to determine its kind.
+	Kind string
+
 	// Position contains the resolved location information (line, column, lineText)
 	// This is populated by the engine using PathIndexer, so renderers don't need
 	// to do any file I/O or position lookup
