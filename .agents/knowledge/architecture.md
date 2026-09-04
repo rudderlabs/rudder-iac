@@ -269,3 +269,9 @@
 - Google Ads Offline Conversions destination support is implemented as local type `google_adwords_offline_conversions`, API type `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/google_adwords_offline_conversions` with Go package name `googleadwordsofflineconversions`.
 - `google_adwords_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Google Ads Offline Conversions has no CLI secret keys and declares only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`) with cloud-only connection mode.
+
+## DEX-771 — HTTP Destination Verified Promotion
+<!-- ticket:DEX-771 -->
+- HTTP is now a verified/native destination definition: `cli/internal/app/newDestinationRegistry` registers `http.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- The verified registry block now includes both `s3` and `http`; enabling unverified destinations adds the remaining unverified definitions and must not register HTTP a second time.
+- HTTP's definition surface remains unchanged by the promotion: CLI type `http`, API type `HTTP`, version `1`, and the existing CLI-owned event-stream source-type boundary still apply.
