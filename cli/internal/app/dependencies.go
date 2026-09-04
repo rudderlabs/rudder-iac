@@ -316,6 +316,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		return registry, nil
 	}
 
+	if err := registry.Register(attentivetag.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
 	}
@@ -332,9 +335,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(am.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering am destination definition: %w", err)
-		}
-		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
 		}
 		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
