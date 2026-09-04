@@ -282,3 +282,10 @@
 - `bqstream` no longer requires `ExperimentalFlags.UnverifiedDestinations`; the unverified gate should remain reserved for destinations that have not completed verification.
 - Do not also register `bqstream` in the unverified block; when both destination flags are enabled, duplicate registry registration would make registry construction fail.
 - Destination E2E fixtures still enable `UnverifiedDestinations` because the shared fixture set contains other unverified destinations; do not infer the live E2E gate from bqstream's verified registry status.
+
+## DEX-749 — ActiveCampaign Verified Promotion
+<!-- ticket:DEX-749 -->
+- `active_campaign` has been promoted from the unverified destination registry to the verified/native destination set after QA verification.
+- Register `active_campaign` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`; this supersedes the DEX-487 onboarding note that originally classified it as unverified.
+- Destination registry flag-matrix tests should expect `active_campaign` to appear with destination support alone; the unverified-destination flag should only add still-unverified definitions.
+- The ActiveCampaign definition contract and E2E fixtures remain unchanged: CLI type `active_campaign`, API type `ACTIVE_CAMPAIGN`, version `1`, and the existing flat config/secret surface still apply.
