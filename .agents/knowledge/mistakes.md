@@ -71,3 +71,8 @@
 <!-- ticket:DEX-531 -->
 - CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
 - Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.
+
+## DEX-749 — Transformations Batch Test Transient Backend Failures
+<!-- ticket:DEX-749 -->
+- CI can fail in `TestTransformationsTest` when the live transformations test endpoint returns transient backend `Internal server error` responses for Python transformation suites such as `py_greeting_suite` or `py_transform_success`; the aborted batch call can also leave `test-results.json` missing.
+- Durable mitigation: keep generic HTTP client retries limited to idempotent requests, and handle this by adding targeted retry around `cli/internal/providers/transformations/testorchestrator.Runner` BatchTest calls for internal-server backend failures so ordinary assertion mismatches and user-code errors remain visible.
