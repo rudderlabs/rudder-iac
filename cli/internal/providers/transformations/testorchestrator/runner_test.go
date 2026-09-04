@@ -692,6 +692,94 @@ func TestRunTestUnitTask(t *testing.T) {
 		assert.Contains(t, err.Error(), "running tests for trans-1")
 	})
 
+	t.Run("retries transient internal server errors", func(t *testing.T) {
+		ctx := context.Background()
+		mockStore := &testutil.MockTransformationStore{}
+
+		unitTask := &testUnitTask{
+			ID:                    "trans-1",
+			Name:                  "Test Transformation",
+			testDefs:              []*tc.TestDefinition{{Name: "test1", Input: []any{map[string]any{"type": "track"}}}},
+			transformationVersion: "ver-1",
+		}
+
+		attempts := 0
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
+			attempts++
+			if attempts == 1 {
+				return nil, errors.New("running batch tests: http status code: 500, error code: 'INTERNAL_ERROR', error: 'Internal server error'")
+			}
+			return &tc.BatchTestResponse{
+				Pass: true,
+				ValidationOutput: tc.ValidationOutput{
+					Transformations: []tc.TransformationTestResult{
+						{
+							ID:        "trans-1",
+							VersionID: "ver-1",
+							Pass:      true,
+							TestSuiteResult: tc.TestSuiteRunResult{
+								Status: tc.TestRunStatusPass,
+								Results: []tc.TestResult{
+									{Name: "test1", Status: tc.TestRunStatusPass},
+								},
+							},
+						},
+					},
+				},
+			}, nil
+		}
+
+		runner := &Runner{store: mockStore}
+		results := tasker.NewResults[*testUnitResult]()
+
+		err := runner.runTestUnitTask(ctx, results)(unitTask)
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, attempts)
+	})
+
+	t.Run("retries transient internal server result errors", func(t *testing.T) {
+		ctx := context.Background()
+		mockStore := &testutil.MockTransformationStore{}
+
+		attempts := 0
+		mockStore.BatchTestFunc = func(ctx context.Context, req *tc.BatchTestRequest) (*tc.BatchTestResponse, error) {
+			attempts++
+			if attempts == 1 {
+				return &tc.BatchTestResponse{
+					Pass: false,
+					ValidationOutput: tc.ValidationOutput{
+						Transformations: []tc.TransformationTestResult{
+							{
+								ID:        "trans-1",
+								VersionID: "ver-1",
+								Pass:      false,
+								TestSuiteResult: tc.TestSuiteRunResult{
+									Status: tc.TestRunStatusError,
+									Results: []tc.TestResult{
+										{
+											Name:   "test1",
+											Status: tc.TestRunStatusError,
+											Errors: []tc.TestError{{Message: "Internal server error"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			}
+			return &tc.BatchTestResponse{Pass: true}, nil
+		}
+
+		resp, err := runBatchTestWithRetry(ctx, mockStore, &tc.BatchTestRequest{})
+
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.Pass)
+		assert.Equal(t, 2, attempts)
+	})
+
 	t.Run("returns error for invalid task type", func(t *testing.T) {
 		ctx := context.Background()
 		runner := &Runner{}
