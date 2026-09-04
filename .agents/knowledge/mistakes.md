@@ -76,3 +76,8 @@
 <!-- ticket:DEX-735 -->
 - CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
 - Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.
+
+## DEX-731 — Live Apply/Destroy Eventual Consistency
+<!-- ticket:DEX-731 -->
+- CI live E2E can observe stale upstream state immediately after project apply/destroy moves through the composite provider; observed symptoms included catalog snapshot counts such as 0 resources instead of 37 and a follow-up dry-run still listing a transformation deletion like `transformation:py_transform`.
+- Durable mitigation: poll the existing exact live E2E assertions for a bounded consistency window after apply/destroy operations instead of treating the first immediate remote read as definitive.
