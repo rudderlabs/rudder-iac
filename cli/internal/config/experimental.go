@@ -14,8 +14,6 @@ import (
 type ExperimentalConfig struct {
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
-	// LocalTyper enables `typer generate --local`, generating typed code from local specs without applying to remote
-	LocalTyper bool `mapstructure:"localTyper"`
 	// ImportMerge enables import-manifest.yaml generation during `import workspace`
 	// and treats the import-manifest kind as a recognized spec kind during
 	// validation. This feature `import workspace --merge` links matching
