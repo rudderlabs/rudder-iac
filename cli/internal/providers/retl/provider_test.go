@@ -762,7 +762,10 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 		collection, err := provider.LoadResourcesFromRemote(ctx)
 		require.Error(t, err)
 		assert.Nil(t, collection)
-		assert.Contains(t, err.Error(), "loading retl-source-sql-model")
+		// The provider iterates handlers from a map, so which source handler
+		// fails first is not deterministic. Assert that the error is wrapped
+		// with *a* handler's resource type rather than a specific one.
+		assert.Regexp(t, `loading retl-source-(sql-model|table)`, err.Error())
 		assert.Contains(t, err.Error(), "listing RETL sources")
 	})
 }
