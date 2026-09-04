@@ -36,6 +36,7 @@ func TestUpstreamSnapshot(t *testing.T) {
 
 	mockState := map[string]string{
 		"event:product_viewed_1": "ca94de47-123b-4dc2-9558-02c57bc289b7",
+		"event:stale_resource":   "stale-resource-id",
 	}
 	reader := &MockUpstreamStateReader{remoteIDs: mockState}
 
@@ -70,6 +71,26 @@ func TestUpstreamSnapshot(t *testing.T) {
 
 	err = upstreamTester.SnapshotTest(context.Background())
 	require.NoError(t, err, "upstream snapshot test")
+}
+
+func TestUpstreamSnapshotReportsMissingExpectedResource(t *testing.T) {
+	t.Parallel()
+
+	reader := &MockUpstreamStateReader{remoteIDs: map[string]string{}}
+
+	fileManager, err := NewSnapshotFileManager("testdata/snapshot/expected/upstream")
+	require.NoError(t, err, "creating state file manager")
+
+	upstreamTester := NewUpstreamSnapshotTester(
+		&MockDataCatalogClient{},
+		reader,
+		fileManager,
+		nil,
+	)
+
+	err = upstreamTester.SnapshotTest(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing expected upstream resources: event_product_viewed_1")
 }
 
 func strptr(str string) *string {
