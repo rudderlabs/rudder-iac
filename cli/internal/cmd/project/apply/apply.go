@@ -59,7 +59,7 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}

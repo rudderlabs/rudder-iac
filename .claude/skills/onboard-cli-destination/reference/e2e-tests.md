@@ -158,7 +158,6 @@ Prerequisites:
   stack;
 - destination APIs available for the stack;
 - unverified destinations enabled when any fixture uses an unverified type;
-- var substitution enabled (the test sets the CLI env flag for the process).
 
 Recommended workflow:
 

@@ -72,3 +72,8 @@
 <!-- ticket:DEX-531 -->
 - CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
 - Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.
+
+## DEX-735 — Google Analytics Account Fixture CI Failure
+<!-- ticket:DEX-735 -->
+- CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
+- Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.

@@ -6,13 +6,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 )
 
-// Audience destination is warehouse-only (integrations-config
-// destinations/customerio_audience supportedSourceTypes), which makes it the
-// one definition that may declare warehouse: the CLI cannot produce that source
-// token yet, so no connection can exercise this destination end to end. That is
-// also why it stays in the unverified registry — promote it to the verified
-// block once warehouse sources are supported and the apply cycle can be proven
-// against a live stack.
+// Warehouse-only destinations may declare warehouse when integrations-config has
+// no event-stream source types for them. The CLI cannot produce that source token
+// yet, so keep these definitions unverified until warehouse/account-linked apply
+// flows can be proven against a live stack. Current examples are
+// customerio_audience and bingads_offline_conversions.
 var sourceTypes = []string{
 	common.SourceTypeWarehouse,
 }
