@@ -35,9 +35,10 @@
 - CI E2E exposed live catalog read-after-write lag in `TestProjectApply`: immediately after a successful migrated update apply, upstream verification saw only 25 of 40 resources and the following dry-run still reported properties/tracking plans as new.
 - Durable mitigation: poll catalog-backed snapshot and no-diff dry-run assertions for a short consistency window after apply, preserving the original drift signal if eventual consistency does not settle.
 - CI E2E dry-runs can fail when shared disposable workspaces contain managed unverified destinations but the global apply/destroy/dry-run path does not enable unverified destinations; the observed error was an unregistered `ATTENTIVE_TAG` destination type during destination remote loading.
-- Durable mitigation: e2e tests that may run against a shared workspace should enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` so remote state loading can decode unverified managed destinations left by destination e2e.
-- In the test-with-coverage workflow, the unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, and opt-in `AccountsImportWorkspace`, not only destination-specific tests; after destination support GA, those paths need only the unverified-destinations env gate.
-- Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors.
+- Durable mitigation: e2e tests that may run against a shared workspace enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` through `allowUnverifiedDestinationResidue` in `cli/tests/main_test.go`, so remote state loading can decode unverified managed destinations left by destination e2e.
+- The unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, `ConnectionsApply` and opt-in `AccountsImportWorkspace`, not only destination-specific tests. Set the gate in the tests that need it rather than as a `test-with-coverage` repository variable, so the requirement travels with the code instead of living in CI settings nothing in the repo records; the workflow no longer passes `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` at all.
+- `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` is inert without `RUDDERSTACK_CLI_EXPERIMENTAL`, because `GetConfig` zeroes the whole flag struct when the umbrella switch is off. Keep the umbrella switch set explicitly in each test rather than folding it into a narrower helper, so removing that helper can never silently disable an unrelated flag the test does depend on.
+- Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors. Because destinations are GA the provider loads remote state on every apply and destroy, so the strict error must name the `unverifiedDestinations` flag that unblocks a user whose workspace holds residue they never opted into.
 
 ## DEX-509 — Kafka Destination Fixture Snapshot Count Mismatch
 <!-- ticket:DEX-509 -->
@@ -61,17 +62,6 @@
 <!-- ticket:DEX-490 -->
 - CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
 - Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
-
-## DEX-731 — GA Destination Fixture Account Reference Failure
-<!-- ticket:DEX-731 -->
-- CI failed when the live destination E2E fixture `cli/tests/testdata/destinations/{create,update}/ga.yaml` set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`, but the test workspace did not create an account with that ID.
-- The observed `TestDestinationsApply` failure was `task: destination:ga failed: creating destination: http status code: 400 ... 'Account not found with given id in the workspace'`.
-- Durable mitigation: omit account-ID config from GA destination fixtures unless the referenced account is seeded or managed by the test setup; future destination E2E fixtures should only include account-ID fields with a real test prerequisite.
-
-## DEX-732 — Destination GA Fixture Account ID Failure
-<!-- ticket:DEX-732 -->
-- CI live destination E2E failed when the GA fixture set `config.rudder_delete_account_id` to dummy value `rudderCliE2eDeleteAccount`; the API maps it to `rudderDeleteAccountId` and rejects create with `400 ... 'Account not found with given id in the workspace'` after `TestDestinationsApply` has destroyed the workspace.
-- Durable mitigation: omit this optional field from live destination fixtures unless the test also provisions and resolves a real account ID in that workspace.
 
 ## DEX-730 — GA Delete Account Fixture Requires Real Account
 <!-- ticket:DEX-730 -->

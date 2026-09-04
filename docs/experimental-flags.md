@@ -80,10 +80,10 @@ Users can manage experimental flags through CLI commands:
 rudder-cli experimental list
 
 # Enable a flag
-rudder-cli experimental enable transformations
+rudder-cli experimental enable yourNewFeature
 
 # Disable a flag
-rudder-cli experimental disable eventRuleIncludes
+rudder-cli experimental disable yourOtherFeature
 
 # Reset all flags to default (false)
 rudder-cli experimental reset
@@ -97,8 +97,8 @@ Flags are stored in `~/.rudder/config.json`:
 {
   "experimental": true,
   "flags": {
-    "transformations": true,
-    "eventRuleIncludes": false
+    "yourNewFeature": true,
+    "yourOtherFeature": false
   }
 }
 ```
@@ -110,8 +110,8 @@ In order for them to be effective, the top-level `experimental` field must also 
 Flags can be set via environment variables using the `RUDDERSTACK_X_` prefix:
 
 ```bash
-export RUDDERSTACK_X_TRANSFORMATIONS=true
-export RUDDERSTACK_X_EVENT_RULE_INCLUDES=true
+export RUDDERSTACK_X_YOUR_NEW_FEATURE=true
+export RUDDERSTACK_X_YOUR_OTHER_FEATURE=true
 rudder-cli apply
 ```
 
