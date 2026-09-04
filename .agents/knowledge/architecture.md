@@ -101,21 +101,21 @@
 ## DEX-510 — HTTP Destination Registration Boundary
 <!-- ticket:DEX-510 -->
 - HTTP destination support is implemented as a destination-provider definition under `cli/internal/providers/destination/definitions/http`, with registry wiring in `cli/internal/app/dependencies.go`.
-- HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, matching the S3 destination gate.
+- HTTP is treated as an unverified destination: it should register only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled; S3 and Attentive Tag are verified/native destinations and do not share that gate.
 - HTTP destination identity is `Type: http`, API type `HTTP`, and version `1`; allowed source types are intentionally restricted to the CLI-owned event-stream set (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `react_native`, `flutter`, `cordova`, `cloud`) while upstream `amp`, `warehouse`, and `shopify` are excluded.
 
 ## DEX-608 — S3 Destination Verified Registry Promotion
 <!-- ticket:DEX-608 -->
-- S3 is a verified/native destination definition: `cli/internal/app/newDestinationRegistry` should register `s3.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- S3 and Attentive Tag are verified/native destination definitions: `cli/internal/app/newDestinationRegistry` should register `s3.NewDefinition()` and `attentivetag.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
 - HTTP remains an unverified destination definition and still requires both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` before `http.NewDefinition()` is registered.
-- Destination registry flag-matrix expectations should reflect S3 as available with destination support alone, while enabling unverified destinations adds HTTP alongside S3.
-- This supersedes earlier destination-registry guidance that used S3 as an unverified peer example for HTTP; HTTP remains gated, but S3 no longer shares that gate.
+- Destination registry flag-matrix expectations should reflect S3 and Attentive Tag as available with destination support alone, while enabling unverified destinations adds HTTP alongside those verified definitions.
+- This supersedes earlier destination-registry guidance that used S3 as an unverified peer example for HTTP; HTTP remains gated, but S3 and Attentive Tag do not share that gate.
 
 ## DEX-499 — GCS Destination Unverified Registry Placement
 <!-- ticket:DEX-499 -->
 - Every newly onboarded destination definition registers as unverified: it goes inside the `ExperimentalFlags.UnverifiedDestinations` block in `cli/internal/app/dependencies.go`, requiring both `DestinationSupport` and `UnverifiedDestinations`.
-- GCS is treated as an unverified destination definition on that rule, alongside Attentive Tag, Customer.io Audience, HTTP, and RS.
-- S3 remains the verified/native cloud-storage destination registered with `ExperimentalFlags.DestinationSupport` alone; do not use S3's gate as the GCS registry precedent.
+- GCS is treated as an unverified destination definition on that rule, alongside Customer.io Audience, HTTP, and RS.
+- S3 and Attentive Tag remain verified/native destinations registered with `ExperimentalFlags.DestinationSupport` alone; do not use their gate as the GCS registry precedent.
 - Promotion to the verified block is a separate, deliberate step once a definition has been verified against a live stack — never part of the onboarding change itself.
 
 ## DEX-498 — Facebook Conversions Destination Onboarding
@@ -289,3 +289,8 @@
 - Register `active_campaign` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`; this supersedes the DEX-487 onboarding note that originally classified it as unverified.
 - Destination registry flag-matrix tests should expect `active_campaign` to appear with destination support alone; the unverified-destination flag should only add still-unverified definitions.
 - The ActiveCampaign definition contract and E2E fixtures remain unchanged: CLI type `active_campaign`, API type `ACTIVE_CAMPAIGN`, version `1`, and the existing flat config/secret surface still apply.
+
+## DEX-753 — Attentive Tag Verified Destination Promotion
+<!-- ticket:DEX-753 -->
+- `attentive_tag` is a verified/native destination after QA verification: register `attentivetag.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- Keep Attentive Tag registered exactly once in `cli/internal/app/dependencies.go`; enabling both destination flags should not attempt duplicate registration.

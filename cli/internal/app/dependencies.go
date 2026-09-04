@@ -328,6 +328,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	if err := registry.Register(activecampaign.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering active_campaign destination definition: %w", err)
 	}
+	if err := registry.Register(attentivetag.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
 		if err := registry.Register(adj.NewDefinition()); err != nil {
@@ -338,9 +341,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(am.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering am destination definition: %w", err)
-		}
-		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
 		}
 		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
