@@ -35,6 +35,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
@@ -373,6 +374,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
+		}
+		if err := registry.Register(googleadwordsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering google_adwords_offline_conversions destination definition: %w", err)
 		}
 		if err := registry.Register(googleads.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
