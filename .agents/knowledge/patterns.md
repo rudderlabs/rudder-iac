@@ -68,7 +68,7 @@
 
 ## DEX-608 — Destination E2E Unverified Fixture Gate
 <!-- ticket:DEX-608 -->
-- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `attentive_tag`, `http`, and `rs`; S3 is verified/native and does not need that gate.
+- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `http`, `rs`, and `salesforce`; S3 and Attentive Tag are verified/native and do not need that gate.
 - Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.
 
 ## DEX-661 — Destination Export Empty-Value Pruning

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -48,18 +49,23 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 		return fmt.Errorf("listing upstream files: %w", err)
 	}
 
-	if len(remoteIDs) != len(expectedResources) {
-		return fmt.Errorf(
-			"resource count mismatch: got %d resources, want %d resources",
-			len(remoteIDs),
-			len(expectedResources),
-		)
+	expectedResourceFiles := make(map[string]struct{}, len(expectedResources))
+	for _, resource := range expectedResources {
+		expectedResourceFiles[resource] = struct{}{}
 	}
 
 	var errs Errors
 
-	// For each entity ID, call appropriate API method and compare with expected upstream state
+	// CI workspaces can contain remote catalog resources left by an earlier run,
+	// so compare only resources with committed snapshots while still failing if
+	// an expected resource was not created.
 	for urn, resourceID := range remoteIDs {
+		resourceFile := u.fileManager.resourceURNToFileName(urn)
+		if _, ok := expectedResourceFiles[resourceFile]; !ok {
+			continue
+		}
+		delete(expectedResourceFiles, resourceFile)
+
 		parts := strings.Split(urn, ":")
 		resourceType := parts[0]
 
@@ -78,6 +84,15 @@ func (u *UpstreamSnapshotTester) SnapshotTest(ctx context.Context) error {
 		if err := CompareStates(actual, expected, u.ignore); err != nil {
 			errs = append(errs, fmt.Errorf("resource %s failed comparison with upstream state: %v", urn, err))
 		}
+	}
+
+	if len(expectedResourceFiles) > 0 {
+		missingResources := make([]string, 0, len(expectedResourceFiles))
+		for resource := range expectedResourceFiles {
+			missingResources = append(missingResources, resource)
+		}
+		sort.Strings(missingResources)
+		errs = append(errs, fmt.Errorf("missing expected upstream resources: %s", strings.Join(missingResources, ", ")))
 	}
 
 	if len(errs) == 0 {

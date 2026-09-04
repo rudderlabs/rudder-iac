@@ -12,7 +12,7 @@
 
 ## DEX-608 — Destination Unverified Gate Documentation
 <!-- ticket:DEX-608 -->
-- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `attentive_tag`, `http`, and `rs`, while S3 is verified/native.
+- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `http`, `rs`, and `salesforce`, while S3 and Attentive Tag are verified/native.
 
 ## DEX-661 — Destination Empty Secret Export
 <!-- ticket:DEX-661 -->

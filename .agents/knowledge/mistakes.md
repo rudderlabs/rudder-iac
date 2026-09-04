@@ -71,3 +71,8 @@
 <!-- ticket:DEX-531 -->
 - CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
 - Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.
+
+## DEX-753 — Upstream Snapshot Extra Resource Tolerance
+<!-- ticket:DEX-753 -->
+- CI live E2E failed in `TestProjectApply/rudder_specs/should_create_entities_in_catalog_from_project` when `UpstreamSnapshotTester.SnapshotTest` assumed the shared live catalog workspace contained exactly the committed create snapshots; stale upstream resources produced `resource count mismatch: got 40 resources, want 37 resources` before per-resource comparison.
+- Durable mitigation: `cli/tests/helpers/snapshot_upstream.go` should compare only remote URNs that have committed snapshot files while still failing when any expected snapshot is missing, so leftover resources from earlier runs do not break unrelated CI.
