@@ -24,9 +24,13 @@ func initConfigWithSyncerConcurrency(t *testing.T, syncer int) {
 }
 
 // Concurrent syncs went GA in DEX-731, so concurrency.syncer is now read on
-// every apply/destroy. Configs carrying a sub-1 value were previously inert —
-// WithConcurrency was never applied and the syncer used its own default of 1 —
-// so they must keep working rather than fail the command outright.
+// every apply/destroy. A sub-1 value was previously inert for anyone who had
+// not enabled the flag — WithConcurrency was never applied and the syncer used
+// its own default of 1 — so those configs must keep working rather than start
+// failing the command outright.
+//
+// The subtests stay serial on purpose: InitConfig mutates the viper singleton,
+// so t.Parallel here would race the parallel tests elsewhere in the package.
 func TestGetConfig_ClampsSyncerConcurrency(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -47,9 +51,9 @@ func TestGetConfig_ClampsSyncerConcurrency(t *testing.T) {
 	}
 }
 
-// concurrency.syncer was the only concurrency key without an env binding, which
-// left no way to tune sync parallelism per-run once RUDDERSTACK_X_CONCURRENT_SYNCS
-// went away with the flag.
+// Removing the flag took RUDDERSTACK_X_CONCURRENT_SYNCS with it, leaving no way
+// to tune sync parallelism per run; concurrency.syncer had no env binding of its
+// own. (concurrency.dataGraph is still unbound — out of scope here.)
 func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 	t.Setenv("RUDDERSTACK_CLI_CONCURRENCY_SYNCER", "7")
 	initConfigWithSyncerConcurrency(t, 3)

@@ -182,10 +182,12 @@ func GetConfig() Config {
 		config.ExperimentalFlags = ExperimentalConfig{}
 	}
 
-	// While concurrent syncs were gated, a sub-1 concurrency.syncer was inert:
-	// WithConcurrency was never applied and the syncer fell back to 1. Now that
-	// the value is always read, clamp it here so those configs keep working
-	// instead of turning into a hard failure at apply/destroy time.
+	// While concurrent syncs were gated, a sub-1 concurrency.syncer was inert
+	// for anyone who had not enabled the flag: WithConcurrency was never applied
+	// and the syncer fell back to 1. Reading the value unconditionally would
+	// fail their next apply, so clamp instead of erroring. Users who did enable
+	// the flag were already refused by WithConcurrency, and clamping is the
+	// quieter of the two — chosen so that no existing config breaks on upgrade.
 	if config.Concurrency.Syncer < 1 {
 		config.Concurrency.Syncer = 1
 	}
