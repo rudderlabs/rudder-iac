@@ -247,6 +247,11 @@
 - Amplitude declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them (DEX-730).
 - Amplitude `SecretKeys` contains only local `api_secret`, following db-config `apiSecret` secret metadata.
 
+## DEX-731 — Concurrent Syncs GA
+<!-- ticket:DEX-731 -->
+- Apply and destroy project syncers should always be constructed with `syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer)`; concurrent sync execution is no longer gated by an experimental flag.
+- `concurrency.syncer` remains the main configuration tuning knob for sync parallelism after GA promotion; do not replace it with hard-coded concurrency or reintroduce a `concurrentSyncs` gate.
+
 ## DEX-730 — Never-Declared Source Types
 <!-- ticket:DEX-730 -->
 - `amp`, `shopify`, `warehouse` and `cloud_source` are never declared in a definition's `SourceTypes`, even when db-config lists them: an event stream source's `type` is constrained to the SDK definitions, and `SourceTypeToken` reaches `warehouse`/`cloud_source` only through a source category the sole call site never sets. A definition declaring them advertises support no connection could match.

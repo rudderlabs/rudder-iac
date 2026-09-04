@@ -22,11 +22,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "concurrentSyncs",
-			flagName: "concurrentSyncs",
-			want:     "RUDDERSTACK_X_CONCURRENT_SYNCS",
-		},
-		{
 			name:     "eventRuleIncludes",
 			flagName: "eventRuleIncludes",
 			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
@@ -105,6 +100,13 @@ func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
 	t.Parallel()
 
 	removedFlag := "data" + "Graph"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_ConcurrentSyncsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "concurrent" + "Syncs"
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
