@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.25.0](https://github.com/rudderlabs/rudder-iac/compare/v0.24.0...v0.25.0) (2026-09-04)
+
+
+### Features
+
+* **api:** restore VersionInfo on the destination client (INT-7057) ([#784](https://github.com/rudderlabs/rudder-iac/issues/784)) ([3392998](https://github.com/rudderlabs/rudder-iac/commit/339299888cb67cd7bc1cecc3b8752b2631b5a697))
+* **cli:** onboard adjust destination definition ([#692](https://github.com/rudderlabs/rudder-iac/issues/692)) ([a765da5](https://github.com/rudderlabs/rudder-iac/commit/a765da5cc0d1cc9a20311e64be2b8e9666612cf6))
+* **cli:** onboard adobe_analytics destination definition ([#698](https://github.com/rudderlabs/rudder-iac/issues/698)) ([67283dd](https://github.com/rudderlabs/rudder-iac/commit/67283ddc3e6d1f8e59e6960256cb7beaf6aba2ee))
+* **cli:** onboard GA4 destination definition ([#696](https://github.com/rudderlabs/rudder-iac/issues/696)) ([f2fc1d7](https://github.com/rudderlabs/rudder-iac/commit/f2fc1d795d0aade8f8c570f577fcee3bfdc58b58))
+* **cli:** onboard iterable destination definition ([#702](https://github.com/rudderlabs/rudder-iac/issues/702)) ([88ef891](https://github.com/rudderlabs/rudder-iac/commit/88ef891bba4c186a9a92b6ee7f1e45be953da06f))
+* **cli:** onboard posthog destination definition ([#700](https://github.com/rudderlabs/rudder-iac/issues/700)) ([02a6b27](https://github.com/rudderlabs/rudder-iac/commit/02a6b275b8341fd215abc28f5b8cded2976ec98d))
+* **cli:** onboard tiktok_ads destination definition ([#707](https://github.com/rudderlabs/rudder-iac/issues/707)) ([839555e](https://github.com/rudderlabs/rudder-iac/commit/839555e8b169a678d67586a41549731d0a23539a))
+* **destination:** add connection_mode and normalise event_filtering local shape ([#794](https://github.com/rudderlabs/rudder-iac/issues/794)) ([5471e4c](https://github.com/rudderlabs/rudder-iac/commit/5471e4c72cbac999d5cb4ff1882e46c0a815f231))
+* **destination:** model connection_mode across schema-declaring destinations ([#789](https://github.com/rudderlabs/rudder-iac/issues/789)) ([308efec](https://github.com/rudderlabs/rudder-iac/commit/308efecc2cbc96b4c98c67767f0e50cd4b965c14))
+* **destination:** model connection_mode as GA4 config, pilot for the fleet ([#781](https://github.com/rudderlabs/rudder-iac/issues/781)) ([faae0b2](https://github.com/rudderlabs/rudder-iac/commit/faae0b259b460582ada8e71a0624ccbefffc5977))
+* **destination:** onboard ActiveCampaign destination ([#767](https://github.com/rudderlabs/rudder-iac/issues/767)) ([7cad6f5](https://github.com/rudderlabs/rudder-iac/commit/7cad6f5263b607153199aec869ed26f3a938267a))
+* **destination:** onboard Amplitude destination ([#785](https://github.com/rudderlabs/rudder-iac/issues/785)) ([7d9d58b](https://github.com/rudderlabs/rudder-iac/commit/7d9d58bbd58ff5ac92a2fe4adfef58530c62f337))
+* **destination:** onboard bing ads offline conversions ([#811](https://github.com/rudderlabs/rudder-iac/issues/811)) ([752ef86](https://github.com/rudderlabs/rudder-iac/commit/752ef86a7ab718f348c29839b66dee5cd4f7e7d0))
+* **destination:** onboard Braze destination ([#768](https://github.com/rudderlabs/rudder-iac/issues/768)) ([225d5b2](https://github.com/rudderlabs/rudder-iac/commit/225d5b2224c629bd526903d6ed0b53b767159f5a))
+* **destination:** onboard customerio definition ([#769](https://github.com/rudderlabs/rudder-iac/issues/769)) ([4e312cc](https://github.com/rudderlabs/rudder-iac/commit/4e312cc54e1ce132f8fa0506fcd3b29211394600))
+* **destination:** onboard facebook_pixel CLI definition ([#771](https://github.com/rudderlabs/rudder-iac/issues/771)) ([caeac63](https://github.com/rudderlabs/rudder-iac/commit/caeac63bb0ba9f21c5eafb150d3a6e768e782d5b))
+* **destination:** onboard firebase destination ([#773](https://github.com/rudderlabs/rudder-iac/issues/773)) ([fff8c21](https://github.com/rudderlabs/rudder-iac/commit/fff8c210ed987d9766382d184a41eddd77f7e6f6))
+* **destination:** onboard google adwords offline conversions ([#812](https://github.com/rudderlabs/rudder-iac/issues/812)) ([e8e7c68](https://github.com/rudderlabs/rudder-iac/commit/e8e7c68368bbf1ea5c422470816e1ee81dc4281e))
+* **destination:** onboard google analytics destination ([#775](https://github.com/rudderlabs/rudder-iac/issues/775)) ([5780a50](https://github.com/rudderlabs/rudder-iac/commit/5780a503a5d3968e8e7a7328c60926fb758d2d5c))
+* **destination:** onboard googleads CLI definition ([#697](https://github.com/rudderlabs/rudder-iac/issues/697)) ([19b16b4](https://github.com/rudderlabs/rudder-iac/commit/19b16b434760b53bda444fc7520e51df748af6d2))
+* **destination:** onboard gtm CLI definition ([#691](https://github.com/rudderlabs/rudder-iac/issues/691)) ([949b532](https://github.com/rudderlabs/rudder-iac/commit/949b532d0726df1de8e2cf069a626bff41465347))
+* **destination:** onboard hs CLI definition ([#772](https://github.com/rudderlabs/rudder-iac/issues/772)) ([c64e0a7](https://github.com/rudderlabs/rudder-iac/commit/c64e0a7efabc3c700607a4c59cfb1f5e907160b2))
+* **destination:** onboard intercom definition ([#770](https://github.com/rudderlabs/rudder-iac/issues/770)) ([dfdfe26](https://github.com/rudderlabs/rudder-iac/commit/dfdfe26abc8ed4fea227a821c5f2822290227a7f))
+* **destination:** onboard LinkedIn Ads definition ([#743](https://github.com/rudderlabs/rudder-iac/issues/743)) ([de92064](https://github.com/rudderlabs/rudder-iac/commit/de9206456424a3c47559fc988546d6a06d5cdb3d))
+* **destination:** onboard linkedin insight tag definition ([#786](https://github.com/rudderlabs/rudder-iac/issues/786)) ([ba9e146](https://github.com/rudderlabs/rudder-iac/commit/ba9e146dde22bc7c83946ea75bbec919da519902))
+* **destination:** onboard mixpanel definition ([#787](https://github.com/rudderlabs/rudder-iac/issues/787)) ([cb17746](https://github.com/rudderlabs/rudder-iac/commit/cb177460347791aa72036086830f055bdeb6bb59))
+* **destination:** onboard qualtrics definition ([#788](https://github.com/rudderlabs/rudder-iac/issues/788)) ([0dc1639](https://github.com/rudderlabs/rudder-iac/commit/0dc163982ff5c5d9be32026000ef0dd659603f0c))
+* **destination:** onboard sentry CLI definition ([#704](https://github.com/rudderlabs/rudder-iac/issues/704)) ([39209d9](https://github.com/rudderlabs/rudder-iac/commit/39209d92b83e891aeefffdb9f64abee54cfa25e2))
+* **destination:** onboard snowpipe streaming destination ([#760](https://github.com/rudderlabs/rudder-iac/issues/760)) ([87618bf](https://github.com/rudderlabs/rudder-iac/commit/87618bf3cd7deff8a573ac96e569f719a29d159b))
+* **destination:** onboard VWO destination definition ([#774](https://github.com/rudderlabs/rudder-iac/issues/774)) ([c5bb94f](https://github.com/rudderlabs/rudder-iac/commit/c5bb94f293f2906592570a78912103acacb9b1e6))
+* **destination:** onboard webhook definition ([#751](https://github.com/rudderlabs/rudder-iac/issues/751)) ([3b7a825](https://github.com/rudderlabs/rudder-iac/commit/3b7a82502f10a799138b1236522c58002b83f59b))
+* **destination:** populate schema-declared config defaults for http specs ([#779](https://github.com/rudderlabs/rudder-iac/issues/779)) ([7244d04](https://github.com/rudderlabs/rudder-iac/commit/7244d0451944f75938b80282c91af44fd652e91d))
+* **destination:** promote bqstream to verified registry ([#817](https://github.com/rudderlabs/rudder-iac/issues/817)) ([9aec2f7](https://github.com/rudderlabs/rudder-iac/commit/9aec2f7e76b4bb0a9ff3580f339e122998cc9bf1))
+* **destination:** promote http to verified registry ([#818](https://github.com/rudderlabs/rudder-iac/issues/818)) ([7a1fed1](https://github.com/rudderlabs/rudder-iac/commit/7a1fed1ce7c5276150de998ccf4a5b8e223ef2a3))
+* **typer:** promote `typer generate --local` to GA ([#821](https://github.com/rudderlabs/rudder-iac/issues/821)) ([5b8db05](https://github.com/rudderlabs/rudder-iac/commit/5b8db0529ea89b2f858bc36fe3d4450a7c3cebc5))
+* **varsubst:** promote variable substitution to GA ([#807](https://github.com/rudderlabs/rudder-iac/issues/807)) ([24893e9](https://github.com/rudderlabs/rudder-iac/commit/24893e9e930b47e89d505c08659a08c4a102e2da))
+
+
+### Bug Fixes
+
+* **connection:** require destination settings for the connecting source type ([#793](https://github.com/rudderlabs/rudder-iac/issues/793)) ([ec0d5d9](https://github.com/rudderlabs/rudder-iac/commit/ec0d5d93477871c5e85370f9d144a9423785cc80))
+* **destination:** correct definition metadata tags ([#799](https://github.com/rudderlabs/rudder-iac/issues/799)) ([89c57b1](https://github.com/rudderlabs/rudder-iac/commit/89c57b128e000f9a06e2497d4d47b8934d12dab3))
+* **destination:** declare schema defaults and model erased config keys fleet-wide ([#790](https://github.com/rudderlabs/rudder-iac/issues/790)) ([925bb7b](https://github.com/rudderlabs/rudder-iac/commit/925bb7b764c0e1d8921cb65a8b5c02c7158059b6))
+* **destination:** match schema semantics in facebook_pixel and intercom conditionals ([#791](https://github.com/rudderlabs/rudder-iac/issues/791)) ([1e1d921](https://github.com/rudderlabs/rudder-iac/commit/1e1d92183ddfc1ff189040df4e9f0da44df909c7))
+* **destination:** re-onboard hubspot schema ([#780](https://github.com/rudderlabs/rudder-iac/issues/780)) ([7934640](https://github.com/rudderlabs/rudder-iac/commit/79346409236b1fe77332034b1c4a118600d82363))
+* **event-stream:** accept android_kotlin and ios_swift source types ([#820](https://github.com/rudderlabs/rudder-iac/issues/820)) ([14f43e1](https://github.com/rudderlabs/rudder-iac/commit/14f43e1a28dd6656298f65e5770530e640842fd3))
+
+
+### Miscellaneous
+
+* **config:** remove dead transformations experimental flag ([#797](https://github.com/rudderlabs/rudder-iac/issues/797)) ([7990027](https://github.com/rudderlabs/rudder-iac/commit/7990027b5509eec3c608f10e55e90a2bcd544759))
+* **connection:** cover both settings blocks in the connection e2e fixtures ([#806](https://github.com/rudderlabs/rudder-iac/issues/806)) ([a1e4d63](https://github.com/rudderlabs/rudder-iac/commit/a1e4d635c6a07014fe1d8b86a03d8143dda430e0))
+* correct the migrationDocsUrl convention and the map key count message ([#792](https://github.com/rudderlabs/rudder-iac/issues/792)) ([29d6a43](https://github.com/rudderlabs/rudder-iac/commit/29d6a435498bf617591b46a50b67058656f8d87c))
+* **destination:** derive connection required keys per source-type, mode ([#796](https://github.com/rudderlabs/rudder-iac/issues/796)) ([28b3dc4](https://github.com/rudderlabs/rudder-iac/commit/28b3dc473fa6aba8975e9844c6aad9387c2c8a9e))
+* **e2e:** drop rudderDeleteAccountId from legacy GA fixtures ([#805](https://github.com/rudderlabs/rudder-iac/issues/805)) ([ec781ad](https://github.com/rudderlabs/rudder-iac/commit/ec781ad0c752e7c8563e721f501b2f4e8bbe4558))
+* **secret:** walk nested secret paths and keep slice diffs secret-only ([#795](https://github.com/rudderlabs/rudder-iac/issues/795)) ([17d02af](https://github.com/rudderlabs/rudder-iac/commit/17d02af3b19da10046bc7831893727b5ce2a8144))
+* **skill:** derive destination connect-time required keys from schema.json ([#782](https://github.com/rudderlabs/rudder-iac/issues/782)) ([944167c](https://github.com/rudderlabs/rudder-iac/commit/944167c41af7ad8b9e0ae181c9beb6a77316fa33))
+* update repository code owners ([#783](https://github.com/rudderlabs/rudder-iac/issues/783)) ([08cbdf9](https://github.com/rudderlabs/rudder-iac/commit/08cbdf9aba6ac1de1c1449665f11af185b1ec8c8))
+
 ## [0.24.0](https://github.com/rudderlabs/rudder-iac/compare/v0.23.0...v0.24.0) (2026-08-21)
 
 
