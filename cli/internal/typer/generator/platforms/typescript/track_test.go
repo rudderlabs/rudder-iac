@@ -40,7 +40,7 @@ func TestBuildTrackMethod_NonEmptySchema(t *testing.T) {
 		PropsTypeName: "UserSignedUp",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
-			{Name: "props", Type: "UserSignedUp", Comment: "The properties to include with this event"},
+			{Name: "props", Type: "TrackUserSignedUpProperties", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"User Signed Up"`},
@@ -115,7 +115,7 @@ func TestBuildTrackMethod_EventNameWithSpecialChars(t *testing.T) {
 		PropsTypeName: "ProductPremiumClicked",
 		SDKMethodName: "track",
 		MethodArguments: []TSMethodArgument{
-			{Name: "props", Type: "ProductPremiumClicked", Comment: "The properties to include with this event"},
+			{Name: "props", Type: "TrackProductPremiumClickedProperties", Comment: "The properties to include with this event"},
 		},
 		SDKArguments: []TSSDKArgument{
 			{Value: `"Product \"Premium\" Clicked"`},
@@ -162,14 +162,14 @@ func TestProcessEventRules_EmitsVariants(t *testing.T) {
 	assert.Equal(t, "trackPlainEvent", ctx.AnalyticsMethods[1].Name)
 
 	assert.Len(t, ctx.Interfaces, 1, "plain event still gets an interface")
-	assert.Equal(t, "PlainEvent", ctx.Interfaces[0].Name)
+	assert.Equal(t, "TrackPlainEventProperties", ctx.Interfaces[0].Name)
 
 	require.Len(t, ctx.VariantTypes, 1)
 	group := ctx.VariantTypes[0]
-	assert.Equal(t, "HasVariants", group.UnionAlias.Alias)
+	assert.Equal(t, "TrackHasVariantsProperties", group.UnionAlias.Alias)
 	require.Len(t, group.CaseInterfaces, 2, "one named case + default")
-	assert.Equal(t, "HasVariantsCaseAlpha", group.CaseInterfaces[0].Name)
-	assert.Equal(t, "HasVariantsDefault", group.CaseInterfaces[1].Name)
+	assert.Equal(t, "TrackHasVariantsPropertiesCaseAlpha", group.CaseInterfaces[0].Name)
+	assert.Equal(t, "TrackHasVariantsPropertiesDefault", group.CaseInterfaces[1].Name)
 }
 
 func TestProcessEventRules_SkipsUnsupportedEventTypes(t *testing.T) {
@@ -377,13 +377,13 @@ func TestBuildEventInterface_HoistsNestedSchemas(t *testing.T) {
 	require.Len(t, ctx.NestedInterfaces, 2, "two nested levels → two hoisted interfaces")
 
 	// Deepest-first: location (level 2) appears before context (level 1).
-	assert.Equal(t, "OrderPlacedContextLocation", ctx.NestedInterfaces[0].Name)
-	assert.Equal(t, "OrderPlacedContext", ctx.NestedInterfaces[1].Name)
+	assert.Equal(t, "TrackOrderPlacedPropertiesContextLocation", ctx.NestedInterfaces[0].Name)
+	assert.Equal(t, "TrackOrderPlacedPropertiesContext", ctx.NestedInterfaces[1].Name)
 
 	// Parent interface references the nested name, not the open record type.
 	parent := ctx.Interfaces[0]
 	require.Len(t, parent.Properties, 1)
-	assert.Equal(t, "OrderPlacedContext", parent.Properties[0].Type)
+	assert.Equal(t, "TrackOrderPlacedPropertiesContext", parent.Properties[0].Type)
 
 	// Level-1 interface references the level-2 interface by name.
 	level1 := ctx.NestedInterfaces[1]
@@ -394,7 +394,7 @@ func TestBuildEventInterface_HoistsNestedSchemas(t *testing.T) {
 			break
 		}
 	}
-	assert.Equal(t, "OrderPlacedContextLocation", locationProp.Type)
+	assert.Equal(t, "TrackOrderPlacedPropertiesContextLocation", locationProp.Type)
 }
 
 func TestEmptyObjectType_RespectsAdditionalProperties(t *testing.T) {
