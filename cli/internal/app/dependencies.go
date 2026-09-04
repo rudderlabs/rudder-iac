@@ -302,8 +302,14 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
 
+	if err := registry.Register(bqstream.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
+	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	if err := registry.Register(httpdest.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering http destination definition: %w", err)
 	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
@@ -327,9 +333,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(bq.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bq destination definition: %w", err)
-		}
-		if err := registry.Register(bqstream.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
 		}
 		if err := registry.Register(braze.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering braze destination definition: %w", err)
@@ -378,9 +381,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(hs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
-		if err := registry.Register(httpdest.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}
 		if err := registry.Register(intercom.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering intercom destination definition: %w", err)

@@ -119,6 +119,13 @@ func TestIsValidExperimentalFlag_ConnectionSupportRemoved(t *testing.T) {
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
+func TestIsValidExperimentalFlag_LocalTyperRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "local" + "Typer"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestIsValidExperimentalFlag_TransformationsRemoved(t *testing.T) {
 	t.Parallel()
 
