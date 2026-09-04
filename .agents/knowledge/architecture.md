@@ -294,3 +294,9 @@
 <!-- ticket:DEX-753 -->
 - `attentive_tag` is a verified/native destination after QA verification: register `attentivetag.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
 - Keep Attentive Tag registered exactly once in `cli/internal/app/dependencies.go`; enabling both destination flags should not attempt duplicate registration.
+
+## DEX-754 — BigQuery Verified Destination Promotion
+<!-- ticket:DEX-754 -->
+- BigQuery (`bq.NewDefinition`) is a verified destination after QA verification: `cli/internal/app/dependencies.go` should register it whenever `ExperimentalFlags.DestinationSupport` is enabled, alongside verified destinations such as S3.
+- BigQuery promotion is registry-only; do not change the BigQuery destination definition, config surface, source types, fixtures, or snapshots when the task is only to move `bq` from unverified to verified.
+- Destinations not named by this promotion remain under the unverified-destination gate unless a separate verified-promotion task explicitly moves them.

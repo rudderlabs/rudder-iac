@@ -81,3 +81,8 @@
 <!-- ticket:DEX-812 -->
 - CI live destination E2E showed Iterable create responses can include backend default `config.eventFilteringOption = "disable"` even when local `cli/tests/testdata/destinations/create/iterable.yaml` omits an `event_filtering` block.
 - Durable mitigation: include `"eventFilteringOption": "disable"` in the Iterable create upstream snapshot while keeping local YAML free of any direct event-filtering option field.
+
+## DEX-754 — Concurrent Same-File Edit Corruption
+<!-- ticket:DEX-754 -->
+- During BigQuery verified-destination promotion, running two same-file edits concurrently against `cli/internal/app/dependencies.go` corrupted or partially overwrote the file tail and dropped the intended `bq` registry insertion.
+- Durable mitigation: serialize edits to the same file, even when replacements look independent; use parallel edits only for different destination files.
