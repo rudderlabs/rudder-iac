@@ -15,7 +15,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connections"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -30,6 +32,10 @@ type mockRETLStore struct {
 	deleteRetlSourceFunc func(ctx context.Context, id string) error
 	getRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
 	listRetlSourcesFunc  func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
+	// Connection operations. The embedded RETLStore interface is nil, so any
+	// provider method that fans out across handlers panics unless the
+	// connection handler's calls are stubbed here too.
+	listConnectionsFunc func(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error)
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
@@ -70,6 +76,13 @@ func (m *mockRETLStore) ListRetlSources(ctx context.Context, opts ...retlClient.
 		return m.listRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{}, nil
+}
+
+func (m *mockRETLStore) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if m.listConnectionsFunc != nil {
+		return m.listConnectionsFunc(ctx, req)
+	}
+	return &retlClient.RETLConnectionsPage{}, nil
 }
 
 // Preview methods
@@ -162,10 +175,19 @@ func TestProvider(t *testing.T) {
 		t.Parallel()
 
 		p := retl.New(newDefaultMockClient())
-		kind := "retl-source-sql-model"
+
 		var want []vrules.MatchPattern
-		want = append(want, prules.LegacyVersionPatterns(kind)...)
-		want = append(want, prules.V1VersionPatterns(kind)...)
+		// retl-source-sql-model shipped on rudder/0.1 and has existing users, so
+		// it matches legacy and v1 patterns both.
+		want = append(want, prules.LegacyVersionPatterns("retl-source-sql-model")...)
+		want = append(want, prules.V1VersionPatterns("retl-source-sql-model")...)
+		// retl-source-table was introduced after legacy versions were retired, so
+		// it must match v1 only. Registering legacy patterns for it would let a
+		// project pin rudder/0.1 on a new kind, which is a breaking change to
+		// withdraw once anyone relies on it.
+		want = append(want, prules.V1VersionPatterns(table.ResourceKind)...)
+		want = append(want, prules.V1VersionPatterns(connections.ResourceKind)...)
+
 		assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
 	})
 
@@ -683,6 +705,13 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 			if hasExternalID == nil || !*hasExternalID {
 				return nil, fmt.Errorf("expected hasExternalID=true filter")
 			}
+			// Honour the sourceType filter the way the API does. Every handler
+			// in the provider calls this, so a mock that ignores the filter
+			// hands one type's sources to another type's handler — and
+			// DecodeConfig is lenient enough not to reject them.
+			if resolved.SourceType != string(retlClient.ModelSourceType) {
+				return &retlClient.RETLSources{}, nil
+			}
 			return &retlClient.RETLSources{
 				Data: []retlClient.RETLSource{
 					{
@@ -733,7 +762,10 @@ func TestProviderLoadResourcesFromRemote(t *testing.T) {
 		collection, err := provider.LoadResourcesFromRemote(ctx)
 		require.Error(t, err)
 		assert.Nil(t, collection)
-		assert.Contains(t, err.Error(), "loading retl-source-sql-model")
+		// The provider iterates handlers from a map, so which source handler
+		// fails first is not deterministic. Assert that the error is wrapped
+		// with *a* handler's resource type rather than a specific one.
+		assert.Regexp(t, `loading retl-source-(sql-model|table)`, err.Error())
 		assert.Contains(t, err.Error(), "listing RETL sources")
 	})
 }
@@ -1152,6 +1184,9 @@ func TestProviderResourceMatchers(t *testing.T) {
 
 	matchers := p.ResourceMatchers()
 
-	require.Len(t, matchers, 1)
+	// Order matters: source matchers must precede any connection matcher, so a
+	// connection's source reference resolves against matches already recorded.
+	require.Len(t, matchers, 2)
 	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
+	assert.Equal(t, table.ResourceType, matchers[1].ResourceType)
 }
