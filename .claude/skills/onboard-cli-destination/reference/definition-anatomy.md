@@ -171,13 +171,12 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 ```go
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
     registry := definitions.NewRegistry()
-    if !cfg.ExperimentalFlags.DestinationSupport {
-        return registry, nil
-    }
     if err := registry.Register(s3.NewDefinition()); err != nil {
         return nil, fmt.Errorf("registering s3 destination definition: %w", err)
     }
-    // Append the new definition here, same pattern.
+    if cfg.ExperimentalFlags.UnverifiedDestinations {
+        // Append the new definition here, same pattern.
+    }
     return registry, nil
 }
 ```

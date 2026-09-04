@@ -196,17 +196,17 @@ if cfg.ExperimentalFlags.UnverifiedDestinations {
 }
 ```
 
-The verified section (registered on `DestinationSupport` alone) is reserved for
-definitions already proven against a live stack — S3 today. Promotion into it is
-a separate, deliberate change after that verification; it is never part of the
-onboarding PR, no matter how simple the destination looks.
+The unconditional verified section is reserved for definitions already proven
+against a live stack - S3 today. Promotion into it is a separate, deliberate
+change after that verification; it is never part of the onboarding PR, no matter
+how simple the destination looks.
 
 Then update the flag-matrix expectation in
 `cli/internal/app/dependencies_test.go`: add the new type to the
-`wantTypes` list of the both-flags-enabled case only (`SupportedTypes()` is
-sorted, so insert alphabetically). The verified-only case must stay unchanged —
-if adding the type there makes a test pass, the registration landed in the wrong
-block.
+`wantTypes` list of the unverified-destinations-enabled case only (`SupportedTypes()` is
+sorted, so insert alphabetically). The unverified-disabled case must keep only
+verified destinations; if adding the type there makes a test
+pass, the registration landed in the wrong block.
 
 Registration itself validates the definition (source types mapped, connection
 modes complete for every source type, consent field type). A broken definition
@@ -306,8 +306,8 @@ Final response must include:
   terraform mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
-- Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`
-  + `flags.unverifiedDestinations: true` in the CLI config — newly onboarded
+- Reminder: usage requires `experimental: true` +
+  `flags.unverifiedDestinations: true` in the CLI config; newly onboarded
   destinations are always behind the unverified gate (Step 5)
 
 ## Guardrails
