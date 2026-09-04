@@ -64,20 +64,18 @@ type Provider struct {
 // Option configures the provider at construction.
 type Option func(*Provider)
 
-// WithConnectionSupport registers the event-stream-connections kind. Without
-// it the kind is simply not a supported spec, so callers gate this behind the
-// connectionSupport experimental flag.
-func WithConnectionSupport() Option {
-	return func(p *Provider) {
-		p.kindToType[connectionHandler.EventStreamConnectionResourceKind] = connectionHandler.EventStreamConnectionResourceType
-		p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(p.client, importDir)
-	}
-}
-
 // WithDestinationRegistry supplies the destination definitions that back the
-// connection semantic rules' source-type compatibility checks.
+// connection semantic rules' source-type compatibility checks. A nil registry
+// is ignored so this option cannot clear the empty default New installs:
+// connection rules are registered unconditionally now, and registry.Get
+// indexes a map on its receiver, so a nil registry constructs fine and only
+// panics later, mid-validate. This narrows the option, not the whole type —
+// a zero Provider built inside the package still has the hazard.
 func WithDestinationRegistry(registry *definitions.Registry) Option {
 	return func(p *Provider) {
+		if registry == nil {
+			return
+		}
 		p.destinationRegistry = registry
 	}
 }
@@ -86,11 +84,14 @@ func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
 		client: client,
 		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
+			"event-stream-source":                               sourceHandler.ResourceType,
+			connectionHandler.EventStreamConnectionResourceKind: connectionHandler.EventStreamConnectionResourceType,
 		},
-		handlers: make(map[string]handler),
+		handlers:            make(map[string]handler),
+		destinationRegistry: definitions.NewRegistry(),
 	}
 	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(client, importDir)
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -147,14 +148,9 @@ func (p *Provider) SupportedTypes() []string {
 // ResourceMatchers overrides the EmptyProvider default to opt into import
 // --merge smart linking for event stream sources and connections. The
 // connection matcher is listed after the source matcher so its endpoint
-// lookups can rely on source matches being recorded already; it rides the
-// same gate as the kind itself.
+// lookups can rely on source matches being recorded already.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	matchers := []importmatcher.Matcher{sourceHandler.Matcher()}
-	if _, ok := p.handlers[connectionHandler.EventStreamConnectionResourceType]; ok {
-		matchers = append(matchers, connectionHandler.Matcher())
-	}
-	return matchers
+	return []importmatcher.Matcher{sourceHandler.Matcher(), connectionHandler.Matcher()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -331,30 +327,16 @@ func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	r := []rules.Rule{
+	return []rules.Rule{
 		sourceRules.NewSourceSpecSyntaxValidRule(),
+		connectionRules.NewConnectionSpecSyntaxValidRule(),
 	}
-	// Connection rules ride the same gate as the kind itself: when
-	// connectionSupport is off the kind is not a supported match pattern and
-	// registering a rule scoped to it would fail registry validation.
-	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
-		r = append(r, connectionRules.NewConnectionSpecSyntaxValidRule())
-	}
-	return r
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	r := []rules.Rule{
+	return []rules.Rule{
 		sourceRules.NewSourceSemanticValidRule(),
+		connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+		connectionRules.NewConnectionEnabledEndpointsRule(),
 	}
-	// Connection rules ride the same gate as the kind itself: when
-	// connectionSupport is off the kind is not a supported match pattern and
-	// registering a rule scoped to it would fail registry validation.
-	if _, ok := p.kindToType[connectionHandler.EventStreamConnectionResourceKind]; ok {
-		r = append(r,
-			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
-			connectionRules.NewConnectionEnabledEndpointsRule(),
-		)
-	}
-	return r
 }

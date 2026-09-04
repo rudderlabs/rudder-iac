@@ -49,8 +49,6 @@ jobs:
           # Account provider is gated too — enable it so the account docs fragments
           # (duplicate-urn / metadata-syntax-valid coverage) match the live rule set.
           RUDDERSTACK_X_ACCOUNT_SUPPORT: ${{ vars.RUDDERSTACK_X_ACCOUNT_SUPPORT || 'true' }}
-          # Same for the event-stream-connections kind.
-          RUDDERSTACK_X_CONNECTION_SUPPORT: ${{ vars.RUDDERSTACK_X_CONNECTION_SUPPORT || 'true' }}
 
       - name: upload rule catalog
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

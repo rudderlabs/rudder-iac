@@ -259,6 +259,12 @@
 - `newDestinationRegistry` should always register verified/native S3; `ExperimentalFlags.UnverifiedDestinations` remains the gate for unverified destination definitions.
 - This supersedes earlier destination-registry guidance that required two destination gates for unverified definitions: only `UnverifiedDestinations` remains as the experimental gate after destination support GA.
 
+## DEX-733 — Event Stream Connections GA Registry Safety
+<!-- ticket:DEX-733 -->
+- Event-stream connections are first-class provider capability after DEX-733: connection kind/handler/rules should be registered by default rather than through an event-stream provider option.
+- `eventstream.New` should create a default empty destination definitions registry so unconditional connection semantic rules can call registry lookups safely even when tests or direct callers do not pass `WithDestinationRegistry`.
+- App dependency wiring still passes the real destination registry when destination support is configured; the provider-level empty registry is only the safe default that preserves no-definition behavior without a nil panic.
+
 ## DEX-730 — Never-Declared Source Types
 <!-- ticket:DEX-730 -->
 - `amp`, `shopify`, `warehouse` and `cloud_source` are never declared in a definition's `SourceTypes`, even when db-config lists them: an event stream source's `type` is constrained to the SDK definitions, and `SourceTypeToken` reaches `warehouse`/`cloud_source` only through a source category the sole call site never sets. A definition declaring them advertises support no connection could match.
