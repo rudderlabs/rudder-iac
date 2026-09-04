@@ -94,3 +94,25 @@ typer-typescript-validate: ## Validate generated TypeScript code against the Rud
 	cp cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts \
 	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts
 	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && docker compose run --rm -T validator
+
+# Directory of a rudder-data-gov checkout to verify `typer generate --local` against.
+# It intentionally holds data-graphs/ and transformations/ next to its catalog —
+# kinds the local typer does not register — so this exercises the skip-unknown-kinds path.
+DATAGOV_DIR ?=
+DATAGOV_TRACKING_PLAN ?= webapp
+TS_VALIDATOR_DIR = cli/internal/typer/generator/platforms/typescript/testdata/validator
+
+.PHONY: typer-verify-datagov
+typer-verify-datagov: build ## Generate a typed TS client from a rudder-data-gov checkout via --local and typecheck it against the JS SDK (set DATAGOV_DIR)
+	@test -n "$(DATAGOV_DIR)" || { echo "DATAGOV_DIR is required, e.g. make typer-verify-datagov DATAGOV_DIR=../rudder-data-gov"; exit 1; }
+	mkdir -p $(TS_VALIDATOR_DIR)/src/RudderTyper
+	RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_TYPER=true \
+	  bin/rudder-cli typer generate --local \
+	    --location $(DATAGOV_DIR) \
+	    --tracking-plan-id $(DATAGOV_TRACKING_PLAN) \
+	    --platform typescript \
+	    -o $(TS_VALIDATOR_DIR)/src/RudderTyper
+	# typecheck the generated file only (tsconfig.gen-only) — the reference-plan
+	# vitest suite is written against a different plan and would not compile here.
+	cd $(TS_VALIDATOR_DIR) && docker compose run --rm -T validator \
+	  sh -c "npm ci && npx tsc -p tsconfig.gen-only.json"
