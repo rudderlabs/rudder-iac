@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/samber/lo"
 
@@ -21,6 +23,11 @@ import (
 )
 
 var testLogger = logger.New("testorchestrator")
+
+const (
+	batchTestMaxAttempts = 3
+	batchTestRetryDelay  = 200 * time.Millisecond
+)
 
 // remoteStateLoader abstracts provider methods needed by the runner
 type remoteStateLoader interface {
@@ -311,7 +318,7 @@ func (r *Runner) runTestUnitTask(ctx context.Context, results *tasker.Results[*t
 		testReq := buildTestRequest(unitTask.transformationVersion, unitTask.testDefs, unitTask.libraryVersionIDs)
 
 		testLogger.Debug("Executing tests via API", "transformation", unitTask.ID)
-		resp, err := r.store.BatchTest(ctx, testReq)
+		resp, err := runBatchTestWithRetry(ctx, r.store, testReq)
 		if err != nil {
 			return fmt.Errorf("running tests for %s: %w", unitTask.ID, err)
 		}
@@ -345,7 +352,7 @@ func (r *Runner) testStandaloneLibraries(ctx context.Context, libs []*model.Libr
 
 	testLogger.Info("Testing standalone libraries", "count", len(libInputs))
 
-	resp, err := r.store.BatchTest(ctx, &transformations.BatchTestRequest{
+	resp, err := runBatchTestWithRetry(ctx, r.store, &transformations.BatchTestRequest{
 		Libraries: libInputs,
 	})
 	if err != nil {
@@ -361,4 +368,77 @@ func (r *Runner) testStandaloneLibraries(ctx context.Context, libs []*model.Libr
 	}
 
 	return resp.ValidationOutput.Libraries, trResults, nil
+}
+
+func runBatchTestWithRetry(
+	ctx context.Context,
+	store transformations.TransformationStore,
+	req *transformations.BatchTestRequest,
+) (*transformations.BatchTestResponse, error) {
+	var (
+		resp *transformations.BatchTestResponse
+		err  error
+	)
+
+	for attempt := 0; attempt < batchTestMaxAttempts; attempt++ {
+		resp, err = store.BatchTest(ctx, req)
+		if attempt == batchTestMaxAttempts-1 || !isRetryableBatchTestFailure(resp, err) {
+			return resp, err
+		}
+
+		testLogger.Warn("Retrying transformation batch test after transient backend failure",
+			"attempt", attempt+1,
+			"maxAttempts", batchTestMaxAttempts,
+			"error", err,
+		)
+
+		timer := time.NewTimer(time.Duration(attempt+1) * batchTestRetryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return resp, ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	return resp, err
+}
+
+func isRetryableBatchTestFailure(resp *transformations.BatchTestResponse, err error) bool {
+	if err != nil {
+		return isInternalServerError(err.Error())
+	}
+	if resp == nil {
+		return false
+	}
+	if isInternalServerError(resp.Message) {
+		return true
+	}
+
+	for _, lib := range resp.ValidationOutput.Libraries {
+		if !lib.Pass && isInternalServerError(lib.Message) {
+			return true
+		}
+	}
+
+	for _, tr := range resp.ValidationOutput.Transformations {
+		if isInternalServerError(tr.Message) {
+			return true
+		}
+		for _, result := range tr.TestSuiteResult.Results {
+			for _, testErr := range result.Errors {
+				if isInternalServerError(testErr.Message) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func isInternalServerError(message string) bool {
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "internal server error") ||
+		strings.Contains(lower, "http status code: 500")
 }
