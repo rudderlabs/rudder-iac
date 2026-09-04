@@ -124,15 +124,14 @@ func getOrRegisterEventInterfaceName(rule *plan.EventRule, nr *core.NameRegistry
 	switch rule.Event.EventType {
 	case plan.EventTypeIdentify:
 		// Identify is a singleton — interface is always `IdentifyTraits`. The
-		// rule's section (traits vs context.traits) doesn't change the
-		// generated interface name; the routing difference is handled in
-		// the dispatcher body (AddDataToContext).
+		// rule's section (traits vs context.traits) changes neither the
+		// interface name nor the emitted call.
 		name := FormatTypeName("Identify", "Traits")
 		return nr.RegisterName(key, globalTypeScope, name)
 	case plan.EventTypeGroup:
 		// Group mirrors identify: singleton in analytics-js, one `group()`
 		// method, one `GroupTraits` interface. The section (traits vs
-		// context.traits) affects routing, not the interface name.
+		// context.traits) changes neither.
 		name := FormatTypeName("Group", "Traits")
 		return nr.RegisterName(key, globalTypeScope, name)
 	case plan.EventTypeTrack:
@@ -530,7 +529,6 @@ func emitCustomType(ct *plan.CustomType, ctx *TSContext, nr *core.NameRegistry) 
 	}
 }
 
-
 func emitCustomObjectType(ct *plan.CustomType, typeName string, ctx *TSContext, nr *core.NameRegistry) error {
 	if isEmptySchema(ct.Schema) {
 		// `additionalProperties: true` → permissive `Record<string, unknown>`;
@@ -886,12 +884,6 @@ func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 
 	ctx.UsesApiCallback = true
 
-	// identity_section describes which part of the payload the plan validates,
-	// not how the data reaches the SDK. Traits always go through the SDK's
-	// traits parameter: that is what makes the SDK remember them for later
-	// events (identify) and what puts them in the field consumers read
-	// (group). Routing them through options.context instead loses both — see
-	// the wire-contract suite and DAW-3732.
 	traitsType := ""
 	if !isEmptySchema(&rule.Schema) {
 		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
@@ -903,15 +895,15 @@ func buildIdentifyMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegi
 	}
 
 	return buildIdentityCallMethod(identityCallSpec{
-		MethodName:       methodName,
-		Comment:          rule.Event.Description,
-		EventName:        rule.Event.Name,
-		SDKMethodName:    "identify",
-		IDParamName:      "userId",
-		IDArgName:        "userIdOrTraits",
-		TraitsType:       traitsType,
-		SDKTraitsType:    sdkIdentifyTraitsAlias,
-		AllowAnonymous:   true,
+		MethodName:     methodName,
+		Comment:        rule.Event.Description,
+		EventName:      rule.Event.Name,
+		SDKMethodName:  "identify",
+		IDParamName:    "userId",
+		IDArgName:      "userIdOrTraits",
+		TraitsType:     traitsType,
+		SDKTraitsType:  sdkIdentifyTraitsAlias,
+		AllowAnonymous: true,
 	}), nil
 }
 
@@ -985,12 +977,6 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 
 	ctx.UsesApiCallback = true
 
-	// identity_section describes which part of the payload the plan validates,
-	// not how the data reaches the SDK. Traits always go through the SDK's
-	// traits parameter: that is what makes the SDK remember them for later
-	// events (identify) and what puts them in the field consumers read
-	// (group). Routing them through options.context instead loses both — see
-	// the wire-contract suite and DAW-3732.
 	traitsType := ""
 	if !isEmptySchema(&rule.Schema) {
 		interfaceName, err := getOrRegisterEventInterfaceName(rule, nr)
@@ -1002,15 +988,15 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 	}
 
 	return buildIdentityCallMethod(identityCallSpec{
-		MethodName:       methodName,
-		Comment:          rule.Event.Description,
-		EventName:        rule.Event.Name,
-		SDKMethodName:    "group",
-		IDParamName:      "groupId",
-		IDArgName:        "groupIdOrTraits",
-		TraitsType:       traitsType,
-		SDKTraitsType:    sdkIdentifyTraitsAlias,
-		AllowAnonymous:   true,
+		MethodName:     methodName,
+		Comment:        rule.Event.Description,
+		EventName:      rule.Event.Name,
+		SDKMethodName:  "group",
+		IDParamName:    "groupId",
+		IDArgName:      "groupIdOrTraits",
+		TraitsType:     traitsType,
+		SDKTraitsType:  sdkIdentifyTraitsAlias,
+		AllowAnonymous: true,
 	}), nil
 }
 
@@ -1018,15 +1004,15 @@ func buildGroupMethod(rule *plan.EventRule, ctx *TSContext, nr *core.NameRegistr
 // identify and group. The two methods have identical shape: an optional
 // string identifier, optional typed traits, options, and callback.
 type identityCallSpec struct {
-	MethodName       string
-	Comment          string
-	EventName        string
-	SDKMethodName    string // "identify" or "group"
-	IDParamName      string // "userId" or "groupId" — name shown in the typed overloads
-	IDArgName        string // "userIdOrTraits" — name of the union-typed impl param
-	TraitsType       string // generated interface name; empty if the rule has no traits
-	SDKTraitsType    string // SDK type alias to cast to (sdkIdentifyTraitsAlias)
-	AllowAnonymous bool // emit the second (no-ID) overload
+	MethodName     string
+	Comment        string
+	EventName      string
+	SDKMethodName  string // "identify" or "group"
+	IDParamName    string // "userId" or "groupId" — name shown in the typed overloads
+	IDArgName      string // "userIdOrTraits" — name of the union-typed impl param
+	TraitsType     string // generated interface name; empty if the rule has no traits
+	SDKTraitsType  string // SDK type alias to cast to (sdkIdentifyTraitsAlias)
+	AllowAnonymous bool   // emit the second (no-ID) overload
 }
 
 // buildIdentityCallMethod constructs a TSAnalyticsMethod for identify/group.
@@ -1110,7 +1096,13 @@ func buildIdentityCallMethodNoTraits(spec identityCallSpec) *TSAnalyticsMethod {
 		DispatcherBranches: []TSDispatcherBranch{{
 			SDKArguments: []TSSDKArgument{
 				{Value: spec.IDParamName},
-				{Value: "undefined"},
+				// An empty-schema rule exposes no traits parameter, so the caller
+				// cannot supply one — but the slot cannot be dropped either, since
+				// the SDK has no (id, options, callback) overload and would read
+				// the options object as traits. `undefined` here would reset traits
+				// the caller never set and cannot see, so pass an empty object: the
+				// SDK merges it, which is a no-op.
+				{Value: "{}"},
 				{Value: "this.withRudderTyperContext(options)"},
 				{Value: "callback"},
 			},
@@ -1122,6 +1114,15 @@ func buildIdentityCallMethodNoTraits(spec identityCallSpec) *TSAnalyticsMethod {
 // of identify/group. The body branches on `typeof <IDArgName> === "string"`
 // to forward to either the with-ID overload or the anonymous overload at the
 // SDK level.
+// buildIdentityCallBranches emits the dispatcher branches for identify/group.
+//
+// Traits always go through the SDK's traits parameter, whatever the rule's
+// identity_section says. identity_section describes which part of the payload
+// the plan validates, not how the data reaches the SDK, and that parameter is
+// what makes the SDK remember traits for later events (identify) and what puts
+// them in the field consumers read (group). Routing them through
+// options.context instead loses both — see the wire-contract suite and
+// DAW-3732.
 func buildIdentityCallBranches(spec identityCallSpec) []TSDispatcherBranch {
 	// `?? {}` guards a call that omits traits, e.g. identify("user-1"). The JS
 	// SDK resets stored traits when the argument is undefined or null, but

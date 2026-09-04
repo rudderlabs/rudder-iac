@@ -82,6 +82,8 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 	  > cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts
 	go run ./cli/internal/typer/generator/platforms/typescript/testutils/identity_sections \
 	  > cli/internal/typer/generator/platforms/typescript/testdata/IdentitySections.ts
+	go run ./cli/internal/typer/generator/platforms/typescript/testutils/empty_identity \
+	  > cli/internal/typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
 
 .PHONY: typer-swift-validate
 typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
@@ -97,4 +99,6 @@ typer-typescript-validate: ## Validate generated TypeScript code against the Rud
 	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts
 	cp cli/internal/typer/generator/platforms/typescript/testdata/IdentitySections.ts \
 	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/IdentitySections.ts
+	cp cli/internal/typer/generator/platforms/typescript/testdata/EmptyIdentity.ts \
+	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/EmptyIdentity.ts
 	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && docker compose run --rm -T validator

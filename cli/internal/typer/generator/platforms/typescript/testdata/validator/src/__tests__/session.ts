@@ -20,7 +20,7 @@ export async function freshAnalytics(): Promise<RudderAnalytics> {
     uaChTrackLevel: "none",
   });
   await new Promise<void>((resolve) => analytics.ready(() => resolve()));
-  (analytics as unknown as { reset: (b: boolean) => void }).reset(true);
+  analytics.reset(true);
   return analytics;
 }
 

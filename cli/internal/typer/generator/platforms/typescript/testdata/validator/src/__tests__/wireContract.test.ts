@@ -19,6 +19,7 @@ import type { RudderAnalytics } from "@rudderstack/analytics-js/bundled";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RudderTyper } from "../RudderTyper/RudderTyper.ts";
 import { RudderTyper as IdentitySections } from "../RudderTyper/IdentitySections.ts";
+import { RudderTyper as EmptyIdentity } from "../RudderTyper/EmptyIdentity.ts";
 import { interceptor } from "./eventInterceptor.ts";
 import { freshAnalytics, traitsOf } from "./session.ts";
 
@@ -143,15 +144,18 @@ describe("wire contract: group with identity_section context.traits", () => {
   });
 
   it("does not discard traits the caller supplied in options.context", async () => {
+    // With a prior identify in place, this also pins the merge order against
+    // the SDK's stored user traits rather than only the empty-session case.
+    typer.identify("user-1", { email: "user@example.com", active: true });
     (typer as unknown as { group: (id: string, t: unknown, o: unknown) => void }).group(
       "org-1",
       { active: true },
       { context: { traits: { tenant: "acme" } } },
     );
 
-    const [event] = await interceptor.waitForEvents(1);
+    const [, event] = await interceptor.waitForEvents(2);
 
-    expect(traitsOf(event)).toEqual({ tenant: "acme" });
+    expect(traitsOf(event)).toEqual({ email: "user@example.com", active: true, tenant: "acme" });
   });
 });
 
@@ -206,5 +210,46 @@ describe("wire contract: caller-supplied options survive", () => {
       trackingPlanId: "plan_12345",
       trackingPlanVersion: 13,
     });
+  });
+});
+
+describe("wire contract: identify and group rules with no properties", () => {
+  let typer: EmptyIdentity;
+
+  beforeEach(async () => {
+    const analytics = await freshAnalytics();
+    typer = new EmptyIdentity(() => analytics as RudderAnalytics);
+  });
+
+  it("identify does not clear traits the caller never supplied", async () => {
+    const analytics = await freshAnalytics();
+    // Traits established outside this plan — an untyped call, another plan, or
+    // an earlier session. The generated identify takes no traits parameter, so
+    // the caller has no way to protect them.
+    analytics.identify("user-1", { email: "user@example.com" });
+    typer = new EmptyIdentity(() => analytics as RudderAnalytics);
+
+    typer.identify("user-1");
+    typer.trackUserSignedUp({ active: true });
+
+    const [, , followUp] = await interceptor.waitForEvents(3);
+
+    expect(traitsOf(followUp)).toEqual({ email: "user@example.com" });
+  });
+
+  it("group does not clear group traits the caller never supplied", async () => {
+    const analytics = await freshAnalytics();
+    // Group traits established outside this plan. The SDK sources a group
+    // event's traits from stored state, so a later group call that resets that
+    // state empties the field every consumer reads.
+    analytics.group("org-1", { plan: "enterprise" });
+    typer = new EmptyIdentity(() => analytics as RudderAnalytics);
+
+    typer.group("org-1");
+
+    const [, second] = await interceptor.waitForEvents(2);
+
+    expect(second.type).toBe("group");
+    expect(second.traits).toEqual({ plan: "enterprise" });
   });
 });
