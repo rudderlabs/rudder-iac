@@ -27,7 +27,8 @@
 ## DEX-731 — Experimental Flag Promotion Review Guidance
 <!-- ticket:DEX-731 -->
 - In `docs/experimental-flags.md`, examples under "Adding a New Experimental Flag" should use placeholder flag names such as `YourNewFeature` instead of real experimental flags, so future flag promotions do not require guide rewrites.
-- When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active; either preserve compatibility by clamping intentionally or return an error that names the exact config key, such as `concurrency.syncer`, so users can fix their config.
+- When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active. `concurrency.syncer < 1` was inert while the flag gated `WithConcurrency`, so GA clamps it to 1 in `config.GetConfig` rather than erroring — turning a previously ignored value into a hard failure is a breaking change for existing configs.
+- Normalise such values once at config load, not in each command: copying the guard into `apply` and `destroy` duplicated validation `syncer.WithConcurrency` already performs and would drift on the third caller.
 
 ## DEX-728 — Experimental Flag Removal Regression Coverage
 <!-- ticket:DEX-728 -->

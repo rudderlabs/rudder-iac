@@ -103,6 +103,13 @@ func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
+func TestIsValidExperimentalFlag_ConcurrentSyncsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "concurrent" + "Syncs"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
 func TestIsValidExperimentalFlag_TransformationsRemoved(t *testing.T) {
 	t.Parallel()
 

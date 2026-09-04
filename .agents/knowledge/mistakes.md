@@ -62,12 +62,6 @@
 - CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
 - Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
 
-## DEX-731 — GA Destination Fixture Account Reference Failure
-<!-- ticket:DEX-731 -->
-- CI failed when the live destination E2E fixture `cli/tests/testdata/destinations/{create,update}/ga.yaml` set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`, but the test workspace did not create an account with that ID.
-- The observed `TestDestinationsApply` failure was `task: destination:ga failed: creating destination: http status code: 400 ... 'Account not found with given id in the workspace'`.
-- Durable mitigation: omit account-ID config from GA destination fixtures unless the referenced account is seeded or managed by the test setup; future destination E2E fixtures should only include account-ID fields with a real test prerequisite.
-
 ## DEX-730 — GA Delete Account Fixture Requires Real Account
 <!-- ticket:DEX-730 -->
 - CI failed in `TestDestinationsApply` when the GA destination live E2E fixture set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`; the backend validates `rudderDeleteAccountId` against workspace accounts and returned HTTP 400 `Account not found with given id in the workspace` during `destination:ga` creation.
