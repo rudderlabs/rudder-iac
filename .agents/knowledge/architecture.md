@@ -269,3 +269,10 @@
 - Google Ads Offline Conversions destination support is implemented as local type `google_adwords_offline_conversions`, API type `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/google_adwords_offline_conversions` with Go package name `googleadwordsofflineconversions`.
 - `google_adwords_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Google Ads Offline Conversions has no CLI secret keys and declares only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`) with cloud-only connection mode.
+
+## DEX-755 — BQ Streaming Verified Registry Promotion
+<!-- ticket:DEX-755 -->
+- `bqstream` is a verified/native destination definition after QA verification, so `cli/internal/app/newDestinationRegistry` registers `bqstream.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled.
+- `bqstream` no longer requires `ExperimentalFlags.UnverifiedDestinations`; the unverified gate should remain reserved for destinations that have not completed verification.
+- Do not also register `bqstream` in the unverified block; when both destination flags are enabled, duplicate registry registration would make registry construction fail.
+- Destination E2E fixtures still enable `UnverifiedDestinations` because the shared fixture set contains other unverified destinations; do not infer the live E2E gate from bqstream's verified registry status.
