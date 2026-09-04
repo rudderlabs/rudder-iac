@@ -57,7 +57,6 @@ func TestAccountsImportWorkspace(t *testing.T) {
 		t.Skip("set RUN_ACCOUNT_E2E=1 with a disposable live stack to run accounts import workspace e2e")
 	}
 
-	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 
 	executor, err := NewCmdExecutor("")

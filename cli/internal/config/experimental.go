@@ -28,9 +28,6 @@ type ExperimentalConfig struct {
 	// UnverifiedDestinations enables registration of destination definitions
 	// that still need the unverified gate when DestinationSupport is also enabled.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
-	// AccountSupport enables account provider registration and account kind
-	// matching for validate/apply/import flows.
-	AccountSupport bool `mapstructure:"accountSupport"`
 	// ConnectionSupport enables the event-stream-connections kind for
 	// validate/apply flows.
 	ConnectionSupport bool `mapstructure:"connectionSupport"`
