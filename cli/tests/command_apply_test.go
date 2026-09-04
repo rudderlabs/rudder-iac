@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -69,6 +70,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
 		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
+		assertWorkspaceBanner(t, output)
 		verifyState(t, "create")
 	})
 
@@ -77,6 +79,7 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
+		assertWorkspaceBanner(t, output)
 		verifyState(t, "update")
 	})
 
@@ -105,7 +108,20 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 		"--confirm=false",
 	)
 	require.NoError(t, err, "Dry run failed for update: %s", string(output))
+	assertWorkspaceBanner(t, output)
 	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+}
+
+func assertWorkspaceBanner(t *testing.T, output []byte) {
+	t.Helper()
+
+	assert.Regexp(
+		t,
+		regexp.MustCompile(`(?m)^Workspace: .+ \(.+\)$`),
+		string(output),
+		"Expected apply output to include workspace name and id banner, got: %s",
+		string(output),
+	)
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
