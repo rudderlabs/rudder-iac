@@ -227,3 +227,8 @@
 <!-- ticket:DEX-747 -->
 - Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
 - Dummy `rudderAccountId` fixtures fail live `TestDestinationsApply` before snapshot comparison — verified against the dev stack, which rejects the create with `http status code: 400 … 'Account not found with given id in the workspace'`, the same failure the legacy GA `rudderDeleteAccountId` fixture hit (DEX-736). Autonomous coverage therefore relies on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
+
+## DEX-771 — Destination E2E Unverified Fixture Gate After HTTP Promotion
+<!-- ticket:DEX-771 -->
+- `TestDestinationsApply` still sets `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`, but HTTP is no longer the reason; the fixture set still includes unverified destination types such as `attentive_tag`, `rs`, and `salesforce`.
+- HTTP fixture coverage remains in the shared destination E2E suite as a verified destination, so compile-only validation can exercise its test code without live workspace mutation.

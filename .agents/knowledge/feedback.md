@@ -28,3 +28,8 @@
 <!-- ticket:DEX-728 -->
 - When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.
 - Do not remove useful `TestGetEnvironmentVariableName` table coverage solely because the input no longer corresponds to a live `ExperimentalConfig` flag; `GetEnvironmentVariableName` is a pure string transform, so keep a single-token lowercase input case to cover the no-substitution branch.
+
+## DEX-771 — HTTP Verified Destination Gate
+<!-- ticket:DEX-771 -->
+- HTTP has completed QA verification and should be documented as verified/native: `type: http` must be available with `RUDDERSTACK_X_DESTINATION_SUPPORT` alone, without `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS`.
+- Do not cite HTTP as an unverified fixture in E2E gate comments or skip messages; retain the unverified flag only for remaining unverified fixtures such as `attentive_tag`, `rs`, and `salesforce`.
