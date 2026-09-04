@@ -217,6 +217,11 @@
 - Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
 - Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
 
+## DEX-735 — Plan Nested Diff Rendering GA
+<!-- ticket:DEX-735 -->
+- Plan output now renders per-field nested diffs unconditionally via the nested diff renderer rather than behind `ExperimentalConfig.NestedDiffs`.
+- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar/nil/non-decomposable changes still keep their single-line behavior.
+
 ## DEX-745 — Bing Ads Offline Conversions E2E Deferral
 <!-- ticket:DEX-745 -->
 - Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.

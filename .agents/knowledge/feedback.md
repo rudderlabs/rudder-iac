@@ -24,6 +24,11 @@
 - Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
 
+## DEX-735 — Keep Unrelated Live Fixture Fixes Separate
+<!-- ticket:DEX-735 -->
+- Do not bundle live destination E2E fixture/snapshot changes into unrelated PRs; plan-rendering or other focused changes should leave destination fixture failures for a dedicated ticket/PR.
+- If a live backend fixture fails, decide whether to drop a field or seed backend data in a destination-focused change with destination-reviewer visibility.
+
 ## DEX-728 — Experimental Flag Removal Regression Coverage
 <!-- ticket:DEX-728 -->
 - When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.
