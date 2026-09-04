@@ -217,6 +217,11 @@
 - Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
 - Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
 
+## DEX-735 — Plan Nested Diff Rendering GA
+<!-- ticket:DEX-735 -->
+- Plan output now renders per-field nested diffs unconditionally via the nested diff renderer rather than behind `ExperimentalConfig.NestedDiffs`.
+- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar/nil/non-decomposable changes still keep their single-line behavior.
+
 ## DEX-745 — Bing Ads Offline Conversions E2E Deferral
 <!-- ticket:DEX-745 -->
 - Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.
@@ -227,3 +232,8 @@
 <!-- ticket:DEX-747 -->
 - Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
 - Dummy `rudderAccountId` fixtures fail live `TestDestinationsApply` before snapshot comparison — verified against the dev stack, which rejects the create with `http status code: 400 … 'Account not found with given id in the workspace'`, the same failure the legacy GA `rudderDeleteAccountId` fixture hit (DEX-736). Autonomous coverage therefore relies on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
+
+## DEX-771 — Destination E2E Unverified Fixture Gate After HTTP Promotion
+<!-- ticket:DEX-771 -->
+- `TestDestinationsApply` still sets `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`, but HTTP is no longer the reason; the fixture set still includes unverified destination types such as `attentive_tag`, `rs`, and `salesforce`.
+- HTTP fixture coverage remains in the shared destination E2E suite as a verified destination, so compile-only validation can exercise its test code without live workspace mutation.

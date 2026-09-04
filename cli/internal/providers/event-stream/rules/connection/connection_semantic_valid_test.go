@@ -91,11 +91,13 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 			"web",
 			"android",
 			"ios",
+			"android_kotlin",
 		},
 		ConnectionModes: map[string][]string{
-			"web":     {"cloud"},
-			"android": {"cloud"},
-			"ios":     {"cloud"},
+			"web":            {"cloud"},
+			"android":        {"cloud"},
+			"ios":            {"cloud"},
+			"android_kotlin": {"cloud"},
 		},
 		ConnectionRequiredKeys: map[string]map[string][]string{
 			"web":     {"cloud": {"webhook_url", "auth_token"}},
@@ -400,6 +402,29 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Equal(t, "/connections/0/destination", results[0].Reference)
 		assert.Contains(t, results[0].Message, "destination 'dest-1' (type 'webhook') does not support source 'src-py'")
 		assert.Contains(t, results[0].Message, "source type 'cloud' is not among supported source types: web, android")
+	})
+
+	t.Run("android_kotlin source resolves to its own type", func(t *testing.T) {
+		t.Parallel()
+
+		// The event stream sources API reports the Android Kotlin SDK under the
+		// same token destinations declare, so the source reaches the membership
+		// check untranslated.
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-ak", "android_kotlin", true)
+		addDestinationResource(graph, "dest-1", "webhook", true, map[string]any{
+			"connection_mode": map[string]any{"android_kotlin": "cloud"},
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-ak", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-ak", "dest-1")},
+		}
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
 	})
 
 	t.Run("missing required config fields for the source type", func(t *testing.T) {

@@ -308,8 +308,8 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 }
 
 // newDestinationRegistry builds the destination definition registry.
-// DestinationSupport must be on before any definitions are registered.
-// Unverified definitions additionally require UnverifiedDestinations.
+// Verified definitions require DestinationSupport only; unverified definitions
+// additionally require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
 	if !cfg.ExperimentalFlags.DestinationSupport {
@@ -321,6 +321,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	if err := registry.Register(httpdest.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering http destination definition: %w", err)
 	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
@@ -392,9 +395,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(hs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
-		if err := registry.Register(httpdest.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}
 		if err := registry.Register(intercom.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering intercom destination definition: %w", err)
