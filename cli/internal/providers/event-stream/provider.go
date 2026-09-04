@@ -65,9 +65,15 @@ type Provider struct {
 type Option func(*Provider)
 
 // WithDestinationRegistry supplies the destination definitions that back the
-// connection semantic rules' source-type compatibility checks.
+// connection semantic rules' source-type compatibility checks. A nil registry
+// is ignored so the empty default in New always stands: connection rules are
+// registered unconditionally now, and registry.Get dereferences the receiver's
+// map, so a nil registry would panic mid-validate rather than fail to build.
 func WithDestinationRegistry(registry *definitions.Registry) Option {
 	return func(p *Provider) {
+		if registry == nil {
+			return
+		}
 		p.destinationRegistry = registry
 	}
 }
