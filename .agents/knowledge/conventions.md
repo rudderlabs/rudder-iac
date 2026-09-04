@@ -233,3 +233,8 @@
 <!-- ticket:DEX-747 -->
 - For `events_to_offline_conversions_type_mapping[].to`, follow integrations-config `schema.json` over Terraform: the property is optional and the schema enum includes an empty string, so use `omitempty,oneof=click call store` to allow omitted/empty values while rejecting unknown non-empty values.
 - Google Ads Offline Conversions pattern-validated single-line fields should use shared `dynamic_or_pattern=single_line_100` for schema constraints like `^(.{0,100})$` or `^(.{1,100})$`; do not add a destination-local reject just to block `env.*` literals, because that would be stricter than existing broad single-line destination fields.
+
+## DEX-799 — Event-Stream SDK Source Type Spellings
+<!-- ticket:DEX-799 -->
+- Event-stream source specs keep the API spellings `kotlin` and `swift`; do not rewrite them to destination/config-backend spellings in source model enums or imported source specs.
+- Connection semantic validation documentation should show the cross-API boundary explicitly: an event-stream `kotlin` source validates against destination config keyed by `connection_mode.android_kotlin`.

@@ -64,12 +64,13 @@ type multiModeTestConfig struct {
 	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
 }
 
-// newTestRegistry registers four definitions, each shaped for one facet of the
-// checks:
+// newTestRegistry registers definitions shaped for each facet of the checks:
 //
 //   - "webhook" drives the V-C5 tests: web needs webhook_url and auth_token,
 //     android needs connection_mode, ios needs nothing. It models
 //     connection_mode so those keys are reachable at all.
+//   - "kotlin-only" accepts Android Kotlin but not cloud, guarding the
+//     event-stream API spelling used at the caller boundary.
 //   - "barebones" has neither settings block, so the settings check never
 //     applies.
 //   - "mode-aware" has both blocks, so either can satisfy the settings check.
@@ -100,6 +101,15 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		ConnectionRequiredKeys: map[string]map[string][]string{
 			"web":     {"cloud": {"webhook_url", "auth_token"}},
 			"android": {"cloud": {"connection_mode"}},
+		},
+	}))
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "kotlin-only",
+		Version:     1,
+		NewConfig:   func() any { return &webhookTestConfig{} },
+		SourceTypes: []string{"android_kotlin"},
+		ConnectionModes: map[string][]string{
+			"android_kotlin": {"cloud"},
 		},
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
@@ -377,6 +387,26 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 	t.Parallel()
 
 	registry := newTestRegistry(t)
+
+	t.Run("event-stream kotlin spelling maps to android_kotlin", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		addSourceResource(graph, "src-kotlin", "kotlin", true)
+		addDestinationResource(graph, "dest-1", "kotlin-only", true, map[string]any{
+			"connection_mode": map[string]any{"android_kotlin": "cloud"},
+		})
+		addConnectionResource(graph, "conn-1",
+			resources.URN("src-kotlin", esSource.ResourceType),
+			resources.URN("dest-1", destination.DestinationResourceType),
+		)
+
+		spec := esConnection.ConnectionsSpec{
+			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-kotlin", "dest-1")},
+		}
+
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
+	})
 
 	t.Run("unsupported source type", func(t *testing.T) {
 		t.Parallel()

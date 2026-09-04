@@ -71,9 +71,11 @@ func LocalToAPISourceTypes() map[string]string {
 // ServiceUtil.getSourceType (rudder-config-backend src/services/serviceUtil.ts),
 // which produces the token used for the supportedSourceTypes membership check
 // and as the key into supportedSourcesValidation at connect time — translated
-// here to the CLI's local (snake_case) source types. The backend receives the
-// definition name "ReactNative" and lowercases it to "reactnative"; the CLI
-// spells that SDK type "react_native", so both spellings are accepted.
+// here to the CLI's local (snake_case) source types. Some SDK source types have
+// different spellings across APIs: config-backend uses android_kotlin,
+// ios_swift, and reactnative, while event-stream uses kotlin, swift, and
+// react_native. Accept both spellings so imported event-stream specs validate
+// against the destination source-type keys they actually require.
 func SourceTypeToken(sourceType, category string) string {
 	switch category {
 	case SourceCategoryCloud, SourceCategorySinger:
@@ -85,9 +87,9 @@ func SourceTypeToken(sourceType, category string) string {
 	switch strings.ToLower(sourceType) {
 	case "javascript":
 		return SourceTypeWeb
-	case "android_kotlin":
+	case "android_kotlin", "kotlin":
 		return SourceTypeAndroidKotlin
-	case "ios_swift":
+	case "ios_swift", "swift":
 		return SourceTypeIOSSwift
 	case "android":
 		return SourceTypeAndroid
@@ -106,8 +108,8 @@ func SourceTypeToken(sourceType, category string) string {
 	case "shopify":
 		return SourceTypeShopify
 	default:
-		// Webhook sources and every other event-stream type (java, go, kotlin,
-		// swift, ...) connect as cloud sources.
+		// Webhook sources and every other event-stream type (java, go, ...)
+		// connect as cloud sources.
 		return SourceTypeCloud
 	}
 }

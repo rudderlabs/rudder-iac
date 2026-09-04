@@ -59,6 +59,46 @@ match_behavior:
                 - id: js-to-s3
                   source: "#event-stream-source:my-js-source"
                   destination: "#destination:my-s3-destination"
+      - example_id: "es-connection-semantic-valid-kotlin-source"
+        title: "Kotlin event-stream source uses the Android Kotlin destination settings"
+        description: "Event-stream sources use type kotlin, while destination config is keyed by android_kotlin; validation accepts the connection when the destination declares android_kotlin settings."
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-kotlin-source
+            spec:
+              id: my-kotlin-source
+              name: My Android Kotlin Source
+              type: kotlin
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: true
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  android_kotlin: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: kotlin-to-s3
+                  source: "#event-stream-source:my-kotlin-source"
+                  destination: "#destination:my-s3-destination"
     invalid:
       - example_id: "es-connection-semantic-source-not-found"
         title: "Connection whose source does not exist in the project"
