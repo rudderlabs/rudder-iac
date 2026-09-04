@@ -268,11 +268,17 @@ func (h *HandlerImpl) MapRemoteToState(
 // error in front of users who never opted into unverifiedDestinations but
 // whose workspace still holds a destination created under it, so the message
 // has to name the way out rather than just the corruption.
+//
+// It names the env vars rather than `experimental enable unverifiedDestinations`
+// because that command writes only flags.unverifiedDestinations; without the
+// umbrella experimental switch GetConfig zeroes the flag struct and the user
+// hits this same error again with nothing new to go on.
 func errUnregisteredManagedType(id, apiType string, version int64) error {
 	return fmt.Errorf(
 		"managed destination %s has unregistered type %q and version %d; "+
-			"if it was created under the unverifiedDestinations experimental flag, "+
-			"re-enable that flag to manage it, or remove the destination from the workspace",
+			"if it was created under the unverifiedDestinations experimental flag, re-run with "+
+			"RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true "+
+			"to manage it, or remove the destination from the workspace",
 		id,
 		apiType,
 		version,

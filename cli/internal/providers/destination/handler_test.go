@@ -846,7 +846,7 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		_, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unregistered type")
-		assert.Contains(t, err.Error(), "unverifiedDestinations")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true")
 	})
 
 	t.Run("empty external ID errors", func(t *testing.T) {
@@ -922,8 +922,10 @@ func TestHandlerImpl_LoadRemoteResourcesErrorsOnUnregisteredManagedType(t *testi
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unregistered type")
 	// Destinations are GA, so this now blocks applies for users who never set
-	// unverifiedDestinations; the message must name the flag that unblocks them.
-	assert.Contains(t, err.Error(), "unverifiedDestinations")
+	// unverifiedDestinations. The flag alone does nothing without the umbrella
+	// switch, so the message has to name both or it sends them in a loop.
+	assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true")
+	assert.Contains(t, err.Error(), "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true")
 }
 
 func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.T) {

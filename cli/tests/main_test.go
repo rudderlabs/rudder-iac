@@ -53,9 +53,12 @@ func TestMain(m *testing.M) {
 // destroy fails, only s3 is registered on the next run and the residue fails
 // the whole load. Keep this with the tests that need it rather than as a CI
 // repository variable, so the requirement travels with the code.
+//
+// Callers set RUDDERSTACK_CLI_EXPERIMENTAL themselves. This only reads as
+// redundant — the umbrella switch is what makes their own flags take effect, so
+// dropping this call must never be able to silently disable an unrelated one.
 func allowUnverifiedDestinationResidue(t *testing.T) {
 	t.Helper()
 
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 }
