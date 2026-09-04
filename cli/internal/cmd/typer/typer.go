@@ -9,7 +9,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
@@ -63,10 +62,6 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("unsupported platform: %s (supported platforms: %s)", platform, strings.Join(supported, ", "))
 			}
 
-			if local && !config.GetConfig().ExperimentalFlags.LocalTyper {
-				return fmt.Errorf("--local is experimental; enable it by setting both RUDDERSTACK_CLI_EXPERIMENTAL=true (the umbrella experimental flag) and RUDDERSTACK_X_LOCAL_TYPER=true (the 'localTyper' flag). The per-flag setting is ignored unless the umbrella flag is also set")
-			}
-
 			defer func() {
 				telemetry.TrackCommand("typer", nil, []telemetry.KV{
 					{K: "platform", V: platform},
@@ -110,7 +105,7 @@ func newCmdGenerate() *cobra.Command {
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
 
-	cmd.Flags().BoolVar(&local, "local", false, "[experimental] Generate from local specs instead of the remote workspace (no apply or network needed); requires the 'localTyper' flag")
+	cmd.Flags().BoolVar(&local, "local", false, "Generate from local specs instead of the remote workspace (no workspace, apply, auth or network needed)")
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory or spec file (used with --local)")
 
 	cmd.Flags().StringArrayVar(&options, "option", []string{},
