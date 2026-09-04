@@ -47,7 +47,6 @@ func TestAccountsApply(t *testing.T) {
 	allowUnverifiedDestinationResidue(t)
 	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

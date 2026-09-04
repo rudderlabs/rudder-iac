@@ -12,12 +12,8 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// NestedDiffs enables detailed diff reports for nested structures
-	NestedDiffs bool `mapstructure:"nestedDiffs"`
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
-	// EnableVarSubstitution enables variable substitution in project specs via --var-file and RUDDER_* env vars
-	EnableVarSubstitution bool `mapstructure:"enableVarSubstitution"`
 	// LocalTyper enables `typer generate --local`, generating typed code from local specs without applying to remote
 	LocalTyper bool `mapstructure:"localTyper"`
 	// ImportMerge enables import-manifest.yaml generation during `import workspace`

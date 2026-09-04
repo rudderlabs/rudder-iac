@@ -10,11 +10,6 @@ import (
 )
 
 func TestProjectLoad(t *testing.T) {
-	// The umbrella flag has to come first: every per-flag setting below is
-	// ignored unless it is set.
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
-
 	// The create fixtures keep the two api_tracking fields as {{ .VAR }}
 	// placeholders. project.Load() resolves them from RUDDER_* env vars, so
 	// supply the values here; the e2e suite passes the same ones via the

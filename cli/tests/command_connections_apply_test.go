@@ -26,6 +26,20 @@ var (
 	connectionSnapshotIgnore      = []string{"id", "sourceId", "destinationId", "createdAt", "updatedAt"}
 )
 
+// connScenarioEndpoints pairs each managed destination with the connection
+// linking the android source to it. Both are here because a destination
+// declares its per-source settings in one of two blocks and the connect-time
+// check accepts either: s3 satisfies it through connection_mode, while
+// firebase declares no connection_mode at all (schema.json has no such
+// property), so its use_native_sdk entry is the only thing that can.
+var connScenarioEndpoints = []struct {
+	destination string
+	connection  string
+}{
+	{destination: "e2e-conn-s3", connection: "e2e-android-to-s3"},
+	{destination: "e2e-conn-firebase", connection: "e2e-android-to-firebase"},
+}
+
 // TestConnectionsApply drives the event stream source → destination → connection
 // trio end-to-end against a live stack: apply create wires the endpoints
 // together, apply update drops the connection spec and must disconnect them
@@ -48,9 +62,12 @@ func TestConnectionsApply(t *testing.T) {
 		t.Skip("set RUN_CONNECTION_E2E=1 with a live connection-enabled stack")
 	}
 
-	allowUnverifiedDestinationResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
+	// This test needs the unverified gate for its own fixtures, not merely to
+	// tolerate residue: firebase is registered behind UnverifiedDestinations and
+	// is the use_native_sdk half of connScenarioEndpoints — s3, the only
+	// definition registered without the flag, models connection_mode alone.
+	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -103,12 +120,12 @@ func TestConnectionsApply(t *testing.T) {
 	})
 }
 
-// verifyConnectionsState snapshot-compares the event stream source, the
-// destination, and the connection linking them against
-// testdata/expected/upstream/connections/<dir>, mirroring verifyAccountUpstream.
-// The update dir deliberately has no connection snapshot: dropping the
-// connection spec must disconnect the endpoints, so no managed connection may
-// remain while both endpoint snapshots still match.
+// verifyConnectionsState snapshot-compares the event stream source, every
+// destination in connScenarioEndpoints, and the connections linking them
+// against testdata/expected/upstream/connections/<dir>, mirroring
+// verifyAccountUpstream. The update dir deliberately has no connection
+// snapshots: dropping the connection specs must disconnect the endpoints, so
+// no managed connection may remain while every endpoint snapshot still matches.
 func verifyConnectionsState(t *testing.T, dir string) {
 	t.Helper()
 
@@ -141,45 +158,74 @@ func verifyConnectionsState(t *testing.T, dir string) {
 
 	destinations, err := apiClient.Destinations.GetAll(ctx)
 	require.NoError(t, err, "listing destinations")
-	var destination *client.Destination
-	for i := range destinations {
-		if destinations[i].ExternalID == "e2e-conn-s3" {
-			destination = &destinations[i]
-			break
+	destinationIDs := make(map[string]string, len(connScenarioEndpoints))
+	for _, endpoint := range connScenarioEndpoints {
+		var destination *client.Destination
+		for i := range destinations {
+			if destinations[i].ExternalID == endpoint.destination {
+				destination = &destinations[i]
+				break
+			}
 		}
+		require.NotNil(t, destination, "managed destination %s missing upstream", endpoint.destination)
+		destinationIDs[endpoint.destination] = destination.ID
+		assert.NoError(t, helpers.CompareStates(
+			toJSONMap(t, destination),
+			readJSONFile(t, filepath.Join(expectedDir, "destination_"+endpoint.destination+".json")),
+			connDestinationSnapshotIgnore,
+		), "upstream destination snapshot mismatch for %s/%s", dir, endpoint.destination)
 	}
-	require.NotNil(t, destination, "managed destination missing upstream")
-	assert.NoError(t, helpers.CompareStates(
-		toJSONMap(t, destination),
-		readJSONFile(t, filepath.Join(expectedDir, "destination_e2e-conn-s3.json")),
-		connDestinationSnapshotIgnore,
-	), "upstream destination snapshot mismatch for %s", dir)
 
 	conns := listConnections(t, ctx, apiClient, client.WithConnectionsHasExternalID(true))
+	connsByExternalID := make(map[string]client.Connection, len(conns))
+	for _, conn := range conns {
+		connsByExternalID[conn.ExternalID] = conn
+	}
 
 	// The snapshot files are the expectation: a connection snapshot present
 	// means exactly that managed connection must exist; absent means none may.
-	connSnapshot := filepath.Join(expectedDir, "connection_e2e-android-to-s3.json")
-	if _, statErr := os.Stat(connSnapshot); statErr == nil {
-		require.Len(t, conns, 1, "expected exactly one managed connection upstream")
+	// Counting the expected ones keeps "no extras upstream" an assertion too.
+	var expected int
+	for _, endpoint := range connScenarioEndpoints {
+		connSnapshot := filepath.Join(expectedDir, "connection_"+endpoint.connection+".json")
+		if _, statErr := os.Stat(connSnapshot); statErr != nil {
+			require.ErrorIs(t, statErr, os.ErrNotExist,
+				"unexpected error probing connection snapshot %s", connSnapshot)
+			assert.NotContains(t, connsByExternalID, endpoint.connection,
+				"no snapshot for %q in %q: that managed connection may not remain", endpoint.connection, dir)
+			continue
+		}
+
+		expected++
+		conn, found := connsByExternalID[endpoint.connection]
+		if !assert.True(t, found, "managed connection %s missing upstream", endpoint.connection) {
+			continue
+		}
 		// The snapshot ignores the server-assigned endpoint ids, so the wiring
 		// is asserted directly: the connection must link exactly these endpoints.
-		assert.Equal(t, source.ID, conns[0].SourceID, "connection must link the managed source")
-		assert.Equal(t, destination.ID, conns[0].DestinationID, "connection must link the managed destination")
+		assert.Equal(t, source.ID, conn.SourceID, "connection %s must link the managed source", endpoint.connection)
+		assert.Equal(t, destinationIDs[endpoint.destination], conn.DestinationID,
+			"connection %s must link destination %s", endpoint.connection, endpoint.destination)
 		assert.NoError(t, helpers.CompareStates(
-			toJSONMap(t, conns[0]),
+			toJSONMap(t, conn),
 			readJSONFile(t, connSnapshot),
 			connectionSnapshotIgnore,
-		), "upstream connection snapshot mismatch for %s", dir)
-	} else {
-		require.ErrorIs(t, statErr, os.ErrNotExist,
-			"unexpected error probing connection snapshot %s", connSnapshot)
-		assert.Empty(t, conns, "no connection snapshot for %q: no managed connection may remain", dir)
+		), "upstream connection snapshot mismatch for %s/%s", dir, endpoint.connection)
+	}
+	require.Len(t, conns, expected, "unexpected managed connections upstream")
+
+	if expected == 0 {
 		// Disconnected must hold for the endpoints themselves, not just for
-		// externalId-carrying rows: no connection at all may link this pair.
+		// externalId-carrying rows: no connection at all may link these pairs.
 		for _, conn := range listConnections(t, ctx, apiClient) {
-			assert.False(t, conn.SourceID == source.ID && conn.DestinationID == destination.ID,
-				"source and destination must be disconnected, but connection %s links them", conn.ID)
+			if conn.SourceID != source.ID {
+				continue
+			}
+			for destExternalID, destID := range destinationIDs {
+				assert.NotEqual(t, destID, conn.DestinationID,
+					"source and destination %s must be disconnected, but connection %s links them",
+					destExternalID, conn.ID)
+			}
 		}
 	}
 }
