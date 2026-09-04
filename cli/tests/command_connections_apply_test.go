@@ -48,7 +48,7 @@ func TestConnectionsApply(t *testing.T) {
 		t.Skip("set RUN_CONNECTION_E2E=1 with a live connection-enabled stack")
 	}
 
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	allowUnverifiedDestinationResidue(t)
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 

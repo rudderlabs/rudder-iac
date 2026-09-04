@@ -846,6 +846,7 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		_, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unregistered type")
+		assert.Contains(t, err.Error(), "unverifiedDestinations")
 	})
 
 	t.Run("empty external ID errors", func(t *testing.T) {
@@ -920,6 +921,9 @@ func TestHandlerImpl_LoadRemoteResourcesErrorsOnUnregisteredManagedType(t *testi
 	_, err := h.Impl.LoadRemoteResources(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unregistered type")
+	// Destinations are GA, so this now blocks applies for users who never set
+	// unverifiedDestinations; the message must name the flag that unblocks them.
+	assert.Contains(t, err.Error(), "unverifiedDestinations")
 }
 
 func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.T) {
