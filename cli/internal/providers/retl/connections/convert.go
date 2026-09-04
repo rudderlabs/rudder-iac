@@ -105,6 +105,7 @@ func toSyncSettings(data resources.ResourceData) *retlClient.SyncSettings {
 	return out
 }
 
+// toCreateRequest deliberately omits ExternalID — see Handler.Create.
 func toCreateRequest(externalID string, data resources.ResourceData) (*retlClient.CreateRETLConnectionRequest, error) {
 	sourceID, err := refValue(data, SourceKey)
 	if err != nil {
@@ -120,7 +121,6 @@ func toCreateRequest(externalID string, data resources.ResourceData) (*retlClien
 		SourceID:      sourceID,
 		DestinationID: destinationID,
 		Enabled:       &enabled,
-		ExternalID:    externalID,
 		Schedule:      toSchedule(data),
 		SyncSettings:  toSyncSettings(data),
 		Identifiers:   toMappings(data, IdentifiersKey),
@@ -174,4 +174,89 @@ func toResourceData(c *retlClient.RETLConnection) *resources.ResourceData {
 		CursorColumnKey:  c.CursorColumn,
 		ObjectKey:        c.Object,
 	}
+}
+
+// toSpecShapedInput rebuilds the spec-side view of a remote connection. It must
+// mirror exactly what GetResources emits, or every plan reports a spurious
+// update: the differ compares the union of keys, so a state map using different
+// key names (sourceId vs source) or omitting fields produces a permanent diff.
+func toSpecShapedInput(c *retlClient.RETLConnection, sourceURN, destinationURN string) resources.ResourceData {
+	data := resources.ResourceData{
+		SourceKey:        &resources.PropertyRef{URN: sourceURN, Property: "id"},
+		DestinationKey:   &resources.PropertyRef{URN: destinationURN, Property: "id"},
+		EnabledKey:       c.Enabled,
+		SyncBehaviourKey: string(c.SyncBehaviour),
+		CursorColumnKey:  c.CursorColumn,
+		ObjectKey:        c.Object,
+		ScheduleKey:      scheduleSpecFrom(c.Schedule),
+		EventKey:         eventSpecFrom(c.Event),
+		IdentifiersKey:   mappingSpecsFrom(c.Identifiers),
+		MappingsKey:      mappingSpecsFrom(c.Mappings),
+		ConstantsKey:     constantSpecsFrom(c.Constants),
+		SyncSettingsKey:  syncSettingsSpecFrom(c.SyncSettings),
+	}
+	return data
+}
+
+func scheduleSpecFrom(s retlClient.Schedule) ScheduleSpec {
+	out := ScheduleSpec{Type: string(s.Type), EveryMinutes: s.EveryMinutes}
+	if s.CronExpression != nil {
+		out.CronExpression = *s.CronExpression
+	}
+	return out
+}
+
+func eventSpecFrom(e *retlClient.Event) *EventSpec {
+	if e == nil {
+		return nil
+	}
+	return &EventSpec{Type: string(e.Type), Name: e.Name, NameColumn: e.NameColumn}
+}
+
+func mappingSpecsFrom(ms []retlClient.Mapping) []MappingSpec {
+	if len(ms) == 0 {
+		return nil
+	}
+	out := make([]MappingSpec, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, MappingSpec{From: m.From, To: m.To})
+	}
+	return out
+}
+
+func constantSpecsFrom(cs []retlClient.Constant) []ConstantSpec {
+	if len(cs) == 0 {
+		return nil
+	}
+	out := make([]ConstantSpec, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, ConstantSpec{Key: c.Key, Value: c.Value})
+	}
+	return out
+}
+
+// syncSettingsSpecFrom reconstructs the remote sync settings.
+//
+// ponytail: this is where declarative diffing and merge semantics collide. The
+// server fills defaults on create, so remote always carries a FULL object while
+// a spec may declare a subset — the differ then reports a change forever. Until
+// the differ can compare declared fields only, a spec that declares
+// sync_settings must declare every field it cares about. Tracked as a spike
+// finding, not solved here.
+func syncSettingsSpecFrom(s *retlClient.SyncSettings) *SyncSettingsSpec {
+	if s == nil {
+		return nil
+	}
+	out := &SyncSettingsSpec{}
+	if s.SyncLogsConfig != nil {
+		out.SyncLogs = &SyncLogsSpec{
+			Enabled:           s.SyncLogsConfig.Enabled,
+			RetentionDays:     s.SyncLogsConfig.LogRetentionInDays,
+			SnapshotsToRetain: s.SyncLogsConfig.SnapshotsToRetain,
+		}
+	}
+	if s.FailedKeysConfig != nil {
+		out.FailedKeys = &FailedKeysSpec{Retry: s.FailedKeysConfig.EnableFailedKeysRetry}
+	}
+	return out
 }

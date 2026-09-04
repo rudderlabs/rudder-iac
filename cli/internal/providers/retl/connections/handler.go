@@ -7,10 +7,13 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -18,13 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
-// destinationSpecKind is the spec kind a connection's destination reference
-// points at. Declared locally rather than imported to keep the spike free of a
-// dependency on the destination provider.
-const destinationSpecKind = "destination"
-
-// destinationResourceType mirrors the destination provider's resource type.
-const destinationResourceType = "destination"
+var log = logger.New("retl-connection")
 
 // Handler implements the retl provider's resourceHandler interface for RETL
 // connections. One spec document yields many resources.
@@ -210,6 +207,19 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 	if err != nil {
 		return nil, fmt.Errorf("creating RETL connection: %w", err)
 	}
+
+	// The API rejects externalId inline on create — "Fields not allowed for
+	// JSON Mapper flow: externalId" (400) — even though
+	// CreateRETLConnectionRequest carries the field. It has to be claimed in a
+	// second call, unlike RETL sources where ExternalID on create is accepted.
+	if err := h.client.SetConnectionExternalId(ctx, &retlClient.SetRETLConnectionExternalIDRequest{
+		ID:         resp.ID,
+		ExternalID: ID,
+	}); err != nil {
+		return nil, fmt.Errorf("setting external ID on new RETL connection %s: %w", resp.ID, err)
+	}
+	resp.ExternalID = ID
+
 	return toResourceData(resp), nil
 }
 
@@ -304,29 +314,47 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 }
 
 func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
-	s := state.EmptyState()
+	st := state.EmptyState()
 	for _, r := range collection.GetAll(ResourceType) {
 		conn, ok := r.Data.(retlClient.RETLConnection)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to retl connection")
 		}
-		output := toResourceData(&conn)
-		input := resources.ResourceData{
-			SourceIDKey:      conn.SourceID,
-			DestinationIDKey: conn.DestinationID,
-			EnabledKey:       conn.Enabled,
-			SyncBehaviourKey: string(conn.SyncBehaviour),
-			CursorColumnKey:  conn.CursorColumn,
-			ObjectKey:        conn.Object,
+
+		// Endpoint URNs come from the sibling collections. A connection whose
+		// source or destination is not CLI-managed is skipped rather than
+		// failed — the same stance event-stream takes.
+		sourceURN, err := sourceURNFor(collection, conn.SourceID)
+		if err != nil {
+			log.Warn("skipping connection whose source is not managed by the CLI",
+				"connection", conn.ExternalID, "sourceId", conn.SourceID)
+			continue
 		}
-		s.AddResource(&state.ResourceState{
+		destinationURN, err := collection.GetURNByID(destination.DestinationResourceType, conn.DestinationID)
+		if err != nil {
+			log.Warn("skipping connection whose destination is not managed by the CLI",
+				"connection", conn.ExternalID, "destinationId", conn.DestinationID)
+			continue
+		}
+
+		st.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     conn.ExternalID,
-			Input:  input,
-			Output: *output,
+			Input:  toSpecShapedInput(&conn, sourceURN, destinationURN),
+			Output: *toResourceData(&conn),
 		})
 	}
-	return s, nil
+	return st, nil
+}
+
+// sourceURNFor resolves a connection's source against either RETL source kind.
+func sourceURNFor(collection *resources.RemoteResources, sourceID string) (string, error) {
+	for _, rt := range []string{table.ResourceType, sqlmodel.ResourceType} {
+		if urn, err := collection.GetURNByID(rt, sourceID); err == nil {
+			return urn, nil
+		}
+	}
+	return "", fmt.Errorf("source %s not found in any managed RETL source collection", sourceID)
 }
 
 // Preview is meaningless for a connection.
@@ -368,12 +396,33 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 		table.ResourceKind, sqlmodel.ResourceKind, ref)
 }
 
+// parseDestinationRef resolves "#destination:<id>" through the destination
+// provider's typed state.
+//
+// A naive &resources.PropertyRef{URN, Property: "id"} does NOT work here, and
+// fails only at apply time with "destination is missing or of unexpected type
+// <nil>". RETL source refs get away with it because those handlers put a
+// literal "id" key in their output ResourceData; a destination's state is a
+// typed DestinationState struct, so it needs a resolver. Mirrors
+// event-stream's parseDestinationRef.
 func parseDestinationRef(ref string) (*resources.PropertyRef, error) {
-	id, ok := refID(ref, destinationSpecKind)
+	id, ok := refID(ref, destination.DestinationSpecKind)
 	if !ok {
-		return nil, fmt.Errorf("expected a reference of the form #%s:<id>, got %q", destinationSpecKind, ref)
+		return nil, fmt.Errorf("expected a reference of the form #%s:<id>, got %q", destination.DestinationSpecKind, ref)
 	}
-	return &resources.PropertyRef{URN: resources.URN(id, destinationResourceType), Property: "id"}, nil
+	propertyRef := handler.CreatePropertyRef(
+		resources.URN(id, destination.DestinationResourceType),
+		func(state *destination.DestinationState) (string, error) {
+			if state.ID == "" {
+				return "", fmt.Errorf("destination state has empty ID")
+			}
+			return state.ID, nil
+		},
+	)
+	// Stamp "id" so the differ's comparePropertyRefs sees a stable shape on
+	// both the spec and state sides — same workaround event-stream carries.
+	propertyRef.Property = "id"
+	return propertyRef, nil
 }
 
 func refID(ref, kind string) (string, bool) {

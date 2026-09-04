@@ -14,12 +14,19 @@ import (
 
 type mockStore struct {
 	retlClient.RETLStore
-	createFunc func(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error)
-	updateFunc func(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error)
+	createFunc     func(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error)
+	updateFunc     func(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error)
+	setExternalIDs []string
 }
 
 func (m *mockStore) CreateConnection(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
 	return m.createFunc(ctx, req)
+}
+
+// The API rejects externalId on create, so Create claims it in a second call.
+func (m *mockStore) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
+	m.setExternalIDs = append(m.setExternalIDs, req.ExternalID)
+	return nil
 }
 
 func (m *mockStore) UpdateConnection(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
@@ -127,6 +134,12 @@ func TestSyncSettingsSendsOnlyDeclaredSections(t *testing.T) {
 		_, err := h.Create(context.Background(), "users-to-webhook", data)
 		require.NoError(t, err)
 		assert.Nil(t, captured.SyncSettings, "no sync_settings declared, so none must be sent")
+
+		// The API rejects externalId inline: 400 "Fields not allowed for JSON
+		// Mapper flow: externalId". It must be claimed in a follow-up call.
+		assert.Empty(t, captured.ExternalID, "externalId must not be sent on create")
+		assert.Equal(t, []string{"users-to-webhook"}, h.clientSetExternalIDs(),
+			"create must claim the external id in a second call")
 	})
 
 	t.Run("only the declared section is sent", func(t *testing.T) {
@@ -176,6 +189,11 @@ func TestCreateFailsIfRefsWereNotDereferenced(t *testing.T) {
 
 // resolvedData mimics what the syncer hands the lifecycle: endpoint refs
 // replaced by their resolved remote ids.
+// clientSetExternalIDs surfaces what the handler asked the store to claim.
+func (h *Handler) clientSetExternalIDs() []string {
+	return h.client.(*mockStore).setExternalIDs
+}
+
 func resolvedData(t *testing.T, h *Handler) resources.ResourceData {
 	t.Helper()
 	res, err := h.GetResources()

@@ -90,7 +90,6 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	h.resources[spec.ID] = &TableResource{
 		ID:               spec.ID,
 		DisplayName:      spec.DisplayName,
-		Description:      spec.Description,
 		AccountID:        spec.AccountID,
 		PrimaryKey:       spec.PrimaryKey,
 		Schema:           spec.Schema,
@@ -136,7 +135,6 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 		data := resources.ResourceData{
 			LocalIDKey:          spec.ID,
 			DisplayNameKey:      spec.DisplayName,
-			DescriptionKey:      spec.Description,
 			AccountIDKey:        spec.AccountID,
 			PrimaryKeyKey:       spec.PrimaryKey,
 			SchemaKey:           spec.Schema,
@@ -322,7 +320,6 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		}
 		input := resources.ResourceData{
 			DisplayNameKey:      source.Name,
-			DescriptionKey:      "",
 			AccountIDKey:        source.AccountID,
 			PrimaryKeyKey:       cfg.PrimaryKey,
 			SchemaKey:           cfg.Schema,
@@ -382,7 +379,6 @@ func toResourceData(source *retlClient.RETLSource) (*resources.ResourceData, err
 	}
 	result := resources.ResourceData{
 		DisplayNameKey:      source.Name,
-		DescriptionKey:      "",
 		AccountIDKey:        source.AccountID,
 		PrimaryKeyKey:       cfg.PrimaryKey,
 		SchemaKey:           cfg.Schema,

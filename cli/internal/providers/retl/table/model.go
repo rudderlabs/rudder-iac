@@ -15,7 +15,6 @@ const (
 
 	LocalIDKey          = "local_id"
 	DisplayNameKey      = "display_name"
-	DescriptionKey      = "description"
 	AccountIDKey        = "account_id"
 	PrimaryKeyKey       = "primary_key"
 	SourceDefinitionKey = "source_definition"
@@ -69,7 +68,6 @@ func isValidSourceDefinition(sd SourceDefinition) bool {
 type TableSpec struct {
 	ID               string           `json:"id"                mapstructure:"id"                validate:"required"`
 	DisplayName      string           `json:"display_name"      mapstructure:"display_name"      validate:"required"`
-	Description      string           `json:"description"       mapstructure:"description"`
 	AccountID        string           `json:"account_id"        mapstructure:"account_id"        validate:"required"`
 	PrimaryKey       string           `json:"primary_key"       mapstructure:"primary_key"       validate:"required"`
 	Schema           string           `json:"schema"            mapstructure:"schema"            validate:"required"`
@@ -79,10 +77,13 @@ type TableSpec struct {
 }
 
 // TableResource is a loaded spec ready for API operations.
+//
+// There is no Description: RETLTableConfig carries only primaryKey/schema/table,
+// unlike RETLSQLModelConfig which has a Description. A description in the spec
+// could never round-trip, producing a permanent diff on every plan.
 type TableResource struct {
 	ID               string `json:"id"`
 	DisplayName      string `json:"display_name"`
-	Description      string `json:"description"`
 	AccountID        string `json:"account_id"`
 	PrimaryKey       string `json:"primary_key"`
 	Schema           string `json:"schema"`
@@ -93,7 +94,6 @@ type TableResource struct {
 
 func (t *TableResource) FromResourceData(data resources.ResourceData) {
 	t.DisplayName = data[DisplayNameKey].(string)
-	t.Description = data[DescriptionKey].(string)
 	t.AccountID = data[AccountIDKey].(string)
 	t.PrimaryKey = data[PrimaryKeyKey].(string)
 	t.Schema = data[SchemaKey].(string)
@@ -108,9 +108,6 @@ func (t *TableResource) FromResourceData(data resources.ResourceData) {
 // it rather than inventing a replace the backend does not require.
 func (t *TableResource) DiffUpstream(upstream *TableResource) bool {
 	if t.DisplayName != upstream.DisplayName {
-		return true
-	}
-	if t.Description != upstream.Description {
 		return true
 	}
 	if t.AccountID != upstream.AccountID {

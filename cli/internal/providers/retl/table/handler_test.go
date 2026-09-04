@@ -41,7 +41,6 @@ func validSpec() *specs.Spec {
 		Spec: map[string]any{
 			"id":                "users-table",
 			"display_name":      "Users",
-			"description":       "Customer records",
 			"account_id":        "acc-123",
 			"source_definition": "snowflake",
 			"primary_key":       "id",
@@ -62,6 +61,8 @@ func TestLoadSpec(t *testing.T) {
 
 		data := got[0].Data()
 		assert.Equal(t, "Users", data[table.DisplayNameKey])
+		assert.NotContains(t, data, "description",
+			"RETLTableConfig has no Description field, so a description could never round-trip")
 		assert.Equal(t, "public", data[table.SchemaKey])
 		assert.Equal(t, "users", data[table.TableKey])
 		assert.Equal(t, "id", data[table.PrimaryKeyKey])
