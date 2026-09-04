@@ -162,6 +162,24 @@ func TestSyncSettingsSendsOnlyDeclaredSections(t *testing.T) {
 	})
 }
 
+// Endpoints are replace-only: the update request carries neither id, so a
+// "change" would be silently dropped by the API while the CLI recorded it.
+func TestUpdateRejectsEndpointChange(t *testing.T) {
+	h := NewHandler(&mockStore{})
+	require.NoError(t, h.LoadSpec("c.yaml", specWith(entry(nil))))
+	data := resolvedData(t, h)
+
+	state := resources.ResourceData{
+		IDKey:            "conn-1",
+		SourceIDKey:      "src-remote-1",
+		DestinationIDKey: "dst-remote-OLD",
+	}
+	_, err := h.Update(context.Background(), "users-to-webhook", data, state)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destination cannot be changed")
+	assert.Contains(t, err.Error(), "must be replaced")
+}
+
 func TestUpdateRejectsImmutableChange(t *testing.T) {
 	h := NewHandler(&mockStore{})
 	require.NoError(t, h.LoadSpec("c.yaml", specWith(entry(nil))))

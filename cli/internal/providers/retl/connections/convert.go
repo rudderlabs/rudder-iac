@@ -1,6 +1,7 @@
 package connections
 
 import (
+	"encoding/json"
 	"fmt"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -135,6 +136,13 @@ func toCreateRequest(externalID string, data resources.ResourceData) (*retlClien
 	if cc, ok := data[CursorColumnKey].(string); ok {
 		req.CursorColumn = cc
 	}
+	if dc, ok := data[DestinationConfigKey].(map[string]any); ok && len(dc) > 0 {
+		raw, err := json.Marshal(dc)
+		if err != nil {
+			return nil, fmt.Errorf("encoding destination_config: %w", err)
+		}
+		req.DestinationConfig = raw
+	}
 	return req, nil
 }
 
@@ -194,6 +202,12 @@ func toSpecShapedInput(c *retlClient.RETLConnection, sourceURN, destinationURN s
 		MappingsKey:      mappingSpecsFrom(c.Mappings),
 		ConstantsKey:     constantSpecsFrom(c.Constants),
 		SyncSettingsKey:  syncSettingsSpecFrom(c.SyncSettings),
+	}
+	if len(c.DestinationConfig) > 0 {
+		var dc map[string]any
+		if err := json.Unmarshal(c.DestinationConfig, &dc); err == nil {
+			data[DestinationConfigKey] = dc
+		}
 	}
 	return data
 }

@@ -127,19 +127,20 @@ func (h *Handler) loadConnection(c ConnectionSpec) (*connectionResource, error) 
 	}
 
 	return &connectionResource{
-		LocalID:       c.LocalID,
-		Source:        sourceRef,
-		Destination:   destinationRef,
-		Enabled:       enabled,
-		SyncBehaviour: c.SyncBehaviour,
-		CursorColumn:  c.CursorColumn,
-		Object:        c.Object,
-		Schedule:      c.Schedule,
-		Event:         c.Event,
-		Identifiers:   c.Identifiers,
-		Mappings:      c.Mappings,
-		Constants:     c.Constants,
-		SyncSettings:  c.SyncSettings,
+		LocalID:           c.LocalID,
+		Source:            sourceRef,
+		Destination:       destinationRef,
+		Enabled:           enabled,
+		SyncBehaviour:     c.SyncBehaviour,
+		CursorColumn:      c.CursorColumn,
+		Object:            c.Object,
+		Schedule:          c.Schedule,
+		Event:             c.Event,
+		Identifiers:       c.Identifiers,
+		Mappings:          c.Mappings,
+		Constants:         c.Constants,
+		SyncSettings:      c.SyncSettings,
+		DestinationConfig: c.DestinationConfig,
 	}, nil
 }
 
@@ -171,18 +172,19 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for _, c := range h.resources {
 		data := resources.ResourceData{
-			SourceKey:        c.Source,
-			DestinationKey:   c.Destination,
-			EnabledKey:       c.Enabled,
-			SyncBehaviourKey: c.SyncBehaviour,
-			CursorColumnKey:  c.CursorColumn,
-			ObjectKey:        c.Object,
-			ScheduleKey:      c.Schedule,
-			EventKey:         c.Event,
-			IdentifiersKey:   c.Identifiers,
-			MappingsKey:      c.Mappings,
-			ConstantsKey:     c.Constants,
-			SyncSettingsKey:  c.SyncSettings,
+			SourceKey:            c.Source,
+			DestinationKey:       c.Destination,
+			EnabledKey:           c.Enabled,
+			SyncBehaviourKey:     c.SyncBehaviour,
+			CursorColumnKey:      c.CursorColumn,
+			ObjectKey:            c.Object,
+			ScheduleKey:          c.Schedule,
+			EventKey:             c.Event,
+			IdentifiersKey:       c.Identifiers,
+			MappingsKey:          c.Mappings,
+			ConstantsKey:         c.Constants,
+			SyncSettingsKey:      c.SyncSettings,
+			DestinationConfigKey: c.DestinationConfig,
 		}
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", ResourceKind, c.LocalID)),
@@ -231,6 +233,32 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	connectionID, ok := st[IDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing %s in resource state", IDKey)
+	}
+
+	// Endpoints are replace-only. UpdateRETLConnectionRequest carries neither
+	// sourceId nor destinationId, so sending a "change" here is silently
+	// ignored: the API returns 200, the CLI records the new endpoint in state,
+	// and the server keeps the old one. Verified against a live workspace —
+	// the divergence only surfaced later when deleting the old destination
+	// failed with "The destination has active connections".
+	//
+	// data holds the ref resolved to a remote id; state holds the remote id the
+	// connection was created with.
+	for _, endpoint := range []struct {
+		dataKey  string
+		stateKey string
+		label    string
+	}{
+		{SourceKey, SourceIDKey, "source"},
+		{DestinationKey, DestinationIDKey, "destination"},
+	} {
+		newVal, _ := data[endpoint.dataKey].(string)
+		oldVal, hadOld := st[endpoint.stateKey].(string)
+		if hadOld && newVal != "" && newVal != oldVal {
+			return nil, fmt.Errorf(
+				"%s cannot be changed on an existing connection (%s -> %s); the connection must be replaced",
+				endpoint.label, oldVal, newVal)
+		}
 	}
 
 	for _, immutable := range []struct {

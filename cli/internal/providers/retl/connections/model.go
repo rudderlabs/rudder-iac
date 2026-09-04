@@ -10,19 +10,20 @@ const (
 	MetadataName = "retl-connections"
 	ImportPath   = "connections.yaml"
 
-	ConnectionsKey   = "connections"
-	SourceKey        = "source"
-	DestinationKey   = "destination"
-	EnabledKey       = "enabled"
-	SyncBehaviourKey = "sync_behaviour"
-	CursorColumnKey  = "cursor_column"
-	ObjectKey        = "object"
-	ScheduleKey      = "schedule"
-	EventKey         = "event"
-	IdentifiersKey   = "identifiers"
-	MappingsKey      = "mappings"
-	ConstantsKey     = "constants"
-	SyncSettingsKey  = "sync_settings"
+	ConnectionsKey       = "connections"
+	SourceKey            = "source"
+	DestinationKey       = "destination"
+	EnabledKey           = "enabled"
+	SyncBehaviourKey     = "sync_behaviour"
+	CursorColumnKey      = "cursor_column"
+	ObjectKey            = "object"
+	ScheduleKey          = "schedule"
+	EventKey             = "event"
+	IdentifiersKey       = "identifiers"
+	MappingsKey          = "mappings"
+	ConstantsKey         = "constants"
+	SyncSettingsKey      = "sync_settings"
+	DestinationConfigKey = "destination_config"
 
 	// Output-side keys held in state.
 	IDKey            = "id"
@@ -59,6 +60,11 @@ type ConnectionSpec struct {
 	Mappings      []MappingSpec     `json:"mappings"       mapstructure:"mappings"       validate:"dive"`
 	Constants     []ConstantSpec    `json:"constants"      mapstructure:"constants"      validate:"dive"`
 	SyncSettings  *SyncSettingsSpec `json:"sync_settings"  mapstructure:"sync_settings"`
+	// DestinationConfig carries destination-specific flow fields. Schema-less at
+	// spec level by design — the destination registry validates it. Customer.io
+	// requires "object" in here rather than top-level, which the API enforces
+	// with "destinationConfig: missing required property 'object'".
+	DestinationConfig map[string]any `json:"destination_config" mapstructure:"destination_config"`
 }
 
 type ScheduleSpec struct {
@@ -108,19 +114,20 @@ type FailedKeysSpec struct {
 // PropertyRefs give the resource graph its dependency edges; the syncer
 // dereferences them to remote ids before calling the lifecycle.
 type connectionResource struct {
-	LocalID       string
-	Source        *resources.PropertyRef
-	Destination   *resources.PropertyRef
-	Enabled       bool
-	SyncBehaviour string
-	CursorColumn  string
-	Object        string
-	Schedule      ScheduleSpec
-	Event         *EventSpec
-	Identifiers   []MappingSpec
-	Mappings      []MappingSpec
-	Constants     []ConstantSpec
-	SyncSettings  *SyncSettingsSpec
+	LocalID           string
+	Source            *resources.PropertyRef
+	Destination       *resources.PropertyRef
+	Enabled           bool
+	SyncBehaviour     string
+	CursorColumn      string
+	Object            string
+	Schedule          ScheduleSpec
+	Event             *EventSpec
+	Identifiers       []MappingSpec
+	Mappings          []MappingSpec
+	Constants         []ConstantSpec
+	SyncSettings      *SyncSettingsSpec
+	DestinationConfig map[string]any
 }
 
 type ImportResourceInfo struct {
