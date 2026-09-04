@@ -7,12 +7,19 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/typescript"
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
 //go:embed testdata/RudderTyper.ts
 var rudderTyperTS string
+
+//go:embed testdata/IdentitySections.ts
+var identitySectionsTS string
+
+//go:embed testdata/EmptyIdentity.ts
+var emptyIdentityTS string
 
 func TestGenerate(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
@@ -29,6 +36,37 @@ func TestGenerate(t *testing.T) {
 
 	if diff := cmp.Diff(rudderTyperTS, files[0].Content); diff != "" {
 		t.Errorf("generated content does not match testdata/RudderTyper.ts (-want +got):\n%s\nRun 'make typer-typescript-update-testdata' to update the golden file.", diff)
+	}
+}
+
+// TestGenerateAuxiliaryGoldens keeps the clients the wire-contract suite runs
+// against in step with the generator. They are generated from their own plans
+// because identify and group are singletons — one shape each per plan — so the
+// identity-section matrix and the empty-schema path cannot live in the main
+// reference plan.
+func TestGenerateAuxiliaryGoldens(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		plan       *plan.TrackingPlan
+		outputFile string
+		want       string
+	}{
+		{"identity sections", testutils.GetIdentitySectionsPlan(), "IdentitySections.ts", identitySectionsTS},
+		{"empty identity", testutils.GetEmptyIdentityPlan(), "EmptyIdentity.ts", emptyIdentityTS},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			generator := &typescript.Generator{}
+			files, err := generator.Generate(tc.plan, core.GenerateOptions{
+				RudderCLIVersion: "1.0.0",
+			}, typescript.TypeScriptOptions{OutputFileName: tc.outputFile})
+
+			assert.NoError(t, err)
+			assert.Len(t, files, 1)
+
+			if diff := cmp.Diff(tc.want, files[0].Content); diff != "" {
+				t.Errorf("generated content does not match testdata/%s (-want +got):\n%s\nRun 'make typer-typescript-update-testdata' to update the golden files.", tc.outputFile, diff)
+			}
+		})
 	}
 }
 
