@@ -30,6 +30,11 @@
 - When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active. `concurrency.syncer < 1` was inert for users who never enabled `concurrentSyncs` (the flag gated whether `WithConcurrency` was applied at all), so GA clamps it to 1 in `config.GetConfig` rather than erroring — turning a previously ignored value into a hard failure is a breaking change for those configs. Users who had enabled the flag were already refused by `WithConcurrency`; clamping trades their loud error for a quiet default, which is the deliberate cost of not breaking anyone on upgrade.
 - Normalise such values once at config load, not in each command: copying the guard into `apply` and `destroy` duplicated validation `syncer.WithConcurrency` already performs and would drift on the third caller.
 
+## DEX-735 — Keep Unrelated Live Fixture Fixes Separate
+<!-- ticket:DEX-735 -->
+- Do not bundle live destination E2E fixture/snapshot changes into unrelated PRs; plan-rendering or other focused changes should leave destination fixture failures for a dedicated ticket/PR.
+- If a live backend fixture fails, decide whether to drop a field or seed backend data in a destination-focused change with destination-reviewer visibility.
+
 ## DEX-728 — Experimental Flag Removal Regression Coverage
 <!-- ticket:DEX-728 -->
 - When deleting an experimental flag from `cli/internal/config.ExperimentalConfig`, add a removal regression test in `cli/internal/config/experimental_test.go` similar to `TestIsValidExperimentalFlag_DataGraphRemoved`: build the removed flag string by concatenation so the full deleted flag literal is not present in source, and assert `IsValidExperimentalFlag` returns false so deleted flags cannot silently reappear in `experimental list` or telemetry.

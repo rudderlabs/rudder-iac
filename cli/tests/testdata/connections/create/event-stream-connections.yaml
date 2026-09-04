@@ -8,3 +8,7 @@ spec:
       source: "#event-stream-source:e2e-conn-android"
       destination: "#destination:e2e-conn-s3"
       enabled: true
+    - id: e2e-android-to-firebase
+      source: "#event-stream-source:e2e-conn-android"
+      destination: "#destination:e2e-conn-firebase"
+      enabled: true

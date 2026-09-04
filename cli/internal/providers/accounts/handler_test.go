@@ -7,23 +7,9 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// enableVarSubstitution turns on the experimental gate that makes exported
-// secrets serialize as "{{ .VAR }}" references instead of masked literals.
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
-}
 
 // mockStore records the last request seen by each verb and returns canned data.
 type mockStore struct {
@@ -213,7 +199,6 @@ func bqRemote(externalID string, opts string) *RemoteAccount {
 // user fills via a var file — the API never returns the value, so a masked
 // literal would be useless. Non-secret options pass through verbatim.
 func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
-	enableVarSubstitution(t)
 	h := &HandlerImpl{store: &mockStore{}}
 
 	specMap, err := h.toExportSpecMap("prod-analytics-bq", bqRemote("prod-analytics-bq", `{"project":"acme","location":"US"}`))
@@ -232,7 +217,6 @@ func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
 // never carry a raw secret. Even a value the API happened to echo back stays
 // masked.
 func TestFormatForExport_NeverLeaksSecret(t *testing.T) {
-	enableVarSubstitution(t)
 	h := &HandlerImpl{store: &mockStore{}}
 
 	entities, entries, err := h.FormatForExport(

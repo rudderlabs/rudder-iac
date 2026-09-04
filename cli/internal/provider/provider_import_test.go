@@ -15,7 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst/resolver"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -97,17 +96,7 @@ func printFileContentsRecursively(t *testing.T, dir string) {
 // spec with a variable reference (never a masked literal) plus a var
 // file with a placeholder; filling the var file and applying round-trips the
 // real value to the backend through the secret type.
-//
-// Not parallel: toggles the global experimental config.
 func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
-
 	b := backend.NewBackend()
 	testDir := t.TempDir()
 
