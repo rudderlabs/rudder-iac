@@ -316,6 +316,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		return registry, nil
 	}
 
+	if err := registry.Register(bq.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering bq destination definition: %w", err)
+	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
 	}
@@ -338,9 +341,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(bq.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bq destination definition: %w", err)
 		}
 		if err := registry.Register(bqstream.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bqstream destination definition: %w", err)

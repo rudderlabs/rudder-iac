@@ -71,3 +71,8 @@
 <!-- ticket:DEX-531 -->
 - CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
 - Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.
+
+## DEX-754 — Concurrent Same-File Edit Corruption
+<!-- ticket:DEX-754 -->
+- During BigQuery verified-destination promotion, running two same-file edits concurrently against `cli/internal/app/dependencies.go` corrupted or partially overwrote the file tail and dropped the intended `bq` registry insertion.
+- Durable mitigation: serialize edits to the same file, even when replacements look independent; use parallel edits only for different destination files.

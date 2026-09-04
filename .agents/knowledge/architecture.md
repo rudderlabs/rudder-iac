@@ -269,3 +269,9 @@
 - Google Ads Offline Conversions destination support is implemented as local type `google_adwords_offline_conversions`, API type `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/google_adwords_offline_conversions` with Go package name `googleadwordsofflineconversions`.
 - `google_adwords_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
 - Google Ads Offline Conversions has no CLI secret keys and declares only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`) with cloud-only connection mode.
+
+## DEX-754 — BigQuery Verified Destination Promotion
+<!-- ticket:DEX-754 -->
+- BigQuery (`bq.NewDefinition`) is a verified destination after QA verification: `cli/internal/app/dependencies.go` should register it whenever `ExperimentalFlags.DestinationSupport` is enabled, alongside verified destinations such as S3.
+- BigQuery promotion is registry-only; do not change the BigQuery destination definition, config surface, source types, fixtures, or snapshots when the task is only to move `bq` from unverified to verified.
+- `bqstream` and other destinations remain under the unverified-destination gate unless a separate verified-promotion task explicitly moves them.
