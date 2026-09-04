@@ -42,7 +42,7 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 		{
 			name:                   "unverifiedDestinations disabled registers verified destinations",
 			unverifiedDestinations: false,
-			wantTypes:              []string{"s3"},
+			wantTypes:              []string{"bqstream", "http", "s3"},
 		},
 		{
 			name:                   "unverifiedDestinations enabled registers verified and unverified destinations",
