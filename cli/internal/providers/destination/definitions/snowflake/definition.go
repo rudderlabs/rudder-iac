@@ -57,6 +57,20 @@ func init() {
 		`^(.{0,2}|.{64,})$`,
 		"must be 3-63 characters of lowercase letters, digits and single hyphens",
 	)
+
+	// The storage conditionals below are custom tags, so each needs its message
+	// registered: the formatter cannot derive one from a tag that carries no
+	// parameters. Every branch is gated on staging in your own bucket, so each
+	// message names that alongside the provider it applies to.
+	const ownStorage = "is required when 'use_rudder_storage' is false and 'cloud_provider' is"
+
+	funcs.NewTagMessage("snowflake_s3_required", ownStorage+" AWS")
+	funcs.NewTagMessage("snowflake_s3_role_required", ownStorage+" AWS and 's3.role_based_auth' is true")
+	funcs.NewTagMessage("snowflake_s3_key_required", ownStorage+" AWS and 's3.role_based_auth' is false")
+	funcs.NewTagMessage("snowflake_gcp_required", ownStorage+" GCP")
+	funcs.NewTagMessage("snowflake_azure_required", ownStorage+" AZURE")
+	funcs.NewTagMessage("snowflake_azure_key_required", ownStorage+" AZURE and 'azure.use_sas_tokens' is false")
+	funcs.NewTagMessage("snowflake_azure_sas_required", ownStorage+" AZURE and 'azure.use_sas_tokens' is true")
 }
 
 // bucketNameConditional switches bucket_name between the S3 and GCS rules that

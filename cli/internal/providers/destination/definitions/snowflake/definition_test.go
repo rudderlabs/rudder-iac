@@ -611,6 +611,35 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
+	t.Run("storage conditionals report a readable message, not validator internals", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		cfg["storage_integration"] = "RUDDER_S3"
+		cfg["s3"] = map[string]any{"role_based_auth": false}
+
+		errors := registered.ValidateConfig(cfg)
+		require.NotEmpty(t, errors)
+
+		var found bool
+		for _, err := range errors {
+			if err.Path != "/s3/access_key_id" {
+				continue
+			}
+			found = true
+			assert.Equal(
+				t,
+				"'access_key_id' is required when 'use_rudder_storage' is false and 'cloud_provider' is AWS and 's3.role_based_auth' is false",
+				err.Message,
+			)
+			assert.NotContains(t, err.Message, "snowflakeConfig", "must not leak the Go struct name")
+			assert.NotContains(t, err.Message, "Field validation for", "must not leak raw validator output")
+		}
+		require.True(t, found, "expected an error for /s3/access_key_id")
+	})
+
 	t.Run("unknown key rejected", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
