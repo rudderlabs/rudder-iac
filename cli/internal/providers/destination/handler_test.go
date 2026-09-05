@@ -248,6 +248,32 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		assert.Equal(t, "secret", apiSecret.Reveal(), "defaults do not disturb secret wrapping")
 	})
 
+	t.Run("numbers carry the types a decoded API response produces", func(t *testing.T) {
+		t.Parallel()
+
+		registry := definitions.NewRegistry()
+		require.NoError(t, registry.Register(defaultsTestDefinition()))
+		h := destination.NewHandler(nil, registry)
+
+		// A spec decoded from YAML yields int, while the remote side is decoded
+		// from JSON and yields float64. Left unnormalized the two never compare
+		// equal and the destination reports drift on every apply.
+		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/numeric.yaml", &destination.DestinationSpec{
+			ID:                "defaulted",
+			Type:              "DEFAULTED",
+			DefinitionVersion: 1,
+			Config: map[string]any{
+				"api_secret": "secret",
+				"batch_size": 100,
+			},
+		})
+		require.NoError(t, err)
+
+		resource := extracted["defaulted"]
+		require.NotNil(t, resource)
+		assert.Equal(t, float64(100), resource.Config["batch_size"])
+	})
+
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
 
