@@ -22,6 +22,7 @@ import (
 	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
+	bingadsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
@@ -34,6 +35,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
@@ -306,16 +308,22 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 }
 
 // newDestinationRegistry builds the destination definition registry.
-// DestinationSupport must be on before any definitions are registered.
-// Unverified definitions additionally require UnverifiedDestinations.
+// Verified definitions require DestinationSupport only; unverified definitions
+// additionally require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
 	if !cfg.ExperimentalFlags.DestinationSupport {
 		return registry, nil
 	}
 
+	if err := registry.Register(bqstream.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
+	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
+	}
+	if err := registry.Register(httpdest.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering http destination definition: %w", err)
 	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
@@ -334,11 +342,11 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
 		}
+		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
+		}
 		if err := registry.Register(bq.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bq destination definition: %w", err)
-		}
-		if err := registry.Register(bqstream.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
 		}
 		if err := registry.Register(braze.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering braze destination definition: %w", err)
@@ -370,6 +378,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
 		}
+		if err := registry.Register(googleadwordsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering google_adwords_offline_conversions destination definition: %w", err)
+		}
 		if err := registry.Register(googleads.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
 		}
@@ -384,9 +395,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(hs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
-		if err := registry.Register(httpdest.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}
 		if err := registry.Register(intercom.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering intercom destination definition: %w", err)

@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -57,7 +56,7 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}

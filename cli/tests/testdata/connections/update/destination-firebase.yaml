@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: e2e-conn-firebase
+spec:
+  id: e2e-conn-firebase
+  display_name: E2E Connection Firebase
+  type: firebase
+  enabled: true
+  definition_version: 1
+  config:
+    # firebase declares no connection_mode (schema.json has no such property),
+    # so this entry is the only thing that can satisfy the connect-time
+    # settings check for the android source — the use_native_sdk half of what
+    # the s3 destination covers through connection_mode.
+    use_native_sdk:
+      android: true

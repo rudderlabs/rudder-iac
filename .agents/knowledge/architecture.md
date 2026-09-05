@@ -257,3 +257,28 @@
 - Webhook declares the ten event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`); `amp`, `warehouse` and `shopify` are dropped even though db-config lists them, per DEX-730's never-declared rule.
 - Webhook supports cloud-only connection mode for all retained source types.
 - Do not narrow webhook further to the S3/GCS/Kinesis cloud-storage subset; it follows broad non-storage destination precedents such as Slack, Marketo, and Salesforce.
+
+## DEX-745 — Bing Ads Offline Conversions Destination Onboarding
+<!-- ticket:DEX-745 -->
+- `bingads_offline_conversions` destination support is implemented as CLI destination type `bingads_offline_conversions`, API type `BINGADS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/bingads_offline_conversions` using Go package name `bingadsofflineconversions`.
+- `bingads_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled, not with destination support alone.
+- Bing Ads Offline Conversions is a warehouse-only/account-linked destination: it may declare `common.SourceTypeWarehouse` only because integrations-config has no event-stream source types for it, and it should remain unverified until warehouse/account-linked apply flows are proven live.
+
+## DEX-747 — Google Ads Offline Conversions Destination Onboarding
+<!-- ticket:DEX-747 -->
+- Google Ads Offline Conversions destination support is implemented as local type `google_adwords_offline_conversions`, API type `GOOGLE_ADWORDS_OFFLINE_CONVERSIONS`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/google_adwords_offline_conversions` with Go package name `googleadwordsofflineconversions`.
+- `google_adwords_offline_conversions` is treated as an unverified destination definition: register it only when both `ExperimentalFlags.DestinationSupport` and `ExperimentalFlags.UnverifiedDestinations` are enabled.
+- Google Ads Offline Conversions has no CLI secret keys and declares only event-stream-reachable source types (`android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`, `cordova`) with cloud-only connection mode.
+
+## DEX-771 — HTTP Destination Verified Promotion
+<!-- ticket:DEX-771 -->
+- HTTP is now a verified/native destination definition: `cli/internal/app/newDestinationRegistry` registers `http.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled, without requiring `ExperimentalFlags.UnverifiedDestinations`.
+- The verified registry block now includes `http` alongside the other verified definitions; enabling unverified destinations adds the remaining unverified definitions and must not register HTTP a second time.
+- HTTP's definition surface remains unchanged by the promotion: CLI type `http`, API type `HTTP`, version `1`, and the existing CLI-owned event-stream source-type boundary still apply.
+
+## DEX-755 — BQ Streaming Verified Registry Promotion
+<!-- ticket:DEX-755 -->
+- `bqstream` is a verified/native destination definition after QA verification, so `cli/internal/app/newDestinationRegistry` registers `bqstream.NewDefinition()` whenever `ExperimentalFlags.DestinationSupport` is enabled.
+- `bqstream` no longer requires `ExperimentalFlags.UnverifiedDestinations`; the unverified gate should remain reserved for destinations that have not completed verification.
+- Do not also register `bqstream` in the unverified block; when both destination flags are enabled, duplicate registry registration would make registry construction fail.
+- Destination E2E fixtures still enable `UnverifiedDestinations` because the shared fixture set contains other unverified destinations; do not infer the live E2E gate from bqstream's verified registry status.

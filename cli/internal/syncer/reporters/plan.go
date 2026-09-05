@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -153,7 +152,7 @@ func printable(val any) string {
 	return fmt.Sprintf("%v", val)
 }
 
-// renderPropertyDiff renders a single property diff, either as a flat diff or expanded nested diff
+// renderPropertyDiff renders a single property diff, expanding nested value changes when possible.
 func renderPropertyDiff(diff differ.PropertyDiff) []string {
 	// A secret-only diff has no meaningful old => new — the remote value is unknown
 	// — so it is rendered by the dedicated secret helper and never enters the
@@ -162,24 +161,15 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 		return []string{renderSecretDiff(diff.Property)}
 	}
 
-	// If nested diff printing is disabled, use old behavior
-	useNestedDiffPrinting := config.GetConfig().ExperimentalFlags.NestedDiffs
-	if !useNestedDiffPrinting {
-		line := formattedLine(diff.Property, ValuePair{Source: diff.SourceValue, Target: diff.TargetValue})
-		return []string{line}
+	valueDiffs := ComputeNestedDiffs(diff.SourceValue, diff.TargetValue)
+
+	if len(valueDiffs) == 0 {
+		return []string{formattedLine(diff.Property, ValuePair{Source: diff.SourceValue, Target: diff.TargetValue})}
 	}
 
-	// Compute nested diffs
-	nestedDiffs := ComputeNestedDiffs(diff.SourceValue, diff.TargetValue)
-
-	// If no diffs found (values are equal), return empty
-	if len(nestedDiffs) == 0 {
-		return []string{}
-	}
-
-	// If only one diff and it's at the root level (empty path), use old behavior
-	if len(nestedDiffs) == 1 {
-		if pair, hasRoot := nestedDiffs[""]; hasRoot {
+	// If only one diff and it's at the root level (empty path), use single-line behavior.
+	if len(valueDiffs) == 1 {
+		if pair, hasRoot := valueDiffs[""]; hasRoot {
 			line := formattedLine(diff.Property, pair)
 			return []string{line}
 		}
@@ -189,14 +179,14 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 	lines := []string{}
 
 	// Sort paths for consistent output
-	paths := make([]string, 0, len(nestedDiffs))
-	for path := range nestedDiffs {
+	paths := make([]string, 0, len(valueDiffs))
+	for path := range valueDiffs {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
 
 	for _, path := range paths {
-		pair := nestedDiffs[path]
+		pair := valueDiffs[path]
 		// if path is a bracket notation, use it as is, otherwise add a dot
 		var fullPath string
 		if strings.HasPrefix(path, "[") {
