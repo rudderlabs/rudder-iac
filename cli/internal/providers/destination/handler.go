@@ -76,8 +76,14 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 	}
 
 	// Enriched before secret wrapping so the graph carries the same config the
-	// backend persists (see ApplyDefaults).
-	config := registered.ApplyDefaults(spec.Config)
+	// backend persists (see ApplyDefaults), then re-decoded through JSON so it
+	// carries the same concrete types the API response produces — mapstructure
+	// keeps YAML's int, json.Unmarshal yields float64, and the two never compare
+	// equal (see isEmptyConfigValue, which already assumes the JSON types).
+	config, err := jsonNormalized(registered.ApplyDefaults(spec.Config))
+	if err != nil {
+		return nil, err
+	}
 
 	resource := &DestinationResource{
 		ID:                spec.ID,
@@ -515,6 +521,23 @@ func isEmptyConfigValue(value any) bool {
 	default:
 		return false
 	}
+}
+
+// jsonNormalized re-decodes config through JSON so local spec values carry the
+// concrete types a decoded API response does. Without it a number written in a
+// spec stays an int while the remote side is a float64, and the resource reports
+// drift on every apply despite both sides rendering identically.
+func jsonNormalized(config map[string]any) (map[string]any, error) {
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling destination config: %w", err)
+	}
+
+	var normalized map[string]any
+	if err := json.Unmarshal(encoded, &normalized); err != nil {
+		return nil, fmt.Errorf("unmarshalling destination config: %w", err)
+	}
+	return normalized, nil
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case
