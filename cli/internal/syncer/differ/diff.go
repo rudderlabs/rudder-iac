@@ -348,13 +348,30 @@ func isNil(val any) bool {
 	return false
 }
 
-// isSecretValue reports whether v is a secret.String (value or pointer). Used
-// when one side omits a key so a presence-based secret still classifies as
-// SecretOnly rather than genuine drift.
+// isSecretValue reports whether v is a secret.String (value or pointer), or a
+// map holding nothing but those. Used when one side omits a key so a
+// presence-based secret still classifies as SecretOnly rather than genuine drift.
 func isSecretValue(v any) bool {
-	switch v.(type) {
+	switch t := v.(type) {
 	case secret.String, *secret.String:
 		return true
+
+	// A group whose every key is a secret is absent from the remote entirely —
+	// the API strips the keys, and nothing is left to carry the group. Presence
+	// is then decided on the group rather than on a secret, so recurse: without
+	// this the missing group reads as real drift and the resource is re-reported
+	// as changed on every plan. A group holding any non-secret is a real diff.
+	case map[string]any:
+		if len(t) == 0 {
+			return false
+		}
+		for _, child := range t {
+			if !isSecretValue(child) {
+				return false
+			}
+		}
+		return true
+
 	default:
 		return false
 	}
