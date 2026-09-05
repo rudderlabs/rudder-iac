@@ -35,6 +35,18 @@ func minimalConfig() map[string]any {
 	}
 }
 
+// setStorage writes one key into its provider block, creating the block on
+// first use. Provider-scoped storage keys live under s3/gcp/azure now, so tests
+// set them through here rather than at the top level.
+func setStorage(cfg map[string]any, block, key string, value any) {
+	inner, ok := cfg[block].(map[string]any)
+	if !ok {
+		inner = map[string]any{}
+		cfg[block] = inner
+	}
+	inner[key] = value
+}
+
 func copyConfig(src map[string]any) map[string]any {
 	out := make(map[string]any, len(src))
 	for k, v := range src {
@@ -71,7 +83,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	// on nested secret-path support.
 	assert.Equal(t, []string{
 		"password", "private_key", "private_key_passphrase",
-		"access_key_id", "access_key", "account_key", "sas_token", "credentials",
+		"s3.access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcp.credentials",
 	}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
@@ -189,16 +201,16 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			switch provider {
 			case "AWS":
 				cfg["bucket_name"] = "rudder-bucket"
-				cfg["role_based_auth"] = true
-				cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
+				setStorage(cfg, "s3", "role_based_auth", true)
+				setStorage(cfg, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/rudder")
 			case "GCP":
 				cfg["bucket_name"] = "rudder-gcs"
 				cfg["storage_integration"] = "RUDDER_GCS"
-				cfg["credentials"] = "{}"
+				setStorage(cfg, "gcp", "credentials", "{}")
 			case "AZURE":
-				cfg["container_name"] = "rudder-logs"
+				setStorage(cfg, "azure", "container_name", "rudder-logs")
 				cfg["storage_integration"] = "RUDDER_AZURE"
-				cfg["account_name"] = "rudderaccount"
+				setStorage(cfg, "azure", "account_name", "rudderaccount")
 			}
 			assert.Empty(t, registered.ValidateConfig(cfg), provider)
 		}
@@ -237,11 +249,42 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["cloud_provider"] = "AWS"
 		cfg["bucket_name"] = "rudder-bucket"
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/role_based_auth")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/role_based_auth")
 	})
 
 	// schema.json declares roleBasedAuth only inside the AWS branch, so the other
 	// providers must not be made to carry an AWS-only flag.
+	// An explicit false is a stated selector, not an absent one. go-playground
+	// dereferences a non-nil *bool before the validator sees it, so false and
+	// "missing" both look zero unless the pointer kind is checked — the live e2e
+	// caught this on the s3-keys fixture.
+	t.Run("aws accepts an explicit false role selector", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		setStorage(cfg, "s3", "role_based_auth", false)
+		setStorage(cfg, "s3", "access_key_id", "AKIAIOSFODNN7EXAMPLE")
+		setStorage(cfg, "s3", "access_key", "wJalrXUtnFEMI/K7MDENG")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("azure accepts an explicit false sas selector", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AZURE"
+		cfg["storage_integration"] = "RUDDER_AZURE"
+		setStorage(cfg, "azure", "container_name", "rudder-logs")
+		setStorage(cfg, "azure", "account_name", "rudderaccount")
+		setStorage(cfg, "azure", "use_sas_tokens", false)
+		setStorage(cfg, "azure", "account_key", "azure-account-key")
+
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
 	t.Run("role selector not required outside the aws branch", func(t *testing.T) {
 		t.Parallel()
 
@@ -250,16 +293,16 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		gcp["cloud_provider"] = "GCP"
 		gcp["bucket_name"] = "rudder-gcs"
 		gcp["storage_integration"] = "RUDDER_GCS"
-		gcp["credentials"] = "{}"
+		setStorage(gcp, "gcp", "credentials", "{}")
 		assert.Empty(t, registered.ValidateConfig(gcp))
 
 		azure := copyConfig(minimalConfig())
 		azure["use_rudder_storage"] = false
 		azure["cloud_provider"] = "AZURE"
-		azure["container_name"] = "rudder-logs"
+		setStorage(azure, "azure", "container_name", "rudder-logs")
 		azure["storage_integration"] = "RUDDER_AZURE"
-		azure["account_name"] = "rudderaccount"
-		azure["account_key"] = "azure-account-key"
+		setStorage(azure, "azure", "account_name", "rudderaccount")
+		setStorage(azure, "azure", "account_key", "azure-account-key")
 		assert.Empty(t, registered.ValidateConfig(azure))
 
 		rudderStorage := copyConfig(minimalConfig())
@@ -286,9 +329,9 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AWS"
 		cfg["bucket_name"] = "rudder-bucket"
-		cfg["role_based_auth"] = true
+		setStorage(cfg, "s3", "role_based_auth", true)
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/iam_role_arn")
 	})
 
 	t.Run("aws explicit key auth requires both access keys", func(t *testing.T) {
@@ -297,10 +340,10 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AWS"
 		cfg["bucket_name"] = "rudder-bucket"
-		cfg["role_based_auth"] = false
-		cfg["access_key_id"] = "access-key-id"
+		setStorage(cfg, "s3", "role_based_auth", false)
+		setStorage(cfg, "s3", "access_key_id", "access-key-id")
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/access_key")
 	})
 
 	t.Run("aws access key id template does not bypass literal pattern", func(t *testing.T) {
@@ -309,11 +352,11 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AWS"
 		cfg["bucket_name"] = "rudder-bucket"
-		cfg["role_based_auth"] = false
-		cfg["access_key_id"] = "{{ config.key || " + strings.Repeat("a", 150) + " }}"
-		cfg["access_key"] = "{{ config.secret || secret-access-key }}"
+		setStorage(cfg, "s3", "role_based_auth", false)
+		setStorage(cfg, "s3", "access_key_id", "{{ config.key || "+strings.Repeat("a", 150)+" }}")
+		setStorage(cfg, "s3", "access_key", "{{ config.secret || secret-access-key }}")
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key_id")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/access_key_id")
 	})
 
 	t.Run("gcp storage requires staging fields", func(t *testing.T) {
@@ -325,7 +368,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(cfg)
 		assertHasPath(t, errors, "/bucket_name")
 		assertHasPath(t, errors, "/storage_integration")
-		assertHasPath(t, errors, "/credentials")
+		assertHasPath(t, errors, "/gcp/credentials")
 	})
 
 	t.Run("azure storage requires staging fields", func(t *testing.T) {
@@ -335,9 +378,9 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["cloud_provider"] = "AZURE"
 
 		errors := registered.ValidateConfig(cfg)
-		assertHasPath(t, errors, "/container_name")
+		assertHasPath(t, errors, "/azure/container_name")
 		assertHasPath(t, errors, "/storage_integration")
-		assertHasPath(t, errors, "/account_name")
+		assertHasPath(t, errors, "/azure/account_name")
 	})
 
 	t.Run("azure omitted sas selector uses backend default", func(t *testing.T) {
@@ -345,9 +388,9 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AZURE"
-		cfg["container_name"] = "azure-logs"
+		setStorage(cfg, "azure", "container_name", "azure-logs")
 		cfg["storage_integration"] = "RUDDER_AZURE"
-		cfg["account_name"] = "rudderaccount"
+		setStorage(cfg, "azure", "account_name", "rudderaccount")
 
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
@@ -357,12 +400,12 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AZURE"
-		cfg["container_name"] = "azure-logs"
+		setStorage(cfg, "azure", "container_name", "azure-logs")
 		cfg["storage_integration"] = "RUDDER_AZURE"
-		cfg["account_name"] = "rudderaccount"
-		cfg["use_sas_tokens"] = false
+		setStorage(cfg, "azure", "account_name", "rudderaccount")
+		setStorage(cfg, "azure", "use_sas_tokens", false)
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/account_key")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/azure/account_key")
 	})
 
 	t.Run("azure explicit sas auth requires sas token", func(t *testing.T) {
@@ -370,12 +413,12 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AZURE"
-		cfg["container_name"] = "azure-logs"
+		setStorage(cfg, "azure", "container_name", "azure-logs")
 		cfg["storage_integration"] = "RUDDER_AZURE"
-		cfg["account_name"] = "rudderaccount"
-		cfg["use_sas_tokens"] = true
+		setStorage(cfg, "azure", "account_name", "rudderaccount")
+		setStorage(cfg, "azure", "use_sas_tokens", true)
 
-		assertHasPath(t, registered.ValidateConfig(cfg), "/sas_token")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/azure/sas_token")
 	})
 
 	// The full schema.json enum, including "10" which the definition originally omitted.
@@ -416,14 +459,14 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 
 		for _, name := range []string{"ruddercliE2e", "ab", strings.Repeat("a", 64), "a--b", "-abc", "abc-"} {
 			cfg := copyConfig(minimalConfig())
-			cfg["container_name"] = name
+			setStorage(cfg, "azure", "container_name", name)
 			errors := registered.ValidateConfig(cfg)
 			require.NotEmpty(t, errors, name)
-			assert.Equal(t, "/container_name", errors[0].Path)
+			assert.Equal(t, "/azure/container_name", errors[0].Path)
 		}
 
 		cfg := copyConfig(minimalConfig())
-		cfg["container_name"] = "rudder-cli-e2e"
+		setStorage(cfg, "azure", "container_name", "rudder-cli-e2e")
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
@@ -437,8 +480,8 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			cfg := copyConfig(minimalConfig())
 			cfg["use_rudder_storage"] = false
 			cfg["cloud_provider"] = "AWS"
-			cfg["role_based_auth"] = true
-			cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
+			setStorage(cfg, "s3", "role_based_auth", true)
+			setStorage(cfg, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/rudder")
 			cfg["bucket_name"] = bucket
 			return cfg
 		}
@@ -468,7 +511,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			cfg["use_rudder_storage"] = false
 			cfg["cloud_provider"] = "GCP"
 			cfg["storage_integration"] = "RUDDER_GCS"
-			cfg["credentials"] = "{}"
+			setStorage(cfg, "gcp", "credentials", "{}")
 			cfg["bucket_name"] = bucket
 			return cfg
 		}
@@ -499,10 +542,10 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		azure := copyConfig(minimalConfig())
 		azure["use_rudder_storage"] = false
 		azure["cloud_provider"] = "AZURE"
-		azure["container_name"] = "rudder-logs"
+		setStorage(azure, "azure", "container_name", "rudder-logs")
 		azure["storage_integration"] = "RUDDER_AZURE"
-		azure["account_name"] = "rudderaccount"
-		azure["account_key"] = "azure-account-key"
+		setStorage(azure, "azure", "account_name", "rudderaccount")
+		setStorage(azure, "azure", "account_key", "azure-account-key")
 		azure["bucket_name"] = "Stale_Bucket.From..AWS"
 		assert.Empty(t, registered.ValidateConfig(azure), "a stale bucket name must round-trip rather than error")
 
@@ -521,11 +564,11 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 			cfg["bucket_name"] = `{{ .BUCKET_NAME || rudder-bucket }}`
 			switch provider {
 			case "AWS":
-				cfg["role_based_auth"] = true
-				cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/rudder"
+				setStorage(cfg, "s3", "role_based_auth", true)
+				setStorage(cfg, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/rudder")
 			case "GCP":
 				cfg["storage_integration"] = "RUDDER_GCS"
-				cfg["credentials"] = "{}"
+				setStorage(cfg, "gcp", "credentials", "{}")
 			}
 			assert.Empty(t, registered.ValidateConfig(cfg), provider)
 		}
@@ -558,14 +601,43 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["use_rudder_storage"] = false
 		cfg["cloud_provider"] = "AZURE"
 		cfg["bucket_name"] = "gcs"
-		cfg["container_name"] = "azure-logs"
+		setStorage(cfg, "azure", "container_name", "azure-logs")
 		cfg["storage_integration"] = "azure_int"
-		cfg["account_name"] = "accountname"
-		cfg["account_key"] = "key"
-		cfg["role_based_auth"] = true
-		cfg["iam_role_arn"] = ""
+		setStorage(cfg, "azure", "account_name", "accountname")
+		setStorage(cfg, "azure", "account_key", "key")
+		setStorage(cfg, "s3", "role_based_auth", true)
+		setStorage(cfg, "s3", "iam_role_arn", "")
 
 		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("storage conditionals report a readable message, not validator internals", func(t *testing.T) {
+		t.Parallel()
+		cfg := copyConfig(minimalConfig())
+		cfg["use_rudder_storage"] = false
+		cfg["cloud_provider"] = "AWS"
+		cfg["bucket_name"] = "rudder-bucket"
+		cfg["storage_integration"] = "RUDDER_S3"
+		cfg["s3"] = map[string]any{"role_based_auth": false}
+
+		errors := registered.ValidateConfig(cfg)
+		require.NotEmpty(t, errors)
+
+		var found bool
+		for _, err := range errors {
+			if err.Path != "/s3/access_key_id" {
+				continue
+			}
+			found = true
+			assert.Equal(
+				t,
+				"'access_key_id' is required when 'use_rudder_storage' is false and 'cloud_provider' is AWS and 's3.role_based_auth' is false",
+				err.Message,
+			)
+			assert.NotContains(t, err.Message, "snowflakeConfig", "must not leak the Go struct name")
+			assert.NotContains(t, err.Message, "Field validation for", "must not leak raw validator output")
+		}
+		require.True(t, found, "expected an error for /s3/access_key_id")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -686,16 +758,22 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				"cleanup_object_storage_files": false,
 				"bucket_name": "gcs",
 				"storage_integration": "azure_int",
-				"role_based_auth": true,
-				"enable_sse": false,
-				"iam_role_arn": "",
 				"private_key": "",
 				"private_key_passphrase": "",
-				"credentials": "",
-				"container_name": "azure-logs",
-				"account_name": "accountname",
-				"use_sas_tokens": false,
-				"account_key": "key"
+				"s3": {
+					"role_based_auth": true,
+					"enable_sse": false,
+					"iam_role_arn": ""
+				},
+				"gcp": {
+					"credentials": ""
+				},
+				"azure": {
+					"container_name": "azure-logs",
+					"account_name": "accountname",
+					"use_sas_tokens": false,
+					"account_key": "key"
+				}
 			}`,
 			APIJSON: `{
 				"account": "qua-xxx-1",
@@ -744,8 +822,10 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				"cloud_provider": "AWS",
 				"bucket_name": "rudder-bucket",
 				"storage_integration": "RUDDER_S3",
-				"role_based_auth": true,
-				"iam_role_arn": "arn:aws:iam::000000000000:role/rudder"
+				"s3": {
+					"role_based_auth": true,
+					"iam_role_arn": "arn:aws:iam::000000000000:role/rudder"
+				}
 			}`,
 			APIJSON: `{
 				"account": "rudder-cli-e2e.us-east-1",
@@ -783,7 +863,9 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				"cloud_provider": "GCP",
 				"bucket_name": "rudder-gcs",
 				"storage_integration": "RUDDER_GCS",
-				"credentials": "{\"type\":\"service_account\"}"
+				"gcp": {
+					"credentials": "{\"type\":\"service_account\"}"
+				}
 			}`,
 			APIJSON: `{
 				"account": "rudder-cli-e2e.us-east-1",
@@ -825,10 +907,14 @@ func TestSnowflakeConversionRoundTrip(t *testing.T) {
 				"cloud_provider": "AWS",
 				"skip_tracks_table": false,
 				"prefer_append": false,
-				"enable_sse": false,
-				"use_sas_tokens": false,
 				"underscore_divide_numbers": false,
-				"allow_users_context_traits": false
+				"allow_users_context_traits": false,
+				"s3": {
+					"enable_sse": false
+				},
+				"azure": {
+					"use_sas_tokens": false
+				}
 			}`,
 			APIJSON: `{
 				"account": "rudder-cli-e2e.us-east-1",

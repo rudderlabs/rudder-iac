@@ -27,8 +27,7 @@
     "bucketName": "rudder-cli-e2e-s3keys-updated",
     "storageIntegration": "RUDDER_S3_KEYS_INTEGRATION",
     "enableSSE": false,
-    "roleBasedAuth": false,
-    "useSASTokens": false
+    "roleBasedAuth": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

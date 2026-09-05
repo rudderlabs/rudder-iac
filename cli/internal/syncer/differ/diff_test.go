@@ -162,6 +162,48 @@ func TestCompareData_Secret(t *testing.T) {
 		assert.True(t, secretOnly)
 	})
 
+	t.Run("a group of only secrets, absent remotely, is secret-only not drift", func(t *testing.T) {
+		// The API strips every key in the group, so the group itself does not
+		// come back — presence is decided on the map, not on a secret.
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": map[string]any{"credentials": secret.New("blob")}},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.True(t, diffs["gcp"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("a group of only secrets, absent locally, is secret-only not drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"gcp": map[string]any{"credentials": secret.New("blob")}},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.True(t, diffs["gcp"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("an absent group holding a non-secret is genuine drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"s3": map[string]any{"access_key": secret.New("k"), "enable_sse": false}},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "s3")
+		assert.False(t, diffs["s3"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("an absent empty group is genuine drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": map[string]any{}},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.False(t, diffs["gcp"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
 	t.Run("secret nested in a map with a real sibling is a real diff", func(t *testing.T) {
 		diffs, secretOnly := differ.CompareData(
 			resources.ResourceData{"config": map[string]any{"token": secret.New("hunter2"), "name": "a"}},

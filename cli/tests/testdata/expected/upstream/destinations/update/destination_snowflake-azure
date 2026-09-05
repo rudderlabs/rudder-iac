@@ -27,8 +27,7 @@
     "containerName": "rudder-cli-e2e-updated",
     "storageIntegration": "RUDDER_AZURE_INTEGRATION",
     "accountName": "ruddercliE2e",
-    "useSASTokens": false,
-    "enableSSE": false
+    "useSASTokens": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
