@@ -20,6 +20,7 @@
     "displayInterval": {
       "web": "2500"
     },
+    "eventFilteringOption": "disable",
     "getInAppEventMapping": {
       "web": [
         {
