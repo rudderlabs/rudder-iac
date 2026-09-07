@@ -315,9 +315,50 @@ func toAnySlice(entries []map[string]any) []any {
 	return out
 }
 
+// rewriteNumber converts any numeric value to float64. Values beyond 2^53 lose
+// precision, which config numbers never approach and JSON could not represent
+// exactly either.
+func rewriteNumber(input any) (float64, bool) {
+	switch n := input.(type) {
+	case int:
+		return float64(n), true
+	case int8:
+		return float64(n), true
+	case int16:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case uint:
+		return float64(n), true
+	case uint8:
+		return float64(n), true
+	case uint16:
+		return float64(n), true
+	case uint32:
+		return float64(n), true
+	case uint64:
+		return float64(n), true
+	case float32:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
 // rewrite []any ->  map[string]any if possible
 // and return back the response.
 func rewriteCompatibleType(input any) (any, bool) {
+	// A whole number decodes to int from a YAML spec but to float64 from a JSON
+	// API response, so the same value would fail the type gate below and the
+	// resource would report drift on every apply. Normalize to float64, the type
+	// json.Unmarshal produces, since remote state always arrives that way.
+	if number, ok := rewriteNumber(input); ok {
+		return number, true
+	}
 
 	if _, ok := input.([]any); !ok {
 		return nil, false
