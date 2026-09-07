@@ -4,13 +4,6 @@
       "web": "400"
     },
     "apiKey": "rudderCliE2eApiKeyUpdated",
-    "blacklistedEvents": {
-      "web": [
-        {
-          "eventName": "Page Viewed"
-        }
-      ]
-    },
     "closeButtonColor": {
       "web": "#ffffff"
     },
@@ -38,9 +31,6 @@
     "dataCenter": "EUDC",
     "displayInterval": {
       "web": "2500"
-    },
-    "eventFilteringOption": {
-      "web": "blacklistedEvents"
     },
     "getInAppEventMapping": {
       "web": [
