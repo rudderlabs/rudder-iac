@@ -241,12 +241,22 @@ func TestIterableConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	// iterable and adobe_analytics are the only two destinations whose
-	// whitelistedEvents/blacklistedEvents carry no {{ … || … }} branch upstream,
-	// so template text is an ordinary literal measured against the bound.
-	t.Run("event filtering measures template text", func(t *testing.T) {
+	t.Run("event filtering event names accept dynamic templates", func(t *testing.T) {
 		t.Parallel()
-		long := "{{ config.event || " + strings.Repeat("a", 150) + " }}"
+		template := "{{ config.event || " + strings.Repeat("a", 150) + " }}"
+		for _, key := range []string{"whitelist", "blacklist"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key":         "iterable-api-key",
+				"data_center":     "USDC",
+				"event_filtering": map[string]any{key: []any{template}},
+			})
+			assert.Empty(t, errors, key)
+		}
+	})
+
+	t.Run("event filtering measures literal event names", func(t *testing.T) {
+		t.Parallel()
+		long := strings.Repeat("a", 150)
 		for _, key := range []string{"whitelist", "blacklist"} {
 			errors := registered.ValidateConfig(map[string]any{
 				"api_key":         "iterable-api-key",
