@@ -29,4 +29,5 @@ spec:
     cleanup_object_storage_files: false
     bucket_name: rudder-cli-e2e-gcs-updated
     storage_integration: RUDDER_GCS_INTEGRATION
-    credentials: '{{ .SNOWFLAKE_GCP_CREDENTIALS }}'
+    gcp:
+      credentials: '{{ .SNOWFLAKE_GCP_CREDENTIALS }}'

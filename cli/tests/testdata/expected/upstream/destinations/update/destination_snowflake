@@ -32,9 +32,7 @@
     "user": "RUDDER_CLI_E2E",
     "warehouse": "RUDDER_WH",
     "cloudProvider": "AWS",
-    "cleanupObjectStorageFiles": false,
-    "enableSSE": false,
-    "useSASTokens": false
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

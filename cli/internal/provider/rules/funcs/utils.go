@@ -210,6 +210,12 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		return fmt.Sprintf("'%s' and '%s' cannot be specified together", fieldName, otherField)
 
 	default:
+		// Custom tags registered via ConfigValidateFuncs have no parameters to
+		// build a message from, so they rely on a registered message. Without
+		// one the raw validator error leaks the Go struct name to the user.
+		if msg, ok := getTagErrorMessage(err.ActualTag()); ok {
+			return fmt.Sprintf("'%s' %s", fieldName, msg)
+		}
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
 }

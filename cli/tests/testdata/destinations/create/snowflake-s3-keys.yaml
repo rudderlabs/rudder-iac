@@ -29,7 +29,8 @@ spec:
     cleanup_object_storage_files: false
     bucket_name: rudder-cli-e2e-s3keys
     storage_integration: RUDDER_S3_KEYS_INTEGRATION
-    enable_sse: false
-    role_based_auth: false
-    access_key_id: "{{ .SNOWFLAKE_ACCESS_KEY_ID }}"
-    access_key: "{{ .SNOWFLAKE_ACCESS_KEY }}"
+    s3:
+      enable_sse: false
+      role_based_auth: false
+      access_key_id: "{{ .SNOWFLAKE_ACCESS_KEY_ID }}"
+      access_key: "{{ .SNOWFLAKE_ACCESS_KEY }}"
