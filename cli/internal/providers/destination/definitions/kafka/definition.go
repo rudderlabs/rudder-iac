@@ -97,39 +97,28 @@ type sshConfig struct {
 }
 
 // kafkaSSHRequired reads the selector from the top-level config because the SSH
-// fields live in a nested block and go-playground's required_if only resolves
-// fields on the current struct.
+// fields live in a nested block: fl.Parent() is sshConfig, which does not carry
+// UseSSH, and go-playground's required_if only resolves fields on that parent.
 func kafkaSSHRequired(fl validator.FieldLevel) bool {
 	if fl.Field().String() != "" {
 		return true
 	}
 
 	root := fl.Top()
-	for root.Kind() == reflect.Pointer {
-		if root.IsNil() {
-			return true
-		}
+	if root.Kind() == reflect.Pointer {
 		root = root.Elem()
 	}
 	if root.Kind() != reflect.Struct {
 		return true
 	}
 
-	useSSH := root.FieldByName("UseSSH")
-	if !useSSH.IsValid() {
-		return true
-	}
-	for useSSH.Kind() == reflect.Pointer {
-		if useSSH.IsNil() {
-			return true
-		}
-		useSSH = useSSH.Elem()
-	}
-	if useSSH.Kind() != reflect.Bool || !useSSH.Bool() {
+	field := root.FieldByName("UseSSH")
+	if !field.IsValid() {
 		return true
 	}
 
-	return false
+	useSSH, _ := field.Interface().(*bool)
+	return useSSH == nil || !*useSSH
 }
 
 // schema.json requires both fields inside avroSchemas.items, but only within the
