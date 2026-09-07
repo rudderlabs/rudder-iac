@@ -76,3 +76,8 @@
 <!-- ticket:DEX-735 -->
 - CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
 - Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.
+
+## DEX-812 — Iterable Create Snapshot Default
+<!-- ticket:DEX-812 -->
+- CI live destination E2E showed Iterable create responses can include backend default `config.eventFilteringOption = "disable"` even when local `cli/tests/testdata/destinations/create/iterable.yaml` omits an `event_filtering` block.
+- Durable mitigation: include `"eventFilteringOption": "disable"` in the Iterable create upstream snapshot while keeping local YAML free of any direct event-filtering option field.
