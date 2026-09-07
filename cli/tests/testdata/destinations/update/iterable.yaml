@@ -47,9 +47,6 @@ spec:
       web: "16"
     is_required_to_dismiss_message:
       web: false
-    event_filtering:
-      blacklist:
-        - Page Viewed
     consent_management:
       web:
         - provider: oneTrust
