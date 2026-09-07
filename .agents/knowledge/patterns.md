@@ -237,3 +237,9 @@
 <!-- ticket:DEX-771 -->
 - `TestDestinationsApply` still sets `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`, but HTTP is no longer the reason; the fixture set still includes unverified destination types such as `attentive_tag`, `rs`, and `salesforce`.
 - HTTP fixture coverage remains in the shared destination E2E suite as a verified destination, so compile-only validation can exercise its test code without live workspace mutation.
+
+## DEX-812 — Kafka SSH Grouping And Validation
+<!-- ticket:DEX-812 -->
+- Kafka maps nested local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` to the unchanged flat API keys `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey` with dotted `converter.Simple` paths; `use_ssh` remains top-level as the branch selector.
+- Use a value nested SSH struct instead of a pointer struct so validators still descend into SSH fields when the local `ssh` block is absent, allowing per-field `/ssh/...` errors when `use_ssh` is true.
+- Nested Kafka SSH requiredness uses a destination-scoped `kafka_ssh_required` validator that reads top-level `UseSSH` via `validator.FieldLevel.Top()`; ordinary `required_if=UseSSH true` on nested fields would silently become a no-op because go-playground resolves field names within the current struct.

@@ -1,10 +1,15 @@
 package kafka
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 const (
@@ -78,13 +83,53 @@ type kafkaConfig struct {
 	EventTypeToTopicMap []eventTypeTopicMapping  `mapstructure:"event_type_to_topic_map" validate:"omitempty,dive"`
 	EventToTopicMap     []topicMapping           `mapstructure:"event_to_topic_map" validate:"omitempty,dive"`
 	UseSSH              *bool                    `mapstructure:"use_ssh"`
-	SSHHost             string                   `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_host"`
-	SSHPort             string                   `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_port"`
-	SSHUser             string                   `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_user_name"`
-	SSHPublicKey        string                   `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=kafka_ssh_public_key"`
+	SSH                 sshConfig                `mapstructure:"ssh"`
 	EmbedAvroSchemaID   *bool                    `mapstructure:"embed_avro_schema_id"`
 	ConnectionMode      common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
+}
+
+type sshConfig struct {
+	Host      string `mapstructure:"host" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_ssh_host"`
+	Port      string `mapstructure:"port" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_port"`
+	User      string `mapstructure:"user" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_user_name"`
+	PublicKey string `mapstructure:"public_key" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_ssh_public_key"`
+}
+
+// kafkaSSHRequired reads the selector from the top-level config because the SSH
+// fields live in a nested block and go-playground's required_if only resolves
+// fields on the current struct.
+func kafkaSSHRequired(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "" {
+		return true
+	}
+
+	root := fl.Top()
+	for root.Kind() == reflect.Pointer {
+		if root.IsNil() {
+			return true
+		}
+		root = root.Elem()
+	}
+	if root.Kind() != reflect.Struct {
+		return true
+	}
+
+	useSSH := root.FieldByName("UseSSH")
+	if !useSSH.IsValid() {
+		return true
+	}
+	for useSSH.Kind() == reflect.Pointer {
+		if useSSH.IsNil() {
+			return true
+		}
+		useSSH = useSSH.Elem()
+	}
+	if useSSH.Kind() != reflect.Bool || !useSSH.Bool() {
+		return true
+	}
+
+	return false
 }
 
 // schema.json requires both fields inside avroSchemas.items, but only within the
@@ -136,10 +181,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 		converter.Simple("useSSH", "use_ssh"),
-		converter.Simple("sshHost", "ssh_host"),
-		converter.Simple("sshPort", "ssh_port"),
-		converter.Simple("sshUser", "ssh_user"),
-		converter.Simple("sshPublicKey", "ssh_public_key"),
+		converter.Simple("sshHost", "ssh.host"),
+		converter.Simple("sshPort", "ssh.port"),
+		converter.Simple("sshUser", "ssh.user"),
+		converter.Simple("sshPublicKey", "ssh.public_key"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
@@ -155,5 +200,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "kafka_ssh_required", Func: kafkaSSHRequired},
+		},
 	}
 }
