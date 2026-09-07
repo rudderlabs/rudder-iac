@@ -315,47 +315,27 @@ func toAnySlice(entries []map[string]any) []any {
 	return out
 }
 
-// rewriteNumber converts any numeric value to float64. Values beyond 2^53 lose
-// precision, which config numbers never approach and JSON could not represent
-// exactly either.
+// rewriteNumber widens any number to float64, the type json.Unmarshal produces
+// for remote state. The same value decoded from a YAML spec arrives as an int,
+// and without this the two fail the type gate below and re-diff on every apply.
 func rewriteNumber(input any) (float64, bool) {
-	switch n := input.(type) {
-	case int:
-		return float64(n), true
-	case int8:
-		return float64(n), true
-	case int16:
-		return float64(n), true
-	case int32:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	case uint:
-		return float64(n), true
-	case uint8:
-		return float64(n), true
-	case uint16:
-		return float64(n), true
-	case uint32:
-		return float64(n), true
-	case uint64:
-		return float64(n), true
-	case float32:
-		return float64(n), true
-	case float64:
-		return n, true
+	value := reflect.ValueOf(input)
+
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(value.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(value.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return value.Float(), true
 	default:
 		return 0, false
 	}
 }
 
-// rewrite []any ->  map[string]any if possible
+// rewrite []any ->  map[string]any and int -> float64 if possible
 // and return back the response.
 func rewriteCompatibleType(input any) (any, bool) {
-	// A whole number decodes to int from a YAML spec but to float64 from a JSON
-	// API response, so the same value would fail the type gate below and the
-	// resource would report drift on every apply. Normalize to float64, the type
-	// json.Unmarshal produces, since remote state always arrives that way.
 	if number, ok := rewriteNumber(input); ok {
 		return number, true
 	}
