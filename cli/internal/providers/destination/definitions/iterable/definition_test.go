@@ -66,8 +66,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"icon_path/web":                      {"web"},
 		"is_required_to_dismiss_message/web": {"web"},
 		"close_button_position/web":          {"web"},
-		"event_filtering/whitelist":          {"web"},
-		"event_filtering/blacklist":          {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("ITERABLE", 1)
@@ -461,7 +459,7 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "event filtering whitelist derives web-scoped option",
+			Name: "event filtering whitelist derives option",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
 				"data_center": "USDC",
@@ -470,12 +468,12 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
 				"dataCenter": "USDC",
-				"eventFilteringOption": {"web": "whitelistedEvents"},
-				"whitelistedEvents": {"web": [{"eventName": "one"}, {"eventName": "two"}]}
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents": [{"eventName": "one"}, {"eventName": "two"}]
 			}`,
 		},
 		{
-			Name: "event filtering blacklist derives web-scoped option",
+			Name: "event filtering blacklist derives option",
 			LocalJSON: `{
 				"api_key": "iterable-api-key",
 				"data_center": "USDC",
@@ -484,8 +482,8 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 			APIJSON: `{
 				"apiKey": "iterable-api-key",
 				"dataCenter": "USDC",
-				"eventFilteringOption": {"web": "blacklistedEvents"},
-				"blacklistedEvents": {"web": [{"eventName": "noise"}]}
+				"eventFilteringOption": "blacklistedEvents",
+				"blacklistedEvents": [{"eventName": "noise"}]
 			}`,
 		},
 		{
