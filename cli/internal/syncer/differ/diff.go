@@ -315,9 +315,30 @@ func toAnySlice(entries []map[string]any) []any {
 	return out
 }
 
-// rewrite []any ->  map[string]any if possible
+// rewriteNumber widens any number to float64, the type json.Unmarshal produces
+// for remote state. The same value decoded from a YAML spec arrives as an int,
+// and without this the two fail the type gate below and re-diff on every apply.
+func rewriteNumber(input any) (float64, bool) {
+	value := reflect.ValueOf(input)
+
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(value.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(value.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return value.Float(), true
+	default:
+		return 0, false
+	}
+}
+
+// rewrite []any ->  map[string]any and int -> float64 if possible
 // and return back the response.
 func rewriteCompatibleType(input any) (any, bool) {
+	if number, ok := rewriteNumber(input); ok {
+		return number, true
+	}
 
 	if _, ok := input.([]any); !ok {
 		return nil, false
