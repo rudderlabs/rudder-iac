@@ -12,8 +12,6 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// ConcurrentSyncs enables concurrent sync operations when applying changes
-	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// ImportMerge enables import-manifest.yaml generation during `import workspace`
@@ -22,18 +20,9 @@ type ExperimentalConfig struct {
 	// remote resources to existing local project resources instead of
 	// generating duplicate specs
 	ImportMerge bool `mapstructure:"importMerge"`
-	// DestinationSupport enables destination definition registration and
-	// destination kind matching for validate/apply/import flows.
-	DestinationSupport bool `mapstructure:"destinationSupport"`
 	// UnverifiedDestinations enables registration of destination definitions
-	// that still need the unverified gate when DestinationSupport is also enabled.
+	// that still need the unverified gate.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
-	// AccountSupport enables account provider registration and account kind
-	// matching for validate/apply/import flows.
-	AccountSupport bool `mapstructure:"accountSupport"`
-	// ConnectionSupport enables the event-stream-connections kind for
-	// validate/apply flows.
-	ConnectionSupport bool `mapstructure:"connectionSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

@@ -68,14 +68,14 @@ func TestBuildIdentifyMethod_StrictCast(t *testing.T) {
 				Condition: `typeof userIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "userIdOrTraits"},
-					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					propsArg("%s as unknown as SDKIdentifyTraits", "userIdOrTraits"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "userIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -115,7 +115,7 @@ func TestBuildIdentifyMethod_EmptySchema_NoTraitsType(t *testing.T) {
 		},
 		DispatcherBranches: []TSDispatcherBranch{
 			{SDKArguments: []TSSDKArgument{
-				{Value: "userId"}, {Value: "undefined"},
+				{Value: "userId"}, {Value: "{}"},
 				{Value: "this.withRudderTyperContext(options)"}, {Value: "callback"},
 			}},
 		},
@@ -125,39 +125,60 @@ func TestBuildIdentifyMethod_EmptySchema_NoTraitsType(t *testing.T) {
 	assert.True(t, ctx.UsesApiCallback)
 }
 
-func TestBuildIdentifyMethod_ContextTraitsRoutesToContext(t *testing.T) {
-	rule := &plan.EventRule{
-		Event:   plan.Event{EventType: plan.EventTypeIdentify, Description: "Identify with context traits"},
-		Section: plan.IdentitySectionContextTraits,
-		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-			"email": {Property: plan.Property{Name: "email", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
-		}},
+// TestIdentitySectionDoesNotChangeTheCall pins the core of the DAW-3732 fix:
+// identity_section describes which part of the payload the plan validates, and
+// must not change how the data reaches the SDK. Every section has to produce
+// the same call, with traits in the SDK's traits parameter.
+//
+// The previous behaviour made context.traits emit a different shape, which
+// stopped the SDK persisting traits (identify) and left the event's own traits
+// field empty (group).
+func TestIdentitySectionDoesNotChangeTheCall(t *testing.T) {
+	schema := plan.ObjectSchema{
+		Properties: map[string]plan.PropertySchema{
+			"plan": {Property: plan.Property{Name: "plan", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
+		},
+	}
+	sections := []plan.IdentitySection{
+		plan.IdentitySectionProperties,
+		plan.IdentitySectionTraits,
+		plan.IdentitySectionContextTraits,
 	}
 
-	ctx := &TSContext{}
-	method, err := buildIdentifyMethod(rule, ctx, newTestRegistry())
-	require.NoError(t, err)
+	for _, build := range []struct {
+		name string
+		call func(section plan.IdentitySection) (*TSAnalyticsMethod, error)
+	}{
+		{"identify", func(section plan.IdentitySection) (*TSAnalyticsMethod, error) {
+			rule := &plan.EventRule{
+				Event:   plan.Event{EventType: plan.EventTypeIdentify, Description: "Identify"},
+				Section: section,
+				Schema:  schema,
+			}
+			return buildIdentifyMethod(rule, &TSContext{}, newTestRegistry())
+		}},
+		{"group", func(section plan.IdentitySection) (*TSAnalyticsMethod, error) {
+			return buildGroupMethod(groupRule("Group", section, schema), &TSContext{}, newTestRegistry())
+		}},
+	} {
+		t.Run(build.name, func(t *testing.T) {
+			var want []TSDispatcherBranch
+			for _, section := range sections {
+				method, err := build.call(section)
+				require.NoError(t, err)
 
-	assert.Equal(t, []TSDispatcherBranch{
-		{
-			Condition: `typeof userIdOrTraits === "string"`,
-			SDKArguments: []TSSDKArgument{
-				{Value: "userIdOrTraits"},
-				{Value: "undefined"},
-				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
-				{Value: "callback"},
-			},
-		},
-		{
-			SDKArguments: []TSSDKArgument{
-				{Value: "null"},
-				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "userIdOrTraits"),
-				{Value: "optionsOrCallback as ApiCallback | undefined"},
-			},
-		},
-	}, method.DispatcherBranches)
-
-	assert.False(t, ctx.UsesSDKIdentifyTraits)
+				if want == nil {
+					want = method.DispatcherBranches
+					// The shape every section must produce: traits in the SDK's
+					// traits parameter, guarded so an omitted call cannot clear
+					// what is already stored.
+					require.Contains(t, want[0].SDKArguments[1].Value, "?? {}) as unknown as SDKIdentifyTraits")
+					continue
+				}
+				assert.Equal(t, want, method.DispatcherBranches, "section %q changed the emitted call", section)
+			}
+		})
+	}
 }
 
 // ===== Group =====
@@ -202,14 +223,14 @@ func TestBuildGroupMethod_EmitsOverloads(t *testing.T) {
 				Condition: `typeof groupIdOrTraits === "string"`,
 				SDKArguments: []TSSDKArgument{
 					{Value: "groupIdOrTraits"},
-					propsArg("%s as unknown as SDKIdentifyTraits", "traitsOrOptions"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "traitsOrOptions"),
 					{Value: "this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined)"},
 					{Value: "callback"},
 				},
 			},
 			{
 				SDKArguments: []TSSDKArgument{
-					propsArg("%s as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
+					propsArg("(%s ?? {}) as unknown as SDKIdentifyTraits", "groupIdOrTraits"),
 					{Value: "this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined)"},
 					{Value: "optionsOrCallback as ApiCallback | undefined"},
 				},
@@ -245,7 +266,7 @@ func TestBuildGroupMethod_EmptySchema_OmitsTraitsType(t *testing.T) {
 		},
 		DispatcherBranches: []TSDispatcherBranch{
 			{SDKArguments: []TSSDKArgument{
-				{Value: "groupId"}, {Value: "undefined"},
+				{Value: "groupId"}, {Value: "{}"},
 				{Value: "this.withRudderTyperContext(options)"}, {Value: "callback"},
 			}},
 		},
@@ -253,39 +274,6 @@ func TestBuildGroupMethod_EmptySchema_OmitsTraitsType(t *testing.T) {
 
 	assert.False(t, ctx.UsesSDKIdentifyTraits)
 	assert.True(t, ctx.UsesApiCallback)
-}
-
-func TestBuildGroupMethod_ContextTraitsRoutesToContext(t *testing.T) {
-	rule := groupRule("", plan.IdentitySectionContextTraits, plan.ObjectSchema{
-		Properties: map[string]plan.PropertySchema{
-			"tenant": {Property: plan.Property{Name: "tenant", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true},
-		},
-	})
-
-	ctx := &TSContext{}
-	method, err := buildGroupMethod(rule, ctx, newTestRegistry())
-	require.NoError(t, err)
-
-	assert.Equal(t, []TSDispatcherBranch{
-		{
-			Condition: `typeof groupIdOrTraits === "string"`,
-			SDKArguments: []TSSDKArgument{
-				{Value: "groupIdOrTraits"},
-				{Value: "undefined"},
-				propsArg("this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, %s as unknown as SDKApiObject)", "traitsOrOptions"),
-				{Value: "callback"},
-			},
-		},
-		{
-			SDKArguments: []TSSDKArgument{
-				{Value: "null"},
-				propsArg("this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, %s as unknown as SDKApiObject)", "groupIdOrTraits"),
-				{Value: "optionsOrCallback as ApiCallback | undefined"},
-			},
-		},
-	}, method.DispatcherBranches)
-
-	assert.False(t, ctx.UsesSDKIdentifyTraits)
 }
 
 // ===== Page =====

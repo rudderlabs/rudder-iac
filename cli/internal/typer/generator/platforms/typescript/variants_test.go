@@ -29,7 +29,7 @@ func TestBuildVariantGroup_StringDiscriminator(t *testing.T) {
 				DisplayName: "Beta",
 				Match:       []any{"beta"},
 				Description: "The beta case",
-				Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
+				Schema:      plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
 			},
 		},
 		DefaultSchema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
@@ -154,7 +154,7 @@ func TestBuildVariantGroup_MultipleMatchValues(t *testing.T) {
 			{
 				Match:       []any{"fast", "turbo"},
 				Description: "Fast modes",
-				Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
+				Schema:      plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}},
 			},
 		},
 	}

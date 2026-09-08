@@ -100,10 +100,7 @@ func NewCmdApply() *cobra.Command {
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
-			}
-
-			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
 			}
 
 			// Create syncer to handle the changes
