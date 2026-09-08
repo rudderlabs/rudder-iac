@@ -69,7 +69,6 @@ func TestConnectionsApply(t *testing.T) {
 	// such as s3 and attentive_tag register without the flag, but model
 	// connection_mode alone.
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
-	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

@@ -26,9 +26,6 @@ type ExperimentalConfig struct {
 	// AccountSupport enables account provider registration and account kind
 	// matching for validate/apply/import flows.
 	AccountSupport bool `mapstructure:"accountSupport"`
-	// ConnectionSupport enables the event-stream-connections kind for
-	// validate/apply flows.
-	ConnectionSupport bool `mapstructure:"connectionSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
