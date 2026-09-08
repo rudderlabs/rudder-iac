@@ -44,7 +44,40 @@ func testRegistry(t *testing.T) *definitions.Registry {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(webhookTestDefinition()))
 	require.NoError(t, registry.Register(ga4TestDefinition()))
+	require.NoError(t, registry.Register(eventFilteringTestDefinition()))
 	return registry
+}
+
+// eventFilteringTestDefinition groups two flat upstream keys under one local
+// parent, the shape where a cleared list arrives as a member of an object that
+// is itself populated.
+func eventFilteringTestDefinition() *definitions.DestinationDefinition {
+	return &definitions.DestinationDefinition{
+		Type:    "EVENTFILTERING",
+		Version: 1,
+		Properties: []converter.ConfigProperty{
+			converter.Simple("appToken", "app_token"),
+			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+			converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+				"event_filtering.whitelist": "whitelistedEvents",
+				"event_filtering.blacklist": "blacklistedEvents",
+			}),
+		},
+		NewConfig: func() any {
+			return &struct {
+				AppToken       string `mapstructure:"app_token"`
+				EventFiltering *struct {
+					Whitelist []string `mapstructure:"whitelist" validate:"excluded_with=Blacklist"`
+					Blacklist []string `mapstructure:"blacklist" validate:"excluded_with=Whitelist"`
+				} `mapstructure:"event_filtering"`
+			}{}
+		},
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+	}
 }
 
 func webhookTestDefinition() *definitions.DestinationDefinition {
@@ -1462,6 +1495,42 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, map[string]any{
 			"blacklisted_events": []any{"", "Order Completed"},
 		}, config, "emptiness is a property of the whole value, not of each member")
+	})
+
+	t.Run("drops a cleared list grouped under a populated parent", func(t *testing.T) {
+		h := destination.NewHandler(nil, registry)
+
+		collection := map[string]*destination.RemoteDestination{
+			"filtered": {Destination: &client.Destination{
+				ID:        "dst-3",
+				Name:      "Filtered",
+				Type:      "EVENTFILTERING",
+				Version:   1,
+				IsEnabled: true,
+				// The webapp stores a cleared list as a single empty row. Emitting
+				// it next to the whitelist would fail the spec's own validation,
+				// since the two are mutually exclusive.
+				Config: []byte(`{
+					"appToken": "token-1",
+					"eventFilteringOption": "whitelistedEvents",
+					"whitelistedEvents": [{"eventName": "Order Completed"}],
+					"blacklistedEvents": [{"eventName": ""}]
+				}`),
+			}},
+		}
+
+		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
+		require.NoError(t, err)
+		require.Len(t, entities, 1)
+
+		spec, ok := entities[0].Content.(*specs.Spec)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{
+			"app_token": "token-1",
+			"event_filtering": map[string]any{
+				"whitelist": []any{"Order Completed"},
+			},
+		}, spec.Spec["config"])
 	})
 
 	t.Run("resolves transformation reference", func(t *testing.T) {

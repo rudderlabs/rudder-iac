@@ -451,21 +451,29 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 // toExportSpecMap builds the "spec" section of an importable destination's
-// YAML: local config with empty values pruned and secrets masked, plus an
-// optional transformation ref.
+// YAML: remote config with empty values pruned, converted to local and with
+// secrets masked, plus an optional transformation ref.
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
 	registered, err := h.registry.GetByAPIType(remote.Type, remote.Version)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition for %s: %w", remote.ID, err)
 	}
 
-	localConfig, err := h.apiConfigToLocal(registered.Type, remote.Version, remote.Config)
+	apiConfig, err := unmarshalAPIConfig(remote.Config)
+	if err != nil {
+		return nil, fmt.Errorf("reading destination %s config: %w", remote.ID, err)
+	}
+	// Prune before conversion: upstream every setting is its own key, so an empty
+	// one is prunable there, while conversion can group it under a populated
+	// parent (event_filtering.blacklist) that key-level pruning has to keep.
+	// Pruning here also keeps an empty secret from becoming a "{{ .VAR }}"
+	// reference, asking the user to supply a credential the destination does not use.
+	pruneEmptyValues(apiConfig)
+
+	localConfig, err := registered.APIToLocal(apiConfig)
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
-	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
-	// reference, asking the user to supply a credential the destination does not use.
-	pruneEmptyValues(localConfig)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
@@ -508,8 +516,8 @@ func pruneEmptyValues(config map[string]any) {
 // isEmptyConfigValue reports whether a config value carries nothing: nil, an
 // empty string, or a container holding only empty values. Booleans and numbers
 // are never empty — false and 0 are meaningful settings, not absence. The
-// concrete types are those json.Unmarshal produces, since local config is
-// decoded from the API response.
+// concrete types are those json.Unmarshal produces, since the config is decoded
+// from the API response.
 func isEmptyConfigValue(value any) bool {
 	switch v := value.(type) {
 	case nil:
@@ -562,6 +570,19 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 	return bytes, nil
 }
 
+// unmarshalAPIConfig decodes a remote config payload, treating a JSON null as an
+// empty config so callers always get a usable map.
+func unmarshalAPIConfig(apiConfig json.RawMessage) (map[string]any, error) {
+	var apiMap map[string]any
+	if err := json.Unmarshal(apiConfig, &apiMap); err != nil {
+		return nil, fmt.Errorf("unmarshalling destination config: %w", err)
+	}
+	if apiMap == nil {
+		apiMap = map[string]any{}
+	}
+	return apiMap, nil
+}
+
 // apiConfigToLocal is the inverse of localConfigToAPI, used by MapRemoteToState.
 func (h *HandlerImpl) apiConfigToLocal(destType string, version int64, apiConfig json.RawMessage) (map[string]any, error) {
 	registered, err := h.registry.Get(destType, version)
@@ -569,12 +590,9 @@ func (h *HandlerImpl) apiConfigToLocal(destType string, version int64, apiConfig
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
-	var apiMap map[string]any
-	if err := json.Unmarshal(apiConfig, &apiMap); err != nil {
-		return nil, fmt.Errorf("unmarshalling destination config: %w", err)
-	}
-	if apiMap == nil {
-		apiMap = map[string]any{}
+	apiMap, err := unmarshalAPIConfig(apiConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	local, err := registered.APIToLocal(apiMap)
