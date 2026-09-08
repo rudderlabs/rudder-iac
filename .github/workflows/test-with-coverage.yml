@@ -62,12 +62,20 @@ jobs:
       - name: checking go version
         run: go version
 
-      # `make test` excludes ./cli/tests, so this job never reaches the control plane
-      # and needs no token. It carries no concurrency group on purpose: unit runs are
-      # free to overlap across PRs, which is what keeps a fast signal on every PR now
-      # that queued e2e runs get superseded.
+      # No concurrency group on purpose: unit runs are free to overlap across PRs,
+      # which is what keeps a fast signal on every PR now that queued e2e runs get
+      # superseded.
+      #
+      # `make test` excludes ./cli/tests, but it is not offline: cli/pkg/exp/project's
+      # TestProjectLoad calls project.Load, which builds app deps and so requires a
+      # token before it ever reads a spec off disk. It performs no writes — Load only
+      # loads specs locally and returns a resource graph — so this job stays outside
+      # the e2e mutex.
       - name: running unit tests
         run: make test
+        env:
+          RUDDERSTACK_API_URL: ${{ vars.RUDDERSTACK_API_URL }}
+          RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
 
       - name: upload unit coverage to Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
