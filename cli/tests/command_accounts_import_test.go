@@ -58,7 +58,6 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	}
 
 	allowUnverifiedDestinationResidue(t)
-	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 
 	executor, err := NewCmdExecutor("")

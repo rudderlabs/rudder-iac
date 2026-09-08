@@ -24,12 +24,9 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	prevExp := viper.Get("experimental")
-	prevAccountSupport := viper.Get("flags.accountSupport")
 	viper.Set("experimental", true)
-	viper.Set("flags.accountSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
-		viper.Set("flags.accountSupport", prevAccountSupport)
 	})
 
 	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")

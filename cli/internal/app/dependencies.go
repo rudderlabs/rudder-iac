@@ -265,6 +265,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
+	ap := accountsProvider.NewProvider(c.Accounts)
 	dp := destProvider.NewProvider(c, destRegistry)
 
 	providers := &Providers{
@@ -274,6 +275,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
+		Account:         ap,
 		Destination:     dp,
 	}
 
@@ -283,14 +285,8 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		"eventstream":     esp,
 		"transformations": trp,
 		"datagraph":       dgp,
+		"account":         ap,
 		"destination":     dp,
-	}
-
-	if cfg.ExperimentalFlags.AccountSupport {
-		ap := accountsProvider.NewProvider(c.Accounts)
-
-		providerMap["account"] = ap
-		providers.Account = ap
 	}
 
 	return providers, providerMap, nil

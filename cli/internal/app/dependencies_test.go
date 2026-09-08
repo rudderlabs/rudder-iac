@@ -23,11 +23,13 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	composite, providers, err := composeProviders(c)
 	require.NoError(t, err)
 	require.NotNil(t, providers.DataGraph)
+	require.NotNil(t, providers.Account)
 	require.NotNil(t, providers.Destination)
 
 	cp, ok := composite.(*provider.CompositeProvider)
 	require.True(t, ok)
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
+	assert.Same(t, providers.Account, cp.Providers["account"])
 	assert.Same(t, providers.Destination, cp.Providers["destination"])
 }
 
