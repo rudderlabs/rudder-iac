@@ -48,14 +48,21 @@ func TestProjectApply(t *testing.T) {
 
 	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
-		// to make sure migration is applied correctly, we need to verify no
-		// changes are reported if we re-apply the same project, therefore we dedicatedly
-		// test this scenario below
+
+		// The dry run lands on the state the subtest above just applied from the
+		// source update/ dir, so "No changes to apply" proves the migrated specs are
+		// semantically identical to their v0.1 originals — the whole contract of
+		// `migrate`. Re-applying the migrated project from scratch re-proved that at
+		// ~85 writes against the live control plane on every CI run, so it is
+		// deliberately not done; the validate below covers the create/ half.
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-		// then we apply this project again from scratch and verify no
-		// changes are reported in snapshot tests meaning after migration of the directory
-		// the upstream resources are created same
-		applyAndVerify(t, executor, migratedDir)
+
+		// create/ is never applied, and `migrate` validates its input rather than its
+		// output, so assert the migrated files still load and pass every rule. One
+		// GET, no writes.
+		output, err := executor.Execute(cliBinPath, "validate", "-l",
+			filepath.Join(migratedDir, "create"), "--var-file", varFilePath)
+		require.NoError(t, err, "migrated create/ failed validation: %s", string(output))
 	})
 }
 

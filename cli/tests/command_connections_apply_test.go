@@ -97,7 +97,7 @@ func TestConnectionsApply(t *testing.T) {
 	// write-only, so they map to always-unknown secrets that re-apply every run
 	// (see secret.String.Diff). A dry-run would therefore always report a diff.
 	// Snapshot the non-secret upstream fields instead to prove nothing else
-	// churns, matching TestDestinationsApply's re-apply subtest.
+	// churns, matching TestAccountsApply's re-apply subtest.
 	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
 		apply(t, "update")
 		verifyConnectionsState(t, "update")
