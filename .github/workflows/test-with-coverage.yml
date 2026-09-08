@@ -53,6 +53,11 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # Neither job pushes; both upload artifacts. Don't leave the git
+          # credential on disk where an upload could capture it (zizmor
+          # artipacked). Matches gen-rule-docs.yml.
+          persist-credentials: false
 
       - name: setup go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -95,6 +100,7 @@ jobs:
     # Keep the push run as the final verification of the tree that actually landed.
     # A pull request's merge ref can become stale when main advances, and this workflow
     # is not a required status check, so its PR run cannot replace the post-merge run.
+    #
     # The mutex over the single shared workspace. These tests open with a workspace-wide
     # destroy and count-guard their snapshots over every managed resource, so two must
     # never overlap.
@@ -117,6 +123,11 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # Neither job pushes; both upload artifacts. Don't leave the git
+          # credential on disk where an upload could capture it (zizmor
+          # artipacked). Matches gen-rule-docs.yml.
+          persist-credentials: false
 
       - name: setup go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
