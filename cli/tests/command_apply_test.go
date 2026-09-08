@@ -36,6 +36,7 @@ func TestProjectApply(t *testing.T) {
 	//     var wins, resolving to "API Tracking" (the var file value is ignored).
 	// Both resolve to the values already in the snapshots, so a precedence
 	// regression — env losing to the file — would fail the snapshot comparison.
+	allowUnverifiedDestinationResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 

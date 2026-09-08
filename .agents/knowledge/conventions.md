@@ -223,6 +223,11 @@
 - Avoid full live apply/destroy E2E validation in non-disposable autonomous environments because those flows can mutate or destroy the configured RudderStack workspace.
 - For sync-behavior changes without an explicitly disposable workspace, use compile-only E2E validation such as `go test ./cli/tests -run '^$'` as the safe substitute, alongside focused unit tests.
 
+## DEX-732 — Removed Experimental Flag Coverage
+<!-- ticket:DEX-732 -->
+- When promoting an experimental flag to GA, keep an explicit negative config test for the removed flag name when there is precedent, as with the existing DataGraph removed-flag test.
+- For destination support GA, the removed destination-support flag name should be asserted as an invalid experimental option rather than only deleting its positive env-name table case, guarding against accidental flag reintroduction.
+
 ## DEX-730 — Amplitude Source Scope
 <!-- ticket:DEX-730 -->
 - Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.

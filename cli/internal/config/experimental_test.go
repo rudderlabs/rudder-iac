@@ -27,11 +27,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
 		},
 		{
-			name:     "destinationSupport",
-			flagName: "destinationSupport",
-			want:     "RUDDERSTACK_X_DESTINATION_SUPPORT",
-		},
-		{
 			name:     "unverifiedDestinations",
 			flagName: "unverifiedDestinations",
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
@@ -107,6 +102,13 @@ func TestIsValidExperimentalFlag_ConcurrentSyncsRemoved(t *testing.T) {
 	t.Parallel()
 
 	removedFlag := "concurrent" + "Syncs"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_RemovedDestinationFlag(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "destination" + "Support"
 	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 

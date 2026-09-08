@@ -63,10 +63,10 @@ func TestConnectionsApply(t *testing.T) {
 	}
 
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
-	// firebase is registered behind UnverifiedDestinations, and it is the
-	// use_native_sdk half of connScenarioEndpoints. Verified definitions such
-	// as s3 and attentive_tag register without this flag, but model
+	// This test needs the unverified gate for its own fixtures, not merely to
+	// tolerate residue: firebase is registered behind UnverifiedDestinations and
+	// is the use_native_sdk half of connScenarioEndpoints — verified definitions
+	// such as s3 and attentive_tag register without the flag, but model
 	// connection_mode alone.
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 	t.Setenv("RUDDERSTACK_X_CONNECTION_SUPPORT", "true")
