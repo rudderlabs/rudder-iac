@@ -12,7 +12,7 @@
 
 ## DEX-608 — Destination Unverified Gate Documentation
 <!-- ticket:DEX-608 -->
-- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `attentive_tag`, `http`, and `rs`, while S3 is verified/native.
+- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `rs` and `salesforce`, while S3, HTTP, and Attentive Tag are verified/native.
 
 ## DEX-661 — Destination Empty Secret Export
 <!-- ticket:DEX-661 -->
@@ -20,9 +20,24 @@
 
 ## DEX-499 — GCS Destination Gate Correction
 <!-- ticket:DEX-499 -->
-- Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available with `ExperimentalFlags.DestinationSupport` alone.
-- Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
+- Register the CLI `gcs` destination only under `ExperimentalFlags.UnverifiedDestinations`, not as a verified/native destination available unconditionally.
+- Keep `s3` as the verified destination registered unconditionally; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
+
+## DEX-731 — Experimental Flag Promotion Review Guidance
+<!-- ticket:DEX-731 -->
+- In `docs/experimental-flags.md`, examples under "Adding a New Experimental Flag" should use placeholder flag names such as `YourNewFeature` instead of real experimental flags, so future flag promotions do not require guide rewrites.
+- When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active. `concurrency.syncer < 1` was inert for users who never enabled `concurrentSyncs` (the flag gated whether `WithConcurrency` was applied at all), so GA clamps it to 1 in `config.GetConfig` rather than erroring — turning a previously ignored value into a hard failure is a breaking change for those configs. Users who had enabled the flag were already refused by `WithConcurrency`; clamping trades their loud error for a quiet default, which is the deliberate cost of not breaking anyone on upgrade.
+- Normalise such values once at config load, not in each command: copying the guard into `apply` and `destroy` duplicated validation `syncer.WithConcurrency` already performs and would drift on the third caller.
+
+## DEX-732 — Experimental Flag Promotion Scope
+<!-- ticket:DEX-732 -->
+- When promoting or deleting an experimental flag, search and update hidden active contributor docs/runbooks as well as code and workflows; stale `.claude/skills/...` or `.agents/knowledge/...` guidance can keep instructing contributors to use removed config fields or env vars.
+- Keep experimental-flag promotion PRs narrowly scoped: do not bundle opportunistic E2E fixture or snapshot remediation, and split invalid live API fixture fixes such as provisioning real upstream IDs into separate tickets/PRs.
+
+## DEX-733 — Experimental Flag Promotion Cleanup
+<!-- ticket:DEX-733 -->
+- When promoting or deleting an experimental flag, update durable repo guidance that references the removed flag or environment variable so future work does not follow inert configuration advice.
 
 ## DEX-735 — Keep Unrelated Live Fixture Fixes Separate
 <!-- ticket:DEX-735 -->
@@ -38,3 +53,9 @@
 <!-- ticket:DEX-771 -->
 - HTTP has completed QA verification and should be documented as verified/native: `type: http` must be available with `RUDDERSTACK_X_DESTINATION_SUPPORT` alone, without `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS`.
 - Do not cite HTTP as an unverified fixture in E2E gate comments or skip messages; retain the unverified flag only for remaining unverified fixtures such as `attentive_tag`, `rs`, and `salesforce`.
+
+## DEX-753 — Attentive Tag Promotion Scope
+<!-- ticket:DEX-753 -->
+- Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
+- Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
+- Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
