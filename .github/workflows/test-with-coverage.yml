@@ -4,17 +4,102 @@ on:
     branches:
       - main
       - "release/*"
+    # Docs cannot change Go behaviour. Safe only while this workflow is NOT a required
+    # status check: the org ruleset master-branch-protection (id 4378086) carries only
+    # deletion, non_fast_forward and pull_request rules. If it is ever made required, a
+    # skipped run leaves the PR pending forever and this must become a job-level gate.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".claude/**"
+      - ".agents/**"
   pull_request:
     branches:
       - main
+    # Keep in sync with the push filter above; Actions does not support YAML anchors.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".claude/**"
+      - ".agents/**"
+
+# Supersession, keyed per PR: a new commit cancels the older run of that same PR
+# instead of letting every intermediate commit spend a full e2e suite against the live
+# workspace. Cancelling mid-apply is safe because every e2e test opens with
+# `destroy --confirm=false` — but only while the repository variable
+# RUDDERSTACK_X_UNVERIFIED_DESTINATIONS is true, without which destinations left behind
+# by a killed run make the next run's opening destroy fail on an unregistered type.
+#
+# github.head_ref is set only on pull_request, so push runs fall back to github.run_id:
+# a group of one, never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  test-and-upload-code-coverage:
-    name: "upload coverage to codecov"
+  unit:
+    name: "unit tests"
     runs-on: "ubuntu-24.04"
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: setup go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          check-latest: true
+          cache: true
+          go-version: "~1.25"
+
+      - name: checking go version
+        run: go version
+
+      # `make test` excludes ./cli/tests, so this job never reaches the control plane
+      # and needs no token. It carries no concurrency group on purpose: unit runs are
+      # free to overlap across PRs, which is what keeps a fast signal on every PR now
+      # that queued e2e runs get superseded.
+      - name: running unit tests
+        run: make test
+
+      - name: upload unit coverage to Codecov
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: rudderlabs/rudder-iac
+          flags: unit
+          disable_search: true
+          files: coverage-unit.out
+
+  e2e:
+    name: "e2e tests (live control plane)"
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 30
+    # Not run on merges to main: the pull_request run for this same tree finished
+    # minutes earlier, and repeating it doubles the write volume this suite aims at the
+    # production config-backend outbox. Release branches keep it as a pre-release gate.
+    # A job skipped by `if:` never acquires the concurrency group below.
+    if: >-
+      github.event_name == 'pull_request' ||
+      startsWith(github.ref, 'refs/heads/release/')
+    # The mutex over the single shared workspace. These tests open with a workspace-wide
+    # destroy and count-guard their snapshots over every managed resource, so two must
+    # never overlap.
+    #
+    # cancel-in-progress stays false — supersession belongs to the workflow-level group
+    # above, not here. Do not add `queue: max`: the default single-pending-slot
+    # behaviour drops redundant queued runs, which is itself a saving.
+    #
+    # The group name is deliberately the one the pre-split workflow used. Renaming it
+    # would open a window where a run on the old definition and a run on the new one
+    # hold different group names and write to the same workspace at once.
     concurrency:
       group: test-and-upload-code-coverage
       cancel-in-progress: false
@@ -37,8 +122,8 @@ jobs:
       - name: checking go version
         run: go version
 
-      - name: running tests
-        run: make test-all
+      - name: running e2e tests
+        run: make test-e2e
         env:
           RUDDERSTACK_API_URL: ${{ vars.RUDDERSTACK_API_URL }}
           RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
@@ -48,6 +133,9 @@ jobs:
           RUDDERSTACK_X_CONCURRENT_SYNCS: ${{ vars.RUDDERSTACK_X_CONCURRENT_SYNCS }}
           RUDDERSTACK_X_TRANSFORMATIONS: ${{ vars.RUDDERSTACK_X_TRANSFORMATIONS }}
           RUDDERSTACK_X_DESTINATION_SUPPORT: ${{ vars.RUDDERSTACK_X_DESTINATION_SUPPORT }}
+          # Must be true now that runs get cancelled: a run killed mid-TestDestinationsApply
+          # skips its t.Cleanup destroy, and with this off the next run's opening destroy
+          # fails hard on an unregistered type and the workspace needs manual repair.
           RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: ${{ vars.RUDDERSTACK_X_UNVERIFIED_DESTINATIONS }}
           # Gates TestDestinationsApply, which opens by destroying every resource in
           # the workspace RUDDERSTACK_ACCESS_TOKEN points at. Set the repository
@@ -58,18 +146,22 @@ jobs:
           # workspace is disposable.
           RUN_CONNECTION_E2E: ${{ vars.RUN_CONNECTION_E2E }}
 
+      # Only this job drives the binary, so only it produces CLI logs. upload-artifact
+      # rejects a duplicate artifact name within a run, so the unit job must not also
+      # upload one. if-no-files-found: a cancelled run may die before the log exists.
       - name: upload cli logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: cli.log
           path: ~/.rudder/cli.log
+          if-no-files-found: ignore
 
-      - name: upload coverage reports to Codecov
+      - name: upload e2e coverage to Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
-          files: |
-            coverage-unit.out
-            coverage-e2e.out
+          flags: e2e
+          disable_search: true
+          files: coverage-e2e.out
