@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/rudderlabs/rudder-iac/compare/v0.25.0...v0.25.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **typer:** trigger release for identity trait persistence ([#830](https://github.com/rudderlabs/rudder-iac/issues/830)) ([bee7a17](https://github.com/rudderlabs/rudder-iac/commit/bee7a179861b7a5c625aa730aec555c4f2d5d0d5))
+
 ## [0.25.0](https://github.com/rudderlabs/rudder-iac/compare/v0.24.0...v0.25.0) (2026-09-08)
 
 
