@@ -107,8 +107,8 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 }
 
 // TestDestinationsApply drives the destination provider end-to-end against a live
-// stack: apply create → apply update. All destination specs live side by side under
-// one folder and are applied
+// stack: apply create → apply update → re-apply churns only the write-only secret.
+// All destination specs live side by side under one folder and are applied
 // together (like the catalog e2e applies events, properties, etc. in one shot),
 // then the managed destinations are snapshot-compared upstream via
 // DestinationSnapshotTester — the same file-manager + count-guard +
@@ -122,13 +122,6 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // the unverified fixture set, and the destroy below would otherwise wipe the
 // workspace before the (failing) apply on a stack without that support. The skip
 // must come before the destroy.
-//
-// There is deliberately no re-apply subtest here. "A re-apply churns the write-only
-// secret and nothing else" is a property of secret.String.Diff and the shared plan
-// path, not of any destination definition, so TestAccountsApply asserts it over 3
-// accounts instead. Asserting it again over these 84 fixtures re-PUT the 55 that
-// carry a {{ .VAR }} placeholder on every CI run — against production, into the
-// config-backend outbox — to prove something already proven.
 func TestDestinationsApply(t *testing.T) {
 	if os.Getenv("RUN_DESTINATION_E2E") != "1" {
 		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
@@ -172,6 +165,26 @@ func TestDestinationsApply(t *testing.T) {
 	})
 
 	t.Run("apply update", func(t *testing.T) {
+		apply(t, "update")
+		verifyDestinationState(t, "update")
+	})
+
+	// Re-apply cannot be a full no-op here: the key-based spec's access keys are
+	// write-only, so they map to always-unknown secrets that re-apply every run
+	// (see secret.String.Diff). A dry-run would therefore always report a diff.
+	// Snapshot the non-secret upstream fields instead to prove nothing else churns,
+	// matching the accounts e2e (TestAccountsApply's re-apply subtest).
+	//
+	// This is the expensive subtest in the suite — it re-PUTs the 55 of 84 fixtures
+	// that carry a {{ .VAR }} placeholder on every run. It earns that cost: it is the
+	// only place per-definition MapRemoteToState round-tripping is exercised across
+	// the whole fleet. A definition that reconstructs local state imperfectly from a
+	// remote response shows up here as a spurious second diff, and nowhere else —
+	// only 2 of 50 definitions test MapRemoteToState in their own definition_test.go,
+	// and handler_integration_test.go round-trips ga4 alone. TestAccountsApply's
+	// re-apply covers the shared secret/plan path but a different provider, so it is
+	// not a substitute. Shrink the fixture set before deleting this subtest.
+	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
 		apply(t, "update")
 		verifyDestinationState(t, "update")
 	})

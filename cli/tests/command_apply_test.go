@@ -50,16 +50,21 @@ func TestProjectApply(t *testing.T) {
 		migratedDir := copyAndMigrateProject(t, executor, projectDir)
 
 		// The dry run lands on the state the subtest above just applied from the
-		// source update/ dir, so "No changes to apply" proves the migrated specs are
-		// semantically identical to their v0.1 originals — the whole contract of
+		// source update/ dir, so "No changes to apply" proves the migrated update/
+		// specs are semantically identical to their v0.1 originals — the contract of
 		// `migrate`. Re-applying the migrated project from scratch re-proved that at
 		// ~85 writes against the live control plane on every CI run, so it is
-		// deliberately not done; the validate below covers the create/ half.
+		// deliberately not done.
 		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
 
-		// create/ is never applied, and `migrate` validates its input rather than its
-		// output, so assert the migrated files still load and pass every rule. One
-		// GET, no writes.
+		// create/ is a different tree and is no longer applied, so this is weaker than
+		// what it replaces: it proves the migrated files load and pass every rule, NOT
+		// that they produce the same upstream state. That gap is narrow because the
+		// two trees share a key set and update/ carries strictly more (variants, cases,
+		// defaults), so migrating update/ exercises a superset of the transform — and
+		// MigrateSpec itself is unit-tested in localcatalog. It is still worth having:
+		// `migrate` validates its input, never its output, so nothing checked these
+		// files before. One GET, no writes.
 		output, err := executor.Execute(cliBinPath, "validate", "-l",
 			filepath.Join(migratedDir, "create"), "--var-file", varFilePath)
 		require.NoError(t, err, "migrated create/ failed validation: %s", string(output))
