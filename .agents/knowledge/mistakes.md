@@ -86,3 +86,8 @@
 <!-- ticket:DEX-754 -->
 - During BigQuery verified-destination promotion, running two same-file edits concurrently against `cli/internal/app/dependencies.go` corrupted or partially overwrote the file tail and dropped the intended `bq` registry insertion.
 - Durable mitigation: serialize edits to the same file, even when replacements look independent; use parallel edits only for different destination files.
+
+## DEX-731 — Live Apply/Destroy Eventual Consistency
+<!-- ticket:DEX-731 -->
+- CI live E2E can observe stale upstream state immediately after project apply/destroy moves through the composite provider; observed symptoms included catalog snapshot counts such as 0 resources instead of 37 and a follow-up dry-run still listing a transformation deletion like `transformation:py_transform`.
+- Durable mitigation: poll the existing exact live E2E assertions for a bounded consistency window after apply/destroy operations instead of treating the first immediate remote read as definitive.

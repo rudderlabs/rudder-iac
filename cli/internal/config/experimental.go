@@ -12,8 +12,6 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// ConcurrentSyncs enables concurrent sync operations when applying changes
-	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
 	// EventRuleIncludes enables including event rules from other tracking plans
 	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
 	// ImportMerge enables import-manifest.yaml generation during `import workspace`

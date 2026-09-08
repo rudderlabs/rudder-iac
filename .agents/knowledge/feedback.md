@@ -24,6 +24,12 @@
 - Keep `s3` as the verified destination registered with `ExperimentalFlags.DestinationSupport` alone; reviewer guidance explicitly corrected GCS to the unverified gate.
 - Every newly onboarded destination starts under the unverified gate; promotion to verified is a separate, deliberate change after live verification.
 
+## DEX-731 — Experimental Flag Promotion Review Guidance
+<!-- ticket:DEX-731 -->
+- In `docs/experimental-flags.md`, examples under "Adding a New Experimental Flag" should use placeholder flag names such as `YourNewFeature` instead of real experimental flags, so future flag promotions do not require guide rewrites.
+- When removing an experimental guard around a code path that consumes configuration, check whether invalid existing user config becomes active. `concurrency.syncer < 1` was inert for users who never enabled `concurrentSyncs` (the flag gated whether `WithConcurrency` was applied at all), so GA clamps it to 1 in `config.GetConfig` rather than erroring — turning a previously ignored value into a hard failure is a breaking change for those configs. Users who had enabled the flag were already refused by `WithConcurrency`; clamping trades their loud error for a quiet default, which is the deliberate cost of not breaking anyone on upgrade.
+- Normalise such values once at config load, not in each command: copying the guard into `apply` and `destroy` duplicated validation `syncer.WithConcurrency` already performs and would drift on the third caller.
+
 ## DEX-735 — Keep Unrelated Live Fixture Fixes Separate
 <!-- ticket:DEX-735 -->
 - Do not bundle live destination E2E fixture/snapshot changes into unrelated PRs; plan-rendering or other focused changes should leave destination fixture failures for a dedicated ticket/PR.

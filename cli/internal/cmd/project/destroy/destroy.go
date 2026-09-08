@@ -66,10 +66,7 @@ func NewCmdDestroy() *cobra.Command {
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
-			}
-
-			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
 			}
 
 			s, err := syncer.New(deps.CompositeProvider(), &client.Workspace{}, options...)

@@ -16,12 +16,8 @@ Add your flag to `cli/internal/config/experimental.go`:
 
 ```go
 type ExperimentalConfig struct {
-    // StatelessCLI enables stateless CLI mode, which does not depend on resource state being persisted across runs
-    StatelessCLI  bool `mapstructure:"statelessCLI"`
-
-    // ConcurrentSyncs enables concurrent sync operations when applying changes
-    ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
-
+    // YourNewFeature enables the new feature while it is being validated
+    YourNewFeature bool `mapstructure:"yourNewFeature"`
 }
 ```
 
@@ -84,10 +80,10 @@ Users can manage experimental flags through CLI commands:
 rudder-cli experimental list
 
 # Enable a flag
-rudder-cli experimental enable statelessCLI
+rudder-cli experimental enable yourNewFeature
 
 # Disable a flag
-rudder-cli experimental disable concurrentSyncs
+rudder-cli experimental disable yourOtherFeature
 
 # Reset all flags to default (false)
 rudder-cli experimental reset
@@ -101,8 +97,8 @@ Flags are stored in `~/.rudder/config.json`:
 {
   "experimental": true,
   "flags": {
-    "statelessCLI": true,
-    "concurrentSyncs": false
+    "yourNewFeature": true,
+    "yourOtherFeature": false
   }
 }
 ```
@@ -114,8 +110,8 @@ In order for them to be effective, the top-level `experimental` field must also 
 Flags can be set via environment variables using the `RUDDERSTACK_X_` prefix:
 
 ```bash
-export RUDDERSTACK_X_STATELESS_CLI=true
-export RUDDERSTACK_X_CONCURRENT_SYNCS=true
+export RUDDERSTACK_X_YOUR_NEW_FEATURE=true
+export RUDDERSTACK_X_YOUR_OTHER_FEATURE=true
 rudder-cli apply
 ```
 
@@ -151,15 +147,15 @@ Experimental flag status is automatically included in all command telemetry. No 
 ### Struct Fields (camelCase)
 
 ```go
-StatelessCLI    bool `mapstructure:"statelessCLI"`
-ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
+YourNewFeature   bool `mapstructure:"yourNewFeature"`
+YourOtherFeature bool `mapstructure:"yourOtherFeature"`
 ```
 
 ### Environment Variables (UPPER_SNAKE_CASE)
 
 ```bash
-RUDDERSTACK_X_STATELESS_CLI=true
-RUDDERSTACK_X_CONCURRENT_SYNCS=true
+RUDDERSTACK_X_YOUR_NEW_FEATURE=true
+RUDDERSTACK_X_YOUR_OTHER_FEATURE=true
 ```
 
 ## Common Pitfalls
