@@ -264,6 +264,33 @@ func TestGA4ConfigValidation(t *testing.T) {
 		}
 	})
 
+	// schema.json gives capturePageView.web a default of "rs" and the backend
+	// applies it on persist, so a spec that carries the block without the key
+	// must be enriched or it diffs forever. An absent block stays absent.
+	t.Run("capture_page_view web default applies inside a present block", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t,
+			map[string]any{"web": "rs"},
+			registered.ApplyDefaults(map[string]any{
+				"api_secret":        "secret",
+				"client_type":       "gtag",
+				"capture_page_view": map[string]any{},
+			})["capture_page_view"])
+
+		assert.NotContains(t,
+			registered.ApplyDefaults(map[string]any{"api_secret": "secret", "client_type": "gtag"}),
+			"capture_page_view")
+
+		assert.Equal(t,
+			map[string]any{"web": "gtag"},
+			registered.ApplyDefaults(map[string]any{
+				"api_secret":        "secret",
+				"client_type":       "gtag",
+				"capture_page_view": map[string]any{"web": "gtag"},
+			})["capture_page_view"], "an explicit value is never overwritten")
+	})
+
 	t.Run("invalid capture_page_view.web rejected", func(t *testing.T) {
 		t.Parallel()
 		for _, value := range []string{"other", "{{ config.capturePageView || rs }}", "env.CAPTURE_PAGE_VIEW"} {

@@ -50,7 +50,7 @@ type webBool struct {
 }
 
 type webPersonProfiles struct {
-	Web string `mapstructure:"web" validate:"omitempty,dynamic_or_oneof=always identified_only"`
+	Web string `mapstructure:"web" validate:"omitempty,oneof=always identified_only" default:"always"`
 }
 
 type xhrHeader struct {

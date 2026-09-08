@@ -34,10 +34,11 @@
 - Durable mitigation: give each destination handler test client its own `http.Transport` through `client.WithHTTPClient(&http.Client{Transport: transport})` and close that transport from the same test cleanup.
 - CI E2E exposed live catalog read-after-write lag in `TestProjectApply`: immediately after a successful migrated update apply, upstream verification saw only 25 of 40 resources and the following dry-run still reported properties/tracking plans as new.
 - Durable mitigation: poll catalog-backed snapshot and no-diff dry-run assertions for a short consistency window after apply, preserving the original drift signal if eventual consistency does not settle.
-- CI E2E dry-runs can fail when shared disposable workspaces contain managed unverified destinations but the global apply/destroy/dry-run path only enables destination support; the observed error was an unregistered `ATTENTIVE_TAG` destination type during destination remote loading.
-- Durable mitigation: e2e tests that may run with destination support against a shared workspace should also enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` so remote state loading can decode unverified managed destinations left by destination e2e.
-- In the test-with-coverage workflow, `RUDDERSTACK_X_DESTINATION_SUPPORT` is passed to every `cli/tests` E2E command; the unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, and opt-in `AccountsImportWorkspace`, not only destination-specific tests.
-- Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors.
+- CI E2E dry-runs can fail when shared disposable workspaces contain managed unverified destinations but the global apply/destroy/dry-run path does not enable unverified destinations; the observed error was an unregistered `ATTENTIVE_TAG` destination type during destination remote loading.
+- Durable mitigation: e2e tests that may run against a shared workspace enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` through `allowUnverifiedDestinationResidue` in `cli/tests/main_test.go`, so remote state loading can decode unverified managed destinations left by destination e2e.
+- The unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, `ConnectionsApply` and opt-in `AccountsImportWorkspace`, not only destination-specific tests. Set the gate in the tests that need it rather than as a `test-with-coverage` repository variable, so the requirement travels with the code instead of living in CI settings nothing in the repo records; the workflow no longer passes `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` at all.
+- `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` is inert without `RUDDERSTACK_CLI_EXPERIMENTAL`, because `GetConfig` zeroes the whole flag struct when the umbrella switch is off. Keep the umbrella switch set explicitly in each test rather than folding it into a narrower helper, so removing that helper can never silently disable an unrelated flag the test does depend on.
+- Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors. Because destinations are GA the provider loads remote state on every apply and destroy, so the strict error must name the `unverifiedDestinations` flag that unblocks a user whose workspace holds residue they never opted into.
 
 ## DEX-509 — Kafka Destination Fixture Snapshot Count Mismatch
 <!-- ticket:DEX-509 -->
@@ -52,8 +53,8 @@
 
 ## DEX-702 — HubSpot Re-Onboarding CI Failures
 <!-- ticket:DEX-702 -->
-- CI live E2E cleanup can fail when workspace-wide destroy sees event-stream sources and destinations but event-stream connection support is disabled; the symptom is an HTTP 400 while deleting a source or destination with active connections. Durable mitigation: enable `RUDDERSTACK_X_CONNECTION_SUPPORT` alongside destination and unverified-destination support before any live `cli/tests` cleanup invokes `rudder-cli destroy`.
-- CI live E2E cleanup can still fail with connection support enabled if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`. Durable mitigation: live workspace cleanup should delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`, while production remote loading remains limited to external-ID-managed connections.
+- CI live E2E cleanup can fail when workspace-wide destroy sees event-stream sources and destinations but event-stream connection resources are not loaded; the symptom is an HTTP 400 while deleting a source or destination with active connections. After DEX-733, event-stream connection support is unconditional, so the durable mitigation is to run live cleanup with destination and unverified-destination support enabled and rely on the default event-stream provider to load connections before `rudder-cli destroy`.
+- CI live E2E cleanup can still fail when connection resources are loaded if the shared disposable workspace contains unmanaged event-stream connections with no `externalId`. Durable mitigation: live workspace cleanup should delete all event-stream connections, managed or unmanaged, before invoking `rudder-cli destroy`, while production remote loading remains limited to external-ID-managed connections.
 - The lint workflow can fail before linting when `golangci/golangci-lint-action` config verification fetches the remote golangci-lint JSON schema and times out. Durable mitigation: set `verify: false` in the lint workflow while keeping the pinned golangci-lint run enabled.
 - HubSpot live destination create returns backend default `config.authorizationType = "newPrivateAppApi"` for `newApi` creates even though local YAML/definition should omit `authorization_type`. Durable mitigation: keep `authorization_type` out of local config while including `authorizationType: "newPrivateAppApi"` in the HS create upstream snapshot; update snapshots may omit it when the live update response omits it.
 
@@ -61,3 +62,33 @@
 <!-- ticket:DEX-490 -->
 - CI live destination E2E showed `destination:am-minimal` update responses omit default `config.eventFilteringOption` when local YAML does not set `event_filtering`; hand-written snapshots expecting `"eventFilteringOption": "disable"` failed with a missing-key mismatch.
 - Durable mitigation: keep discriminator-derived default keys out of minimal Amplitude update snapshots unless the live API actually returns them, while still snapshotting create/update discriminator values when event filtering is explicitly configured.
+
+## DEX-730 — GA Delete Account Fixture Requires Real Account
+<!-- ticket:DEX-730 -->
+- CI failed in `TestDestinationsApply` when the GA destination live E2E fixture set `config.rudder_delete_account_id` to placeholder `rudderCliE2eDeleteAccount`; the backend validates `rudderDeleteAccountId` against workspace accounts and returned HTTP 400 `Account not found with given id in the workspace` during `destination:ga` creation.
+- Durable mitigation: keep workspace-specific GA delete-account IDs out of live destination fixtures unless the referenced account is provisioned for that CI workspace; rely on unit conversion tests for this field or inject a real workspace account ID explicitly.
+
+## DEX-531 — Webhook Header Secret Placeholder CI Failure
+<!-- ticket:DEX-531 -->
+- CI failed in the `upload coverage to codecov` job when `TestWebhookHeaderSecretsAreWrappedRevealedAndMasked` expected the old shared nested-header secret placeholder (`WEBHOOK_PRODUCTION_HEADERS_TO`) while webhook export intentionally emitted indexed placeholders such as `WEBHOOK_PRODUCTION_HEADERS_0_TO` for collection elements.
+- Durable mitigation: keep webhook nested-secret export assertions aligned with indexed variable naming so multi-header secrets remain distinct and `make test-all` coverage upload does not fail on stale placeholder expectations.
+
+## DEX-735 — Google Analytics Account Fixture CI Failure
+<!-- ticket:DEX-735 -->
+- CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
+- Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.
+
+## DEX-812 — Iterable Create Snapshot Default
+<!-- ticket:DEX-812 -->
+- CI live destination E2E showed Iterable create responses can include backend default `config.eventFilteringOption = "disable"` even when local `cli/tests/testdata/destinations/create/iterable.yaml` omits an `event_filtering` block.
+- Durable mitigation: include `"eventFilteringOption": "disable"` in the Iterable create upstream snapshot while keeping local YAML free of any direct event-filtering option field.
+
+## DEX-754 — Concurrent Same-File Edit Corruption
+<!-- ticket:DEX-754 -->
+- During BigQuery verified-destination promotion, running two same-file edits concurrently against `cli/internal/app/dependencies.go` corrupted or partially overwrote the file tail and dropped the intended `bq` registry insertion.
+- Durable mitigation: serialize edits to the same file, even when replacements look independent; use parallel edits only for different destination files.
+
+## DEX-731 — Live Apply/Destroy Eventual Consistency
+<!-- ticket:DEX-731 -->
+- CI live E2E can observe stale upstream state immediately after project apply/destroy moves through the composite provider; observed symptoms included catalog snapshot counts such as 0 resources instead of 37 and a follow-up dry-run still listing a transformation deletion like `transformation:py_transform`.
+- Durable mitigation: poll the existing exact live E2E assertions for a bounded consistency window after apply/destroy operations instead of treating the first immediate remote read as definitive.

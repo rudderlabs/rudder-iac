@@ -243,6 +243,68 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 	})
 }
 
+// Empty-string handling on enum fields is not decided by the enum: omitempty
+// and dynamic_or_oneof both pass "" through regardless of what schema.json
+// lists. These cases pin the resulting verdicts so a later tightening has to
+// confront them deliberately — see docs/destination-validation-discrepancies.md.
+func TestTiktokAdsEmptyEnumValues(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(tiktokads.NewDefinition()))
+	registered, err := registry.Get("tiktok_ads", 1)
+	require.NoError(t, err)
+
+	// schema.json lists "" as the 23rd member of the eventsToStandard `to`
+	// enum, and terraform encodes it as a trailing empty alternative. The UI
+	// persists half-filled mapping rows, so rejecting it would break importing
+	// a workspace that has one.
+	t.Run("events_to_standard.to accepts an empty mapping", func(t *testing.T) {
+		t.Parallel()
+
+		config := map[string]any{
+			"pixel_code":         "C12345",
+			"events_to_standard": []any{map[string]any{"from": "Order Completed", "to": ""}},
+		}
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		api, err := registered.LocalToAPI(config)
+		require.NoError(t, err)
+		assert.Equal(t, []any{map[string]any{"from": "Order Completed", "to": ""}}, api["eventsToStandard"],
+			"an empty mapping must survive conversion rather than being dropped")
+	})
+
+	t.Run("events_to_standard.to still rejects a non-standard event", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"pixel_code":         "C12345",
+			"events_to_standard": []any{map[string]any{"from": "Order Completed", "to": "NotAStandardEvent"}},
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/events_to_standard/0/to", errors[0].Path)
+	})
+
+	// Known divergence: schema.json's version enum is ["v2","v1"] with no empty
+	// member, yet "" validates and ships as an empty value the backend rejects.
+	// Pinned as-is; flipping this assertion is the marker for that fix landing.
+	t.Run("version accepts empty despite the upstream enum", func(t *testing.T) {
+		t.Parallel()
+
+		config := map[string]any{"pixel_code": "C12345", "version": ""}
+		assert.Empty(t, registered.ValidateConfig(config),
+			"known gap: omitempty passes \"\" before the enum is consulted")
+
+		api, err := registered.LocalToAPI(config)
+		require.NoError(t, err)
+		assert.Equal(t, "", api["version"], "the empty value reaches the payload")
+
+		absent, err := registered.LocalToAPI(map[string]any{"pixel_code": "C12345"})
+		require.NoError(t, err)
+		assert.NotContains(t, absent, "version", "an absent key stays absent — distinguishable from \"\"")
+	})
+}
+
 func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 

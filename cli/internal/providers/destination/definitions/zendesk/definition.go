@@ -38,12 +38,9 @@ var connectionModes = map[string][]string{
 // integrations-config destinations/zendesk defaultConfig; validation
 // constraints mirror schema.json.
 type zendeskConfig struct {
-	Email    string `mapstructure:"email" validate:"required,dynamic_or_pattern=single_line_100"`
-	APIToken string `mapstructure:"api_token" validate:"required,dynamic_or_pattern=single_line_100"`
-	Domain   string `mapstructure:"domain" validate:"required,dynamic_or_pattern=single_line_100"`
-	// schema.json declares sourceName but terraform does not map it. Modelled
-	// anyway: an unmodelled key is dropped from the update payload and erased
-	// upstream on the first apply.
+	Email                       string                   `mapstructure:"email" validate:"required,dynamic_or_pattern=single_line_100"`
+	APIToken                    string                   `mapstructure:"api_token" validate:"required,dynamic_or_pattern=single_line_100"`
+	Domain                      string                   `mapstructure:"domain" validate:"required,dynamic_or_pattern=single_line_100"`
 	SourceName                  string                   `mapstructure:"source_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	CreateUsersAsVerified       *bool                    `mapstructure:"create_users_as_verified" default:"false"`
 	SendGroupCallsWithoutUserID *bool                    `mapstructure:"send_group_calls_without_user_id" default:"false"`

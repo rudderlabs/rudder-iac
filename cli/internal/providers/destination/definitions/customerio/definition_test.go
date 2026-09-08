@@ -133,14 +133,23 @@ func TestCustomerioConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("datacenter accepts dynamic values", func(t *testing.T) {
+	// schema.json declares a plain enum with no {{ … || … }} branch, so a
+	// templated value would be stored verbatim and rejected by the backend.
+	t.Run("datacenter rejects dynamic values", func(t *testing.T) {
 		t.Parallel()
 
-		config := minimalConfig()
-		config["datacenter"] = "{{ .CUSTOMERIO_DATACENTER }}"
+		for _, value := range []string{
+			"{{ .CUSTOMERIO_DATACENTER }}",
+			`{{ .CUSTOMERIO_DATACENTER || US }}`,
+			"env.CUSTOMERIO_DATACENTER",
+		} {
+			config := minimalConfig()
+			config["datacenter"] = value
 
-		errors := registered.ValidateConfig(config)
-		assert.Empty(t, errors)
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/datacenter", errors[0].Path)
+		}
 	})
 
 	t.Run("single line fields reject invalid literals", func(t *testing.T) {

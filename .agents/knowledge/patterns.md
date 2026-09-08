@@ -68,7 +68,7 @@
 
 ## DEX-608 — Destination E2E Unverified Fixture Gate
 <!-- ticket:DEX-608 -->
-- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `attentive_tag`, `http`, and `rs`; S3 is verified/native and does not need that gate.
+- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `rs` and `salesforce`; S3, HTTP, and Attentive Tag are verified/native and do not need that gate.
 - Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.
 
 ## DEX-661 — Destination Export Empty-Value Pruning
@@ -197,3 +197,49 @@
 - For `bqstream`, `confluent_cloud`, and `googlesheets` connection-mode additions, E2E upstream snapshots may be updated mechanically from the existing converter mapping and snapshot conventions when no explicitly disposable live destination-enabled workspace is available.
 - Avoid live `RUN_DESTINATION_E2E` execution for these destination snapshot updates in autonomous environments unless disposable credentials are explicitly provided, because destination E2E mutates the configured workspace.
 - Renaming event-filter local keys to the nested block (adj, tiktok_ads, iterable) leaves expected upstream snapshots byte-identical: the API keys don't change, and the derived `eventFilteringOption` equals what the old fixtures set by hand — a built-in equivalence check when converting a definition.
+
+## DEX-730 — Event-Filter Dynamic Values
+<!-- ticket:DEX-730 -->
+- An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as a `single_line_100` pattern tag, never `max=100`.
+- Pick `dynamic_or_pattern` vs plain `pattern` from the property itself: only when schema.json declares the `(^\{\{.*\|\|(.*)\}\}$)` branch does the field accept templates. Whole destinations often declare none (bq, postgres, slack, adobe_analytics), and the split can differ per key inside one destination (attentive_tag has it, adobe has it on three URL fields only). The tag — never the regex — carries template support.
+- Dropping `dynamic_or_pattern` rarely makes a field reject templates outright: a permissive `.{0,N}` accepts template text as an ordinary literal, exactly as upstream does. What changes is that the text is now measured against the bound instead of bypassing it — so assert length, not rejection, unless the pattern's shape excludes `{{`.
+- Dropping an unreachable source type can break test fixtures that used it incidentally (Amplitude's consent round-trip used `shopify` for its `custom` provider case); move that coverage to a kept source type rather than deleting the case.
+
+## DEX-736 — Legacy GA Destination E2E Account-Link Deferral
+<!-- ticket:DEX-736 -->
+- Legacy Google Analytics (`type: ga`) E2E fixtures stay in place; only `rudder_delete_account_id` is dropped from them, because the upstream config API rejects an account id that is not a real account link in the workspace.
+- `RudderDeleteAccountID` is `omitempty` in the GA definition, so omitting it from a fixture keeps the spec valid and simply leaves `rudderDeleteAccountId` out of the upstream payload and its expected snapshot.
+- Prefer trimming the account-linked key over deleting whole fixture/snapshot pairs: it keeps `TestDestinationsApply` coverage for the rest of the legacy GA config surface while removing the only field that needs a cross-linked account.
+
+## DEX-531 — Webhook Dotted Secret Paths
+<!-- ticket:DEX-531 -->
+- Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
+- Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
+- Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
+
+## DEX-735 — Plan Nested Diff Rendering GA
+<!-- ticket:DEX-735 -->
+- Plan output now renders per-field nested diffs unconditionally via the nested diff renderer rather than behind `ExperimentalConfig.NestedDiffs`.
+- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar/nil/non-decomposable changes still keep their single-line behavior.
+
+## DEX-745 — Bing Ads Offline Conversions E2E Deferral
+<!-- ticket:DEX-745 -->
+- Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.
+- Do not use dummy `rudder_account_id` values for live destination fixtures: it is an OAuth account-management foreign key and placeholder values fail live apply, matching the account-linked destination precedent from LinkedIn Ads and GA delete-account fixtures.
+- Until live account-linked fixtures are runnable, rely on definition/unit coverage for example config and conversion behavior plus compile-only `TestDestinationsApply` validation in autonomous environments.
+
+## DEX-747 — Account-Linked Destination E2E Deferral
+<!-- ticket:DEX-747 -->
+- Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
+- Dummy `rudderAccountId` fixtures fail live `TestDestinationsApply` before snapshot comparison — verified against the dev stack, which rejects the create with `http status code: 400 … 'Account not found with given id in the workspace'`, the same failure the legacy GA `rudderDeleteAccountId` fixture hit (DEX-736). Autonomous coverage therefore relies on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
+
+## DEX-771 — Destination E2E Unverified Fixture Gate After HTTP Promotion
+<!-- ticket:DEX-771 -->
+- `TestDestinationsApply` still sets `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`, but HTTP is no longer the reason; the fixture set still includes unverified destination types such as `attentive_tag`, `rs`, and `salesforce`.
+- HTTP fixture coverage remains in the shared destination E2E suite as a verified destination, so compile-only validation can exercise its test code without live workspace mutation.
+
+## DEX-812 — Kafka SSH Grouping And Validation
+<!-- ticket:DEX-812 -->
+- Kafka maps nested local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` to the unchanged flat API keys `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey` with dotted `converter.Simple` paths; `use_ssh` remains top-level as the branch selector.
+- Use a value nested SSH struct instead of a pointer struct so validators still descend into SSH fields when the local `ssh` block is absent, allowing per-field `/ssh/...` errors when `use_ssh` is true.
+- Nested Kafka SSH requiredness uses a destination-scoped `kafka_ssh_required` validator that reads top-level `UseSSH` via `validator.FieldLevel.Top()`; ordinary `required_if=UseSSH true` on nested fields would silently become a no-op because go-playground resolves field names within the current struct.

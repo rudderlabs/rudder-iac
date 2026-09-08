@@ -15,9 +15,10 @@ spec:
     ssl_enabled: false
     use_sasl: false
     use_ssh: true
-    ssh_host: bastion.rudder-cli-e2e.internal:22
-    ssh_port: "22"
-    ssh_user: rudder-updated
-    ssh_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5rudderE2E rudder@rudder-cli-e2e
+    ssh:
+      host: bastion.rudder-cli-e2e.internal:22
+      port: "22"
+      user: rudder-updated
+      public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5rudderE2E rudder@rudder-cli-e2e
     convert_to_avro: false
     enable_multi_topic: false

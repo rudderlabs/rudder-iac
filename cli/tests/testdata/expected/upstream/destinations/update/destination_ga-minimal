@@ -3,6 +3,7 @@
     "anonymizeIp": false,
     "disableMd5": false,
     "doubleClick": false,
+    "enableServerSideIdentify": false,
     "enhancedEcommerce": false,
     "enhancedLinkAttribution": false,
     "includeSearch": false,

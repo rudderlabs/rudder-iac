@@ -7,22 +7,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
-
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
-}
 
 func specEntity(spec map[string]any) writer.FormattableEntity {
 	return writer.FormattableEntity{
@@ -56,7 +44,6 @@ func TestCollectVariableNames(t *testing.T) {
 }
 
 func TestScaffoldSecretsVarFile(t *testing.T) {
-	enableVarSubstitution(t)
 	dir := t.TempDir()
 
 	entities := []writer.FormattableEntity{
@@ -80,7 +67,6 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 // An existing var file may hold real secret values the user filled in, so
 // scaffolding never overwrites or merges into it — it errors out instead.
 func TestScaffoldSecretsVarFile_ExistingFileErrors(t *testing.T) {
-	enableVarSubstitution(t)
 	dir := t.TempDir()
 
 	existing := filepath.Join(dir, SecretsVarFileName)
@@ -96,22 +82,10 @@ func TestScaffoldSecretsVarFile_ExistingFileErrors(t *testing.T) {
 }
 
 func TestScaffoldSecretsVarFile_NoVariables(t *testing.T) {
-	enableVarSubstitution(t)
 	dir := t.TempDir()
 
 	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
 		specEntity(map[string]any{"plain": "value"}),
-	})
-	require.NoError(t, err)
-	assert.Empty(t, path)
-	assert.NoFileExists(t, filepath.Join(dir, SecretsVarFileName))
-}
-
-func TestScaffoldSecretsVarFile_GateOff(t *testing.T) {
-	dir := t.TempDir()
-
-	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
-		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	})
 	require.NoError(t, err)
 	assert.Empty(t, path)

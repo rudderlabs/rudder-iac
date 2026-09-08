@@ -10,6 +10,7 @@ spec:
   definition_version: 1
   config:
     api_key: rudderCliE2eAmFullKeyUpdated
+    residency_server: standard
     group_type_trait: org
     group_value_trait: orgId
     track_all_pages: false

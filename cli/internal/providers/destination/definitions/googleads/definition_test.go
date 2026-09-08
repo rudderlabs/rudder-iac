@@ -202,6 +202,50 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/sdk_base_url", errors[0].Path)
 	})
 
+	// The 0-500 bound is upstream's (?=[\s\S]{0,500}$) lookahead, which RE2
+	// cannot express, so a max tag carries it. Pin the exact edge.
+	t.Run("sdk_base_url length boundary", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			total int
+			valid bool
+		}{
+			{total: 500, valid: true},
+			{total: 501, valid: false},
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"conversion_id": "AW-123456789",
+				"sdk_base_url":  strings.Repeat("a", tc.total-4) + ".com",
+			})
+			if tc.valid {
+				assert.Empty(t, errors, "length %d", tc.total)
+				continue
+			}
+			require.NotEmpty(t, errors, "length %d", tc.total)
+			assert.Equal(t, "/sdk_base_url", errors[0].Path)
+		}
+	})
+
+	// The domain pattern carries the no-line-break constraint, so the max tag is
+	// only a length cap here — unlike a bare min/max, which would let this pass.
+	t.Run("sdk_base_url rejects line breaks", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"sdk_base_url":  "https://cdn.example.com\nevil.com",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/sdk_base_url", errors[0].Path)
+	})
+
+	t.Run("sdk_base_url accepts a ui template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"sdk_base_url":  `{{ .SDK_BASE_URL || https://cdn.example.com/gtag }}`,
+		}))
+	})
+
 	t.Run("sdk_base_url rejects a value over 500 characters", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

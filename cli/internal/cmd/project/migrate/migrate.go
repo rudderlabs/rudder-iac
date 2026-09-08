@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -47,9 +46,8 @@ func NewCmdMigrate() *cobra.Command {
 
 			// Wire variable substitution so specs containing {{ .VAR }} placeholders
 			// resolve before they are validated and migrated; otherwise migration of a
-			// project that uses substitution would fail on the literal tokens. Gated by
-			// the same experimental flag as apply/validate, so it is a no-op when off.
-			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			// project that uses substitution would fail on the literal tokens.
+			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}

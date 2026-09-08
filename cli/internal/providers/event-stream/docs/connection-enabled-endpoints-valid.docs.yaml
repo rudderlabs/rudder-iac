@@ -36,6 +36,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -75,6 +77,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -115,6 +119,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -158,6 +164,8 @@ match_behavior:
                 bucket_name: my-bucket
                 role_based_auth: true
                 iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections

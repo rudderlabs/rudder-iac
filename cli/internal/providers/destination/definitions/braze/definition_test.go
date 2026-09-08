@@ -60,7 +60,13 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"enable_push_notification/web":       {"web"},
 		"allow_user_supplied_javascript/web": {"web"},
 	}, registered.GatedKeyPaths())
-	assert.Nil(t, registered.SupportedSourcesValidation("web"))
+	for _, sourceType := range expectedSourceTypes {
+		assert.Equal(t, []string{"rest_api_key"}, registered.ConnectionRequiredKeys(sourceType, "cloud"), sourceType)
+		assert.Nil(t, registered.ConnectionRequiredKeys(sourceType, "device"), sourceType)
+	}
+	for _, sourceType := range []string{"android", "android_kotlin", "ios", "ios_swift", "web"} {
+		assert.Equal(t, []string{"rest_api_key"}, registered.ConnectionRequiredKeys(sourceType, "hybrid"), sourceType)
+	}
 
 	byAPI, err := registry.GetByAPIType("BRAZE", 1)
 	require.NoError(t, err)

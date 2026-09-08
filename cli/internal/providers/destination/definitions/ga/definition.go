@@ -80,6 +80,7 @@ type googleAnalyticsConfig struct {
 	DoubleClick                 *bool                    `mapstructure:"double_click" default:"false"`
 	EnhancedLinkAttribution     *bool                    `mapstructure:"enhanced_link_attribution" default:"false"`
 	IncludeSearch               *bool                    `mapstructure:"include_search" default:"false"`
+	EnableServerSideIdentify    *bool                    `mapstructure:"enable_server_side_identify" default:"false"`
 	ServerSideIdentify          *serverSideIdentify      `mapstructure:"server_side_identify"`
 	DisableMD5                  *bool                    `mapstructure:"disable_md5" default:"false"`
 	AnonymizeIP                 *bool                    `mapstructure:"anonymize_ip" default:"false"`
@@ -117,9 +118,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("includeSearch", "include_search"),
 		converter.Simple("serverSideIdentifyEventCategory", "server_side_identify.event_category"),
 		converter.Simple("serverSideIdentifyEventAction", "server_side_identify.event_action"),
-		converter.Discriminator("enableServerSideIdentify", converter.DiscriminatorValues{
-			"server_side_identify.event_category": true,
-		}),
+		converter.Simple("enableServerSideIdentify", "enable_server_side_identify"),
 		converter.Simple("disableMd5", "disable_md5"),
 		converter.Simple("anonymizeIp", "anonymize_ip"),
 		converter.Simple("enhancedEcommerce", "enhanced_ecommerce"),

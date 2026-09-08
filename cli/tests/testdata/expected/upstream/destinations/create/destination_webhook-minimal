@@ -1,0 +1,15 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "webhook-minimal",
+  "name": "E2E Webhook Minimal",
+  "type": "WEBHOOK",
+  "enabled": true,
+  "config": {
+    "webhookUrl": "https://minimal.example.com/rudder",
+    "webhookMethod": "POST"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

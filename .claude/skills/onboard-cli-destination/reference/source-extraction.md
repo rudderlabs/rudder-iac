@@ -170,10 +170,10 @@ default you found but did not declare, with the reason.
 **First, route the branch.** An `allOf` branch whose `if` tests
 `connectionMode` states a requirement that depends on the *connected source*,
 not on the config alone — no struct tag can express it. Those branches become
-`SupportedSourcesValidation` entries instead (source-type-mapping.md
+`ConnectionRequiredKeys` entries instead (source-type-mapping.md
 "Per-source-type connect-time required keys"), **except** a branch whose `if`
 also carries another config key (e.g. Braze's `usePlatformSpecificApiKeys`):
-that shape has no room in `SupportedSourcesValidation`'s map, so express it
+that shape has no room in `ConnectionRequiredKeys`'s map, so express it
 directly as a custom validator instead — see "The one exception" below and
 source-type-mapping.md "Expressing it as a custom validator instead".
 Everything else in this section is for branches conditioned on ordinary

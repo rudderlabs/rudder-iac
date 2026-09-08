@@ -37,7 +37,7 @@ type customerioConfig struct {
 	SiteID               string `mapstructure:"site_id" validate:"required,dynamic_or_pattern=single_line_100"`
 	APIKey               string `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
 	DeviceTokenEventName string `mapstructure:"device_token_event_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	Datacenter           string `mapstructure:"datacenter" validate:"required,dynamic_or_oneof=US EU"`
+	Datacenter           string `mapstructure:"datacenter" validate:"required,oneof=US EU"`
 	// The v2 API path: both keys are declared by schema.json and db-config, and
 	// were unmodelled, so update erased whatever the UI had set.
 	// Since integrations-config #2661 the backend persists api_version, applying

@@ -22,6 +22,7 @@ import (
 	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
+	bingadsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
@@ -34,6 +35,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
@@ -63,6 +65,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
 	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
@@ -248,10 +251,8 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	// Built ahead of the event-stream provider, whose connection semantic
-	// rules read destination definitions. newDestinationRegistry registers no
-	// definitions unless DestinationSupport is on, so with the flag off both
-	// providers share an empty registry and the definition-backed connection
-	// checks quietly find nothing to validate against.
+	// rules read destination definitions. Sharing one populated registry keeps
+	// connection checks aligned with the destination provider's validation.
 	destRegistry, err := newDestinationRegistry(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize destination registry: %w", err)
@@ -260,14 +261,12 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	dcp := datacatalog.New(catalogClient)
 	retlp := retl.New(retlClient.NewRudderRETLStore(c))
 
-	esOpts := []esProvider.Option{esProvider.WithDestinationRegistry(destRegistry)}
-	if cfg.ExperimentalFlags.ConnectionSupport {
-		esOpts = append(esOpts, esProvider.WithConnectionSupport())
-	}
-	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esOpts...)
+	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esProvider.WithDestinationRegistry(destRegistry))
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
+	ap := accountsProvider.NewProvider(c.Accounts)
+	dp := destProvider.NewProvider(c, destRegistry)
 
 	providers := &Providers{
 		DataCatalog:     dcp,
@@ -276,6 +275,8 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		Transformations: trp,
 		Workspace:       wsp,
 		DataGraph:       dgp,
+		Account:         ap,
+		Destination:     dp,
 	}
 
 	providerMap := map[string]provider.Provider{
@@ -284,43 +285,39 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		"eventstream":     esp,
 		"transformations": trp,
 		"datagraph":       dgp,
-	}
-
-	if cfg.ExperimentalFlags.DestinationSupport {
-		dp := destProvider.NewProvider(c, destRegistry)
-
-		providerMap["destination"] = dp
-		providers.Destination = dp
-
-	}
-
-	if cfg.ExperimentalFlags.AccountSupport {
-		ap := accountsProvider.NewProvider(c.Accounts)
-
-		providerMap["account"] = ap
-		providers.Account = ap
+		"account":         ap,
+		"destination":     dp,
 	}
 
 	return providers, providerMap, nil
 }
 
 // newDestinationRegistry builds the destination definition registry.
-// DestinationSupport must be on before any definitions are registered.
-// Unverified definitions additionally require UnverifiedDestinations.
+// Verified definitions are always registered; unverified definitions still
+// require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	registry := definitions.NewRegistry()
-	if !cfg.ExperimentalFlags.DestinationSupport {
-		return registry, nil
-	}
 
+	if err := registry.Register(bqstream.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
+	}
 	if err := registry.Register(s3.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
 	}
+	if err := registry.Register(httpdest.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering http destination definition: %w", err)
+	}
+	if err := registry.Register(activecampaign.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering active_campaign destination definition: %w", err)
+	}
+	if err := registry.Register(attentivetag.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
+	}
+	if err := registry.Register(bq.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering bq destination definition: %w", err)
+	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
-		if err := registry.Register(activecampaign.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering active_campaign destination definition: %w", err)
-		}
 		if err := registry.Register(adj.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering adj destination definition: %w", err)
 		}
@@ -330,14 +327,8 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(am.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering am destination definition: %w", err)
 		}
-		if err := registry.Register(attentivetag.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
-		}
-		if err := registry.Register(bq.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bq destination definition: %w", err)
-		}
-		if err := registry.Register(bqstream.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
+		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
 		}
 		if err := registry.Register(braze.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering braze destination definition: %w", err)
@@ -369,6 +360,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(gcs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
 		}
+		if err := registry.Register(googleadwordsofflineconversions.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering google_adwords_offline_conversions destination definition: %w", err)
+		}
 		if err := registry.Register(googleads.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
 		}
@@ -383,9 +377,6 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(hs.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
-		if err := registry.Register(httpdest.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering http destination definition: %w", err)
 		}
 		if err := registry.Register(intercom.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering intercom destination definition: %w", err)
@@ -452,6 +443,9 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		}
 		if err := registry.Register(vwo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering vwo destination definition: %w", err)
+		}
+		if err := registry.Register(webhook.NewDefinition()); err != nil {
+			return nil, fmt.Errorf("registering webhook destination definition: %w", err)
 		}
 		if err := registry.Register(zendesk.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering zendesk destination definition: %w", err)
