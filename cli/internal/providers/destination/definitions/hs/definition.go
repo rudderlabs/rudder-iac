@@ -35,7 +35,7 @@ var connectionModes = map[string][]string{
 }
 
 type hsConfig struct {
-	APIVersion string `mapstructure:"api_version" validate:"required,dynamic_or_oneof=newApi legacyApi"`
+	APIVersion string `mapstructure:"api_version" validate:"required,oneof=newApi legacyApi"`
 	// accessToken's schema pattern (^(.{1,100})$) carries no {{ }} / env.
 	// branch, unlike every other single_line_100 field here — plain pattern.
 	AccessToken       string                   `mapstructure:"access_token" validate:"required,pattern=single_line_100"`

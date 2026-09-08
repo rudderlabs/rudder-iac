@@ -21,7 +21,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -156,17 +155,6 @@ func requireSecret(t *testing.T, config map[string]any, key string) *secret.Stri
 	require.True(t, ok, "key %q: expected *secret.String, got %T", key, v)
 	require.NotNil(t, s)
 	return s
-}
-
-func enableVarSubstitution(t *testing.T) {
-	t.Helper()
-	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.enableVarSubstitution")
-	viper.Set("experimental", true)
-	viper.Set("flags.enableVarSubstitution", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-		viper.Set("flags.enableVarSubstitution", prevFlag)
-	})
 }
 
 func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
@@ -846,6 +834,7 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		_, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unregistered type")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true")
 	})
 
 	t.Run("empty external ID errors", func(t *testing.T) {
@@ -920,6 +909,11 @@ func TestHandlerImpl_LoadRemoteResourcesErrorsOnUnregisteredManagedType(t *testi
 	_, err := h.Impl.LoadRemoteResources(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unregistered type")
+	// Destinations are GA, so this now blocks applies for users who never set
+	// unverifiedDestinations. The flag alone does nothing without the umbrella
+	// switch, so the message has to name both or it sends them in a loop.
+	assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true")
+	assert.Contains(t, err.Error(), "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true")
 }
 
 func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.T) {
@@ -1217,8 +1211,6 @@ func (r stubResolver) ResolveToReference(entityType string, remoteID string) (st
 }
 
 func TestHandlerImpl_FormatForExport(t *testing.T) {
-	// Not parallel: subtests toggle enableVarSubstitution via global viper.
-
 	registry := testRegistry(t)
 
 	t.Run("empty collection", func(t *testing.T) {
@@ -1279,8 +1271,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("masks secret keys with external ID prefix", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1306,35 +1296,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
 	})
 
-	t.Run("masks secret keys as literal when var substitution is off", func(t *testing.T) {
-		h := destination.NewHandler(nil, registry)
-
-		collection := map[string]*destination.RemoteDestination{
-			"ga4-production": {Destination: &client.Destination{
-				ID:        "dst-2",
-				Name:      "GA4",
-				Type:      "GA4",
-				Version:   1,
-				IsEnabled: true,
-				Config:    []byte(`{"apiSecret":"super-secret","measurementId":"G-123"}`),
-			}},
-		}
-
-		entities, _, err := h.Impl.FormatForExport(collection, nil, stubResolver{})
-		require.NoError(t, err)
-		require.Len(t, entities, 1)
-
-		spec, ok := entities[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		config, ok := spec.Spec["config"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "(unknown)", config["api_secret"])
-		assert.Equal(t, "G-123", config["measurement_id"])
-	})
-
 	t.Run("does not invent secret keys omitted by the API", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1362,8 +1324,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("prunes empty secret keys instead of masking them", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1393,8 +1353,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("prunes null secret keys instead of masking them", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1422,8 +1380,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("prunes empty strings, nulls, arrays and objects", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1451,8 +1407,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("prunes containers holding only empty members", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1484,8 +1438,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 	})
 
 	t.Run("keeps containers holding any populated member", func(t *testing.T) {
-		enableVarSubstitution(t)
-
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1714,8 +1666,6 @@ func TestHandlerImpl_Import_TranslatesAPITypeToLocal(t *testing.T) {
 }
 
 func TestHandlerImpl_FormatForExport_EmitsLocalType(t *testing.T) {
-	enableVarSubstitution(t)
-
 	registry := s3TestRegistry(t)
 	h := destination.NewHandler(nil, registry)
 

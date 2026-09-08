@@ -4,8 +4,10 @@ match_behavior:
   # resolve to project resources (V-C1), a source-destination pair can only be
   # connected once (V-C3), the destination definition must support the
   # source's mapped type (V-C4), its config must carry the fields that type
-  # requires to connect (V-C5) and, in connection_mode or use_native_sdk, an
-  # entry for that type (V-C6 — skipped where the config surface has neither
+  # requires to connect in the connection_mode it declares for it (V-C5 —
+  # skipped where no mode is declared, since which fields are required
+  # depends on it) and, in connection_mode or use_native_sdk, an
+  # entry for that type (V-C8 — skipped where the config surface has neither
   # block, or cannot name that source type in one), and a destination cannot
   # receive from both
   # event stream and rETL sources (V-E1 — cannot fire today: the edge scan
@@ -259,7 +261,7 @@ match_behavior:
             message_contains: "has no 'connection_mode' entry for source type 'web'"
       - example_id: "es-connection-semantic-missing-required-config"
         title: "Destination config missing a field the source type requires to connect"
-        description: "The WEBHOOK definition here requires webhook_url in the destination config before a web source may connect; the config omits it."
+        description: "The WEBHOOK definition here requires webhook_url before a web source may connect in cloud mode; the config declares that mode but omits the field."
         files:
           source.yaml: |
             version: rudder/v1
@@ -281,7 +283,9 @@ match_behavior:
               type: WEBHOOK
               enabled: true
               definition_version: 1
-              config: {}
+              config:
+                connection_mode:
+                  web: cloud
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections

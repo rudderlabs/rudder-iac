@@ -10,3 +10,4 @@ spec:
   definition_version: 1
   config:
     api_key: rudderCliE2eAmKey
+    residency_server: standard

@@ -59,14 +59,12 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 // cover each other exactly and the catalog validates with zero errors. This is the
 // assembly seam that package app exercises end-to-end against the real providers.
 func TestBuild_GatekeeperOnly(t *testing.T) {
-	prevExp, prevFlag, prevDestSupport := viper.Get("experimental"), viper.Get("flags.importMerge"), viper.Get("flags.destinationSupport")
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
 	viper.Set("experimental", true)
 	viper.Set("flags.importMerge", true)
-	viper.Set("flags.destinationSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
 		viper.Set("flags.importMerge", prevFlag)
-		viper.Set("flags.destinationSupport", prevDestSupport)
 	})
 
 	cp := &testutils.MockProvider{

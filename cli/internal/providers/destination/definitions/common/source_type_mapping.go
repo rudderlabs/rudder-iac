@@ -106,8 +106,8 @@ func SourceTypeToken(sourceType, category string) string {
 	case "shopify":
 		return SourceTypeShopify
 	default:
-		// Webhook sources and every other event-stream type (java, go, kotlin,
-		// swift, ...) connect as cloud sources.
+		// Webhook sources and every other event-stream type (java, go,
+		// python, ...) connect as cloud sources.
 		return SourceTypeCloud
 	}
 }

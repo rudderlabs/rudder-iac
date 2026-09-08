@@ -87,7 +87,7 @@ func NewDefinition() *definitions.DestinationDefinition {
         // connectionMode-conditioned `allOf` branches in schema.json (see
         // source-type-mapping.md "Per-source-type connect-time required keys").
         // Omit the field when no source type contributes a key.
-        SupportedSourcesValidation: map[string]map[string][]string{
+        ConnectionRequiredKeys: map[string]map[string][]string{
             common.SourceTypeWeb: {"cloud": {"api_key"}, "device": {"app_id"}},
         },
     }
@@ -122,7 +122,7 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - `NewConfig` must return a pointer to struct.
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
-- `SupportedSourcesValidation` (nested shape pending DEX-709) keys ⊆
+- `ConnectionRequiredKeys` keys ⊆
   `SourceTypes`, every inner mode ∈ `ConnectionModes[sourceType]`, each key list
   non-empty, and every required key must exist on the config struct or be a
   source-type block key (`connection_mode`, `use_native_sdk`). Entries are
@@ -171,13 +171,12 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 ```go
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
     registry := definitions.NewRegistry()
-    if !cfg.ExperimentalFlags.DestinationSupport {
-        return registry, nil
-    }
     if err := registry.Register(s3.NewDefinition()); err != nil {
         return nil, fmt.Errorf("registering s3 destination definition: %w", err)
     }
-    // Append the new definition here, same pattern.
+    if cfg.ExperimentalFlags.UnverifiedDestinations {
+        // Append the new definition here, same pattern.
+    }
     return registry, nil
 }
 ```

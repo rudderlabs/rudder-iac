@@ -113,18 +113,27 @@ func TestCustomerioAudienceConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("region accepts dynamic values", func(t *testing.T) {
+	// schema.json declares a plain enum with no {{ … || … }} branch, so a
+	// templated value would be stored verbatim and rejected by the backend.
+	t.Run("region rejects dynamic values", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"site_id":     "site-id-1",
-			"api_key":     "api-key-1",
-			"app_api_key": "app-api-key-1",
-			"region":      "{{ .CUSTOMERIO_REGION }}",
-		})
-		assert.Empty(t, errors)
+		for _, value := range []string{
+			"{{ .CUSTOMERIO_REGION }}",
+			`{{ .CUSTOMERIO_REGION || US }}`,
+			"env.CUSTOMERIO_REGION",
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"site_id":     "site-id-1",
+				"api_key":     "api-key-1",
+				"app_api_key": "app-api-key-1",
+				"region":      value,
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/region", errors[0].Path)
+		}
 	})
 
-	t.Run("credentials reject values over 100 characters", func(t *testing.T) {
+	t.Run("credentials reject overlong values and line breaks", func(t *testing.T) {
 		t.Parallel()
 
 		for _, field := range []string{"site_id", "api_key", "app_api_key"} {
@@ -136,11 +145,13 @@ func TestCustomerioAudienceConfigValidation(t *testing.T) {
 					"app_api_key": "app-api-key-1",
 					"region":      "US",
 				}
-				config[field] = strings.Repeat("a", 101)
+				for _, value := range []string{strings.Repeat("a", 101), "bad\nvalue"} {
+					config[field] = value
 
-				errors := registered.ValidateConfig(config)
-				require.Len(t, errors, 1)
-				assert.Equal(t, "/"+field, errors[0].Path)
+					errors := registered.ValidateConfig(config)
+					require.Len(t, errors, 1, value)
+					assert.Equal(t, "/"+field, errors[0].Path)
+				}
 			})
 		}
 	})

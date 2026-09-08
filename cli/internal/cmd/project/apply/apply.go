@@ -59,7 +59,7 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}
@@ -100,10 +100,7 @@ func NewCmdApply() *cobra.Command {
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
-			}
-
-			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
 			}
 
 			// Create syncer to handle the changes

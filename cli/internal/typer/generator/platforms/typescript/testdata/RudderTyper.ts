@@ -617,14 +617,14 @@ export class RudderTyper {
         if (typeof groupIdOrTraits === "string") {
             this.analytics.group(
                 groupIdOrTraits,
-                undefined,
-                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined, traitsOrOptions as unknown as SDKApiObject),
+                (traitsOrOptions ?? {}) as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
             this.analytics.group(
-                null,
-                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined, groupIdOrTraits as unknown as SDKApiObject),
+                (groupIdOrTraits ?? {}) as unknown as SDKIdentifyTraits,
+                this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
             );
         }
@@ -653,13 +653,13 @@ export class RudderTyper {
         if (typeof userIdOrTraits === "string") {
             this.analytics.identify(
                 userIdOrTraits,
-                traitsOrOptions as unknown as SDKIdentifyTraits,
+                (traitsOrOptions ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(optionsOrCallback as ApiOptions | undefined),
                 callback,
             );
         } else {
             this.analytics.identify(
-                userIdOrTraits as unknown as SDKIdentifyTraits,
+                (userIdOrTraits ?? {}) as unknown as SDKIdentifyTraits,
                 this.withRudderTyperContext(traitsOrOptions as ApiOptions | undefined),
                 optionsOrCallback as ApiCallback | undefined,
             );
@@ -876,7 +876,7 @@ export class RudderTyper {
         );
     }
 
-    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
         const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
                 "platform": "typescript",
@@ -885,9 +885,6 @@ export class RudderTyper {
                 "trackingPlanVersion": 13,
             },
         };
-        if (contextTraits) {
-            rudderTyperContext["traits"] = contextTraits;
-        }
         return {
             ...(options ?? {}),
             context: {

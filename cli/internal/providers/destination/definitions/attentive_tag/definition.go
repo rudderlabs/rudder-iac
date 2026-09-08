@@ -50,8 +50,8 @@ var connectionModes = map[string][]string{
 // integrations-config destinations/attentive_tag defaultConfig; validation
 // constraints mirror overlapping schema.json rules.
 type attentiveTagConfig struct {
-	APIKey                string                   `mapstructure:"api_key" validate:"required,min=1,max=100"`
-	SignUpSourceID        string                   `mapstructure:"sign_up_source_id" validate:"omitempty,pattern=attentive_tag_sign_up_source_id"`
+	APIKey                string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
+	SignUpSourceID        string                   `mapstructure:"sign_up_source_id" validate:"omitempty,dynamic_or_pattern=attentive_tag_sign_up_source_id"`
 	EnableNewIdentifyFlow *bool                    `mapstructure:"enable_new_identify_flow" default:"false"`
 	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`

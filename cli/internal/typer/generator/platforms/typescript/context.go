@@ -109,13 +109,13 @@ type TSDispatcherBranch struct {
 // the body needs if/else branches to inspect the arguments at runtime and
 // forward to the correct SDK call shape.
 type TSAnalyticsMethod struct {
-	Name            string
-	Comment         string
-	EventName       string
-	MethodArguments []TSMethodArgument
-	SDKMethodName   string // "identify", "track", etc.
-	SDKArguments    []TSSDKArgument
-	Overloads       []TSOverloadSignature
+	Name               string
+	Comment            string
+	EventName          string
+	MethodArguments    []TSMethodArgument
+	SDKMethodName      string // "identify", "track", etc.
+	SDKArguments       []TSSDKArgument
+	Overloads          []TSOverloadSignature
 	DispatcherBranches []TSDispatcherBranch
 	// PropsTypeName is the generated type of the plan-defined props/traits this
 	// method accepts (an interface name, a union alias, or an open Record).
@@ -141,8 +141,8 @@ type TSContext struct {
 	// PropertyEnums and CustomTypeAliases are emitted as `export type X = ...`
 	// declarations. PropertyEnums covers property-level enum constraints; the
 	// other slice covers primitive / array / enum custom types.
-	PropertyEnums      []TSTypeAlias
-	CustomTypeAliases  []TSTypeAlias
+	PropertyEnums     []TSTypeAlias
+	CustomTypeAliases []TSTypeAlias
 	// CustomInterfaces holds object custom types, emitted as `export interface`.
 	CustomInterfaces []TSInterface
 	// NestedInterfaces holds inline-schema nested objects from event rules,

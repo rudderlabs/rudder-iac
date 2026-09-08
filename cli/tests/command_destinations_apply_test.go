@@ -112,11 +112,10 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // together (like the catalog e2e applies events, properties, etc. in one shot),
 // then the managed destinations are snapshot-compared upstream via
 // DestinationSnapshotTester — the same file-manager + count-guard +
-// per-resource-compare structure verifyState uses. DestinationSupport enables
-// the kind, while UnverifiedDestinations remains enabled here because these
-// fixtures include unverified destination types such as attentive_tag, http, rs,
-// and salesforce. Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at
-// apply time.
+// per-resource-compare structure verifyState uses. Destinations are GA, while
+// UnverifiedDestinations remains enabled here because these fixtures include
+// unverified destination types such as rs and salesforce. Key-auth specs
+// reference secrets via {{ .VAR }} placeholders resolved at apply time.
 //
 // Gated behind RUN_DESTINATION_E2E because it needs a live stack with support for
 // the unverified fixture set, and the destroy below would otherwise wipe the
@@ -127,10 +126,8 @@ func TestDestinationsApply(t *testing.T) {
 		t.Skip("set RUN_DESTINATION_E2E=1 with a live destination-enabled stack; current fixtures include unverified destination types")
 	}
 
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_ENABLE_VAR_SUBSTITUTION", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -175,12 +172,12 @@ func TestDestinationsApply(t *testing.T) {
 	// Snapshot the non-secret upstream fields instead to prove nothing else churns,
 	// matching the accounts e2e (TestAccountsApply's re-apply subtest).
 	//
-	// This is the expensive subtest in the suite — it re-PUTs the 55 of 84 fixtures
+	// This is the expensive subtest in the suite — it re-PUTs the 56 of 86 fixtures
 	// that carry a {{ .VAR }} placeholder on every run. It earns that cost: it is the
 	// only place per-definition MapRemoteToState round-tripping is exercised across
 	// the whole fleet. A definition that reconstructs local state imperfectly from a
 	// remote response shows up here as a spurious second diff, and nowhere else —
-	// only 2 of 50 definitions test MapRemoteToState in their own definition_test.go,
+	// only 3 of 51 definitions test MapRemoteToState in their own definition_test.go,
 	// and handler_integration_test.go round-trips ga4 alone. TestAccountsApply's
 	// re-apply covers the shared secret/plan path but a different provider, so it is
 	// not a substitute. Shrink the fixture set before deleting this subtest.

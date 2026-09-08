@@ -1,0 +1,25 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "webhook",
+  "name": "E2E Webhook",
+  "type": "WEBHOOK",
+  "enabled": true,
+  "config": {
+    "webhookUrl": "https://webhooks.example.com/rudder",
+    "webhookMethod": "POST",
+    "headers": [
+      {
+        "from": "X-Rudder-Token",
+        "to": ""
+      }
+    ],
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

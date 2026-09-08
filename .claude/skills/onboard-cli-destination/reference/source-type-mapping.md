@@ -53,7 +53,7 @@ Current mapping (local → API):
   entry in `SourceTypes` — registration errors otherwise. Copy the modes per
   source type from db-config `supportedConnectionModes` (values are `cloud`,
   `device`, `hybrid`).
-- `SupportedSourcesValidation` is derived from the **per-source-type key lists
+- `ConnectionRequiredKeys` is derived from the **per-source-type key lists
   inside `config.destConfig`** — see "Per-source-type config keys" below.
 - Consent management uses the same mapping automatically via
   `common.Properties(sourceTypes)` — no extra work per source type.
@@ -64,12 +64,7 @@ Current mapping (local → API):
 
 ## Per-source-type connect-time required keys
 
-> **Pending DEX-709.** The Go field is still `map[string][]string` and the
-> accessor still takes only a source type. Until that lands, derive the map as
-> below and put it in the report instead of `definition.go` — do not hand-fold
-> the modes away to make it compile.
-
-`SupportedSourcesValidation` is
+`ConnectionRequiredKeys` is
 `map[localSourceType]map[connectionMode][]localConfigKey` — the config keys a
 destination must carry for a source of that type, connected in that mode, to be
 valid. Both dimensions matter: Braze needs `rest_api_key` from a cloud-mode
@@ -107,11 +102,11 @@ key list; `if` says when it applies. Only branches conditioned on
 | `if.properties.connectionMode.anyOf[]`, each branch `{properties: {<apiSourceType>: {const: <mode>}}, required: [<apiSourceType>]}` | Braze | the union of the listed `(source type, mode)` pairs |
 | `if.properties.connectionMode.properties`, mapping `<apiSourceType>` → `{const: <mode>}` (usually with `additionalProperties: false`) | Intercom | each `(source type, mode)` pair in the object |
 | `if.not { … connectionMode … }` | Facebook Pixel: `not(connectionMode.web == "device")` → `accessToken` | every supported `(source type, mode)` pair **except** the ones the negated clause matches |
-| `if.properties` carries `connectionMode` **and** another config key (Braze `usePlatformSpecificApiKeys: {const: true}`, `if.required: ["usePlatformSpecificApiKeys", "connectionMode"]`) | Braze `appKey` / `androidApiKey` / `iOSApiKey` / `webApiKey` | **not expressible as a `SupportedSourcesValidation` entry** — the map has no room for a value-dependent condition. Express the whole branch as a custom validator instead (see "Expressing it as a custom validator instead" below) and drop it from this map |
+| `if.properties` carries `connectionMode` **and** another config key (Braze `usePlatformSpecificApiKeys: {const: true}`, `if.required: ["usePlatformSpecificApiKeys", "connectionMode"]`) | Braze `appKey` / `androidApiKey` / `iOSApiKey` / `webApiKey` | **not expressible as a `ConnectionRequiredKeys` entry** — the map has no room for a value-dependent condition. Express the whole branch as a custom validator instead (see "Expressing it as a custom validator instead" below) and drop it from this map |
 
 ### Expressing it as a custom validator instead
 
-The last row above is unexpressible only *as a `SupportedSourcesValidation`
+The last row above is unexpressible only *as a `ConnectionRequiredKeys`
 entry* — that map has one key per `(source type, mode)` pair and no room for a
 condition on another config key. Since every destination models
 `connection_mode` as real, validated config (source-extraction.md's
@@ -150,7 +145,7 @@ Two branches: `connectionMode` device for `android`/`ios`/`web` → `appId`;
 (not in `SourceTypes`):
 
 ```go
-SupportedSourcesValidation: map[string]map[string][]string{
+ConnectionRequiredKeys: map[string]map[string][]string{
     common.SourceTypeAndroid:     {"cloud": {"api_key"}, "device": {"app_id"}},
     common.SourceTypeIOS:         {"cloud": {"api_key"}, "device": {"app_id"}},
     common.SourceTypeWeb:         {"cloud": {"api_key"}, "device": {"app_id"}},

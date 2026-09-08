@@ -23,7 +23,12 @@ func init() {
 	)
 }
 
-// Source types from integrations-config destinations/am/db-config.json.
+// Source types from integrations-config destinations/am/db-config.json, minus
+// amp, warehouse and shopify: the CLI maps those tokens but cannot produce
+// them, since an event stream source's type is constrained to the SDK
+// definitions and SourceTypeToken only reaches warehouse through a source
+// category the sole call site never sets. Declaring them would advertise
+// support no connection could ever match.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -31,13 +36,10 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
 }
 
 var connectionModes = map[string][]string{
@@ -47,13 +49,10 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
 }
 
 type eventFiltering struct {
@@ -172,7 +171,7 @@ type amplitudeConfig struct {
 	UseNativeSDK                     *sdkBools                `mapstructure:"use_native_sdk"`
 	ConnectionMode                   common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement                common.ConsentManagement `mapstructure:"consent_management"`
-	ResidencyServer                  string                   `mapstructure:"residency_server" validate:"omitempty,oneof=standard EU" default:"standard"`
+	ResidencyServer                  string                   `mapstructure:"residency_server" validate:"required,oneof=standard EU"`
 }
 
 // NewDefinition returns the Amplitude destination definition.

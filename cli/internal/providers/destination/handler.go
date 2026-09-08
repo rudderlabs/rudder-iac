@@ -222,7 +222,7 @@ func (h *HandlerImpl) MapRemoteToState(
 	version := int64(remote.Version)
 	registered, err := h.registry.GetByAPIType(remote.Type, version)
 	if err != nil {
-		return nil, nil, fmt.Errorf("managed destination %s has unregistered type %q and version %d", remote.ID, remote.Type, remote.Version)
+		return nil, nil, errUnregisteredManagedType(remote.ID, remote.Type, remote.Version)
 	}
 
 	localConfig, err := h.apiConfigToLocal(
@@ -262,6 +262,29 @@ func (h *HandlerImpl) MapRemoteToState(
 	return resource, state, nil
 }
 
+// errUnregisteredManagedType reports a managed destination the CLI has no
+// definition for. Destinations are GA, so remote state now loads on every
+// apply and destroy — including ones touching no destinations. That puts the
+// error in front of users who never opted into unverifiedDestinations but
+// whose workspace still holds a destination created under it, so the message
+// has to name the way out rather than just the corruption.
+//
+// It names the env vars rather than `experimental enable unverifiedDestinations`
+// because that command writes only flags.unverifiedDestinations; without the
+// umbrella experimental switch GetConfig zeroes the flag struct and the user
+// hits this same error again with nothing new to go on.
+func errUnregisteredManagedType(id, apiType string, version int64) error {
+	return fmt.Errorf(
+		"managed destination %s has unregistered type %q and version %d; "+
+			"if it was created under the unverifiedDestinations experimental flag, re-run with "+
+			"RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true "+
+			"to manage it, or remove the destination from the workspace",
+		id,
+		apiType,
+		version,
+	)
+}
+
 // LoadRemoteResources returns only managed destinations (ExternalID set). An
 // unregistered type on a managed resource indicates corrupted state and errors.
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestination, error) {
@@ -280,12 +303,7 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 		}
 
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
-			return nil, fmt.Errorf(
-				"managed destination %s has unregistered type %q and version %d",
-				d.ID,
-				d.Type,
-				d.Version,
-			)
+			return nil, errUnregisteredManagedType(d.ID, d.Type, d.Version)
 		}
 		result = append(result, &RemoteDestination{Destination: d})
 	}

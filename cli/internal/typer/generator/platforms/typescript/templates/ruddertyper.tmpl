@@ -118,7 +118,7 @@ export class RudderTyper {
     }
 {{- end }}
 {{ end }}
-    private withRudderTyperContext(options?: ApiOptions, contextTraits?: SDKApiObject): ApiOptions {
+    private withRudderTyperContext(options?: ApiOptions): ApiOptions {
         const rudderTyperContext: SDKApiObject = {
             ruddertyper: {
 {{- range $key, $value := .EventContext }}
@@ -126,9 +126,6 @@ export class RudderTyper {
 {{- end }}
             },
         };
-        if (contextTraits) {
-            rudderTyperContext["traits"] = contextTraits;
-        }
         return {
             ...(options ?? {}),
             context: {

@@ -68,19 +68,20 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
-	// schema.json defaults these eight; the backend injects them on create but
+	// schema.json defaults these nine; the backend injects them on create but
 	// not update, so declaring them keeps a spec that omits them from diffing
-	// forever. enableServerSideIdentify and eventFilteringOption are absent by
-	// design: both are Discriminator-derived and have no local key to tag.
+	// forever. eventFilteringOption is absent by design: it is Discriminator-
+	// derived and has no local key to tag.
 	assert.Equal(t, map[string]any{
-		"double_click":              false,
-		"enhanced_link_attribution": false,
-		"include_search":            false,
-		"disable_md5":               false,
-		"anonymize_ip":              false,
-		"enhanced_ecommerce":        false,
-		"non_interaction":           false,
-		"send_user_id":              false,
+		"enable_server_side_identify": false,
+		"double_click":                false,
+		"enhanced_link_attribution":   false,
+		"include_search":              false,
+		"disable_md5":                 false,
+		"anonymize_ip":                false,
+		"enhanced_ecommerce":          false,
+		"non_interaction":             false,
+		"send_user_id":                false,
 	}, registered.ApplyDefaults(map[string]any{}))
 
 	// An explicit value wins, including one equal to the default.
@@ -155,6 +156,47 @@ func TestGoogleAnalyticsConfigValidation(t *testing.T) {
 		})
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/server_side_identify/event_action", errors[0].Path)
+	})
+
+	// ui-config declares Enable Server Side Identify as a standalone checkbox and
+	// schema.json ties it to nothing, so the flag is real config rather than
+	// something derived from event_category. Terraform never modelled it.
+	t.Run("enable_server_side_identify is independent of the event fields", func(t *testing.T) {
+		t.Parallel()
+
+		// Flag on, no category/action — legal upstream, previously unrepresentable.
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"tracking_id":                 "UA-123456-1",
+			"enable_server_side_identify": true,
+		}))
+
+		// Fields set, flag explicitly off — the derived mapping could not express this.
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"tracking_id":                 "UA-123456-1",
+			"enable_server_side_identify": false,
+			"server_side_identify": map[string]any{
+				"event_category": "All",
+				"event_action":   "User Enriched",
+			},
+		}))
+	})
+
+	t.Run("enable_server_side_identify survives a round trip", func(t *testing.T) {
+		t.Parallel()
+
+		api, err := registered.LocalToAPI(map[string]any{
+			"tracking_id":                 "UA-123456-1",
+			"enable_server_side_identify": true,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, true, api["enableServerSideIdentify"])
+
+		off, err := registered.LocalToAPI(map[string]any{
+			"tracking_id":                 "UA-123456-1",
+			"enable_server_side_identify": false,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, false, off["enableServerSideIdentify"], "an explicit false must reach the payload")
 	})
 
 	t.Run("source type scoped config rejects unsupported source keys", func(t *testing.T) {
@@ -363,6 +405,7 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 				"double_click": true,
 				"enhanced_link_attribution": true,
 				"include_search": true,
+				"enable_server_side_identify": true,
 				"server_side_identify": {
 					"event_category": "User",
 					"event_action": "Identify"
@@ -483,6 +526,9 @@ func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
 
 	assert.Equal(t, map[string]any{
 		"tracking_id": "UA-123456-1",
+		// Previously dropped: the flag was derived from event_category on the way
+		// out and never read back, so an explicit false was lost on import.
+		"enable_server_side_identify": false,
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Order Completed"},
 			"blacklist": []any{"Application Opened"},

@@ -1,10 +1,15 @@
 package snowflake
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func init() {
@@ -26,6 +31,21 @@ func init() {
 		"must be at most 64 characters, must not contain line breaks, and must not start with a pg_ prefix",
 	)
 
+	// schema.json states a different bucketName rule per provider branch. RE2 has
+	// no lookahead, so each becomes a reject pattern.
+	funcs.NewPatternWithReject(
+		"snowflake_s3_bucket_name",
+		`^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$`,
+		`^xn--|\.\.|^(\d+(\.|$)){4}$`,
+		"must be a valid S3 bucket name: lowercase, no xn-- prefix, no consecutive dots, not an IP address",
+	)
+	funcs.NewPatternWithReject(
+		"snowflake_gcs_bucket_name",
+		`^[a-z0-9][a-z0-9-._]{1,61}[a-z0-9]$`,
+		`^goog|google|\.\.|^(\d+(\.|$)){4}$`,
+		"must be a valid GCS bucket name: lowercase, no goog prefix, must not contain google, no consecutive dots, not an IP address",
+	)
+
 	// Azure container naming: schema.json is ^(?=.{3,63}$)[a-z0-9]+(-[a-z0-9]+)*$.
 	// RE2 has no lookahead, so the length bound moves into the reject pattern
 	// while the accept pattern carries the character rule. The backend rejects
@@ -37,6 +57,42 @@ func init() {
 		`^(.{0,2}|.{64,})$`,
 		"must be 3-63 characters of lowercase letters, digits and single hyphens",
 	)
+}
+
+// bucketNameConditional switches bucket_name between the S3 and GCS rules that
+// schema.json states per if/then branch. Outside those branches upstream sets no
+// rule, so a stale bucket name from another provider round-trips rather than
+// erroring.
+func bucketNameConditional(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	if value == "" || definitions.IsTemplateConfigValue(value) {
+		return true
+	}
+
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	useRudderStorageField := parent.FieldByName("UseRudderStorage")
+	cloudProviderField := parent.FieldByName("CloudProvider")
+	if !useRudderStorageField.IsValid() || !cloudProviderField.IsValid() {
+		return true
+	}
+
+	useRudderStorage, _ := useRudderStorageField.Interface().(*bool)
+	if useRudderStorage == nil || *useRudderStorage {
+		return true
+	}
+
+	switch cloudProviderField.String() {
+	case "AWS":
+		return funcs.MatchPattern("snowflake_s3_bucket_name", value)
+	case "GCP":
+		return funcs.MatchPattern("snowflake_gcs_bucket_name", value)
+	default:
+		return true
+	}
 }
 
 // Source types from integrations-config destinations/snowflake/db-config.json
@@ -95,7 +151,7 @@ type snowflakeConfig struct {
 	PrivateKey           string `mapstructure:"private_key" validate:"required_if=UseKeyPairAuth true,omitempty,pattern=snowflake_private_key"`
 	PrivateKeyPassphrase string `mapstructure:"private_key_passphrase" validate:"omitempty,pattern=single_line_100"`
 
-	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,dynamic_or_oneof=5 10 15 30 60 180 360 720 1440"`
+	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at" validate:"omitempty"`
 	ExcludeWindow *excludeWindow `mapstructure:"exclude_window"`
 
@@ -111,14 +167,14 @@ type snowflakeConfig struct {
 	// flat object, so conditionals only validate the active provider; stale keys
 	// from another provider can still round-trip without erasure.
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
-	CloudProvider             string `mapstructure:"cloud_provider" validate:"required_if=UseRudderStorage false,omitempty,dynamic_or_oneof=AWS GCP AZURE" default:"AWS"`
+	CloudProvider             string `mapstructure:"cloud_provider" validate:"required_if=UseRudderStorage false,omitempty,oneof=AWS GCP AZURE" default:"AWS"`
 	Prefix                    string `mapstructure:"prefix" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 	StorageIntegration        string `mapstructure:"storage_integration" validate:"required_unless=UseRudderStorage true CloudProvider AWS,omitempty,dynamic_or_pattern=single_line_100"`
 
 	// AWS
-	BucketName    string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100"`
-	RoleBasedAuth *bool  `mapstructure:"role_based_auth" default:"true"`
+	BucketName    string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true CloudProvider AZURE,omitempty,dynamic_or_pattern=single_line_100,snowflake_bucket_name"`
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth" validate:"required_if=UseRudderStorage false CloudProvider AWS"`
 	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,pattern=single_line_100"`
 	AccessKey     string `mapstructure:"access_key" validate:"required_if=UseRudderStorage false CloudProvider AWS RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
@@ -205,5 +261,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "snowflake_bucket_name", Func: bucketNameConditional},
+		},
 	}
 }

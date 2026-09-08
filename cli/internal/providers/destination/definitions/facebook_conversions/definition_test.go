@@ -131,14 +131,23 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	t.Run("action_source accepts dynamic values", func(t *testing.T) {
+	// schema.json declares a plain enum with no {{ … || … }} branch, so a
+	// templated value would be stored verbatim and rejected by the backend.
+	t.Run("action_source rejects dynamic values", func(t *testing.T) {
 		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"dataset_id":    "dataset-1",
-			"access_token":  "access-token-1",
-			"action_source": "{{ .FACEBOOK_ACTION_SOURCE }}",
-		})
-		assert.Empty(t, errors)
+		for _, value := range []string{
+			"{{ .FACEBOOK_ACTION_SOURCE }}",
+			`{{ .FACEBOOK_ACTION_SOURCE || website }}`,
+			"env.FACEBOOK_ACTION_SOURCE",
+		} {
+			errors := registered.ValidateConfig(map[string]any{
+				"dataset_id":    "dataset-1",
+				"access_token":  "access-token-1",
+				"action_source": value,
+			})
+			require.NotEmpty(t, errors, value)
+			assert.Equal(t, "/action_source", errors[0].Path)
+		}
 	})
 
 	t.Run("invalid mapped event target", func(t *testing.T) {

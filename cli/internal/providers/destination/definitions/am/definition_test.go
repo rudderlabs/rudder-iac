@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "amp", "cloud", "warehouse", "react_native", "flutter", "cordova", "shopify",
+		"unity", "cloud", "react_native", "flutter", "cordova",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -39,18 +39,22 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"ios_swift":      {"cloud"},
 		"web":            {"cloud", "device"},
 		"unity":          {"cloud"},
-		"amp":            {"cloud"},
 		"cloud":          {"cloud"},
-		"warehouse":      {"cloud"},
 		"react_native":   {"cloud", "device"},
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
-		"shopify":        {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, "source type %s", sourceType)
+	}
+	// Upstream lists amp, warehouse and shopify, but the CLI cannot produce
+	// those source tokens, so the definition does not advertise them.
+	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+		assert.NotContains(t, registered.SupportedSourceTypes(), sourceType)
+		_, err := registered.ConnectionModes(sourceType)
+		require.Error(t, err)
 	}
 
 	assert.Equal(t, map[string]any{
@@ -63,7 +67,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"track_products_once":                false,
 		"track_revenue_per_product":          false,
 		"use_user_defined_screen_event_name": false,
-		"residency_server":                   "standard",
 		"sdk_version":                        map[string]any{"web": float64(2)},
 		"track_session_events":               map[string]any{"web": false},
 		"auto_capture": map[string]any{
@@ -169,8 +172,22 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 	t.Run("defaulted minimal config is valid", func(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, registered.ValidateConfig(registered.ApplyDefaults(map[string]any{
-			"api_key": "amplitude-api-key",
+			"api_key":          "amplitude-api-key",
+			"residency_server": "standard",
 		})))
+	})
+
+	// schema.json lists residencyServer in `required` as well as giving it a
+	// default, so a spec must state it: the tag combination is rejected at
+	// registration, and required is the side that cannot silently diverge.
+	t.Run("missing residency_server rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "amplitude-api-key",
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/residency_server", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
 	})
 
 	t.Run("invalid api_key pattern rejected", func(t *testing.T) {
@@ -309,13 +326,10 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 				"ios":            "device",
 				"ios_swift":      "cloud",
 				"unity":          "cloud",
-				"amp":            "cloud",
 				"cloud":          "cloud",
-				"warehouse":      "cloud",
 				"react_native":   "device",
 				"flutter":        "device",
 				"cordova":        "cloud",
-				"shopify":        "cloud",
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -409,6 +423,22 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 		require.Len(t, errors, 1)
 		assert.Equal(t, "/connection_mode/unity", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// The dropped source types are no longer part of any source-scoped block.
+	// consent_management rejects them here; connection_mode is rejected a layer
+	// up by sourceTypeKeyResults, which owns unsupported source keys for it.
+	t.Run("dropped source types rejected in consent_management", func(t *testing.T) {
+		t.Parallel()
+		for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+			config := validMinimal()
+			config["consent_management"] = map[string]any{sourceType: []any{}}
+
+			errors := registered.ValidateConfig(config)
+			require.Len(t, errors, 1, sourceType)
+			assert.Equal(t, "/consent_management/"+sourceType, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "is not supported")
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -576,13 +606,10 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"ios": "device",
 					"ios_swift": "cloud",
 					"unity": "cloud",
-					"amp": "cloud",
 					"cloud": "cloud",
-					"warehouse": "cloud",
 					"react_native": "device",
 					"flutter": "device",
-					"cordova": "cloud",
-					"shopify": "cloud"
+					"cordova": "cloud"
 				},
 				"consent_management": {
 					"android_kotlin": [{"provider": "oneTrust"}],
@@ -684,13 +711,10 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"ios": "device",
 					"iosSwift": "cloud",
 					"unity": "cloud",
-					"amp": "cloud",
 					"cloud": "cloud",
-					"warehouse": "cloud",
 					"reactnative": "device",
 					"flutter": "device",
-					"cordova": "cloud",
-					"shopify": "cloud"
+					"cordova": "cloud"
 				},
 				"consentManagement": {
 					"androidKotlin": [{"provider": "oneTrust"}],
@@ -723,7 +747,7 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"android_kotlin": [{"provider": "oneTrust"}],
 					"ios_swift": [{"provider": "ketch"}],
 					"react_native": [{"provider": "iubenda"}],
-					"shopify": [{"provider": "custom", "resolution_strategy": "or", "consents": ["marketing"]}]
+					"cordova": [{"provider": "custom", "resolution_strategy": "or", "consents": ["marketing"]}]
 				}
 			}`,
 			APIJSON: `{
@@ -733,7 +757,7 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"androidKotlin": [{"provider": "oneTrust"}],
 					"iosSwift": [{"provider": "ketch"}],
 					"reactnative": [{"provider": "iubenda"}],
-					"shopify": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "marketing"}]}]
+					"cordova": [{"provider": "custom", "resolutionStrategy": "or", "consents": [{"consent": "marketing"}]}]
 				}
 			}`,
 		},

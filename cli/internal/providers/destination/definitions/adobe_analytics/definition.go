@@ -23,6 +23,14 @@ func init() {
 		`\.ngrok\.io`,
 		"must be at most 100 characters and must not contain .ngrok.io",
 	)
+
+	// adobe_analytics_url with no dynamic pattern support
+	funcs.NewPatternWithReject(
+		"adobe_analytics_url_static",
+		`^(.{0,100})$`,
+		`\.ngrok\.io|^\{\{|^env\.`,
+		"must be a literal value of at most 100 characters and must not contain .ngrok.io",
+	)
 }
 
 // Source types from integrations-config destinations/adobe_analytics/db-config.json
@@ -54,23 +62,26 @@ var connectionModes = map[string][]string{
 }
 
 type mappingEntry struct {
-	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"required,dynamic_or_pattern=single_line_100"`
+	From string `mapstructure:"from" validate:"required,pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"required,pattern=single_line_100"`
+}
+
+// listMapping and customPropsMapping carry a per-entry delimiter; schema.json
+// allows the empty string alongside the five separators, which omitempty covers.
+type delimitedMappingEntry struct {
+	From      string `mapstructure:"from" validate:"required,pattern=single_line_100"`
+	To        string `mapstructure:"to" validate:"required,pattern=single_line_100"`
+	Delimiter string `mapstructure:"delimiter" validate:"omitempty,pattern=adobe_analytics_delimiter"`
 }
 
 type eventToTypeEntry struct {
-	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
+	From string `mapstructure:"from" validate:"required,pattern=single_line_100"`
 	To   string `mapstructure:"to" validate:"omitempty,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
 }
 
-type delimiterEntry struct {
-	From string `mapstructure:"from" validate:"required,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"required,pattern=adobe_analytics_delimiter"`
-}
-
 type eventFiltering struct {
-	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
-	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,pattern=single_line_100"`
 }
 
 type useNativeSDK struct {
@@ -87,9 +98,9 @@ type adobeAnalyticsConfig struct {
 	TrackingServerSecureUrl       string                   `mapstructure:"tracking_server_secure_url" validate:"omitempty,dynamic_or_pattern=adobe_analytics_url"`
 	ReportSuiteIDs                string                   `mapstructure:"report_suite_ids" validate:"required,dynamic_or_pattern=single_line_300"`
 	SSLHeartbeat                  *bool                    `mapstructure:"ssl_heartbeat" default:"true"`
-	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url"`
-	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url"`
+	HeartbeatTrackingServerUrl    string                   `mapstructure:"heartbeat_tracking_server_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
+	ProxyNormalUrl                string                   `mapstructure:"proxy_normal_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
+	ProxyHeartbeatUrl             string                   `mapstructure:"proxy_heartbeat_url" validate:"omitempty,pattern=adobe_analytics_url_static"`
 	EventsToTypes                 []eventToTypeEntry       `mapstructure:"events_to_types" validate:"omitempty,dive"`
 	MarketingCloudOrgID           string                   `mapstructure:"marketing_cloud_org_id" validate:"omitempty,pattern=single_line_100"`
 	DropVisitorID                 *bool                    `mapstructure:"drop_visitor_id" default:"true"`
@@ -104,14 +115,12 @@ type adobeAnalyticsConfig struct {
 	MobileEventMapping            []mappingEntry           `mapstructure:"mobile_event_mapping" validate:"omitempty,dive"`
 	EVarMapping                   []mappingEntry           `mapstructure:"e_var_mapping" validate:"omitempty,dive"`
 	HierMapping                   []mappingEntry           `mapstructure:"hier_mapping" validate:"omitempty,dive"`
-	ListMapping                   []mappingEntry           `mapstructure:"list_mapping" validate:"omitempty,dive"`
-	ListDelimiter                 []delimiterEntry         `mapstructure:"list_delimiter" validate:"omitempty,dive"`
-	CustomPropsMapping            []mappingEntry           `mapstructure:"custom_props_mapping" validate:"omitempty,dive"`
-	PropsDelimiter                []delimiterEntry         `mapstructure:"props_delimiter" validate:"omitempty,dive"`
+	ListMapping                   []delimitedMappingEntry  `mapstructure:"list_mapping" validate:"omitempty,dive"`
+	CustomPropsMapping            []delimitedMappingEntry  `mapstructure:"custom_props_mapping" validate:"omitempty,dive"`
 	EventMerchEventToAdobeEvent   []mappingEntry           `mapstructure:"event_merch_event_to_adobe_event" validate:"omitempty,dive"`
-	EventMerchProperties          []string                 `mapstructure:"event_merch_properties" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	EventMerchProperties          []string                 `mapstructure:"event_merch_properties" validate:"omitempty,dive,pattern=single_line_100"`
 	ProductMerchEventToAdobeEvent []mappingEntry           `mapstructure:"product_merch_event_to_adobe_event" validate:"omitempty,dive"`
-	ProductMerchProperties        []string                 `mapstructure:"product_merch_properties" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
+	ProductMerchProperties        []string                 `mapstructure:"product_merch_properties" validate:"omitempty,dive,pattern=single_line_100"`
 	ProductMerchEvarsMap          []mappingEntry           `mapstructure:"product_merch_evars_map" validate:"omitempty,dive"`
 	ProductIdentifier             string                   `mapstructure:"product_identifier" validate:"omitempty,oneof=name id sku" default:"name"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
@@ -163,20 +172,14 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 		converter.ArrayWithObjects("listMapping", "list_mapping", map[string]any{
-			"from": "from",
-			"to":   "to",
-		}),
-		converter.ArrayWithObjects("listDelimiter", "list_delimiter", map[string]any{
-			"from": "from",
-			"to":   "to",
+			"from":      "from",
+			"to":        "to",
+			"delimiter": "delimiter",
 		}),
 		converter.ArrayWithObjects("customPropsMapping", "custom_props_mapping", map[string]any{
-			"from": "from",
-			"to":   "to",
-		}),
-		converter.ArrayWithObjects("propsDelimiter", "props_delimiter", map[string]any{
-			"from": "from",
-			"to":   "to",
+			"from":      "from",
+			"to":        "to",
+			"delimiter": "delimiter",
 		}),
 		converter.ArrayWithObjects("eventMerchEventToAdobeEvent", "event_merch_event_to_adobe_event", map[string]any{
 			"from": "from",

@@ -26,9 +26,10 @@ on:
 # Supersession, keyed per PR: a new commit cancels the older run of that same PR
 # instead of letting every intermediate commit spend a full e2e suite against the live
 # workspace. Cancelling mid-apply is safe because every e2e test opens with
-# `destroy --confirm=false` — but only while RUDDERSTACK_X_UNVERIFIED_DESTINATIONS
-# is forced on in the e2e job below. Without it, destinations left behind by a
-# killed run make the next run's opening destroy fail on an unregistered type.
+# `destroy --confirm=false`, and because each of them turns
+# RUDDERSTACK_X_UNVERIFIED_DESTINATIONS on for itself (see
+# allowUnverifiedDestinationResidue) — without that flag, destinations left behind
+# by a killed run make the next run's opening destroy fail on an unregistered type.
 #
 # Keyed on the PR number, not github.head_ref: head_ref is only a branch name, so two
 # PRs sharing one (typically from different forks) would cancel each other. The number
@@ -147,19 +148,15 @@ jobs:
           RUDDERSTACK_CLI_DEBUG: ${{ vars.RUDDERSTACK_CLI_DEBUG }}
           RUDDERSTACK_CLI_TELEMETRY_DISABLED: ${{ vars.RUDDERSTACK_CLI_TELEMETRY_DISABLED }}
           RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL }}
-          RUDDERSTACK_X_CONCURRENT_SYNCS: ${{ vars.RUDDERSTACK_X_CONCURRENT_SYNCS }}
-          RUDDERSTACK_X_TRANSFORMATIONS: ${{ vars.RUDDERSTACK_X_TRANSFORMATIONS }}
-          RUDDERSTACK_X_DESTINATION_SUPPORT: ${{ vars.RUDDERSTACK_X_DESTINATION_SUPPORT }}
-          # Pinned here rather than read from a repository variable so the setting
-          # travels with the workflow that depends on it. It must be true now that runs
-          # get cancelled: a run killed mid-TestDestinationsApply skips its t.Cleanup
-          # destroy and leaves unverified destinations upstream, and with the flag off
-          # the next run's opening destroy fails hard at destination/handler.go
-          # LoadResources ("managed destination ... has unregistered type") — the
-          # workspace then needs manual repair. The fixture set already includes
-          # unverified types (attentive_tag, http, rs, salesforce), so this only
-          # restates what TestDestinationsApply sets for itself via t.Setenv.
-          RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: "true"
+          # Matters because runs now get cancelled: a run killed mid-
+          # TestDestinationsApply skips its t.Cleanup destroy and leaves unverified
+          # destinations upstream, and with the flag off the next run's opening
+          # destroy fails hard in destination LoadResources ("managed destination ...
+          # has unregistered type"), which needs manual repair. Every e2e test already
+          # sets it for itself via allowUnverifiedDestinationResidue, so this is a
+          # backstop for one that forgets and a way to flip it without a code change.
+          # The variable does not exist yet; unset, this resolves to empty.
+          RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: ${{ vars.RUDDERSTACK_X_UNVERIFIED_DESTINATIONS }}
           # Gates TestDestinationsApply, which opens by destroying every resource in
           # the workspace RUDDERSTACK_ACCESS_TOKEN points at. Set the repository
           # variable to 1 only while that workspace is disposable.

@@ -26,7 +26,6 @@
     "cleanupObjectStorageFiles": false,
     "bucketName": "rudder-cli-e2e-gcs-updated",
     "storageIntegration": "RUDDER_GCS_INTEGRATION",
-    "roleBasedAuth": true,
     "enableSSE": false,
     "useSASTokens": false
   },

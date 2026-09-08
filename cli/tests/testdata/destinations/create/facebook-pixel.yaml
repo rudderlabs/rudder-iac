@@ -35,9 +35,8 @@ spec:
     auto_config:
       web: true
     legacy_conversion_pixel_id:
-      web:
-        - from: Product Viewed
-          to: "9876543210"
+      - from: Product Viewed
+        to: "9876543210"
     connection_mode:
       web: cloud
       android_kotlin: cloud

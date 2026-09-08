@@ -145,7 +145,7 @@ Mechanical rules:
   (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
   reach.
 - `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
-  `SupportedSourcesValidation`, a
+  `ConnectionRequiredKeys`, a
   `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the
   branch's `then.required` makes **required**, never optional ones. Source types
   translated to CLI-local types via the same mapping, keys to snake_case.
@@ -196,17 +196,17 @@ if cfg.ExperimentalFlags.UnverifiedDestinations {
 }
 ```
 
-The verified section (registered on `DestinationSupport` alone) is reserved for
-definitions already proven against a live stack — S3 today. Promotion into it is
-a separate, deliberate change after that verification; it is never part of the
-onboarding PR, no matter how simple the destination looks.
+The unconditional verified section is reserved for definitions already proven
+against a live stack - S3 today. Promotion into it is a separate, deliberate
+change after that verification; it is never part of the onboarding PR, no matter
+how simple the destination looks.
 
 Then update the flag-matrix expectation in
 `cli/internal/app/dependencies_test.go`: add the new type to the
-`wantTypes` list of the both-flags-enabled case only (`SupportedTypes()` is
-sorted, so insert alphabetically). The verified-only case must stay unchanged —
-if adding the type there makes a test pass, the registration landed in the wrong
-block.
+`wantTypes` list of the unverified-destinations-enabled case only (`SupportedTypes()` is
+sorted, so insert alphabetically). The unverified-disabled case must keep only
+verified destinations; if adding the type there makes a test
+pass, the registration landed in the wrong block.
 
 Registration itself validates the definition (source types mapped, connection
 modes complete for every source type, consent field type). A broken definition
@@ -219,8 +219,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 1. `TestNewDefinitionMetadata` — register in fresh registry, assert `Type`,
    `APIType`, `Version`, `SecretKeys()`, `SupportedSourceTypes()`,
    `ConnectionModes()` per source type, and `GetByAPIType` lookup. When the
-   definition carries `SupportedSourcesValidation`, also assert
-   `SupportedSourcesValidation(sourceType, connectionMode)` per configured
+   definition carries `ConnectionRequiredKeys`, also assert
+   `ConnectionRequiredKeys(sourceType, mode)` per configured
    pair and `Nil` for one supported pair without an entry. When the
    definition has gated properties, also assert the full `GatedKeyPaths()`
    map with `assert.Equal` (JSON-pointer keypaths, e.g.
@@ -301,13 +301,13 @@ Final response must include:
   performed
 - Flagged discrepancies (terraform vs schema.json disagreements, dropped
   source types, connectionMode-conditioned required keys that could not be
-  expressed in `SupportedSourcesValidation`, upstream fields
+  expressed in `ConnectionRequiredKeys`, upstream fields
   intentionally omitted, and every `schema.json` key modelled without a
   terraform mapping — name each one and the local key you derived for it)
 - Gated keys: which properties were gated and to which source types; gates
   narrowed or properties omitted because their source types were dropped
-- Reminder: usage requires `experimental: true` + `flags.destinationSupport: true`
-  + `flags.unverifiedDestinations: true` in the CLI config — newly onboarded
+- Reminder: usage requires `experimental: true` +
+  `flags.unverifiedDestinations: true` in the CLI config; newly onboarded
   destinations are always behind the unverified gate (Step 5)
 
 ## Guardrails

@@ -217,3 +217,39 @@
 - Amplitude local config should include terraform-mapped web-only fields even when schema/db-config do not list them, including `device_id_from_url_param`, `force_https`, `track_gclid`, `track_referrer`, and `save_params_referrer_once_per_session`; keep those fields web-gated and avoid inventing validation beyond their boolean shape.
 - Amplitude should model schema/db-config fields absent from Terraform mappings, including `enable_enhanced_user_operations`, using mechanical camelCase-to-snake_case local naming.
 - Nested schema defaults (`sdkVersion.web`, `trackSessionEvents.web`, the `enable*AutoCapture.web` family) are declared with `default` tags on the nested struct fields, not a whole-object `default_json` tag; ApplyDefaults merges them only into a block the spec already carries, matching backend AJV `useDefaults` behavior where an absent parent object stays absent.
+
+## DEX-731 — Apply/Destroy E2E Safety
+<!-- ticket:DEX-731 -->
+- Avoid full live apply/destroy E2E validation in non-disposable autonomous environments because those flows can mutate or destroy the configured RudderStack workspace.
+- For sync-behavior changes without an explicitly disposable workspace, use compile-only E2E validation such as `go test ./cli/tests -run '^$'` as the safe substitute, alongside focused unit tests.
+
+## DEX-732 — Removed Experimental Flag Coverage
+<!-- ticket:DEX-732 -->
+- When promoting an experimental flag to GA, keep an explicit negative config test for the removed flag name when there is precedent, as with the existing DataGraph removed-flag test.
+- For destination support GA, the removed destination-support flag name should be asserted as an invalid experimental option rather than only deleting its positive env-name table case, guarding against accidental flag reintroduction.
+
+## DEX-730 — Amplitude Source Scope
+<!-- ticket:DEX-730 -->
+- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
+- A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.
+
+## DEX-745 — Bing Ads Offline Conversions Config Surface
+<!-- ticket:DEX-745 -->
+- Bing Ads Offline Conversions local config is `rudder_account_id`, `customer_account_id`, `customer_id`, `is_hash_required` with default `false`, `connection_mode`, and shared `consent_management`; legacy `one_trust_cookie_categories` and `ketch_consent_purposes` remain unmodelled and unknown.
+- Use a destination-local named pattern for numeric Bing Ads IDs because no existing production named pattern enforces digits-only; schema patterns for `customerAccountId` and `customerId` reduce to `^[0-9]+$`, with template support expressed by the `dynamic_or_pattern` validation tag.
+- Keep Bing Ads Offline Conversions as an unverified warehouse-only destination, alongside `customerio_audience`, rather than broadening it to event-stream source types or treating placeholder account IDs as valid live fixtures.
+
+## DEX-747 — Google Ads Offline Conversions Validation
+<!-- ticket:DEX-747 -->
+- For `events_to_offline_conversions_type_mapping[].to`, follow integrations-config `schema.json` over Terraform: the property is optional and the schema enum includes an empty string, so use `omitempty,oneof=click call store` to allow omitted/empty values while rejecting unknown non-empty values.
+- Google Ads Offline Conversions pattern-validated single-line fields should use shared `dynamic_or_pattern=single_line_100` for schema constraints like `^(.{0,100})$` or `^(.{1,100})$`; do not add a destination-local reject just to block `env.*` literals, because that would be stricter than existing broad single-line destination fields.
+
+## DEX-808 — Removed Experimental Flag Coverage
+<!-- ticket:DEX-808 -->
+- `accountSupport` should be asserted as an invalid experimental option in `cli/internal/config/experimental_test.go`, following the existing `dataGraph` / `localTyper` removed-flag precedent, so the flag cannot be silently reintroduced.
+
+## DEX-812 — Kafka SSH Local Config Shape
+<!-- ticket:DEX-812 -->
+- Kafka keeps `use_ssh` as the top-level SSH branch selector while grouping the four SSH member keys under `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` in local YAML.
+- The nested SSH key names intentionally drop the redundant `ssh_` prefix inside the `ssh` block; there is no Terraform mapping precedent for Kafka SSH keys, so the shape is a CLI ergonomics convention rather than a Terraform parity rule.
+- Kafka's only CLI secret remains `password`; SSH config such as `ssh.public_key` is import/export visible and should not be added to `SecretKeys` unless upstream db-config secret metadata changes.
