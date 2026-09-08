@@ -41,37 +41,14 @@ func TestProjectApply(t *testing.T) {
 	require.NoError(t, err)
 
 	projectDir := filepath.Join("testdata", "project")
+	migratedDir := copyAndMigrateProject(t, executor, projectDir)
 
 	t.Run("rudder specs", func(t *testing.T) {
-		applyAndVerify(t, executor, projectDir)
-	})
-
-	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
-		migratedDir := copyAndMigrateProject(t, executor, projectDir)
-
-		// The dry run lands on the state the subtest above just applied from the
-		// source update/ dir, so "No changes to apply" proves the migrated update/
-		// specs are semantically identical to their v0.1 originals — the contract of
-		// `migrate`. Re-applying the migrated project from scratch re-proved that at
-		// ~85 writes against the live control plane on every CI run, so it is
-		// deliberately not done.
-		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-
-		// create/ is a different tree and is no longer applied, so this is weaker than
-		// what it replaces: it proves the migrated files load and pass every rule, NOT
-		// that they produce the same upstream state. That gap is narrow because the
-		// two trees share a key set and update/ carries strictly more (variants, cases,
-		// defaults), so migrating update/ exercises a superset of the transform — and
-		// MigrateSpec itself is unit-tested in localcatalog. It is still worth having:
-		// `migrate` validates its input, never its output, so nothing checked these
-		// files before. One GET, no writes.
-		output, err := executor.Execute(cliBinPath, "validate", "-l",
-			filepath.Join(migratedDir, "create"), "--var-file", varFilePath)
-		require.NoError(t, err, "migrated create/ failed validation: %s", string(output))
+		applyAndVerify(t, executor, projectDir, migratedDir)
 	})
 }
 
-func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
+func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir, migratedDir string) {
 	t.Helper()
 
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
@@ -88,12 +65,23 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		verifyState(t, "create")
 	})
 
+	t.Run("migrated create specs should produce the same state", func(t *testing.T) {
+		// Compare the migrated create tree while the live workspace still contains
+		// the state produced by the original create tree. This covers create-only
+		// resources without issuing the duplicate writes of a second apply cycle.
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "create"))
+	})
+
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
+	})
+
+	t.Run("migrated update specs should produce the same state", func(t *testing.T) {
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
 	})
 
 	t.Run("applying on already applied project should not create any diff", func(t *testing.T) {
@@ -107,7 +95,6 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	t.Helper()
 
-	// we only verify no diff after migration for the update directory, as the last apply was run on it.
 	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
 	// applied; otherwise the file-only variable would be undefined and the dry run would error.
 	output, err := executor.Execute(
@@ -120,8 +107,8 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 		"--dry-run",
 		"--confirm=false",
 	)
-	require.NoError(t, err, "Dry run failed for update: %s", string(output))
-	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	require.NoError(t, err, "Dry run failed for %s: %s", path, string(output))
+	assert.Contains(t, string(output), "No changes to apply", "Expected no diff for %s, but got: %s", path, string(output))
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {

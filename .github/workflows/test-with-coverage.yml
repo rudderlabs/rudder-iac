@@ -26,9 +26,9 @@ on:
 # Supersession, keyed per PR: a new commit cancels the older run of that same PR
 # instead of letting every intermediate commit spend a full e2e suite against the live
 # workspace. Cancelling mid-apply is safe because every e2e test opens with
-# `destroy --confirm=false` — but only while the repository variable
-# RUDDERSTACK_X_UNVERIFIED_DESTINATIONS is true, without which destinations left behind
-# by a killed run make the next run's opening destroy fail on an unregistered type.
+# `destroy --confirm=false` — but only while RUDDERSTACK_X_UNVERIFIED_DESTINATIONS
+# is forced on in the e2e job below. Without it, destinations left behind by a
+# killed run make the next run's opening destroy fail on an unregistered type.
 #
 # Keyed on the PR number, not github.head_ref: head_ref is only a branch name, so two
 # PRs sharing one (typically from different forks) would cancel each other. The number
@@ -92,16 +92,9 @@ jobs:
     name: "e2e tests (live control plane)"
     runs-on: "ubuntu-24.04"
     timeout-minutes: 30
-    # Not run on merges to main: the pull_request run tests the merge ref and finishes
-    # minutes earlier, and repeating it doubles the write volume this suite aims at the
-    # production config-backend outbox. The trade is real but small — if the base moves
-    # between that run and the merge, the merged tree is no longer the tree the PR run
-    # covered, and the regression surfaces on the next PR instead of here.
-    # Release branches keep the suite as a pre-release gate.
-    # A job skipped by `if:` never acquires the concurrency group below.
-    if: >-
-      github.event_name == 'pull_request' ||
-      startsWith(github.ref, 'refs/heads/release/')
+    # Keep the push run as the final verification of the tree that actually landed.
+    # A pull request's merge ref can become stale when main advances, and this workflow
+    # is not a required status check, so its PR run cannot replace the post-merge run.
     # The mutex over the single shared workspace. These tests open with a workspace-wide
     # destroy and count-guard their snapshots over every managed resource, so two must
     # never overlap.

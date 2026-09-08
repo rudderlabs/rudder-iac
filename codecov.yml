@@ -11,12 +11,10 @@ ignore:
   - "**/*.pb.go"
   - "*.pb.go"
 
-# Coverage now arrives from two jobs under two flags. The e2e job does not run on
-# merges to main, and a flag with no upload on a commit reports 0% rather than
-# nothing, which would sink main's number; carryforward makes those commits inherit
-# the parent's e2e coverage instead.
+# Coverage arrives from two jobs under two flags. Neither flag is carried forward:
+# every code-changing pull request and push must report the coverage it actually ran.
 flags:
   unit:
     carryforward: false
   e2e:
-    carryforward: true
+    carryforward: false
