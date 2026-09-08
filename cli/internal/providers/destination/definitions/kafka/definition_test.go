@@ -64,6 +64,35 @@ func TestKafkaConfigValidation(t *testing.T) {
 		}
 	}
 
+	sshConfig := func() map[string]any {
+		return map[string]any{
+			"host":       "ssh.example.com",
+			"port":       "22",
+			"user":       "rudder",
+			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey",
+		}
+	}
+
+	withSSH := func(config map[string]any) {
+		config["use_ssh"] = true
+		config["ssh"] = sshConfig()
+	}
+
+	setNestedConfigValue := func(config map[string]any, path string, value any) {
+		parent, field, ok := strings.Cut(path, ".")
+		if !ok {
+			config[path] = value
+			return
+		}
+
+		nested, ok := config[parent].(map[string]any)
+		if !ok {
+			nested = map[string]any{}
+			config[parent] = nested
+		}
+		nested[field] = value
+	}
+
 	assertError := func(t *testing.T, errors []definitions.ConfigError, path string, message string) {
 		t.Helper()
 		for _, err := range errors {
@@ -99,38 +128,36 @@ func TestKafkaConfigValidation(t *testing.T) {
 		{name: "topic contains invalid slash", field: "topic", value: "bad/topic"},
 		{name: "username contains space", field: "username", value: "bad user"},
 		{name: "password contains line break", field: "password", value: "bad\npassword"},
-		{name: "ssh host starts with hyphen", field: "ssh_host", value: "-ssh.example.com"},
-		{name: "ssh port is zero", field: "ssh_port", value: "0"},
-		{name: "ssh user contains space", field: "ssh_user", value: "bad user"},
-		{name: "ssh public key has unsupported type", field: "ssh_public_key", value: "ssh-ecdsa AAAAC3NzaC1lZDI1NTE5AAAAIExample"},
+		{name: "ssh host starts with hyphen", field: "ssh.host", value: "-ssh.example.com"},
+		{name: "ssh port is zero", field: "ssh.port", value: "0"},
+		{name: "ssh user contains space", field: "ssh.user", value: "bad user"},
+		{name: "ssh public key has unsupported type", field: "ssh.public_key", value: "ssh-ecdsa AAAAC3NzaC1lZDI1NTE5AAAAIExample"},
 	} {
 		tc := tc
 		t.Run("invalid literal "+tc.name, func(t *testing.T) {
 			t.Parallel()
 			config := minimalConfig()
-			config[tc.field] = tc.value
+			if strings.HasPrefix(tc.field, "ssh.") {
+				withSSH(config)
+			}
+			setNestedConfigValue(config, tc.field, tc.value)
 
 			errors := registered.ValidateConfig(config)
 
 			require.NotEmpty(t, errors)
-			assertError(t, errors, "/"+tc.field, "not valid")
+			assertError(t, errors, "/"+strings.ReplaceAll(tc.field, ".", "/"), "not valid")
 		})
 	}
 
-	for _, field := range []string{"host_name", "port", "topic", "username", "ssh_host", "ssh_port", "ssh_user", "ssh_public_key"} {
+	for _, field := range []string{"host_name", "port", "topic", "username", "ssh.host", "ssh.port", "ssh.user", "ssh.public_key"} {
 		field := field
 		t.Run("template accepted for "+field, func(t *testing.T) {
 			t.Parallel()
 			config := minimalConfig()
-			config[field] = "{{ config." + field + " || fallback }}"
-			if strings.HasPrefix(field, "ssh_") {
-				config["use_ssh"] = true
-				config["ssh_host"] = "ssh.example.com"
-				config["ssh_port"] = "22"
-				config["ssh_user"] = "rudder"
-				config["ssh_public_key"] = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey"
-				config[field] = "{{ config." + field + " || fallback }}"
+			if strings.HasPrefix(field, "ssh.") {
+				withSSH(config)
 			}
+			setNestedConfigValue(config, field, "{{ config."+field+" || fallback }}")
 			if field == "username" {
 				config["ssl_enabled"] = true
 				config["use_sasl"] = true
@@ -178,7 +205,7 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
-	t.Run("ssh fields required when ssh tunnel is enabled", func(t *testing.T) {
+	t.Run("ssh fields required when ssh tunnel is enabled without ssh block", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
 		config["use_ssh"] = true
@@ -186,10 +213,34 @@ func TestKafkaConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(config)
 
 		require.Len(t, errors, 4)
-		assertError(t, errors, "/ssh_host", "required")
-		assertError(t, errors, "/ssh_port", "required")
-		assertError(t, errors, "/ssh_user", "required")
-		assertError(t, errors, "/ssh_public_key", "required")
+		assertError(t, errors, "/ssh/host", "required")
+		assertError(t, errors, "/ssh/port", "required")
+		assertError(t, errors, "/ssh/user", "required")
+		assertError(t, errors, "/ssh/public_key", "required")
+	})
+
+	t.Run("ssh fields required when ssh tunnel is enabled with partial ssh block", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["use_ssh"] = true
+		config["ssh"] = map[string]any{"host": "ssh.example.com"}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 3)
+		assertError(t, errors, "/ssh/port", "required")
+		assertError(t, errors, "/ssh/user", "required")
+		assertError(t, errors, "/ssh/public_key", "required")
+	})
+
+	t.Run("ssh block is optional when ssh tunnel is disabled", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["use_ssh"] = false
+
+		errors := registered.ValidateConfig(config)
+
+		assert.Empty(t, errors)
 	})
 
 	t.Run("avro schemas required when avro conversion is enabled", func(t *testing.T) {
@@ -303,11 +354,7 @@ func TestKafkaConfigValidation(t *testing.T) {
 		config["enable_multi_topic"] = true
 		config["event_type_to_topic_map"] = []any{map[string]any{"from": "identify", "to": "identifies"}}
 		config["event_to_topic_map"] = []any{map[string]any{"from": "Signed Up", "to": "signups"}}
-		config["use_ssh"] = true
-		config["ssh_host"] = "ssh.example.com"
-		config["ssh_port"] = "22"
-		config["ssh_user"] = "rudder"
-		config["ssh_public_key"] = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey"
+		withSSH(config)
 		config["consent_management"] = map[string]any{
 			"android_kotlin": []any{
 				map[string]any{
@@ -438,10 +485,12 @@ func TestKafkaConversionRoundTrip(t *testing.T) {
 					{"from": "Signed Up", "to": "signups"}
 				],
 				"use_ssh": true,
-				"ssh_host": "ssh.example.com",
-				"ssh_port": "22",
-				"ssh_user": "rudder",
-				"ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey"
+				"ssh": {
+					"host": "ssh.example.com",
+					"port": "22",
+					"user": "rudder",
+					"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey"
+				}
 			}`,
 			APIJSON: `{
 				"hostName": "broker1.example.com, broker2.example.com",
@@ -533,20 +582,22 @@ func TestKafkaRemoteReadExportRoundTrip(t *testing.T) {
 		},
 	}
 	expectedLocal := map[string]any{
-		"host_name":            "broker1.example.com",
-		"port":                 "9092",
-		"topic":                "rudder-cli-events",
-		"ssl_enabled":          true,
-		"ca_certificate":       "certificate-body",
-		"use_sasl":             true,
-		"sasl_type":            "sha256",
-		"username":             "rudder_user",
-		"password":             "kafkaPasswordXXXXXXXXXXXX",
-		"use_ssh":              true,
-		"ssh_host":             "ssh.example.com",
-		"ssh_port":             "22",
-		"ssh_user":             "rudder",
-		"ssh_public_key":       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey",
+		"host_name":      "broker1.example.com",
+		"port":           "9092",
+		"topic":          "rudder-cli-events",
+		"ssl_enabled":    true,
+		"ca_certificate": "certificate-body",
+		"use_sasl":       true,
+		"sasl_type":      "sha256",
+		"username":       "rudder_user",
+		"password":       "kafkaPasswordXXXXXXXXXXXX",
+		"use_ssh":        true,
+		"ssh": map[string]any{
+			"host":       "ssh.example.com",
+			"port":       "22",
+			"user":       "rudder",
+			"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKey",
+		},
 		"convert_to_avro":      true,
 		"avro_schemas":         []any{map[string]any{"schema_id": "event-value", "schema": `{"type":"record","name":"Event"}`}},
 		"embed_avro_schema_id": true,

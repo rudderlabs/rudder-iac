@@ -52,3 +52,6 @@ spec:
         - provider: oneTrust
           consents:
             - analytics
+    event_filtering:
+      blacklist:
+        - Page Viewed

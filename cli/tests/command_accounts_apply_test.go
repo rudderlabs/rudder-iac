@@ -44,7 +44,7 @@ var accountSnapshotIgnore = []string{"id", "workspaceId", "createdAt", "updatedA
 func TestAccountsApply(t *testing.T) {
 	// Accounts are gated behind an experimental flag, and the specs reference
 	// secrets via {{ .VAR }} placeholders resolved at apply time.
-	t.Setenv("RUDDERSTACK_X_ACCOUNT_SUPPORT", "true")
+	allowUnverifiedDestinationResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 
 	executor, err := NewCmdExecutor("")

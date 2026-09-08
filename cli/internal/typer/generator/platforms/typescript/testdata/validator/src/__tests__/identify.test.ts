@@ -1,26 +1,13 @@
-import { RudderAnalytics } from "@rudderstack/analytics-js/bundled";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RudderTyper } from "../RudderTyper/RudderTyper.ts";
-import {
-  TEST_CONFIG_BE_URL,
-  TEST_DATA_PLANE_URL,
-  TEST_WRITE_KEY,
-  interceptor,
-} from "./eventInterceptor.ts";
+import { interceptor } from "./eventInterceptor.ts";
+import { freshAnalytics } from "./session.ts";
 
 describe("RudderTyper.identify", () => {
   let typer: RudderTyper;
 
   beforeEach(async () => {
-    const analytics = new RudderAnalytics();
-    analytics.load(TEST_WRITE_KEY, TEST_DATA_PLANE_URL, {
-      configUrl: TEST_CONFIG_BE_URL,
-      logLevel: "ERROR",
-      queueOptions: { maxItems: 1, batch: { enabled: false } },
-      sessions: { autoTrack: false },
-      uaChTrackLevel: "none",
-    });
-    await new Promise<void>((resolve) => analytics.ready(() => resolve()));
+    const analytics = await freshAnalytics();
     typer = new RudderTyper(() => analytics);
   });
 
