@@ -223,13 +223,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.androidKotlin", "use_native_sdk.android_kotlin"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("useNativeSDK.iosSwift", "use_native_sdk.ios_swift"),
-		converter.Simple("useNativeSDK.reactnative", "use_native_sdk.react_native"),
-		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
 		converter.Simple("useEcommerceRecommendedEvents", "use_ecommerce_recommended_events"),
 		converter.Simple("usePlatformSpecificApiKeys", "use_platform_specific_api_keys"),
 		converter.Simple("androidApiKey", "android_api_key"),
@@ -237,6 +230,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("webApiKey", "web_api_key"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
+	properties = append(properties, common.NativeSDKProperties(connectionModes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

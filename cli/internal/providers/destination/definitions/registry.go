@@ -3,6 +3,7 @@ package definitions
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
@@ -81,6 +82,9 @@ func validateDefinitionSourceTypes(def *DestinationDefinition) error {
 	if err := validateConnectionModeSourceTypes(def); err != nil {
 		return err
 	}
+	if err := validateNativeSDKSourceTypes(def); err != nil {
+		return err
+	}
 	return validateConsentValidationOverrides(def)
 }
 
@@ -111,6 +115,48 @@ func validateConnectionModeSourceTypes(def *DestinationDefinition) error {
 		if _, ok := def.ConnectionModes[sourceType]; !ok {
 			return fmt.Errorf("source type %q has no connection modes", sourceType)
 		}
+	}
+	return nil
+}
+
+// validateNativeSDKSourceTypes pins the config model's use_native_sdk fields to
+// the source types NativeSDKProperties derives converters for, so the struct,
+// the property mappings and the connection-mode metadata cannot drift apart.
+//
+// Only definitions that model the block are checked: upstream freely omits
+// useNativeSDK from schema.json for device-capable destinations (pendo,
+// optimizely, snap_pixel, ...), so a missing block is a legitimate shape rather
+// than an oversight. An open map means the destination accepts any platform
+// key, which the source-type key check governs instead.
+func validateNativeSDKSourceTypes(def *DestinationDefinition) error {
+	if def.NewConfig == nil {
+		return nil
+	}
+
+	configType := derefType(reflect.TypeOf(def.NewConfig()))
+	if configType == nil || configType.Kind() != reflect.Struct {
+		return nil
+	}
+
+	field, ok := structFieldsByMapstructureTag(configType)[nativeSDKConfigKey]
+	if !ok {
+		return nil
+	}
+
+	blockType := derefType(field.Type)
+	if blockType.Kind() != reflect.Struct {
+		return nil
+	}
+
+	var (
+		declared = slices.Sorted(maps.Keys(structFieldsByMapstructureTag(blockType)))
+		derived  = common.NativeSDKSourceTypes(def.ConnectionModes)
+	)
+	if !slices.Equal(declared, derived) {
+		return fmt.Errorf(
+			"%s fields %v do not match the source types with a device or hybrid connection mode %v",
+			nativeSDKConfigKey, declared, derived,
+		)
 	}
 	return nil
 }

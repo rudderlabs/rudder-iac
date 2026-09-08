@@ -73,8 +73,9 @@ type multiModeTestConfig struct {
 //   - "barebones" has neither settings block, so the settings check never
 //     applies.
 //   - "mode-aware" has both blocks, so either can satisfy the settings check.
-//     Its use_native_sdk names web, android and ios but not cloud, and only
-//     ios lists connection_mode as a required key.
+//     Its use_native_sdk names web, android and ios — the device-routed source
+//     types — but not cloud, and only ios lists connection_mode as a required
+//     key.
 //   - "native-only" has use_native_sdk alone, naming web but not android.
 //   - "multimode" mirrors intercom: a web source needs api_key in cloud mode
 //     and app_id in device mode, so required keys cannot be resolved from the
@@ -116,8 +117,8 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		},
 		ConnectionModes: map[string][]string{
 			"web":     {"cloud", "device"},
-			"android": {"cloud"},
-			"ios":     {"cloud"},
+			"android": {"cloud", "device"},
+			"ios":     {"cloud", "device"},
 			"cloud":   {"cloud"},
 		},
 		ConnectionRequiredKeys: map[string]map[string][]string{

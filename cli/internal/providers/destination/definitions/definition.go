@@ -11,9 +11,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
+const nativeSDKConfigKey = "use_native_sdk"
+
 var sourceTypeConfigKeys = []string{
 	"connection_mode",
-	"use_native_sdk",
+	nativeSDKConfigKey,
 }
 
 // DestinationDefinition is the input to Registry.Register().

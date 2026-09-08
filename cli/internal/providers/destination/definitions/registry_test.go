@@ -227,6 +227,124 @@ func TestRegistryRejectsNonSharedConnectionModeModel(t *testing.T) {
 	assert.Contains(t, err.Error(), "connection_mode config field must use common.ConnectionMode")
 }
 
+type nativeSDKGuardBlock struct {
+	Web           *bool `mapstructure:"web"`
+	AndroidKotlin *bool `mapstructure:"android_kotlin"`
+}
+
+func nativeSDKGuardDefinition(connectionModes map[string][]string, newConfig func() any) *definitions.DestinationDefinition {
+	sourceTypes := make([]string, 0, len(connectionModes))
+	for sourceType := range connectionModes {
+		sourceTypes = append(sourceTypes, sourceType)
+	}
+
+	return &definitions.DestinationDefinition{
+		Type:            "TEST",
+		Version:         1,
+		SourceTypes:     sourceTypes,
+		ConnectionModes: connectionModes,
+		NewConfig:       newConfig,
+	}
+}
+
+func TestRegistryAcceptsNativeSDKMatchingDeviceRoutedSourceTypes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(nativeSDKGuardDefinition(
+		map[string][]string{
+			"web":            {"cloud", "device", "hybrid"},
+			"android_kotlin": {"cloud", "hybrid"},
+			"cloud":          {"cloud"},
+		},
+		func() any {
+			return &struct {
+				UseNativeSDK nativeSDKGuardBlock `mapstructure:"use_native_sdk"`
+			}{}
+		},
+	))
+
+	require.NoError(t, err)
+}
+
+func TestRegistryRejectsNativeSDKFieldWithoutDeviceRoutedMode(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(nativeSDKGuardDefinition(
+		map[string][]string{
+			"web":            {"cloud", "device"},
+			"android_kotlin": {"cloud"},
+		},
+		func() any {
+			return &struct {
+				UseNativeSDK nativeSDKGuardBlock `mapstructure:"use_native_sdk"`
+			}{}
+		},
+	))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "use_native_sdk fields [android_kotlin web] do not match")
+}
+
+func TestRegistryRejectsNativeSDKMissingDeviceRoutedSourceType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(nativeSDKGuardDefinition(
+		map[string][]string{
+			"web":            {"cloud", "device"},
+			"android_kotlin": {"cloud", "device"},
+		},
+		func() any {
+			return &struct {
+				UseNativeSDK struct {
+					Web *bool `mapstructure:"web"`
+				} `mapstructure:"use_native_sdk"`
+			}{}
+		},
+	))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "use_native_sdk fields [web] do not match")
+}
+
+// An open map accepts any platform key by design, so the source-type key check
+// governs it instead of this guard.
+func TestRegistryAcceptsNativeSDKOpenMap(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(nativeSDKGuardDefinition(
+		map[string][]string{"web": {"cloud", "device"}},
+		func() any {
+			return &struct {
+				UseNativeSDK map[string]bool `mapstructure:"use_native_sdk"`
+			}{}
+		},
+	))
+
+	require.NoError(t, err)
+}
+
+// Upstream omits useNativeSDK from schema.json for plenty of device-capable
+// destinations, so an absent block is a legitimate shape.
+func TestRegistryAcceptsAbsentNativeSDKBlock(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(nativeSDKGuardDefinition(
+		map[string][]string{"web": {"cloud", "device"}},
+		func() any {
+			return &struct {
+				WebhookURL string `mapstructure:"webhook_url"`
+			}{}
+		},
+	))
+
+	require.NoError(t, err)
+}
+
 func TestRegistrySupportedTypesAndVersions(t *testing.T) {
 	t.Parallel()
 
