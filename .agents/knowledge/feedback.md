@@ -12,7 +12,7 @@
 
 ## DEX-608 — Destination Unverified Gate Documentation
 <!-- ticket:DEX-608 -->
-- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `attentive_tag`, `http`, and `rs`, while S3 is verified/native.
+- When documenting or commenting on destination E2E unverified gating, do not describe HTTP as the only remaining unverified destination; the unverified registry can include multiple definitions such as `rs` and `salesforce`, while S3, HTTP, and Attentive Tag are verified/native.
 
 ## DEX-661 — Destination Empty Secret Export
 <!-- ticket:DEX-661 -->
@@ -44,3 +44,9 @@
 <!-- ticket:DEX-771 -->
 - HTTP has completed QA verification and should be documented as verified/native: `type: http` must be available with `RUDDERSTACK_X_DESTINATION_SUPPORT` alone, without `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS`.
 - Do not cite HTTP as an unverified fixture in E2E gate comments or skip messages; retain the unverified flag only for remaining unverified fixtures such as `attentive_tag`, `rs`, and `salesforce`.
+
+## DEX-753 — Attentive Tag Promotion Scope
+<!-- ticket:DEX-753 -->
+- Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
+- Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
+- Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.

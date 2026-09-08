@@ -77,6 +77,16 @@
 - CI failed when legacy Google Analytics destination E2E fixtures set `rudder_delete_account_id: rudderCliE2eDeleteAccount` without seeding that account in the workspace; create/update calls returned HTTP 400 `Account not found with given id in the workspace`.
 - Durable mitigation: keep `rudder_delete_account_id` out of `cli/tests/testdata/destinations/{create,update}/ga.yaml` unless E2E setup provisions a real matching account, and update `destination_ga` upstream snapshots in the same scoped change.
 
+## DEX-812 — Iterable Create Snapshot Default
+<!-- ticket:DEX-812 -->
+- CI live destination E2E showed Iterable create responses can include backend default `config.eventFilteringOption = "disable"` even when local `cli/tests/testdata/destinations/create/iterable.yaml` omits an `event_filtering` block.
+- Durable mitigation: include `"eventFilteringOption": "disable"` in the Iterable create upstream snapshot while keeping local YAML free of any direct event-filtering option field.
+
+## DEX-754 — Concurrent Same-File Edit Corruption
+<!-- ticket:DEX-754 -->
+- During BigQuery verified-destination promotion, running two same-file edits concurrently against `cli/internal/app/dependencies.go` corrupted or partially overwrote the file tail and dropped the intended `bq` registry insertion.
+- Durable mitigation: serialize edits to the same file, even when replacements look independent; use parallel edits only for different destination files.
+
 ## DEX-731 — Live Apply/Destroy Eventual Consistency
 <!-- ticket:DEX-731 -->
 - CI live E2E can observe stale upstream state immediately after project apply/destroy moves through the composite provider; observed symptoms included catalog snapshot counts such as 0 resources instead of 37 and a follow-up dry-run still listing a transformation deletion like `transformation:py_transform`.

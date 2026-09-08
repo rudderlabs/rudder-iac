@@ -20,9 +20,7 @@
     "displayInterval": {
       "web": "2500"
     },
-    "eventFilteringOption": {
-      "web": "whitelistedEvents"
-    },
+    "eventFilteringOption": "whitelistedEvents",
     "getInAppEventMapping": {
       "web": [
         {
@@ -59,13 +57,11 @@
     "useNativeSDK": {
       "web": true
     },
-    "whitelistedEvents": {
-      "web": [
-        {
-          "eventName": "Order Completed"
-        }
-      ]
-    }
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ]
   },
   "createdAt": "\u003cignored\u003e",
   "enabled": true,

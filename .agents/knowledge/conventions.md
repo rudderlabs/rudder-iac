@@ -238,3 +238,9 @@
 <!-- ticket:DEX-747 -->
 - For `events_to_offline_conversions_type_mapping[].to`, follow integrations-config `schema.json` over Terraform: the property is optional and the schema enum includes an empty string, so use `omitempty,oneof=click call store` to allow omitted/empty values while rejecting unknown non-empty values.
 - Google Ads Offline Conversions pattern-validated single-line fields should use shared `dynamic_or_pattern=single_line_100` for schema constraints like `^(.{0,100})$` or `^(.{1,100})$`; do not add a destination-local reject just to block `env.*` literals, because that would be stricter than existing broad single-line destination fields.
+
+## DEX-812 — Kafka SSH Local Config Shape
+<!-- ticket:DEX-812 -->
+- Kafka keeps `use_ssh` as the top-level SSH branch selector while grouping the four SSH member keys under `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` in local YAML.
+- The nested SSH key names intentionally drop the redundant `ssh_` prefix inside the `ssh` block; there is no Terraform mapping precedent for Kafka SSH keys, so the shape is a CLI ergonomics convention rather than a Terraform parity rule.
+- Kafka's only CLI secret remains `password`; SSH config such as `ssh.public_key` is import/export visible and should not be added to `SecretKeys` unless upstream db-config secret metadata changes.
