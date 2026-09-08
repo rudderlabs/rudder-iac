@@ -114,9 +114,8 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 // DestinationSnapshotTester — the same file-manager + count-guard +
 // per-resource-compare structure verifyState uses. Destinations are GA, while
 // UnverifiedDestinations remains enabled here because these fixtures include
-// unverified destination types such as attentive_tag, rs, and salesforce.
-// Key-auth specs reference secrets via {{ .VAR }} placeholders resolved at apply
-// time.
+// unverified destination types such as rs and salesforce. Key-auth specs
+// reference secrets via {{ .VAR }} placeholders resolved at apply time.
 //
 // Gated behind RUN_DESTINATION_E2E because it needs a live stack with support for
 // the unverified fixture set, and the destroy below would otherwise wipe the

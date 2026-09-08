@@ -120,6 +120,63 @@ func TestComputeDiff(t *testing.T) {
 // TestCompareData_Secret covers the secret-aware rules on the Data() path, where
 // the concrete secret.String value lives directly in the resource map. It also
 // asserts the secret-only verdict CompareData returns alongside the diffs.
+// A whole number decodes to int from a YAML spec but to float64 from a JSON API
+// response. Both sides render identically, so an unnormalized comparison reports
+// a diff that reads as "1 => 1" and never settles.
+func TestCompareData_NumberDecodeTypes(t *testing.T) {
+	t.Run("equal numbers from different decode paths do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": float64(1)},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("equal numbers nested in a map do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"sdk_version": map[string]any{"web": 1}},
+			resources.ResourceData{"sdk_version": map[string]any{"web": float64(1)}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("equal numbers inside a slice of objects do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []any{map[string]any{"n": 1}}},
+			resources.ResourceData{"items": []any{map[string]any{"n": float64(1)}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("every integer width normalizes", func(t *testing.T) {
+		for _, value := range []any{int8(1), int16(1), int32(1), int64(1), uint(1), uint64(1), float32(1)} {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"n": value},
+				resources.ResourceData{"n": float64(1)},
+			)
+			assert.Emptyf(t, diffs, "%T must compare equal to float64", value)
+		}
+	})
+
+	t.Run("a changed number is still genuine drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": float64(2)},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"web": {Property: "web", SourceValue: float64(1), TargetValue: float64(2)},
+		}, diffs)
+	})
+
+	t.Run("a number replaced by a string is still genuine drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": "1"},
+		)
+		require.Contains(t, diffs, "web")
+	})
+}
+
 func TestCompareData_Secret(t *testing.T) {
 	t.Run("equal known secrets do not diff", func(t *testing.T) {
 		diffs, secretOnly := differ.CompareData(
