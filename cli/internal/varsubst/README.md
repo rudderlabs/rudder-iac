@@ -167,10 +167,16 @@ The `--var-file` flag and substitution apply to:
 - `rudder-cli apply`
 - `rudder-cli validate`
 - `rudder-cli migrate`
+- `rudder-cli import workspace`
 
-They are **not** available on `destroy` or `import` (those commands either do not load local
-specs or are out of scope for this feature). Even without `--var-file`, `RUDDER_*` environment
-variables are always picked up by the commands above.
+They are **not** available on `destroy` or `import retl-sources`, which do not load local specs.
+Even without `--var-file`, `RUDDER_*` environment variables are always picked up by the commands
+above.
+
+`import workspace` refuses to run while the project has changes to sync, and it compares your
+local specs against the workspace to decide that. Pass it the same variable files you pass to
+`apply` — otherwise an unresolved `{{ .VAR }}` is compared literally against the value `apply`
+sent, and the import is rejected as out of sync.
 
 ---
 
