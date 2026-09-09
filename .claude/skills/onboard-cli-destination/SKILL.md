@@ -142,8 +142,12 @@ Mechanical rules:
   [reference/source-type-mapping.md](reference/source-type-mapping.md).
   Drop and flag in the final report — never guess — both upstream types with no
   row in that mapping (e.g. `tiktokAds`, `singer-*`) and the never-declared set
-  (`amp`, `shopify`, `warehouse`, `cloud_source`), which the CLI maps but cannot
-  reach.
+  (`amp`, `shopify`, `cloud_source`), which the CLI maps but cannot reach.
+  `warehouse` **is** declared whenever db-config lists it: rETL connections
+  reach destinations through it.
+- `db-config.json` `config.syncBehaviours` / `config.supportsVisualMapper` →
+  `SyncBehaviours` / `SupportsVisualMapper` — see source-type-mapping.md
+  "rETL metadata".
 - `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
   `ConnectionRequiredKeys`, a
   `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the
@@ -197,7 +201,8 @@ if cfg.ExperimentalFlags.UnverifiedDestinations {
 ```
 
 The unconditional verified section is reserved for definitions already proven
-against a live stack - S3 today. Promotion into it is a separate, deliberate
+against a live stack — `bqstream`, `s3`, `http`, `active_campaign`,
+`attentive_tag` and `bq` today. Promotion into it is a separate, deliberate
 change after that verification; it is never part of the onboarding PR, no matter
 how simple the destination looks.
 
