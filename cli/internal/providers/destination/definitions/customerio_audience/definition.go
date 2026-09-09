@@ -53,5 +53,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		// db-config.json config.syncBehaviours; supportsVisualMapper is absent
+		// upstream. Destination-specific flows stay unsupported regardless.
+		SyncBehaviours: []string{"mirror"},
 	}
 }
