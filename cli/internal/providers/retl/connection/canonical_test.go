@@ -202,6 +202,13 @@ func TestConfigFromDataErrors(t *testing.T) {
 		assert.ErrorContains(t, err, "decoding connection config data")
 	})
 
+	t.Run("a key the spec does not know is reported, not dropped", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := configFromData(map[string]any{"sync_behaviour": "upsert", "destination_config": map[string]any{"audience_id": "aud-1"}})
+		assert.ErrorContains(t, err, "decoding connection config data")
+	})
+
 	t.Run("a value that cannot be encoded is reported", func(t *testing.T) {
 		t.Parallel()
 
