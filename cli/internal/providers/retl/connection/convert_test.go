@@ -263,6 +263,9 @@ func TestToCreateRequestObjectMapping(t *testing.T) {
 
 	config := objectMappingConfig()
 	config.Mappings = []MappingSpec{}
+	// Constants belong to the other flow; an empty list would be dropped by
+	// omitempty either way, so only a populated one proves they are omitted.
+	config.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
 
 	request, err := toCreateRequest(graphData(t, config))
 	require.NoError(t, err)
@@ -462,11 +465,17 @@ func TestToOutput(t *testing.T) {
 func TestConfigFromRemoteRejectsDestinationConfig(t *testing.T) {
 	t.Parallel()
 
-	_, err := configFromRemote(&retlClient.RETLConnection{
-		ID:                "conn-1",
-		DestinationConfig: json.RawMessage(`{"audienceId": "aud-1"}`),
-	})
-	assert.ErrorContains(t, err, `connection "conn-1": destination-specific configuration has no spec equivalent`)
+	// Anything that cannot be proven empty is refused, so a shape the spec has
+	// no field for is surfaced instead of being read as an absent config.
+	for _, raw := range []json.RawMessage{
+		json.RawMessage(`{"audienceId": "aud-1"}`),
+		json.RawMessage(`"opaque"`),
+		json.RawMessage(`[1]`),
+		json.RawMessage(`{"broken"`),
+	} {
+		_, err := configFromRemote(&retlClient.RETLConnection{ID: "conn-1", DestinationConfig: raw})
+		assert.ErrorContainsf(t, err, `connection "conn-1": destination-specific configuration has no spec equivalent`, "%s must be refused", raw)
+	}
 
 	// An absent one arrives as an empty, null or empty-object payload; none of
 	// those carries anything to lose.
@@ -569,6 +578,11 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
+		// The request carries the user's entries untouched: the reclassification
+		// below is the backend's doing, not ours.
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
+
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
 
@@ -586,6 +600,11 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
+
+		// The entry aimed at the reserved target is still in the request; only
+		// the backend consumes it as a synthetic identifier.
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)

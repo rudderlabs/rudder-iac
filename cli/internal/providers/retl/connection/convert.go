@@ -63,10 +63,14 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 		SyncBehaviour: lo.ToPtr(retlClient.SyncBehaviour(config.SyncBehaviour)),
 		Identifiers:   apiMappings(config.Identifiers),
 		Mappings:      apiMappings(config.Mappings),
-		Constants:     apiConstants(config.Constants),
 		Event:         apiEvent(config.Event),
 		CursorColumn:  config.CursorColumn,
 		Object:        lo.FromPtr(config.Object),
+	}
+	// Constants belong to the JSON mapper flow only; the per-flow allow-list
+	// rejects them on an object mapping create just as it does on update.
+	if config.Object == nil {
+		request.Constants = apiConstants(config.Constants)
 	}
 	// The config map is canonical, so sync settings are present only when they
 	// differ from what the server fills in by itself.
@@ -171,8 +175,17 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 // the spec has no field for, so a connection carrying them cannot round-trip
 // and must be refused rather than silently stripped.
 func hasDestinationConfig(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return false
+	}
 	var fields map[string]json.RawMessage
-	return json.Unmarshal(raw, &fields) == nil && len(fields) > 0
+	// Only an empty object or null proves the field carries nothing. A scalar,
+	// an array or malformed bytes cannot, so they are refused rather than
+	// dropped on the assumption that they are empty.
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return true
+	}
+	return len(fields) > 0
 }
 
 func apiSchedule(schedule ScheduleSpec) retlClient.Schedule {

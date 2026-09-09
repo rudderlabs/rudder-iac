@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -115,8 +116,12 @@ func configFromData(data any) (ConfigSpec, error) {
 		return ConfigSpec{}, fmt.Errorf("encoding connection config data: %w", err)
 	}
 
+	// A key the spec does not know is state this conversion would drop on the
+	// floor, so it is reported instead of silently losing the configuration.
 	var config ConfigSpec
-	if err := json.Unmarshal(encoded, &config); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
 		return ConfigSpec{}, fmt.Errorf("decoding connection config data: %w", err)
 	}
 	return config, nil
