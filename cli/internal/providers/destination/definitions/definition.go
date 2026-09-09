@@ -36,6 +36,16 @@ type DestinationDefinition struct {
 	// connectionMode-conditioned configSchema.allOf branches; the backend calls
 	// its equivalent check supportedSourcesValidation.
 	ConnectionRequiredKeys map[string]map[string][]string
+	// SyncBehaviours lists the rETL sync behaviours the destination accepts
+	// (integrations-config db-config.json config.syncBehaviours). Nil means the
+	// destination declares none upstream and the backend fallback applies; an
+	// explicitly empty list accepts none, mirroring the backend's `??` fallback
+	// on absence only.
+	SyncBehaviours []string
+	// SupportsVisualMapper mirrors db-config.json config.supportsVisualMapper.
+	// With it, a rETL connection that names an object runs the object-mapping
+	// flow; without it every connection is a JSON-mapper one.
+	SupportsVisualMapper bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 	// ConfigValidateFuncs registers extra go-playground custom validate tags,
@@ -90,6 +100,31 @@ func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 		return nil
 	}
 	return append([]string(nil), d.SourceTypes...)
+}
+
+// defaultSyncBehaviours is the fallback the backend applies to a definition
+// that declares no syncBehaviours (config-backend
+// retl/api-gateway/connection-config/constants.ts DEFAULT_SYNC_BEHAVIOURS). It
+// doubles as the enum registration validates declared behaviours against; split
+// the two if the backend default ever narrows below the accepted set.
+var defaultSyncBehaviours = []string{"upsert", "mirror", "full"}
+
+// SyncBehaviours returns the accepted rETL sync behaviours, falling back to the
+// backend default only when the definition declares none at all.
+func (d *RegisteredDefinition) SyncBehaviours() []string {
+	behaviours := d.DestinationDefinition.SyncBehaviours
+	if behaviours == nil {
+		behaviours = defaultSyncBehaviours
+	}
+	// Copied by length rather than appended onto a nil slice, which would hand
+	// back nil for a declared-empty list and read as absence to the caller.
+	copied := make([]string, len(behaviours))
+	copy(copied, behaviours)
+	return copied
+}
+
+func (d *RegisteredDefinition) SupportsVisualMapper() bool {
+	return d.DestinationDefinition.SupportsVisualMapper
 }
 
 // LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.
