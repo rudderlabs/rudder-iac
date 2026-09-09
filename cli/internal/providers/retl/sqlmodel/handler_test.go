@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -235,6 +236,10 @@ func (m *mockRETLClient) ListConnections(ctx context.Context, req *retlClient.Li
 
 func (m *mockRETLClient) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
 	return unexpectedConnectionCall("SetConnectionExternalId")
+}
+
+func (m *mockRETLClient) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	return nil, unexpectedConnectionCall("GetDestinations")
 }
 
 func TestSQLModelHandler(t *testing.T) {
