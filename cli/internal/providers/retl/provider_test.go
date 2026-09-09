@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -33,6 +34,9 @@ type mockRETLStore struct {
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	// Connection functions
+	getDestinationsFunc func(ctx context.Context) ([]client.Destination, error)
+	listConnectionsFunc func(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error)
 }
 
 // Mock RETL source operations
@@ -85,6 +89,23 @@ func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID str
 		return m.getPreviewResultFunc(ctx, resultID)
 	}
 	return &retlClient.PreviewResultResponse{Status: retlClient.Completed}, nil
+}
+
+// Connection methods — the defaults keep callers with no connection handler
+// enabled off the nil embedded RETLStore.
+
+func (m *mockRETLStore) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	if m.getDestinationsFunc != nil {
+		return m.getDestinationsFunc(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRETLStore) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if m.listConnectionsFunc != nil {
+		return m.listConnectionsFunc(ctx, req)
+	}
+	return &retlClient.RETLConnectionsPage{}, nil
 }
 
 // newDefaultMockClient creates a new mock client with default behavior

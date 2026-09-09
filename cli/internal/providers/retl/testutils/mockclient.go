@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
@@ -16,11 +17,18 @@ type mockRETLStore struct {
 	UpdateRetlSourceFunc func(ctx context.Context, sourceID string, source *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
 	DeleteRetlSourceFunc func(ctx context.Context, id string) error
 	GetRetlSourceFunc    func(ctx context.Context, id string) (*retlClient.RETLSource, error)
-	ListRetlSourcesFunc  func(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error)
+	ListRetlSourcesFunc  func(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error)
 	// Preview functions
 	SubmitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	GetPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	// Connection functions
+	GetDestinationsFunc func(ctx context.Context) ([]client.Destination, error)
+	ListConnectionsFunc func(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error)
 }
+
+// The embedded interface hides missing methods, so only a mismatched override
+// can break the contract — this catches one instead of letting the fake rot.
+var _ retlClient.RETLStore = (*mockRETLStore)(nil)
 
 // Mock RETL source operations
 
@@ -52,9 +60,9 @@ func (m *mockRETLStore) GetRetlSource(ctx context.Context, id string) (*retlClie
 	return nil, nil
 }
 
-func (m *mockRETLStore) ListRetlSources(ctx context.Context, sourceType string, hasExternalID *bool) (*retlClient.RETLSources, error) {
+func (m *mockRETLStore) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 	if m.ListRetlSourcesFunc != nil {
-		return m.ListRetlSourcesFunc(ctx, sourceType, hasExternalID)
+		return m.ListRetlSourcesFunc(ctx, opts...)
 	}
 	return &retlClient.RETLSources{}, nil
 }
@@ -72,6 +80,23 @@ func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID str
 		return m.GetPreviewResultFunc(ctx, resultID)
 	}
 	return &retlClient.PreviewResultResponse{Status: retlClient.Completed}, nil
+}
+
+// Connection methods — the defaults keep callers with no connection handler
+// enabled off the nil embedded RETLStore.
+
+func (m *mockRETLStore) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	if m.GetDestinationsFunc != nil {
+		return m.GetDestinationsFunc(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRETLStore) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if m.ListConnectionsFunc != nil {
+		return m.ListConnectionsFunc(ctx, req)
+	}
+	return &retlClient.RETLConnectionsPage{}, nil
 }
 
 // NewDefaultMockClient creates a new mock client with default behavior
