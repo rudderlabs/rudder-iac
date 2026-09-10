@@ -12,7 +12,7 @@
     "host": "db.acme-analytics.internal",
     "dbname": "analytics",
     "user": "rudder",
-    "port": "5432",
+    "port": 5432,
     "sslMode": "disable"
   },
   "createdAt": "<ignored>",
