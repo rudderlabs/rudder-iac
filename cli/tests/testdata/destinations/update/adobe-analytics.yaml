@@ -28,8 +28,6 @@ spec:
     context_data_mapping:
       - from: source
         to: sourceName
-    use_native_sdk:
-      web: false
     connection_mode:
       web: cloud
     event_filtering:

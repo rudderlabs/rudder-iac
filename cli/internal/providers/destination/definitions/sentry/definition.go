@@ -33,10 +33,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // sentryConfig is the local YAML config model. Field set mirrors the keys
 // upstream declares in db-config.json destConfig; validation constraints mirror
 // schema.json.
@@ -53,7 +49,6 @@ type sentryConfig struct {
 	AllowURLs             []string                 `mapstructure:"allow_urls" validate:"omitempty,dive,dynamic_or_pattern=sentry_url"`
 	DenyURLs              []string                 `mapstructure:"deny_urls" validate:"omitempty,dive,dynamic_or_pattern=sentry_url"`
 	EventFiltering        *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK          *useNativeSDK            `mapstructure:"use_native_sdk"`
 	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement     common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -72,7 +67,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.ArrayWithStrings("includePaths", "includePaths", "include_paths"),
 		converter.ArrayWithStrings("allowUrls", "allowUrls", "allow_urls"),
 		converter.ArrayWithStrings("denyUrls", "denyUrls", "deny_urls"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		// Terraform omits eventFilteringOption; the key is in db-config

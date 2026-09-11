@@ -18,9 +18,6 @@
     "sendExperimentTrack": true,
     "settingsTolerance": "2000",
     "useExistingJquery": false,
-    "useNativeSDK": {
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

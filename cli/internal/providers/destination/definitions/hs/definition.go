@@ -44,7 +44,6 @@ type hsConfig struct {
 	DoAssociation     *bool                    `mapstructure:"do_association" default:"false"`
 	HubSpotEvents     []hubSpotEvent           `mapstructure:"hubspot_events" validate:"omitempty,dive"`
 	EventFiltering    *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -63,10 +62,6 @@ type eventProperty struct {
 type eventFiltering struct {
 	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
-}
-
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
 }
 
 // NewDefinition returns the HubSpot destination definition.
@@ -88,7 +83,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

@@ -30,8 +30,6 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    use_native_sdk:
-      web: true
     auto_config:
       web: true
     legacy_conversion_pixel_id:

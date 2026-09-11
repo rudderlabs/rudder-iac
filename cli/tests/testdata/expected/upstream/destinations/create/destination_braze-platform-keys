@@ -19,10 +19,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true,
-      "android": false
-    },
     "trackAnonymousUser": {
       "web": false
     },

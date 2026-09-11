@@ -37,9 +37,6 @@
     "trackPageName": true,
     "trackingServerSecureUrl": "secure.example.com",
     "trackingServerUrl": "metrics.example.com",
-    "useNativeSDK": {
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

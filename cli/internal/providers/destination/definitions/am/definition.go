@@ -168,7 +168,6 @@ type amplitudeConfig struct {
 	TrackSessionEvents               *trackSessionEvents      `mapstructure:"track_session_events"`
 	UseAdvertisingIDForDeviceID      *mobileBool              `mapstructure:"use_advertising_id_for_device_id"`
 	UseIDFAAsDeviceID                *idfaBool                `mapstructure:"use_idfa_as_device_id"`
-	UseNativeSDK                     *sdkBools                `mapstructure:"use_native_sdk"`
 	ConnectionMode                   common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement                common.ConsentManagement `mapstructure:"consent_management"`
 	ResidencyServer                  string                   `mapstructure:"residency_server" validate:"required,oneof=standard EU"`
@@ -328,11 +327,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			converter.Simple("eventUploadThreshold.flutter", "event_upload_threshold.flutter"),
 			common.SourceTypeFlutter,
 		),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.reactnative", "use_native_sdk.react_native"),
-		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
 		converter.Gated(
 			converter.Simple("enableLocationListening.android", "enable_location_listening.android"),
 			common.SourceTypeAndroid,

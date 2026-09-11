@@ -351,7 +351,7 @@ func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
 	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"), "a supported mode without an entry has no required keys")
 	assert.Nil(t, registered.ConnectionRequiredKeys("android", "cloud"))
 
-	assert.Equal(t, []string{"connection_mode", "use_native_sdk"}, registered.SourceTypeConfigKeys())
+	assert.Equal(t, []string{"connection_mode"}, registered.SourceTypeConfigKeys())
 
 	local := map[string]any{
 		"api_secret":     "secret",

@@ -195,9 +195,6 @@ func TestPosthogConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"connection_mode": map[string]any{
 				"web":            "device",
 				"android_kotlin": "cloud",
@@ -244,9 +241,6 @@ func TestPosthogConfigValidation(t *testing.T) {
 			"use_v2_group": true,
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"connection_mode": map[string]any{
 				"web":   "device",
@@ -440,7 +434,6 @@ func TestPosthogConversionRoundTrip(t *testing.T) {
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
 				},
-				"use_native_sdk": {"web": true},
 				"connection_mode": {
 					"web": "device",
 					"android_kotlin": "cloud",
@@ -467,7 +460,6 @@ func TestPosthogConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"useNativeSDK": {"web": true},
 				"connectionMode": {
 					"web": "device",
 					"androidKotlin": "cloud",

@@ -16,8 +16,6 @@ spec:
     logger: rudder-cli
     custom_version_property: appVersion
     debug_mode: false
-    use_native_sdk:
-      web: true
     ignore_errors:
       - ResizeObserver loop limit exceeded
     include_paths:

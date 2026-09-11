@@ -15,8 +15,6 @@ spec:
         to: "1234567"
       - from: Product Viewed
         to: "7654321"
-    use_native_sdk:
-      web: true
     event_filtering:
       whitelist:
         - Order Completed

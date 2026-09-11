@@ -19,8 +19,6 @@ spec:
     enable_conversion_label: false
     allow_enhanced_conversions: true
     default_page_conversion: checkout
-    use_native_sdk:
-      web: true
     connection_mode:
       web: device
     dynamic_remarketing:

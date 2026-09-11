@@ -17,10 +17,6 @@ spec:
     event_filtering:
       blacklist:
         - Page Viewed
-    use_native_sdk:
-      web: false
-      android: true
-      ios: true
     send_page_name_in_sdk:
       web: true
     data_use_in_app:

@@ -84,12 +84,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web     *bool `mapstructure:"web"`
-	IOS     *bool `mapstructure:"ios"`
-	Android *bool `mapstructure:"android"`
-}
-
 // adobeAnalyticsConfig is the local YAML config model. Field set mirrors
 // terraform-provider destination_adobe_analytics.go; validation constraints
 // mirror overlapping schema.json rules for those mapped fields.
@@ -124,7 +118,6 @@ type adobeAnalyticsConfig struct {
 	ProductMerchEvarsMap          []mappingEntry           `mapstructure:"product_merch_evars_map" validate:"omitempty,dive"`
 	ProductIdentifier             string                   `mapstructure:"product_identifier" validate:"omitempty,oneof=name id sku" default:"name"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK                  *useNativeSDK            `mapstructure:"use_native_sdk"`
 	ConnectionMode                common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement             common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -196,9 +189,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"to":   "to",
 		}),
 		converter.Simple("productIdentifier", "product_identifier"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{

@@ -69,10 +69,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // posthogConfig is the local YAML config model. Field set mirrors terraform
 // destination_posthog mappings; validation constraints mirror schema.json.
 type posthogConfig struct {
@@ -80,7 +76,6 @@ type posthogConfig struct {
 	Endpoint                      string                   `mapstructure:"endpoint" validate:"omitempty,pattern=posthog_endpoint"`
 	UseV2Group                    *bool                    `mapstructure:"use_v2_group" default:"false"`
 	EventFiltering                *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK                  *useNativeSDK            `mapstructure:"use_native_sdk"`
 	Autocapture                   *webBool                 `mapstructure:"autocapture"`
 	CapturePageView               *webBool                 `mapstructure:"capture_page_view"`
 	DisableSessionRecording       *webBool                 `mapstructure:"disable_session_recording"`
@@ -98,7 +93,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("yourInstance", "endpoint"),
 		converter.Simple("teamApiKey", "api_key"),
 		converter.Simple("useV2Group", "use_v2_group"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Gated(
 			converter.Simple("disableSessionRecording.web", "disable_session_recording.web"),
 			common.SourceTypeWeb,

@@ -15,8 +15,6 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    use_native_sdk:
-      web: true
     connection_mode:
       web: device
       android_kotlin: cloud

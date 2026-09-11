@@ -25,9 +25,6 @@
     "token": "mpTokenXXXXXXXXXXXXXXXXXXXXXX",
     "trackCategorizedPages": false,
     "trackNamedPages": false,
-    "useNativeSDK": {
-      "web": true
-    },
     "useNewMapping": false,
     "useUserDefinedPageEventName": false,
     "useUserDefinedScreenEventName": false,
@@ -40,13 +37,13 @@
       }
     ]
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "mp",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E Mixpanel",
   "type": "MP",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }

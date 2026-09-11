@@ -99,9 +99,6 @@ func TestVWOConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"connection_mode": map[string]any{
 				"web": "device",
 			},
@@ -143,9 +140,6 @@ func TestVWOConfigValidation(t *testing.T) {
 			"use_existing_jquery":      true,
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"connection_mode": map[string]any{
 				"web": "device",
@@ -355,9 +349,6 @@ func TestVWOConversionRoundTrip(t *testing.T) {
 				"use_existing_jquery": true,
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
-				},
-				"use_native_sdk": {
-					"web": true
 				}
 			}`,
 			APIJSON: `{
@@ -372,10 +363,7 @@ func TestVWOConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {
-					"web": true
-				}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{
@@ -397,16 +385,10 @@ func TestVWOConversionRoundTrip(t *testing.T) {
 		{
 			Name: "use native sdk web",
 			LocalJSON: `{
-				"account_id": "410057",
-				"use_native_sdk": {
-					"web": false
-				}
+				"account_id": "410057"
 			}`,
 			APIJSON: `{
-				"accountId": "410057",
-				"useNativeSDK": {
-					"web": false
-				}
+				"accountId": "410057"
 			}`,
 		},
 		{

@@ -12,11 +12,6 @@
     "apiVersion": "v2",
     "sendAnonymousId": true,
     "updateLastRequestAt": false,
-    "useNativeSDK": {
-      "web": true,
-      "android": true,
-      "ios": true
-    },
     "mobileApiKeyAndroid": {
       "android": "rudderCliE2eDeviceAndroidKeyUpdated"
     },

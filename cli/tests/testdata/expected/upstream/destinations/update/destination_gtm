@@ -35,10 +35,7 @@
     "containerID": "GTM-E2EUPDATE",
     "environmentID": "env-9",
     "eventFilteringOption": "blacklistedEvents",
-    "serverUrl": "sgtm-updated.rudder-cli-e2e.com/collect",
-    "useNativeSDK": {
-      "web": true
-    }
+    "serverUrl": "sgtm-updated.rudder-cli-e2e.com/collect"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

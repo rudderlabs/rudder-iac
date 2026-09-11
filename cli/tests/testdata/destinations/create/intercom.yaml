@@ -18,10 +18,6 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    use_native_sdk:
-      web: true
-      android: false
-      ios: false
     mobile_api_key_android: rudderCliE2eAndroidKey
     mobile_api_key_ios: rudderCliE2eIosKey
     connection_mode:

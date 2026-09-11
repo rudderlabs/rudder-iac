@@ -53,7 +53,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	// One flag per platform, matching schema.json's four sub-keys and db-config's
-	// per-source-type destConfig. use_native_sdk is a source-type block key and is
 	// deliberately ungated, so it does not appear here.
 	assert.Equal(t, map[string][]string{
 		"enable_install_attribution_tracking/android":        {"android"},
@@ -452,7 +451,6 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// use_native_sdk and the two added attribution sub-keys are declared by
 // schema.json; unmodelled they were dropped from the payload and erased upstream
 // on the first apply.
 func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
@@ -460,17 +458,8 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 
 	testutil.AssertConversion(t, adj.NewDefinition().Properties, []testutil.ConversionCase{
 		{
-			Name: "use_native_sdk and per-platform attribution",
 			LocalJSON: `{
 				"app_token": "adjToken",
-				"use_native_sdk": {
-					"android": true,
-					"android_kotlin": true,
-					"ios": false,
-					"ios_swift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enable_install_attribution_tracking": {
 					"android": true,
 					"android_kotlin": false,
@@ -480,14 +469,6 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"appToken": "adjToken",
-				"useNativeSDK": {
-					"android": true,
-					"androidKotlin": true,
-					"ios": false,
-					"iosSwift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enableInstallAttributionTracking": {
 					"android": true,
 					"androidKotlin": false,

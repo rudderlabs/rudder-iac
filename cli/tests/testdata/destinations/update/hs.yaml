@@ -13,8 +13,6 @@ spec:
     access_token: "{{ .HS_ACCESS_TOKEN }}"
     hub_id: "87654321"
     do_association: false
-    use_native_sdk:
-      web: false
     event_filtering:
       blacklist:
         - Application Opened

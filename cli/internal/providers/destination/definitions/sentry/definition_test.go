@@ -179,9 +179,6 @@ func TestSentryConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Error Captured", "Exception Thrown"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -210,9 +207,6 @@ func TestSentryConfigValidation(t *testing.T) {
 			"deny_urls":               []any{"https://cdn.example.com"},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Error Captured"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -325,8 +319,7 @@ func TestSentryConversionRoundTrip(t *testing.T) {
 				"deny_urls": ["https://cdn.example.com"],
 				"event_filtering": {
 					"whitelist": ["Error Captured", "Exception Thrown"]
-				},
-				"use_native_sdk": {"web": true}
+				}
 			}`,
 			APIJSON: `{
 				"dsn": "https://public@o0.ingest.sentry.io/0",
@@ -353,8 +346,7 @@ func TestSentryConversionRoundTrip(t *testing.T) {
 				"whitelistedEvents": [
 					{"eventName": "Error Captured"},
 					{"eventName": "Exception Thrown"}
-				],
-				"useNativeSDK": {"web": true}
+				]
 			}`,
 		},
 		{

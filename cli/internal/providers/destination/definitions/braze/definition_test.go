@@ -207,12 +207,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 		config["android_api_key"] = "android-key"
 		config["ios_api_key"] = "ios-key"
 		config["web_api_key"] = "web-key"
-		config["use_native_sdk"] = map[string]any{
-			"android_kotlin": true,
-			"ios_swift":      true,
-			"web":            true,
-			"react_native":   true,
-		}
 		config["track_anonymous_user"] = map[string]any{"web": true}
 		config["enable_braze_logging"] = map[string]any{"web": true}
 		config["enable_push_notification"] = map[string]any{"web": false}
@@ -234,9 +228,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 			"support_dedup":                    true,
 			"use_ecommerce_recommended_events": true,
 			"use_platform_specific_api_keys":   false,
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"track_anonymous_user": map[string]any{
 				"web": true,
 			},
@@ -282,25 +273,6 @@ func TestBrazeConfigValidation(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "expected /connection_mode/cloud to be rejected")
-	})
-
-	t.Run("unsupported source key rejected in source-type blocks", func(t *testing.T) {
-		t.Parallel()
-
-		for _, key := range []string{"use_native_sdk"} {
-			t.Run(key, func(t *testing.T) {
-				t.Parallel()
-				config := minimalConfig()
-				config[key] = map[string]any{"cloud_source": "cloud"}
-				if key == "use_native_sdk" {
-					config[key] = map[string]any{"cloud_source": true}
-				}
-
-				errors := registered.ValidateConfig(config)
-				require.NotEmpty(t, errors)
-				assert.Equal(t, "/"+key+"/cloud_source", errors[0].Path)
-			})
-		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -381,26 +353,16 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 			LocalJSON: `{
 				"data_center": "US-02",
 				"app_key": "default-app-key",
-				"use_platform_specific_api_keys": false,
-				"use_native_sdk": {
-					"web": true,
-					"android": true,
-					"ios": true
-				}
+				"use_platform_specific_api_keys": false
 			}`,
 			APIJSON: `{
 				"dataCenter": "US-02",
 				"appKey": "default-app-key",
-				"usePlatformSpecificApiKeys": false,
-				"useNativeSDK": {
-					"web": true,
-					"android": true,
-					"ios": true
-				}
+				"usePlatformSpecificApiKeys": false
 			}`,
 		},
 		{
-			Name: "platform specific keys and sdk booleans",
+			Name: "platform specific keys and platform options",
 			LocalJSON: `{
 				"data_center": "EU-01",
 				"rest_api_key": "rest-key",
@@ -408,13 +370,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"android_api_key": "android-key",
 				"ios_api_key": "ios-key",
 				"web_api_key": "web-key",
-				"use_native_sdk": {
-					"android_kotlin": true,
-					"ios_swift": true,
-					"react_native": true,
-					"flutter": true,
-					"web": true
-				},
 				"track_anonymous_user": {"web": true},
 				"enable_braze_logging": {"web": true},
 				"enable_push_notification": {"web": false},
@@ -427,13 +382,6 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				"androidApiKey": "android-key",
 				"iOSApiKey": "ios-key",
 				"webApiKey": "web-key",
-				"useNativeSDK": {
-					"androidKotlin": true,
-					"iosSwift": true,
-					"reactnative": true,
-					"flutter": true,
-					"web": true
-				},
 				"trackAnonymousUser": {"web": true},
 				"enableBrazeLogging": {"web": true},
 				"enablePushNotification": {"web": false},

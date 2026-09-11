@@ -33,10 +33,10 @@ merged S3 definition passes no filters to any `Simple`; match it.
 
 ## Dot-path API keys
 
-gjson/sjson paths work the same in both: `"useNativeSDK.web"` writes/reads a
-nested API object. Terraform's local side uses TF list indexing
-(`use_native_sdk.0.web`); the CLI local side is plain YAML nesting, so use
-`"use_native_sdk.web"`.
+gjson/sjson paths work the same in both: dotted API keys such as
+`"connectionMode.web"` write/read nested API objects. Terraform's local side may
+use TF list indexing for nested blocks; the CLI local side is plain YAML nesting,
+so use dotted local paths such as `"connection_mode.web"`.
 
 ## Common patterns
 

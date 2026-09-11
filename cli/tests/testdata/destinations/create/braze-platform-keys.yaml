@@ -23,9 +23,6 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    use_native_sdk:
-      web: true
-      android: false
     track_anonymous_user:
       web: false
     enable_braze_logging:

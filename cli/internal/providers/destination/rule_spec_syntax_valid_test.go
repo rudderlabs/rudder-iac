@@ -19,7 +19,6 @@ import (
 type ruleTestConfig struct {
 	WebhookURL        string                   `mapstructure:"webhook_url" validate:"required"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
-	UseNativeSDK      map[string]bool          `mapstructure:"use_native_sdk"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -337,19 +336,6 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported source type under use_native_sdk",
-			config: map[string]any{
-				"webhook_url":    "https://example.com/hook",
-				"use_native_sdk": map[string]any{"ios": true},
-			},
-			expected: []vrules.ValidationResult{
-				{
-					Reference: "/spec/config/use_native_sdk/ios",
-					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
-				},
-			},
-		},
-		{
 			name: "unsupported source type under consent_management",
 			config: map[string]any{
 				"webhook_url": "https://example.com/hook",
@@ -369,7 +355,6 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			config: map[string]any{
 				"webhook_url":     "https://example.com/hook",
 				"connection_mode": map[string]any{"web": "cloud", "react_native": "cloud"},
-				"use_native_sdk":  map[string]any{"react_native": true},
 			},
 			expected: []vrules.ValidationResult{},
 		},

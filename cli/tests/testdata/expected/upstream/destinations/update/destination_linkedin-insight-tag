@@ -25,18 +25,15 @@
         "to": "9998887"
       }
     ],
-    "partnerId": "rudderCliE2eFullPartnerUpdated",
-    "useNativeSDK": {
-      "web": false
-    }
+    "partnerId": "rudderCliE2eFullPartnerUpdated"
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "linkedin-insight-tag",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E LinkedIn Insight Tag Updated",
   "type": "LINKEDIN_INSIGHT_TAG",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }
