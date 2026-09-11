@@ -27,12 +27,7 @@
     "useNativeSDK": {
       "android": true,
       "ios": true,
-      "web": true
-    },
-    "connectionMode": {
-      "web": "device",
-      "android": "device",
-      "ios": "device"
+      "web": false
     }
   },
   "createdAt": "\u003cignored\u003e",

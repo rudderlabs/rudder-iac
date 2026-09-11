@@ -16,11 +16,7 @@ spec:
     use_native_sdk:
       web: true
       android: true
-      ios: true
-    connection_mode:
-      web: device
-      android: device
-      ios: device
+      ios: false
     event_filtering:
       whitelist:
         - Order Completed

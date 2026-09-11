@@ -281,7 +281,7 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 				"project_id": "ZN_blw7XXXTWxCGung",
 				"brand_id": "examplebrand",
 				"enable_generic_page_title": {"web": true},
-				"use_native_sdk": {"web": true, "android": true, "ios": true},
+				"use_native_sdk": {"web": true, "android": false, "ios": true},
 				"connection_mode": {"web": "device", "android": "device", "ios": "device"},
 				"event_filtering": {
 					"whitelist": ["Anonymous Page Visit", "Product Viewed"]
@@ -295,7 +295,7 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 				"projectId": "ZN_blw7XXXTWxCGung",
 				"brandId": "examplebrand",
 				"enableGenericPageTitle": {"web": true},
-				"useNativeSDK": {"web": true, "android": true, "ios": true},
+				"useNativeSDK": {"web": true, "android": false, "ios": true},
 				"connectionMode": {"web": "device", "android": "device", "ios": "device"},
 				"whitelistedEvents": [
 					{"eventName": "Anonymous Page Visit"},
@@ -326,12 +326,12 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 			Name: "source scoped sdk and page title",
 			LocalJSON: `{
 				"enable_generic_page_title": {"web": false},
-				"use_native_sdk": {"web": true, "android": true, "ios": true},
+				"use_native_sdk": {"web": true, "android": true, "ios": false},
 				"connection_mode": {"web": "device", "android": "device", "ios": "device"}
 			}`,
 			APIJSON: `{
 				"enableGenericPageTitle": {"web": false},
-				"useNativeSDK": {"web": true, "android": true, "ios": true},
+				"useNativeSDK": {"web": true, "android": true, "ios": false},
 				"connectionMode": {"web": "device", "android": "device", "ios": "device"}
 			}`,
 		},

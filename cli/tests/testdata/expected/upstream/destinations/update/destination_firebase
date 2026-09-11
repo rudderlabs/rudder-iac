@@ -32,22 +32,13 @@
     },
     "eventFilteringOption": "blacklistedEvents",
     "useNativeSDK": {
-      "android": true,
-      "androidKotlin": true,
+      "android": false,
+      "androidKotlin": false,
       "flutter": true,
-      "ios": true,
+      "ios": false,
       "iosSwift": true,
-      "reactnative": true,
+      "reactnative": false,
       "unity": true
-    },
-    "connectionMode": {
-      "android": "device",
-      "androidKotlin": "device",
-      "ios": "device",
-      "iosSwift": "device",
-      "unity": "device",
-      "reactnative": "device",
-      "flutter": "device"
     }
   },
   "createdAt": "<ignored>",

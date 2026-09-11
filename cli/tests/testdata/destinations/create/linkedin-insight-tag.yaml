@@ -17,8 +17,6 @@ spec:
         to: "7654321"
     use_native_sdk:
       web: true
-    connection_mode:
-      web: device
     event_filtering:
       whitelist:
         - Order Completed

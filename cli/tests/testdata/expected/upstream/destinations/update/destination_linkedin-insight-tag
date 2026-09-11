@@ -27,10 +27,7 @@
     ],
     "partnerId": "rudderCliE2eFullPartnerUpdated",
     "useNativeSDK": {
-      "web": true
-    },
-    "connectionMode": {
-      "web": "device"
+      "web": false
     }
   },
   "createdAt": "\u003cignored\u003e",

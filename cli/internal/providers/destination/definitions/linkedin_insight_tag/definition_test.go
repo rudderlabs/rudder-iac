@@ -372,7 +372,7 @@ func validFullConfig() map[string]any {
 			"blacklist": []any{"Page Viewed"},
 		},
 		"use_native_sdk": map[string]any{
-			"web": true,
+			"web": false,
 		},
 		"connection_mode": map[string]any{
 			"web": "device",

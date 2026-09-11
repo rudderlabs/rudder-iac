@@ -296,12 +296,12 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 			LocalJSON: `{
 				"use_native_sdk": {
 					"android": true,
-					"android_kotlin": true,
+					"android_kotlin": false,
 					"ios": true,
-					"ios_swift": true,
+					"ios_swift": false,
 					"unity": true,
 					"react_native": true,
-					"flutter": true
+					"flutter": false
 				},
 				"connection_mode": {
 					"android": "device",
@@ -313,12 +313,12 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 			APIJSON: `{
 				"useNativeSDK": {
 					"android": true,
-					"androidKotlin": true,
+					"androidKotlin": false,
 					"ios": true,
-					"iosSwift": true,
+					"iosSwift": false,
 					"unity": true,
 					"reactnative": true,
-					"flutter": true
+					"flutter": false
 				},
 				"connectionMode": {
 					"android": "device",

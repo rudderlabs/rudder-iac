@@ -251,6 +251,9 @@
 
 ## DEX-852 — Destination Connection Mode Fixture Pinning
 <!-- ticket:DEX-852 -->
-- When adding `connection_mode` to existing destination definitions, update the existing destination fixture and expected upstream snapshot pairs in lockstep rather than adding unmatched fixture-only coverage.
-- For `adj`, `firebase`, `linkedin_insight_tag`, `posthog`, and `qualtrics`, every existing create/update fixture variation should carry `connection_mode`; minimal fixtures for device-only destinations should still pin `device` so post-`use_native_sdk` behavior cannot silently drift to cloud.
-- Mixed-mode destinations in this set should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.
+- When adding `connection_mode` to existing destination definitions, update the destination fixture and expected upstream snapshot pairs in lockstep rather than adding unmatched fixture-only coverage.
+- Do not add `connection_mode` to every fixture. E2E fixtures exist to prove the wire conversion, so a mixed-mode destination carrying both enum values and the snake-to-camel source keys (`adj`, `posthog`) covers it; repeating a device-only `web: device` block across the other fixtures adds no assertion. Per-destination mode validation belongs in the definition unit tests, where the valid set actually differs.
+- Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
+- Never change an unrelated `use_native_sdk` value to make it agree with a newly added `connection_mode`. The two are independent keys on the wire, converter fixtures deliberately carry `false` values, and flipping them silently drops that coverage.
+- The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must stay `use_native_sdk`-only. `validateSourceTypeSettings` returns on the first block naming the source type, so adding `connection_mode` there collapses the s3/firebase pairing into one branch and leaves the `use_native_sdk` path untested.
+- Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.
