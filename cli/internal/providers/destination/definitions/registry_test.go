@@ -143,6 +143,90 @@ func TestRegistryRejectsConnectionRequiredKeysUnknownKey(t *testing.T) {
 	assert.Contains(t, err.Error(), `connection required keys for source type "web" in mode "cloud" reference unknown config key "no_such_key"`)
 }
 
+// warehouseTestDefinition is a webhook definition retargeted at warehouse, the
+// only source type rETL metadata is legal on.
+func warehouseTestDefinition() *definitions.DestinationDefinition {
+	def := definitions.WebhookTestDefinition("WH", 1)
+	def.SourceTypes = []string{common.SourceTypeWarehouse}
+	def.ConnectionModes = map[string][]string{common.SourceTypeWarehouse: {"cloud"}}
+	return def
+}
+
+// An explicitly empty list is not absence: the backend falls back only when the
+// definition omits syncBehaviours entirely.
+func TestRegistryRETLMetadataExplicitlyEmptySyncBehaviours(t *testing.T) {
+	t.Parallel()
+
+	def := warehouseTestDefinition()
+	def.SyncBehaviours = []string{}
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	registered, err := registry.Get("WH", 1)
+	require.NoError(t, err)
+
+	behaviours := registered.SyncBehaviours()
+	require.NotNil(t, behaviours, "a declared-empty list must not read back as absence")
+	assert.Empty(t, behaviours)
+}
+
+// The fallback slice is package-level, so a caller mutating what the accessor
+// hands back would otherwise corrupt it for every other definition.
+func TestRegistrySyncBehavioursAreNotMutableByCallers(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(warehouseTestDefinition()))
+	registered, err := registry.Get("WH", 1)
+	require.NoError(t, err)
+
+	registered.SyncBehaviours()[0] = "mutated"
+
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+
+	declared := warehouseTestDefinition()
+	declared.SyncBehaviours = []string{"mirror"}
+	declaredRegistry := definitions.NewRegistry()
+	require.NoError(t, declaredRegistry.Register(declared))
+	registeredDeclared, err := declaredRegistry.Get("WH", 1)
+	require.NoError(t, err)
+
+	registeredDeclared.SyncBehaviours()[0] = "mutated"
+
+	assert.Equal(t, []string{"mirror"}, registeredDeclared.SyncBehaviours())
+}
+
+func TestRegistryRejectsUnknownSyncBehaviour(t *testing.T) {
+	t.Parallel()
+
+	def := warehouseTestDefinition()
+	def.SyncBehaviours = []string{"upsert", "append"}
+
+	err := definitions.NewRegistry().Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `sync behaviour "append" is not one of [upsert mirror full]`)
+}
+
+func TestRegistryRejectsRETLMetadataWithoutWarehouse(t *testing.T) {
+	t.Parallel()
+
+	for name, mutate := range map[string]func(*definitions.DestinationDefinition){
+		"empty sync behaviours": func(def *definitions.DestinationDefinition) { def.SyncBehaviours = []string{} },
+		"visual mapper":         func(def *definitions.DestinationDefinition) { def.SupportsVisualMapper = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+			mutate(def)
+
+			err := definitions.NewRegistry().Register(def)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "rETL metadata requires the warehouse source type")
+		})
+	}
+}
+
 func TestRegistryRejectsConsentOverrideWithoutSourceType(t *testing.T) {
 	t.Parallel()
 
