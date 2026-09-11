@@ -238,6 +238,7 @@ rudder-cli import workspace [flags]
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--location`, `-l` | Path to the project directory (default `.`).                                                                                                                                      |
 | `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
+| `--var-file`       | Variable file (`.vars.yaml`/`.vars.yml`) resolving `{{ .VAR }}` references while the project is read. Repeatable; later files win. Pass the same files you pass to `apply`, or a templated field reads as divergence. |
 
 Import writes into an `imported/` subdirectory of the project and **fails if that
 directory already exists** — move or remove a previous `imported/` before

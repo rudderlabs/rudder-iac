@@ -168,3 +168,79 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	assert.Equal(t, "filled-in-access-key", books[0].AccessKey)
 	assert.Equal(t, "the-hobbit", books[0].ExternalID)
 }
+
+// A non-secret field carrying a "{{ .VAR }}" reference must not read as drift.
+// The import sync guard diffs the local graph against remote state, so import
+// has to substitute exactly as apply does: apply sends the resolved value, and
+// an unsubstituted token compares as a real (non-secret) change that blocks the
+// import. Secrets are exempt from the guard, so only plain fields expose this.
+func TestImportSyncGuardNeedsSubstitutedGraph(t *testing.T) {
+	b := backend.NewBackend()
+	testDir := t.TempDir()
+	varFilePath := filepath.Join(testDir, "project.vars.yaml")
+
+	writeProjectFile(t, filepath.Join(testDir, "writer", "tolkien.yaml"), `version: rudder/v1
+kind: writer
+metadata:
+  name: common
+spec:
+  id: tolkien
+  name: J.R.R. Tolkien
+`)
+	writeProjectFile(t, filepath.Join(testDir, "books", "books.yaml"), `version: rudder/v1
+kind: books
+metadata:
+  name: my_books
+spec:
+  books:
+    - id: "hobbit"
+      name: "{{ .BOOK_NAME }}"
+      author: "#writer:tolkien"
+`)
+	writeProjectFile(t, varFilePath, "BOOK_NAME: The Hobbit\n")
+
+	loadProject := func(t *testing.T, withVarFile bool) (*example.Provider, project.Project) {
+		t.Helper()
+
+		var opts []project.ProjectOption
+		if withVarFile {
+			fileResolver, err := resolver.NewFileResolver(varFilePath)
+			require.NoError(t, err)
+			opts = append(opts, project.WithSubstitutor(varsubst.NewSubstitutor(fileResolver)))
+		}
+
+		p := example.NewProvider(b)
+		proj := project.New(p, opts...)
+		require.NoError(t, proj.Load(testDir))
+		return p, proj
+	}
+
+	// Apply resolves the variable, so the backend holds the real name.
+	applyProvider, applyProject := loadProject(t, true)
+	graph, err := applyProject.ResourceGraph()
+	require.NoError(t, err)
+	s, err := syncer.New(applyProvider, &client.Workspace{ID: "test-workspace-id", Name: "Test Workspace"})
+	require.NoError(t, err)
+	require.NoError(t, s.Sync(context.Background(), graph))
+
+	// An unmanaged remote resource, so the import has work to do past the guard.
+	_, err = b.CreateWriter("George Orwell", "")
+	require.NoError(t, err)
+
+	// Without substitution the local graph still holds the literal token.
+	noVarsProvider, noVarsProject := loadProject(t, false)
+	err = importer.WorkspaceImport(context.Background(), noVarsProject, noVarsProvider, importer.ImportOptions{})
+	require.ErrorIs(t, err, importer.ErrProjectNotSynced)
+
+	// With substitution both sides agree and the import proceeds.
+	varsProvider, varsProject := loadProject(t, true)
+	require.NoError(t, importer.WorkspaceImport(context.Background(), varsProject, varsProvider, importer.ImportOptions{}))
+	assert.DirExists(t, filepath.Join(testDir, importer.ImportedDir))
+}
+
+func writeProjectFile(t *testing.T, path, content string) {
+	t.Helper()
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+}
