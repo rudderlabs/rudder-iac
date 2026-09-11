@@ -44,25 +44,14 @@ func TestProjectApply(t *testing.T) {
 	require.NoError(t, err)
 
 	projectDir := filepath.Join("testdata", "project")
+	migratedDir := copyAndMigrateProject(t, executor, projectDir)
 
 	t.Run("rudder specs", func(t *testing.T) {
-		applyAndVerify(t, executor, projectDir)
-	})
-
-	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
-		migratedDir := copyAndMigrateProject(t, executor, projectDir)
-		// to make sure migration is applied correctly, we need to verify no
-		// changes are reported if we re-apply the same project, therefore we dedicatedly
-		// test this scenario below
-		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
-		// then we apply this project again from scratch and verify no
-		// changes are reported in snapshot tests meaning after migration of the directory
-		// the upstream resources are created same
-		applyAndVerify(t, executor, migratedDir)
+		applyAndVerify(t, executor, projectDir, migratedDir)
 	})
 }
 
-func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
+func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir, migratedDir string) {
 	t.Helper()
 
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
@@ -79,12 +68,23 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 		verifyState(t, "create")
 	})
 
+	t.Run("migrated create specs should produce the same state", func(t *testing.T) {
+		// Compare the migrated create tree while the live workspace still contains
+		// the state produced by the original create tree. This covers create-only
+		// resources without issuing the duplicate writes of a second apply cycle.
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "create"))
+	})
+
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
 
 		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
+	})
+
+	t.Run("migrated update specs should produce the same state", func(t *testing.T) {
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
 	})
 
 	t.Run("applying on already applied project should not create any diff", func(t *testing.T) {
@@ -98,7 +98,6 @@ func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
 func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	t.Helper()
 
-	// we only verify no diff after migration for the update directory, as the last apply was run on it.
 	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
 	// applied; otherwise the file-only variable would be undefined and the dry run would error.
 	var (
@@ -126,8 +125,8 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 		time.Sleep(upstreamConsistencyPollInterval)
 	}
 
-	require.NoError(t, err, "Dry run failed for update: %s", string(output))
-	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	require.NoError(t, err, "Dry run failed for %s: %s", path, string(output))
+	assert.Contains(t, string(output), "No changes to apply", "Expected no diff for %s, but got: %s", path, string(output))
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
