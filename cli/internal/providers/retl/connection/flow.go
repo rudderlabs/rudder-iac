@@ -9,6 +9,9 @@ import (
 // Flow is how a connection maps source rows onto the destination. The spec
 // never names one: it follows from the destination and from whether the spec
 // sets an object, exactly as the backend derives it.
+//
+// Classify once, then branch on the result: each flow allows a different set
+// of config fields.
 type Flow string
 
 const (
