@@ -16,10 +16,7 @@
         "eventName": "Page Viewed"
       }
     ],
-    "eventFilteringOption": "blacklistedEvents",
-    "useNativeSDK": {
-      "web": false
-    }
+    "eventFilteringOption": "blacklistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

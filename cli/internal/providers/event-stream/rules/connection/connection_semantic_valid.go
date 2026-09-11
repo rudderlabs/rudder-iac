@@ -289,9 +289,8 @@ func validateSourceTypeCompatibility(
 }
 
 // validateSourceTypeSettings (V-C8): a destination declares its per-source
-// settings in blocks keyed by source type — connection_mode and
-// use_native_sdk — so connecting a source needs an entry for its type in at
-// least one of them.
+// connection settings in connection_mode, so connecting a source needs an entry
+// for its type there when that config block is available.
 func validateSourceTypeSettings(
 	registered *definitions.RegisteredDefinition,
 	index int,
@@ -334,8 +333,8 @@ func validateSourceTypeSettings(
 		candidates = append(candidates, key)
 	}
 
-	// No block can name this source type, so there is nowhere for the author to
-	// write the entry an error would ask for.
+	// No block can name this source type, so there is nowhere for the author
+	// to write the entry an error would ask for.
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -358,9 +357,7 @@ func missingRequiredConfigKeys(
 ) []string {
 	var missing []string
 	for _, key := range connectTimeRequiredKeys(registered, sourceType, config) {
-		// Source-type-scoped keys (connection_mode, use_native_sdk) are not
 		// flat config fields: the destination spec carries them as maps keyed
-		// by source type (e.g. config.use_native_sdk.web). For those,
 		// "present" means the map has an entry for the connecting source's
 		// type, and a miss is reported as <key>.<source type>.
 		if slices.Contains(registered.SourceTypeConfigKeys(), key) {

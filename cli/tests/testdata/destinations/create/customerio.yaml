@@ -17,10 +17,6 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    use_native_sdk:
-      web: true
-      android: false
-      ios: false
     send_page_name_in_sdk:
       web: false
     data_use_in_app:

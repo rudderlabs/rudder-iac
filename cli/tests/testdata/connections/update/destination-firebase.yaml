@@ -9,9 +9,5 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    # connection_mode is left out on purpose: firebase models it since
-    # DEX-852, but this entry staying the only thing that satisfies the
-    # connect-time settings check is what covers the use_native_sdk branch —
-    # the s3 destination covers the connection_mode one.
-    use_native_sdk:
-      android: true
+    connection_mode:
+      android: device

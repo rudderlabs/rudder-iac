@@ -48,12 +48,6 @@ var connectionModes = map[string][]string{
 	common.SourceTypeCordova:       {"cloud"},
 }
 
-// useNativeSDK is web-only upstream: schema.json declares just the web key, and
-// web is the one source type offering device and hybrid modes.
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // activeCampaignConfig is the local YAML config model. Field set mirrors
 // integrations-config destinations/active_campaign defaultConfig; validation
 // constraints mirror schema.json after stripping UI template/env branches.
@@ -62,7 +56,6 @@ type activeCampaignConfig struct {
 	APIKey            string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=single_line_100"`
 	ActID             string                   `mapstructure:"actid" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventKey          string                   `mapstructure:"event_key" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -74,7 +67,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("apiKey", "api_key"),
 		converter.Simple("actid", "actid"),
 		converter.Simple("eventKey", "event_key"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

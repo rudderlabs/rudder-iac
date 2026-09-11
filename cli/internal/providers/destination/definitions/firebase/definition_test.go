@@ -65,15 +65,6 @@ func TestFirebaseConfigValidation(t *testing.T) {
 	t.Run("valid full example config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
-			"use_native_sdk": map[string]any{
-				"android":        true,
-				"android_kotlin": true,
-				"ios":            true,
-				"ios_swift":      true,
-				"unity":          true,
-				"react_native":   true,
-				"flutter":        true,
-			},
 			"connection_mode": map[string]any{
 				"android":        "device",
 				"android_kotlin": "device",
@@ -180,9 +171,7 @@ func TestFirebaseConfigValidation(t *testing.T) {
 			name string
 			key  string
 			path string
-		}{
-			{name: "use native sdk", key: "use_native_sdk", path: "/use_native_sdk/web"},
-		}
+		}{}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
@@ -294,15 +283,6 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 		{
 			Name: "source scoped sdk and connection mode mappings",
 			LocalJSON: `{
-				"use_native_sdk": {
-					"android": true,
-					"android_kotlin": false,
-					"ios": true,
-					"ios_swift": false,
-					"unity": true,
-					"react_native": true,
-					"flutter": false
-				},
 				"connection_mode": {
 					"android": "device",
 					"android_kotlin": "device",
@@ -311,15 +291,6 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 			APIJSON: `{
-				"useNativeSDK": {
-					"android": true,
-					"androidKotlin": false,
-					"ios": true,
-					"iosSwift": false,
-					"unity": true,
-					"reactnative": true,
-					"flutter": false
-				},
 				"connectionMode": {
 					"android": "device",
 					"androidKotlin": "device",

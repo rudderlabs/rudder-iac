@@ -84,7 +84,6 @@ type facebookPixelConfig struct {
 	BlacklistPIIProperties  []piiDenylistEntry             `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
 	WhitelistPIIProperties  []piiAllowlistEntry            `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`
 	EventFiltering          *eventFiltering                `mapstructure:"event_filtering"`
-	UseNativeSDK            webBool                        `mapstructure:"use_native_sdk"`
 	AutoConfig              webBool                        `mapstructure:"auto_config"`
 	LegacyConversionPixelID []legacyConversionPixelMapping `mapstructure:"legacy_conversion_pixel_id" validate:"omitempty,dive"`
 	ConnectionMode          common.ConnectionMode          `mapstructure:"connection_mode"`
@@ -168,7 +167,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Gated(
 			converter.Simple("autoConfig.web", "auto_config.web"),
 			common.SourceTypeWeb,

@@ -70,18 +70,15 @@
     },
     "trackAllPages": false,
     "trackCategorisedPages": true,
-    "trackNamedPages": true,
-    "useNativeSDK": {
-      "web": true
-    }
+    "trackNamedPages": true
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "iterable",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E Iterable Updated",
   "type": "ITERABLE",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }

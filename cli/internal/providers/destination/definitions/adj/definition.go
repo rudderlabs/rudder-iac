@@ -46,18 +46,6 @@ type enableInstallAttributionTracking struct {
 	IOSSwift      *bool `mapstructure:"ios_swift"`
 }
 
-// Sub-key set mirrors schema.json; db-config lists the same six source types
-// under destConfig. Not gated, following the source-type block convention
-// use_native_sdk shares with consent_management and connection_mode.
-type useNativeSDK struct {
-	Android       *bool `mapstructure:"android"`
-	AndroidKotlin *bool `mapstructure:"android_kotlin"`
-	IOS           *bool `mapstructure:"ios"`
-	IOSSwift      *bool `mapstructure:"ios_swift"`
-	Unity         *bool `mapstructure:"unity"`
-	Flutter       *bool `mapstructure:"flutter"`
-}
-
 // Nested event_filtering block, matching the fleet convention (braze,
 // facebook_pixel, ...). schema.json patterns each eventName the same way as
 // the mapping fields.
@@ -78,7 +66,6 @@ type adjustConfig struct {
 	CustomMappings                   []adjustMapping                   `mapstructure:"custom_mappings" validate:"omitempty,dive"`
 	PartnerParamKeys                 []adjustMapping                   `mapstructure:"partner_params_keys" validate:"omitempty,dive"`
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`
-	UseNativeSDK                     *useNativeSDK                     `mapstructure:"use_native_sdk"`
 	EventFiltering                   *eventFiltering                   `mapstructure:"event_filtering"`
 	ConnectionMode                   common.ConnectionMode             `mapstructure:"connection_mode"`
 	ConsentManagement                common.ConsentManagement          `mapstructure:"consent_management"`
@@ -114,12 +101,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			converter.Simple("enableInstallAttributionTracking.iosSwift", "enable_install_attribution_tracking.ios_swift"),
 			common.SourceTypeIOSSwift,
 		),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.androidKotlin", "use_native_sdk.android_kotlin"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("useNativeSDK.iosSwift", "use_native_sdk.ios_swift"),
-		converter.Simple("useNativeSDK.unity", "use_native_sdk.unity"),
-		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{

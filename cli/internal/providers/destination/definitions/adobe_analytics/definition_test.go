@@ -156,11 +156,6 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web":     true,
-				"ios":     true,
-				"android": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -199,9 +194,6 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 			"product_identifier": "name",
 			"event_filtering": map[string]any{
 				"blacklist": []any{"Application Opened"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"consent_management": map[string]any{
 				"android_kotlin": []any{
@@ -584,11 +576,6 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 				"product_identifier": "sku",
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
-				},
-				"use_native_sdk": {
-					"web": true,
-					"ios": true,
-					"android": true
 				}
 			}`,
 			APIJSON: `{
@@ -653,12 +640,7 @@ func TestAdobeAnalyticsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {
-					"web": true,
-					"ios": true,
-					"android": true
-				}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

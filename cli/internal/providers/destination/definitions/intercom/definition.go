@@ -57,7 +57,6 @@ type intercomConfig struct {
 	MobileAPIKeyAndroid string                   `mapstructure:"mobile_api_key_android" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	MobileAPIKeyIOS     string                   `mapstructure:"mobile_api_key_ios" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	EventFiltering      *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK        *useNativeSDK            `mapstructure:"use_native_sdk"`
 	ConnectionMode      common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement   common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -65,12 +64,6 @@ type intercomConfig struct {
 type eventFiltering struct {
 	Whitelist []string `mapstructure:"whitelist" validate:"excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
 	Blacklist []string `mapstructure:"blacklist" validate:"excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
-}
-
-type useNativeSDK struct {
-	Android *bool `mapstructure:"android"`
-	IOS     *bool `mapstructure:"ios"`
-	Web     *bool `mapstructure:"web"`
 }
 
 // schema.json splits Intercom's credentials by connection mode: device-mode
@@ -175,9 +168,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

@@ -95,7 +95,6 @@ type mpConfig struct {
 	PersistenceName                string                   `mapstructure:"persistence_name" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	SecureCookie                   *bool                    `mapstructure:"secure_cookie" default:"false"`
 	EventFiltering                 *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK                   *webBool                 `mapstructure:"use_native_sdk"`
 	UseNewMapping                  *bool                    `mapstructure:"use_new_mapping" default:"false"`
 	ConnectionMode                 common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement              common.ConsentManagement `mapstructure:"consent_management"`
@@ -147,7 +146,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Simple("useNewMapping", "use_new_mapping"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)

@@ -21,10 +21,6 @@ spec:
       whitelist:
         - Order Completed
         - Product Viewed
-    use_native_sdk:
-      web: true
-      android: false
-      ios: false
     connection_mode:
       web: hybrid
       android: cloud
@@ -36,6 +32,4 @@ spec:
     override_client_and_session_ids:
       web: false
     extend_page_view_params:
-      web: false
-    use_native_sdk_to_send:
       web: false

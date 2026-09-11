@@ -60,7 +60,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"debug_view/web":                      {"web"},
 		"override_client_and_session_ids/web": {"web"},
 		"extend_page_view_params/web":         {"web"},
-		"use_native_sdk_to_send/web":          {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("GA4", 1)
@@ -339,9 +338,6 @@ func TestGA4ConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"connection_mode": map[string]any{
 				"web":     "hybrid",
 				"android": "device",
@@ -357,9 +353,6 @@ func TestGA4ConfigValidation(t *testing.T) {
 				"web": true,
 			},
 			"extend_page_view_params": map[string]any{
-				"web": true,
-			},
-			"use_native_sdk_to_send": map[string]any{
 				"web": true,
 			},
 			"consent_management": map[string]any{
@@ -559,11 +552,6 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
 				},
-				"use_native_sdk": {
-					"web": true,
-					"android": true,
-					"ios": false
-				},
 				"connection_mode": {
 					"web": "hybrid",
 					"android": "device"
@@ -571,8 +559,7 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"capture_page_view": {"web": "rs"},
 				"debug_view": {"web": true},
 				"override_client_and_session_ids": {"web": true},
-				"extend_page_view_params": {"web": true},
-				"use_native_sdk_to_send": {"web": false}
+				"extend_page_view_params": {"web": true}
 			}`,
 			APIJSON: `{
 				"apiSecret": "secret",
@@ -591,11 +578,6 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 					{"eventName": "Order Completed"}
 				],
 				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {
-					"web": true,
-					"android": true,
-					"ios": false
-				},
 				"connectionMode": {
 					"web": "hybrid",
 					"android": "device"
@@ -603,8 +585,7 @@ func TestGA4ConversionRoundTrip(t *testing.T) {
 				"capturePageView": {"web": "rs"},
 				"debugView": {"web": true},
 				"overrideClientAndSessionId": {"web": true},
-				"extendPageViewParams": {"web": true},
-				"useNativeSDKToSend": {"web": false}
+				"extendPageViewParams": {"web": true}
 			}`,
 		},
 		{

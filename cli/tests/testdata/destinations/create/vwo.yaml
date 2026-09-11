@@ -16,8 +16,6 @@ spec:
     library_tolerance: "2000"
     settings_tolerance: "2000"
     use_existing_jquery: false
-    use_native_sdk:
-      web: true
     connection_mode:
       web: device
     event_filtering:

@@ -85,7 +85,6 @@ type googleAdsConfig struct {
 	EventsToTrackDynamicRemarketing         []string `mapstructure:"events_to_track_dynamic_remarketing" validate:"omitempty,dive,dynamic_or_pattern=single_line_100"`
 
 	EventFiltering    *eventFilteringConfig    `mapstructure:"event_filtering"`
-	UseNativeSDK      *webBoolConfig           `mapstructure:"use_native_sdk"`
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -128,7 +127,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

@@ -20,10 +20,6 @@ spec:
     event_filtering:
       whitelist:
         - Checkout Started
-    use_native_sdk:
-      web: true
-      android: false
-      ios: false
     connection_mode:
       web: device
       android: device
@@ -35,8 +31,6 @@ spec:
     override_client_and_session_ids:
       web: false
     extend_page_view_params:
-      web: false
-    use_native_sdk_to_send:
       web: false
     consent_management:
       web:

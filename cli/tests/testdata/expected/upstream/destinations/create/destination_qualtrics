@@ -6,11 +6,6 @@
     },
     "eventFilteringOption": "whitelistedEvents",
     "projectId": "rudderCliE2eFullProject",
-    "useNativeSDK": {
-      "android": true,
-      "ios": false,
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"
@@ -20,13 +15,13 @@
       }
     ]
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "qualtrics",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E Qualtrics",
   "type": "QUALTRICS",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }

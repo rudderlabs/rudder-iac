@@ -30,8 +30,6 @@ spec:
     event_filtering:
       blacklist:
         - Page Viewed
-    use_native_sdk:
-      web: false
     auto_config:
       web: false
     legacy_conversion_pixel_id:

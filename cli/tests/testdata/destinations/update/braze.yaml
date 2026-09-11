@@ -21,9 +21,6 @@ spec:
     event_filtering:
       blacklist:
         - Page Viewed
-    use_native_sdk:
-      web: false
-      android: true
     track_anonymous_user:
       web: true
     enable_braze_logging:

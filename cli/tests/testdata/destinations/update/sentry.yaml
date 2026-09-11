@@ -16,8 +16,6 @@ spec:
     logger: rudder-cli-updated
     custom_version_property: buildVersion
     debug_mode: true
-    use_native_sdk:
-      web: true
     ignore_errors:
       - Non-Error promise rejection captured
     include_paths:

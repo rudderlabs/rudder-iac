@@ -53,10 +53,7 @@
     ],
     "logger": "rudder-cli-updated",
     "release": "2.0.0",
-    "serverName": "rudder-cli-e2e-updated",
-    "useNativeSDK": {
-      "web": true
-    }
+    "serverName": "rudder-cli-e2e-updated"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

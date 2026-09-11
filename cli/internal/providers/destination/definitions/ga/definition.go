@@ -47,10 +47,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 type webBool struct {
 	Web *bool `mapstructure:"web"`
 }
@@ -88,7 +84,6 @@ type googleAnalyticsConfig struct {
 	NonInteraction              *bool                    `mapstructure:"non_interaction" default:"false"`
 	SendUserID                  *bool                    `mapstructure:"send_user_id" default:"false"`
 	EventFiltering              *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK                *useNativeSDK            `mapstructure:"use_native_sdk"`
 	TrackCategorizedPages       *webBool                 `mapstructure:"track_categorized_pages"`
 	TrackNamedPages             *webBool                 `mapstructure:"track_named_pages"`
 	UseRichEventNames           *webBool                 `mapstructure:"use_rich_event_names"`
@@ -130,7 +125,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Gated(
 			converter.Simple("trackCategorizedPages.web", "track_categorized_pages.web"),
 			common.SourceTypeWeb,

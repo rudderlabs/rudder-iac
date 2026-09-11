@@ -73,9 +73,6 @@ func TestGTMConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -95,9 +92,6 @@ func TestGTMConfigValidation(t *testing.T) {
 			"server_url":   "https://gtm.example.com",
 			"event_filtering": map[string]any{
 				"blacklist": []any{"Application Opened"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -315,9 +309,6 @@ func TestGTMConversionRoundTrip(t *testing.T) {
 				"authorization_token": "gtmAuthToken",
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
-				},
-				"use_native_sdk": {
-					"web": true
 				}
 			}`,
 			APIJSON: `{
@@ -329,10 +320,7 @@ func TestGTMConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {
-					"web": true
-				}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

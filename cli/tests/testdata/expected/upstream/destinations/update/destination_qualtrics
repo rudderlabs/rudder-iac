@@ -23,20 +23,15 @@
       "web": false
     },
     "eventFilteringOption": "blacklistedEvents",
-    "projectId": "rudderCliE2eFullProjectUpdated",
-    "useNativeSDK": {
-      "android": true,
-      "ios": true,
-      "web": false
-    }
+    "projectId": "rudderCliE2eFullProjectUpdated"
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "qualtrics",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E Qualtrics Updated",
   "type": "QUALTRICS",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }

@@ -143,7 +143,7 @@
 <!-- ticket:DEX-494 -->
 - Customer.io models shared `consent_management` only; legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unknown local config fields because the backend migrates those surfaces into `consentManagement` and drops the legacy keys.
 - Customer.io `SecretKeys` should stay empty because db-config `secretKeys` is authoritative for CLI write-only secret handling; Terraform sensitivity alone should not make `api_key` a CLI secret placeholder field.
-- Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; `useNativeSDK` is handled through source-type config rather than the ordinary gated-property list.
+- Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; native-SDK source-type config is no longer modeled by CLI destination definitions.
 
 ## DEX-508 — Intercom Config Surface
 <!-- ticket:DEX-508 -->
@@ -164,7 +164,7 @@
 - HubSpot should keep the broad mapped db-config source-type set, not the older event-stream-only subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - HubSpot models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even if upstream schema/db-config still mention their API keys, because re-sending legacy consent keys can cause non-converging applies after backend migration to `consentManagement`.
 - HubSpot local config should omit stale legacy auth fields `authorization_type` and `api_key`; current schema requires `accessToken` and `apiVersion`, so local YAML should model `access_token` as the only secret and require it with `api_version`.
-- HubSpot `lookup_field` remains required only for `api_version: newApi`, and `use_native_sdk.web` stays source-gated to `web`.
+- HubSpot `lookup_field` remains required only for `api_version: newApi`; native-SDK source-type config is no longer modeled by CLI destination definitions.
 
 ## DEX-518 — Qualtrics Config Surface
 <!-- ticket:DEX-518 -->
@@ -230,7 +230,7 @@
 
 ## DEX-730 — Amplitude Source Scope
 <!-- ticket:DEX-730 -->
-- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
+- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows source-scoped blocks such as `connection_mode` and `consent_management` with no new metadata field.
 - A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.
 
 ## DEX-745 — Bing Ads Offline Conversions Config Surface
@@ -259,3 +259,8 @@
 - `adj`, `firebase`, `linkedin_insight_tag`, `posthog`, and `qualtrics` expose `connection_mode` in CLI local config through the shared connection-mode property pattern, without changing their existing `SourceTypes` or `ConnectionModes` metadata.
 - Device-only destinations in this set (`firebase`, `linkedin_insight_tag`, and `qualtrics`) should explicitly model `connection_mode` so later removal of `use_native_sdk` cannot make them resolve as cloud by default.
 - This supersedes earlier Qualtrics guidance from DEX-518 that omitted `connection_mode` because schema metadata did not declare it; DEX-852 intentionally adds the missing config surface for the post-`use_native_sdk` path.
+
+## DEX-848 — Destination Native SDK Config Removal
+
+- Destination definitions should reject the removed native-SDK source-type config block as an unknown key; keep `SourceTypeConfigKeys()` limited to `connection_mode`.
+- For this removal, treat the broad `useNativeSDK` grep gate as authoritative: remove similarly prefixed destination-definition settings such as GA4's `use_native_sdk_to_send` / `useNativeSDKToSend` unless a future task explicitly reintroduces a separately named schema-backed field.

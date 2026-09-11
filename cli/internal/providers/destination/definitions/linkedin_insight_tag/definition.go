@@ -25,10 +25,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // oneTrustCookieCategories and ketchConsentPurposes are deliberately absent:
 // the backend migrates them into consentManagement on write and never returns
 // them, so modelling them makes every plan diff.
@@ -40,7 +36,6 @@ type linkedinInsightTagConfig struct {
 	PartnerID              string                       `mapstructure:"partner_id" validate:"required"`
 	EventToConversionIDMap []eventToConversionIDMapping `mapstructure:"event_to_conversion_id_map" validate:"omitempty,dive"`
 	EventFiltering         *eventFiltering              `mapstructure:"event_filtering"`
-	UseNativeSDK           *useNativeSDK                `mapstructure:"use_native_sdk"`
 	ConnectionMode         common.ConnectionMode        `mapstructure:"connection_mode"`
 	ConsentManagement      common.ConsentManagement     `mapstructure:"consent_management"`
 }
@@ -59,7 +54,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"from": "from",
 			"to":   "to",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

@@ -19,10 +19,7 @@
         "eventName": "Screen Viewed"
       }
     ],
-    "eventFilteringOption": "blacklistedEvents",
-    "useNativeSDK": {
-      "web": true
-    }
+    "eventFilteringOption": "blacklistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

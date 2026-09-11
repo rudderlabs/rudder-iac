@@ -17,7 +17,3 @@ spec:
       blacklist:
         - Page Viewed
         - Screen Viewed
-    use_native_sdk:
-      android: true
-      ios: true
-      web: false

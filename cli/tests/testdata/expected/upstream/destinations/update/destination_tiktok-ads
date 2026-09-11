@@ -31,9 +31,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": false
-    },
     "consentManagement": {
       "web": [
         {

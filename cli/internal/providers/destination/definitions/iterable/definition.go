@@ -82,7 +82,6 @@ type iterableConfig struct {
 	TrackAllPages                 *bool                    `mapstructure:"track_all_pages" default:"false"`
 	TrackCategorizedPages         *bool                    `mapstructure:"track_categorized_pages" default:"true"`
 	TrackNamedPages               *bool                    `mapstructure:"track_named_pages" default:"true"`
-	UseNativeSDK                  webBool                  `mapstructure:"use_native_sdk"`
 	InitialisationIdentifier      webInitIdentifier        `mapstructure:"initialisation_identifier"`
 	GetInAppEventMapping          webStringList            `mapstructure:"get_in_app_event_mapping"`
 	PurchaseEventMapping          webStringList            `mapstructure:"purchase_event_mapping"`
@@ -147,7 +146,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("trackAllPages", "track_all_pages"),
 		converter.Simple("trackCategorisedPages", "track_categorized_pages"),
 		converter.Simple("trackNamedPages", "track_named_pages"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 		converter.Gated(
 			converter.Simple("initialisationIdentifier.web", "initialisation_identifier.web"),
 			common.SourceTypeWeb,

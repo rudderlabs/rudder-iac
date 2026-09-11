@@ -13,7 +13,6 @@ import (
 
 var sourceTypeConfigKeys = []string{
 	"connection_mode",
-	"use_native_sdk",
 }
 
 // DestinationDefinition is the input to Registry.Register().
@@ -120,10 +119,8 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 }
 
 // AcceptsSourceTypeEntry reports whether the config model would accept an entry
-// for sourceType under the source-type-scoped block key. The two blocks are
-// shaped differently: connection_mode is an open map, so every source type
-// fits, while use_native_sdk is a struct naming one field per source type, so
-// only those do.
+// for sourceType under the source-type-scoped block key. connection_mode is an
+// open map, so every source type fits.
 func (d *RegisteredDefinition) AcceptsSourceTypeEntry(key, sourceType string) bool {
 	field, ok := structFieldsByMapstructureTag(d.configType)[key]
 	if !ok {

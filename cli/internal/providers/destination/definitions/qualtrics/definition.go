@@ -24,12 +24,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web     *bool `mapstructure:"web"`
-	Android *bool `mapstructure:"android"`
-	IOS     *bool `mapstructure:"ios"`
-}
-
 type enableGenericPageTitle struct {
 	Web *bool `mapstructure:"web"`
 }
@@ -44,7 +38,6 @@ type qualtricsConfig struct {
 	ProjectID              string                   `mapstructure:"project_id" validate:"required"`
 	BrandID                string                   `mapstructure:"brand_id" validate:"required"`
 	EnableGenericPageTitle *enableGenericPageTitle  `mapstructure:"enable_generic_page_title"`
-	UseNativeSDK           *useNativeSDK            `mapstructure:"use_native_sdk"`
 	EventFiltering         *eventFiltering          `mapstructure:"event_filtering"`
 	ConnectionMode         common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement      common.ConsentManagement `mapstructure:"consent_management"`
@@ -59,9 +52,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			converter.Simple("enableGenericPageTitle.web", "enable_generic_page_title.web"),
 			common.SourceTypeWeb,
 		),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{

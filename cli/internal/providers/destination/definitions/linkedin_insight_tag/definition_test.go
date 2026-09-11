@@ -117,19 +117,6 @@ func TestLinkedinInsightTagConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
-	t.Run("use_native_sdk rejects unsupported source keys", func(t *testing.T) {
-		t.Parallel()
-		errors := registered.ValidateConfig(map[string]any{
-			"partner_id": "12345",
-			"use_native_sdk": map[string]any{
-				"android": true,
-			},
-		})
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
-	})
-
 	t.Run("connection_mode accepts supported device mode", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
@@ -278,7 +265,6 @@ func TestLinkedinInsightTagConversionRoundTrip(t *testing.T) {
 				"event_filtering": {
 					"whitelist": ["Order Completed", "Product Viewed"]
 				},
-				"use_native_sdk": {"web": true},
 				"connection_mode": {"web": "device"},
 				"consent_management": {
 					"web": [{
@@ -298,7 +284,6 @@ func TestLinkedinInsightTagConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"}
 				],
 				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {"web": true},
 				"connectionMode": {"web": "device"},
 				"consentManagement": {
 					"web": [{
@@ -343,9 +328,6 @@ func validExampleConfig() map[string]any {
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Order Completed", "Product Viewed"},
 		},
-		"use_native_sdk": map[string]any{
-			"web": true,
-		},
 		"connection_mode": map[string]any{
 			"web": "device",
 		},
@@ -370,9 +352,6 @@ func validFullConfig() map[string]any {
 		},
 		"event_filtering": map[string]any{
 			"blacklist": []any{"Page Viewed"},
-		},
-		"use_native_sdk": map[string]any{
-			"web": false,
 		},
 		"connection_mode": map[string]any{
 			"web": "device",

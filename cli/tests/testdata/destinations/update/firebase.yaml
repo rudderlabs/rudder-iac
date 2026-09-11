@@ -9,14 +9,6 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    use_native_sdk:
-      android: false
-      android_kotlin: false
-      ios: false
-      ios_swift: true
-      unity: true
-      react_native: false
-      flutter: true
     event_filtering:
       blacklist:
         - Application Opened
