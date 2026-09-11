@@ -369,6 +369,16 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+		{
+			// A var file cannot fix a malformed token, so no --var-file hint.
+			name:        "invalid variable syntax aborts load without var-file hint",
+			substitutor: varsubst.NewSubstitutor(mapResolver{}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: \"{{ .1A }}\"\nspec:\n  k: v"),
+			},
 			wantErr:   "variable substitution failed",
 			wantSpecs: map[string]*specs.Spec{},
 		},
@@ -396,7 +406,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
 				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
-			wantErr:   "variable substitution failed",
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
 			wantSpecs: map[string]*specs.Spec{},
 		},
 	}
@@ -423,8 +433,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 
 			err := proj.Load("test_dir")
 			if tc.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.wantErr)
+				require.EqualError(t, err, tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}

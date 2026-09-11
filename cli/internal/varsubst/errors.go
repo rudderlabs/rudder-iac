@@ -6,9 +6,7 @@ import (
 )
 
 var (
-	// The hint rides on the error itself because the usual cause is a var file
-	// that was never passed, not a bad spec.
-	ErrUndefinedVariable = errors.New("make sure to pass this variable through --var-file. undefined variable")
+	ErrUndefinedVariable = errors.New("undefined variable")
 	ErrInvalidVarSyntax  = errors.New("invalid variable syntax")
 )
 
