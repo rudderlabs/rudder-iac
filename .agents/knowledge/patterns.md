@@ -48,6 +48,12 @@
 - `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the `Flag is not enabled for your account` prefix or the `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
 - Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
 
+## DEX-657 — CLI-Boundary Forbidden API Error Formatting
+<!-- ticket:DEX-657 -->
+- `api/client.APIError` now exposes two explicit HTTP 403 classifiers: `IsFeatureDisabled()` for the recognized feature-disabled message prefixes, and `IsPermissionDenied()` for other 403 responses treated as token/RBAC permission failures.
+- User-facing 403 conversion belongs at the command boundary in `cli/internal/cmd/cmderrors.FormatUserFacingError`, which uses `errors.As` to unwrap `*client.APIError` while preserving lower-layer error wrapping.
+- `cli/internal/cmd/root.go` applies the formatter after preserving `SilentError` suppression, keeping `cli/internal/ui` transport-agnostic and avoiding broader reporter/UI behavior changes.
+
 ## DEX-545 — Named Pattern Allow/Reject Registry
 <!-- ticket:DEX-545 -->
 - Named pattern validation is centralized in `cli/internal/provider/rules/funcs/regex.go`; `validate:"pattern=<name>"` consumers should rely on the registry match path rather than calling stored allow regexes directly.

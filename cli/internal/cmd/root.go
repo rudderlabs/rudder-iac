@@ -157,10 +157,22 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
-		var silent *cmderrors.SilentError
-		if !errors.As(err, &silent) {
-			ui.PrintError(err)
+		if message, ok := formatExecutionError(err); ok {
+			ui.PrintErrorMessage(message)
 		}
 		os.Exit(1)
 	}
+}
+
+func formatExecutionError(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+
+	var silent *cmderrors.SilentError
+	if errors.As(err, &silent) {
+		return "", false
+	}
+
+	return cmderrors.FormatUserFacingError(err), true
 }
