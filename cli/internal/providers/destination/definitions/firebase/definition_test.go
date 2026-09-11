@@ -74,6 +74,11 @@ func TestFirebaseConfigValidation(t *testing.T) {
 				"react_native":   true,
 				"flutter":        true,
 			},
+			"connection_mode": map[string]any{
+				"android":        "device",
+				"android_kotlin": "device",
+				"react_native":   "device",
+			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
@@ -126,17 +131,46 @@ func TestFirebaseConfigValidation(t *testing.T) {
 		}))
 	})
 
-	t.Run("connection mode rejected as config", func(t *testing.T) {
+	t.Run("connection_mode accepts supported device mode", func(t *testing.T) {
 		t.Parallel()
 
 		errors := registered.ValidateConfig(map[string]any{
 			"connection_mode": map[string]any{
-				"android": "device",
+				"android":        "device",
+				"android_kotlin": "device",
+				"react_native":   "device",
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects unsupported values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []string{"cloud", "hybrid", "{{ .FIREBASE_CONNECTION_MODE || device }}", ""} {
+			errors := registered.ValidateConfig(map[string]any{
+				"connection_mode": map[string]any{
+					"android": value,
+				},
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/connection_mode/android", errors[0].Path, value)
+			assert.Contains(t, errors[0].Message, "must be one of", value)
+		}
+	})
+
+	t.Run("connection_mode rejects non-string values", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{
+				"android": true,
 			},
 		})
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/android", err.Path)
+		}
 	})
 
 	t.Run("unsupported source keys rejected under source-scoped config", func(t *testing.T) {
@@ -258,7 +292,7 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
-			Name: "use native sdk source mapping",
+			Name: "source scoped sdk and connection mode mappings",
 			LocalJSON: `{
 				"use_native_sdk": {
 					"android": true,
@@ -268,6 +302,12 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 					"unity": true,
 					"react_native": true,
 					"flutter": false
+				},
+				"connection_mode": {
+					"android": "device",
+					"android_kotlin": "device",
+					"ios_swift": "device",
+					"react_native": "device"
 				}
 			}`,
 			APIJSON: `{
@@ -279,6 +319,12 @@ func TestFirebaseConversionRoundTrip(t *testing.T) {
 					"unity": true,
 					"reactnative": true,
 					"flutter": false
+				},
+				"connectionMode": {
+					"android": "device",
+					"androidKotlin": "device",
+					"iosSwift": "device",
+					"reactnative": "device"
 				}
 			}`,
 		},

@@ -38,11 +38,6 @@ type enableGenericPageTitle struct {
 // the backend migrates them into consentManagement on write and never returns
 // them, so modelling them makes every plan diff.
 //
-// connection_mode is deliberately absent too. db-config lists connectionMode
-// under every supported source type, but schema.json declares no such property,
-// and schema.json is the authority on the config surface. ConnectionModes below
-// still advertises the supported modes as metadata.
-//
 // qualtricsConfig is the local YAML config model. Field set mirrors schema.json
 // and db-config.json destConfig; validation constraints mirror schema.json.
 type qualtricsConfig struct {
@@ -51,6 +46,7 @@ type qualtricsConfig struct {
 	EnableGenericPageTitle *enableGenericPageTitle  `mapstructure:"enable_generic_page_title"`
 	UseNativeSDK           *useNativeSDK            `mapstructure:"use_native_sdk"`
 	EventFiltering         *eventFiltering          `mapstructure:"event_filtering"`
+	ConnectionMode         common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement      common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -73,6 +69,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

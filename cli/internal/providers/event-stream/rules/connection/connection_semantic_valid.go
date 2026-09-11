@@ -334,9 +334,8 @@ func validateSourceTypeSettings(
 		candidates = append(candidates, key)
 	}
 
-	// No block can name this source type — adj and posthog declare
-	// use_native_sdk as a closed struct and no connection_mode — so there is
-	// nowhere for the author to write the entry an error would ask for.
+	// No block can name this source type, so there is nowhere for the author to
+	// write the entry an error would ask for.
 	if len(candidates) == 0 {
 		return nil
 	}

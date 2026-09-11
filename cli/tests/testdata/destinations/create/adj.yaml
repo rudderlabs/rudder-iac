@@ -21,6 +21,9 @@ spec:
     enable_install_attribution_tracking:
       android: true
       ios: false
+    connection_mode:
+      android: device
+      react_native: cloud
     event_filtering:
       blacklist:
         - Password Reset

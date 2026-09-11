@@ -253,3 +253,9 @@
 - Kafka keeps `use_ssh` as the top-level SSH branch selector while grouping the four SSH member keys under `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` in local YAML.
 - The nested SSH key names intentionally drop the redundant `ssh_` prefix inside the `ssh` block; there is no Terraform mapping precedent for Kafka SSH keys, so the shape is a CLI ergonomics convention rather than a Terraform parity rule.
 - Kafka's only CLI secret remains `password`; SSH config such as `ssh.public_key` is import/export visible and should not be added to `SecretKeys` unless upstream db-config secret metadata changes.
+
+## DEX-852 — Missing Destination Connection Mode Config Surface
+<!-- ticket:DEX-852 -->
+- `adj`, `firebase`, `linkedin_insight_tag`, `posthog`, and `qualtrics` expose `connection_mode` in CLI local config through the shared connection-mode property pattern, without changing their existing `SourceTypes` or `ConnectionModes` metadata.
+- Device-only destinations in this set (`firebase`, `linkedin_insight_tag`, and `qualtrics`) should explicitly model `connection_mode` so later removal of `use_native_sdk` cannot make them resolve as cloud by default.
+- This supersedes earlier Qualtrics guidance from DEX-518 that omitted `connection_mode` because schema metadata did not declare it; DEX-852 intentionally adds the missing config surface for the post-`use_native_sdk` path.

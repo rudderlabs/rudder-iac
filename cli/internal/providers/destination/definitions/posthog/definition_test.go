@@ -198,6 +198,11 @@ func TestPosthogConfigValidation(t *testing.T) {
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
+			"connection_mode": map[string]any{
+				"web":            "device",
+				"android_kotlin": "cloud",
+				"react_native":   "cloud",
+			},
 			"autocapture": map[string]any{
 				"web": true,
 			},
@@ -243,6 +248,10 @@ func TestPosthogConfigValidation(t *testing.T) {
 			"use_native_sdk": map[string]any{
 				"web": true,
 			},
+			"connection_mode": map[string]any{
+				"web":   "device",
+				"cloud": "cloud",
+			},
 			"autocapture": map[string]any{
 				"web": true,
 			},
@@ -274,6 +283,45 @@ func TestPosthogConfigValidation(t *testing.T) {
 			},
 		})
 		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode validates mode per source type", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_key": "phc_test_key",
+			"connection_mode": map[string]any{
+				"web":          "device",
+				"react_native": "cloud",
+			},
+		}))
+
+		for _, value := range []string{"device", "hybrid", "{{ .POSTHOG_CONNECTION_MODE || cloud }}", ""} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key": "phc_test_key",
+				"connection_mode": map[string]any{
+					"android": value,
+				},
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/connection_mode/android", errors[0].Path, value)
+			assert.Contains(t, errors[0].Message, "must be one of", value)
+		}
+	})
+
+	t.Run("connection_mode rejects non-string values", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "phc_test_key",
+			"connection_mode": map[string]any{
+				"web": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -393,6 +441,11 @@ func TestPosthogConversionRoundTrip(t *testing.T) {
 					"whitelist": ["Product Viewed", "Order Completed"]
 				},
 				"use_native_sdk": {"web": true},
+				"connection_mode": {
+					"web": "device",
+					"android_kotlin": "cloud",
+					"react_native": "cloud"
+				},
 				"autocapture": {"web": true},
 				"capture_page_view": {"web": false},
 				"disable_session_recording": {"web": true},
@@ -415,6 +468,11 @@ func TestPosthogConversionRoundTrip(t *testing.T) {
 					{"eventName": "Order Completed"}
 				],
 				"useNativeSDK": {"web": true},
+				"connectionMode": {
+					"web": "device",
+					"androidKotlin": "cloud",
+					"reactnative": "cloud"
+				},
 				"autocapture": {"web": true},
 				"capturePageView": {"web": false},
 				"disableSessionRecording": {"web": true},

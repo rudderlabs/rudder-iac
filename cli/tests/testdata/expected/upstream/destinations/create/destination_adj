@@ -26,6 +26,10 @@
     },
     "environment": false,
     "eventFilteringOption": "blacklistedEvents",
+    "connectionMode": {
+      "android": "device",
+      "reactnative": "cloud"
+    },
     "partnerParamsKeys": [
       {
         "from": "userId",

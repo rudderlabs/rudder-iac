@@ -17,6 +17,10 @@ spec:
         - Order Completed
     use_native_sdk:
       web: true
+    connection_mode:
+      web: device
+      android_kotlin: cloud
+      react_native: cloud
     autocapture:
       web: false
     capture_page_view:
