@@ -15,6 +15,9 @@
     "useNativeSDK": {
       "web": true
     },
+    "connectionMode": {
+      "web": "device"
+    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

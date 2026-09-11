@@ -13,10 +13,18 @@ spec:
       android: true
       android_kotlin: true
       ios: true
-      ios_swift: false
-      unity: false
+      ios_swift: true
+      unity: true
       react_native: true
-      flutter: false
+      flutter: true
+    connection_mode:
+      android: device
+      android_kotlin: device
+      ios: device
+      ios_swift: device
+      unity: device
+      react_native: device
+      flutter: device
     consent_management:
       android:
         - provider: oneTrust

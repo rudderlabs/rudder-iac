@@ -27,11 +27,11 @@ var (
 )
 
 // connScenarioEndpoints pairs each managed destination with the connection
-// linking the android source to it. Both are here because a destination
-// declares its per-source settings in one of two blocks and the connect-time
-// check accepts either: s3 satisfies it through connection_mode, while
-// firebase declares no connection_mode at all (schema.json has no such
-// property), so its use_native_sdk entry is the only thing that can.
+// linking the android source to it. Both are here because destinations can
+// declare per-source delivery settings differently during the connection_mode
+// transition: s3 exercises the connection_mode-only shape, while firebase keeps
+// the legacy use_native_sdk key alongside the new connection_mode value until
+// DEX-848 removes use_native_sdk.
 var connScenarioEndpoints = []struct {
 	destination string
 	connection  string
@@ -64,10 +64,8 @@ func TestConnectionsApply(t *testing.T) {
 
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	// This test needs the unverified gate for its own fixtures, not merely to
-	// tolerate residue: firebase is registered behind UnverifiedDestinations and
-	// is the use_native_sdk half of connScenarioEndpoints — verified definitions
-	// such as s3 and attentive_tag register without the flag, but model
-	// connection_mode alone.
+	// tolerate residue: firebase is registered behind UnverifiedDestinations.
+	// Verified definitions such as s3 and attentive_tag register without the flag.
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 
 	executor, err := NewCmdExecutor("")

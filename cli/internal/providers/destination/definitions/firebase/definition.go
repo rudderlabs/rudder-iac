@@ -46,17 +46,13 @@ type useNativeSDK struct {
 // the backend migrates them into consentManagement on write and never returns
 // them, so modelling them makes every plan diff. See DEX-696 Discrepancy 3.
 //
-// connection_mode is deliberately absent too. db-config lists connectionMode
-// under all seven source types, but schema.json declares no such property, and
-// schema.json is the authority on the config surface. ConnectionModes below
-// still advertises the supported modes as metadata.
-//
 // firebaseConfig is the local YAML config model. Field set mirrors the keys
 // upstream declares in schema.json and db-config.json destConfig; validation
 // constraints mirror schema.json.
 type firebaseConfig struct {
 	EventFiltering    *eventFiltering          `mapstructure:"event_filtering"`
 	UseNativeSDK      *useNativeSDK            `mapstructure:"use_native_sdk"`
+	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
@@ -77,6 +73,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("useNativeSDK.reactnative", "use_native_sdk.react_native"),
 		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

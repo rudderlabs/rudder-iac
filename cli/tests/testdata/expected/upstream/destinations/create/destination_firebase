@@ -54,11 +54,20 @@
     "useNativeSDK": {
       "android": true,
       "androidKotlin": true,
-      "flutter": false,
+      "flutter": true,
       "ios": true,
-      "iosSwift": false,
+      "iosSwift": true,
       "reactnative": true,
-      "unity": false
+      "unity": true
+    },
+    "connectionMode": {
+      "android": "device",
+      "androidKotlin": "device",
+      "ios": "device",
+      "iosSwift": "device",
+      "unity": "device",
+      "reactnative": "device",
+      "flutter": "device"
     },
     "whitelistedEvents": [
       {

@@ -80,6 +80,7 @@ type adjustConfig struct {
 	EnableInstallAttributionTracking *enableInstallAttributionTracking `mapstructure:"enable_install_attribution_tracking"`
 	UseNativeSDK                     *useNativeSDK                     `mapstructure:"use_native_sdk"`
 	EventFiltering                   *eventFiltering                   `mapstructure:"event_filtering"`
+	ConnectionMode                   common.ConnectionMode             `mapstructure:"connection_mode"`
 	ConsentManagement                common.ConsentManagement          `mapstructure:"consent_management"`
 }
 
@@ -126,6 +127,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
 	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{

@@ -12,7 +12,10 @@
         "eventName": "Application Opened"
       }
     ],
-    "eventFilteringOption": "blacklistedEvents"
+    "eventFilteringOption": "blacklistedEvents",
+    "connectionMode": {
+      "android": "device"
+    }
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

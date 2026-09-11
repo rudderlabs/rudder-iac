@@ -8,8 +8,13 @@
     "projectId": "rudderCliE2eFullProject",
     "useNativeSDK": {
       "android": true,
-      "ios": false,
+      "ios": true,
       "web": true
+    },
+    "connectionMode": {
+      "web": "device",
+      "android": "device",
+      "ios": "device"
     },
     "whitelistedEvents": [
       {

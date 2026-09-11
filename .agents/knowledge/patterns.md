@@ -248,3 +248,9 @@
 <!-- ticket:DEX-846 -->
 - Slack create E2E fixtures should explicitly carry empty local arrays for `event_channel_settings`, `event_template_settings`, `whitelisted_trait_settings`, and `deny_list_of_events`, with matching upstream `[]` snapshot entries for `eventChannelSettings`, `eventTemplateSettings`, `whitelistedTraitsSettings`, and `denyListOfEvents`.
 - Pinning those arrays in the fixture prevents the backend from applying its schema `default: []` values invisibly and keeps the create snapshot stable without changing the destination defaults engine.
+
+## DEX-852 — Destination Connection Mode Fixture Pinning
+<!-- ticket:DEX-852 -->
+- When adding `connection_mode` to existing destination definitions, update the existing destination fixture and expected upstream snapshot pairs in lockstep rather than adding unmatched fixture-only coverage.
+- For `adj`, `firebase`, `linkedin_insight_tag`, `posthog`, and `qualtrics`, every existing create/update fixture variation should carry `connection_mode`; minimal fixtures for device-only destinations should still pin `device` so post-`use_native_sdk` behavior cannot silently drift to cloud.
+- Mixed-mode destinations in this set should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.

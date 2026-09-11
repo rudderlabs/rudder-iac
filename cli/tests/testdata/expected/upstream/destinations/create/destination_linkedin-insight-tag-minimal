@@ -1,7 +1,10 @@
 {
   "config": {
     "eventFilteringOption": "disable",
-    "partnerId": "rudderCliE2ePartner"
+    "partnerId": "rudderCliE2ePartner",
+    "connectionMode": {
+      "web": "device"
+    }
   },
   "createdAt": "\u003cignored\u003e",
   "enabled": true,

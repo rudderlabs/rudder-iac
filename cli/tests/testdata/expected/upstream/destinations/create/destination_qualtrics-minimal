@@ -2,7 +2,10 @@
   "config": {
     "brandId": "rudderCliE2eBrand",
     "eventFilteringOption": "disable",
-    "projectId": "rudderCliE2eProject"
+    "projectId": "rudderCliE2eProject",
+    "connectionMode": {
+      "web": "device"
+    }
   },
   "createdAt": "\u003cignored\u003e",
   "enabled": true,

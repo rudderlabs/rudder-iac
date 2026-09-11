@@ -162,16 +162,41 @@ func TestQualtricsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/enable_generic_page_title", errors[0].Path)
 	})
 
-	t.Run("connection mode rejected as config", func(t *testing.T) {
+	t.Run("connection_mode accepts supported device mode", func(t *testing.T) {
 		t.Parallel()
 
 		config := minimalConfig()
-		config["connection_mode"] = map[string]any{"web": "device"}
+		config["connection_mode"] = map[string]any{"web": "device", "android": "device", "ios": "device"}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("connection_mode rejects unsupported values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []string{"cloud", "hybrid", "{{ .QUALTRICS_CONNECTION_MODE || device }}", ""} {
+			config := minimalConfig()
+			config["connection_mode"] = map[string]any{"web": value}
+
+			errors := registered.ValidateConfig(config)
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/connection_mode/web", errors[0].Path, value)
+			assert.Contains(t, errors[0].Message, "must be one of", value)
+		}
+	})
+
+	t.Run("connection_mode rejects non-string values", func(t *testing.T) {
+		t.Parallel()
+
+		config := minimalConfig()
+		config["connection_mode"] = map[string]any{"web": true}
 
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
-		assert.Equal(t, "/connection_mode", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/web", err.Path)
+		}
 	})
 
 	t.Run("legacy consent keys rejected as config", func(t *testing.T) {
@@ -256,7 +281,8 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 				"project_id": "ZN_blw7XXXTWxCGung",
 				"brand_id": "examplebrand",
 				"enable_generic_page_title": {"web": true},
-				"use_native_sdk": {"web": true, "android": false, "ios": true},
+				"use_native_sdk": {"web": true, "android": true, "ios": true},
+				"connection_mode": {"web": "device", "android": "device", "ios": "device"},
 				"event_filtering": {
 					"whitelist": ["Anonymous Page Visit", "Product Viewed"]
 				},
@@ -269,7 +295,8 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 				"projectId": "ZN_blw7XXXTWxCGung",
 				"brandId": "examplebrand",
 				"enableGenericPageTitle": {"web": true},
-				"useNativeSDK": {"web": true, "android": false, "ios": true},
+				"useNativeSDK": {"web": true, "android": true, "ios": true},
+				"connectionMode": {"web": "device", "android": "device", "ios": "device"},
 				"whitelistedEvents": [
 					{"eventName": "Anonymous Page Visit"},
 					{"eventName": "Product Viewed"}
@@ -299,11 +326,13 @@ func TestQualtricsConversionRoundTrip(t *testing.T) {
 			Name: "source scoped sdk and page title",
 			LocalJSON: `{
 				"enable_generic_page_title": {"web": false},
-				"use_native_sdk": {"web": true, "android": true, "ios": false}
+				"use_native_sdk": {"web": true, "android": true, "ios": true},
+				"connection_mode": {"web": "device", "android": "device", "ios": "device"}
 			}`,
 			APIJSON: `{
 				"enableGenericPageTitle": {"web": false},
-				"useNativeSDK": {"web": true, "android": true, "ios": false}
+				"useNativeSDK": {"web": true, "android": true, "ios": true},
+				"connectionMode": {"web": "device", "android": "device", "ios": "device"}
 			}`,
 		},
 		{
@@ -353,6 +382,11 @@ func fullConfig() map[string]any {
 			"android": true,
 			"ios":     true,
 		},
+		"connection_mode": map[string]any{
+			"web":     "device",
+			"android": "device",
+			"ios":     "device",
+		},
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Product Viewed", "Order Completed"},
 		},
@@ -389,6 +423,11 @@ func exampleConfig() map[string]any {
 			"web":     true,
 			"android": true,
 			"ios":     true,
+		},
+		"connection_mode": map[string]any{
+			"web":     "device",
+			"android": "device",
+			"ios":     "device",
 		},
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Anonymous Page Visit", "Product Viewed"},

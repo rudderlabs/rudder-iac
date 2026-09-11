@@ -9,6 +9,8 @@ spec:
   enabled: true
   definition_version: 1
   config:
+    connection_mode:
+      android: device
     event_filtering:
       blacklist:
         - Application Backgrounded

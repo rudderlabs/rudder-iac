@@ -14,7 +14,9 @@ spec:
       - from: Checkout Started
         to: "9998887"
     use_native_sdk:
-      web: false
+      web: true
+    connection_mode:
+      web: device
     event_filtering:
       blacklist:
         - Application Opened

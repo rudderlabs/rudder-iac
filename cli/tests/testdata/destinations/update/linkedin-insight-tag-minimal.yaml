@@ -10,3 +10,5 @@ spec:
   definition_version: 1
   config:
     partner_id: rudderCliE2ePartnerUpdated
+    connection_mode:
+      web: device

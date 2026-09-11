@@ -11,3 +11,5 @@ spec:
   config:
     project_id: rudderCliE2eProjectUpdated
     brand_id: rudderCliE2eBrandUpdated
+    connection_mode:
+      web: device

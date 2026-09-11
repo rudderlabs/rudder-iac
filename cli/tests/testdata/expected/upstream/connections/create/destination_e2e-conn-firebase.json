@@ -9,6 +9,9 @@
   "config": {
     "useNativeSDK": {
       "android": true
+    },
+    "connectionMode": {
+      "android": "device"
     }
   },
   "createdAt": "<ignored>",

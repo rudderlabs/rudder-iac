@@ -10,13 +10,21 @@ spec:
   definition_version: 1
   config:
     use_native_sdk:
-      android: false
-      android_kotlin: false
-      ios: false
+      android: true
+      android_kotlin: true
+      ios: true
       ios_swift: true
       unity: true
-      react_native: false
+      react_native: true
       flutter: true
+    connection_mode:
+      android: device
+      android_kotlin: device
+      ios: device
+      ios_swift: device
+      unity: device
+      react_native: device
+      flutter: device
     event_filtering:
       blacklist:
         - Application Opened

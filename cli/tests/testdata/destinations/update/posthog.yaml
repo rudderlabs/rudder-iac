@@ -17,6 +17,9 @@ spec:
         - Page Viewed
     use_native_sdk:
       web: false
+    connection_mode:
+      web: cloud
+      cloud: cloud
     autocapture:
       web: true
     capture_page_view:

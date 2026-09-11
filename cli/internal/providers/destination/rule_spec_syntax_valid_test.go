@@ -9,7 +9,12 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
+	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/qualtrics"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -384,6 +389,79 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 
 			results := runSyntaxRule(t, ruleTestRegistry(t), spec)
 			assert.Equal(t, c.expected, results)
+		})
+	}
+}
+
+func TestSpecSyntaxValidRuleNewConnectionModeDestinationsRejectUnsupportedSourceKeys(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name              string
+		definition        *definitions.DestinationDefinition
+		destinationType   string
+		config            map[string]any
+		unsupportedSource string
+		message           string
+	}{
+		{
+			name:              "adj",
+			definition:        adj.NewDefinition(),
+			destinationType:   "adj",
+			config:            map[string]any{"app_token": "token", "connection_mode": map[string]any{"warehouse": "cloud"}},
+			unsupportedSource: "warehouse",
+			message:           "source type 'warehouse' is not supported by destination type 'adj'; supported source types: android, android_kotlin, ios, ios_swift, unity, react_native, flutter, cordova, cloud",
+		},
+		{
+			name:              "firebase",
+			definition:        firebase.NewDefinition(),
+			destinationType:   "firebase",
+			config:            map[string]any{"connection_mode": map[string]any{"web": "device"}},
+			unsupportedSource: "web",
+			message:           "source type 'web' is not supported by destination type 'firebase'; supported source types: android, android_kotlin, ios, ios_swift, unity, react_native, flutter",
+		},
+		{
+			name:              "linkedin insight tag",
+			definition:        linkedininsighttag.NewDefinition(),
+			destinationType:   "linkedin_insight_tag",
+			config:            map[string]any{"partner_id": "12345", "connection_mode": map[string]any{"android": "device"}},
+			unsupportedSource: "android",
+			message:           "source type 'android' is not supported by destination type 'linkedin_insight_tag'; supported source types: web",
+		},
+		{
+			name:              "posthog",
+			definition:        posthog.NewDefinition(),
+			destinationType:   "posthog",
+			config:            map[string]any{"api_key": "phc_test_key", "connection_mode": map[string]any{"warehouse": "cloud"}},
+			unsupportedSource: "warehouse",
+			message:           "source type 'warehouse' is not supported by destination type 'posthog'; supported source types: android, android_kotlin, ios, ios_swift, web, unity, react_native, flutter, cordova, cloud",
+		},
+		{
+			name:              "qualtrics",
+			definition:        qualtrics.NewDefinition(),
+			destinationType:   "qualtrics",
+			config:            map[string]any{"project_id": "ZN_blw7XXXTWxCGung", "brand_id": "examplebrand", "connection_mode": map[string]any{"android_kotlin": "device"}},
+			unsupportedSource: "android_kotlin",
+			message:           "source type 'android_kotlin' is not supported by destination type 'qualtrics'; supported source types: web, android, ios",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := definitions.NewRegistry()
+			require.NoError(t, registry.Register(tc.definition))
+
+			spec := validSpecMap()
+			spec["type"] = tc.destinationType
+			spec["config"] = tc.config
+
+			results := runSyntaxRule(t, registry, spec)
+			assert.Equal(t, []vrules.ValidationResult{{
+				Reference: "/spec/config/connection_mode/" + tc.unsupportedSource,
+				Message:   tc.message,
+			}}, results)
 		})
 	}
 }

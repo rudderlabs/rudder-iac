@@ -1,6 +1,9 @@
 {
   "config": {
-    "partnerId": "rudderCliE2ePartnerUpdated"
+    "partnerId": "rudderCliE2ePartnerUpdated",
+    "connectionMode": {
+      "web": "device"
+    }
   },
   "createdAt": "\u003cignored\u003e",
   "enabled": true,
