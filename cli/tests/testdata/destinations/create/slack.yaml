@@ -10,6 +10,10 @@ spec:
   definition_version: 1
   config:
     webhook_url: https://hooks.slack.com/services/T000/B000/example
+    event_channel_settings: []
+    event_template_settings: []
+    whitelisted_trait_settings: []
+    deny_list_of_events: []
     connection_mode:
       web: cloud
       android_kotlin: cloud

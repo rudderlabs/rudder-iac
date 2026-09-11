@@ -243,3 +243,8 @@
 - Kafka maps nested local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` to the unchanged flat API keys `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey` with dotted `converter.Simple` paths; `use_ssh` remains top-level as the branch selector.
 - Use a value nested SSH struct instead of a pointer struct so validators still descend into SSH fields when the local `ssh` block is absent, allowing per-field `/ssh/...` errors when `use_ssh` is true.
 - Nested Kafka SSH requiredness uses a destination-scoped `kafka_ssh_required` validator that reads top-level `UseSSH` via `validator.FieldLevel.Top()`; ordinary `required_if=UseSSH true` on nested fields would silently become a no-op because go-playground resolves field names within the current struct.
+
+## DEX-846 — Slack Empty Array Defaults E2E Pinning
+<!-- ticket:DEX-846 -->
+- Slack create E2E fixtures should explicitly carry empty local arrays for `event_channel_settings`, `event_template_settings`, `whitelisted_trait_settings`, and `deny_list_of_events`, with matching upstream `[]` snapshot entries for `eventChannelSettings`, `eventTemplateSettings`, `whitelistedTraitsSettings`, and `denyListOfEvents`.
+- Pinning those arrays in the fixture prevents the backend from applying its schema `default: []` values invisibly and keeps the create snapshot stable without changing the destination defaults engine.
