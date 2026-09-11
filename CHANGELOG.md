@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.25.2](https://github.com/rudderlabs/rudder-iac/compare/v0.25.1...v0.25.2) (2026-09-11)
+
+
+### Bug Fixes
+
+* **ci:** cut e2e write volume against the production control plane ([#828](https://github.com/rudderlabs/rudder-iac/issues/828)) ([06ce781](https://github.com/rudderlabs/rudder-iac/commit/06ce78147ac9ce28b94de26b00a7a9938247188e))
+* **destination:** remove native SDK config surface ([#846](https://github.com/rudderlabs/rudder-iac/issues/846)) ([5d9ef71](https://github.com/rudderlabs/rudder-iac/commit/5d9ef7134d50b40992509b2fd454aa43851669a4))
+* **import:** substitute variables when loading the project for workspace import ([#833](https://github.com/rudderlabs/rudder-iac/issues/833)) ([022ca2c](https://github.com/rudderlabs/rudder-iac/commit/022ca2c7677da4d6b33a926a861ca70a9b614f22))
+
+
+### Miscellaneous
+
+* **destination:** document the bq definition config surface ([#826](https://github.com/rudderlabs/rudder-iac/issues/826)) ([fa6ac85](https://github.com/rudderlabs/rudder-iac/commit/fa6ac853363e8412736d59814c2127d0b290acae))
+* **destination:** expose connection mode for native SDK configs ([#845](https://github.com/rudderlabs/rudder-iac/issues/845)) ([13131ac](https://github.com/rudderlabs/rudder-iac/commit/13131ac1c7884bc6b879c6908266ced439745e44))
+* **destination:** pin Slack create array defaults ([#844](https://github.com/rudderlabs/rudder-iac/issues/844)) ([9eef77e](https://github.com/rudderlabs/rudder-iac/commit/9eef77ed4c9003508dbb628631aa34a343c8a911))
+
 ## [0.25.1](https://github.com/rudderlabs/rudder-iac/compare/v0.25.0...v0.25.1) (2026-09-08)
 
 
