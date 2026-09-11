@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsDestinationSpecificAPIType(t *testing.T) {
+func TestUsesDestinationSpecificFlow(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, IsDestinationSpecificAPIType("CUSTOMERIO"))
-	assert.True(t, IsDestinationSpecificAPIType("CUSTOMERIO_AUDIENCE"))
-	assert.False(t, IsDestinationSpecificAPIType("WEBHOOK"))
+	assert.True(t, UsesDestinationSpecificFlow("CUSTOMERIO"))
+	assert.True(t, UsesDestinationSpecificFlow("CUSTOMERIO_AUDIENCE"))
+	assert.False(t, UsesDestinationSpecificFlow("WEBHOOK"))
 	// API types are upper case everywhere in the registry, so the match is
 	// exact rather than case-insensitive.
-	assert.False(t, IsDestinationSpecificAPIType("customerio"))
+	assert.False(t, UsesDestinationSpecificFlow("customerio"))
 }
 
 func TestClassifyFlow(t *testing.T) {

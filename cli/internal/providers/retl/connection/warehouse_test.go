@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWarehouseDefinition(t *testing.T) {
+func TestSourceWarehouseMetadata(t *testing.T) {
 	t.Parallel()
 
 	sql := WarehouseMetadata{
@@ -35,35 +35,36 @@ func TestWarehouseDefinition(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.sourceDefinition, func(t *testing.T) {
 			t.Parallel()
-			metadata, ok := WarehouseDefinition(test.sourceDefinition)
+			metadata, ok := SourceWarehouseMetadata(test.sourceDefinition)
 			require.True(t, ok)
 			assert.Equal(t, test.want, metadata)
 		})
 	}
 }
 
-// TestWarehouseDefinitionCopiesSyncBehaviours pins the isolation between calls:
-// the SQL warehouses share one backing array, so a caller that sorts or appends
-// in place would otherwise rewrite the table for every warehouse at once.
-func TestWarehouseDefinitionCopiesSyncBehaviours(t *testing.T) {
+// TestSourceWarehouseMetadataCopiesSyncBehaviours pins the isolation between
+// calls: the SQL warehouses share one backing array, so a caller that sorts or
+// appends in place would otherwise rewrite the table for every warehouse at
+// once.
+func TestSourceWarehouseMetadataCopiesSyncBehaviours(t *testing.T) {
 	t.Parallel()
 
-	metadata, ok := WarehouseDefinition("postgres")
+	metadata, ok := SourceWarehouseMetadata("postgres")
 	require.True(t, ok)
 	metadata.SyncBehaviours[0] = "clobbered"
 
-	fresh, ok := WarehouseDefinition("snowflake")
+	fresh, ok := SourceWarehouseMetadata("snowflake")
 	require.True(t, ok)
 	assert.Equal(t, []string{"upsert", "mirror", "full"}, fresh.SyncBehaviours)
 }
 
-// TestWarehouseDefinitionUnknown pins the unknown result: an absent definition
-// must not read as a warehouse that supports nothing, or callers would report
-// violations the backend would have allowed.
-func TestWarehouseDefinitionUnknown(t *testing.T) {
+// TestSourceWarehouseMetadataUnknown pins the unknown result: an absent
+// definition must not read as a warehouse that supports nothing, or callers
+// would report violations the backend would have allowed.
+func TestSourceWarehouseMetadataUnknown(t *testing.T) {
 	t.Parallel()
 
-	metadata, ok := WarehouseDefinition("oracle")
+	metadata, ok := SourceWarehouseMetadata("oracle")
 	assert.False(t, ok)
 	assert.Equal(t, WarehouseMetadata{}, metadata)
 }

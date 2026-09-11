@@ -238,6 +238,32 @@ func TestSpecValidateTagsIdentifiers(t *testing.T) {
 	}
 }
 
+// TestSpecValidateTagsOmittedConfig pins that config is required without
+// carrying a validate tag of its own: go-playground ignores required on a
+// non-pointer struct field, but descends into it, so the zero config is
+// rejected by its own required members — naming the fields a user left out
+// instead of the block. Making Config a pointer would silently drop all three.
+func TestSpecValidateTagsOmittedConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := ConnectionsSpec{
+		Connections: []ConnectionSpec{{
+			LocalID:     "users-to-webhook",
+			Source:      "#retl-source-sql-model:users",
+			Destination: "#destination:webhook",
+		}},
+	}
+
+	errs, err := rules.ValidateStruct(spec, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, []rules.ValidationResult{
+		{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' is required"},
+		{Reference: "/connections/0/config/schedule/type", Message: "'type' is required"},
+		{Reference: "/connections/0/config/identifiers", Message: "'identifiers' is required"},
+	}, funcs.ParseValidationErrors(errs, nil))
+}
+
 // TestGraphKeysMatchEventStreamConnection guards the keys both connection
 // resource types share. The names repeat the event stream ones so the
 // project-wide connection topology scan, which reads event stream connections
