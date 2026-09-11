@@ -1,0 +1,389 @@
+{
+  "createdAt": "2025-12-11T08:13:59.909Z",
+  "creationType": "Data catalog API",
+  "id": "tp_36gukfnRQ95IMVzwvFx2qcASpd3",
+  "name": "Typer Test Tracking Plan",
+  "rules": {
+    "events": [
+      {
+        "description": "This is a track event with no properties for testing.",
+        "eventType": "track",
+        "name": "Some Empty Track Event",
+        "rules": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "properties": {
+            "properties": {
+              "properties": {},
+              "required": [],
+              "type": "object",
+              "unevaluatedProperties": false
+            }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "description": "This is a track event with no properties but with additional properties for testing.",
+        "eventType": "track",
+        "name": "Some Empty Track Event With Additional Properties",
+        "rules": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "properties": {
+            "properties": {
+              "properties": {},
+              "required": [],
+              "type": "object",
+              "unevaluatedProperties": true
+            }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "description": "This is a track event for testing.",
+        "eventType": "track",
+        "name": "Some Track Event",
+        "rules": {
+          "$defs": {
+            "SomeArrayType": {
+              "type": ["array"]
+            },
+            "SomeBooleanType": {
+              "type": ["boolean"]
+            },
+            "SomeIntegerType": {
+              "type": ["integer"]
+            },
+            "SomeNumberType": {
+              "type": ["number"]
+            },
+            "SomeObjectType": {
+              "properties": {
+                "someCustomString": {
+                  "$ref": "#/$defs/SomeStringType"
+                },
+                "someInteger": {
+                  "type": ["integer"]
+                }
+              },
+              "required": ["someCustomString"],
+              "type": ["object"]
+            },
+            "SomeStringType": {
+              "type": ["string"]
+            },
+            "SomeVariantType": {
+              "allOf": [
+                {
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "enum": ["case_1"]
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someInteger": {
+                            "type": ["integer"]
+                          }
+                        },
+                        "required": ["someInteger"]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "enum": ["case_2_a", "case_2_b"]
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someNumber": {
+                            "type": ["number"]
+                          }
+                        },
+                        "required": ["someNumber"]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "not": {
+                              "enum": ["case_1", "case_2_a", "case_2_b"]
+                            }
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someBoolean": {
+                            "type": ["boolean"]
+                          }
+                        },
+                        "required": []
+                      }
+                    }
+                  ],
+                  "type": "object"
+                }
+              ],
+              "properties": {
+                "someInteger": {
+                  "type": ["integer"]
+                },
+                "someString": {
+                  "type": ["string"]
+                }
+              },
+              "required": ["someString"],
+              "type": ["object"]
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "properties": {
+            "properties": {
+              "properties": {
+                "someArray": {
+                  "type": ["array"]
+                },
+                "someArrayOfBooleans": {
+                  "items": {
+                    "type": ["boolean"]
+                  },
+                  "type": ["array"]
+                },
+                "someArrayOfIntegers": {
+                  "items": {
+                    "type": ["integer"]
+                  },
+                  "type": ["array"]
+                },
+                "someArrayOfMultipleTypes": {
+                  "items": {
+                    "type": ["boolean", "integer", "number", "string"]
+                  },
+                  "type": ["array"]
+                },
+                "someArrayOfNumbers": {
+                  "items": {
+                    "type": ["number"]
+                  },
+                  "type": ["array"]
+                },
+                "someArrayOfStrings": {
+                  "items": {
+                    "type": ["string"]
+                  },
+                  "type": ["array"]
+                },
+                "someBoolean": {
+                  "type": ["boolean"]
+                },
+                "someCustomArray": {
+                  "$ref": "#/$defs/SomeArrayType"
+                },
+                "someCustomBoolean": {
+                  "$ref": "#/$defs/SomeBooleanType"
+                },
+                "someCustomInteger": {
+                  "$ref": "#/$defs/SomeIntegerType"
+                },
+                "someCustomNumber": {
+                  "$ref": "#/$defs/SomeNumberType"
+                },
+                "someCustomObject": {
+                  "$ref": "#/$defs/SomeObjectType"
+                },
+                "someCustomString": {
+                  "$ref": "#/$defs/SomeStringType"
+                },
+                "someInteger": {
+                  "type": ["integer"]
+                },
+                "someIntegerWithEnum": {
+                  "enum": [200, 201, 204, 400, 401, 403, 404, 500],
+                  "type": ["integer"]
+                },
+                "someMultiType": {
+                  "additionalProperties": false,
+                  "type": [
+                    "array",
+                    "boolean",
+                    "integer",
+                    "null",
+                    "number",
+                    "object",
+                    "string"
+                  ]
+                },
+                "someNestedObject": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "someNestedLevel1": {
+                      "additionalProperties": true,
+                      "properties": {
+                        "someNestedLevel2": {
+                          "additionalProperties": true,
+                          "properties": {
+                            "someBoolean": {
+                              "type": ["boolean"]
+                            },
+                            "someInteger": {
+                              "type": ["integer"]
+                            },
+                            "someNumber": {
+                              "type": ["number"]
+                            },
+                            "someObject": {
+                              "additionalProperties": false,
+                              "type": ["object"]
+                            },
+                            "someString": {
+                              "type": ["string"]
+                            }
+                          },
+                          "required": [],
+                          "type": ["object"]
+                        }
+                      },
+                      "required": [],
+                      "type": ["object"]
+                    }
+                  },
+                  "required": [],
+                  "type": ["object"]
+                },
+                "someNumber": {
+                  "type": ["number"]
+                },
+                "someObject": {
+                  "additionalProperties": false,
+                  "type": ["object"]
+                },
+                "someString": {
+                  "type": ["string"]
+                },
+                "someStringWithEnum": {
+                  "enum": ["GET", "PUT", "POST", "DELETE", "PATCH"],
+                  "type": ["string"]
+                },
+                "someVariantType": {
+                  "$ref": "#/$defs/SomeVariantType"
+                }
+              },
+              "required": [
+                "someObject",
+                "someInteger",
+                "someString",
+                "someNumber",
+                "someBoolean"
+              ],
+              "type": "object",
+              "unevaluatedProperties": false
+            }
+          },
+          "type": "object"
+        }
+      },
+      {
+        "description": "This is a track event with variants for testing.",
+        "eventType": "track",
+        "name": "Some Track Event With Variants",
+        "rules": {
+          "$schema": "https://json-schema.org/draft/2019-09/schema",
+          "properties": {
+            "properties": {
+              "allOf": [
+                {
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "enum": ["case_1"]
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someInteger": {
+                            "type": ["integer"]
+                          }
+                        },
+                        "required": ["someInteger"]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "enum": ["case_2_a", "case_2_b"]
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someNumber": {
+                            "type": ["number"]
+                          }
+                        },
+                        "required": []
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "someString": {
+                            "not": {
+                              "enum": ["case_1", "case_2_a", "case_2_b"]
+                            }
+                          }
+                        },
+                        "required": ["someString"]
+                      },
+                      "then": {
+                        "properties": {
+                          "someBoolean": {
+                            "type": ["boolean"]
+                          }
+                        },
+                        "required": []
+                      }
+                    }
+                  ],
+                  "type": "object"
+                }
+              ],
+              "properties": {
+                "someInteger": {
+                  "type": ["integer"]
+                },
+                "someString": {
+                  "type": ["string"]
+                }
+              },
+              "required": ["someString"],
+              "type": "object",
+              "unevaluatedProperties": false
+            }
+          },
+          "type": "object"
+        }
+      }
+    ]
+  },
+  "updatedAt": "2025-12-11T08:13:59.909Z",
+  "version": 2,
+  "workspaceId": "350ihjGX6a6ChqB8SASrfqXgDza"
+}
