@@ -2,10 +2,10 @@ package connection
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -85,12 +85,16 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	}, nil
 }
 
+// scalarRefRegex matches a well-formed scalar reference "#<kind>:<id>". The id
+// side deliberately accepts any non-empty single-line value — endpoint local
+// ids carry no charset restriction, but neither the kind nor the id may span
+// multiple lines.
+var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
+
 // refID splits a scalar "#<kind>:<id>" reference into its parts, reporting
-// whether it is well formed at all. The event stream connection regex is the
-// single definition of the reference grammar, so reference parsing here and
-// the spec syntax rules cannot drift apart.
+// whether it is well formed at all.
 func refID(ref string) (kind string, id string, ok bool) {
-	matches := esConnection.ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
+	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return "", "", false
 	}
