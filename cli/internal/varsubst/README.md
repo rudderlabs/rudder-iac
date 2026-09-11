@@ -207,7 +207,7 @@ default, the command fails *before* applying anything. All problems are reported
 so you can fix them together, for example:
 
 ```
-error[project/var-substitution]: undefined variable "DB_PASSWORD"
+error[project/var-substitution]: make sure to pass this variable through --var-file. undefined variable "DB_PASSWORD"
   --> specs/destination.yaml:8:14
      |
    8 |   password: "{{ .DB_PASSWORD }}"

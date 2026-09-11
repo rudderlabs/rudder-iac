@@ -22,7 +22,7 @@ func TestSubstitutionError_Error(t *testing.T) {
 				LineText: "  password: {{ .DB_PASSWORD }}",
 				Err:      ErrUndefinedVariable,
 			},
-			wantMsg: "line 5, column 12: undefined variable: DB_PASSWORD",
+			wantMsg: "line 5, column 12: make sure to pass this variable through --var-file. undefined variable: DB_PASSWORD",
 		},
 		{
 			name: "without variable name",

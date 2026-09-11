@@ -42,7 +42,7 @@ func TestSubstitutionDiagnostics(t *testing.T) {
 		{
 			RuleID:   "project/var-substitution",
 			Severity: rules.Error,
-			Message:  `undefined variable "DB_PASSWORD"`,
+			Message:  `make sure to pass this variable through --var-file. undefined variable "DB_PASSWORD"`,
 			File:     "specs/dest.yaml",
 			Position: pathindex.Position{
 				Line:     8,
