@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
 
@@ -45,9 +44,9 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
-			if !ok {
-				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
+			resource, err := findSource(graph, externalID)
+			if err != nil {
+				return err
 			}
 			resourceData := resource.Data()
 
@@ -55,7 +54,7 @@ func newCmdValidate() *cobra.Command {
 			retlProvider := d.Providers().RETL
 
 			// Validate by attempting to preview with limit=0
-			_, err = retlProvider.Preview(cmd.Context(), externalID, sqlmodel.ResourceType, resourceData, 0)
+			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
 			if err != nil {
 				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
 				return err

@@ -131,6 +131,10 @@ func TestTableSupportDisabled(t *testing.T) {
 		_, err = p.Create(context.Background(), "users-table", table.ResourceType, resources.ResourceData{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
+
+		_, err = p.Preview(context.Background(), "users-table", table.ResourceType, resources.ResourceData{}, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
 	})
 
 	t.Run("never lists table sources", func(t *testing.T) {
@@ -285,5 +289,27 @@ func TestTableSupportEnabled(t *testing.T) {
 			ExternalID:           "users-table",
 		}, got)
 		assert.Equal(t, "src-new", (*output)[sqlmodel.IDKey])
+	})
+
+	// retl-sources validate previews with limit 0; preview passes its --limit.
+	t.Run("validates table sources through the preview API", func(t *testing.T) {
+		t.Parallel()
+		client := newDefaultMockClient()
+		var got *retlClient.PreviewSubmitRequest
+		client.submitPreviewFunc = func(_ context.Context, req *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			got = req
+			return &retlClient.PreviewSubmitResponse{ID: "req-1"}, nil
+		}
+		p := retl.New(client, retl.WithTableSupport())
+		require.NoError(t, p.LoadSpec("users.yaml", tableSpec()))
+		graph, err := p.ResourceGraph()
+		require.NoError(t, err)
+		r, ok := graph.GetResource("retl-source-table:users-table")
+		require.True(t, ok)
+
+		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 0)
+
+		require.NoError(t, err)
+		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users"`}, got)
 	})
 }

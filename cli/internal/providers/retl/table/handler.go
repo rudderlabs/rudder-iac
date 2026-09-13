@@ -300,12 +300,6 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 	return s, nil
 }
 
-// Preview is not supported: a table source has no query to run, and the
-// webapp's table flow has no preview step either.
-func (h *Handler) Preview(_ context.Context, _ string, _ resources.ResourceData, _ int) ([]map[string]any, error) {
-	return nil, fmt.Errorf("preview is not supported for %s resources", ResourceType)
-}
-
 // FetchImportData backs the single-source `import retl-source` command, which
 // only handles SQL models. Table sources are imported through `import
 // workspace` (LoadImportable and FormatForExport).
