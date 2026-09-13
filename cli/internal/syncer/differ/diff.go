@@ -369,12 +369,40 @@ func isNil(val any) bool {
 	return false
 }
 
-// isSecretValue reports whether v is a secret.String (value or pointer). Used
-// when one side omits a key so a presence-based secret still classifies as
-// SecretOnly rather than genuine drift.
+// isSecretValue reports whether v is secret-driven: a secret.String (value or
+// pointer), or a container whose every leaf is one. Used when one side omits a
+// key so a presence-based secret still classifies as SecretOnly rather than
+// genuine drift.
+//
+// The container case matters because the API strips secret values rather than
+// masking them: a block whose keys are all secret loses every key and so
+// disappears from remote state entirely, leaving a whole-block diff instead of
+// the per-key one the scalar case handles. An empty container carries no secret
+// to justify re-applying, and one non-secret leaf makes the block a real change
+// — the same rule compareValues applies to a nested map present on both sides.
 func isSecretValue(v any) bool {
-	switch v.(type) {
+	switch typed := v.(type) {
 	case secret.String, *secret.String:
+		return true
+	case map[string]any:
+		if len(typed) == 0 {
+			return false
+		}
+		for _, item := range typed {
+			if !isSecretValue(item) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		if len(typed) == 0 {
+			return false
+		}
+		for _, item := range typed {
+			if !isSecretValue(item) {
+				return false
+			}
+		}
 		return true
 	default:
 		return false

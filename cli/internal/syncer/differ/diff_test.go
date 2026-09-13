@@ -421,6 +421,91 @@ func TestCompareData_Secret(t *testing.T) {
 		}, diffs)
 		assert.False(t, secretOnly)
 	})
+
+	// A config block whose keys are all secret loses every key to the API's
+	// secret stripping, so the whole block goes missing from remote state rather
+	// than turning up with an unknown secret inside. Grouped provider blocks hit
+	// this (Snowflake's gcp block holds only credentials); without it the block
+	// reads as genuine drift and the destination updates on every apply.
+	t.Run("all-secret block vs missing key is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": block},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: block, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs all-secret block is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"gcp": block},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: nil, TargetValue: block, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("nested all-secret block vs missing key is secret-only", func(t *testing.T) {
+		block := map[string]any{"inner": map[string]any{"credentials": secret.New("json")}}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": block},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.True(t, diffs["gcp"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("all-secret slice vs missing key is secret-only", func(t *testing.T) {
+		keys := []any{secret.New("first"), secret.New("second")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"keys": keys},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "keys")
+		assert.True(t, diffs["keys"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("block with a non-secret leaf vs missing key stays real drift", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("json"), "region": "us-east1"}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": block},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.False(t, diffs["gcp"].SecretOnly, "one non-secret leaf makes the whole block a real change")
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("non-secret block vs missing key stays real drift", func(t *testing.T) {
+		block := map[string]any{"start_time": "02:00", "end_time": "03:00"}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"exclude_window": block},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "exclude_window")
+		assert.False(t, diffs["exclude_window"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	// An empty block carries no secret to justify re-applying, so it must not be
+	// waved through as secret-only just because it has no non-secret leaf.
+	t.Run("empty block vs missing key stays real drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": map[string]any{}},
+			resources.ResourceData{},
+		)
+		require.Contains(t, diffs, "gcp")
+		assert.False(t, diffs["gcp"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
 }
 
 // TestDiff_HasNonsecretDiff locks the import guard's discriminator. ResourceDiff.SecretOnly
