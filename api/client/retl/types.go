@@ -2,9 +2,14 @@ package retl
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
+
+// ErrUnsupportedSourceType is returned when decoding a RETL source whose
+// sourceType this client doesn't model (e.g. audience, profiles-table).
+var ErrUnsupportedSourceType = errors.New("unsupported RETL source type")
 
 type SourceType string
 
@@ -137,7 +142,7 @@ func decodeConfigFor(sourceType SourceType, sourceDefinitionName string, raw jso
 		}
 		return cfg, nil
 	default:
-		return nil, fmt.Errorf("unsupported RETL source type %q", sourceType)
+		return nil, fmt.Errorf("%w %q", ErrUnsupportedSourceType, sourceType)
 	}
 }
 
@@ -176,6 +181,33 @@ func DecodeConfig[T RETLConfig](raw RETLConfig) (T, error) {
 // RETLSources represents a response of RETL sources
 type RETLSources struct {
 	Data []RETLSource `json:"data"`
+}
+
+// UnmarshalJSON drops sources of a type this client doesn't model, so one
+// unfamiliar source (the workspace can hold audience/profiles sources) doesn't
+// fail the whole list. Any other decode error still fails it.
+func (s *RETLSources) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Data []json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	sources := make([]RETLSource, 0, len(wire.Data))
+	for i, raw := range wire.Data {
+		var source RETLSource
+		err := json.Unmarshal(raw, &source)
+		if errors.Is(err, ErrUnsupportedSourceType) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("decoding RETL source at index %d: %w", i, err)
+		}
+		sources = append(sources, source)
+	}
+	s.Data = sources
+	return nil
 }
 
 // PreviewResultError represents an error in the preview result
