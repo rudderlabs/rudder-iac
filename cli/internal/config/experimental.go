@@ -23,6 +23,9 @@ type ExperimentalConfig struct {
 	// UnverifiedDestinations enables registration of destination definitions
 	// that still need the unverified gate.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
+	// RETLTableSupport registers the retl-source-table spec kind with the RETL
+	// provider.
+	RETLTableSupport bool `mapstructure:"retlTableSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

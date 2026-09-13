@@ -20,6 +20,11 @@ import (
 // — verrs is non-empty and this fails locally, with no CI round-trip needed.
 func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	Initialise("test")
+	// The gatekeeper fragments document the kinds registered with experimental
+	// flags off, which is how CI generates the catalog; an experimental kind
+	// such as retl-source-table joins them when it goes GA, as data-graph did.
+	// Pin its flag off so a developer's environment cannot fail this test.
+	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "false")
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
