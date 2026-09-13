@@ -60,3 +60,29 @@ func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 
 	assert.Equal(t, 7, GetConfig().Concurrency.Syncer)
 }
+
+// retlTableSupport sits under the same umbrella as every other experimental
+// flag: GetConfig zeroes all flags unless experimental mode is on, so the
+// flag's own env var must not enable the table kind by itself.
+func TestGetConfig_RETLTableSupportRequiresExperimentalMode(t *testing.T) {
+	cases := []struct {
+		name         string
+		experimental string
+		flag         string
+		want         bool
+	}{
+		{name: "flag and experimental mode on", experimental: "true", flag: "true", want: true},
+		{name: "flag on without experimental mode", experimental: "false", flag: "true", want: false},
+		{name: "experimental mode on without flag", experimental: "true", flag: "false", want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
+			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", tc.flag)
+			InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+			assert.Equal(t, tc.want, GetConfig().ExperimentalFlags.RETLTableSupport)
+		})
+	}
+}

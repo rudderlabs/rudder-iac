@@ -17,6 +17,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -36,8 +37,22 @@ type Provider struct {
 
 const importDir = "retl"
 
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithTableSupport registers the experimental retl-source-table kind: its spec
+// kind, resource type and handler, whose presence also enables its import
+// --merge matcher. Without it the provider behaves exactly as it did before the
+// kind existed, and never lists table sources.
+func WithTableSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[table.ResourceKind] = table.ResourceType
+		p.handlers[table.ResourceType] = table.NewHandler(p.client, importDir)
+	}
+}
+
 // New creates a new RETL provider instance
-func New(client retlClient.RETLStore) *Provider {
+func New(client retlClient.RETLStore, opts ...Option) *Provider {
 	p := &Provider{
 		client:   client,
 		handlers: make(map[string]resourceHandler),
@@ -49,6 +64,9 @@ func New(client retlClient.RETLStore) *Provider {
 	// Register handlers
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
+	for _, opt := range opts {
+		opt(p)
+	}
 	return p
 }
 
@@ -73,10 +91,19 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns. retl-source-sql-model is
+// absent deliberately: it shipped on rudder/0.1 and keeps legacy support.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	table.ResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -92,9 +119,15 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for SQL models.
+// --merge smart linking for SQL models, and for table sources when registered.
+// The order is fixed here rather than by option order: source matchers must
+// precede any matcher for a resource that references a source.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sqlmodel.Matcher()}
+	matchers := []importmatcher.Matcher{sqlmodel.Matcher()}
+	if _, ok := p.handlers[table.ResourceType]; ok {
+		matchers = append(matchers, table.Matcher())
+	}
+	return matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {

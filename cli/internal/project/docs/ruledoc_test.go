@@ -44,7 +44,9 @@ func gatekeeperScopedPatterns() []rules.MatchPattern {
 	// Tracking plans: legacy kind "tp", v1 kind "tracking-plan".
 	p = append(p, providerrules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
 	p = append(p, providerrules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
-	// v1-only kinds.
+	// v1-only kinds. Kinds behind an experimental flag (retl-source-table) are
+	// left out until GA: the fragments must match the flag-off registry CI
+	// generates the catalog from.
 	p = append(p, providerrules.V1VersionPatterns(esconnection.EventStreamConnectionResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dgHandler.HandlerMetadata.SpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
