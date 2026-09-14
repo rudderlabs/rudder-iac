@@ -36,7 +36,11 @@ clean:
 RULE_DOCS_OUTPUT_DIR ?= docs/generated
 
 .PHONY: gen-rule-docs
+# The catalog documents experimental rETL kinds too, so their flags default on
+# here as in CI; an explicit environment value still wins.
 gen-rule-docs: ## Generate the validation rule documentation artifact
+	RUDDERSTACK_CLI_EXPERIMENTAL=$${RUDDERSTACK_CLI_EXPERIMENTAL:-true} \
+	RUDDERSTACK_X_RETL_TABLE_SUPPORT=$${RUDDERSTACK_X_RETL_TABLE_SUPPORT:-true} \
 	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
 
 .PHONY: test
