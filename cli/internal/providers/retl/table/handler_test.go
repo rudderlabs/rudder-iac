@@ -639,7 +639,9 @@ func TestImportWorkspace(t *testing.T) {
 	assert.Equal(t, "users", users.ExternalID)
 	assert.Equal(t, "#retl-source-table:users", users.Reference)
 
-	entities, entries, err := h.FormatForExport(importable, nil, nil)
+	// The postgres account is imported alongside; the s3 one is of a
+	// definition the accounts provider does not import.
+	entities, entries, err := h.FormatForExport(importable, nil, importResolver(importable, map[string]string{"acc-123": "prod-pg"}))
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []importmanifest.ImportEntry{
 		{WorkspaceID: "ws-1", URN: "retl-source-table:users", RemoteID: "src-1"},
@@ -660,7 +662,7 @@ func TestImportWorkspace(t *testing.T) {
 	assert.Equal(t, map[string]any{
 		"id":                "users",
 		"display_name":      "Users",
-		"account_id":        "acc-123",
+		"account":           "#account:prod-pg",
 		"source_definition": "postgres",
 		"primary_key":       "id",
 		"schema":            "public",

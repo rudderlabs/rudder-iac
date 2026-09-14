@@ -31,7 +31,7 @@ func TestFormatForExportSkipsMatched(t *testing.T) {
 	collection := resources.NewRemoteResources()
 	collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{"src1": matched, "src2": unmatched})
 
-	entities, entries, err := h.FormatForExport(collection, nil, nil)
+	entities, entries, err := h.FormatForExport(collection, nil, importResolver(collection, nil))
 	require.NoError(t, err)
 
 	// One spec file per unmatched model; the matched model writes nothing.

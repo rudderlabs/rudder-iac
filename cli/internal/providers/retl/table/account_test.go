@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -132,6 +134,95 @@ func TestAccountStateFollowsSpecForm(t *testing.T) {
 			}
 			require.Len(t, diffs, 1)
 			assert.Contains(t, diffs, sqlmodel.AccountIDKey)
+		})
+	}
+}
+
+// importResolver adds accounts (remote id to local id) to the import set, and
+// returns the resolver import workspace builds over it.
+func importResolver(importable *resources.RemoteResources, accountIDs map[string]string) *resolver.ImportRefResolver {
+	importableAccounts := make(map[string]*resources.RemoteResource, len(accountIDs))
+	for remoteID, localID := range accountIDs {
+		importableAccounts[remoteID] = &resources.RemoteResource{ID: remoteID, ExternalID: localID, Reference: "#account:" + localID}
+	}
+	importable.Set(accounts.AccountResourceType, importableAccounts)
+	return &resolver.ImportRefResolver{
+		Remote:     resources.NewRemoteResources(),
+		Graph:      resources.NewGraph(),
+		Importable: importable,
+	}
+}
+
+// Import writes the account in a form that loads back and, once apply has
+// adopted the source and the account imported with it, plans no change.
+func TestExportAccountRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name           string
+		accountIDs     map[string]string
+		wantAccount    map[string]any
+		accountManaged bool
+	}{
+		{
+			name:           "references an account imported alongside",
+			accountIDs:     map[string]string{"acc-remote": "prod-pg"},
+			wantAccount:    map[string]any{"account": "#account:prod-pg"},
+			accountManaged: true,
+		},
+		{
+			name:        "falls back to account_id for an account it cannot resolve",
+			wantAccount: map[string]any{"account_id": "acc-remote"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			source := retlClient.RETLSource{
+				ID: "src-1", Name: "Users", WorkspaceID: "ws-1", AccountID: "acc-remote", IsEnabled: true,
+				SourceType: retlClient.TableSourceType, SourceDefinitionName: "postgres",
+				Config: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+			}
+			h := table.NewHandler(newFakeStore(source), "retl")
+			importable, err := h.LoadImportable(ctx, namer.NewExternalIdNamer(namer.StrategyKebabCase))
+			require.NoError(t, err)
+
+			entities, _, err := h.FormatForExport(importable, nil, importResolver(importable, tc.accountIDs))
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			want := map[string]any{
+				"id":                "users",
+				"display_name":      "Users",
+				"source_definition": "postgres",
+				"primary_key":       "id",
+				"schema":            "public",
+				"table":             "users",
+				"enabled":           true,
+			}
+			maps.Copy(want, tc.wantAccount)
+			assert.Equal(t, want, spec.Spec)
+
+			adopted := source
+			adopted.ExternalID = "users"
+			loaded, r := loadResource(t, newFakeStore(adopted), spec)
+			collection, err := loaded.LoadResourcesFromRemote(ctx)
+			require.NoError(t, err)
+			if tc.accountManaged {
+				collection.Set(accounts.AccountResourceType, map[string]*resources.RemoteResource{
+					"acc-remote": {ID: "acc-remote", ExternalID: "prod-pg"},
+				})
+			}
+			st, err := loaded.MapRemoteToState(collection)
+			require.NoError(t, err)
+			rs := st.GetResource(r.URN())
+			require.NotNil(t, rs)
+
+			diffs, _ := differ.CompareData(rs.Input, r.Data())
+			assert.Empty(t, diffs)
 		})
 	}
 }
