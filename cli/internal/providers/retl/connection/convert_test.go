@@ -26,7 +26,7 @@ const (
 func graphData(t *testing.T, config ConfigSpec) resources.ResourceData {
 	t.Helper()
 
-	data, err := configToData(config)
+	data, err := configToMap(config)
 	require.NoError(t, err)
 	return resources.ResourceData{
 		SourceKey:      "src-1",
@@ -121,23 +121,23 @@ func mergedSyncSettings(settings *retlClient.SyncSettings) *retlClient.SyncSetti
 func TestEndpointID(t *testing.T) {
 	t.Parallel()
 
-	id, err := endpointID(resources.ResourceData{SourceKey: "src-1"}, SourceKey)
+	id, err := endpointIDFromData(resources.ResourceData{SourceKey: "src-1"}, SourceKey)
 	require.NoError(t, err)
 	assert.Equal(t, "src-1", id)
 
 	// An unresolved reference is still a PropertyRef at this point; building a
 	// request from it would silently point the connection at nothing.
-	_, err = endpointID(resources.ResourceData{SourceKey: &resources.PropertyRef{}}, SourceKey)
+	_, err = endpointIDFromData(resources.ResourceData{SourceKey: &resources.PropertyRef{}}, SourceKey)
 	assert.ErrorContains(t, err, `"source" is not a resolved endpoint id`)
 
-	_, err = endpointID(resources.ResourceData{SourceKey: ""}, SourceKey)
+	_, err = endpointIDFromData(resources.ResourceData{SourceKey: ""}, SourceKey)
 	assert.ErrorContains(t, err, `"source" is not a resolved endpoint id`)
 }
 
 func TestToCreateRequestErrors(t *testing.T) {
 	t.Parallel()
 
-	config, err := configToData(jsonMapperConfig())
+	config, err := configToMap(jsonMapperConfig())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -446,7 +446,7 @@ func TestToUpdateRequestErrors(t *testing.T) {
 func TestToOutput(t *testing.T) {
 	t.Parallel()
 
-	output := toOutput(&retlClient.RETLConnection{
+	output := toResourceData(&retlClient.RETLConnection{
 		ID:            "conn-1",
 		SourceID:      "src-1",
 		DestinationID: "dst-1",
