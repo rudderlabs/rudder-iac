@@ -9,14 +9,6 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    use_native_sdk:
-      android: true
-      android_kotlin: true
-      ios: true
-      ios_swift: false
-      unity: false
-      react_native: true
-      flutter: false
     consent_management:
       android:
         - provider: oneTrust

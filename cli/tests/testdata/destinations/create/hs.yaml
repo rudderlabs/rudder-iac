@@ -14,8 +14,6 @@ spec:
     hub_id: "12345678"
     lookup_field: email
     do_association: true
-    use_native_sdk:
-      web: true
     hubspot_events:
       - rs_event_name: Order Completed
         hubspot_event_name: pe12345678_order_completed

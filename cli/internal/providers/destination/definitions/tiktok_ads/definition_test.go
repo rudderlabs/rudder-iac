@@ -156,9 +156,6 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Order Completed", "Product Added"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -330,8 +327,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 				"events_to_standard": [
 					{"from": "Order Completed", "to": "CompletePayment"}
 				],
-				"event_filtering": {"whitelist": ["Order Completed", "Product Added"]},
-				"use_native_sdk": {"web": true}
+				"event_filtering": {"whitelist": ["Order Completed", "Product Added"]}
 			}`,
 			APIJSON: `{
 				"pixelCode": "C12345",
@@ -346,8 +342,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Order Completed"},
 					{"eventName": "Product Added"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {"web": true}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

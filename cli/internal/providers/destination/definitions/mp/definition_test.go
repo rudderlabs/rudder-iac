@@ -443,7 +443,6 @@ func TestMPConversionRoundTrip(t *testing.T) {
 				"persistence_name": "mp_cookie",
 				"secure_cookie": true,
 				"event_filtering": {"whitelist": ["Product Viewed", "Order Completed"]},
-				"use_native_sdk": {"web": true},
 				"use_new_mapping": true,
 				"connection_mode": {"web": "device", "android": "cloud"}
 			}`,
@@ -484,7 +483,6 @@ func TestMPConversionRoundTrip(t *testing.T) {
 				"secureCookie": true,
 				"eventFilteringOption": "whitelistedEvents",
 				"whitelistedEvents": [{"eventName": "Product Viewed"}, {"eventName": "Order Completed"}],
-				"useNativeSDK": {"web": true},
 				"useNewMapping": true,
 				"connectionMode": {"web": "device", "android": "cloud"}
 			}`,
@@ -591,9 +589,6 @@ func validFullConfig() map[string]any {
 		"secure_cookie":          true,
 		"event_filtering": map[string]any{
 			"blacklist": []any{"Internal Event"},
-		},
-		"use_native_sdk": map[string]any{
-			"web": true,
 		},
 		"use_new_mapping": true,
 		"connection_mode": map[string]any{

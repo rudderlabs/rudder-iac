@@ -18,10 +18,6 @@ spec:
     event_filtering:
       blacklist:
         - Page Viewed
-    use_native_sdk:
-      web: false
-      android: true
-      ios: true
     mobile_api_key_android: rudderCliE2eAndroidKeyUpdated
     mobile_api_key_ios: rudderCliE2eIosKeyUpdated
     consent_management:

@@ -32,9 +32,6 @@
       }
     ],
     "lookupField": "email",
-    "useNativeSDK": {
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

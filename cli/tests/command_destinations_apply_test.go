@@ -107,7 +107,7 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 }
 
 // TestDestinationsApply drives the destination provider end-to-end against a live
-// stack: apply create → apply update → re-apply churns only the write-only secret.
+// stack: apply create → apply update.
 // All destination specs live side by side under one folder and are applied
 // together (like the catalog e2e applies events, properties, etc. in one shot),
 // then the managed destinations are snapshot-compared upstream via
@@ -162,16 +162,6 @@ func TestDestinationsApply(t *testing.T) {
 	})
 
 	t.Run("apply update", func(t *testing.T) {
-		apply(t, "update")
-		verifyDestinationState(t, "update")
-	})
-
-	// Re-apply cannot be a full no-op here: the key-based spec's access keys are
-	// write-only, so they map to always-unknown secrets that re-apply every run
-	// (see secret.String.Diff). A dry-run would therefore always report a diff.
-	// Snapshot the non-secret upstream fields instead to prove nothing else churns,
-	// matching the accounts e2e (TestAccountsApply's re-apply subtest).
-	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
 		apply(t, "update")
 		verifyDestinationState(t, "update")
 	})

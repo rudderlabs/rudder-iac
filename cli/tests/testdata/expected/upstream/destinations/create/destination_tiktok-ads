@@ -29,10 +29,7 @@
         "eventName": "Product Added"
       }
     ],
-    "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true
-    }
+    "eventFilteringOption": "whitelistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

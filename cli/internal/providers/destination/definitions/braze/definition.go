@@ -43,16 +43,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Android       *bool `mapstructure:"android"`
-	AndroidKotlin *bool `mapstructure:"android_kotlin"`
-	IOS           *bool `mapstructure:"ios"`
-	IOSSwift      *bool `mapstructure:"ios_swift"`
-	Web           *bool `mapstructure:"web"`
-	ReactNative   *bool `mapstructure:"react_native"`
-	Flutter       *bool `mapstructure:"flutter"`
-}
-
 type webBool struct {
 	Web *bool `mapstructure:"web"`
 }
@@ -74,7 +64,6 @@ type brazeConfig struct {
 	EnablePushNotification               *webBool                 `mapstructure:"enable_push_notification"`
 	AllowUserSuppliedJavascript          *webBool                 `mapstructure:"allow_user_supplied_javascript"`
 	EventFiltering                       *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK                         *useNativeSDK            `mapstructure:"use_native_sdk"`
 	UseEcommerceRecommendedEvents        *bool                    `mapstructure:"use_ecommerce_recommended_events" default:"true"`
 	UsePlatformSpecificAPIKeys           *bool                    `mapstructure:"use_platform_specific_api_keys"`
 	AndroidAPIKey                        string                   `mapstructure:"android_api_key" validate:"braze_android_api_key_required,omitempty,dynamic_or_pattern=single_line_100"`
@@ -223,13 +212,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.androidKotlin", "use_native_sdk.android_kotlin"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
-		converter.Simple("useNativeSDK.iosSwift", "use_native_sdk.ios_swift"),
-		converter.Simple("useNativeSDK.reactnative", "use_native_sdk.react_native"),
-		converter.Simple("useNativeSDK.flutter", "use_native_sdk.flutter"),
 		converter.Simple("useEcommerceRecommendedEvents", "use_ecommerce_recommended_events"),
 		converter.Simple("usePlatformSpecificApiKeys", "use_platform_specific_api_keys"),
 		converter.Simple("androidApiKey", "android_api_key"),

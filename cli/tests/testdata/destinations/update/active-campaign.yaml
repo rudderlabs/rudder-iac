@@ -13,8 +13,6 @@ spec:
     api_key: "{{ .ACTIVE_CAMPAIGN_API_KEY }}"
     actid: "67890"
     event_key: "{{ .ACTIVE_CAMPAIGN_EVENT_KEY }}"
-    use_native_sdk:
-      web: true
     consent_management:
       web:
         - provider: oneTrust

@@ -43,9 +43,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true
-    },
     "autoConfig": {
       "web": true
     },

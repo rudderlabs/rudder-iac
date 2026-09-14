@@ -39,12 +39,6 @@ type eventToStandard struct {
 	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=AddPaymentInfo AddToCart AddToWishlist ClickButton CompletePayment CompleteRegistration Contact Download InitiateCheckout PlaceAnOrder Search SubmitForm Subscribe ViewContent CustomizeProduct FindLocation Schedule Purchase Lead ApplicationApproval SubmitApplication StartTrial"`
 }
 
-// useNativeSDK is web-only upstream: db-config lists the key under `web` alone,
-// and schema.json declares no other source type for it.
-type useNativeSDK struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // Nested event_filtering block, matching the fleet convention (braze,
 // facebook_pixel, ...).
 type eventFiltering struct {
@@ -62,7 +56,6 @@ type tiktokAdsConfig struct {
 	SendCustomEvents   *bool                    `mapstructure:"send_custom_events" default:"false"`
 	EventsToStandard   []eventToStandard        `mapstructure:"events_to_standard" validate:"omitempty,dive"`
 	EventFiltering     *eventFiltering          `mapstructure:"event_filtering"`
-	UseNativeSDK       useNativeSDK             `mapstructure:"use_native_sdk"`
 	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -85,7 +78,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

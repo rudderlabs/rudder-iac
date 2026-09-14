@@ -198,9 +198,6 @@ func TestIterableConfigValidation(t *testing.T) {
 			"track_all_pages":         false,
 			"track_categorized_pages": true,
 			"track_named_pages":       true,
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"initialisation_identifier": map[string]any{
 				"web": "email",
 			},
@@ -403,7 +400,6 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 				"track_all_pages": true,
 				"track_categorized_pages": true,
 				"track_named_pages": true,
-				"use_native_sdk": {"web": true},
 				"initialisation_identifier": {"web": "email"},
 				"get_in_app_event_mapping": {"web": ["Product Viewed", "Cart Updated"]},
 				"purchase_event_mapping": {"web": ["Order Completed"]},
@@ -432,7 +428,6 @@ func TestIterableConversionRoundTrip(t *testing.T) {
 				"trackAllPages": true,
 				"trackCategorisedPages": true,
 				"trackNamedPages": true,
-				"useNativeSDK": {"web": true},
 				"initialisationIdentifier": {"web": "email"},
 				"getInAppEventMapping": {"web": [{"eventName": "Product Viewed"}, {"eventName": "Cart Updated"}]},
 				"purchaseEventMapping": {"web": [{"eventName": "Order Completed"}]},

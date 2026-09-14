@@ -110,12 +110,6 @@ type eventFiltering struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDK struct {
-	Web     *bool `mapstructure:"web"`
-	Android *bool `mapstructure:"android"`
-	IOS     *bool `mapstructure:"ios"`
-}
-
 type webBool struct {
 	Web *bool `mapstructure:"web"`
 }
@@ -134,21 +128,17 @@ type webCapturePageView struct {
 // stored verbatim and rejected upstream. Most destinations still use
 // dynamic_or_oneof for enums; reconciling the fleet is tracked separately.
 type ga4Config struct {
-	APISecret             string              `mapstructure:"api_secret" validate:"required,dynamic_or_pattern=single_line_100"`
-	ClientType            string              `mapstructure:"client_type" validate:"required,oneof=gtag firebase"`
-	MeasurementID         string              `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
-	FirebaseAppID         string              `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
-	DebugMode             *bool               `mapstructure:"debug_mode" default:"false"`
-	SDKBaseURL            string              `mapstructure:"sdk_base_url" validate:"omitempty,ga4_sdk_base_url_conditional=ga4_sdk_base_url"`
-	ServerContainerURL    string              `mapstructure:"server_container_url"`
-	PIIPropertiesToIgnore []piiProperty       `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
-	EventFiltering        *eventFiltering     `mapstructure:"event_filtering"`
-	UseNativeSDK          *useNativeSDK       `mapstructure:"use_native_sdk"`
-	CapturePageView       *webCapturePageView `mapstructure:"capture_page_view"`
-	ExtendPageViewParams  *webBool            `mapstructure:"extend_page_view_params"`
-	// schema.json declares useNativeSDKToSend under web but terraform does not map
-	// it; modelled so a CLI apply does not erase a UI-set value.
-	UseNativeSDKToSend    *webBool                 `mapstructure:"use_native_sdk_to_send"`
+	APISecret             string                   `mapstructure:"api_secret" validate:"required,dynamic_or_pattern=single_line_100"`
+	ClientType            string                   `mapstructure:"client_type" validate:"required,oneof=gtag firebase"`
+	MeasurementID         string                   `mapstructure:"measurement_id" validate:"required_if=ClientType gtag,omitempty,dynamic_or_pattern=ga4_measurement_id"`
+	FirebaseAppID         string                   `mapstructure:"firebase_app_id" validate:"required_if=ClientType firebase,omitempty,dynamic_or_pattern=single_line_100"`
+	DebugMode             *bool                    `mapstructure:"debug_mode" default:"false"`
+	SDKBaseURL            string                   `mapstructure:"sdk_base_url" validate:"omitempty,ga4_sdk_base_url_conditional=ga4_sdk_base_url"`
+	ServerContainerURL    string                   `mapstructure:"server_container_url"`
+	PIIPropertiesToIgnore []piiProperty            `mapstructure:"pii_properties_to_ignore" validate:"omitempty,dive"`
+	EventFiltering        *eventFiltering          `mapstructure:"event_filtering"`
+	CapturePageView       *webCapturePageView      `mapstructure:"capture_page_view"`
+	ExtendPageViewParams  *webBool                 `mapstructure:"extend_page_view_params"`
 	DebugView             *webBool                 `mapstructure:"debug_view"`
 	OverrideClientSession *webBool                 `mapstructure:"override_client_and_session_ids"`
 	ConnectionMode        common.ConnectionMode    `mapstructure:"connection_mode"`
@@ -174,9 +164,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 		converter.Gated(
 			converter.Simple("capturePageView.web", "capture_page_view.web"),
 			common.SourceTypeWeb,
@@ -191,10 +178,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		),
 		converter.Gated(
 			converter.Simple("extendPageViewParams.web", "extend_page_view_params.web"),
-			common.SourceTypeWeb,
-		),
-		converter.Gated(
-			converter.Simple("useNativeSDKToSend.web", "use_native_sdk_to_send.web"),
 			common.SourceTypeWeb,
 		),
 	}

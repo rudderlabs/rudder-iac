@@ -207,18 +207,6 @@ func TestCustomerioConfigValidation(t *testing.T) {
 		assertValidationPaths(t, errors, "/event_filtering/whitelist", "/event_filtering/blacklist")
 	})
 
-	t.Run("unknown nested source key rejected", func(t *testing.T) {
-		t.Parallel()
-
-		config := minimalConfig()
-		config["use_native_sdk"] = map[string]any{"android_kotlin": true}
-
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android_kotlin", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
-	})
-
 	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
 
@@ -343,7 +331,6 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"api_key": "api-key-1",
 				"device_token_event_name": "Device Token Registered",
 				"datacenter": "EU",
-				"use_native_sdk": {"web": true, "android": true, "ios": false},
 				"send_page_name_in_sdk": {"web": true},
 				"data_use_in_app": {"web": false},
 				"auto_track_device_attributes": {"android": true, "ios": true},
@@ -355,7 +342,6 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"apiKey": "api-key-1",
 				"deviceTokenEventName": "Device Token Registered",
 				"datacenter": "EU",
-				"useNativeSDK": {"web": true, "android": true, "ios": false},
 				"sendPageNameInSDK": {"web": true},
 				"dataUseInApp": {"web": false},
 				"autoTrackDeviceAttributes": {"android": true, "ios": true},
@@ -520,7 +506,6 @@ func fullConfig() map[string]any {
 		"api_key":                              "api-key-1",
 		"device_token_event_name":              "Device Token Registered",
 		"datacenter":                           "EU",
-		"use_native_sdk":                       map[string]any{"web": true, "android": true, "ios": false},
 		"send_page_name_in_sdk":                map[string]any{"web": true},
 		"data_use_in_app":                      map[string]any{"web": false},
 		"auto_track_device_attributes":         map[string]any{"android": true, "ios": true},
@@ -553,7 +538,6 @@ func exampleConfig() map[string]any {
 		"api_key":                 "cio-api-key",
 		"datacenter":              "US",
 		"device_token_event_name": "Device Token Registered",
-		"use_native_sdk":          map[string]any{"web": true, "android": true, "ios": true},
 		"send_page_name_in_sdk":   map[string]any{"web": true},
 		"data_use_in_app":         map[string]any{"web": false},
 		"auto_track_device_attributes": map[string]any{

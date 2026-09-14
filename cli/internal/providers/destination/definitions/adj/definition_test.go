@@ -53,7 +53,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	// One flag per platform, matching schema.json's four sub-keys and db-config's
-	// per-source-type destConfig. use_native_sdk is a source-type block key and is
 	// deliberately ungated, so it does not appear here.
 	assert.Equal(t, map[string][]string{
 		"enable_install_attribution_tracking/android":        {"android"},
@@ -142,6 +141,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 				"android": true,
 				"ios":     true,
 			},
+			"connection_mode": map[string]any{
+				"android":      "device",
+				"react_native": "cloud",
+			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Purchase", "Signup"},
 			},
@@ -171,6 +174,46 @@ func TestAdjustConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
+	t.Run("connection_mode validates mode per source type", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"app_token": "token",
+			"connection_mode": map[string]any{
+				"android":        "device",
+				"android_kotlin": "cloud",
+				"react_native":   "cloud",
+			},
+		}))
+
+		for _, value := range []string{"device", "hybrid", "{{ .ADJ_CONNECTION_MODE || cloud }}", ""} {
+			errors := registered.ValidateConfig(map[string]any{
+				"app_token": "token",
+				"connection_mode": map[string]any{
+					"react_native": value,
+				},
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/connection_mode/react_native", errors[0].Path, value)
+			assert.Contains(t, errors[0].Message, "must be one of", value)
+		}
+	})
+
+	t.Run("connection_mode rejects non-string values", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"app_token": "token",
+			"connection_mode": map[string]any{
+				"android": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/android", err.Path)
+		}
+	})
+
 	t.Run("example yaml config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
@@ -187,6 +230,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 			"enable_install_attribution_tracking": map[string]any{
 				"android": true,
 				"ios":     true,
+			},
+			"connection_mode": map[string]any{
+				"android": "device",
+				"cloud":   "cloud",
 			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Purchased", "Signup"},
@@ -235,10 +282,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		assert.Empty(t, registered.ValidateConfig(map[string]any{
-			"app_token":                 "token",
-			"custom_mappings":           []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
-			"partner_params_keys":       []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
-			"event_filtering":           map[string]any{"blacklist": []any{"{{ config.event || Password Reset }}"}},
+			"app_token":           "token",
+			"custom_mappings":     []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
+			"partner_params_keys": []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
+			"event_filtering":     map[string]any{"blacklist": []any{"{{ config.event || Password Reset }}"}},
 		}))
 
 		for _, field := range []string{"app_token", "delay"} {
@@ -334,7 +381,12 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					"android": true,
 					"ios": true
 				},
-				"event_filtering": {"whitelist": ["one", "two"]}
+				"event_filtering": {"whitelist": ["one", "two"]},
+				"connection_mode": {
+					"android_kotlin": "device",
+					"ios_swift": "cloud",
+					"react_native": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"appToken": "abc123",
@@ -355,7 +407,12 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 				"whitelistedEvents": [
 					{"eventName": "one"},
 					{"eventName": "two"}
-				]
+				],
+				"connectionMode": {
+					"androidKotlin": "device",
+					"iosSwift": "cloud",
+					"reactnative": "cloud"
+				}
 			}`,
 		},
 		{
@@ -394,7 +451,6 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// use_native_sdk and the two added attribution sub-keys are declared by
 // schema.json; unmodelled they were dropped from the payload and erased upstream
 // on the first apply.
 func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
@@ -402,17 +458,8 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 
 	testutil.AssertConversion(t, adj.NewDefinition().Properties, []testutil.ConversionCase{
 		{
-			Name: "use_native_sdk and per-platform attribution",
 			LocalJSON: `{
 				"app_token": "adjToken",
-				"use_native_sdk": {
-					"android": true,
-					"android_kotlin": true,
-					"ios": false,
-					"ios_swift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enable_install_attribution_tracking": {
 					"android": true,
 					"android_kotlin": false,
@@ -422,14 +469,6 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"appToken": "adjToken",
-				"useNativeSDK": {
-					"android": true,
-					"androidKotlin": true,
-					"ios": false,
-					"iosSwift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enableInstallAttributionTracking": {
 					"android": true,
 					"androidKotlin": false,

@@ -312,13 +312,6 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 				"react_native": false,
 				"flutter":      false,
 			},
-			"use_native_sdk": map[string]any{
-				"web":          true,
-				"android":      true,
-				"ios":          true,
-				"react_native": true,
-				"flutter":      true,
-			},
 			"connection_mode": map[string]any{
 				"web":            "device",
 				"android":        "device",
@@ -592,13 +585,6 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"react_native": false,
 					"flutter": false
 				},
-				"use_native_sdk": {
-					"web": true,
-					"android": true,
-					"ios": true,
-					"react_native": true,
-					"flutter": true
-				},
 				"connection_mode": {
 					"web": "device",
 					"android": "device",
@@ -696,13 +682,6 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 					"ios": false,
 					"reactnative": false,
 					"flutter": false
-				},
-				"useNativeSDK": {
-					"web": true,
-					"android": true,
-					"ios": true,
-					"reactnative": true,
-					"flutter": true
 				},
 				"connectionMode": {
 					"web": "device",

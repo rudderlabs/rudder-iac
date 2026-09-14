@@ -194,20 +194,20 @@ func TestNestedSimplePath(t *testing.T) {
 	t.Parallel()
 
 	props := []converter.ConfigProperty{
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
+		converter.Simple("connectionMode.web", "connection_mode.web"),
 	}
 
 	local := map[string]any{
-		"use_native_sdk": map[string]any{
-			"web": true,
+		"connection_mode": map[string]any{
+			"web": "cloud",
 		},
 	}
 
 	api, err := converter.LocalToAPI(props, local)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
-		"useNativeSDK": map[string]any{
-			"web": true,
+		"connectionMode": map[string]any{
+			"web": "cloud",
 		},
 	}, api)
 

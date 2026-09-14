@@ -13,8 +13,6 @@ spec:
     server_url: https://sgtm.rudder-cli-e2e.com
     environment_id: env-5
     authorization_token: rudderCliE2eGtmAuthToken
-    use_native_sdk:
-      web: true
     event_filtering:
       whitelist:
         - Order Completed

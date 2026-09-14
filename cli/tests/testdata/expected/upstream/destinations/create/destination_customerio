@@ -22,11 +22,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true,
-      "android": false,
-      "ios": false
-    },
     "sendPageNameInSDK": {
       "web": false
     },

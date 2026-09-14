@@ -243,3 +243,16 @@
 - Kafka maps nested local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` to the unchanged flat API keys `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey` with dotted `converter.Simple` paths; `use_ssh` remains top-level as the branch selector.
 - Use a value nested SSH struct instead of a pointer struct so validators still descend into SSH fields when the local `ssh` block is absent, allowing per-field `/ssh/...` errors when `use_ssh` is true.
 - Nested Kafka SSH requiredness uses a destination-scoped `kafka_ssh_required` validator that reads top-level `UseSSH` via `validator.FieldLevel.Top()`; ordinary `required_if=UseSSH true` on nested fields would silently become a no-op because go-playground resolves field names within the current struct.
+
+## DEX-846 — Slack Empty Array Defaults E2E Pinning
+<!-- ticket:DEX-846 -->
+- Slack create E2E fixtures should explicitly carry empty local arrays for `event_channel_settings`, `event_template_settings`, `whitelisted_trait_settings`, and `deny_list_of_events`, with matching upstream `[]` snapshot entries for `eventChannelSettings`, `eventTemplateSettings`, `whitelistedTraitsSettings`, and `denyListOfEvents`.
+- Pinning those arrays in the fixture prevents the backend from applying its schema `default: []` values invisibly and keeps the create snapshot stable without changing the destination defaults engine.
+
+## DEX-852 — Destination Connection Mode Fixture Pinning
+<!-- ticket:DEX-852 -->
+- When adding `connection_mode` to existing destination definitions, update the destination fixture and expected upstream snapshot pairs in lockstep rather than adding unmatched fixture-only coverage.
+- Do not add `connection_mode` to every fixture. E2E fixtures exist to prove the wire conversion, so a mixed-mode destination carrying both enum values and the snake-to-camel source keys (`adj`, `posthog`) covers it; repeating a device-only `web: device` block across the other fixtures adds no assertion. Per-destination mode validation belongs in the definition unit tests, where the valid set actually differs.
+- Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
+- The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must name its source type under `connection_mode`. DEX-848 removed `use_native_sdk`, so `connection_mode` is the only block `validateSourceTypeSettings` can accept — an empty config there fails the connect-time check for the android source.
+- Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.

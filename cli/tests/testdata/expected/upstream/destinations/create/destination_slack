@@ -11,8 +11,12 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "denyListOfEvents": [],
+    "eventChannelSettings": [],
+    "eventTemplateSettings": [],
     "incomingWebhooksType": "legacy",
-    "webhookUrl": "https://hooks.slack.com/services/T000/B000/example"
+    "webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+    "whitelistedTraitsSettings": []
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

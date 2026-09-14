@@ -104,9 +104,6 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -138,9 +135,6 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 			"disable_ad_personalization": false,
 			"event_filtering": map[string]any{
 				"blacklist": []any{"Application Opened"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -414,8 +408,7 @@ func TestGoogleAdsConversionRoundTrip(t *testing.T) {
 				"disable_ad_personalization": true,
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
-				},
-				"use_native_sdk": {"web": true}
+				}
 			}`,
 			APIJSON: `{
 				"conversionID": "AW-123456789",
@@ -434,8 +427,7 @@ func TestGoogleAdsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {"web": true}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

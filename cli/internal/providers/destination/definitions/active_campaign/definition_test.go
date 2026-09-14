@@ -267,24 +267,8 @@ func TestActiveCampaignConfigValidation(t *testing.T) {
 		assert.True(t, found, "expected /connection_mode/android to be rejected")
 	})
 
-	// schema.json declares useNativeSDK with a web key, and web is the one source
 	// type offering device/hybrid modes, so it is genuine destination config. An
 	// unmodelled schema key would be erased upstream on the first apply.
-	t.Run("use_native_sdk is a supported key", func(t *testing.T) {
-		t.Parallel()
-
-		config := validMinimalConfig()
-		config["use_native_sdk"] = map[string]any{"web": true}
-		assert.Empty(t, registered.ValidateConfig(config))
-
-		// schema.json declares no other source type under useNativeSDK.
-		config = validMinimalConfig()
-		config["use_native_sdk"] = map[string]any{"android": true}
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android", errors[0].Path)
-	})
-
 	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
 
