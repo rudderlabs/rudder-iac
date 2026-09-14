@@ -102,9 +102,6 @@ spec:
     use_idfa_as_device_id:
       ios: false
 
-    use_native_sdk:
-      web: true
-      android: true
     connection_mode:
       web: device
       android: device
@@ -120,6 +117,10 @@ spec:
 
 `config` accepts only the keys documented here — anything else fails validation
 with `unknown config field "<key>"`.
+
+A `*` after a key name marks a description that is not carried by the Terraform
+provider and was written from other sources. Those need a closer review pass;
+the markers come out once the wording is confirmed.
 
 Keys that declare a default are filled in before the spec enters the resource
 graph, matching what the backend stores, so omitting one is equivalent to
@@ -148,22 +149,22 @@ Amplitude endpoint receives the events.
 
 ### Page and screen tracking
 
-#### `use_user_defined_page_event_name` — boolean, default `false`
+#### `use_user_defined_page_event_name` \* — boolean, default `false`
 `cloud`
 
 Send `page` calls under a fixed custom event name rather than the derived one.
 
-#### `user_provided_page_event_string` — string
+#### `user_provided_page_event_string` \* — string
 `cloud`
 
 The event name used when the flag above is set. At most 200 characters.
 
-#### `use_user_defined_screen_event_name` — boolean, default `false`
+#### `use_user_defined_screen_event_name` \* — boolean, default `false`
 `cloud`
 
 The `screen` equivalent of `use_user_defined_page_event_name`.
 
-#### `user_provided_screen_event_string` — string
+#### `user_provided_screen_event_string` \* — string
 `cloud`
 
 The event name used when the flag above is set. At most 200 characters.
@@ -219,7 +220,7 @@ Traits appended to an existing list value. Each entry at most 100 characters.
 
 Traits prepended to an existing list value. Each entry at most 100 characters.
 
-#### `enable_enhanced_user_operations` — boolean, default `false`
+#### `enable_enhanced_user_operations` \* — boolean, default `false`
 `cloud`
 
 Enable Amplitude's enhanced user property operations, which lets the increment,
@@ -279,7 +280,7 @@ declare a platform ahead of connecting a source of that type.
 Amplitude Browser SDK major version: `1` or `2`. Version 2 changes attribution
 and session behaviour — new destinations should stay on `2`.
 
-#### `proxy_server_url` — object
+#### `proxy_server_url` \* — object
 `device`
 
 Route SDK traffic through your own proxy instead of Amplitude's endpoint.
@@ -291,12 +292,12 @@ Must not begin with `http://` and must not contain `.ngrok.io`.
 Use RudderStack's `anonymousId` as the Amplitude device ID rather than letting
 the Amplitude SDK generate its own.
 
-#### `attribution` — object
+#### `attribution` \* — object
 `device`
 
 Enable Amplitude's attribution tracking.
 
-#### `track_new_campaigns` — object
+#### `track_new_campaigns` \* — object
 `device`
 
 Start a new session when a new campaign is detected. Browser SDK v2 only — see
@@ -388,10 +389,10 @@ preserves the values already stored against it.
 
 ## Per-source keys
 
-All three keys below are objects keyed by the local source type. A key naming a
+Both keys below are objects keyed by the local source type. A key naming a
 source type this destination does not support fails validation.
 
-#### `connection_mode` — object
+#### `connection_mode` \* — object
 
 Selects the mode per source type. Values are constrained to the modes that
 source type supports, so `device` is rejected for the five cloud-only types:
@@ -401,12 +402,6 @@ connection_mode:
   web: device
   cloud: cloud
 ```
-
-#### `use_native_sdk` — object
-
-Boolean per source type, accepting `web`, `ios`, `android`, `react_native` and
-`flutter`. Set alongside `connection_mode` to load the Amplitude SDK for that
-platform.
 
 #### `consent_management` — object
 
@@ -429,13 +424,11 @@ destination 'amplitude' (type 'am') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry an entry for that source type** under `connection_mode`
-or `use_native_sdk`. This lives on the destination spec, not the connection spec.
-Without it:
+**The config must carry a `connection_mode` entry for that source type.** This
+lives on the destination spec, not the connection spec. Without it:
 
 ```
-destination 'amplitude' config has no 'connection_mode' or 'use_native_sdk' entry
-for source type 'web'
+destination 'amplitude' config has no 'connection_mode' entry for source type 'web'
 ```
 
 Amplitude requires no additional config keys to connect a source of any type.
