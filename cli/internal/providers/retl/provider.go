@@ -25,6 +25,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
 	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
+	tableRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/table"
 )
 
 // Provider implements the provider interface for RETL resources
@@ -41,9 +42,9 @@ const importDir = "retl"
 type Option func(*Provider)
 
 // WithTableSupport registers the experimental retl-source-table kind: its spec
-// kind, resource type and handler, whose presence also enables its import
-// --merge matcher. Without it the provider behaves exactly as it did before the
-// kind existed, and never lists table sources.
+// kind, resource type and handler, whose presence also enables its syntax rule
+// and import --merge matcher. Without it the provider behaves exactly as it did
+// before the kind existed, and never lists table sources.
 func WithTableSupport() Option {
 	return func(p *Provider) {
 		p.kindToType[table.ResourceKind] = table.ResourceType
@@ -91,17 +92,12 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
-// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
-// were retired, so they only ever match v1 patterns. retl-source-sql-model is
-// absent deliberately: it shipped on rudder/0.1 and keeps legacy support.
-var kindsWithoutLegacyVersions = map[string]struct{}{
-	table.ResourceKind: {},
-}
-
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+		// Only the SQL model kind shipped on rudder/0.1; every kind added since
+		// legacy versions were retired is v1-only.
+		if kind == sqlmodel.ResourceKind {
 			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
 		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
@@ -180,9 +176,11 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
-		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),
+	syntactic := []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()}
+	if _, ok := p.handlers[table.ResourceType]; ok {
+		syntactic = append(syntactic, tableRules.NewTableSpecSyntaxValidRule())
 	}
+	return syntactic
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {

@@ -11,9 +11,10 @@ import (
 
 // TestProviderRuleDocs runs the provider's authored fragments through the real
 // docs generator together with its live rules, asserting every rule resolves
-// and passes the DocumentedRules validation invariants.
+// and passes the DocumentedRules validation invariants. Table support is on,
+// as in the CI catalog, so the experimental kind's rule is documented too.
 func TestProviderRuleDocs(t *testing.T) {
-	p := retl.New(newDefaultMockClient())
+	p := retl.New(newDefaultMockClient(), retl.WithTableSupport())
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()
