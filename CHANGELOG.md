@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.26.0](https://github.com/rudderlabs/rudder-iac/compare/v0.25.1...v0.26.0) (2026-09-14)
+
+
+### Features
+
+* **destination:** group postgres storage config blocks ([#854](https://github.com/rudderlabs/rudder-iac/issues/854)) ([5da012a](https://github.com/rudderlabs/rudder-iac/commit/5da012afcf3731dd84df07491dc7836f5f3180d7))
+* **destination:** group snowflake storage config sections ([#808](https://github.com/rudderlabs/rudder-iac/issues/808)) ([5ddffb7](https://github.com/rudderlabs/rudder-iac/commit/5ddffb778da459372585448d6b1391956301fed3))
+
+
+### Bug Fixes
+
+* **ci:** cut e2e write volume against the production control plane ([#828](https://github.com/rudderlabs/rudder-iac/issues/828)) ([06ce781](https://github.com/rudderlabs/rudder-iac/commit/06ce78147ac9ce28b94de26b00a7a9938247188e))
+* **destination:** remove native SDK config surface ([#846](https://github.com/rudderlabs/rudder-iac/issues/846)) ([5d9ef71](https://github.com/rudderlabs/rudder-iac/commit/5d9ef7134d50b40992509b2fd454aa43851669a4))
+* **differ:** classify an all-secret config block as secret-only ([#848](https://github.com/rudderlabs/rudder-iac/issues/848)) ([82f9122](https://github.com/rudderlabs/rudder-iac/commit/82f91225611e791cfa4a7fe324e868e06d21ad70))
+* **import:** substitute variables when loading the project for workspace import ([#833](https://github.com/rudderlabs/rudder-iac/issues/833)) ([022ca2c](https://github.com/rudderlabs/rudder-iac/commit/022ca2c7677da4d6b33a926a861ca70a9b614f22))
+
+
+### Miscellaneous
+
+* **destination:** document the bq definition config surface ([#826](https://github.com/rudderlabs/rudder-iac/issues/826)) ([fa6ac85](https://github.com/rudderlabs/rudder-iac/commit/fa6ac853363e8412736d59814c2127d0b290acae))
+* **destination:** expose connection mode for native SDK configs ([#845](https://github.com/rudderlabs/rudder-iac/issues/845)) ([13131ac](https://github.com/rudderlabs/rudder-iac/commit/13131ac1c7884bc6b879c6908266ced439745e44))
+* **destination:** pin Slack create array defaults ([#844](https://github.com/rudderlabs/rudder-iac/issues/844)) ([9eef77e](https://github.com/rudderlabs/rudder-iac/commit/9eef77ed4c9003508dbb628631aa34a343c8a911))
+* group ssh config under nested block ([#855](https://github.com/rudderlabs/rudder-iac/issues/855)) ([7b7e60f](https://github.com/rudderlabs/rudder-iac/commit/7b7e60faf1b9de7eed7ee6b4dae0bef236711152))
+
 ## [0.25.1](https://github.com/rudderlabs/rudder-iac/compare/v0.25.0...v0.25.1) (2026-09-08)
 
 
