@@ -183,9 +183,8 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	return syntactic
 }
 
-// SemanticRules registers the table rule only with the table kind: rule docs
-// are generated from the flag-off registry, so the rule gets a docs fragment
-// when the kind goes GA.
+// SemanticRules registers the table rule only with the table kind, so with the
+// flag off validation is exactly what it was before the kind existed.
 func (p *Provider) SemanticRules() []rules.Rule {
 	semantic := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),

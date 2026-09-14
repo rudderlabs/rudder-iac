@@ -8,26 +8,18 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// accountSpec is the part of a table source spec this rule reads. The kind's
-// own TableSpec is decoded with mapstructure and carries no json tags for the
-// typed rule's JSON round-trip.
-type accountSpec struct {
-	Account          string `json:"account"`
-	SourceDefinition string `json:"source_definition"`
-}
-
 var validateTableSemantic = func(
 	_ string,
 	_ string,
 	_ map[string]any,
-	spec accountSpec,
+	spec table.TableSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
 	return sqlmodelRules.ValidateAccountReference(spec.Account, spec.SourceDefinition, graph)
 }
 
 // NewTableSemanticValidRule checks a table source's account reference against
-// the project. The rest of the kind's validation runs in its handler's LoadSpec.
+// the project. The spec's own field rules live in retl/table/spec-syntax-valid.
 func NewTableSemanticValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"retl/table/semantic-valid",

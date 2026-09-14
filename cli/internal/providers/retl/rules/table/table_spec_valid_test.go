@@ -47,9 +47,13 @@ func TestTableSpecSyntaxValidRule_Metadata(t *testing.T) {
 func TestTableSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 	t.Parallel()
 
+	referenced := warehouseSpec()
+	referenced.AccountID, referenced.Account = "", "#account:prod-pg"
+
 	cases := map[string]table.TableSpec{
-		"postgres": warehouseSpec(),
-		"s3":       s3Spec(),
+		"postgres":          warehouseSpec(),
+		"s3":                s3Spec(),
+		"account reference": referenced,
 	}
 	for _, sd := range []string{"redshift", "snowflake", "bigquery", "mysql", "databricks", "trino"} {
 		spec := warehouseSpec()
@@ -82,7 +86,29 @@ func TestTableSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expect: []rules.ValidationResult{
 				{Reference: "/display_name", Message: "'display_name' is required"},
-				{Reference: "/account_id", Message: "'account_id' is required"},
+				{Reference: "/account_id", Message: "'account_id' is required when 'account' is not specified"},
+			},
+		},
+		{
+			name: "both account_id and account",
+			spec: func() table.TableSpec {
+				s := warehouseSpec()
+				s.Account = "#account:prod-pg"
+				return s
+			},
+			expect: []rules.ValidationResult{
+				{Reference: "/account_id", Message: "'account_id' and 'account' cannot be specified together"},
+			},
+		},
+		{
+			name: "account that is not an account reference",
+			spec: func() table.TableSpec {
+				s := warehouseSpec()
+				s.AccountID, s.Account = "", "prod-pg"
+				return s
+			},
+			expect: []rules.ValidationResult{
+				{Reference: "/account", Message: "'account' is not valid: must be of the form #account:<id>"},
 			},
 		},
 		{

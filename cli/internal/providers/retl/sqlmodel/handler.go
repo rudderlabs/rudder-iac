@@ -108,7 +108,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	var account string
 	if spec.Account != "" {
 		if account, err = ParseAccountRef(spec.Account); err != nil {
-			return err
+			return fmt.Errorf("parsing account reference: %w", err)
 		}
 	}
 
