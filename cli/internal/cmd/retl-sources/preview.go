@@ -18,8 +18,8 @@ func newCmdPreview() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "preview <external-id>",
-		Short: "Preview a RETL source SQL model",
-		Long:  "Preview a RETL source SQL model to see the data structure and sample rows",
+		Short: "Preview a RETL source (SQL model or table)",
+		Long:  "Preview a RETL source (SQL model or warehouse table) to see the data structure and sample rows. s3 table sources have no query to preview.",
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources preview my-model
 			$ rudder-cli retl-sources preview my-model --location ./project --limit 5
