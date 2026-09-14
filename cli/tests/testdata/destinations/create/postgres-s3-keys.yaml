@@ -20,6 +20,7 @@ spec:
     use_rudder_storage: false
     bucket_provider: S3
     bucket_name: rudder-cli-e2e
-    role_based_auth: false
     access_key_id: "{{ .POSTGRES_ACCESS_KEY_ID }}"
-    access_key: "{{ .POSTGRES_ACCESS_KEY }}"
+    s3:
+      role_based_auth: false
+      access_key: "{{ .POSTGRES_ACCESS_KEY }}"

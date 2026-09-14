@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 func registeredDefinition(t *testing.T) *definitions.RegisteredDefinition {
@@ -49,9 +50,33 @@ func exampleConfig() map[string]any {
 func copyConfig(src map[string]any) map[string]any {
 	out := make(map[string]any, len(src))
 	for k, v := range src {
-		out[k] = v
+		out[k] = copyConfigValue(v)
 	}
 	return out
+}
+
+func copyConfigValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return copyConfig(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = copyConfigValue(item)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func setStorage(cfg map[string]any, section string, key string, value any) {
+	storage, ok := cfg[section].(map[string]any)
+	if !ok {
+		storage = map[string]any{}
+		cfg[section] = storage
+	}
+	storage[key] = value
 }
 
 func TestNewDefinitionMetadata(t *testing.T) {
@@ -70,11 +95,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{
 		"password",
 		"access_key_id",
-		"access_key",
-		"account_key",
-		"sas_token",
-		"secret_access_key",
-		"credentials",
+		"s3.access_key",
+		"azure.account_key",
+		"azure.sas_token",
+		"gcs.credentials",
+		"minio.secret_access_key",
 	}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
@@ -146,8 +171,8 @@ func TestPostgresConfigValidation(t *testing.T) {
 		cfg["bucket_provider"] = "S3"
 		cfg["bucket_name"] = "rudder-postgres-staging"
 		cfg["cleanup_object_storage_files"] = false
-		cfg["role_based_auth"] = true
-		cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderPostgres"
+		setStorage(cfg, "s3", "role_based_auth", true)
+		setStorage(cfg, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/RudderPostgres")
 		cfg["consent_management"] = map[string]any{
 			"android_kotlin": []any{map[string]any{"provider": "oneTrust"}},
 		}
@@ -245,10 +270,10 @@ func TestPostgresConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		cases := map[string][]string{
-			"S3":         {"/bucket_name"},
-			"GCS":        {"/bucket_name", "/credentials"},
-			"AZURE_BLOB": {"/container_name", "/account_name"},
-			"MINIO":      {"/bucket_name", "/end_point", "/access_key_id", "/secret_access_key", "/use_ssl"},
+			"S3":         {"/bucket_name", "/access_key_id", "/s3/access_key"},
+			"GCS":        {"/bucket_name", "/gcs/credentials"},
+			"AZURE_BLOB": {"/azure/container_name", "/azure/account_name", "/azure/account_key"},
+			"MINIO":      {"/bucket_name", "/access_key_id", "/minio/end_point", "/minio/secret_access_key", "/minio/use_ssl"},
 		}
 
 		for provider, want := range cases {
@@ -269,10 +294,19 @@ func TestPostgresConfigValidation(t *testing.T) {
 	t.Run("keys belonging to other providers stay optional", func(t *testing.T) {
 		t.Parallel()
 
-		for _, key := range []string{"role_based_auth", "access_key", "credentials", "use_sas_tokens", "account_key"} {
+		for _, tc := range []struct {
+			section string
+			key     string
+			value   any
+		}{
+			{section: "gcs", key: "credentials", value: "stale"},
+			{section: "azure", key: "use_sas_tokens", value: true},
+			{section: "azure", key: "account_key", value: "stale"},
+			{section: "minio", key: "secret_access_key", value: "stale"},
+		} {
 			cfg := validS3KeyConfig()
-			delete(cfg, key)
-			assert.Empty(t, registered.ValidateConfig(cfg), "%q is not required for S3", key)
+			setStorage(cfg, tc.section, tc.key, tc.value)
+			assert.Empty(t, registered.ValidateConfig(cfg), "%s.%s should be accepted while S3 is selected", tc.section, tc.key)
 		}
 	})
 
@@ -315,12 +349,75 @@ func TestPostgresConfigValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("s3 explicit role auth requires iam role arn", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validS3RoleConfig()
+		delete(cfg["s3"].(map[string]any), "iam_role_arn")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/iam_role_arn")
+	})
+
+	t.Run("s3 explicit key auth requires both access keys", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validS3KeyConfig()
+		delete(cfg, "access_key_id")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/access_key_id")
+
+		cfg = validS3KeyConfig()
+		delete(cfg["s3"].(map[string]any), "access_key")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/s3/access_key")
+	})
+
+	t.Run("s3 omitted role selector defaults to key auth", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validS3KeyConfig()
+		delete(cfg["s3"].(map[string]any), "role_based_auth")
+		assert.Empty(t, registered.ValidateConfig(cfg))
+
+		api, err := registered.LocalToAPI(registered.ApplyDefaults(cfg))
+		require.NoError(t, err)
+		assert.NotContains(t, api, "roleBasedAuth", "schema.json declares no default for the selector")
+	})
+
+	t.Run("azure explicit account key auth requires account key", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validAzureKeyConfig()
+		delete(cfg["azure"].(map[string]any), "account_key")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/azure/account_key")
+	})
+
+	t.Run("azure omitted sas selector defaults to account key auth", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validAzureKeyConfig()
+		delete(cfg["azure"].(map[string]any), "use_sas_tokens")
+		assert.Empty(t, registered.ValidateConfig(cfg))
+
+		api, err := registered.LocalToAPI(registered.ApplyDefaults(cfg))
+		require.NoError(t, err)
+		assert.NotContains(t, api, "useSASTokens", "schema.json declares no default for the selector")
+	})
+
+	t.Run("azure explicit sas auth requires sas token", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validAzureSASConfig()
+		delete(cfg["azure"].(map[string]any), "sas_token")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/azure/sas_token")
+	})
+
 	t.Run("minio accepts use_ssl set to false", func(t *testing.T) {
 		t.Parallel()
 
 		// schema.json requires the key to be present, not to be true.
 		cfg := validMINIOConfig()
-		cfg["use_ssl"] = false
+		setStorage(cfg, "minio", "use_ssl", false)
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
@@ -340,23 +437,29 @@ func TestPostgresConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		cases := []struct {
-			field string
-			value any
-			cfg   map[string]any
+			section string
+			field   string
+			value   any
+			cfg     map[string]any
 		}{
 			{field: "host", value: "demo.ngrok.io", cfg: minimalConfig()},
 			{field: "database", value: "bad\nvalue", cfg: minimalConfig()},
 			{field: "namespace", value: "pg_catalog", cfg: minimalConfig()},
 			{field: "bucket_name", value: "bad\nbucket", cfg: validS3KeyConfig()},
-			{field: "container_name", value: "bad\ncontainer", cfg: validAzureKeyConfig()},
-			{field: "end_point", value: "bad\nendpoint", cfg: validMINIOConfig()},
+			{section: "azure", field: "container_name", value: "bad\ncontainer", cfg: validAzureKeyConfig()},
+			{section: "minio", field: "end_point", value: "bad\nendpoint", cfg: validMINIOConfig()},
 		}
 
 		for _, tc := range cases {
 			cfg := copyConfig(tc.cfg)
-			cfg[tc.field] = tc.value
-			errors := registered.ValidateConfig(cfg)
-			assertHasPath(t, errors, "/"+tc.field)
+			if tc.section == "" {
+				cfg[tc.field] = tc.value
+				assertHasPath(t, registered.ValidateConfig(cfg), "/"+tc.field)
+				continue
+			}
+
+			setStorage(cfg, tc.section, tc.field, tc.value)
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+tc.section+"/"+tc.field)
 		}
 	})
 
@@ -445,13 +548,16 @@ func TestPostgresConfigValidation(t *testing.T) {
 			c["bucket_provider"] = provider
 			c["bucket_name"] = bucket
 			switch provider {
+			case "S3":
+				setStorage(c, "s3", "role_based_auth", true)
+				setStorage(c, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/rudder")
 			case "GCS":
-				c["credentials"] = "{}"
+				setStorage(c, "gcs", "credentials", "{}")
 			case "MINIO":
-				c["end_point"] = "minio.example.com:9000"
+				setStorage(c, "minio", "end_point", "minio.example.com:9000")
 				c["access_key_id"] = "minio-access"
-				c["secret_access_key"] = "minio-secret"
-				c["use_ssl"] = true
+				setStorage(c, "minio", "secret_access_key", "minio-secret")
+				setStorage(c, "minio", "use_ssl", true)
 			}
 			return c
 		}
@@ -480,14 +586,16 @@ func TestPostgresConfigValidation(t *testing.T) {
 			c := copyConfig(minimalConfig())
 			c["use_rudder_storage"] = false
 			c["bucket_provider"] = "AZURE_BLOB"
-			c["account_name"] = "rudderaccount"
-			c["container_name"] = container
+			setStorage(c, "azure", "account_name", "rudderaccount")
+			setStorage(c, "azure", "use_sas_tokens", false)
+			setStorage(c, "azure", "account_key", "account-key")
+			setStorage(c, "azure", "container_name", container)
 			return c
 		}
 
 		assert.Empty(t, registered.ValidateConfig(cfg("rudder-logs")))
 		for _, invalid := range []string{"ab", "Rudder-Logs", "rudder--logs", "rudder_logs", strings.Repeat("a", 64)} {
-			assertHasPath(t, registered.ValidateConfig(cfg(invalid)), "/container_name")
+			assertHasPath(t, registered.ValidateConfig(cfg(invalid)), "/azure/container_name")
 		}
 	})
 
@@ -500,14 +608,14 @@ func TestPostgresConfigValidation(t *testing.T) {
 			c["bucket_provider"] = "MINIO"
 			c["bucket_name"] = "rudder-bucket"
 			c["access_key_id"] = "minio-access"
-			c["secret_access_key"] = "minio-secret"
-			c["use_ssl"] = true
-			c["end_point"] = endpoint
+			setStorage(c, "minio", "secret_access_key", "minio-secret")
+			setStorage(c, "minio", "use_ssl", true)
+			setStorage(c, "minio", "end_point", endpoint)
 			return c
 		}
 
 		assert.Empty(t, registered.ValidateConfig(cfg("minio.example.com:9000")))
-		assertHasPath(t, registered.ValidateConfig(cfg("https://foo.ngrok.io")), "/end_point")
+		assertHasPath(t, registered.ValidateConfig(cfg("https://foo.ngrok.io")), "/minio/end_point")
 	})
 
 	t.Run("unknown key rejected", func(t *testing.T) {
@@ -578,9 +686,9 @@ func validS3KeyConfig() map[string]any {
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "S3"
 	cfg["bucket_name"] = "rudder-postgres-staging"
-	cfg["role_based_auth"] = false
+	setStorage(cfg, "s3", "role_based_auth", false)
 	cfg["access_key_id"] = "access-key-id"
-	cfg["access_key"] = "secret-access-key"
+	setStorage(cfg, "s3", "access_key", "secret-access-key")
 	return cfg
 }
 
@@ -589,8 +697,8 @@ func validS3RoleConfig() map[string]any {
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "S3"
 	cfg["bucket_name"] = "rudder-postgres-staging"
-	cfg["role_based_auth"] = true
-	cfg["iam_role_arn"] = "arn:aws:iam::123456789012:role/RudderPostgres"
+	setStorage(cfg, "s3", "role_based_auth", true)
+	setStorage(cfg, "s3", "iam_role_arn", "arn:aws:iam::123456789012:role/RudderPostgres")
 	return cfg
 }
 
@@ -599,7 +707,7 @@ func validGCSConfig() map[string]any {
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "GCS"
 	cfg["bucket_name"] = "rudder-postgres-gcs"
-	cfg["credentials"] = `{"type":"service_account"}`
+	setStorage(cfg, "gcs", "credentials", `{"type":"service_account"}`)
 	return cfg
 }
 
@@ -607,10 +715,10 @@ func validAzureKeyConfig() map[string]any {
 	cfg := copyConfig(minimalConfig())
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "AZURE_BLOB"
-	cfg["container_name"] = "rudder-postgres"
-	cfg["account_name"] = "rudderaccount"
-	cfg["use_sas_tokens"] = false
-	cfg["account_key"] = "account-key"
+	setStorage(cfg, "azure", "container_name", "rudder-postgres")
+	setStorage(cfg, "azure", "account_name", "rudderaccount")
+	setStorage(cfg, "azure", "use_sas_tokens", false)
+	setStorage(cfg, "azure", "account_key", "account-key")
 	return cfg
 }
 
@@ -618,10 +726,10 @@ func validAzureSASConfig() map[string]any {
 	cfg := copyConfig(minimalConfig())
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "AZURE_BLOB"
-	cfg["container_name"] = "rudder-postgres"
-	cfg["account_name"] = "rudderaccount"
-	cfg["use_sas_tokens"] = true
-	cfg["sas_token"] = "sas-token"
+	setStorage(cfg, "azure", "container_name", "rudder-postgres")
+	setStorage(cfg, "azure", "account_name", "rudderaccount")
+	setStorage(cfg, "azure", "use_sas_tokens", true)
+	setStorage(cfg, "azure", "sas_token", "sas-token")
 	return cfg
 }
 
@@ -630,10 +738,10 @@ func validMINIOConfig() map[string]any {
 	cfg["use_rudder_storage"] = false
 	cfg["bucket_provider"] = "MINIO"
 	cfg["bucket_name"] = "rudder-postgres-minio"
-	cfg["end_point"] = "minio.example.com:9000"
+	setStorage(cfg, "minio", "end_point", "minio.example.com:9000")
 	cfg["access_key_id"] = "access-key-id"
-	cfg["secret_access_key"] = "secret-access-key"
-	cfg["use_ssl"] = true
+	setStorage(cfg, "minio", "secret_access_key", "secret-access-key")
+	setStorage(cfg, "minio", "use_ssl", true)
 	return cfg
 }
 
@@ -646,6 +754,63 @@ func assertHasPath(t *testing.T, errors []definitions.ConfigError, path string) 
 		}
 	}
 	assert.Failf(t, "expected validation path", "path %s not found in %#v", path, errors)
+}
+
+func TestPostgresNestedSecretKeysWrapAndMask(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredDefinition(t)
+	config := secret.WrapKnownSecrets(map[string]any{
+		"password":      "database-password",
+		"access_key_id": "shared-key-id",
+		"s3": map[string]any{
+			"access_key": "s3-key-secret",
+		},
+		"gcs": map[string]any{
+			"credentials": "gcs-credentials",
+		},
+		"azure": map[string]any{
+			"account_key": "azure-account-key",
+			"sas_token":   "azure-sas-token",
+		},
+		"minio": map[string]any{
+			"secret_access_key": "minio-key-secret",
+		},
+	}, registered.SecretKeys())
+
+	assertSecretValue(t, config, "password", "database-password")
+	assertSecretValue(t, config, "access_key_id", "shared-key-id")
+	assertNestedSecretValue(t, config, "s3", "access_key", "s3-key-secret")
+	assertNestedSecretValue(t, config, "gcs", "credentials", "gcs-credentials")
+	assertNestedSecretValue(t, config, "azure", "account_key", "azure-account-key")
+	assertNestedSecretValue(t, config, "azure", "sas_token", "azure-sas-token")
+	assertNestedSecretValue(t, config, "minio", "secret_access_key", "minio-key-secret")
+
+	revealed := secret.RevealSecrets(config, registered.SecretKeys())
+	assert.Equal(t, "shared-key-id", revealed["access_key_id"])
+
+	require.NoError(t, secret.MaskSecrets(revealed, "postgres-prod", registered.SecretKeys()))
+	assert.Equal(t, "{{ .POSTGRES_PROD_PASSWORD }}", revealed["password"])
+	assert.Equal(t, "{{ .POSTGRES_PROD_ACCESS_KEY_ID }}", revealed["access_key_id"])
+	assert.Equal(t, "{{ .POSTGRES_PROD_GCS_CREDENTIALS }}", revealed["gcs"].(map[string]any)["credentials"])
+	assert.Equal(t, "{{ .POSTGRES_PROD_AZURE_ACCOUNT_KEY }}", revealed["azure"].(map[string]any)["account_key"])
+	assert.Equal(t, "{{ .POSTGRES_PROD_MINIO_SECRET_ACCESS_KEY }}", revealed["minio"].(map[string]any)["secret_access_key"])
+}
+
+func assertSecretValue(t *testing.T, config map[string]any, key string, want string) {
+	t.Helper()
+
+	value, ok := config[key].(*secret.String)
+	require.True(t, ok, "expected %s to be wrapped as a secret", key)
+	assert.Equal(t, want, value.Reveal())
+}
+
+func assertNestedSecretValue(t *testing.T, config map[string]any, section string, key string, want string) {
+	t.Helper()
+
+	storage, ok := config[section].(map[string]any)
+	require.True(t, ok, "missing %s storage block", section)
+	assertSecretValue(t, storage, key, want)
 }
 
 func TestPostgresConversionRoundTrip(t *testing.T) {
@@ -698,10 +863,12 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": false,
 				"bucket_provider": "S3",
 				"bucket_name": "rudder-postgres-staging",
-				"cleanup_object_storage_files": false,
-				"role_based_auth": false,
 				"access_key_id": "access-key-id",
-				"access_key": "secret-access-key"
+				"cleanup_object_storage_files": false,
+				"s3": {
+					"role_based_auth": false,
+					"access_key": "secret-access-key"
+				}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -742,8 +909,10 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": false,
 				"bucket_provider": "S3",
 				"bucket_name": "rudder-postgres-staging",
-				"role_based_auth": true,
-				"iam_role_arn": "arn:aws:iam::123456789012:role/RudderPostgres"
+				"s3": {
+					"role_based_auth": true,
+					"iam_role_arn": "arn:aws:iam::123456789012:role/RudderPostgres"
+				}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -773,7 +942,7 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": false,
 				"bucket_provider": "GCS",
 				"bucket_name": "rudder-postgres-gcs",
-				"credentials": "{\"type\":\"service_account\"}"
+				"gcs": {"credentials": "{\"type\":\"service_account\"}"}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -801,10 +970,12 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"sync_frequency": "180",
 				"use_rudder_storage": false,
 				"bucket_provider": "AZURE_BLOB",
-				"container_name": "rudder-postgres",
-				"account_name": "rudderaccount",
-				"use_sas_tokens": true,
-				"sas_token": "sas-token"
+				"azure": {
+					"container_name": "rudder-postgres",
+					"account_name": "rudderaccount",
+					"use_sas_tokens": true,
+					"sas_token": "sas-token"
+				}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -834,10 +1005,12 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"sync_frequency": "180",
 				"use_rudder_storage": false,
 				"bucket_provider": "AZURE_BLOB",
-				"container_name": "rudder-postgres",
-				"account_name": "rudderaccount",
-				"use_sas_tokens": false,
-				"account_key": "account-key"
+				"azure": {
+					"container_name": "rudder-postgres",
+					"account_name": "rudderaccount",
+					"use_sas_tokens": false,
+					"account_key": "account-key"
+				}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -868,10 +1041,12 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"use_rudder_storage": false,
 				"bucket_provider": "MINIO",
 				"bucket_name": "rudder-postgres-minio",
-				"end_point": "minio.example.com:9000",
 				"access_key_id": "access-key-id",
-				"secret_access_key": "secret-access-key",
-				"use_ssl": true
+				"minio": {
+					"end_point": "minio.example.com:9000",
+					"secret_access_key": "secret-access-key",
+					"use_ssl": true
+				}
 			}`,
 			APIJSON: `{
 				"host": "postgres.example.com",
@@ -888,6 +1063,59 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"accessKeyID": "access-key-id",
 				"secretAccessKey": "secret-access-key",
 				"useSSL": true
+			}`,
+		},
+		{
+			Name: "inactive provider storage keys round trip",
+			LocalJSON: `{
+				"host": "postgres.example.com",
+				"database": "rudder_events",
+				"user": "rudder",
+				"password": "s3cret",
+				"port": "5432",
+				"ssl_mode": "disable",
+				"sync_frequency": "180",
+				"use_rudder_storage": false,
+				"bucket_provider": "S3",
+				"bucket_name": "rudder-postgres-staging",
+				"access_key_id": "access-key-id",
+				"s3": {
+					"role_based_auth": false,
+					"access_key": "secret-access-key"
+				},
+				"gcs": {"credentials": "{\"type\":\"service_account\"}"},
+				"azure": {
+					"account_name": "stalerudder",
+					"account_key": "stale-account-key",
+					"use_sas_tokens": false
+				},
+				"minio": {
+					"end_point": "minio.example.com:9000",
+					"secret_access_key": "stale-secret-access-key",
+					"use_ssl": false
+				}
+			}`,
+			APIJSON: `{
+				"host": "postgres.example.com",
+				"database": "rudder_events",
+				"user": "rudder",
+				"password": "s3cret",
+				"port": "5432",
+				"sslMode": "disable",
+				"syncFrequency": "180",
+				"useRudderStorage": false,
+				"bucketProvider": "S3",
+				"bucketName": "rudder-postgres-staging",
+				"roleBasedAuth": false,
+				"accessKeyID": "access-key-id",
+				"accessKey": "secret-access-key",
+				"credentials": "{\"type\":\"service_account\"}",
+				"accountName": "stalerudder",
+				"accountKey": "stale-account-key",
+				"useSASTokens": false,
+				"endPoint": "minio.example.com:9000",
+				"secretAccessKey": "stale-secret-access-key",
+				"useSSL": false
 			}`,
 		},
 		{

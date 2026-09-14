@@ -264,3 +264,10 @@
 
 - Destination definitions should reject the removed native-SDK source-type config block as an unknown key; keep `SourceTypeConfigKeys()` limited to `connection_mode`.
 - For this removal, treat the broad `useNativeSDK` grep gate as authoritative: remove similarly prefixed destination-definition settings such as GA4's `use_native_sdk_to_send` / `useNativeSDKToSend` unless a future task explicitly reintroduces a separately named schema-backed field.
+
+## DEX-881 — Postgres Storage Grouping
+
+- Postgres object-storage local YAML groups provider-specific keys under `s3`, `gcs`, `azure`, and `minio` blocks while preserving the flat upstream API payload shape.
+- Use `s3` rather than `aws` for the AWS-backed block because Postgres' selector value is `bucket_provider: S3`, task examples use `s3.role_based_auth`, and Snowflake already uses an `s3` local block for similar storage settings.
+- Preserve MinIO as its own nested local block (`minio.end_point`, `minio.secret_access_key`, `minio.use_ssl`) rather than leaving those keys flat.
+- Group only keys `schema.json` declares in exactly one `bucketProvider` branch. `bucket_name` (S3/GCS/MinIO) and `access_key_id` (S3/MinIO) are declared in several, so they stay top-level: the API carries one flat key for each, and routing it into a provider block would need a conditional that leaves a stale value from a third provider nowhere to land. Same rule as Snowflake.
