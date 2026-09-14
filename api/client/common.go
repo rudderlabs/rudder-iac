@@ -66,9 +66,17 @@ func formatDetails(details json.RawMessage) string {
 }
 
 func (e *APIError) FeatureFlagNotEnabled() bool {
-	return e.HTTPStatusCode == 403 &&
+	return e.IsFeatureDisabled()
+}
+
+func (e *APIError) IsFeatureDisabled() bool {
+	return e != nil && e.HTTPStatusCode == 403 &&
 		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
 			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))
+}
+
+func (e *APIError) IsPermissionDenied() bool {
+	return e != nil && e.HTTPStatusCode == 403 && !e.IsFeatureDisabled()
 }
 
 func (e *APIError) Msg() string {
