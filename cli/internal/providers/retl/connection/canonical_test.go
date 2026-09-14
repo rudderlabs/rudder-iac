@@ -129,7 +129,7 @@ func TestConfigToData(t *testing.T) {
 	config.CursorColumn = "updated_at"
 	config.SyncSettings = &SyncSettingsSpec{SyncLogs: &SyncLogsSpec{Enabled: ptr(false), SnapshotsToRetain: ptr(0)}}
 
-	data, err := configToData(config)
+	data, err := configToMap(config)
 	require.NoError(t, err)
 
 	// Every number is float64 and every key snake_case, whichever path built
@@ -157,7 +157,7 @@ func TestConfigToDataOmitsAbsentOptionals(t *testing.T) {
 	config.Schedule = ScheduleSpec{Type: "manual"}
 	config.Constants = []ConstantSpec{}
 
-	data, err := configToData(config)
+	data, err := configToMap(config)
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]any{
@@ -177,10 +177,10 @@ func TestConfigDataRoundTrip(t *testing.T) {
 	config.CursorColumn = "updated_at"
 	config.SyncSettings = &SyncSettingsSpec{FailedKeys: &FailedKeysSpec{Retry: ptr(false)}}
 
-	data, err := configToData(config)
+	data, err := configToMap(config)
 	require.NoError(t, err)
 
-	decoded, err := configFromData(data)
+	decoded, err := configFromMap(data)
 	require.NoError(t, err)
 	assert.Equal(t, canonicalConfig(config), decoded)
 }
@@ -191,28 +191,28 @@ func TestConfigFromDataErrors(t *testing.T) {
 	t.Run("a missing config is not a map", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := configFromData(nil)
+		_, err := configFromMap(nil)
 		assert.ErrorContains(t, err, "expected a map, got <nil>")
 	})
 
 	t.Run("a value of the wrong shape is reported, not dropped", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := configFromData(map[string]any{"schedule": "every minute"})
+		_, err := configFromMap(map[string]any{"schedule": "every minute"})
 		assert.ErrorContains(t, err, "decoding connection config data")
 	})
 
 	t.Run("a key the spec does not know is reported, not dropped", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := configFromData(map[string]any{"sync_behaviour": "upsert", "destination_config": map[string]any{"audience_id": "aud-1"}})
+		_, err := configFromMap(map[string]any{"sync_behaviour": "upsert", "destination_config": map[string]any{"audience_id": "aud-1"}})
 		assert.ErrorContains(t, err, "decoding connection config data")
 	})
 
 	t.Run("a value that cannot be encoded is reported", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := configFromData(map[string]any{"cursor_column": make(chan int)})
+		_, err := configFromMap(map[string]any{"cursor_column": make(chan int)})
 		assert.ErrorContains(t, err, "encoding connection config data")
 	})
 }
