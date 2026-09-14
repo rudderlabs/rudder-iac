@@ -92,6 +92,7 @@ match_behavior:
               source_definition: s3
               primary_key: id
               bucket_name: events
+              object_prefix: daily/
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/primary_key"
