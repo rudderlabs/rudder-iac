@@ -157,7 +157,7 @@ Each entry is at most 100 characters. Omit the block to send every event.
 Both keys below are objects keyed by the local source type. A key naming a
 source type this destination does not support fails validation.
 
-#### `connection_mode` \* — object
+#### `connection_mode` — object
 
 Selects the mode per source type. Values are constrained to the modes that
 source type supports, so `device` is rejected for every type except `web`:

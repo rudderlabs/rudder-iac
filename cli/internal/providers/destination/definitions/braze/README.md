@@ -255,7 +255,7 @@ Enable HTML in-app messages, which may contain user-supplied JavaScript.
 Both keys below are objects keyed by the local source type. A key naming a
 source type this destination does not support fails validation.
 
-#### `connection_mode` \* — object
+#### `connection_mode` — object
 
 Selects the mode per source type. Values are constrained to the modes that source
 type supports, so `hybrid` is rejected for `react_native`, `flutter`, `unity`,
