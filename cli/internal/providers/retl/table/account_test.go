@@ -138,37 +138,74 @@ func TestAccountStateFollowsSpecForm(t *testing.T) {
 	}
 }
 
-// importResolver adds accounts (remote id to local id) to the import set, and
-// returns the resolver import workspace builds over it.
-func importResolver(importable *resources.RemoteResources, accountIDs map[string]string) *resolver.ImportRefResolver {
-	importableAccounts := make(map[string]*resources.RemoteResource, len(accountIDs))
-	for remoteID, localID := range accountIDs {
+// importResolver returns the resolver import workspace builds over the import
+// set. imported adds accounts (remote id to local id) to the import set;
+// managed are accounts the project already manages, in remote state and in the
+// project graph as the accounts handler builds it.
+func importResolver(t *testing.T, importable *resources.RemoteResources, imported, managed map[string]string) *resolver.ImportRefResolver {
+	t.Helper()
+	importableAccounts := make(map[string]*resources.RemoteResource, len(imported))
+	for remoteID, localID := range imported {
 		importableAccounts[remoteID] = &resources.RemoteResource{ID: remoteID, ExternalID: localID, Reference: "#account:" + localID}
 	}
 	importable.Set(accounts.AccountResourceType, importableAccounts)
+
+	var (
+		remoteAccounts = make(map[string]*resources.RemoteResource, len(managed))
+		h              = accounts.NewHandler(nil)
+	)
+	for remoteID, localID := range managed {
+		remoteAccounts[remoteID] = &resources.RemoteResource{ID: remoteID, ExternalID: localID}
+		require.NoError(t, h.LoadSpec("accounts.yaml", &specs.Spec{
+			Version: "rudder/v1",
+			Kind:    accounts.AccountSpecKind,
+			Spec: map[string]any{
+				"id":                      localID,
+				"name":                    localID,
+				"account_definition_name": "SOURCE_POSTGRES",
+				"config":                  map[string]any{"host": "db.internal", "password": "secret"},
+			},
+		}))
+	}
+	remote := resources.NewRemoteResources()
+	remote.Set(accounts.AccountResourceType, remoteAccounts)
+	projectAccounts, err := h.Resources()
+	require.NoError(t, err)
+	graph := resources.NewGraph()
+	for _, r := range projectAccounts {
+		graph.AddResource(r)
+	}
+
 	return &resolver.ImportRefResolver{
-		Remote:     resources.NewRemoteResources(),
-		Graph:      resources.NewGraph(),
+		Remote:     remote,
+		Graph:      graph,
 		Importable: importable,
 	}
 }
 
 // Import writes the account in a form that loads back and, once apply has
-// adopted the source and the account imported with it, plans no change.
+// adopted the source (and the account, when imported with it), plans no change.
 func TestExportAccountRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name           string
-		accountIDs     map[string]string
-		wantAccount    map[string]any
-		accountManaged bool
+		name             string
+		importedAccounts map[string]string
+		managedAccounts  map[string]string
+		wantAccount      map[string]any
+		accountManaged   bool
 	}{
 		{
-			name:           "references an account imported alongside",
-			accountIDs:     map[string]string{"acc-remote": "prod-pg"},
-			wantAccount:    map[string]any{"account": "#account:prod-pg"},
-			accountManaged: true,
+			name:             "references an account imported alongside",
+			importedAccounts: map[string]string{"acc-remote": "prod-pg"},
+			wantAccount:      map[string]any{"account": "#account:prod-pg"},
+			accountManaged:   true,
+		},
+		{
+			name:            "references an account the project already manages",
+			managedAccounts: map[string]string{"acc-remote": "prod-pg"},
+			wantAccount:     map[string]any{"account": "#account:prod-pg"},
+			accountManaged:  true,
 		},
 		{
 			name:        "falls back to account_id for an account it cannot resolve",
@@ -189,7 +226,7 @@ func TestExportAccountRoundTrip(t *testing.T) {
 			importable, err := h.LoadImportable(ctx, namer.NewExternalIdNamer(namer.StrategyKebabCase))
 			require.NoError(t, err)
 
-			entities, _, err := h.FormatForExport(importable, nil, importResolver(importable, tc.accountIDs))
+			entities, _, err := h.FormatForExport(importable, nil, importResolver(t, importable, tc.importedAccounts, tc.managedAccounts))
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)

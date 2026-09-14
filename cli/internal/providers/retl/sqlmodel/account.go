@@ -60,12 +60,10 @@ func AccountRef(id string) *resources.PropertyRef {
 // ExportAccount returns the spec field, and its value, that an exported source
 // names its account with: AccountKey and the account's reference when the
 // import resolver has one, else AccountIDKey and the raw id. The resolver has a
-// reference for an account imported in the same run. It has none for an
-// account of a definition the accounts provider does not support, which the CLI
-// cannot manage, nor for one the project already manages: accounts are
-// BaseHandler resources, whose graph entries carry no file metadata to resolve
-// from. Either form reads back into the state input AccountInput builds, so the
-// plan after import is empty.
+// reference for an account imported in the same run or already managed by the
+// project. It has none for an account of a definition the accounts provider
+// does not support, which the CLI cannot manage. Either form reads back into
+// the state input AccountInput builds, so the plan after import is empty.
 func ExportAccount(accountID string, inputResolver resolver.ReferenceResolver) (string, string) {
 	ref, err := inputResolver.ResolveToReference(accounts.AccountResourceType, accountID)
 	if err != nil {
