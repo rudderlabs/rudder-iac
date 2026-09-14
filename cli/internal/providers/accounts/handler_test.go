@@ -167,6 +167,23 @@ func TestExtractResourcesFromSpec_UnsupportedDefinition(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported account definition")
 }
 
+// Every definition an account spec may name has a type, so a source that
+// references the account can always be checked against it.
+func TestDefinitionType_CoversRegisteredDefinitions(t *testing.T) {
+	for name := range registeredAccountSecretKeys {
+		_, ok := DefinitionType(name)
+		assert.True(t, ok, "account definition %s has no type", name)
+	}
+	assert.Len(t, accountDefinitionTypes, len(registeredAccountSecretKeys))
+
+	got, ok := DefinitionType("SOURCE_POSTGRES")
+	assert.True(t, ok)
+	assert.Equal(t, "postgres", got)
+
+	_, ok = DefinitionType("DESTINATION_SALESFORCE_OAUTH")
+	assert.False(t, ok)
+}
+
 func TestMapRemoteToState_SecretIsUnknown(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
 	acc := &client.Account{ID: "remote-1", ExternalID: "prod-bq", Name: "Prod BQ", Options: json.RawMessage(`{"projectId":"p"}`)}

@@ -111,9 +111,8 @@ func TestTableSupportDisabled(t *testing.T) {
 		require.Len(t, matchers, 1)
 		assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
 
-		syntactic := p.SyntacticRules()
-		require.Len(t, syntactic, 1)
-		assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", syntactic[0].ID())
+		assert.Equal(t, []string{"retl/sqlmodel/spec-syntax-valid"}, ruleIDs(p.SyntacticRules()))
+		assert.Equal(t, []string{"retl/sqlmodel/semantic-valid"}, ruleIDs(p.SemanticRules()))
 	})
 
 	t.Run("rejects table specs as an unknown kind", func(t *testing.T) {
@@ -154,8 +153,23 @@ func TestTableSupportDisabled(t *testing.T) {
 	})
 }
 
+func ruleIDs(rs []vrules.Rule) []string {
+	ids := make([]string, 0, len(rs))
+	for _, r := range rs {
+		ids = append(ids, r.ID())
+	}
+	return ids
+}
+
 func TestTableSupportEnabled(t *testing.T) {
 	t.Parallel()
+
+	t.Run("adds the table semantic rule", func(t *testing.T) {
+		t.Parallel()
+		p := retl.New(newDefaultMockClient(), retl.WithTableSupport())
+
+		assert.Equal(t, []string{"retl/sqlmodel/semantic-valid", "retl/table/semantic-valid"}, ruleIDs(p.SemanticRules()))
+	})
 
 	t.Run("adds the table kind on v1 only", func(t *testing.T) {
 		t.Parallel()

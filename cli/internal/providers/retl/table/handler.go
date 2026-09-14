@@ -80,6 +80,13 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding table source spec: %w", err)
 	}
+	// The syntax rule already checks the form; this guards data(), which has
+	// no way to report a reference it cannot parse.
+	if spec.Account != "" {
+		if _, err := sqlmodel.ParseAccountRef(spec.Account); err != nil {
+			return fmt.Errorf("parsing account reference of table source %s: %w", spec.ID, err)
+		}
+	}
 
 	if _, ok := h.resources[spec.ID]; ok {
 		return fmt.Errorf("table source with id %s already exists", spec.ID)
@@ -288,8 +295,10 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 			return nil, err
 		}
 
+		local, ok := h.resources[source.ExternalID]
 		input := remote.data()
 		input[sqlmodel.LocalIDKey] = source.ExternalID
+		input[sqlmodel.AccountIDKey] = sqlmodel.AccountInput(source.AccountID, ok && local.Account == "", collection)
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     source.ExternalID,
