@@ -44,6 +44,24 @@ var registeredAccountSecretKeys = map[string][]string{
 	"SOURCE_SNOWFLAKE": {"password", "privateKey", "privateKeyPassphrase"},
 }
 
+// accountDefinitionTypes maps each registered account definition to its type:
+// the account's role in the control plane, which for a source account is the
+// name of the source definition it backs ("type" in integrations-config's
+// sources/<type>/accounts/<name>/db-config.json). Hardcoded alongside
+// registeredAccountSecretKeys, and kept in lockstep with it by test.
+var accountDefinitionTypes = map[string]string{
+	"SOURCE_BIGQUERY":  "bigquery",
+	"SOURCE_POSTGRES":  "postgres",
+	"SOURCE_SNOWFLAKE": "snowflake",
+}
+
+// DefinitionType returns the type of a registered account definition, e.g.
+// "postgres" for SOURCE_POSTGRES. ok is false for an unregistered definition.
+func DefinitionType(accountDefinitionName string) (string, bool) {
+	t, ok := accountDefinitionTypes[accountDefinitionName]
+	return t, ok
+}
+
 // AccountStore is the subset of the accounts API client the handler needs;
 // declared at the point of use so tests inject a mock. *client.Client.Accounts
 // satisfies it.

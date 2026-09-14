@@ -85,3 +85,38 @@ match_behavior:
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"
+      - example_id: "sqlmodel-semantic-v1-account-definition-mismatch"
+        title: "v1 SQL model referencing an account that cannot back its source_definition"
+        files:
+          account.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: prod-pg
+            spec:
+              id: prod-pg
+              name: Production Postgres
+              account_definition_name: SOURCE_POSTGRES
+              config:
+                host: db.internal
+                dbname: analytics
+                user: rudder
+                port: "5432"
+                password: "{{ .PG_PASSWORD }}"
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model
+            spec:
+              id: churn-model
+              display_name: Churn Risk Model
+              account: "#account:prod-pg"
+              primary_key: user_id
+              source_definition: snowflake
+              sql: SELECT user_id FROM churn_signals
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account"
+            severity: "error"
+            message_contains: "account 'prod-pg' is a 'postgres' account (SOURCE_POSTGRES) and cannot back source_definition 'snowflake'"
