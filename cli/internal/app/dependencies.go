@@ -294,10 +294,10 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 
 // retlOptions returns the RETL provider options gated by experimental flags.
 // cfg comes from config.GetConfig, which clears every flag unless experimental
-// mode is on. The connection handler joins the table kind under the same flag.
+// mode is on.
 func retlOptions(cfg config.Config) []retl.Option {
 	var opts []retl.Option
-	if cfg.ExperimentalFlags.RETLConnectionSupport {
+	if cfg.ExperimentalFlags.RETLTableSupport {
 		opts = append(opts, retl.WithTableSupport())
 	}
 	return opts

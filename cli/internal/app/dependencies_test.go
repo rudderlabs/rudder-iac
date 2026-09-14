@@ -37,7 +37,7 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 // The composed RETL provider picks the flag up from the environment, and only
 // while experimental mode is on — the same umbrella every experimental flag
 // sits under.
-func TestComposeProvidersGatesRETLConnectionSupport(t *testing.T) {
+func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
 	cases := []struct {
 		name         string
 		experimental string
@@ -50,7 +50,7 @@ func TestComposeProvidersGatesRETLConnectionSupport(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
-			t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
+			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
 			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 			c, err := client.New("test-token")
