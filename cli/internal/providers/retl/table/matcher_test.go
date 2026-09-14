@@ -23,8 +23,8 @@ func scopeWith(rs ...*resources.Resource) importmatcher.Scope {
 
 func localSource(id, resourceType, displayName, accountID string) *resources.Resource {
 	return resources.NewResource(id, resourceType, resources.ResourceData{
-		table.DisplayNameKey: displayName,
-		table.AccountIDKey:   accountID,
+		sqlmodel.DisplayNameKey: displayName,
+		sqlmodel.AccountIDKey:   accountID,
 	}, []string{})
 }
 

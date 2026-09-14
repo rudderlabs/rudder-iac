@@ -110,6 +110,10 @@ func TestTableSupportDisabled(t *testing.T) {
 		matchers := p.ResourceMatchers()
 		require.Len(t, matchers, 1)
 		assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
+
+		syntactic := p.SyntacticRules()
+		require.Len(t, syntactic, 1)
+		assert.Equal(t, "retl/sqlmodel/spec-syntax-valid", syntactic[0].ID())
 	})
 
 	t.Run("rejects table specs as an unknown kind", func(t *testing.T) {
@@ -170,6 +174,15 @@ func TestTableSupportEnabled(t *testing.T) {
 		}
 	})
 
+	t.Run("registers the table syntax rule", func(t *testing.T) {
+		t.Parallel()
+		p := retl.New(newDefaultMockClient(), retl.WithTableSupport())
+
+		syntactic := p.SyntacticRules()
+		require.Len(t, syntactic, 2)
+		assert.Equal(t, "retl/table/spec-syntax-valid", syntactic[1].ID())
+	})
+
 	t.Run("orders source matchers SQL model first", func(t *testing.T) {
 		t.Parallel()
 		p := retl.New(newDefaultMockClient(), retl.WithTableSupport())
@@ -199,7 +212,7 @@ func TestTableSupportEnabled(t *testing.T) {
 		require.NoError(t, err)
 		r, ok := graph.GetResource("retl-source-table:users-table")
 		require.True(t, ok)
-		assert.Equal(t, "Users", r.Data()[table.DisplayNameKey])
+		assert.Equal(t, "Users", r.Data()[sqlmodel.DisplayNameKey])
 		require.NotNil(t, r.ImportMetadata(), "the import manifest reaches the table handler")
 		assert.Equal(t, "table-managed", r.ImportMetadata().RemoteId)
 	})
@@ -218,7 +231,7 @@ func TestTableSupportEnabled(t *testing.T) {
 		require.NotNil(t, st.GetResource("retl-source-sql-model:orders-model"))
 		users := st.GetResource("retl-source-table:users-table")
 		require.NotNil(t, users)
-		assert.Equal(t, "table-managed", users.Output[table.IDKey])
+		assert.Equal(t, "table-managed", users.Output[sqlmodel.IDKey])
 		assert.Len(t, st.Resources, 2)
 	})
 
@@ -271,6 +284,6 @@ func TestTableSupportEnabled(t *testing.T) {
 			Enabled:              true,
 			ExternalID:           "users-table",
 		}, got)
-		assert.Equal(t, "src-new", (*output)[table.IDKey])
+		assert.Equal(t, "src-new", (*output)[sqlmodel.IDKey])
 	})
 }

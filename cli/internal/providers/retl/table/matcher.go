@@ -3,6 +3,7 @@ package table
 import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -26,8 +27,8 @@ func matchTable(scope importmatcher.Scope, r *resources.RemoteResource) *resourc
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
 		var (
-			displayName, _ = data[DisplayNameKey].(string)
-			accountID, _   = data[AccountIDKey].(string)
+			displayName, _ = data[sqlmodel.DisplayNameKey].(string)
+			accountID, _   = data[sqlmodel.AccountIDKey].(string)
 		)
 		return displayName == remote.Name && accountID == remote.AccountID
 	})

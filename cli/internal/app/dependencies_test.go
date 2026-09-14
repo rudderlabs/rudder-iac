@@ -10,8 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,46 +34,10 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	assert.Same(t, providers.Destination, cp.Providers["destination"])
 }
 
-func TestRETLOptionsFlagMatrix(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name             string
-		retlTableSupport bool
-		wantKinds        []string
-	}{
-		{
-			name:             "retlTableSupport disabled keeps the SQL model kind only",
-			retlTableSupport: false,
-			wantKinds:        []string{sqlmodel.ResourceKind},
-		},
-		{
-			name:             "retlTableSupport enabled registers the table kind",
-			retlTableSupport: true,
-			wantKinds:        []string{sqlmodel.ResourceKind, table.ResourceKind},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			cfg := config.Config{
-				ExperimentalFlags: config.ExperimentalConfig{
-					RETLTableSupport: tc.retlTableSupport,
-				},
-			}
-
-			p := retl.New(nil, retlOptions(cfg)...)
-			assert.ElementsMatch(t, tc.wantKinds, p.SupportedKinds())
-		})
-	}
-}
-
 // The composed RETL provider picks the flag up from the environment, and only
 // while experimental mode is on — the same umbrella every experimental flag
 // sits under.
-func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
+func TestComposeProvidersGatesRETLConnectionSupport(t *testing.T) {
 	cases := []struct {
 		name         string
 		experimental string
@@ -88,7 +50,7 @@ func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
-			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
+			t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
 			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 			c, err := client.New("test-token")
