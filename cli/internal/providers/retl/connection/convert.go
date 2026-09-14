@@ -9,11 +9,11 @@ import (
 	"github.com/samber/lo"
 )
 
-// endpointID reads one of the two endpoint ids out of a graph entry. The
+// endpointIDFromData reads one of the two endpoint ids out of a graph entry. The
 // syncer dereferences the spec's PropertyRefs before the lifecycle runs, so
 // anything but a nonempty string here means the reference never resolved and
 // the request would be built against a dangling endpoint.
-func endpointID(data resources.ResourceData, key string) (string, error) {
+func endpointIDFromData(data resources.ResourceData, key string) (string, error) {
 	id, ok := data[key].(string)
 	if !ok || id == "" {
 		return "", fmt.Errorf("connection data: %q is not a resolved endpoint id (got %T)", key, data[key])
@@ -21,7 +21,7 @@ func endpointID(data resources.ResourceData, key string) (string, error) {
 	return id, nil
 }
 
-func enabledFlag(data resources.ResourceData) (bool, error) {
+func enabledFromData(data resources.ResourceData) (bool, error) {
 	value, ok := data[EnabledKey].(bool)
 	if !ok {
 		return false, fmt.Errorf("connection data: %q is not a bool (got %T)", EnabledKey, data[EnabledKey])
@@ -35,22 +35,22 @@ func enabledFlag(data resources.ResourceData) (bool, error) {
 // externalId is left out on purpose — the per-flow allow-list rejects it on
 // create, and the handler claims the identity in a separate call afterwards.
 func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnectionRequest, error) {
-	sourceID, err := endpointID(data, SourceKey)
+	sourceID, err := endpointIDFromData(data, SourceKey)
 	if err != nil {
 		return nil, err
 	}
 
-	destinationID, err := endpointID(data, DestinationKey)
+	destinationID, err := endpointIDFromData(data, DestinationKey)
 	if err != nil {
 		return nil, err
 	}
 
-	enabled, err := enabledFlag(data)
+	enabled, err := enabledFromData(data)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := configFromData(data[ConfigKey])
+	config, err := configFromMap(data[ConfigKey])
 	if err != nil {
 		return nil, err
 	}
@@ -59,23 +59,23 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 		SourceID:      sourceID,
 		DestinationID: destinationID,
 		Enabled:       &enabled,
-		Schedule:      apiSchedule(config.Schedule),
+		Schedule:      toAPISchedule(config.Schedule),
 		SyncBehaviour: lo.ToPtr(retlClient.SyncBehaviour(config.SyncBehaviour)),
-		Identifiers:   apiMappings(config.Identifiers),
-		Mappings:      apiMappings(config.Mappings),
-		Event:         apiEvent(config.Event),
+		Identifiers:   toAPIMappings(config.Identifiers),
+		Mappings:      toAPIMappings(config.Mappings),
+		Event:         toAPIEvent(config.Event),
 		CursorColumn:  config.CursorColumn,
 		Object:        lo.FromPtr(config.Object),
 	}
 	// Constants belong to the JSON mapper flow only; the per-flow allow-list
 	// rejects them on an object mapping create just as it does on update.
 	if config.Object == nil {
-		request.Constants = apiConstants(config.Constants)
+		request.Constants = toAPIConstants(config.Constants)
 	}
 	// The config map is canonical, so sync settings are present only when they
 	// differ from what the server fills in by itself.
 	if config.SyncSettings != nil {
-		request.SyncSettings = apiSyncSettings(config.SyncSettings)
+		request.SyncSettings = toAPISyncSettings(config.SyncSettings)
 	}
 	return request, nil
 }
@@ -88,45 +88,45 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 // as an empty array instead of vanishing through omitempty, which the server
 // reads as "keep what is stored".
 func toUpdateRequest(data, state resources.ResourceData) (*retlClient.UpdateRETLConnectionRequest, error) {
-	enabled, err := enabledFlag(data)
+	enabled, err := enabledFromData(data)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := configFromData(data[ConfigKey])
+	config, err := configFromMap(data[ConfigKey])
 	if err != nil {
 		return nil, err
 	}
 
-	stored, err := configFromData(state[ConfigKey])
+	stored, err := configFromMap(state[ConfigKey])
 	if err != nil {
 		return nil, fmt.Errorf("reading stored connection config: %w", err)
 	}
 
 	request := &retlClient.UpdateRETLConnectionRequest{
 		Enabled:     &enabled,
-		Schedule:    apiSchedule(config.Schedule),
-		Identifiers: apiMappings(config.Identifiers),
-		Mappings:    lo.ToPtr(apiMappings(config.Mappings)),
+		Schedule:    toAPISchedule(config.Schedule),
+		Identifiers: toAPIMappings(config.Identifiers),
+		Mappings:    lo.ToPtr(toAPIMappings(config.Mappings)),
 	}
 	// Constants are mutable on the JSON mapper flow only; an object mapping PUT
 	// that carries them, an empty list included, is refused as an immutable
 	// field. An object is what tells the two flows apart, here as in the API.
 	if config.Object == nil {
-		request.Constants = lo.ToPtr(apiConstants(config.Constants))
+		request.Constants = lo.ToPtr(toAPIConstants(config.Constants))
 	}
 	// Omitting syncSettings keeps whatever the server stored, so dropping
 	// nondefault settings has to be spelled out as the defaults a fresh create
 	// would have filled in.
 	if config.SyncSettings != nil || stored.SyncSettings != nil {
-		request.SyncSettings = apiSyncSettings(config.SyncSettings)
+		request.SyncSettings = toAPISyncSettings(config.SyncSettings)
 	}
 	return request, nil
 }
 
-// toOutput is the lifecycle's state output: the remote identifiers only. The
+// toResourceData is the lifecycle's state output: the remote identifiers only. The
 // config and the enabled flag stay on the state input the syncer keeps.
-func toOutput(conn *retlClient.RETLConnection) *resources.ResourceData {
+func toResourceData(conn *retlClient.RETLConnection) *resources.ResourceData {
 	return &resources.ResourceData{
 		IDKey:            conn.ID,
 		SourceIDKey:      conn.SourceID,
@@ -153,13 +153,13 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 
 	config := ConfigSpec{
 		SyncBehaviour: string(conn.SyncBehaviour),
-		Schedule:      scheduleFromRemote(conn.Schedule),
-		Identifiers:   mappingsFromRemote(conn.Identifiers),
-		Mappings:      mappingsFromRemote(conn.Mappings),
-		Constants:     constantsFromRemote(conn.Constants),
-		Event:         eventFromRemote(conn.Event),
+		Schedule:      fromAPISchedule(conn.Schedule),
+		Identifiers:   fromAPIMappings(conn.Identifiers),
+		Mappings:      fromAPIMappings(conn.Mappings),
+		Constants:     fromAPIConstants(conn.Constants),
+		Event:         fromAPIEvent(conn.Event),
 		CursorColumn:  conn.CursorColumn,
-		SyncSettings:  syncSettingsFromRemote(conn.SyncSettings),
+		SyncSettings:  fromAPISyncSettings(conn.SyncSettings),
 	}
 	// A JSON mapper connection has no object at all, and the API sends the
 	// field empty rather than absent; the spec has to omit it entirely for the
@@ -173,7 +173,8 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 // hasDestinationConfig reports whether a response carries integration-owned
 // destination settings. They belong to the destination-specific flow, which
 // the spec has no field for, so a connection carrying them cannot round-trip
-// and must be refused rather than silently stripped.
+// and must be refused rather than silently stripped. It reports true for
+// anything it cannot prove empty, malformed payloads included.
 func hasDestinationConfig(raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return false
@@ -188,7 +189,7 @@ func hasDestinationConfig(raw json.RawMessage) bool {
 	return len(fields) > 0
 }
 
-func apiSchedule(schedule ScheduleSpec) retlClient.Schedule {
+func toAPISchedule(schedule ScheduleSpec) retlClient.Schedule {
 	converted := retlClient.Schedule{
 		Type:         retlClient.ScheduleType(schedule.Type),
 		EveryMinutes: schedule.EveryMinutes,
@@ -199,7 +200,7 @@ func apiSchedule(schedule ScheduleSpec) retlClient.Schedule {
 	return converted
 }
 
-func scheduleFromRemote(schedule retlClient.Schedule) ScheduleSpec {
+func fromAPISchedule(schedule retlClient.Schedule) ScheduleSpec {
 	return ScheduleSpec{
 		Type:           string(schedule.Type),
 		EveryMinutes:   schedule.EveryMinutes,
@@ -207,9 +208,9 @@ func scheduleFromRemote(schedule retlClient.Schedule) ScheduleSpec {
 	}
 }
 
-// apiMappings always returns a non-nil slice: an update that clears mappings
+// toAPIMappings always returns a non-nil slice: an update that clears mappings
 // has to serialize as [], and create's omitempty drops the empty slice anyway.
-func apiMappings(mappings []MappingSpec) []retlClient.Mapping {
+func toAPIMappings(mappings []MappingSpec) []retlClient.Mapping {
 	converted := make([]retlClient.Mapping, len(mappings))
 	for i, mapping := range mappings {
 		converted[i] = retlClient.Mapping{From: mapping.From, To: mapping.To}
@@ -217,7 +218,7 @@ func apiMappings(mappings []MappingSpec) []retlClient.Mapping {
 	return converted
 }
 
-func mappingsFromRemote(mappings []retlClient.Mapping) []MappingSpec {
+func fromAPIMappings(mappings []retlClient.Mapping) []MappingSpec {
 	if len(mappings) == 0 {
 		return nil
 	}
@@ -228,7 +229,7 @@ func mappingsFromRemote(mappings []retlClient.Mapping) []MappingSpec {
 	return converted
 }
 
-func apiConstants(constants []ConstantSpec) []retlClient.Constant {
+func toAPIConstants(constants []ConstantSpec) []retlClient.Constant {
 	converted := make([]retlClient.Constant, len(constants))
 	for i, constant := range constants {
 		converted[i] = retlClient.Constant{Key: constant.Key, Value: constant.Value}
@@ -236,7 +237,7 @@ func apiConstants(constants []ConstantSpec) []retlClient.Constant {
 	return converted
 }
 
-func constantsFromRemote(constants []retlClient.Constant) []ConstantSpec {
+func fromAPIConstants(constants []retlClient.Constant) []ConstantSpec {
 	if len(constants) == 0 {
 		return nil
 	}
@@ -247,7 +248,7 @@ func constantsFromRemote(constants []retlClient.Constant) []ConstantSpec {
 	return converted
 }
 
-func apiEvent(event *EventSpec) *retlClient.Event {
+func toAPIEvent(event *EventSpec) *retlClient.Event {
 	if event == nil {
 		return nil
 	}
@@ -258,7 +259,7 @@ func apiEvent(event *EventSpec) *retlClient.Event {
 	}
 }
 
-func eventFromRemote(event *retlClient.Event) *EventSpec {
+func fromAPIEvent(event *retlClient.Event) *EventSpec {
 	if event == nil {
 		return nil
 	}
@@ -269,12 +270,12 @@ func eventFromRemote(event *retlClient.Event) *EventSpec {
 	}
 }
 
-// apiSyncSettings renders the complete settings object the API stores. A nil
+// toAPISyncSettings renders the complete settings object the API stores. A nil
 // spec is the fully defaulted object — canonicalConfig collapses exactly that
 // to nil — so an update that has to state the settings explicitly can pass nil
 // to reset them.
-func apiSyncSettings(settings *SyncSettingsSpec) *retlClient.SyncSettings {
-	filled := filledSyncSettings(settings)
+func toAPISyncSettings(settings *SyncSettingsSpec) *retlClient.SyncSettings {
+	filled := syncSettingsWithDefaults(settings)
 	return &retlClient.SyncSettings{
 		SyncLogsConfig: &retlClient.SyncLogsConfig{
 			Enabled:            filled.SyncLogs.Enabled,
@@ -287,7 +288,7 @@ func apiSyncSettings(settings *SyncSettingsSpec) *retlClient.SyncSettings {
 	}
 }
 
-func syncSettingsFromRemote(settings *retlClient.SyncSettings) *SyncSettingsSpec {
+func fromAPISyncSettings(settings *retlClient.SyncSettings) *SyncSettingsSpec {
 	if settings == nil {
 		return nil
 	}

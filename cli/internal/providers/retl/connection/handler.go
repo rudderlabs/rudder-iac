@@ -117,7 +117,7 @@ func loadConnection(c ConnectionSpec) (*connectionResource, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: parsing destination reference: %w", c.LocalID, err)
 	}
-	config, err := configToData(c.Config)
+	config, err := configToMap(c.Config)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", c.LocalID, err)
 	}
@@ -280,7 +280,7 @@ func (h *Handler) claimIdentity(ctx context.Context, id string, created *retlCli
 		ExternalID: id,
 	})
 	if claimErr == nil {
-		return toOutput(created), nil
+		return toResourceData(created), nil
 	}
 
 	// The parent context may be the very thing that failed the claim, and a
@@ -295,7 +295,7 @@ func (h *Handler) claimIdentity(ctx context.Context, id string, created *retlCli
 		return nil, fmt.Errorf("%w; reading connection %s back failed too (%v), so it was left in place: import or delete it before the next apply", claimErr, created.ID, err)
 	}
 	if remote.ExternalID == id {
-		return toOutput(remote), nil
+		return toResourceData(remote), nil
 	}
 	if remote.ExternalID != "" {
 		return nil, fmt.Errorf("%w; connection %s already carries external id %q, so it was left in place: reconcile or import it before the next apply", claimErr, created.ID, remote.ExternalID)
@@ -322,11 +322,11 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
 
-	sourceID, err := endpointID(data, SourceKey)
+	sourceID, err := endpointIDFromData(data, SourceKey)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
-	destinationID, err := endpointID(data, DestinationKey)
+	destinationID, err := endpointIDFromData(data, DestinationKey)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
@@ -341,15 +341,15 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
-	enabled, err := enabledFlag(data)
+	enabled, err := enabledFromData(data)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
-	desired, err := configFromData(data[ConfigKey])
+	desired, err := configFromMap(data[ConfigKey])
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
-	stored, err := configFromData(state[ConfigKey])
+	stored, err := configFromMap(state[ConfigKey])
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: reading stored connection config: %w", id, err)
 	}
@@ -370,7 +370,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	}
 
 	if enabled == state[EnabledKey] && reflect.DeepEqual(desired, stored) {
-		return toOutput(&retlClient.RETLConnection{ID: remoteID, SourceID: sourceID, DestinationID: destinationID}), nil
+		return toResourceData(&retlClient.RETLConnection{ID: remoteID, SourceID: sourceID, DestinationID: destinationID}), nil
 	}
 
 	request, err := toUpdateRequest(data, state)
@@ -381,7 +381,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	if err != nil {
 		return nil, fmt.Errorf("updating rETL connection %q: %w", id, err)
 	}
-	return toOutput(updated), nil
+	return toResourceData(updated), nil
 }
 
 // immutableChange names the field that forces a replacement, or "" when the

@@ -49,7 +49,7 @@ func canonicalSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
 		return nil
 	}
 
-	filled := filledSyncSettings(settings)
+	filled := syncSettingsWithDefaults(settings)
 	if *filled.SyncLogs.Enabled == defaultSyncLogsEnabled &&
 		*filled.SyncLogs.RetentionDays == defaultSyncLogsRetentionDays &&
 		*filled.SyncLogs.SnapshotsToRetain == defaultSnapshotsToRetain &&
@@ -59,10 +59,10 @@ func canonicalSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
 	return filled
 }
 
-// filledSyncSettings applies the backend's field-by-field defaulting. Every
+// syncSettingsWithDefaults applies the backend's field-by-field defaulting. Every
 // field comes back in a fresh pointer, so the caller's nested objects are
 // neither shared nor written through.
-func filledSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
+func syncSettingsWithDefaults(settings *SyncSettingsSpec) *SyncSettingsSpec {
 	var (
 		logs   SyncLogsSpec
 		failed FailedKeysSpec
@@ -86,10 +86,10 @@ func filledSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
 	}
 }
 
-// configToData renders a config as the graph's config map. Going through JSON
+// configToMap renders a config as the graph's config map. Going through JSON
 // gives the local and the remote path identical maps, and canonicalizing here
 // is the single choke point for everything that reaches the graph or state.
-func configToData(config ConfigSpec) (map[string]any, error) {
+func configToMap(config ConfigSpec) (map[string]any, error) {
 	encoded, err := json.Marshal(canonicalConfig(config))
 	if err != nil {
 		return nil, fmt.Errorf("encoding connection config: %w", err)
@@ -102,10 +102,10 @@ func configToData(config ConfigSpec) (map[string]any, error) {
 	return data, nil
 }
 
-// configFromData reads back what configToData wrote. It takes any because the
+// configFromMap reads back what configToMap wrote. It takes any because the
 // value arrives out of a resource data map, where the wrong type is one of the
 // malformed inputs it has to report rather than assert on.
-func configFromData(data any) (ConfigSpec, error) {
+func configFromMap(data any) (ConfigSpec, error) {
 	raw, ok := data.(map[string]any)
 	if !ok {
 		return ConfigSpec{}, fmt.Errorf("connection config: expected a map, got %T", data)

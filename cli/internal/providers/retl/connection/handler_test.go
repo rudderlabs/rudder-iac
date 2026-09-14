@@ -104,7 +104,7 @@ func TestLoadSpec(t *testing.T) {
 	require.Len(t, h.resources, 1)
 	resource := h.resources["users-to-webhook"]
 
-	config, err := configToData(jsonMapperConfig())
+	config, err := configToMap(jsonMapperConfig())
 	require.NoError(t, err)
 
 	assert.Equal(t, "users-to-webhook", resource.LocalID)
@@ -368,7 +368,7 @@ func TestGetResources(t *testing.T) {
 	require.Len(t, graphResources, 1)
 
 	resource := graphResources[0]
-	config, err := configToData(jsonMapperConfig())
+	config, err := configToMap(jsonMapperConfig())
 	require.NoError(t, err)
 
 	assert.Equal(t, "retl-connection:users-to-webhook", resource.URN())
@@ -451,7 +451,7 @@ func TestConnectionRefResolution(t *testing.T) {
 	dereferenced, err := state.Dereference(graphResources[0].Data(), st)
 	require.NoError(t, err)
 
-	config, err := configToData(jsonMapperConfig())
+	config, err := configToMap(jsonMapperConfig())
 	require.NoError(t, err)
 	assert.Equal(t, resources.ResourceData{
 		SourceKey:      "src-remote-1",
