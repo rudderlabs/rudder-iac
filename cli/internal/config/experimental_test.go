@@ -32,9 +32,9 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
 		},
 		{
-			name:     "retlConnectionSupport",
-			flagName: "retlConnectionSupport",
-			want:     "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT",
+			name:     "retlTableSupport",
+			flagName: "retlTableSupport",
+			want:     "RUDDERSTACK_X_RETL_TABLE_SUPPORT",
 		},
 		{
 			name:     "lowercase",
@@ -96,10 +96,10 @@ func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("unverifiedDestinations"))
 }
 
-func TestIsValidExperimentalFlag_RETLConnectionSupport(t *testing.T) {
+func TestIsValidExperimentalFlag_RETLTableSupport(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, IsValidExperimentalFlag("retlConnectionSupport"))
+	assert.True(t, IsValidExperimentalFlag("retlTableSupport"))
 }
 
 func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
