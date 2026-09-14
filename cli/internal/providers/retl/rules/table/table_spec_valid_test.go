@@ -47,13 +47,9 @@ func TestTableSpecSyntaxValidRule_Metadata(t *testing.T) {
 func TestTableSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 	t.Parallel()
 
-	noPrefix := s3Spec()
-	noPrefix.ObjectPrefix = ""
-
 	cases := map[string]table.TableSpec{
-		"postgres":          warehouseSpec(),
-		"s3":                s3Spec(),
-		"s3 without prefix": noPrefix,
+		"postgres": warehouseSpec(),
+		"s3":       s3Spec(),
 	}
 	for _, sd := range []string{"redshift", "snowflake", "bigquery", "mysql", "databricks", "trino"} {
 		spec := warehouseSpec()
@@ -124,6 +120,18 @@ func TestTableSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			expect: []rules.ValidationResult{
 				{Reference: "/bucket_name", Message: "'bucket_name' is not allowed unless 'source_definition s3'"},
 				{Reference: "/object_prefix", Message: "'object_prefix' is not allowed unless 'source_definition s3'"},
+			},
+		},
+		{
+			// rudder-api rejects an s3 config without an object prefix.
+			name: "s3 without object prefix",
+			spec: func() table.TableSpec {
+				s := s3Spec()
+				s.ObjectPrefix = ""
+				return s
+			},
+			expect: []rules.ValidationResult{
+				{Reference: "/object_prefix", Message: "'object_prefix' is required when 'source_definition' is s3"},
 			},
 		},
 		{
