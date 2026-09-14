@@ -67,6 +67,7 @@ match_behavior:
               account: "#account:prod-pg"
               source_definition: s3
               bucket_name: events
+              object_prefix: daily/
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/account"
