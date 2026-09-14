@@ -310,6 +310,6 @@ func TestTableSupportEnabled(t *testing.T) {
 		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 0)
 
 		require.NoError(t, err)
-		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users"`}, got)
+		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 1`}, got)
 	})
 }
