@@ -17,8 +17,8 @@ func newCmdValidate() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <external-id>",
-		Short: "Validate a RETL source SQL model",
-		Long:  "Validate a RETL source SQL model by executing the query without returning data",
+		Short: "Validate a RETL source (SQL model or table)",
+		Long:  "Validate a RETL source (SQL model or warehouse table) by executing its query without returning data. s3 table sources have no query to validate.",
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
