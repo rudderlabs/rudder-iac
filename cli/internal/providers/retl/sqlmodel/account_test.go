@@ -2,6 +2,7 @@ package sqlmodel_test
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
@@ -140,6 +142,103 @@ func TestMapRemoteToStateAccountForm(t *testing.T) {
 			})
 
 			st, err := h.MapRemoteToState(collection)
+			require.NoError(t, err)
+			rs := st.GetResource(local[0].URN())
+			require.NotNil(t, rs)
+
+			diffs, _ := differ.CompareData(rs.Input, local[0].Data())
+			assert.Empty(t, diffs)
+		})
+	}
+}
+
+// importResolver adds accounts (remote id to local id) to the import set, and
+// returns the resolver import workspace builds over it.
+func importResolver(importable *resources.RemoteResources, accountIDs map[string]string) *resolver.ImportRefResolver {
+	importableAccounts := make(map[string]*resources.RemoteResource, len(accountIDs))
+	for remoteID, localID := range accountIDs {
+		importableAccounts[remoteID] = &resources.RemoteResource{ID: remoteID, ExternalID: localID, Reference: "#account:" + localID}
+	}
+	importable.Set(accounts.AccountResourceType, importableAccounts)
+	return &resolver.ImportRefResolver{
+		Remote:     resources.NewRemoteResources(),
+		Graph:      resources.NewGraph(),
+		Importable: importable,
+	}
+}
+
+// Import writes the account in a form that loads back and, once apply has
+// adopted the model and the account imported with it, plans no change.
+//
+// Not parallel: LoadSpec records the exported spec's import metadata in a
+// package-level map.
+func TestExportAccountRoundTrip(t *testing.T) {
+	cases := []struct {
+		name           string
+		accountIDs     map[string]string
+		wantAccount    map[string]any
+		accountManaged bool
+	}{
+		{
+			name:           "references an account imported alongside",
+			accountIDs:     map[string]string{"acc-remote": "prod-pg"},
+			wantAccount:    map[string]any{"account": "#account:prod-pg"},
+			accountManaged: true,
+		},
+		{
+			name:        "falls back to account_id for an account it cannot resolve",
+			wantAccount: map[string]any{"account_id": "acc-remote"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			source := retlClient.RETLSource{
+				ID: "src-1", Name: "Orders", WorkspaceID: "ws-1", AccountID: "acc-remote", IsEnabled: true,
+				SourceType: retlClient.ModelSourceType, SourceDefinitionName: "postgres",
+				Config: retlClient.RETLSQLModelConfig{Description: "orders", PrimaryKey: "id", Sql: "SELECT 1"},
+			}
+			importable := resources.NewRemoteResources()
+			importable.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+				"src-1": {ID: "src-1", ExternalID: "orders", Data: &source},
+			})
+			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+
+			entities, _, err := h.FormatForExport(importable, nil, importResolver(importable, tc.accountIDs))
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			want := map[string]any{
+				"id":                "orders",
+				"display_name":      "Orders",
+				"description":       "orders",
+				"primary_key":       "id",
+				"sql":               "SELECT 1",
+				"source_definition": "postgres",
+				"enabled":           true,
+			}
+			maps.Copy(want, tc.wantAccount)
+			assert.Equal(t, want, spec.Spec)
+
+			loaded := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+			require.NoError(t, loaded.LoadSpec("orders.yaml", spec))
+			local, err := loaded.GetResources()
+			require.NoError(t, err)
+			require.Len(t, local, 1)
+
+			adopted := source
+			adopted.ExternalID = "orders"
+			collection := resources.NewRemoteResources()
+			collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
+				"src-1": {ID: "src-1", ExternalID: "orders", Data: adopted},
+			})
+			if tc.accountManaged {
+				collection.Set(accounts.AccountResourceType, map[string]*resources.RemoteResource{
+					"acc-remote": {ID: "acc-remote", ExternalID: "prod-pg"},
+				})
+			}
+			st, err := loaded.MapRemoteToState(collection)
 			require.NoError(t, err)
 			rs := st.GetResource(local[0].URN())
 			require.NotNil(t, rs)
