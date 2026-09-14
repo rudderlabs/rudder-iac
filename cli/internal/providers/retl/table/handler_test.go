@@ -233,13 +233,6 @@ func TestLoadSpec(t *testing.T) {
 		}, r.Data())
 	})
 
-	t.Run("s3 object_prefix is optional", func(t *testing.T) {
-		t.Parallel()
-		_, r := loadResource(t, newFakeStore(), withoutField(s3Spec(), "object_prefix"))
-
-		assert.Equal(t, "", r.Data()[table.ObjectPrefixKey])
-	})
-
 	// Field rules live in retl/table/spec-syntax-valid; LoadSpec only refuses
 	// keys the spec has no field for.
 	invalid := []struct {
@@ -391,9 +384,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       s3Spec,
 			wantConfig: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 			change: func(s *specs.Spec) *specs.Spec {
-				return withoutField(withField(s, "bucket_name", "events-v2"), "object_prefix")
+				return withField(withField(s, "bucket_name", "events-v2"), "object_prefix", "hourly/")
 			},
-			wantUpdate: retlClient.RETLS3TableConfig{BucketName: "events-v2"},
+			wantUpdate: retlClient.RETLS3TableConfig{BucketName: "events-v2", ObjectPrefix: "hourly/"},
 		},
 	}
 
