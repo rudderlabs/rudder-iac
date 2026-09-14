@@ -1,11 +1,14 @@
 package retlsource
 
 import (
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/spf13/cobra"
 )
 
@@ -55,17 +58,26 @@ func newCmdValidate() *cobra.Command {
 
 			// Validate by attempting to preview with limit=0
 			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
-			if err != nil {
-				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
-				return err
-			}
-
-			fmt.Println("✅ SQL query executed successfully")
-			return nil
+			reportValidation(cmd.OutOrStdout(), err)
+			return err
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory")
 
 	return cmd
+}
+
+// reportValidation prints the outcome of validating a source. A source with no
+// query to run is reported apart from a query that failed, so an s3 table
+// source does not read as a broken warehouse query.
+func reportValidation(w io.Writer, err error) {
+	switch {
+	case err == nil:
+		fmt.Fprintln(w, "✅ SQL query executed successfully")
+	case errors.Is(err, table.ErrPreviewUnsupported):
+		fmt.Fprintf(w, "❌ Cannot validate this source: %s\n", err)
+	default:
+		fmt.Fprintf(w, "❌ SQL query failed to execute: %s\n", err)
+	}
 }
