@@ -46,9 +46,9 @@ jobs:
         run: make gen-rule-docs
         env:
           RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL || 'true' }}
-          # The rETL connections kinds are documented while experimental, so
-          # the catalog covers every kind the flag registers.
-          RUDDERSTACK_X_RETL_CONNECTION_SUPPORT: 'true'
+          # Experimental rETL kinds are documented while experimental, so the
+          # catalog covers every kind their flags register.
+          RUDDERSTACK_X_RETL_TABLE_SUPPORT: 'true'
 
       - name: upload rule catalog
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
