@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -54,6 +55,23 @@ func AccountRef(id string) *resources.PropertyRef {
 	// ref AccountInput builds, as event stream connections do for destinations.
 	ref.Property = "id"
 	return ref
+}
+
+// ExportAccount returns the spec field, and its value, that an exported source
+// names its account with: AccountKey and the account's reference when the
+// import resolver has one, else AccountIDKey and the raw id. The resolver has a
+// reference for an account imported in the same run. It has none for an
+// account of a definition the accounts provider does not support, which the CLI
+// cannot manage, nor for one the project already manages: accounts are
+// BaseHandler resources, whose graph entries carry no file metadata to resolve
+// from. Either form reads back into the state input AccountInput builds, so the
+// plan after import is empty.
+func ExportAccount(accountID string, inputResolver resolver.ReferenceResolver) (string, string) {
+	ref, err := inputResolver.ResolveToReference(accounts.AccountResourceType, accountID)
+	if err != nil {
+		return AccountIDKey, accountID
+	}
+	return AccountKey, ref
 }
 
 // AccountInput returns a remote source's account_id state input: a reference to

@@ -102,7 +102,8 @@ func (t TableSpec) data() resources.ResourceData {
 	return data
 }
 
-// specFields returns the flat spec body export writes for the resource.
+// specFields returns the flat spec body export writes for the resource, but
+// for the account, which export names by reference when it can.
 func (t TableSpec) specFields(id string) map[string]any {
 	fields := t.configData()
 	// The webapp can save an s3 source with an empty prefix; leaving the key out
@@ -112,7 +113,6 @@ func (t TableSpec) specFields(id string) map[string]any {
 	}
 	fields[sqlmodel.IDKey] = id
 	fields[sqlmodel.DisplayNameKey] = t.DisplayName
-	fields[sqlmodel.AccountIDKey] = t.AccountID
 	fields[sqlmodel.SourceDefinitionKey] = t.SourceDefinition
 	fields[sqlmodel.EnabledKey] = t.Enabled
 	return fields

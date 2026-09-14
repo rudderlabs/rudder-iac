@@ -353,7 +353,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	_ namer.Namer,
-	_ resolver.ReferenceResolver,
+	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
@@ -401,12 +401,16 @@ func (h *Handler) FormatForExport(
 			return nil, nil, fmt.Errorf("converting metadata for table source %s: %w", source.ExternalID, err)
 		}
 
+		fields := remote.specFields(source.ExternalID)
+		accountKey, account := sqlmodel.ExportAccount(data.AccountID, inputResolver)
+		fields[accountKey] = account
+
 		entities = append(entities, writer.FormattableEntity{
 			Content: &specs.Spec{
 				Version:  specs.SpecVersionV1,
 				Kind:     ResourceKind,
 				Metadata: metadataMap,
-				Spec:     remote.specFields(source.ExternalID),
+				Spec:     fields,
 			},
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})

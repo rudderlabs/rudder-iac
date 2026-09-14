@@ -546,6 +546,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			return nil, nil, err
 		}
 
+		accountKey, account := ExportAccount(sourceData.AccountID, inputResolver)
 		spec := &specs.Spec{
 			Version:  specs.SpecVersionV1,
 			Kind:     ResourceKind,
@@ -553,7 +554,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			Spec: map[string]interface{}{
 				DisplayNameKey:      sourceData.Name,
 				DescriptionKey:      cfg.Description,
-				AccountIDKey:        sourceData.AccountID,
+				accountKey:          account,
 				PrimaryKeyKey:       cfg.PrimaryKey,
 				SQLKey:              cfg.Sql,
 				SourceDefinitionKey: sourceData.SourceDefinitionName,
