@@ -45,10 +45,17 @@ const (
 // Note that config-backend, behind rudder-api, is laxer on both — it validates
 // only that bucketName is a string. rudder-api is the boundary the CLI talks
 // to, so its schema is the one these tags mirror.
+//
+// Account holds the spec's "#account:<id>" reference, empty when the spec sets
+// account_id; remote sources and dereferenced data carry only AccountID.
+// account_id stays beside the reference because the accounts provider cannot
+// manage every account a table source may use (s3 accounts among them), and
+// those can only be named by id.
 type TableSpec struct {
 	ID               string `json:"id"                mapstructure:"id"                validate:"required"`
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
-	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required"`
+	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
+	Account          string `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
 	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino s3"`
 	PrimaryKey       string `json:"primary_key"       mapstructure:"primary_key"       validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
@@ -81,10 +88,14 @@ func (t TableSpec) configData() resources.ResourceData {
 // data returns the resource's graph data, without the local id. The keys are
 // sqlmodel's and primary_key is present for every source definition — empty
 // for s3 — so a connection reads either RETL source kind through one shape.
+// account_id holds the raw id, or a reference that resolves to it.
 func (t TableSpec) data() resources.ResourceData {
 	data := t.configData()
 	data[sqlmodel.DisplayNameKey] = t.DisplayName
 	data[sqlmodel.AccountIDKey] = t.AccountID
+	if id, err := sqlmodel.ParseAccountRef(t.Account); err == nil {
+		data[sqlmodel.AccountIDKey] = sqlmodel.AccountRef(id)
+	}
 	data[sqlmodel.SourceDefinitionKey] = t.SourceDefinition
 	data[sqlmodel.PrimaryKeyKey] = t.PrimaryKey
 	data[sqlmodel.EnabledKey] = t.Enabled

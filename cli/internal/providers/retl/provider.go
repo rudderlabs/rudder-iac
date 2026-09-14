@@ -181,10 +181,17 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	return p.syntacticRules
 }
 
+// SemanticRules registers the table rule only with the table kind: rule docs
+// are generated from the flag-off registry, so the rule gets a docs fragment
+// when the kind goes GA.
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	semantic := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),
 	}
+	if _, ok := p.handlers[table.ResourceType]; ok {
+		semantic = append(semantic, tableRules.NewTableSemanticValidRule())
+	}
+	return semantic
 }
 
 // RuleDocEntries returns the authored documentation fragments embedded with
