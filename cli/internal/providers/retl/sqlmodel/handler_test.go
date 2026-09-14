@@ -371,7 +371,7 @@ func TestSQLModelHandler(t *testing.T) {
 			collection := mkCollection(s1, s2)
 			// The postgres account is imported alongside; the mysql one is of a
 			// definition the accounts provider does not import.
-			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(collection, map[string]string{"acc-1": "prod-pg"}))
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, map[string]string{"acc-1": "prod-pg"}, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -450,7 +450,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
-			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(collection, nil))
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, nil, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)

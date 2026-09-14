@@ -641,7 +641,7 @@ func TestImportWorkspace(t *testing.T) {
 
 	// The postgres account is imported alongside; the s3 one is of a
 	// definition the accounts provider does not import.
-	entities, entries, err := h.FormatForExport(importable, nil, importResolver(importable, map[string]string{"acc-123": "prod-pg"}))
+	entities, entries, err := h.FormatForExport(importable, nil, importResolver(t, importable, map[string]string{"acc-123": "prod-pg"}, nil))
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []importmanifest.ImportEntry{
 		{WorkspaceID: "ws-1", URN: "retl-source-table:users", RemoteID: "src-1"},
