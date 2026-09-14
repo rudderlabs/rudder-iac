@@ -85,6 +85,42 @@ match_behavior:
             reference: "/display_name"
             severity: "error"
             message_contains: "duplicate display_name 'Churn Risk Model' within kind 'retl-source-sql-model'"
+      - example_id: "sqlmodel-semantic-v1-case-variant-display-name"
+        title: "v1 SQL models whose display_names differ only in case (names compare case-insensitively)"
+        files:
+          churn.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model
+            spec:
+              id: churn-model
+              display_name: Churn Risk Model
+              account_id: acc-456
+              primary_key: user_id
+              source_definition: bigquery
+              sql: SELECT user_id FROM churn_signals
+          churn-lowercase.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: churn-model-lowercase
+            spec:
+              id: churn-model-lowercase
+              display_name: churn risk model
+              account_id: acc-456
+              primary_key: user_id
+              source_definition: bigquery
+              sql: SELECT user_id FROM churn_signals
+        expected_diagnostics:
+          - file: "churn.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'Churn Risk Model' (case-insensitive match with 'churn risk model') within kind 'retl-source-sql-model'"
+          - file: "churn-lowercase.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name 'churn risk model' (case-insensitive match with 'Churn Risk Model') within kind 'retl-source-sql-model'"
       - example_id: "sqlmodel-semantic-v1-account-definition-mismatch"
         title: "v1 SQL model referencing an account that cannot back its source_definition"
         files:
