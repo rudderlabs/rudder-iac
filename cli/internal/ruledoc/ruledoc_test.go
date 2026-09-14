@@ -11,6 +11,7 @@ import (
 	esconnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
@@ -41,10 +42,9 @@ func gatekeeperScopedPatterns() []vrules.MatchPattern {
 	// Tracking plans: legacy kind "tp", v1 kind "tracking-plan".
 	p = append(p, providerrules.LegacyVersionPatterns(localcatalog.KindTrackingPlans)...)
 	p = append(p, providerrules.V1VersionPatterns(localcatalog.KindTrackingPlansV1)...)
-	// v1-only kinds. Kinds behind an experimental flag (retl-source-table) are
-	// left out until GA: the fragments must match the flag-off registry CI
-	// generates the catalog from.
+	// v1-only kinds.
 	p = append(p, providerrules.V1VersionPatterns(esconnection.EventStreamConnectionResourceKind)...)
+	p = append(p, providerrules.V1VersionPatterns(table.ResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dgHandler.HandlerMetadata.SpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)

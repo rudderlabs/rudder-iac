@@ -206,14 +206,14 @@ func TestLoadSpec(t *testing.T) {
 		assert.Equal(t, "users-table", r.ID())
 		assert.Equal(t, table.ResourceType, r.Type())
 		assert.Equal(t, resources.ResourceData{
-			table.LocalIDKey:          "users-table",
-			table.DisplayNameKey:      "Users",
-			table.AccountIDKey:        "acc-123",
-			table.SourceDefinitionKey: "postgres",
-			table.PrimaryKeyKey:       "id",
-			table.SchemaKey:           "public",
-			table.TableKey:            "users",
-			table.EnabledKey:          true,
+			sqlmodel.LocalIDKey:          "users-table",
+			sqlmodel.DisplayNameKey:      "Users",
+			sqlmodel.AccountIDKey:        "acc-123",
+			sqlmodel.SourceDefinitionKey: "postgres",
+			sqlmodel.PrimaryKeyKey:       "id",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+			sqlmodel.EnabledKey:          true,
 		}, r.Data())
 	})
 
@@ -222,14 +222,14 @@ func TestLoadSpec(t *testing.T) {
 		_, r := loadResource(t, newFakeStore(), withField(s3Spec(), "enabled", false))
 
 		assert.Equal(t, resources.ResourceData{
-			table.LocalIDKey:          "events-bucket",
-			table.DisplayNameKey:      "Events",
-			table.AccountIDKey:        "acc-s3",
-			table.SourceDefinitionKey: "s3",
-			table.PrimaryKeyKey:       "",
-			table.BucketNameKey:       "events",
-			table.ObjectPrefixKey:     "daily/",
-			table.EnabledKey:          false,
+			sqlmodel.LocalIDKey:          "events-bucket",
+			sqlmodel.DisplayNameKey:      "Events",
+			sqlmodel.AccountIDKey:        "acc-s3",
+			sqlmodel.SourceDefinitionKey: "s3",
+			sqlmodel.PrimaryKeyKey:       "",
+			table.BucketNameKey:          "events",
+			table.ObjectPrefixKey:        "daily/",
+			sqlmodel.EnabledKey:          false,
 		}, r.Data())
 	})
 
@@ -240,53 +240,13 @@ func TestLoadSpec(t *testing.T) {
 		assert.Equal(t, "", r.Data()[table.ObjectPrefixKey])
 	})
 
+	// Field rules live in retl/table/spec-syntax-valid; LoadSpec only refuses
+	// keys the spec has no field for.
 	invalid := []struct {
 		name    string
 		spec    *specs.Spec
 		wantErr string
 	}{
-		{
-			name:    "missing common fields",
-			spec:    withoutField(withoutField(warehouseSpec(), "display_name"), "account_id"),
-			wantErr: "missing required fields: account_id, display_name",
-		},
-		{
-			name:    "unknown source definition",
-			spec:    withField(warehouseSpec(), "source_definition", "oracle"),
-			wantErr: `invalid source_definition "oracle"`,
-		},
-		{
-			name:    "warehouse without schema and table",
-			spec:    withoutField(withoutField(warehouseSpec(), "schema"), "table"),
-			wantErr: `missing required fields for source_definition "postgres": schema, table`,
-		},
-		{
-			name:    "warehouse without primary key",
-			spec:    withoutField(warehouseSpec(), "primary_key"),
-			wantErr: `missing required fields for source_definition "postgres": primary_key`,
-		},
-		{
-			name:    "warehouse with s3 fields",
-			spec:    withField(warehouseSpec(), "bucket_name", "events"),
-			wantErr: `fields not supported for source_definition "postgres": bucket_name`,
-		},
-		{
-			name:    "s3 without bucket",
-			spec:    withoutField(s3Spec(), "bucket_name"),
-			wantErr: `missing required fields for source_definition "s3": bucket_name`,
-		},
-		{
-			name:    "s3 with warehouse fields",
-			spec:    withField(withField(s3Spec(), "schema", "public"), "table", "users"),
-			wantErr: `fields not supported for source_definition "s3": schema, table`,
-		},
-		{
-			// The s3 config the API client sends has no primary key, so an
-			// accepted value would be dropped on every apply.
-			name:    "s3 with primary key",
-			spec:    withField(s3Spec(), "primary_key", "id"),
-			wantErr: `fields not supported for source_definition "s3": primary_key`,
-		},
 		{
 			// A table config carries no description, so it could never round-trip.
 			name:    "description",
@@ -407,24 +367,6 @@ func TestImportMetadata(t *testing.T) {
 	})
 }
 
-// A connection references a RETL source through its graph data and state
-// output without knowing which source kind it is. Reading a table source
-// through sqlmodel's keys proves the two kinds share that contract.
-func TestGraphContractSharedWithSQLModel(t *testing.T) {
-	t.Parallel()
-	store := newFakeStore()
-	h, r := loadResource(t, store, warehouseSpec())
-
-	data := r.Data()
-	assert.Equal(t, "postgres", data[sqlmodel.SourceDefinitionKey])
-	assert.Equal(t, "id", data[sqlmodel.PrimaryKeyKey])
-	assert.Equal(t, true, data[sqlmodel.EnabledKey])
-
-	output, err := h.Create(context.Background(), r.ID(), data)
-	require.NoError(t, err)
-	assert.Equal(t, "src-1", (*output)[sqlmodel.IDKey], "a PropertyRef with Property=id resolves this value")
-}
-
 func TestLifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -465,11 +407,11 @@ func TestLifecycle(t *testing.T) {
 			// Create sends a table source carrying the local id as external id.
 			output, err := h.Create(ctx, r.ID(), r.Data())
 			require.NoError(t, err)
-			sourceID := (*output)[table.IDKey].(string)
+			sourceID := (*output)[sqlmodel.IDKey].(string)
 			created := store.sources[sourceID]
 			assert.Equal(t, retlClient.TableSourceType, created.SourceType)
 			assert.Equal(t, r.ID(), created.ExternalID)
-			assert.Equal(t, r.Data()[table.SourceDefinitionKey], created.SourceDefinitionName)
+			assert.Equal(t, r.Data()[sqlmodel.SourceDefinitionKey], created.SourceDefinitionName)
 			assert.Equal(t, tc.wantConfig, created.Config)
 
 			// Remote state rebuilds exactly the local graph data, so a plan
@@ -481,7 +423,7 @@ func TestLifecycle(t *testing.T) {
 			rs := st.GetResource(r.URN())
 			require.NotNil(t, rs)
 			assert.Equal(t, map[string]any(r.Data()), rs.Input)
-			assert.Equal(t, sourceID, rs.Output[table.IDKey])
+			assert.Equal(t, sourceID, rs.Output[sqlmodel.IDKey])
 
 			// Update sends every mutable field.
 			_, changed := loadResource(t, store, tc.change(tc.spec()))
@@ -503,8 +445,8 @@ func TestUpdate(t *testing.T) {
 		store := newFakeStore()
 		h, r := loadResource(t, store, withField(warehouseSpec(), "source_definition", "snowflake"))
 		state := resources.ResourceData{
-			table.IDKey:               "src-1",
-			table.SourceDefinitionKey: "postgres",
+			sqlmodel.IDKey:               "src-1",
+			sqlmodel.SourceDefinitionKey: "postgres",
 		}
 
 		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
@@ -529,7 +471,7 @@ func TestUpdate(t *testing.T) {
 		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
 		store.failOn = "update:src-1"
 		h, r := loadResource(t, store, warehouseSpec())
-		state := resources.ResourceData{table.IDKey: "src-1", table.SourceDefinitionKey: "postgres"}
+		state := resources.ResourceData{sqlmodel.IDKey: "src-1", sqlmodel.SourceDefinitionKey: "postgres"}
 
 		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
 
@@ -559,7 +501,7 @@ func TestDelete(t *testing.T) {
 		store.failOn = "delete:src-1"
 		h := table.NewHandler(store, "retl")
 
-		err := h.Delete(context.Background(), "users-table", resources.ResourceData{table.IDKey: "src-1"})
+		err := h.Delete(context.Background(), "users-table", resources.ResourceData{sqlmodel.IDKey: "src-1"})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "deleting RETL source")
@@ -591,7 +533,7 @@ func TestImport(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"get:src-remote", "setExternalId:src-remote"}, store.calls)
 		assert.Equal(t, "users-table", store.sources["src-remote"].ExternalID)
-		assert.Equal(t, "src-remote", (*output)[table.IDKey])
+		assert.Equal(t, "src-remote", (*output)[sqlmodel.IDKey])
 	})
 
 	t.Run("updates a diverged source to match the spec", func(t *testing.T) {

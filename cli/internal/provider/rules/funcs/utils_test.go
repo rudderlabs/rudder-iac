@@ -372,6 +372,16 @@ func TestGetErrorMessage_CrossFieldWithRootType(t *testing.T) {
 			},
 			expected: "'access_key_id' is not allowed when 'file' is true",
 		},
+		{
+			name: "required_unless resolves JSON tag from root type",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "required_unless",
+				param:           "File true",
+				structNamespace: "testParentSpec.SQL",
+			},
+			expected: "'sql' is required unless 'file' is true",
+		},
 	}
 
 	for _, tt := range tests {

@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -30,7 +31,7 @@ type importInfo struct {
 // interface diverges from handler.BaseHandler.
 type Handler struct {
 	client    retlClient.RETLStore
-	resources map[string]*TableResource
+	resources map[string]*TableSpec
 	importDir string
 	// importMetadata is keyed by URN. It is per handler rather than package
 	// level so that separate providers — and parallel tests — cannot see each
@@ -41,7 +42,7 @@ type Handler struct {
 func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 	return &Handler{
 		client:         client,
-		resources:      make(map[string]*TableResource),
+		resources:      make(map[string]*TableSpec),
 		importDir:      filepath.Join(importDir, ImportPath),
 		importMetadata: make(map[string]importInfo),
 	}
@@ -50,7 +51,7 @@ func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 // ParseSpec leaves LegacyResourceType empty: retl-source-table is v1-only, so
 // import metadata must use urn rather than the legacy local_id.
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	id, ok := s.Spec[IDKey].(string)
+	id, ok := s.Spec[sqlmodel.IDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("id not found in table source spec")
 	}
@@ -62,8 +63,13 @@ func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) 
 	}, nil
 }
 
+// LoadSpec trusts the spec's field rules to retl/table/spec-syntax-valid, which
+// runs before any spec loads. The decode stays strict so a stray key — a
+// description, or a nested config block — is an error, not a dropped setting.
 func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
-	spec := &TableSpec{}
+	// mapstructure leaves keys absent from the spec untouched, so enabled
+	// defaults to true.
+	spec := &TableSpec{Enabled: true}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      spec,
@@ -75,29 +81,10 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		return fmt.Errorf("decoding table source spec: %w", err)
 	}
 
-	if err := spec.validate(); err != nil {
-		return fmt.Errorf("validating table source %q: %w", spec.ID, err)
-	}
 	if _, ok := h.resources[spec.ID]; ok {
 		return fmt.Errorf("table source with id %s already exists", spec.ID)
 	}
-
-	enabled := true
-	if spec.Enabled != nil {
-		enabled = *spec.Enabled
-	}
-	h.resources[spec.ID] = &TableResource{
-		ID:               spec.ID,
-		DisplayName:      spec.DisplayName,
-		AccountID:        spec.AccountID,
-		SourceDefinition: spec.SourceDefinition,
-		PrimaryKey:       spec.PrimaryKey,
-		Schema:           spec.Schema,
-		Table:            spec.Table,
-		BucketName:       spec.BucketName,
-		ObjectPrefix:     spec.ObjectPrefix,
-		Enabled:          enabled,
-	}
+	h.resources[spec.ID] = spec
 
 	metadata, err := s.CommonMetadata()
 	if err != nil {
@@ -131,7 +118,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for _, t := range h.resources {
 		data := t.data()
-		data[LocalIDKey] = t.ID
+		data[sqlmodel.LocalIDKey] = t.ID
 
 		var opts []resources.ResourceOpts
 		if info, ok := h.importMetadata[resources.URN(t.ID, ResourceType)]; ok {
@@ -163,14 +150,14 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 // request has no field for it, so the API would keep the old value and report
 // success.
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	sourceID, ok := state[IDKey].(string)
+	sourceID, ok := state[sqlmodel.IDKey].(string)
 	if !ok || sourceID == "" {
-		return nil, fmt.Errorf("missing %s in resource state", IDKey)
+		return nil, fmt.Errorf("missing %s in resource state", sqlmodel.IDKey)
 	}
 
 	var (
 		desired    = fromData(data)
-		current, _ = state[SourceDefinitionKey].(string)
+		current, _ = state[sqlmodel.SourceDefinitionKey].(string)
 	)
 	if desired.SourceDefinition != current {
 		return nil, fmt.Errorf("updating table source %s: source_definition cannot be changed from %q to %q", ID, current, desired.SourceDefinition)
@@ -178,7 +165,7 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	return h.update(ctx, sourceID, desired)
 }
 
-func (h *Handler) update(ctx context.Context, sourceID string, t TableResource) (*resources.ResourceData, error) {
+func (h *Handler) update(ctx context.Context, sourceID string, t TableSpec) (*resources.ResourceData, error) {
 	source, err := h.client.UpdateRetlSource(ctx, sourceID, &retlClient.RETLSourceUpdateRequest{
 		Name:      t.DisplayName,
 		Config:    t.config(),
@@ -192,9 +179,9 @@ func (h *Handler) update(ctx context.Context, sourceID string, t TableResource) 
 }
 
 func (h *Handler) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
-	sourceID, ok := state[IDKey].(string)
+	sourceID, ok := state[sqlmodel.IDKey].(string)
 	if !ok || sourceID == "" {
-		return fmt.Errorf("missing %s in resource state", IDKey)
+		return fmt.Errorf("missing %s in resource state", sqlmodel.IDKey)
 	}
 	if err := h.client.DeleteRetlSource(ctx, sourceID); err != nil {
 		return fmt.Errorf("deleting RETL source: %w", err)
@@ -215,13 +202,13 @@ func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.Re
 			return nil, err
 		}
 		result = append(result, resources.ResourceData{
-			IDKey:               source.ID,
-			"name":              source.Name,
-			AccountIDKey:        source.AccountID,
-			SourceDefinitionKey: source.SourceDefinitionName,
-			CreatedAtKey:        source.CreatedAt,
-			UpdatedAtKey:        source.UpdatedAt,
-			"config":            map[string]any(t.configData()),
+			sqlmodel.IDKey:               source.ID,
+			"name":                       source.Name,
+			sqlmodel.AccountIDKey:        source.AccountID,
+			sqlmodel.SourceDefinitionKey: source.SourceDefinitionName,
+			sqlmodel.CreatedAtKey:        source.CreatedAt,
+			sqlmodel.UpdatedAtKey:        source.UpdatedAt,
+			"config":                     map[string]any(t.configData()),
 		})
 	}
 	return result, nil
@@ -302,7 +289,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		}
 
 		input := remote.data()
-		input[LocalIDKey] = source.ExternalID
+		input[sqlmodel.LocalIDKey] = source.ExternalID
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     source.ExternalID,
