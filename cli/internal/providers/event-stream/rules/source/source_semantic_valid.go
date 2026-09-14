@@ -53,21 +53,20 @@ func validateTrackingPlanExists(spec esSource.SourceSpec, graph *resources.Graph
 }
 
 func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
-	countMap := make(map[string]int)
+	var names []string
 	for _, resource := range graph.ResourcesByType(esSource.ResourceType) {
-		data := resource.Data()
-		name, _ := data["name"].(string)
-		countMap[name]++
+		name, _ := resource.Data()["name"].(string)
+		names = append(names, name)
 	}
 
-	if countMap[spec.Name] > 1 {
-		return []rules.ValidationResult{{
-			Reference: "/name",
-			Message:   fmt.Sprintf("duplicate name '%s' within kind 'event-stream-source'", spec.Name),
-		}}
+	clash, ok := prules.NameClash("name", spec.Name, names)
+	if !ok {
+		return nil
 	}
-
-	return nil
+	return []rules.ValidationResult{{
+		Reference: "/name",
+		Message:   fmt.Sprintf("%s within kind '%s'", clash, esSource.ResourceKind),
+	}}
 }
 
 func NewSourceSemanticValidRule() rules.Rule {
