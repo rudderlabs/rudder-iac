@@ -34,33 +34,58 @@ Current mapping (local → API):
   Upstream values with no row here (e.g. `tiktokAds`, `singer-*`): drop them
   and flag in the final report — `registry.Register` fails on any local source
   type missing from the mapping, so guessing breaks the build anyway.
-- The CLI intentionally supports a subset. Never declare `amp`, `shopify`,
-  `warehouse` or `cloud_source`, even when upstream lists them — the CLI cannot
-  produce those tokens, so a destination declaring one can never have a matching
-  connection validated. `SourceSpec`
+- The CLI intentionally supports a subset. Never declare `amp`, `shopify` or
+  `cloud_source`, even when upstream lists them — the CLI cannot produce those
+  tokens, so a destination declaring one can never have a matching connection
+  validated. `SourceSpec`
   (`cli/internal/providers/event-stream/source/model.go`) carries no category
   field and constrains `type` to the SDK definitions, and the sole
   `common.SourceTypeToken` call site
   (`event-stream/rules/connection/connection_semantic_valid.go`) passes an empty
-  category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` and
-  `SourceCategoryWarehouse` → `warehouse` branches dead. What remains is the ten
-  types S3 declares: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`,
-  `unity`, `cloud`, `react_native`, `flutter`, `cordova`. `customerio_audience`
-  is the sole exception, since `warehouse` is its only source type (DEX-720).
-  When unsure about another mapped-but-unusual type, include what S3 includes
-  and flag the rest.
+  category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` branch
+  dead. What remains is the ten types S3 declares: `android`, `android_kotlin`,
+  `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`,
+  `cordova`. When unsure about another mapped-but-unusual type, include what S3
+  includes and flag the rest.
+- **Declare `warehouse` whenever db-config lists it.** rETL connections reach
+  destinations through that token, so it is no longer an exception —
+  warehouse-only destinations (`bingads_offline_conversions`,
+  `customerio_audience`) are just the extreme case. Copy
+  `supportedConnectionModes.warehouse` (always `["cloud"]`) into
+  `ConnectionModes` and derive the two rETL fields in the same pass — see
+  "rETL metadata" below.
 - `ConnectionModes` must be keyed by the same local types and cover every
   entry in `SourceTypes` — registration errors otherwise. Copy the modes per
   source type from db-config `supportedConnectionModes` (values are `cloud`,
   `device`, `hybrid`).
-- `ConnectionRequiredKeys` is derived from the **per-source-type key lists
-  inside `config.destConfig`** — see "Per-source-type config keys" below.
+- `ConnectionRequiredKeys` is derived from the **`schema.json`
+  `configSchema.allOf` branches conditioned on `connectionMode`**, never from
+  `config.destConfig` — see "Per-source-type connect-time required keys" below.
 - Consent management uses the same mapping automatically via
   `common.Properties(sourceTypes)` — no extra work per source type.
 - Connection mode uses the same mapping automatically via
   `common.ConnectionModeProperties(sourceTypes)` — no extra work per source
   type. Its values are validated against this destination's own
   `ConnectionModes` map, not a fixed enum.
+
+## rETL metadata
+
+`warehouse` support and the two rETL fields all come from the same
+`db-config.json`; derive them together, or the registry ends up claiming a
+destination rETL can reach without saying how it may sync.
+
+- Sync behaviours are the closed enum `upsert`, `mirror`, `full`; registration
+  rejects anything else.
+- Never write `SyncBehaviours: []string{}` to mean "unset". An explicitly empty
+  list declares that the destination accepts no behaviour at all — the backend
+  falls back on absence only. Omit the field instead.
+- Both fields require `warehouse` in `SourceTypes`; registration rejects them
+  otherwise.
+- `ConnectionRequiredKeys["warehouse"]["cloud"]` is derived exactly like every
+  other mode, from the `schema.json` `allOf` branches whose `if` names
+  `connectionMode.warehouse`. Among registered destinations only Braze has one
+  (`rest_api_key`); Braze is already registered, so backfilling its warehouse
+  capability belongs to DEX-834.
 
 ## Per-source-type connect-time required keys
 

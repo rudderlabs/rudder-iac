@@ -49,6 +49,10 @@ func (r *Registry) Register(def *DestinationDefinition) error {
 		return err
 	}
 
+	if err := validateRETLMetadata(def); err != nil {
+		return err
+	}
+
 	key := typeVersion{Type: def.Type, Version: def.Version}
 	if _, exists := r.byTypeVersion[key]; exists {
 		return fmt.Errorf("destination definition %s version %d already registered", def.Type, def.Version)
@@ -97,6 +101,22 @@ func validateConfigValidateFuncs(def *DestinationDefinition) error {
 			return fmt.Errorf("config validate func %q registered more than once", fn.Tag)
 		}
 		seen[fn.Tag] = true
+	}
+	return nil
+}
+
+// validateRETLMetadata rejects sync behaviours outside the backend's closed
+// enum, and rETL metadata on a destination no warehouse source can reach. An
+// explicitly empty SyncBehaviours list is metadata too: it accepts nothing.
+func validateRETLMetadata(def *DestinationDefinition) error {
+	for _, behaviour := range def.SyncBehaviours {
+		if !slices.Contains(defaultSyncBehaviours, behaviour) {
+			return fmt.Errorf("sync behaviour %q is not one of %v", behaviour, defaultSyncBehaviours)
+		}
+	}
+
+	if (def.SyncBehaviours != nil || def.SupportsVisualMapper) && !slices.Contains(def.SourceTypes, common.SourceTypeWarehouse) {
+		return fmt.Errorf("rETL metadata requires the warehouse source type")
 	}
 	return nil
 }
