@@ -270,6 +270,26 @@ func TestListRetlSourcesSkipsUnsupportedSourceType(t *testing.T) {
 					"sourceType": "audience",
 					"sourceDefinitionName": "snowflake",
 					"accountId": "acc123"
+				},
+				{
+					"id": "src3",
+					"name": "Profiles Source, Null Config",
+					"config": null,
+					"sourceType": "profiles-table",
+					"sourceDefinitionName": "snowflake"
+				},
+				{
+					"id": "src4",
+					"name": "Audience Source, No Config",
+					"sourceType": "audience",
+					"sourceDefinitionName": "snowflake"
+				},
+				{
+					"id": "src5",
+					"name": "Table Source, Null Config",
+					"config": null,
+					"sourceType": "table",
+					"sourceDefinitionName": "snowflake"
 				}
 			]
 		}`,
@@ -293,6 +313,55 @@ func TestListRetlSourcesSkipsUnsupportedSourceType(t *testing.T) {
 				SourceType:           retl.ModelSourceType,
 				SourceDefinitionName: "postgres",
 				AccountID:            "acc123",
+			},
+			{
+				ID:                   "src5",
+				Name:                 "Table Source, Null Config",
+				SourceType:           retl.TableSourceType,
+				SourceDefinitionName: "snowflake",
+			},
+		},
+	}, sources)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestListRetlSourcesToleratesSiblingFields(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"data": [
+				{
+					"id": "src1",
+					"name": "Model Source",
+					"config": {"primaryKey":"id","sql":"SELECT * FROM users"},
+					"sourceType": "model",
+					"sourceDefinitionName": "postgres"
+				}
+			],
+			"paging": {"total": 1, "next": "/v2/retl-sources?page=2"}
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	sources, err := retlClient.ListRetlSources(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, &retl.RETLSources{
+		Data: []retl.RETLSource{
+			{
+				ID:                   "src1",
+				Name:                 "Model Source",
+				Config:               retl.RETLSQLModelConfig{PrimaryKey: "id", Sql: "SELECT * FROM users"},
+				SourceType:           retl.ModelSourceType,
+				SourceDefinitionName: "postgres",
 			},
 		},
 	}, sources)
@@ -357,6 +426,41 @@ func TestGetRetlSourceUnsupportedSourceType(t *testing.T) {
 	_, err = retlClient.GetRetlSource(context.Background(), "src2")
 	require.ErrorIs(t, err, retl.ErrUnsupportedSourceType)
 	assert.Contains(t, err.Error(), `"audience"`)
+
+	httpClient.AssertNumberOfCalls()
+}
+
+// The list-only type filter must not leak into single gets: a caller asking
+// for one source by ID still gets it back when there's no config to dispatch.
+func TestGetRetlSourceUnsupportedSourceTypeNullConfig(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources/src2", "")
+		},
+		ResponseStatus: 200,
+		ResponseBody: `{
+			"id": "src2",
+			"name": "Audience Source",
+			"config": null,
+			"sourceType": "audience",
+			"sourceDefinitionName": "snowflake"
+		}`,
+	})
+
+	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	retlClient := retl.NewRudderRETLStore(c)
+
+	source, err := retlClient.GetRetlSource(context.Background(), "src2")
+	require.NoError(t, err)
+
+	assert.Equal(t, &retl.RETLSource{
+		ID:                   "src2",
+		Name:                 "Audience Source",
+		SourceType:           "audience",
+		SourceDefinitionName: "snowflake",
+	}, source)
 
 	httpClient.AssertNumberOfCalls()
 }

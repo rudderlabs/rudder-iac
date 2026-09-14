@@ -189,9 +189,13 @@ type RETLSources struct {
 // unfamiliar source (the workspace can hold audience/profiles sources) doesn't
 // fail the whole list. Any other decode error still fails it.
 func (s *RETLSources) UnmarshalJSON(data []byte) error {
-	var wire struct {
+	// plain sheds this method so any field added next to Data (e.g. paging)
+	// still decodes instead of being silently dropped.
+	type plain RETLSources
+	wire := struct {
+		*plain
 		Data []json.RawMessage `json:"data"`
-	}
+	}{plain: (*plain)(s)}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
@@ -206,10 +210,19 @@ func (s *RETLSources) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return fmt.Errorf("decoding RETL source at index %d: %w", i, err)
 		}
+		// A null or missing config skips the config dispatch, so an unknown
+		// type can decode cleanly and has to be filtered here too.
+		if !isModeledSourceType(source.SourceType) {
+			continue
+		}
 		sources = append(sources, source)
 	}
 	s.Data = sources
 	return nil
+}
+
+func isModeledSourceType(sourceType SourceType) bool {
+	return sourceType == ModelSourceType || sourceType == TableSourceType
 }
 
 // PreviewResultError represents an error in the preview result
