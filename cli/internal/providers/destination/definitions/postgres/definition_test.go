@@ -151,10 +151,12 @@ func TestPostgresConfigValidation(t *testing.T) {
 		cfg := copyConfig(minimalConfig())
 		cfg["namespace"] = "analytics"
 		cfg["use_ssh"] = true
-		cfg["ssh_host"] = "bastion.example.com"
-		cfg["ssh_port"] = "22"
-		cfg["ssh_user"] = "rudder"
-		cfg["ssh_public_key"] = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+		cfg["ssh"] = map[string]any{
+			"host":       "bastion.example.com",
+			"port":       "22",
+			"user":       "rudder",
+			"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+		}
 		cfg["ssl_mode"] = "verify-ca"
 		cfg["client_key"] = "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----"
 		cfg["client_cert"] = "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----"
@@ -215,10 +217,21 @@ func TestPostgresConfigValidation(t *testing.T) {
 		cfg["use_ssh"] = true
 
 		errors := registered.ValidateConfig(cfg)
-		assertHasPath(t, errors, "/ssh_host")
-		assertHasPath(t, errors, "/ssh_port")
-		assertHasPath(t, errors, "/ssh_user")
-		assertHasPath(t, errors, "/ssh_public_key")
+		assertHasPath(t, errors, "/ssh/host")
+		assertHasPath(t, errors, "/ssh/port")
+		assertHasPath(t, errors, "/ssh/user")
+		assertHasPath(t, errors, "/ssh/public_key")
+	})
+
+	// Postgres now follows Kafka's and Redshift's nested SSH local shape; flat SSH
+	// tunnel keys remain unknown rather than becoming an alias layer.
+	t.Run("legacy flat ssh key is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalConfig())
+		cfg["ssh_host"] = "bastion.example.com"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/ssh_host")
 	})
 
 	t.Run("verify ca certificate fields required", func(t *testing.T) {
@@ -1127,10 +1140,12 @@ func TestPostgresConversionRoundTrip(t *testing.T) {
 				"password": "s3cret",
 				"port": "5432",
 				"use_ssh": true,
-				"ssh_host": "bastion.example.com",
-				"ssh_port": "22",
-				"ssh_user": "rudder",
-				"ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+				"ssh": {
+					"host": "bastion.example.com",
+					"port": "22",
+					"user": "rudder",
+					"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+				},
 				"ssl_mode": "verify-ca",
 				"client_key": "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
 				"client_cert": "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----",

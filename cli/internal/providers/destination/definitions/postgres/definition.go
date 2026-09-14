@@ -202,6 +202,42 @@ type s3Storage struct {
 	AccessKey     string `mapstructure:"access_key" validate:"postgres_s3_key_required,omitempty,pattern=single_line_100"`
 }
 
+// SSH tunnel settings, grouped because schema.json declares all four only
+// inside the useSSH branch. use_ssh stays top level as the selector.
+type sshConfig struct {
+	Host string `mapstructure:"host" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	Port string `mapstructure:"port" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	User string `mapstructure:"user" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	// public_key is emitted by the backend and may be long; schema.json bounds it
+	// to 1000 characters when SSH is enabled.
+	PublicKey string `mapstructure:"public_key" validate:"postgres_ssh_required,omitempty,pattern=single_line_1000"`
+}
+
+// postgresSSHRequired reads the selector from the top-level config because the
+// SSH fields live in a nested block: fl.Parent() is sshConfig, which does not
+// carry use_ssh, so required_if would silently never fire.
+func postgresSSHRequired(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "" {
+		return true
+	}
+
+	root := fl.Top()
+	for root.Kind() == reflect.Pointer {
+		root = root.Elem()
+	}
+	if root.Kind() != reflect.Struct {
+		return true
+	}
+
+	field := root.FieldByName("UseSSH")
+	if !field.IsValid() {
+		return true
+	}
+
+	useSSH, _ := field.Interface().(*bool)
+	return useSSH == nil || !*useSSH
+}
+
 type gcsStorage struct {
 	Credentials string `mapstructure:"credentials" validate:"postgres_gcs_required"`
 }
@@ -302,14 +338,9 @@ type postgresConfig struct {
 	Password string `mapstructure:"password" validate:"required"`
 	Port     string `mapstructure:"port" validate:"required,pattern=single_line_100"`
 
-	Namespace string `mapstructure:"namespace" validate:"omitempty,pattern=postgres_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
-	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	// ssh_public_key is emitted by the backend and may be long; schema.json bounds
-	// it to 1000 characters when SSH is enabled.
-	SSHPublicKey string `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true,omitempty,pattern=single_line_1000"`
+	Namespace string    `mapstructure:"namespace" validate:"omitempty,pattern=postgres_namespace"`
+	UseSSH    *bool     `mapstructure:"use_ssh" default:"false"`
+	SSH       sshConfig `mapstructure:"ssh"`
 
 	// schema.json requires the TLS material only for verify-ca, and declares no
 	// pattern for any of the three, so they carry no shape constraint here.
@@ -353,10 +384,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("port", "port"),
 		converter.Simple("namespace", "namespace"),
 		converter.Simple("useSSH", "use_ssh"),
-		converter.Simple("sshHost", "ssh_host"),
-		converter.Simple("sshPort", "ssh_port"),
-		converter.Simple("sshUser", "ssh_user"),
-		converter.Simple("sshPublicKey", "ssh_public_key"),
+		converter.Simple("sshHost", "ssh.host"),
+		converter.Simple("sshPort", "ssh.port"),
+		converter.Simple("sshUser", "ssh.user"),
+		converter.Simple("sshPublicKey", "ssh.public_key"),
 		converter.Simple("sslMode", "ssl_mode"),
 		converter.Simple("clientKey", "client_key"),
 		converter.Simple("clientCert", "client_cert"),
@@ -413,6 +444,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		ConnectionModes: connectionModes,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "postgres_bucket_name", Func: bucketNameConditional},
+			{Tag: "postgres_ssh_required", Func: postgresSSHRequired},
 			{Tag: "postgres_access_key_id_required", Func: accessKeyIDRequired},
 			{Tag: "postgres_s3_role_required", Func: requiredForProviderWhen("S3", "RoleBasedAuth", true)},
 			{Tag: "postgres_s3_key_required", Func: requiredForProviderWhen("S3", "RoleBasedAuth", false)},
