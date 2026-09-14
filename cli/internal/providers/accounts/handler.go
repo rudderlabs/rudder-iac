@@ -27,6 +27,8 @@ var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     AccountResourceType,
 	SpecKind:         AccountSpecKind,
 	SpecMetadataName: AccountMetadataName,
+	// RETL sources reference accounts as "#account:<id>".
+	ReferencedByKind: true,
 }
 
 // registeredAccountSecretKeys maps an account definition to its secret field set — the
