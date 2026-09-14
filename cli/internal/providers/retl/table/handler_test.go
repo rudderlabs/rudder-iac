@@ -251,6 +251,13 @@ func TestLoadSpec(t *testing.T) {
 			spec:    withField(warehouseSpec(), "config", map[string]any{"schema": "public"}),
 			wantErr: "decoding table source spec",
 		},
+		{
+			// The syntax rule rejects this first; LoadSpec must not build a
+			// reference from it either way.
+			name:    "account that is not an account reference",
+			spec:    withField(withoutField(warehouseSpec(), "account_id"), "account", "prod-pg"),
+			wantErr: `parsing account reference of table source users-table: invalid account reference "prod-pg"`,
+		},
 	}
 	for _, tc := range invalid {
 		t.Run("rejects "+tc.name, func(t *testing.T) {
