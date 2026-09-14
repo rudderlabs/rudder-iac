@@ -34,14 +34,21 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		return nil, fmt.Errorf("account ID not found in resource data")
 	}
 
-	// Create preview request
+	return PreviewQuery(ctx, h.client, accountID, sql, limit)
+}
+
+// PreviewQuery runs sql against the account's warehouse through the preview API
+// and polls for the resulting rows. It is shared with table sources, whose
+// preview is a query derived from the table. If limit is 0, the query is
+// validated without returning data.
+func PreviewQuery(ctx context.Context, client retlClient.RETLStore, accountID, sql string, limit int) ([]map[string]any, error) {
 	previewReq := &retlClient.PreviewSubmitRequest{
 		SQL:       sql,
 		AccountID: accountID,
 		Limit:     limit,
 	}
 
-	submitResp, err := h.client.SubmitSourcePreview(ctx, previewReq)
+	submitResp, err := client.SubmitSourcePreview(ctx, previewReq)
 	if err != nil {
 		return nil, fmt.Errorf("submitting preview request: %w", err)
 	}
@@ -60,7 +67,7 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("preview timed out after %s", DefaultTimeout)
 		case <-ticker.C:
-			resultResp, err := h.client.GetSourcePreviewResult(ctx, requestID)
+			resultResp, err := client.GetSourcePreviewResult(ctx, requestID)
 			if err != nil {
 				return nil, fmt.Errorf("getting preview results: %w", err)
 			}
