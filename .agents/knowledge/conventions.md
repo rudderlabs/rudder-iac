@@ -111,6 +111,13 @@
 - Redshift should keep the broad warehouse-style mapped db-config source-type set, not the older S3-like event-stream subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud connection mode for all retained source types.
 - Redshift local sync config should use flat schema/API-aligned keys `sync_frequency`, `sync_start_at`, and `exclude_window.{start_time,end_time}`; do not add a legacy `sync.{frequency,start_at,exclude_window_start_time,exclude_window_end_time}` alias layer inside the definition.
 - Existing old-shape Redshift specs with a top-level `sync` config block should fail closed as unknown-key input rather than being silently converted, because the destination converter/validator has no per-definition alias layer.
+## DEX-882 — Redshift SSH Local Config Shape
+<!-- ticket:DEX-882 -->
+- Redshift keeps `use_ssh` as the top-level SSH branch selector while grouping SSH member keys under local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key`.
+- Redshift SSH grouping changes only the CLI local YAML shape: API payload keys remain the existing flat camelCase `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey`, matching the Kafka grouping precedent.
+- Existing flat local keys should not be aliased for Redshift SSH config because destination config decoding is strict and DEX-882 treats the grouped local shape as an intentional spec change.
+- Postgres SSH config remains unchanged by the Redshift grouping work.
+
 ## DEX-504 — Google Sheets Consent Config Surface
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
