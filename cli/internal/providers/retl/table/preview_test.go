@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -41,17 +42,17 @@ func TestPreviewQueriesTheTable(t *testing.T) {
 		table            string
 		want             string
 	}{
-		{"postgres", "postgres", "public", "users", `select * from "public"."users"`},
-		{"redshift", "redshift", "public", "users", `select * from "public"."users"`},
-		{"snowflake", "snowflake", "public", "users", `select * from "public"."users"`},
-		{"trino", "trino", "public", "users", `select * from "public"."users"`},
-		{"mysql", "mysql", "public", "users", "select * from `public`.`users`"},
-		{"databricks", "databricks", "public", "users", "select * from `public`.`users`"},
-		{"bigquery", "bigquery", "public", "users", "select * from `public.users`"},
+		{"postgres", "postgres", "public", "users", `select * from "public"."users" limit 10`},
+		{"redshift", "redshift", "public", "users", `select * from "public"."users" limit 10`},
+		{"snowflake", "snowflake", "public", "users", `select * from "public"."users" limit 10`},
+		{"trino", "trino", "public", "users", `select * from "public"."users" limit 10`},
+		{"mysql", "mysql", "public", "users", "select * from `public`.`users` limit 10"},
+		{"databricks", "databricks", "public", "users", "select * from `public`.`users` limit 10"},
+		{"bigquery", "bigquery", "public", "users", "select * from `public.users` limit 10"},
 
-		{"double quotes keep case and are doubled", "snowflake", `My"Schema`, "Users Table", `select * from "My""Schema"."Users Table"`},
-		{"backticks are doubled", "databricks", "raw", "we`ird", "select * from `raw`.`we``ird`"},
-		{"bigquery escapes with backslashes", "bigquery", "raw", "we`ird'\"", "select * from `raw.we\\`ird\\'\\\"`"},
+		{"double quotes keep case and are doubled", "snowflake", `My"Schema`, "Users Table", `select * from "My""Schema"."Users Table" limit 10`},
+		{"backticks are doubled", "databricks", "raw", "we`ird", "select * from `raw`.`we``ird` limit 10"},
+		{"bigquery escapes with backslashes", "bigquery", "raw", "we`ird'\"", "select * from `raw.we\\`ird\\'\\\"` limit 10"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -72,6 +73,19 @@ func TestPreviewQueriesTheTable(t *testing.T) {
 	}
 }
 
+// validate previews with limit 0, which the request omits just as it does for
+// SQL models; the query itself still stays bounded.
+func TestPreviewWithoutLimitReadsOneRow(t *testing.T) {
+	t.Parallel()
+	store := &previewStore{}
+	h, r := loadResource(t, store, warehouseSpec())
+
+	_, err := h.Preview(context.Background(), r.ID(), r.Data(), 0)
+
+	require.NoError(t, err)
+	assert.Equal(t, []retlClient.PreviewSubmitRequest{{AccountID: "acc-123", SQL: `select * from "public"."users" limit 1`}}, store.requests)
+}
+
 func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +97,7 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		_, err := h.Preview(context.Background(), r.ID(), r.Data(), 10)
 
 		require.EqualError(t, err, "preview is not supported for s3 table sources")
+		assert.ErrorIs(t, err, table.ErrPreviewUnsupported)
 		assert.Empty(t, store.requests)
 	})
 
@@ -92,13 +107,29 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		h := table.NewHandler(store, "retl")
 
 		_, err := h.Preview(context.Background(), "users-table", resources.ResourceData{
-			table.AccountIDKey:        "acc-123",
-			table.SourceDefinitionKey: "oracle",
-			table.SchemaKey:           "public",
-			table.TableKey:            "users",
+			sqlmodel.AccountIDKey:        "acc-123",
+			sqlmodel.SourceDefinitionKey: "oracle",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
 		}, 10)
 
 		require.EqualError(t, err, `preview is not supported for source_definition "oracle"`)
+		assert.ErrorIs(t, err, table.ErrPreviewUnsupported)
+		assert.Empty(t, store.requests)
+	})
+
+	t.Run("bigquery name with a backslash", func(t *testing.T) {
+		t.Parallel()
+		spec := warehouseSpec()
+		spec.Spec["source_definition"] = "bigquery"
+		spec.Spec["table"] = "users\\` union select 1 --"
+		store := &previewStore{}
+		h, r := loadResource(t, store, spec)
+
+		_, err := h.Preview(context.Background(), r.ID(), r.Data(), 10)
+
+		require.EqualError(t, err, "bigquery schema and table names cannot contain a backslash: \"public.users\\\\` union select 1 --\"")
+		assert.NotErrorIs(t, err, table.ErrPreviewUnsupported)
 		assert.Empty(t, store.requests)
 	})
 
@@ -108,9 +139,9 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		h := table.NewHandler(store, "retl")
 
 		_, err := h.Preview(context.Background(), "users-table", resources.ResourceData{
-			table.SourceDefinitionKey: "postgres",
-			table.SchemaKey:           "public",
-			table.TableKey:            "users",
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
 		}, 10)
 
 		require.EqualError(t, err, "account ID not found in resource data")
