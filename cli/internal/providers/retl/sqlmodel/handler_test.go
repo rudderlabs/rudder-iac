@@ -369,7 +369,9 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, _, err := h.FormatForExport(collection, idNamer, nil)
+			// The postgres account is imported alongside; the mysql one is of a
+			// definition the accounts provider does not import.
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, map[string]string{"acc-1": "prod-pg"}, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -385,15 +387,32 @@ func TestSQLModelHandler(t *testing.T) {
 			require.NotNil(t, ordersSpec)
 			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
 			assert.Equal(t, specs.SpecVersionV1, ordersSpec.Version)
-			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
-			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
-			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])
-			assert.Equal(t, "id", ordersSpec.Spec[sqlmodel.PrimaryKeyKey])
-			assert.Equal(t, "SELECT * FROM orders", ordersSpec.Spec[sqlmodel.SQLKey])
-			assert.Equal(t, "postgres", ordersSpec.Spec[sqlmodel.SourceDefinitionKey])
-			assert.Equal(t, true, ordersSpec.Spec[sqlmodel.EnabledKey])
-			assert.Equal(t, "orders-model", ordersSpec.Spec[sqlmodel.IDKey])
+			assert.Equal(t, map[string]any{
+				"id":                "orders-model",
+				"display_name":      "Orders Model",
+				"description":       "orders",
+				"account":           "#account:prod-pg",
+				"primary_key":       "id",
+				"sql":               "SELECT * FROM orders",
+				"source_definition": "postgres",
+				"enabled":           true,
+			}, ordersSpec.Spec)
 			assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[idx].RelativePath)
+
+			idx, ok = byName["users-model.yaml"]
+			require.True(t, ok)
+			usersSpec, _ := entities[idx].Content.(*specs.Spec)
+			require.NotNil(t, usersSpec)
+			assert.Equal(t, map[string]any{
+				"id":                "users-model",
+				"display_name":      "Users Model",
+				"description":       "users",
+				"account_id":        "acc-2",
+				"primary_key":       "user_id",
+				"sql":               "SELECT * FROM users",
+				"source_definition": "mysql",
+				"enabled":           false,
+			}, usersSpec.Spec)
 
 			// Metadata checks: presence and name
 			assert.Equal(t, "orders-model", ordersSpec.Metadata["name"])
@@ -431,7 +450,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
-			entities, _, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, nil, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)
