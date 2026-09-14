@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -102,6 +103,89 @@ func TestTableSemanticValidRule_AccountReference(t *testing.T) {
 			require.Len(t, results, 1)
 			assert.Equal(t, "/spec/account", results[0].Reference)
 			assert.Contains(t, results[0].Message, tt.wantErr)
+		})
+	}
+}
+
+// Table and SQL model sources share one namespace in the control plane, which
+// compares names case-insensitively. A clash between two SQL models is
+// retl/sqlmodel/semantic-valid's to report.
+func TestTableSemanticValidRule_DisplayNameUniqueness(t *testing.T) {
+	t.Parallel()
+
+	source := func(resourceType, id, displayName string) *resources.Resource {
+		return resources.NewResource(id, resourceType, resources.ResourceData{sqlmodel.DisplayNameKey: displayName}, nil)
+	}
+	spec := map[string]any{
+		"id":                "users-table",
+		"display_name":      "users",
+		"account_id":        "acc-1",
+		"source_definition": "postgres",
+		"primary_key":       "id",
+		"schema":            "public",
+		"table":             "users",
+	}
+
+	tests := []struct {
+		name   string
+		others []*resources.Resource
+		want   []rules.ValidationResult
+	}{
+		{
+			name: "unique across RETL sources",
+			others: []*resources.Resource{
+				source(sqlmodel.ResourceType, "orders", "Orders"),
+				source(table.ResourceType, "events", "Events"),
+			},
+		},
+		{
+			name:   "SQL model whose display name differs only in case",
+			others: []*resources.Resource{source(sqlmodel.ResourceType, "users-model", "Users")},
+			want: []rules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "duplicate display_name 'users' (case-insensitive match with 'Users') within kinds 'retl-source-sql-model' and 'retl-source-table'",
+			}},
+		},
+		{
+			name:   "table source with the same display name",
+			others: []*resources.Resource{source(table.ResourceType, "users-copy", "users")},
+			want: []rules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "duplicate display_name 'users' within kinds 'retl-source-sql-model' and 'retl-source-table'",
+			}},
+		},
+		{
+			name: "clashes with several sources reported once",
+			others: []*resources.Resource{
+				source(sqlmodel.ResourceType, "users-model", "USERS"),
+				source(table.ResourceType, "users-copy", "Users"),
+			},
+			want: []rules.ValidationResult{{
+				Reference: "/spec/display_name",
+				Message:   "duplicate display_name 'users' (case-insensitive match with 'USERS', 'Users') within kinds 'retl-source-sql-model' and 'retl-source-table'",
+			}},
+		},
+	}
+
+	rule := NewTableSemanticValidRule()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph := resources.NewGraph()
+			graph.AddResource(source(table.ResourceType, "users-table", "users"))
+			for _, r := range tt.others {
+				graph.AddResource(r)
+			}
+
+			results := rule.Validate(&rules.ValidationContext{
+				Kind:    table.ResourceKind,
+				Version: specs.SpecVersionV1,
+				Spec:    spec,
+				Graph:   graph,
+			})
+
+			assert.Equal(t, tt.want, results)
 		})
 	}
 }
