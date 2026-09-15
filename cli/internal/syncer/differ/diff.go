@@ -369,13 +369,16 @@ func isNil(val any) bool {
 	return false
 }
 
-// isSecretValue reports whether v is a secret.String (value or pointer). Used
-// when one side omits a key so a presence-based secret still classifies as
-// SecretOnly rather than genuine drift.
+// isSecretValue reports whether v is secret-driven: a secret.String (value or
+// pointer), or a block whose every leaf is one. The API strips secret values
+// rather than masking them, so a block whose keys are all secret vanishes from
+// remote state entirely; an empty block, or one non-secret leaf, is real drift.
 func isSecretValue(v any) bool {
-	switch v.(type) {
+	switch typed := v.(type) {
 	case secret.String, *secret.String:
 		return true
+	case map[string]any:
+		return len(typed) > 0 && lo.EveryBy(lo.Values(typed), isSecretValue)
 	default:
 		return false
 	}

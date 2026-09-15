@@ -17,10 +17,11 @@ spec:
     password: "{{ .RS_PASSWORD }}"
     namespace: rudder_events_ssh
     use_ssh: true
-    ssh_host: bastion.rudder-cli-e2e.internal
-    ssh_port: "22"
-    ssh_user: rudder
-    ssh_public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABrudderE2E
+    ssh:
+      host: bastion.rudder-cli-e2e.internal
+      port: "22"
+      user: rudder
+      public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABrudderE2E
     sync_frequency: "180"
     use_rudder_storage: true
     underscore_divide_numbers: false

@@ -1,10 +1,15 @@
 package rs
 
 import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func init() {
@@ -81,10 +86,10 @@ type excludeWindow struct {
 	EndTime   string `mapstructure:"end_time" validate:"required"`
 }
 
-// rsConfig is the local YAML config model. It is flat because the upstream
-// Redshift warehouse config is flat except excludeWindow; terraform's sync and
-// s3 blocks are provider-specific artifacts and cannot represent every persisted
-// config key without erasing values on whole-config updates.
+// rsConfig is the local YAML config model. It keeps warehouse/storage keys flat
+// because the upstream Redshift warehouse config is flat except excludeWindow;
+// terraform's sync and s3 blocks are provider-specific artifacts and cannot
+// represent every persisted config key without erasing values on whole-config updates.
 type rsConfig struct {
 	// use_iam_for_auth and use_serverless are required even though schema.json
 	// lists neither: its branches are gated on the key being present
@@ -106,14 +111,9 @@ type rsConfig struct {
 	ClusterID         string `mapstructure:"cluster_id" validate:"required_if=UseIAMForAuth true UseServerless false,omitempty,dynamic_or_pattern=rs_single_line_255"`
 	WorkgroupName     string `mapstructure:"workgroup_name" validate:"required_if=UseIAMForAuth true UseServerless true,omitempty,dynamic_or_pattern=rs_single_line_255"`
 
-	Namespace string `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=rs_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
-	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
-	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
-	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,dynamic_or_pattern=single_line_100"`
-	// ssh_public_key is emitted by the backend and may be long; schema.json requires
-	// presence when SSH is enabled but declares no literal pattern.
-	SSHPublicKey string `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true"`
+	Namespace string    `mapstructure:"namespace" validate:"omitempty,dynamic_or_pattern=rs_namespace"`
+	UseSSH    *bool     `mapstructure:"use_ssh" default:"false"`
+	SSH       sshConfig `mapstructure:"ssh"`
 
 	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
@@ -139,6 +139,40 @@ type rsConfig struct {
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
+type sshConfig struct {
+	Host string `mapstructure:"host" validate:"rs_ssh_required,omitempty,dynamic_or_pattern=single_line_100"`
+	Port string `mapstructure:"port" validate:"rs_ssh_required,omitempty,dynamic_or_pattern=single_line_100"`
+	User string `mapstructure:"user" validate:"rs_ssh_required,omitempty,dynamic_or_pattern=single_line_100"`
+	// public_key is emitted by the backend and may be long; schema.json requires
+	// presence when SSH is enabled but declares no literal pattern.
+	PublicKey string `mapstructure:"public_key" validate:"rs_ssh_required"`
+}
+
+// rsSSHRequired reads the selector from the top-level config because the SSH
+// fields live in a nested block, so required_if cannot resolve UseSSH from the
+// nested field's parent struct.
+func rsSSHRequired(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "" {
+		return true
+	}
+
+	root := fl.Top()
+	if root.Kind() == reflect.Pointer {
+		root = root.Elem()
+	}
+	if root.Kind() != reflect.Struct {
+		return true
+	}
+
+	field := root.FieldByName("UseSSH")
+	if !field.IsValid() {
+		return true
+	}
+
+	useSSH, _ := field.Interface().(*bool)
+	return useSSH == nil || !*useSSH
+}
+
 // NewDefinition returns the Redshift (API type RS) destination definition.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
@@ -161,12 +195,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("prefix", "prefix"),
 		converter.Simple("namespace", "namespace"),
 		converter.Simple("useSSH", "use_ssh"),
-		converter.Simple("sshHost", "ssh_host"),
-		converter.Simple("sshPort", "ssh_port"),
+		converter.Simple("sshHost", "ssh.host"),
+		converter.Simple("sshPort", "ssh.port"),
 		converter.Simple("skipTracksTable", "skip_tracks_table"),
 		converter.Simple("skipUsersTable", "skip_users_table"),
-		converter.Simple("sshUser", "ssh_user"),
-		converter.Simple("sshPublicKey", "ssh_public_key"),
+		converter.Simple("sshUser", "ssh.user"),
+		converter.Simple("sshPublicKey", "ssh.public_key"),
 		converter.Simple("syncFrequency", "sync_frequency"),
 		converter.Simple("syncStartAt", "sync_start_at"),
 		converter.Simple("enableSSE", "enable_sse"),
@@ -193,5 +227,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "rs_ssh_required", Func: rsSSHRequired},
+		},
 	}
 }

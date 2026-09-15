@@ -114,6 +114,51 @@ func bucketNameConditional(fl validator.FieldLevel) bool {
 	}
 }
 
+// accessKeyIDRequired covers the two branches that require access_key_id: MinIO
+// always, and S3 unless role-based auth is on. schema.json declares the key in
+// both branches, so it stays top-level — nesting one key under two providers
+// would need the API's single flat accessKeyID routed by bucket_provider, and a
+// stale value from a third provider would have nowhere to land.
+func accessKeyIDRequired(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "" {
+		return true
+	}
+
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	useRudderStorageField := parent.FieldByName("UseRudderStorage")
+	bucketProviderField := parent.FieldByName("BucketProvider")
+	if !useRudderStorageField.IsValid() || !bucketProviderField.IsValid() {
+		return true
+	}
+
+	useRudderStorage, _ := useRudderStorageField.Interface().(*bool)
+	if useRudderStorage == nil || *useRudderStorage {
+		return true
+	}
+
+	switch bucketProviderField.String() {
+	case "MINIO":
+		return false
+	case "S3":
+		s3Field := parent.FieldByName("S3")
+		if !s3Field.IsValid() {
+			return true
+		}
+		roleBasedField := s3Field.FieldByName("RoleBasedAuth")
+		if !roleBasedField.IsValid() {
+			return true
+		}
+		roleBased, _ := roleBasedField.Interface().(*bool)
+		return roleBased != nil && *roleBased
+	default:
+		return true
+	}
+}
+
 // Source types from integrations-config destinations/postgres/db-config.json.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
@@ -147,8 +192,145 @@ type excludeWindow struct {
 	EndTime   string `mapstructure:"end_time" validate:"required"`
 }
 
-// postgresConfig is the local YAML config model. It is flat because the upstream
-// config is flat; terraform's object-storage grouping is a provider artefact.
+// Provider-scoped object-storage settings. The local YAML groups keys by the
+// storage provider that owns them, while converter mappings keep the upstream
+// POSTGRES API payload flat. Shared selector/staging keys stay top-level because
+// the API uses them across branches and update replaces the whole config object.
+type s3Storage struct {
+	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
+	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"postgres_s3_role_required,omitempty,pattern=single_line_100"`
+	AccessKey     string `mapstructure:"access_key" validate:"postgres_s3_key_required,omitempty,pattern=single_line_100"`
+}
+
+// SSH tunnel settings, grouped because schema.json declares all four only
+// inside the useSSH branch. use_ssh stays top level as the selector.
+type sshConfig struct {
+	Host string `mapstructure:"host" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	Port string `mapstructure:"port" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	User string `mapstructure:"user" validate:"postgres_ssh_required,omitempty,pattern=single_line_100"`
+	// public_key is emitted by the backend and may be long; schema.json bounds it
+	// to 1000 characters when SSH is enabled.
+	PublicKey string `mapstructure:"public_key" validate:"postgres_ssh_required,omitempty,pattern=single_line_1000"`
+}
+
+// postgresSSHRequired reads the selector from the top-level config because the
+// SSH fields live in a nested block: fl.Parent() is sshConfig, which does not
+// carry use_ssh, so required_if would silently never fire.
+func postgresSSHRequired(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "" {
+		return true
+	}
+
+	root := fl.Top()
+	for root.Kind() == reflect.Pointer {
+		root = root.Elem()
+	}
+	if root.Kind() != reflect.Struct {
+		return true
+	}
+
+	field := root.FieldByName("UseSSH")
+	if !field.IsValid() {
+		return true
+	}
+
+	useSSH, _ := field.Interface().(*bool)
+	return useSSH == nil || !*useSSH
+}
+
+type gcsStorage struct {
+	Credentials string `mapstructure:"credentials" validate:"postgres_gcs_required"`
+}
+
+type azureStorage struct {
+	AccountName   string `mapstructure:"account_name" validate:"postgres_azure_required,omitempty,pattern=single_line_100"`
+	AccountKey    string `mapstructure:"account_key" validate:"postgres_azure_key_required,omitempty,pattern=single_line_100"`
+	SASToken      string `mapstructure:"sas_token" validate:"postgres_azure_sas_required"`
+	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
+	ContainerName string `mapstructure:"container_name" validate:"postgres_azure_required,omitempty,pattern=postgres_container_name"`
+}
+
+type minioStorage struct {
+	EndPoint        string `mapstructure:"end_point" validate:"postgres_minio_required,omitempty,pattern=postgres_end_point"`
+	SecretAccessKey string `mapstructure:"secret_access_key" validate:"postgres_minio_required,omitempty,pattern=single_line_100"`
+	UseSSL          *bool  `mapstructure:"use_ssl" validate:"postgres_minio_required"`
+}
+
+// storageBranchActive reports whether the given bucketProvider branch is in
+// force. Every storage branch is gated on useRudderStorage=false plus the
+// provider selector, so outside that pair no branch rule applies.
+func storageBranchActive(fl validator.FieldLevel, provider string) bool {
+	top := fl.Top()
+	for top.Kind() == reflect.Pointer {
+		top = top.Elem()
+	}
+
+	useRudderStorageField := top.FieldByName("UseRudderStorage")
+	bucketProviderField := top.FieldByName("BucketProvider")
+	if !useRudderStorageField.IsValid() || !bucketProviderField.IsValid() {
+		return false
+	}
+
+	useRudderStorage, _ := useRudderStorageField.Interface().(*bool)
+	if useRudderStorage == nil || *useRudderStorage {
+		return false
+	}
+	return bucketProviderField.String() == provider
+}
+
+// storageFieldIsSet reports whether the spec states a value. go-playground
+// dereferences a non-nil pointer before calling the validator, so a *bool only
+// arrives as a pointer when it is nil (via CallEvenIfNull): an explicit false
+// reaches here as bool(false) and must count as stated, not as absent.
+func storageFieldIsSet(fl validator.FieldLevel) bool {
+	field := fl.Field()
+	switch field.Kind() {
+	case reflect.Pointer:
+		return !field.IsNil()
+	case reflect.Bool:
+		return true
+	default:
+		return !field.IsZero()
+	}
+}
+
+func requiredForProvider(provider string) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		if !storageBranchActive(fl, provider) {
+			return true
+		}
+		return storageFieldIsSet(fl)
+	}
+}
+
+// requiredForProviderWhen adds the sibling-flag condition upstream expresses as
+// an anyOf inside the branch (roleBasedAuth picks IAM role vs access keys,
+// useSASTokens picks SAS token vs account key). schema.json defaults neither
+// flag, so an omitted one reads as false and selects the access-key side.
+func requiredForProviderWhen(provider, flagField string, want bool) validator.Func {
+	return func(fl validator.FieldLevel) bool {
+		if !storageBranchActive(fl, provider) {
+			return true
+		}
+
+		parent := fl.Parent()
+		for parent.Kind() == reflect.Pointer {
+			parent = parent.Elem()
+		}
+		field := parent.FieldByName(flagField)
+		if !field.IsValid() {
+			return true
+		}
+
+		flag, _ := field.Interface().(*bool)
+		selected := flag != nil && *flag
+		if selected != want {
+			return true
+		}
+		return storageFieldIsSet(fl)
+	}
+}
+
 type postgresConfig struct {
 	Host     string `mapstructure:"host" validate:"required,pattern=postgres_host"`
 	Database string `mapstructure:"database" validate:"required,pattern=single_line_100"`
@@ -156,14 +338,9 @@ type postgresConfig struct {
 	Password string `mapstructure:"password" validate:"required"`
 	Port     string `mapstructure:"port" validate:"required,pattern=single_line_100"`
 
-	Namespace string `mapstructure:"namespace" validate:"omitempty,pattern=postgres_namespace"`
-	UseSSH    *bool  `mapstructure:"use_ssh" default:"false"`
-	SSHHost   string `mapstructure:"ssh_host" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	SSHPort   string `mapstructure:"ssh_port" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	SSHUser   string `mapstructure:"ssh_user" validate:"required_if=UseSSH true,omitempty,pattern=single_line_100"`
-	// ssh_public_key is emitted by the backend and may be long; schema.json bounds
-	// it to 1000 characters when SSH is enabled.
-	SSHPublicKey string `mapstructure:"ssh_public_key" validate:"required_if=UseSSH true,omitempty,pattern=single_line_1000"`
+	Namespace string    `mapstructure:"namespace" validate:"omitempty,pattern=postgres_namespace"`
+	UseSSH    *bool     `mapstructure:"use_ssh" default:"false"`
+	SSH       sshConfig `mapstructure:"ssh"`
 
 	// schema.json requires the TLS material only for verify-ca, and declares no
 	// pattern for any of the three, so they carry no shape constraint here.
@@ -182,38 +359,16 @@ type postgresConfig struct {
 	AllowUsersContextTraits *bool  `mapstructure:"allow_users_context_traits" default:"false"`
 	UnderscoreDivideNumbers *bool  `mapstructure:"underscore_divide_numbers" default:"false"`
 
-	// Object-storage staging. Upstream keeps every provider's keys in the same
-	// flat object, so a key is required only for the providers schema.json names
-	// it under — and only while rudder-managed storage is off, so a stale
-	// bucketProvider left in config cannot resurrect the requirement.
-	//
-	// bucket_name is the one key required for more than one provider (S3, GCS and
-	// MINIO but not AZURE_BLOB). required_if cannot express that, so it is stated
-	// as its inverse with required_unless: exempt when storage is rudder-managed
-	// or the provider is AZURE_BLOB, required otherwise.
 	UseRudderStorage          *bool  `mapstructure:"use_rudder_storage" validate:"required"`
 	BucketProvider            string `mapstructure:"bucket_provider" validate:"required_if=UseRudderStorage false,omitempty,oneof=S3 GCS AZURE_BLOB MINIO"`
 	BucketName                string `mapstructure:"bucket_name" validate:"required_unless=UseRudderStorage true BucketProvider AZURE_BLOB,omitempty,pattern=single_line_100,postgres_bucket_name"`
+	AccessKeyID               string `mapstructure:"access_key_id" validate:"postgres_access_key_id_required,omitempty,pattern=single_line_100"`
 	CleanupObjectStorageFiles *bool  `mapstructure:"cleanup_object_storage_files" default:"false"`
 
-	// S3
-	RoleBasedAuth *bool  `mapstructure:"role_based_auth"`
-	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"omitempty,pattern=single_line_100"`
-	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,pattern=single_line_100"`
-	AccessKey     string `mapstructure:"access_key" validate:"omitempty,pattern=single_line_100"`
-
-	// Azure Blob
-	AccountName   string `mapstructure:"account_name" validate:"required_if=UseRudderStorage false BucketProvider AZURE_BLOB,omitempty,pattern=single_line_100"`
-	AccountKey    string `mapstructure:"account_key" validate:"omitempty,pattern=single_line_100"`
-	SASToken      string `mapstructure:"sas_token"`
-	UseSASTokens  *bool  `mapstructure:"use_sas_tokens"`
-	ContainerName string `mapstructure:"container_name" validate:"required_if=UseRudderStorage false BucketProvider AZURE_BLOB,omitempty,pattern=postgres_container_name"`
-
-	// GCS / MinIO
-	Credentials     string `mapstructure:"credentials" validate:"required_if=UseRudderStorage false BucketProvider GCS"`
-	EndPoint        string `mapstructure:"end_point" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,pattern=postgres_end_point"`
-	SecretAccessKey string `mapstructure:"secret_access_key" validate:"required_if=UseRudderStorage false BucketProvider MINIO,omitempty,pattern=single_line_100"`
-	UseSSL          *bool  `mapstructure:"use_ssl" validate:"required_if=UseRudderStorage false BucketProvider MINIO"`
+	S3    s3Storage    `mapstructure:"s3"`
+	GCS   gcsStorage   `mapstructure:"gcs"`
+	Azure azureStorage `mapstructure:"azure"`
+	MinIO minioStorage `mapstructure:"minio"`
 
 	ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
@@ -229,10 +384,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("port", "port"),
 		converter.Simple("namespace", "namespace"),
 		converter.Simple("useSSH", "use_ssh"),
-		converter.Simple("sshHost", "ssh_host"),
-		converter.Simple("sshPort", "ssh_port"),
-		converter.Simple("sshUser", "ssh_user"),
-		converter.Simple("sshPublicKey", "ssh_public_key"),
+		converter.Simple("sshHost", "ssh.host"),
+		converter.Simple("sshPort", "ssh.port"),
+		converter.Simple("sshUser", "ssh.user"),
+		converter.Simple("sshPublicKey", "ssh.public_key"),
 		converter.Simple("sslMode", "ssl_mode"),
 		converter.Simple("clientKey", "client_key"),
 		converter.Simple("clientCert", "client_cert"),
@@ -251,19 +406,19 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("bucketProvider", "bucket_provider"),
 		converter.Simple("bucketName", "bucket_name"),
 		converter.Simple("cleanupObjectStorageFiles", "cleanup_object_storage_files"),
-		converter.Simple("roleBasedAuth", "role_based_auth"),
-		converter.Simple("iamRoleARN", "iam_role_arn"),
+		converter.Simple("roleBasedAuth", "s3.role_based_auth"),
+		converter.Simple("iamRoleARN", "s3.iam_role_arn"),
 		converter.Simple("accessKeyID", "access_key_id"),
-		converter.Simple("accessKey", "access_key"),
-		converter.Simple("accountName", "account_name"),
-		converter.Simple("accountKey", "account_key"),
-		converter.Simple("sasToken", "sas_token"),
-		converter.Simple("useSASTokens", "use_sas_tokens"),
-		converter.Simple("containerName", "container_name"),
-		converter.Simple("credentials", "credentials"),
-		converter.Simple("endPoint", "end_point"),
-		converter.Simple("secretAccessKey", "secret_access_key"),
-		converter.Simple("useSSL", "use_ssl"),
+		converter.Simple("accessKey", "s3.access_key"),
+		converter.Simple("accountName", "azure.account_name"),
+		converter.Simple("accountKey", "azure.account_key"),
+		converter.Simple("sasToken", "azure.sas_token"),
+		converter.Simple("useSASTokens", "azure.use_sas_tokens"),
+		converter.Simple("containerName", "azure.container_name"),
+		converter.Simple("credentials", "gcs.credentials"),
+		converter.Simple("endPoint", "minio.end_point"),
+		converter.Simple("secretAccessKey", "minio.secret_access_key"),
+		converter.Simple("useSSL", "minio.use_ssl"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)
@@ -276,11 +431,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		SecretKeys: []string{
 			"password",
 			"access_key_id",
-			"access_key",
-			"account_key",
-			"sas_token",
-			"secret_access_key",
-			"credentials",
+			"s3.access_key",
+			"azure.account_key",
+			"azure.sas_token",
+			"gcs.credentials",
+			"minio.secret_access_key",
 		},
 		NewConfig: func() any {
 			return &postgresConfig{}
@@ -289,6 +444,15 @@ func NewDefinition() *definitions.DestinationDefinition {
 		ConnectionModes: connectionModes,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "postgres_bucket_name", Func: bucketNameConditional},
+			{Tag: "postgres_ssh_required", Func: postgresSSHRequired},
+			{Tag: "postgres_access_key_id_required", Func: accessKeyIDRequired},
+			{Tag: "postgres_s3_role_required", Func: requiredForProviderWhen("S3", "RoleBasedAuth", true)},
+			{Tag: "postgres_s3_key_required", Func: requiredForProviderWhen("S3", "RoleBasedAuth", false)},
+			{Tag: "postgres_gcs_required", Func: requiredForProvider("GCS")},
+			{Tag: "postgres_azure_required", Func: requiredForProvider("AZURE_BLOB")},
+			{Tag: "postgres_azure_key_required", Func: requiredForProviderWhen("AZURE_BLOB", "UseSASTokens", false)},
+			{Tag: "postgres_azure_sas_required", Func: requiredForProviderWhen("AZURE_BLOB", "UseSASTokens", true)},
+			{Tag: "postgres_minio_required", Func: requiredForProvider("MINIO"), CallEvenIfNull: true},
 		},
 	}
 }

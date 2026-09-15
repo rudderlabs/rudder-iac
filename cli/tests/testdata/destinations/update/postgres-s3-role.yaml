@@ -20,5 +20,6 @@ spec:
     use_rudder_storage: false
     bucket_provider: S3
     bucket_name: rudder-cli-e2e
-    role_based_auth: true
-    iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e-updated
+    s3:
+      role_based_auth: true
+      iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e-updated
