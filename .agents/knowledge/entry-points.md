@@ -57,3 +57,10 @@ Read these first when working on HTTP destination onboarding or destination defi
 - `cli/internal/providers/destination/definitions`: shared destination definition and converter surface used by HTTP event filtering mappings.
 - `cli/internal/providers/destination/handler.go`: local spec extraction, secret wrapping, API conversion, and remote-to-state conversion boundary for destination definitions.
 - `cli/internal/app/dependencies.go`: destination definition registry wiring and experimental-flag gating for unverified destinations such as HTTP.
+
+## ACT2-756 — Offline Validate And Installability Entry
+<!-- ticket:ACT2-756 -->
+Read these first when working on offline `rudder-cli validate` or published `go install` support:
+- `cli/internal/cmd/project/validate/validate.go`: command entry for offline validation flags and project construction.
+- `cli/internal/app/dependencies.go`: dependency assembly surface containing the offline composite project path used by validate.
+- `go.mod`: module/release installability surface; local `replace` directives can make tagged `go install github.com/rudderlabs/rudder-iac/cli/cmd/rudder-cli@<tag>` fail.
