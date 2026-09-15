@@ -76,7 +76,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ACTIVE_CAMPAIGN",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_key", "event_key"},
+		SecretKeys: []string{"actid", "api_key", "event_key"},
+		// actid is returned by the API, unlike api_key/event_key which remain
+		// write-only. Preserve it for diffing while masking output/export.
+		ReturnedSecretKeys: []string{"actid"},
 		NewConfig: func() any {
 			return &activeCampaignConfig{}
 		},

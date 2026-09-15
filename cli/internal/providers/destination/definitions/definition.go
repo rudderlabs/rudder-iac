@@ -21,13 +21,20 @@ type DestinationDefinition struct {
 	Type string
 	// APIType is the upstream API destination type (e.g. "S3").
 	// When empty at registration, it defaults to Type.
-	APIType         string
-	Version         int64
-	Properties      []converter.ConfigProperty
-	SecretKeys      []string
-	NewConfig       func() any
-	SourceTypes     []string
-	ConnectionModes map[string][]string
+	APIType    string
+	Version    int64
+	Properties []converter.ConfigProperty
+	// SecretKeys lists local config paths whose values must be redacted on CLI
+	// output/export and revealed only for API writes. By default these are
+	// treated as write-only when mapping remote state.
+	SecretKeys []string
+	// ReturnedSecretKeys is the subset of SecretKeys the API returns in read
+	// responses. They remain known in memory so no-op applies can compare them,
+	// while SecretKeys still masks them anywhere they are rendered/exported.
+	ReturnedSecretKeys []string
+	NewConfig          func() any
+	SourceTypes        []string
+	ConnectionModes    map[string][]string
 	// ConnectionRequiredKeys lists, per local source type and connection mode,
 	// the local config keys a source of that type must carry to connect in that
 	// mode. Both dimensions matter: Braze needs rest_api_key from a cloud-mode
@@ -82,6 +89,34 @@ func (d *RegisteredDefinition) SecretKeys() []string {
 		return []string{}
 	}
 	return append([]string(nil), d.DestinationDefinition.SecretKeys...)
+}
+
+func (d *RegisteredDefinition) ReturnedSecretKeys() []string {
+	if d.DestinationDefinition == nil || d.DestinationDefinition.ReturnedSecretKeys == nil {
+		return []string{}
+	}
+	return append([]string(nil), d.DestinationDefinition.ReturnedSecretKeys...)
+}
+
+func (d *RegisteredDefinition) WriteOnlySecretKeys() []string {
+	secretKeys := d.SecretKeys()
+	if len(secretKeys) == 0 {
+		return []string{}
+	}
+
+	returnedSecretKeys := d.ReturnedSecretKeys()
+	if len(returnedSecretKeys) == 0 {
+		return secretKeys
+	}
+
+	writeOnlySecretKeys := make([]string, 0, len(secretKeys))
+	for _, key := range secretKeys {
+		if slices.Contains(returnedSecretKeys, key) {
+			continue
+		}
+		writeOnlySecretKeys = append(writeOnlySecretKeys, key)
+	}
+	return writeOnlySecretKeys
 }
 
 func (d *RegisteredDefinition) SupportedSourceTypes() []string {
@@ -176,6 +211,10 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating connection required keys: %w", err)
 	}
 
+	if err := validateReturnedSecretKeys(def); err != nil {
+		return nil, fmt.Errorf("validating returned secret keys: %w", err)
+	}
+
 	keyPathSourceTypes, err := buildGatedKeyPaths(def, configType)
 	if err != nil {
 		return nil, fmt.Errorf("building gated key paths: %w", err)
@@ -199,6 +238,16 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 // and required keys outside the local config surface (the config struct plus
 // the source-type block keys) — the config model is a closed allowlist, so an
 // unknown required key could never be satisfied.
+func validateReturnedSecretKeys(def *DestinationDefinition) error {
+	for _, key := range def.ReturnedSecretKeys {
+		if slices.Contains(def.SecretKeys, key) {
+			continue
+		}
+		return fmt.Errorf("returned secret key %q is not listed in secret keys", key)
+	}
+	return nil
+}
+
 func validateConnectionRequiredKeys(def *DestinationDefinition, configType reflect.Type) error {
 	configFields := structFieldsByMapstructureTag(configType)
 

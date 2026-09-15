@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 func TestNewDefinitionMetadata(t *testing.T) {
@@ -24,7 +25,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "adj", registered.Type)
 	assert.Equal(t, "ADJ", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Empty(t, registered.SecretKeys(), "db-config declares no secretKeys")
+	assert.Equal(t, []string{"app_token"}, registered.SecretKeys(), "revision-2 secrecy policy marks app_token secret")
+	assert.Equal(t, []string{"app_token"}, registered.ReturnedSecretKeys())
+	assert.Empty(t, registered.WriteOnlySecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift",
@@ -69,6 +72,22 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	byAPI, err := registry.GetByAPIType("ADJ", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestAdjustSecretKeysWrapSensitiveValues(t *testing.T) {
+	t.Parallel()
+
+	registered := adj.NewDefinition()
+	config := secret.WrapKnownSecrets(map[string]any{
+		"app_token": "raw-app-token",
+		"delay":     "60",
+	}, registered.SecretKeys)
+
+	wrapped, ok := config["app_token"].(*secret.String)
+	require.True(t, ok, "expected app_token to be wrapped as a secret")
+	assert.Equal(t, "raw-app-token", wrapped.Reveal())
+	assert.NotContains(t, wrapped.String(), "raw-app-token")
+	assert.Equal(t, "60", config["delay"])
 }
 
 func TestAdjustApplyDefaults(t *testing.T) {

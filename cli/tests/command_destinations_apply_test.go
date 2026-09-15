@@ -15,15 +15,24 @@ import (
 
 // destinationSnapshotIgnore are the volatile upstream fields excluded from the
 // snapshot comparison: server-assigned id, workspace scoping, definition version
-// and its lifecycle advisory, and timestamps. Write-only secrets (e.g. S3 access
-// keys) are never returned by the API, so they never appear here.
+// and its lifecycle advisory, and timestamps. Newly classified secrets that the
+// API still returns are also ignored by path so snapshots can pin presence with
+// placeholder values without storing the real secret.
 //
 // A key recorded in a snapshot is still required to come back: ignoring it drops
 // the value comparison, not the presence check. The one asymmetry is that an
-// ignored key may be *extra* in the response, which is what keeps versionInfo
-// harmless — the API only attaches it once a destination's stored major falls
-// behind its definition's current one, so it is absent from every snapshot here.
-var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versionInfo", "createdAt", "updatedAt"}
+// ignored key may be *extra* in the response, which is what keeps conditional
+// versionInfo harmless when it is absent from snapshots.
+var destinationSnapshotIgnore = []string{
+	"id",
+	"workspaceId",
+	"version",
+	"versionInfo",
+	"createdAt",
+	"updatedAt",
+	"config.appToken",
+	"config.actid",
+}
 
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
@@ -39,6 +48,9 @@ var destinationRawSecrets = []string{
 	"customerioApiKeyXXXXXXXXXXXXXX",
 	"tiktokAdsAccessTokenXXXXXXXXXX",
 	"brazeRestApiKeyXXXXXXXXXXXXXX",
+	"rudderCliE2eAppToken",
+	"activeCampaignActidXXXXXXXXXXXX",
+	"activeCampaignActidUpdatedXXXXX",
 	"activeCampaignApiKeyXXXXXXXXXX",
 	"activeCampaignEventKeyXXXXXXXX",
 	"ga4ApiSecretXXXXXXXXXXXXXXXX",
@@ -97,7 +109,7 @@ var destinationRawSecrets = []string{
 	"s3DatalakeSecretAccessKeyXXXXXXXXXXXXXXXXX",
 }
 
-// assertNoRawSecrets fails if any write-only secret appears in CLI output. Both
+// assertNoRawSecrets fails if any destination secret appears in CLI output. Both
 // apply and destroy render plans, so both are leak surfaces.
 func assertNoRawSecrets(t *testing.T, out []byte) {
 	t.Helper()

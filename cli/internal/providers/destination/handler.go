@@ -234,10 +234,11 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, err
 	}
 
-	// API responses omit secret values. Wrap only secret keys that are still
-	// present after conversion (defensive); absent keys stay absent so
-	// presence-based wrapping never invents conditional secrets.
-	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
+	// Most API secret fields are write-only, but a few endpoints return sensitive
+	// values. Keep returned secrets known for diffing while still relying on
+	// SecretKeys for output/export masking.
+	localConfig = secret.WrapKnownSecrets(localConfig, registered.ReturnedSecretKeys())
+	localConfig = secret.WrapUnknownSecrets(localConfig, registered.WriteOnlySecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
