@@ -116,11 +116,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ADJ",
 		Version:    1,
 		Properties: properties,
-		// db-config declares no secretKeys. Terraform marks app_token Sensitive, but
-		// db-config is authoritative for write-only values: the API returns app_token,
-		// so wrapping it as a secret would make the destination diff on every apply
-		// and export as a "{{ .VAR }}" the user has to fill in by hand.
-		SecretKeys: nil,
+		// app_token is a revision-2 secrecy-policy exception while upstream
+		// db-config/UI/Terraform metadata catches up. The API returns it, so keep
+		// the value available for diffing while still masking CLI output/export.
+		SecretKeys:         []string{"app_token"},
+		ReturnedSecretKeys: []string{"app_token"},
 		NewConfig: func() any {
 			return &adjustConfig{}
 		},

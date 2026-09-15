@@ -15,6 +15,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
@@ -768,7 +770,7 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		assert.NotNil(t, resource.Transformation.Resolve)
 		assert.Equal(t, "G-123", resource.Config["measurement_id"])
 		apiSecret := requireSecret(t, resource.Config, "api_secret")
-		assert.True(t, apiSecret.IsUnknown(), "remote secrets must be unknown — API never returns them")
+		assert.True(t, apiSecret.IsUnknown(), "write-only remote secrets must be unknown")
 		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-1"}, state)
 	})
 
@@ -1693,6 +1695,102 @@ func TestHandlerImpl_FormatForExport_EmitsLocalType(t *testing.T) {
 	assert.Equal(t, "my-bucket", config["bucket_name"])
 	assert.Equal(t, "{{ .MY_S3_ACCESS_KEY }}", config["access_key"])
 	assert.NotContains(t, config, "access_key_id", "absent secrets are not invented")
+}
+
+func TestHandlerImpl_ReturnedSecretKeysDoNotForceDiff(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		definition  *definitions.DestinationDefinition
+		localType   string
+		apiType     string
+		id          string
+		config      map[string]any
+		apiConfig   string
+		secretKey   string
+		secretValue string
+	}{
+		{
+			name:        "adjust app token",
+			definition:  adj.NewDefinition(),
+			localType:   "adj",
+			apiType:     "ADJ",
+			id:          "adj-production",
+			config:      map[string]any{"app_token": "returned-app-token"},
+			apiConfig:   `{"appToken":"returned-app-token","environment":false}`,
+			secretKey:   "app_token",
+			secretValue: "returned-app-token",
+		},
+		{
+			name:        "active campaign account id",
+			definition:  activecampaign.NewDefinition(),
+			localType:   "active_campaign",
+			apiType:     "ACTIVE_CAMPAIGN",
+			id:          "active-campaign",
+			config:      map[string]any{"actid": "returned-actid"},
+			apiConfig:   `{"actid":"returned-actid"}`,
+			secretKey:   "actid",
+			secretValue: "returned-actid",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := definitions.NewRegistry()
+			require.NoError(t, registry.Register(tc.definition))
+			h := destination.NewHandler(nil, registry)
+
+			local, err := h.Impl.ExtractResourcesFromSpec("destination.yaml", &destination.DestinationSpec{
+				ID:                tc.id,
+				DisplayName:       "Destination",
+				Type:              tc.localType,
+				Enabled:           true,
+				DefinitionVersion: 1,
+				Config:            tc.config,
+			})
+			require.NoError(t, err)
+
+			remoteMapped, _, err := h.Impl.MapRemoteToState(&destination.RemoteDestination{Destination: &client.Destination{
+				ID:         "remote-" + tc.id,
+				ExternalID: tc.id,
+				Name:       "Destination",
+				Type:       tc.apiType,
+				Version:    1,
+				IsEnabled:  true,
+				Config:     []byte(tc.apiConfig),
+			}}, urnResolver{})
+			require.NoError(t, err)
+
+			returnedSecret := requireSecret(t, remoteMapped.Config, tc.secretKey)
+			assert.False(t, returnedSecret.IsUnknown())
+			assert.Equal(t, tc.secretValue, returnedSecret.Reveal())
+
+			source := resources.NewGraph()
+			target := resources.NewGraph()
+			source.AddResource(resources.NewResource(
+				tc.id,
+				destination.DestinationResourceType,
+				resources.ResourceData{},
+				[]string{},
+				resources.WithRawData(remoteMapped),
+			))
+			target.AddResource(resources.NewResource(
+				tc.id,
+				destination.DestinationResourceType,
+				resources.ResourceData{},
+				[]string{},
+				resources.WithRawData(local[tc.id]),
+			))
+
+			diff := differ.ComputeDiff(source, target, differ.DiffOptions{})
+
+			assert.Empty(t, diff.UpdatedResources)
+			assert.Contains(t, diff.UnmodifiedResources, resources.URN(tc.id, destination.DestinationResourceType))
+		})
+	}
 }
 
 func TestHandlerImpl_SecretOnlyDiff(t *testing.T) {

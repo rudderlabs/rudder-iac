@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    app_token: rudderCliE2eAppToken
+    app_token: "{{ .ADJ_APP_TOKEN }}"
     environment: false
     delay: "60"
     custom_mappings:
