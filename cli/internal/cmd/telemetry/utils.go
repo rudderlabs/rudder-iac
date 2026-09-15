@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
+	"strings"
+
+	"github.com/spf13/cobra"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
@@ -36,8 +39,11 @@ func getCIExecutionContext() map[string]interface{} {
 	return executionContext
 }
 
-func TrackCommand(command string, err error, extras ...KV) {
+// TrackCommand is a variable so tests can observe what a command reports
+// without sending events.
+var TrackCommand = trackCommand
 
+func trackCommand(command string, err error, extras ...KV) {
 	props := map[string]interface{}{
 		"command": command,
 		"errored": err != nil,
@@ -59,5 +65,32 @@ func TrackCommand(command string, err error, extras ...KV) {
 
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
+	}
+}
+
+// TrackPreRunFailures reports PreRunE failures (auth, workspace lookup, spec
+// loading) across the command tree. Commands track themselves from RunE,
+// which cobra skips when PreRunE fails, so there is no double counting.
+//
+// ponytail: the command name is the path below the root, which matches the
+// name every current PreRunE command passes to TrackCommand from RunE; a new
+// command tracking under a different name would split into two funnel steps.
+func TrackPreRunFailures(cmd *cobra.Command) {
+	for _, sub := range cmd.Commands() {
+		TrackPreRunFailures(sub)
+	}
+
+	preRunE := cmd.PreRunE
+	if preRunE == nil {
+		return
+	}
+
+	cmd.PreRunE = func(c *cobra.Command, args []string) error {
+		err := preRunE(c, args)
+		if err != nil {
+			command := strings.TrimPrefix(c.CommandPath(), c.Root().Name()+" ")
+			TrackCommand(command, err, KV{K: "stage", V: "pre_run"})
+		}
+		return err
 	}
 }
