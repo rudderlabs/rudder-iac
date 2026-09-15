@@ -26,7 +26,6 @@ func NewCmdValidate() *cobra.Command {
 		deps      app.Deps
 		p         project.Project
 		workspace *client.Workspace
-		err       error
 		location  string
 		varFiles  []string
 	)
@@ -42,7 +41,7 @@ func NewCmdValidate() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli validate --location </path/to/dir or file>
 		`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -65,7 +64,8 @@ func NewCmdValidate() *cobra.Command {
 			p = deps.NewProject(projectOpts...)
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		// Named return so the deferred telemetry sees the error RunE returns.
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			validateLog.Debug("validate", "location", location)
 
 			defer func() {

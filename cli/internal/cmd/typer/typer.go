@@ -51,7 +51,15 @@ func newCmdGenerate() *cobra.Command {
 			$ rudder-cli typer generate --tracking-plan-id <id> --platform kotlin
 			$ rudder-cli typer generate --local --location ./project --platform kotlin
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		// Named return so the deferred telemetry sees the error RunE returns.
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer func() {
+				telemetry.TrackCommand("typer", err, []telemetry.KV{
+					{K: "platform", V: platform},
+					{K: "local", V: local},
+				}...)
+			}()
+
 			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true, platformTypeScript: true}
 			if !validPlatforms[platform] {
 				supported := make([]string, 0, len(validPlatforms))
@@ -62,17 +70,7 @@ func newCmdGenerate() *cobra.Command {
 				return fmt.Errorf("unsupported platform: %s (supported platforms: %s)", platform, strings.Join(supported, ", "))
 			}
 
-			defer func() {
-				telemetry.TrackCommand("typer", nil, []telemetry.KV{
-					{K: "platform", V: platform},
-					{K: "local", V: local},
-				}...)
-			}()
-
-			var (
-				planProvider typer.PlanProvider
-				err          error
-			)
+			var planProvider typer.PlanProvider
 			if local {
 				planProvider, err = providers.NewLocalCatalogPlanProviderForProject(location, trackingPlanID)
 			} else {

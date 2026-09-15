@@ -29,8 +29,8 @@ func NewCmdInfo() *cobra.Command {
 		Use:   "info",
 		Short: "Show information about the authenticated workspace",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
+		// Named return so the deferred telemetry sees the error RunE returns.
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				telemetry.TrackCommand("workspace info", err)
 			}()

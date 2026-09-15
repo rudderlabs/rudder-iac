@@ -30,7 +30,6 @@ func NewCmdRetlSource() *cobra.Command {
 		remoteID    string
 		location    string
 		sqlLocation string
-		err         error
 	)
 
 	cmd := &cobra.Command{
@@ -52,7 +51,8 @@ func NewCmdRetlSource() *cobra.Command {
 			$ rudder-cli import retl-sources --local-id analytics-model --remote-id def789 --location ./models --sql-location ./sql
 			$ rudder-cli import retl-sources -i analytics-model -r def789 -l ./models -s ./sql
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		// Named return so the deferred telemetry sees the error RunE returns.
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			retlSourceImportLog.Debug("import retl-source", "localID", localID, "remoteID", remoteID, "location", location, "sqlLocation", sqlLocation)
 			retlSourceImportLog.Debug("importing remote RETL SQL Model to local configuration")
 
