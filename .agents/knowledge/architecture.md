@@ -331,3 +331,9 @@
 - The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
 - Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
 - GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.
+
+## ACT2-756 — Offline Validate Composition
+<!-- ticket:ACT2-756 -->
+- `rudder-cli validate` is intended to run as a local/offline project validation path: it should construct an offline composite project through `app.NewOfflineProject` rather than initializing full authenticated dependencies and calling `Workspaces.GetByAuthToken`.
+- Offline validation should retain the same composite provider/rule coverage as authenticated project validation, rather than falling back to a DataCatalog-only provider that would miss non-catalog project rules.
+- When `--workspace-id` is omitted, offline validate intentionally keeps project workspace scope empty so workspace-aware import-manifest rules check every workspace block; `--workspace-id` scopes those checks without requiring auth or a workspace API lookup.

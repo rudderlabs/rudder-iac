@@ -1,11 +1,9 @@
 package validate
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -23,12 +21,11 @@ var (
 
 func NewCmdValidate() *cobra.Command {
 	var (
-		deps      app.Deps
-		p         project.Project
-		workspace *client.Workspace
-		err       error
-		location  string
-		varFiles  []string
+		p           project.Project
+		err         error
+		location    string
+		workspaceID string
+		varFiles    []string
 	)
 
 	cmd := &cobra.Command{
@@ -38,31 +35,27 @@ func NewCmdValidate() *cobra.Command {
 			Validates the project configuration files for correctness and consistency.
 			This includes checking for valid syntax, required fields, and relationships
 			between resources.
+
+			When --workspace-id is omitted, workspace-aware rules validate every
+			workspace block in import-manifest files.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli validate --location </path/to/dir or file>
+			$ rudder-cli validate --location </path/to/dir --workspace-id <workspace-id>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			deps, err = app.NewDeps()
-			if err != nil {
-				return fmt.Errorf("initialising dependencies: %w", err)
-			}
-
-			// Resolve the active workspace so validation scopes workspace-aware
-			// rules (e.g. import-manifest orphaned-urn) to the same workspace apply
-			// targets.
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
-			}
-
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}
-			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
+			if workspaceID != "" {
+				projectOpts = append(projectOpts, project.WithWorkspaceID(workspaceID))
+			}
 
-			p = deps.NewProject(projectOpts...)
+			p, err = app.NewOfflineProject(projectOpts...)
+			if err != nil {
+				return fmt.Errorf("initialising offline project: %w", err)
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -90,6 +83,7 @@ func NewCmdValidate() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace ID used to scope workspace-aware validation rules without requiring authentication")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	return cmd
 }
