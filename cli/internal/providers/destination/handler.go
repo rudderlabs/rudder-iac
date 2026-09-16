@@ -464,9 +464,16 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
+	// The discriminator of a mutually exclusive group lives in the API config, so
+	// decide what pruning must leave alone before dropping down to local keys.
+	var apiConfig map[string]any
+	if err := json.Unmarshal(remote.Config, &apiConfig); err != nil {
+		return nil, fmt.Errorf("unmarshalling destination %s config: %w", remote.ID, err)
+	}
+
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
-	pruneEmptyValues(localConfig, registered.ExclusiveKeyRoots(localConfig)...)
+	pruneEmptyValues(localConfig, registered.ExclusiveKeyRoots(localConfig, apiConfig)...)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)

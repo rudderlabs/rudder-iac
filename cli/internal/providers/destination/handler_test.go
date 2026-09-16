@@ -1726,6 +1726,15 @@ func TestHandlerImpl_FormatForExport_KeepsEmptySelectedEventFilter(t *testing.T)
 			config: `{"trackingID":"UA-1","eventFilteringOption":"disable","whitelistedEvents":[{"eventName":""}],"blacklistedEvents":[{"eventName":""}]}`,
 			want:   nil,
 		},
+		{
+			// No discriminator means upstream applies no filtering, so a cleared
+			// list carries no setting to protect. Emitting it would hand back a
+			// spec whose next apply supplies the missing discriminator and turns
+			// filtering on — flipping the destination to discard every event.
+			name:   "cleared list with no discriminator is not protected",
+			config: `{"trackingID":"UA-1","whitelistedEvents":[{"eventName":""}]}`,
+			want:   nil,
+		},
 	}
 
 	for _, tt := range tests {
