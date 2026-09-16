@@ -86,14 +86,13 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 			Scope: h.metadata.ResourceType,
 		})
 
-		reference := h.reference(externalID)
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
 		}
 		resourceMap[metadata.ID] = &resources.RemoteResource{
 			ID:         metadata.ID,
 			ExternalID: externalID,
-			Reference:  reference,
+			Reference:  h.reference(externalID),
 			Data:       remoteData,
 		}
 	}
