@@ -62,8 +62,7 @@ func enabledFromData(data resources.ResourceData) (bool, error) {
 // toCreateRequest builds the flattened POST /v2/retl-connections body: the API
 // takes every setting at the top level and derives the flow itself from the
 // destination and the object, so there is no nested config field to fill.
-// externalId is left out on purpose — the per-flow allow-list rejects it on
-// create, and the handler claims the identity in a separate call afterwards.
+// The handler stamps ExternalID, which is the local id it owns.
 func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnectionRequest, error) {
 	sourceID, err := endpointIDFromData(data, SourceKey)
 	if err != nil {

@@ -209,8 +209,7 @@ func TestToCreateRequest(t *testing.T) {
 		},
 	}, request)
 
-	// The wire body is flat: no nested config field, and no externalId — the
-	// per-flow allow-list rejects it on create.
+	// The wire body is flat: no nested config field.
 	body, err := json.Marshal(request)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{

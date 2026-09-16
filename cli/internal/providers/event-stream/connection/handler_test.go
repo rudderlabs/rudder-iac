@@ -242,7 +242,7 @@ func TestRefID(t *testing.T) {
 }
 
 func TestDestinationRefResolve(t *testing.T) {
-	ref, err := parseDestinationRef("#destination:s3")
+	ref, err := ParseDestinationRef("#destination:s3")
 	require.NoError(t, err)
 
 	t.Run("resolves the remote id from the destination state", func(t *testing.T) {
