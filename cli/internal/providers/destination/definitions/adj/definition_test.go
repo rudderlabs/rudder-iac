@@ -26,8 +26,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "ADJ", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"app_token"}, registered.SecretKeys(), "revision-2 secrecy policy marks app_token secret")
-	assert.Equal(t, []string{"app_token"}, registered.ReturnedSecretKeys())
-	assert.Empty(t, registered.WriteOnlySecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift",

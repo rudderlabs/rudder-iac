@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "ZENDESK", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"api_token", "email"}, registered.SecretKeys())
-	assert.Equal(t, []string{"email"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

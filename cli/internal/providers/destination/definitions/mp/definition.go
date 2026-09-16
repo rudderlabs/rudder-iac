@@ -168,7 +168,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"service_account_secret",
 			"service_account_user_name",
 		},
-		ReturnedSecretKeys: []string{"service_account_user_name"},
 		NewConfig: func() any {
 			return &mpConfig{}
 		},

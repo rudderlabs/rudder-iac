@@ -82,7 +82,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	// The full db-config secretKeys set. All eight are top-level, so none depend
 	// on nested secret-path support.
 	assert.Equal(t, []string{"password", "private_key", "private_key_passphrase", "s3.access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcp.credentials", "user"}, registered.SecretKeys())
-	assert.Equal(t, []string{"user"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

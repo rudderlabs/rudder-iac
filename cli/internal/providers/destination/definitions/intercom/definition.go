@@ -187,7 +187,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"mobile_api_key_android",
 			"mobile_api_key_ios",
 		},
-		ReturnedSecretKeys: []string{"app_id", "mobile_api_key_android", "mobile_api_key_ios"},
 		NewConfig: func() any {
 			return &intercomConfig{}
 		},

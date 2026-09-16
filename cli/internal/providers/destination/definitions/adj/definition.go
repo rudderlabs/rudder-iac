@@ -116,11 +116,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ADJ",
 		Version:    1,
 		Properties: properties,
-		// app_token is a revision-2 secrecy-policy exception while upstream
-		// db-config/UI/Terraform metadata catches up. The API returns it, so keep
-		// the value available for diffing while still masking CLI output/export.
-		SecretKeys:         []string{"app_token"},
-		ReturnedSecretKeys: []string{"app_token"},
+		// db-config declares no secretKeys, but the revision-2 secrecy policy marks
+		// app_token secret: it alone authorises the Adjust S2S call. Marking it
+		// ahead of upstream is deliberate — the API returns the value, so it reads
+		// back unknown and the destination re-applies on every plan.
+		SecretKeys: []string{"app_token"},
 		NewConfig: func() any {
 			return &adjustConfig{}
 		},

@@ -242,12 +242,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"ios_api_key",
 			"web_api_key",
 		},
-		ReturnedSecretKeys: []string{
-			"android_api_key",
-			"app_key",
-			"ios_api_key",
-			"web_api_key",
-		},
 		NewConfig: func() any {
 			return &brazeConfig{}
 		},

@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "MP", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret", "service_account_user_name"}, registered.SecretKeys())
-	assert.Equal(t, []string{"service_account_user_name"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",

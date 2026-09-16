@@ -91,12 +91,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "facebook_conversions",
-		APIType:            "FACEBOOK_CONVERSIONS",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"access_token", "dataset_id"},
-		ReturnedSecretKeys: []string{"dataset_id"},
+		Type:       "facebook_conversions",
+		APIType:    "FACEBOOK_CONVERSIONS",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"access_token", "dataset_id"},
 		NewConfig: func() any {
 			return &facebookConversionsConfig{}
 		},

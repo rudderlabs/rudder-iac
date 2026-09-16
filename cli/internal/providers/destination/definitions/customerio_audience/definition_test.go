@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "CUSTOMERIO_AUDIENCE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"app_api_key", "api_key", "site_id"}, registered.SecretKeys())
-	assert.Equal(t, []string{"site_id"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{"warehouse"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())

@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "LINKEDIN_INSIGHT_TAG", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"partner_id"}, registered.SecretKeys())
-	assert.Equal(t, []string{"partner_id"}, registered.ReturnedSecretKeys())
 	assert.Equal(t, []string{"web"}, registered.SupportedSourceTypes())
 
 	modes, err := registered.ConnectionModes("web")

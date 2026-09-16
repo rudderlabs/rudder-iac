@@ -209,11 +209,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"marketing_cloud_org_id",
 			"tracking_server_url",
 		},
-		ReturnedSecretKeys: []string{
-			"heartbeat_tracking_server_url",
-			"marketing_cloud_org_id",
-			"tracking_server_url",
-		},
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

@@ -179,12 +179,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "kafka",
-		APIType:            "KAFKA",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"password", "host_name", "username"},
-		ReturnedSecretKeys: []string{"host_name", "username"},
+		Type:       "kafka",
+		APIType:    "KAFKA",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"password", "host_name", "username"},
 		NewConfig: func() any {
 			return &kafkaConfig{}
 		},

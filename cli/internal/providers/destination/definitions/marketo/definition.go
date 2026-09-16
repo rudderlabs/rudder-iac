@@ -95,12 +95,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "marketo",
-		APIType:            "MARKETO",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"client_secret", "client_id"},
-		ReturnedSecretKeys: []string{"client_id"},
+		Type:       "marketo",
+		APIType:    "MARKETO",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"client_secret", "client_id"},
 		NewConfig: func() any {
 			return &marketoConfig{}
 		},

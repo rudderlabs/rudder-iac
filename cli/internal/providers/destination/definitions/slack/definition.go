@@ -115,12 +115,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "slack",
-		APIType:            "SLACK",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"webhook_url"},
-		ReturnedSecretKeys: []string{"webhook_url"},
+		Type:       "slack",
+		APIType:    "SLACK",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"webhook_url"},
 		NewConfig: func() any {
 			return &slackConfig{}
 		},

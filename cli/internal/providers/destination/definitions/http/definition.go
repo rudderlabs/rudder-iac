@@ -225,7 +225,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"api_key_name",
 			"username",
 		},
-		ReturnedSecretKeys: []string{"api_key_name", "username"},
 		NewConfig: func() any {
 			return &httpConfig{}
 		},

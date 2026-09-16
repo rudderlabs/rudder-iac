@@ -57,12 +57,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "vwo",
-		APIType:            "VWO",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"account_id"},
-		ReturnedSecretKeys: []string{"account_id"},
+		Type:       "vwo",
+		APIType:    "VWO",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"account_id"},
 		NewConfig: func() any {
 			return &vwoConfig{}
 		},

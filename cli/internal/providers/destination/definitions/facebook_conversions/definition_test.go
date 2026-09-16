@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "FACEBOOK_CONVERSIONS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"access_token", "dataset_id"}, registered.SecretKeys())
-	assert.Equal(t, []string{"dataset_id"}, registered.ReturnedSecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 	assert.Equal(t, map[string]any{
 		"action_source":      "website",

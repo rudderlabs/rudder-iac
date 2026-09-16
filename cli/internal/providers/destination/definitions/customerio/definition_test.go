@@ -30,7 +30,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "CUSTOMERIO", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"api_key", "site_id"}, registered.SecretKeys())
-	assert.Equal(t, []string{"site_id"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -464,9 +463,8 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 		"a returned value wrapped as a secret reads back unknown, so every plan re-applies it")
 	remoteSiteID, ok := remoteResource.Config["site_id"].(*secret.String)
 	require.True(t, ok)
-	assert.False(t, remoteSiteID.IsUnknown(),
-		"site_id is a returned secret, so remote state keeps the value known and no-op plans stay clean")
-	assert.Equal(t, "site-id-1", remoteSiteID.Reveal())
+	assert.True(t, remoteSiteID.IsUnknown(),
+		"the API returns siteID, but marking it secret makes it read back unknown — so it re-applies on every plan")
 
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
 		"customerio-production": {Destination: &client.Destination{

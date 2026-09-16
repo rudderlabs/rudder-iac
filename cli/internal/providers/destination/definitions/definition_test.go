@@ -34,18 +34,6 @@ func TestNewRegisteredDefinition(t *testing.T) {
 	assertConfigError(t, errors, "/api_secret", "'api_secret' is required")
 }
 
-func TestNewRegisteredDefinitionRejectsReturnedSecretKeysOutsideSecretKeys(t *testing.T) {
-	t.Parallel()
-
-	def := GA4TestDefinition()
-	def.ReturnedSecretKeys = []string{"measurement_id"}
-
-	_, err := newRegisteredDefinition(def)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "returned secret key \"measurement_id\" is not listed in secret keys")
-}
-
 func assertConfigError(t *testing.T, errors []ConfigError, path, message string) {
 	t.Helper()
 

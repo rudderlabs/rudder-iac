@@ -354,7 +354,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"gcp.credentials",
 			"user",
 		},
-		ReturnedSecretKeys: []string{"user"},
 		NewConfig: func() any {
 			return &snowflakeConfig{}
 		},

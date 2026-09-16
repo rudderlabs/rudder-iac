@@ -80,12 +80,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "sentry",
-		APIType:            "SENTRY",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"dsn"},
-		ReturnedSecretKeys: []string{"dsn"},
+		Type:       "sentry",
+		APIType:    "SENTRY",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"dsn"},
 		NewConfig: func() any {
 			return &sentryConfig{}
 		},

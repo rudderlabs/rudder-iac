@@ -71,7 +71,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Empty(t, registered.GatedKeyPaths())
 	assert.Equal(t, []string{"private_key", "private_key_passphrase", "user"}, registered.SecretKeys())
-	assert.Equal(t, []string{"user"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",

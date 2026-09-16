@@ -40,11 +40,11 @@ func WrapKnownSecrets(config map[string]any, secretKeys []string) map[string]any
 }
 
 // WrapUnknownSecrets returns a copy of config with each listed secret path that
-// is present marked as an unknown *String. Used when mapping write-only remote
-// secrets: APIs often omit secret values, so a present-but-opaque key must always
-// diff (see String.Diff). Absent keys stay absent — inventing them would force
-// perpetual re-apply for conditional secrets that do not apply. A provider whose
-// secret is unconditional must seed the key before calling (see accounts.MapRemoteToState).
+// is present marked as an unknown *String. Used when mapping remote state: APIs
+// never return secret values, so a present-but-opaque key must always diff (see
+// String.Diff). Absent keys stay absent — inventing them would force perpetual
+// re-apply for conditional secrets that do not apply. A provider whose secret is
+// unconditional must seed the key before calling (see accounts.MapRemoteToState).
 func WrapUnknownSecrets(config map[string]any, secretKeys []string) map[string]any {
 	return replaceSecrets(config, secretKeys, func(any) any {
 		s := NewUnknown()

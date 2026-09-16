@@ -43,12 +43,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:               "customerio_audience",
-		APIType:            "CUSTOMERIO_AUDIENCE",
-		Version:            1,
-		Properties:         properties,
-		SecretKeys:         []string{"app_api_key", "api_key", "site_id"},
-		ReturnedSecretKeys: []string{"site_id"},
+		Type:       "customerio_audience",
+		APIType:    "CUSTOMERIO_AUDIENCE",
+		Version:    1,
+		Properties: properties,
+		SecretKeys: []string{"app_api_key", "api_key", "site_id"},
 		NewConfig: func() any {
 			return &customerioAudienceConfig{}
 		},

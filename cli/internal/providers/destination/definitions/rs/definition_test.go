@@ -120,7 +120,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "RS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"password", "access_key_id", "access_key", "user"}, registered.SecretKeys())
-	assert.Equal(t, []string{"user"}, registered.ReturnedSecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{

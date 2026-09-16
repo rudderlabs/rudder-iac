@@ -27,7 +27,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "KAFKA", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"password", "host_name", "username"}, registered.SecretKeys())
-	assert.Equal(t, []string{"host_name", "username"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

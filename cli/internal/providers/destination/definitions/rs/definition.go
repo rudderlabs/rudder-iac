@@ -227,7 +227,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"access_key",
 			"user",
 		},
-		ReturnedSecretKeys: []string{"user"},
 		NewConfig: func() any {
 			return &rsConfig{}
 		},

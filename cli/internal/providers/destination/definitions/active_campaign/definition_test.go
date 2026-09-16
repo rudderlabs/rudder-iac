@@ -26,8 +26,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "ACTIVE_CAMPAIGN", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"actid", "api_key", "event_key"}, registered.SecretKeys())
-	assert.Equal(t, []string{"actid"}, registered.ReturnedSecretKeys())
-	assert.Equal(t, []string{"api_key", "event_key"}, registered.WriteOnlySecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{

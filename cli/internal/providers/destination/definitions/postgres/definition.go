@@ -440,7 +440,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"client_key",
 			"user",
 		},
-		ReturnedSecretKeys: []string{"client_cert", "client_key", "user"},
 		NewConfig: func() any {
 			return &postgresConfig{}
 		},

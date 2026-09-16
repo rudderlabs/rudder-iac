@@ -190,8 +190,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "facebook_pixel_access_token_required", Func: accessTokenConditional},
 		},
-		SecretKeys:         []string{"access_token", "pixel_id"},
-		ReturnedSecretKeys: []string{"pixel_id"},
+		SecretKeys: []string{"access_token", "pixel_id"},
 		NewConfig: func() any {
 			return &facebookPixelConfig{}
 		},

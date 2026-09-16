@@ -25,7 +25,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "INTERCOM", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"api_key", "app_id", "mobile_api_key_android", "mobile_api_key_ios"}, registered.SecretKeys())
-	assert.Equal(t, []string{"app_id", "mobile_api_key_android", "mobile_api_key_ios"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
