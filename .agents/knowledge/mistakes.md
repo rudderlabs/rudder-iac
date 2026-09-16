@@ -96,4 +96,5 @@
 ## DEX-888 — Destination Raw-Secret Substring Guard
 <!-- ticket:DEX-888 -->
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
-- Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use distinct dummy secret domains or paths for webhook/destination secret variables.
+- The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
+- Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
