@@ -82,10 +82,14 @@ destination rETL can reach without saying how it may sync.
 - Both fields require `warehouse` in `SourceTypes`; registration rejects them
   otherwise.
 - `ConnectionRequiredKeys["warehouse"]["cloud"]` is derived exactly like every
-  other mode, from the `schema.json` `allOf` branches whose `if` names
-  `connectionMode.warehouse`. Among registered destinations only Braze has one
-  (`rest_api_key`); Braze is already registered, so backfilling its warehouse
-  capability belongs to DEX-834.
+  other mode: from the `schema.json` `allOf` branches that name
+  `connectionMode.warehouse`, plus the negated branches whose exclusion does not
+  cover it — an `if.not` applies to every supported pair it does not exclude, so
+  declaring `warehouse` pulls `(warehouse, cloud)` into those branches too. The
+  known cases among already-registered destinations are Braze (`rest_api_key`,
+  named branch) and Facebook Pixel (`access_token`, via
+  `not(connectionMode.web == "device")`); both are backfills, so they belong to
+  DEX-834.
 
 ## Per-source-type connect-time required keys
 
