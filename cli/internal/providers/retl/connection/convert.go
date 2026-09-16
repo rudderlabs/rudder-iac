@@ -16,11 +16,12 @@ import (
 // ANONYMOUS_ID and SYSTEM_CONSTANTS.id in config-backend
 // src/modules/retl/api-gateway/connection-config/constants.ts. A user mapping
 // aimed at one of them is folded into the identifiers, or consumed outright, so
-// it never comes back where it was written.
+// it never comes back where it was written. Exported so the connection
+// validation rules name the same targets rather than repeating the literals.
 const (
-	userIDTarget      = "user_id"
-	anonymousIDTarget = "anonymous_id"
-	externalIDTarget  = "context.externalId[0].id"
+	UserIDTarget      = "user_id"
+	AnonymousIDTarget = "anonymous_id"
+	ExternalIDTarget  = "context.externalId[0].id"
 )
 
 // ErrUnrepresentableConfig marks a remote connection that the supported spec
@@ -36,8 +37,9 @@ var ErrUnrepresentableConfig = errors.New("connection config cannot be represent
 // Normalization has already turned an empty list into nil, so anything left
 // here was genuinely supplied. Omitting it instead of reporting it would lose
 // user input silently, which is the one thing these conversions must not do.
-// DEX-829 rejects the same combination at spec load; this check stands because
-// the handler is registered (DEX-826) before those rules land.
+// The connection semantic rule rejects the same combination at spec load; this
+// check stands because a remote row reaches export and import without ever
+// passing through the spec rules.
 func checkObjectMappingFlow(config ConfigSpec) error {
 	if config.Object == nil {
 		return nil
@@ -214,17 +216,18 @@ func checkImmutableUnchanged(config, stored ConfigSpec) error {
 // mapper mapping aimed at user_id or anonymous_id reappears as an identifier,
 // and an object mapping one aimed at user_id or context.externalId[0].id is
 // consumed as a synthetic identifier and vanishes from the user mappings. Those
-// targets are therefore forbidden in user mappings — DEX-829 validates it — and
-// nothing here moves or drops entries to paper over one. Destination and source
-// eligibility is checked before this runs.
+// targets are therefore forbidden in user mappings — the connection semantic
+// rule validates it — and nothing here moves or drops entries to paper over
+// one. Destination and source eligibility is checked before this runs.
 //
 // What it refuses, all wrapping ErrUnrepresentableConfig so a caller can skip
 // the row with errors.Is, are shapes the spec has no way to express: a
 // destination-specific config, no identifiers at all, the object mapping flow
 // carrying constants or an event, and — checked on the rebuilt spec — the
-// mapping shapes a re-apply would not reproduce. DEX-829 rejects the same
-// mapping shapes at spec load; they are caught here too because a remote row
-// reaches export and import without ever passing through the spec rules.
+// mapping shapes a re-apply would not reproduce. The connection semantic rule
+// rejects the same mapping shapes at spec load; they are caught here too
+// because a remote row reaches export and import without ever passing through
+// the spec rules.
 func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if hasDestinationConfig(conn.DestinationConfig) {
 		return ConfigSpec{}, fmt.Errorf("connection %q: destination-specific configuration has no spec equivalent: %w", conn.ID, ErrUnrepresentableConfig)
@@ -270,9 +273,9 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 // recreated from the spec. Either way the connection would diff on every apply,
 // which is the drift these conversions exist to prevent.
 func checkRepresentableMappings(config ConfigSpec) error {
-	reserved := []string{userIDTarget, anonymousIDTarget}
+	reserved := []string{UserIDTarget, AnonymousIDTarget}
 	if config.Object != nil {
-		reserved = []string{userIDTarget, externalIDTarget}
+		reserved = []string{UserIDTarget, ExternalIDTarget}
 		if len(config.Identifiers) > 1 {
 			return fmt.Errorf("object mapping supports a single identifier, found %d", len(config.Identifiers))
 		}

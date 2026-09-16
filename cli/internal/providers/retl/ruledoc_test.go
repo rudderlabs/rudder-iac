@@ -3,6 +3,7 @@ package retl_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/stretchr/testify/assert"
@@ -12,8 +13,12 @@ import (
 // TestProviderRuleDocs runs the provider's authored fragments through the real
 // docs generator together with its live rules, asserting every rule resolves
 // and passes the DocumentedRules validation invariants.
+//
+// Connection support is on because the embedded fragments cover the connection
+// rules too; without it those four fragments would be orphans, which is exactly
+// what the gen-rule-docs workflow sets the experimental flag for.
 func TestProviderRuleDocs(t *testing.T) {
-	p := retl.New(newDefaultMockClient())
+	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()

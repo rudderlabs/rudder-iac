@@ -2,8 +2,25 @@ package connection
 
 import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
+
+const (
+	// columnNamePattern is the grammar a warehouse column reference has to
+	// follow: a letter or underscore, then word characters, "$" or "." — the
+	// same shape the backend accepts for identifiers, mappings, the cursor
+	// column and the event name column.
+	columnNamePattern = `^[A-Za-z_][\w$.]*$`
+	columnNameTag     = "retl_column_name"
+)
+
+// Registering here rather than in the rules package keeps the pattern available
+// wherever the spec is validated: the tag lives on this package's types, so its
+// registrar has to be reachable from this package alone.
+func init() {
+	funcs.NewPattern(columnNameTag, columnNamePattern, "must be a column name matching "+columnNamePattern)
+}
 
 const (
 	ResourceType = "retl-connection"
@@ -88,29 +105,31 @@ type ConfigSpec struct {
 	Constants     []ConstantSpec    `json:"constants,omitempty"     mapstructure:"constants"      validate:"dive"`
 	Event         *EventSpec        `json:"event,omitempty"         mapstructure:"event"`
 	Object        *string           `json:"object,omitempty"        mapstructure:"object"`
-	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column"`
+	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column" validate:"omitempty,pattern=retl_column_name"`
 	SyncSettings  *SyncSettingsSpec `json:"sync_settings,omitempty" mapstructure:"sync_settings"`
 }
 
 // ScheduleSpec is when the connection syncs. Which of the optional fields is
-// required, and which is rejected, depends on Type.
+// required, and which is rejected, depends on Type. The five-minute floor on
+// every_minutes is the same one the cron rule applies to cron expressions
+// through minGapMinutes (retl/rules/connection/cron.go).
 type ScheduleSpec struct {
 	Type           string `json:"type"                      mapstructure:"type"            validate:"required,oneof=basic cron manual"`
-	EveryMinutes   *int   `json:"every_minutes,omitempty"   mapstructure:"every_minutes"`
-	CronExpression string `json:"cron_expression,omitempty" mapstructure:"cron_expression"`
+	EveryMinutes   *int   `json:"every_minutes,omitempty"   mapstructure:"every_minutes"   validate:"required_if=Type basic,excluded_if=Type cron,excluded_if=Type manual,omitempty,gte=5"`
+	CronExpression string `json:"cron_expression,omitempty" mapstructure:"cron_expression" validate:"required_if=Type cron,excluded_if=Type basic,excluded_if=Type manual"`
 }
 
 // EventSpec is the CDP event a JSON mapper connection emits. Name and
 // NameColumn are mutually exclusive.
 type EventSpec struct {
-	Type       string `json:"type"                  mapstructure:"type" validate:"required,oneof=identify track"`
-	Name       string `json:"name,omitempty"        mapstructure:"name"`
-	NameColumn string `json:"name_column,omitempty" mapstructure:"name_column"`
+	Type       string `json:"type"                  mapstructure:"type"        validate:"required,oneof=identify track"`
+	Name       string `json:"name,omitempty"        mapstructure:"name"        validate:"excluded_with=NameColumn"`
+	NameColumn string `json:"name_column,omitempty" mapstructure:"name_column" validate:"omitempty,pattern=retl_column_name"`
 }
 
 // MappingSpec maps a source column to a destination field or identifier.
 type MappingSpec struct {
-	From string `json:"from" mapstructure:"from" validate:"required"`
+	From string `json:"from" mapstructure:"from" validate:"required,pattern=retl_column_name"`
 	To   string `json:"to"   mapstructure:"to"   validate:"required"`
 }
 

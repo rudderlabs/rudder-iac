@@ -9,6 +9,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -185,6 +187,16 @@ func addConnectionResource(graph *resources.Graph, id, sourceURN, destinationURN
 		esConnection.SourceKey:      &resources.PropertyRef{URN: sourceURN, Property: "id"},
 		esConnection.DestinationKey: &resources.PropertyRef{URN: destinationURN, Property: "id"},
 		esConnection.EnabledKey:     true,
+	}, nil))
+}
+
+// addRETLConnectionResource adds a connection of the other family, which the
+// topology scan folds in under the same endpoint keys.
+func addRETLConnectionResource(graph *resources.Graph, id, sourceURN, destinationURN string) {
+	graph.AddResource(resources.NewResource(id, retlConnection.ResourceType, resources.ResourceData{
+		retlConnection.SourceKey:      &resources.PropertyRef{URN: sourceURN, Property: "id"},
+		retlConnection.DestinationKey: &resources.PropertyRef{URN: destinationURN, Property: "id"},
+		retlConnection.EnabledKey:     true,
 	}, nil))
 }
 
@@ -858,14 +870,15 @@ func TestConnectionSemanticValid_DestinationFamily(t *testing.T) {
 
 	registry := newTestRegistry(t)
 
-	t.Run("destination shared with a rETL source", func(t *testing.T) {
+	t.Run("destination shared with a rETL connection", func(t *testing.T) {
 		t.Parallel()
 
-		// A project connection whose source URN belongs to another family
-		// (as the retl-connections kind will produce once it lands).
+		// The clash the rETL connection kind produces for real: the topology
+		// scan folds both connection kinds in, so the destination the event
+		// stream connection points at is seen to carry a rETL source too.
 		graph := compatibleGraph()
-		addConnectionResource(graph, "conn-retl",
-			resources.URN("my-model", "retl-source-sql-model"),
+		addRETLConnectionResource(graph, "conn-retl",
+			resources.URN("my-model", sqlmodel.ResourceType),
 			resources.URN("dest-1", destination.DestinationResourceType),
 		)
 
@@ -884,8 +897,8 @@ func TestConnectionSemanticValid_DestinationFamily(t *testing.T) {
 		t.Parallel()
 
 		graph := compatibleGraph()
-		addConnectionResource(graph, "conn-retl",
-			resources.URN("my-model", "retl-source-sql-model"),
+		addRETLConnectionResource(graph, "conn-retl",
+			resources.URN("my-model", sqlmodel.ResourceType),
 			resources.URN("dest-other", destination.DestinationResourceType),
 		)
 
@@ -893,8 +906,7 @@ func TestConnectionSemanticValid_DestinationFamily(t *testing.T) {
 			Connections: []esConnection.ConnectionSpec{connectionEntry("conn-1", "src-1", "dest-1")},
 		}
 
-		results := validateConnectionsSemantic(registry, spec, graph)
-		assert.Empty(t, results)
+		assert.Empty(t, validateConnectionsSemantic(registry, spec, graph))
 	})
 
 	t.Run("missing destination reports only its absence", func(t *testing.T) {
