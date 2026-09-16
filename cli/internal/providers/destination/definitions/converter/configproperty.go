@@ -20,9 +20,10 @@ type ConfigProperty struct {
 	// connected to one of these local source types. Empty means the key is
 	// allowed for every connected source type.
 	SourceTypes []string
-	// Exclusive, when set via Discriminator, names the local keys the API
-	// discriminator chooses between. At most one of them is ever in force.
-	Exclusive *ExclusiveGroup
+	// Selector, when set via Discriminator, chooses which of several local keys
+	// is in force — such a property selects among keys rather than mapping one.
+	// Nil for ordinary properties.
+	Selector *KeySelector
 }
 
 // Gated restricts prop's local key to the given local source types. The
@@ -110,34 +111,35 @@ func Equals(key, value string) ConfigConditionFunc {
 // so the others linger holding whatever they last did. Converting back to local
 // config drops them: upstream never reads an unselected member, and carrying it
 // across yields a spec that fails the group's own mutual-exclusion rule. An
-// absent discriminator names nothing and drops nothing — see SelectedLocalKey.
+// absent discriminator names nothing and drops nothing — see LocalKeyFor.
 func Discriminator(apiKey string, values DiscriminatorValues) ConfigProperty {
 	return ConfigProperty{
 		FromLocalFunc: discriminatorValue(apiKey, values),
 		ToLocalFunc:   func(local, config string) (string, error) { return local, nil },
-		Exclusive:     &ExclusiveGroup{APIKey: apiKey, LocalKeys: map[string]any(values)},
+		Selector:      &KeySelector{APIKey: apiKey, LocalKeys: map[string]any(values)},
 	}
 }
 
 // DiscriminatorValues maps local config keys to API discriminator values.
 type DiscriminatorValues map[string]any
 
-// ExclusiveGroup describes local config keys an API discriminator chooses between.
-type ExclusiveGroup struct {
+// KeySelector names an API discriminator key and the local key each of its
+// values puts in force. Exactly one is in force at a time.
+type KeySelector struct {
 	// APIKey names the discriminator in API config, e.g. "eventFilteringOption".
 	APIKey string
 	// LocalKeys maps each local config key to the value of APIKey selecting it.
 	LocalKeys map[string]any
 }
 
-// SelectedLocalKey returns the local key the discriminator points at, and
+// LocalKeyFor returns the local key in force for the given API config, and
 // whether the discriminator was present at all. The pair separates three states
-// that must not be conflated: absent says nothing about the members, a value
-// naming none ("disable") says none is live, and a value naming one identifies
-// it. Matching is by equality on the decoded value, so a non-string declared
-// value (an int against JSON's float64) reads as naming none.
-func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (selected string, present bool) {
-	selector, ok := api[g.APIKey]
+// that must not be conflated: absent says nothing about the keys, a value
+// naming none ("disable") says none is in force, and a value naming one
+// identifies it. Matching is by equality on the decoded value, so a non-string
+// declared value (an int against JSON's float64) reads as naming none.
+func (g KeySelector) LocalKeyFor(apiConfig map[string]any) (selected string, present bool) {
+	selector, ok := apiConfig[g.APIKey]
 	if !ok {
 		return "", false
 	}

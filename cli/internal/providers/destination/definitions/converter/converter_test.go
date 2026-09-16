@@ -118,26 +118,26 @@ func TestDiscriminator(t *testing.T) {
 // The discriminator is the only thing that says which of the mutually exclusive
 // local keys is live, so it records the mapping for callers that need to tell a
 // cleared unselected key from a deliberately empty selected one.
-func TestSelectedLocalKeyThreeStates(t *testing.T) {
+func TestLocalKeyForThreeStates(t *testing.T) {
 	t.Parallel()
 
 	p := converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 		"event_filtering.whitelist": "whitelistedEvents",
 		"event_filtering.blacklist": "blacklistedEvents",
 	})
-	require.NotNil(t, p.Exclusive)
+	require.NotNil(t, p.Selector)
 
 	// An absent discriminator says nothing about the members; one naming no
 	// member positively says none is live.
-	selected, present := p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "blacklistedEvents"})
+	selected, present := p.Selector.LocalKeyFor(map[string]any{"eventFilteringOption": "blacklistedEvents"})
 	assert.True(t, present)
 	assert.Equal(t, "event_filtering.blacklist", selected)
 
-	selected, present = p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "disable"})
+	selected, present = p.Selector.LocalKeyFor(map[string]any{"eventFilteringOption": "disable"})
 	assert.True(t, present, "the discriminator is present, it just names no member")
 	assert.Empty(t, selected)
 
-	selected, present = p.Exclusive.SelectedLocalKey(map[string]any{})
+	selected, present = p.Selector.LocalKeyFor(map[string]any{})
 	assert.False(t, present, "an absent discriminator is not a selection of none")
 	assert.Empty(t, selected)
 }
@@ -158,19 +158,19 @@ func TestAPIToLocalDropsUnselectedMembers(t *testing.T) {
 	props := append(append([]converter.ConfigProperty{}, arrays...), discriminator)
 
 	events := func(name string) []any { return []any{map[string]any{"eventName": name}} }
-	api := map[string]any{
+	apiConfig := map[string]any{
 		"eventFilteringOption": "whitelistedEvents",
 		"whitelistedEvents":    events("A"),
 		"blacklistedEvents":    events("B"),
 	}
 
-	local, err := converter.APIToLocal(props, api)
+	local, err := converter.APIToLocal(props, apiConfig)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"whitelist": []any{"A"}}, local["event_filtering"])
 
 	// The drop runs in the APIToLocal driver, not in Discriminator's own
 	// ToLocalFunc, so declaration order cannot change the result.
-	local, err = converter.APIToLocal(append([]converter.ConfigProperty{discriminator}, arrays...), api)
+	local, err = converter.APIToLocal(append([]converter.ConfigProperty{discriminator}, arrays...), apiConfig)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"whitelist": []any{"A"}}, local["event_filtering"])
 

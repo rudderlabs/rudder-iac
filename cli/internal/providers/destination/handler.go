@@ -473,7 +473,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
-	pruneEmptyValues(localConfig, registered.ExclusiveKeyRoots(apiConfig)...)
+	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)

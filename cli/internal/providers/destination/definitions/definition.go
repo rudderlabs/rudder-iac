@@ -78,21 +78,21 @@ func (d *RegisteredDefinition) APIToLocal(api map[string]any) (map[string]any, e
 	return converter.APIToLocal(d.Properties, api)
 }
 
-// ExclusiveKeyRoots returns the top-level config keys holding the discriminator-
+// SelectedKeyRoots returns the top-level config keys holding the discriminator-
 // selected member of an exclusive group. Callers that prune empty values use it
 // to leave those blocks alone: an empty selected member is a real setting, since
 // whitelisting with no event named discards every event. A member surviving only
 // because no discriminator was present carries no such meaning and is not
 // protected — keeping it would emit a spec whose next apply supplies the missing
 // discriminator and turns filtering on.
-func (d *RegisteredDefinition) ExclusiveKeyRoots(api map[string]any) []string {
+func (d *RegisteredDefinition) SelectedKeyRoots(apiConfig map[string]any) []string {
 	var roots []string
 	for _, prop := range d.Properties {
-		if prop.Exclusive == nil {
+		if prop.Selector == nil {
 			continue
 		}
 		// An absent discriminator also yields "", so this covers both.
-		selected, _ := prop.Exclusive.SelectedLocalKey(api)
+		selected, _ := prop.Selector.LocalKeyFor(apiConfig)
 		if selected == "" {
 			continue
 		}

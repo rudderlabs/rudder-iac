@@ -58,17 +58,17 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 // discriminator does not point at — including all of them when it names none.
 // See Discriminator for why. It runs after the whole pipeline so it does not
 // depend on where the group's properties sit in the list.
-func dropUnselectedMembers(localJSON string, api map[string]any, props []ConfigProperty) (string, error) {
+func dropUnselectedMembers(localJSON string, apiConfig map[string]any, props []ConfigProperty) (string, error) {
 	for _, p := range props {
-		if p.Exclusive == nil {
+		if p.Selector == nil {
 			continue
 		}
-		selected, present := p.Exclusive.SelectedLocalKey(api)
+		selected, present := p.Selector.LocalKeyFor(apiConfig)
 		if !present {
 			continue
 		}
 
-		for localKey := range p.Exclusive.LocalKeys {
+		for localKey := range p.Selector.LocalKeys {
 			if localKey == selected || !gjson.Get(localJSON, localKey).Exists() {
 				continue
 			}

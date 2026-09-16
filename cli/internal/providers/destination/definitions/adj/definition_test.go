@@ -364,13 +364,13 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name string
-		api  map[string]any
-		want any
+		name      string
+		apiConfig map[string]any
+		want      any
 	}{
 		{
 			name: "unselected list cleared by the webapp",
-			api: map[string]any{
+			apiConfig: map[string]any{
 				"eventFilteringOption": "whitelistedEvents",
 				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
 				"blacklistedEvents":    []any{map[string]any{"eventName": ""}},
@@ -379,7 +379,7 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 		},
 		{
 			name: "unselected list left over from a mode switch",
-			api: map[string]any{
+			apiConfig: map[string]any{
 				"eventFilteringOption": "blacklistedEvents",
 				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
 				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
@@ -388,7 +388,7 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 		},
 		{
 			name: "filtering disabled leaves no block behind",
-			api: map[string]any{
+			apiConfig: map[string]any{
 				"eventFilteringOption": "disable",
 				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
 				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
@@ -401,7 +401,7 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 			// outbound conversion re-derives one, so dropping here would lose a
 			// populated list and erase it upstream on the next apply.
 			name: "absent discriminator leaves members alone",
-			api: map[string]any{
+			apiConfig: map[string]any{
 				"whitelistedEvents": []any{map[string]any{"eventName": "Order Completed"}},
 			},
 			want: map[string]any{"whitelist": []any{"Order Completed"}},
@@ -410,7 +410,7 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 			// Whitelisting with no event named discards every event, so the
 			// emptiness is the setting rather than absence.
 			name: "empty selected list survives",
-			api: map[string]any{
+			apiConfig: map[string]any{
 				"eventFilteringOption": "whitelistedEvents",
 				"whitelistedEvents":    []any{map[string]any{"eventName": ""}},
 				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
@@ -423,12 +423,12 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			api := map[string]any{"appToken": "app-token"}
-			for key, value := range tt.api {
-				api[key] = value
+			apiConfig := map[string]any{"appToken": "app-token"}
+			for key, value := range tt.apiConfig {
+				apiConfig[key] = value
 			}
 
-			local, err := registered.APIToLocal(api)
+			local, err := registered.APIToLocal(apiConfig)
 			require.NoError(t, err)
 
 			if tt.want == nil {
