@@ -163,6 +163,31 @@ func TestConnectionsSpecDecodeObject(t *testing.T) {
 	})
 }
 
+// TestConnectionsSpecDecodeUnknownField pins the no-catch-all rule the spec
+// structs rely on: adding a ",remain" map to absorb unknown keys would turn a
+// misspelt field, or a foreign block like destination_config, into a silently
+// dropped setting instead of an error.
+func TestConnectionsSpecDecodeUnknownField(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{
+		"connections": []any{
+			map[string]any{
+				"id":          "users-to-amplitude",
+				"source":      "#retl-source-sql-model:users",
+				"destination": "#destination:amplitude",
+				"config": map[string]any{
+					"sync_behaviour":     "upsert",
+					"destination_config": map[string]any{"api_key": "secret"},
+				},
+			},
+		},
+	}
+
+	_, err := decode(t, raw)
+	assert.EqualError(t, err, "decoding failed due to the following error(s):\n\n'connections[0].config' has invalid keys: destination_config")
+}
+
 // TestSpecValidateTags exercises the spec's validate tags through the rule
 // engine: the tags are the contract for what a connection entry must carry,
 // and the JSON Pointers they produce are the snake_case paths users are
