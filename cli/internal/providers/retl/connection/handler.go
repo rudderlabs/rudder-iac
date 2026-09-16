@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -17,9 +18,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 )
 
+var log = logger.New("retl-connection")
+
 // Handler manages rETL connections the way the event stream connection handler
-// does: one graph resource per spec entry, and any change the API refuses on
-// update handled as a delete-then-create replacement.
+// does: one graph resource per spec entry, an endpoint change handled as a
+// delete-then-create replacement, and an immutable config change rejected with
+// the remedy rather than silently not applied.
 type Handler struct {
 	client    retlClient.RETLStore
 	resources map[string]*connectionResource
@@ -231,6 +235,8 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		if _, err := toCreateRequest(data); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
+		log.Warn("replacing rETL connection after an endpoint change",
+			"connection", id, "connectionId", remoteID)
 		if err := h.Delete(ctx, id, state); err != nil {
 			return nil, err
 		}

@@ -18,7 +18,7 @@ const localID = "users-to-webhook"
 func stateData(t *testing.T, config ConfigSpec) resources.ResourceData {
 	t.Helper()
 
-	data, err := configToData(config)
+	data, err := configToMap(config)
 	require.NoError(t, err)
 	return resources.ResourceData{
 		EnabledKey:       true,
