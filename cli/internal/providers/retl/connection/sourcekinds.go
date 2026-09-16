@@ -73,11 +73,11 @@ func SourceKindBySourceType(sourceType retlClient.SourceType) (SourceKind, bool)
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	kind, id, ok := refID(ref)
 	if !ok {
-		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, SourceKindRefForms())
 	}
 	sourceKind, ok := SourceKindByKind(kind)
 	if !ok {
-		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, SourceKindRefForms())
 	}
 	return &resources.PropertyRef{
 		URN:      resources.URN(id, sourceKind.ResourceType),
@@ -97,8 +97,10 @@ func refID(ref string) (kind string, id string, ok bool) {
 	return matches[1], matches[2], true
 }
 
-// sourceKindRefForms lists the reference forms a source may take, for errors.
-func sourceKindRefForms() string {
+// SourceKindRefForms lists the reference forms a source may take, for errors.
+// Exported so the connection spec rules describe the accepted forms from the
+// same table reference parsing uses.
+func SourceKindRefForms() string {
 	forms := make([]string, len(SourceKinds))
 	for i, sk := range SourceKinds {
 		forms[i] = fmt.Sprintf("#%s:<id>", sk.Kind)

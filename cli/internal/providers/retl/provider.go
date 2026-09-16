@@ -25,6 +25,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/connection"
 	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
 )
 
@@ -47,8 +48,20 @@ type Option func(*Provider)
 // The app applies it only while the retlConnectionSupport experimental flag is
 // effective, so without it the provider keeps exactly the SQL-model surface it
 // had.
+//
+// A nil registry leaves connection support off entirely. Both the semantic
+// rules and remote import index a map on the registry, so a nil one constructs
+// fine and panics later, mid-run. Substituting an empty registry would trade
+// that for something quieter and worse: a registered kind whose validation
+// finds no definition for any destination and so passes everything it cannot
+// see. Keeping the SQL-model-only surface is the state the provider is already
+// built and tested for.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
+		if registry == nil {
+			return
+		}
+
 		p.destinationRegistry = registry
 		p.kindToType[connection.ResourceKind] = connection.ResourceType
 		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
@@ -184,16 +197,34 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
+// SyntacticRules and SemanticRules register the connection rules only once the
+// connection handler is, so a provider without WithConnectionSupport keeps
+// exactly the SQL-model rule set — and its authored connection fragments stay
+// out of the generated catalog.
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
+	registered := []rules.Rule{
 		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),
 	}
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		registered = append(registered,
+			connectionRules.NewConnectionSpecSyntaxValidRule(),
+			connectionRules.NewConnectionCronExpressionValidRule(),
+		)
+	}
+	return registered
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	registered := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),
 	}
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		registered = append(registered,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
+	}
+	return registered
 }
 
 // RuleDocEntries returns the authored documentation fragments embedded with

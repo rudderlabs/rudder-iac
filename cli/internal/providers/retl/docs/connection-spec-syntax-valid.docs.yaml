@@ -1,0 +1,96 @@
+rule_id: "retl/connection/spec-syntax-valid"
+match_behavior:
+  # Per-entry spec shape: required fields and enums from the struct tags, the
+  # two endpoint reference families (V-C2, V-C6), the schedule fields each
+  # schedule type owns together with the five-minute floor (V-R3), column names
+  # (V-R6), cursor_column's upsert requirement (V-R7), the event name/name_column
+  # exclusion (V-R8), the reserved constant key (V-R9a) and a declared object's
+  # shape (V-R10). A cron expression this CLI cannot parse at all is a warning
+  # from retl/connection/cron-expression-valid, not an error here.
+  - applies_to:
+      - kind: "retl-connections"
+        version: "rudder/v1"
+    valid:
+      - example_id: "retl-connection-spec-valid"
+        title: "Valid rETL connection with a basic schedule and JSON mapping"
+        files:
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    cursor_column: updated_at
+                    schedule:
+                      type: basic
+                      every_minutes: 30
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+    invalid:
+      - example_id: "retl-connection-spec-every-minutes-too-small"
+        title: "Basic schedule syncing more often than every five minutes"
+        files:
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: basic
+                      every_minutes: 2
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/schedule/every_minutes"
+            severity: "error"
+            message_contains: "'every_minutes' must be greater than or equal to 5"
+      - example_id: "retl-connection-spec-wrong-source-family"
+        title: "Source reference pointing at an event stream source"
+        files:
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/source"
+            severity: "error"
+            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id>)"

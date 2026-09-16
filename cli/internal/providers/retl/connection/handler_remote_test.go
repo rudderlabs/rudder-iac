@@ -79,7 +79,7 @@ func remoteRow(id, externalID, sourceID, destinationID string) retlClient.RETLCo
 // moves the entry into the identifiers, so the row would diff forever.
 func reservedMappingRow() retlClient.RETLConnection {
 	conn := remoteRow("conn-reserved-mapping", "", "src-1", "dst-1")
-	conn.Mappings = append(conn.Mappings, retlClient.Mapping{From: "device", To: anonymousIDTarget})
+	conn.Mappings = append(conn.Mappings, retlClient.Mapping{From: "device", To: AnonymousIDTarget})
 	return conn
 }
 

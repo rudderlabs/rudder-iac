@@ -64,6 +64,27 @@ func NewPathAwarePatternValidator[T any](
 	}
 }
 
+// NewRawPatternValidator creates a syntactic validation handler that receives
+// the raw spec map instead of a decoded struct, for a rule that has to own its
+// decoding. The json round-trip the typed constructors use cannot express a
+// strict spec shape: it drops keys the spec type does not carry without a word,
+// and collapses every wrong-typed value into a single result at the spec root
+// rather than pointing at the field. A rule that decodes the map itself reports
+// both against the entry that carries them.
+func NewRawPatternValidator(
+	patterns []rules.MatchPattern,
+	fn func(Kind string, Version string, Metadata map[string]any, Spec map[string]any) []rules.ValidationResult,
+) PatternValidator {
+	return PatternValidator{
+		patterns: patterns,
+		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
+			results := fn(ctx.Kind, ctx.Version, ctx.Metadata, ctx.Spec)
+			prefixReferences(results)
+			return results
+		},
+	}
+}
+
 // NewSemanticPatternValidator creates a semantic validation handler (with graph access).
 // The generic type T determines the spec struct the raw map[string]any is
 // unmarshaled into before being passed to fn along with the resource graph.

@@ -47,7 +47,7 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 
 	if request.Object == "" {
 		for _, mapping := range slices.Concat(request.Identifiers, request.Mappings) {
-			if mapping.To == userIDTarget || mapping.To == anonymousIDTarget {
+			if mapping.To == UserIDTarget || mapping.To == AnonymousIDTarget {
 				conn.Identifiers = append(conn.Identifiers, mapping)
 				continue
 			}
@@ -65,12 +65,12 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 	// back out of the system constants. Constants and event never surface.
 	identifier := request.Identifiers[0]
 	stored := append([]retlClient.Mapping{
-		{From: identifier.From, To: userIDTarget},
-		{From: identifier.From, To: externalIDTarget},
+		{From: identifier.From, To: UserIDTarget},
+		{From: identifier.From, To: ExternalIDTarget},
 	}, request.Mappings...)
 
 	for _, mapping := range stored {
-		if mapping.To == userIDTarget || mapping.To == externalIDTarget {
+		if mapping.To == UserIDTarget || mapping.To == ExternalIDTarget {
 			continue
 		}
 		conn.Mappings = append(conn.Mappings, mapping)
@@ -518,7 +518,7 @@ func representableConnection() *retlClient.RETLConnection {
 		ID:            "conn-1",
 		SyncBehaviour: retlClient.SyncBehaviourUpsert,
 		Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
-		Identifiers:   []retlClient.Mapping{{From: "id", To: userIDTarget}},
+		Identifiers:   []retlClient.Mapping{{From: "id", To: UserIDTarget}},
 		Mappings:      []retlClient.Mapping{{From: "email", To: "traits.email"}},
 		SyncSettings:  mergedSyncSettings(nil),
 	}
@@ -650,21 +650,21 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := jsonMapperConfig()
-		config.Mappings = []MappingSpec{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}
+		config.Mappings = []MappingSpec{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The request carries the user's entries untouched: the reclassification
 		// below is the backend's doing, not ours.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
 
 		reclassified := jsonMapperConfig()
-		reclassified.Identifiers = []MappingSpec{{From: "id", To: userIDTarget}, {From: "device", To: anonymousIDTarget}}
+		reclassified.Identifiers = []MappingSpec{{From: "id", To: UserIDTarget}, {From: "device", To: AnonymousIDTarget}}
 		assert.Equal(t, reclassified, remote)
 		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
@@ -673,15 +673,15 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := objectMappingConfig()
-		config.Mappings = []MappingSpec{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}
+		config.Mappings = []MappingSpec{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The entry aimed at the reserved target is still in the request; only
 		// the backend consumes it as a synthetic identifier.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
