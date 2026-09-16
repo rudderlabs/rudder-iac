@@ -388,11 +388,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "am",
-		APIType:    "AM",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_secret"},
+		Type:               "am",
+		APIType:            "AM",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"api_secret", "api_key"},
+		ReturnedSecretKeys: []string{"api_key"},
 		NewConfig: func() any {
 			return &amplitudeConfig{}
 		},

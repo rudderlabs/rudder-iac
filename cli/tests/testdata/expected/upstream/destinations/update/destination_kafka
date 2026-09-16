@@ -14,14 +14,14 @@
     "caCertificate": "-----BEGIN CERTIFICATE-----\nrudderCliE2eKafkaCa\n-----END CERTIFICATE-----",
     "convertToAvro": false,
     "enableMultiTopic": false,
-    "hostName": "kafka-1.rudder-cli-e2e.internal,kafka-2.rudder-cli-e2e.internal",
+    "hostName": "<ignored>",
     "port": "9092",
     "saslType": "sha512",
     "sslEnabled": true,
     "topic": "rudder-cli-e2e-updated",
     "useSASL": true,
     "useSSH": false,
-    "username": "rudder_cli_e2e"
+    "username": "<ignored>"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

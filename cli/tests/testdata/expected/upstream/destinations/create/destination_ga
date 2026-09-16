@@ -70,7 +70,7 @@
     "trackNamedPages": {
       "web": false
     },
-    "trackingID": "UA-123456-1",
+    "trackingID": "<ignored>",
     "useGoogleAmpClientId": {
       "web": false
     },

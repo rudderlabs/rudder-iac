@@ -235,7 +235,19 @@ func NewDefinition() *definitions.DestinationDefinition {
 			{Tag: "braze_ios_api_key_required", Func: platformKeyConditional(brazeIOSSources)},
 			{Tag: "braze_web_api_key_required", Func: platformKeyConditional(brazeWebSources)},
 		},
-		SecretKeys: []string{"rest_api_key"},
+		SecretKeys: []string{
+			"rest_api_key",
+			"android_api_key",
+			"app_key",
+			"ios_api_key",
+			"web_api_key",
+		},
+		ReturnedSecretKeys: []string{
+			"android_api_key",
+			"app_key",
+			"ios_api_key",
+			"web_api_key",
+		},
 		NewConfig: func() any {
 			return &brazeConfig{}
 		},

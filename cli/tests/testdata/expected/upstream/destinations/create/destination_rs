@@ -24,7 +24,7 @@
     "useIAMForAuth": false,
     "useRudderStorage": true,
     "useSSH": false,
-    "user": "rudder",
+    "user": "<ignored>",
     "useServerless": false,
     "roleBasedAuth": true,
     "enableSSE": false,

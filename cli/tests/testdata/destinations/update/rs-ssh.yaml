@@ -13,7 +13,7 @@ spec:
     host: rudder-cli-e2e-ssh.redshift.amazonaws.com
     port: "5439"
     database: analytics
-    user: rudder
+    user: "{{ .RS_SSH_DB_USER }}"
     password: "{{ .RS_PASSWORD }}"
     namespace: rudder_events_ssh
     use_ssh: true

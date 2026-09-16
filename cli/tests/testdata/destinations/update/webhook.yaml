@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    webhook_url: https://webhooks.example.com/rudder/updated
+    webhook_url: "{{ .WEBHOOK_WEBHOOK_URL_UPDATED }}"
     webhook_method: PATCH
     headers:
       - from: X-Rudder-Token

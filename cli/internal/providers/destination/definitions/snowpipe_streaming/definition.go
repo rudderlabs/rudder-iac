@@ -101,11 +101,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "snowpipe_streaming",
-		APIType:    "SNOWPIPE_STREAMING",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"private_key", "private_key_passphrase"},
+		Type:               "snowpipe_streaming",
+		APIType:            "SNOWPIPE_STREAMING",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"private_key", "private_key_passphrase", "user"},
+		ReturnedSecretKeys: []string{"user"},
 		NewConfig: func() any {
 			return &snowpipeStreamingConfig{}
 		},

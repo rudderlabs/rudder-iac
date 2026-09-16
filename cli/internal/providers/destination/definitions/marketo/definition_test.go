@@ -24,7 +24,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "marketo", registered.Type)
 	assert.Equal(t, "MARKETO", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"client_secret"}, registered.SecretKeys())
+	assert.Equal(t, []string{"client_secret", "client_id"}, registered.SecretKeys())
+	assert.Equal(t, []string{"client_id"}, registered.ReturnedSecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{

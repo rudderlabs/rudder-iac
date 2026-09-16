@@ -24,7 +24,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "adobe_analytics", registered.Type)
 	assert.Equal(t, "ADOBE_ANALYTICS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{}, registered.SecretKeys())
+	assert.Equal(t, []string{"heartbeat_tracking_server_url", "marketing_cloud_org_id", "tracking_server_url"}, registered.SecretKeys())
+	assert.Equal(t, []string{"heartbeat_tracking_server_url", "marketing_cloud_org_id", "tracking_server_url"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

@@ -218,7 +218,14 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "HTTP",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"password", "bearer_token", "api_key_value"},
+		SecretKeys: []string{
+			"password",
+			"bearer_token",
+			"api_key_value",
+			"api_key_name",
+			"username",
+		},
+		ReturnedSecretKeys: []string{"api_key_name", "username"},
 		NewConfig: func() any {
 			return &httpConfig{}
 		},

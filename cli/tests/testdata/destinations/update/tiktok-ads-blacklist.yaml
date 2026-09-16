@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    pixel_code: C0000000000000000012
+    pixel_code: "{{ .TIKTOK_ADS_BLACKLIST_PIXEL_CODE_UPDATED }}"
     access_token: "{{ .TIKTOK_ADS_ACCESS_TOKEN }}"
     version: v2
     hash_user_properties: true

@@ -73,7 +73,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "S3_DATALAKE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Empty(t, registered.GatedKeyPaths())
-	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_key_id", "access_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",

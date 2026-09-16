@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    partner_id: rudderCliE2eFullPartnerUpdated
+    partner_id: "{{ .LINKEDIN_INSIGHT_TAG_PARTNER_ID_UPDATED }}"
     event_to_conversion_id_map:
       - from: Checkout Started
         to: "9998887"

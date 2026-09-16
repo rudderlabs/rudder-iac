@@ -11,7 +11,7 @@
         "to": "7654321"
       }
     ],
-    "partnerId": "rudderCliE2eFullPartner",
+    "partnerId": "<ignored>",
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

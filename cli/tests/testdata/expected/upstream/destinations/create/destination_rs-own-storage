@@ -25,7 +25,7 @@
     "useIAMForAuth": false,
     "useRudderStorage": false,
     "useSSH": false,
-    "user": "rudder",
+    "user": "<ignored>",
     "useServerless": false
   },
   "createdAt": "<ignored>",

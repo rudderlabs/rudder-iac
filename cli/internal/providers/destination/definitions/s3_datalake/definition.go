@@ -129,7 +129,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "S3_DATALAKE",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"password", "access_key_id", "access_key"},
+		SecretKeys: []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &s3DatalakeConfig{}
 		},

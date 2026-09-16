@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    tracking_id: UA-654321-2
+    tracking_id: "{{ .GA_TRACKING_ID_UPDATED }}"
     double_click: false
     enhanced_link_attribution: false
     include_search: true

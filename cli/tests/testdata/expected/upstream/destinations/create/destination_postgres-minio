@@ -25,7 +25,7 @@
     "useRudderStorage": false,
     "useSSH": false,
     "useSSL": true,
-    "user": "rudder"
+    "user": "<ignored>"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -7,7 +7,7 @@
   "type": "VWO",
   "enabled": true,
   "config": {
-    "accountId": "rudderCliE2eAccount",
+    "accountId": "<ignored>",
     "connectionMode": {
       "web": "device"
     },

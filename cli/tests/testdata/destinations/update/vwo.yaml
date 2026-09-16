@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    account_id: rudderCliE2eAccountUpdated
+    account_id: "{{ .VWO_ACCOUNT_ID_UPDATED }}"
     is_spa: false
     send_experiment_track: false
     send_experiment_identify: true

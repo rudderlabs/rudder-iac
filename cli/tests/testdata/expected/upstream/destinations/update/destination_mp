@@ -34,7 +34,7 @@
     "projectId": "rudderCliE2eProjectUpdated",
     "secureCookie": false,
     "serviceAccountSecret": "mpServiceAccountSecretXXXXXXXX",
-    "serviceAccountUserName": "rudderCliE2eServiceUserUpdated",
+    "serviceAccountUserName": "<ignored>",
     "sessionReplayPercentage": {
       "web": "50"
     },

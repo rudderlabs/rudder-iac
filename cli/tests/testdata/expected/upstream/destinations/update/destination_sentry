@@ -38,7 +38,7 @@
         "denyUrls": "https://internal.rudder-cli-e2e.com"
       }
     ],
-    "dsn": "https://rudderclie2eupdated@o0.ingest.sentry.io/1",
+    "dsn": "<ignored>",
     "environment": "production",
     "eventFilteringOption": "blacklistedEvents",
     "ignoreErrors": [

@@ -25,7 +25,7 @@
     "useRudderStorage": false,
     "useSASTokens": false,
     "useSSH": false,
-    "user": "rudder"
+    "user": "<ignored>"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

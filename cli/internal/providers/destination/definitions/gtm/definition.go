@@ -69,10 +69,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "gtm",
-		APIType:    "GTM",
-		Version:    1,
-		Properties: properties,
+		Type:               "gtm",
+		APIType:            "GTM",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"authorization_token", "container_id"},
+		ReturnedSecretKeys: []string{"authorization_token", "container_id"},
 		NewConfig: func() any {
 			return &gtmConfig{}
 		},

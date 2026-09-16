@@ -21,7 +21,7 @@
     "useRudderStorage": true,
     "useSSH": false,
     "useServerless": true,
-    "user": "rudder",
+    "user": "<ignored>",
     "workgroupName": "rudder-cli-e2e-wg",
     "roleBasedAuth": true,
     "enableSSE": false,

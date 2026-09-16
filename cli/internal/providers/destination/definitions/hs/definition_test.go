@@ -24,7 +24,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "hs", registered.Type)
 	assert.Equal(t, "HS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "hub_id"}, registered.SecretKeys())
+	assert.Equal(t, []string{"hub_id"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

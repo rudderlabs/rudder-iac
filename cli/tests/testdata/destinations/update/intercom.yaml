@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    app_id: rudderCliE2eAppIdUpdated
+    app_id: "{{ .INTERCOM_APP_ID_UPDATED }}"
     api_key: "{{ .INTERCOM_API_KEY }}"
     api_server: eu
     api_version: v1
@@ -18,8 +18,8 @@ spec:
     event_filtering:
       blacklist:
         - Page Viewed
-    mobile_api_key_android: rudderCliE2eAndroidKeyUpdated
-    mobile_api_key_ios: rudderCliE2eIosKeyUpdated
+    mobile_api_key_android: "{{ .INTERCOM_MOBILE_API_KEY_ANDROID_UPDATED }}"
+    mobile_api_key_ios: "{{ .INTERCOM_MOBILE_API_KEY_IOS_UPDATED }}"
     consent_management:
       web:
         - provider: oneTrust

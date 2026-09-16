@@ -29,7 +29,7 @@
     "underscoreDivideNumbers": false,
     "useKeyPairAuth": false,
     "useRudderStorage": true,
-    "user": "RUDDER_CLI_E2E",
+    "user": "<ignored>",
     "warehouse": "RUDDER_WH",
     "cloudProvider": "AWS",
     "cleanupObjectStorageFiles": false

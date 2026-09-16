@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "userName": "rudder-cli-e2e@example.com",
+    "userName": "<ignored>",
     "mapProperties": false,
     "sandbox": true,
     "useContactId": true

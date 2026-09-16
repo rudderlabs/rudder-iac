@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "pixelId": "6543210987654321",
+    "pixelId": "<ignored>",
     "standardPageCall": false,
     "valueFieldIdentifier": "properties.price",
     "advancedMapping": true,

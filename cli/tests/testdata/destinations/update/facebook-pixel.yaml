@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    pixel_id: "6543210987654321"
+    pixel_id: "{{ .FACEBOOK_PIXEL_PIXEL_ID_UPDATED }}"
     access_token: "{{ .FACEBOOK_PIXEL_ACCESS_TOKEN }}"
     standard_page_call: false
     value_field_identifier: properties.price

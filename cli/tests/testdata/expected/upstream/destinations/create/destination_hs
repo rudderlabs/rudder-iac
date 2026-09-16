@@ -14,7 +14,7 @@
     "apiVersion": "newApi",
     "doAssociation": true,
     "eventFilteringOption": "whitelistedEvents",
-    "hubID": "12345678",
+    "hubID": "<ignored>",
     "hubspotEvents": [
       {
         "eventProperties": [

@@ -24,7 +24,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "googleads", registered.Type)
 	assert.Equal(t, "GOOGLEADS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{}, registered.SecretKeys())
+	assert.Equal(t, []string{"conversion_id"}, registered.SecretKeys())
+	assert.Equal(t, []string{"conversion_id"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{"web"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())

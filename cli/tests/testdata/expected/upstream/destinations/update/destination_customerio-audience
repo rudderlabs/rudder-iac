@@ -4,7 +4,7 @@
       "warehouse": "cloud"
     },
     "region": "EU",
-    "siteId": "rudderCliE2eSiteIdUpdated"
+    "siteId": "<ignored>"
   },
   "createdAt": "<ignored>",
   "enabled": true,

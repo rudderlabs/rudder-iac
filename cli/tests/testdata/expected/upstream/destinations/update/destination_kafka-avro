@@ -28,7 +28,7 @@
         "to": "rudder-identifies"
       }
     ],
-    "hostName": "kafka-avro.rudder-cli-e2e.internal",
+    "hostName": "<ignored>",
     "port": "9092",
     "sslEnabled": false,
     "topic": "rudder-cli-e2e-avro-updated",

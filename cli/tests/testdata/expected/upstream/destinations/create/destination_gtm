@@ -10,8 +10,8 @@
     "connectionMode": {
       "web": "device"
     },
-    "authorizationToken": "rudderCliE2eGtmAuthToken",
-    "containerID": "GTM-E2ECREATE",
+    "authorizationToken": "<ignored>",
+    "containerID": "<ignored>",
     "environmentID": "env-5",
     "eventFilteringOption": "whitelistedEvents",
     "serverUrl": "https://sgtm.rudder-cli-e2e.com",

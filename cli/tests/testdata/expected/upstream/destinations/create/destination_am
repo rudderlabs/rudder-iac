@@ -1,6 +1,6 @@
 {
   "config": {
-    "apiKey": "rudderCliE2eAmFullKey",
+    "apiKey": "<ignored>",
     "connectionMode": {
       "web": "device"
     },

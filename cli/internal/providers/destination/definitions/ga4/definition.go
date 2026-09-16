@@ -185,11 +185,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "ga4",
-		APIType:    "GA4",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_secret"},
+		Type:               "ga4",
+		APIType:            "GA4",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"api_secret", "measurement_id"},
+		ReturnedSecretKeys: []string{"measurement_id"},
 		NewConfig: func() any {
 			return &ga4Config{}
 		},

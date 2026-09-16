@@ -37,7 +37,7 @@
     },
     "doAssociation": false,
     "eventFilteringOption": "blacklistedEvents",
-    "hubID": "87654321"
+    "hubID": "<ignored>"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

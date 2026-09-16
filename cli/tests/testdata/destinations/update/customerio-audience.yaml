@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    site_id: rudderCliE2eSiteIdUpdated
+    site_id: "{{ .CUSTOMERIO_AUDIENCE_SITE_ID_UPDATED }}"
     api_key: "{{ .CUSTOMERIO_AUDIENCE_API_KEY }}"
     app_api_key: "{{ .CUSTOMERIO_AUDIENCE_APP_API_KEY }}"
     region: EU

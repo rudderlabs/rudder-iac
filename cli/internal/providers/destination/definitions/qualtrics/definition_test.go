@@ -23,7 +23,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "qualtrics", registered.Type)
 	assert.Equal(t, "QUALTRICS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Empty(t, registered.SecretKeys())
+	assert.Equal(t, []string{"project_id"}, registered.SecretKeys())
+	assert.Equal(t, []string{"project_id"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{"web", "android", "ios"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())

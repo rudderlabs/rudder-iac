@@ -10,7 +10,7 @@
     "account": "rudder-cli-e2e.us-east-1",
     "database": "RUDDER_E2E_GCP",
     "warehouse": "RUDDER_WH",
-    "user": "RUDDER_CLI_E2E",
+    "user": "<ignored>",
     "role": "RUDDER_ROLE",
     "namespace": "rudder_cli_e2e_gcp",
     "useKeyPairAuth": false,

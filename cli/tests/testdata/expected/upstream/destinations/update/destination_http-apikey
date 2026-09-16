@@ -4,7 +4,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "apiKeyName": "X-Api-Key",
+    "apiKeyName": "<ignored>",
     "apiUrl": "https://webhooks.example.com/rudder/events",
     "auth": "apiKeyAuth",
     "format": "JSON",

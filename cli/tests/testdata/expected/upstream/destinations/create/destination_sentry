@@ -17,7 +17,7 @@
     ],
     "customVersionProperty": "appVersion",
     "debugMode": false,
-    "dsn": "https://rudderclie2e@o0.ingest.sentry.io/0",
+    "dsn": "<ignored>",
     "environment": "staging",
     "eventFilteringOption": "whitelistedEvents",
     "ignoreErrors": [

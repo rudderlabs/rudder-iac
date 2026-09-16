@@ -6,7 +6,7 @@
     "isBatchingEnabled": false,
     "isDefaultMapping": true,
     "method": "POST",
-    "username": "rudder"
+    "username": "<ignored>"
   },
   "createdAt": "<ignored>",
   "enabled": true,

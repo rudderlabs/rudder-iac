@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+    "webhookUrl": "<ignored>",
     "incomingWebhooksType": "modern",
     "identifyTemplate": "Identify user",
     "eventChannelSettings": [

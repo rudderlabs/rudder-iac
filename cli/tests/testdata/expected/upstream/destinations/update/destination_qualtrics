@@ -23,7 +23,7 @@
       "web": false
     },
     "eventFilteringOption": "blacklistedEvents",
-    "projectId": "rudderCliE2eFullProjectUpdated"
+    "projectId": "<ignored>"
   },
   "createdAt": "<ignored>",
   "enabled": true,

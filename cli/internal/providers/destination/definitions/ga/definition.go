@@ -190,10 +190,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "ga",
-		APIType:    "GA",
-		Version:    1,
-		Properties: properties,
+		Type:               "ga",
+		APIType:            "GA",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"tracking_id"},
+		ReturnedSecretKeys: []string{"tracking_id"},
 		NewConfig: func() any {
 			return &googleAnalyticsConfig{}
 		},

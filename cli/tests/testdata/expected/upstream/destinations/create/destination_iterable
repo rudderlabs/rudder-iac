@@ -3,7 +3,7 @@
     "animationDuration": {
       "web": "400"
     },
-    "apiKey": "rudderCliE2eApiKey",
+    "apiKey": "<ignored>",
     "closeButtonColor": {
       "web": "#ffffff"
     },

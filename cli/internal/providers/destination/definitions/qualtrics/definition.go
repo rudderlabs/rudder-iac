@@ -63,11 +63,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "qualtrics",
-		APIType:    "QUALTRICS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:               "qualtrics",
+		APIType:            "QUALTRICS",
+		Version:            1,
+		Properties:         properties,
+		SecretKeys:         []string{"project_id"},
+		ReturnedSecretKeys: []string{"project_id"},
 		NewConfig: func() any {
 			return &qualtricsConfig{}
 		},

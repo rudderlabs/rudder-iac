@@ -7,7 +7,7 @@
   "type": "WEBHOOK",
   "enabled": true,
   "config": {
-    "webhookUrl": "https://webhooks.example.com/rudder",
+    "webhookUrl": "<ignored>",
     "webhookMethod": "POST",
     "headers": [
       {

@@ -5,7 +5,7 @@
       "web": true
     },
     "eventFilteringOption": "whitelistedEvents",
-    "projectId": "rudderCliE2eFullProject",
+    "projectId": "<ignored>",
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

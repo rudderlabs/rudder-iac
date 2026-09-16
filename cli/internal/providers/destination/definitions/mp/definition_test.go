@@ -24,7 +24,8 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "mp", registered.Type)
 	assert.Equal(t, "MP", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret"}, registered.SecretKeys())
+	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret", "service_account_user_name"}, registered.SecretKeys())
+	assert.Equal(t, []string{"service_account_user_name"}, registered.ReturnedSecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
@@ -384,7 +385,9 @@ func TestMPSecretKeysWrapSensitiveValues(t *testing.T) {
 		require.True(t, ok, "expected %s to be wrapped as a secret", key)
 		assert.NotContains(t, wrapped.String(), "raw-")
 	}
-	assert.Equal(t, "visible-user", config["service_account_user_name"])
+	userName, ok := config["service_account_user_name"].(*secret.String)
+	require.True(t, ok, "service_account_user_name must be wrapped as a secret")
+	assert.Equal(t, "visible-user", userName.Reveal())
 }
 
 func TestMPConversionRoundTrip(t *testing.T) {

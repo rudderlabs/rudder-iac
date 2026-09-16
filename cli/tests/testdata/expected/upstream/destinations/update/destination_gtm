@@ -10,7 +10,7 @@
     "connectionMode": {
       "web": "device"
     },
-    "authorizationToken": "rudderCliE2eGtmAuthTokenUpdated",
+    "authorizationToken": "<ignored>",
     "blacklistedEvents": [
       {
         "eventName": "Application Opened"
@@ -32,7 +32,7 @@
         }
       ]
     },
-    "containerID": "GTM-E2EUPDATE",
+    "containerID": "<ignored>",
     "environmentID": "env-9",
     "eventFilteringOption": "blacklistedEvents",
     "serverUrl": "sgtm-updated.rudder-cli-e2e.com/collect"

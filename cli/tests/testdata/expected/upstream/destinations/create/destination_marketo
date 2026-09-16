@@ -12,7 +12,7 @@
       "androidKotlin": "cloud"
     },
     "accountId": "123-ABC-456",
-    "clientId": "marketo-client-id",
+    "clientId": "<ignored>",
     "trackAnonymousEvents": false,
     "createIfNotExist": true,
     "rudderEventsMapping": [

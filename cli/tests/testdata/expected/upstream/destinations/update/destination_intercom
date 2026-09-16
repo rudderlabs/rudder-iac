@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "appId": "rudderCliE2eAppIdUpdated",
+    "appId": "<ignored>",
     "apiServer": "eu",
     "apiVersion": "v1",
     "sendAnonymousId": true,
@@ -23,10 +23,10 @@
     ],
     "eventFilteringOption": "blacklistedEvents",
     "mobileApiKeyAndroid": {
-      "android": "rudderCliE2eAndroidKeyUpdated"
+      "android": "<ignored>"
     },
     "mobileApiKeyIOS": {
-      "ios": "rudderCliE2eIosKeyUpdated"
+      "ios": "<ignored>"
     },
     "consentManagement": {
       "web": [

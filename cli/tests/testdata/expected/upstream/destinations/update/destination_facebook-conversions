@@ -11,7 +11,7 @@
         "blacklistPiiProperties": "phone"
       }
     ],
-    "datasetId": "123456789012345",
+    "datasetId": "<ignored>",
     "eventsToEvents": [
       {
         "from": "Product Added",

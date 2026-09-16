@@ -7,7 +7,7 @@
   "type": "VWO",
   "enabled": true,
   "config": {
-    "accountId": "rudderCliE2eAccountUpdated",
+    "accountId": "<ignored>",
     "blacklistedEvents": [
       {
         "eventName": "Application Opened"

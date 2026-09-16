@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    host_name: kafka-ssh.rudder-cli-e2e.internal
+    host_name: "{{ .KAFKA_SSH_HOST_NAME }}"
     port: "9092"
     topic: rudder-cli-e2e-ssh-updated
     ssl_enabled: false
