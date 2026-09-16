@@ -1,6 +1,9 @@
 package connection
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/resources"
+import (
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+)
 
 const (
 	ResourceType = "retl-connection"
@@ -29,7 +32,28 @@ const (
 	IDKey            = "id"
 	SourceIDKey      = "sourceId"
 	DestinationIDKey = "destinationId"
+
+	// ExternalIDKey marks CLI-managed rows in List output.
+	ExternalIDKey = "externalId"
 )
+
+// RemoteConnection carries a remote connection through import and export
+// together with the identity the connection row itself does not hold: the
+// workspace and the source kind come from the rETL source, the endpoints'
+// display names are what an imported connection is named after, and the
+// endpoints' externalIds — empty when an endpoint is not CLI-managed — are the
+// endpoints' local resource ids. Both endpoint catalogs are read once per
+// operation, so carrying the result here is what keeps naming, export and
+// matching free of further API calls.
+type RemoteConnection struct {
+	retlClient.RETLConnection
+	WorkspaceID           string
+	SourceKind            SourceKind
+	SourceName            string
+	SourceExternalID      string
+	DestinationName       string
+	DestinationExternalID string
+}
 
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of
 // connection entries. JSON tags enable the typed rule engine's

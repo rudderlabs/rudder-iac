@@ -695,8 +695,8 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 
 // A change to an immutable field cannot ride on a PUT: the body has no field
 // for it, so the server would apply nothing and the diff would return on every
-// apply. DEX-825 routes these to delete-then-create, so this guard only fires
-// on a bug — but a loud error beats silent perpetual drift.
+// apply. Only an endpoint change is replaced; the rest are reported here, with
+// the remedy the UI imposes too.
 func TestToUpdateRequestRejectsImmutableChanges(t *testing.T) {
 	t.Parallel()
 

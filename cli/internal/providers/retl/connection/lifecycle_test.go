@@ -13,6 +13,13 @@ import (
 
 const localID = "users-to-webhook"
 
+// lifecycleHandler builds a handler for the create/update/delete path: only the
+// remote flows consult the destination registry, so it stays nil and an
+// accidental lookup panics.
+func lifecycleHandler(client *MockConnectionClient) *Handler {
+	return NewHandler(client, importDir, nil)
+}
+
 // stateData is what the syncer hands Update and Delete: the prior Input (the
 // canonical config and enabled flag) merged with the Output (the remote ids).
 func stateData(t *testing.T, config ConfigSpec) resources.ResourceData {
@@ -42,7 +49,7 @@ func TestCreate(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{}
-		output, err := NewHandler(mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
+		output, err := lifecycleHandler(mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
 		require.NoError(t, err)
 
 		require.Len(t, mock.CreateCalls, 1)
@@ -57,7 +64,7 @@ func TestCreate(t *testing.T) {
 		data[DestinationKey] = &resources.PropertyRef{URN: "destination:webhook"}
 
 		mock := &MockConnectionClient{}
-		_, err := NewHandler(mock).Create(context.Background(), localID, data)
+		_, err := lifecycleHandler(mock).Create(context.Background(), localID, data)
 
 		assert.ErrorContains(t, err, `building create request for rETL connection "users-to-webhook"`)
 		assert.Empty(t, mock.CreateCalls)
@@ -71,7 +78,7 @@ func TestCreate(t *testing.T) {
 				return nil, errors.New("source and destination are already connected")
 			},
 		}
-		_, err := NewHandler(mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
+		_, err := lifecycleHandler(mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
 
 		assert.EqualError(t, err, `creating rETL connection "users-to-webhook": source and destination are already connected`)
 	})
@@ -84,7 +91,7 @@ func TestUpdate(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{}
-		output, err := NewHandler(mock).Update(context.Background(), localID,
+		output, err := lifecycleHandler(mock).Update(context.Background(), localID,
 			graphData(t, jsonMapperConfig()), stateData(t, jsonMapperConfig()))
 		require.NoError(t, err)
 
@@ -105,7 +112,7 @@ func TestUpdate(t *testing.T) {
 				return &retlClient.RETLConnection{ID: id, SourceID: "src-1", DestinationID: "dst-1"}, nil
 			},
 		}
-		output, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+		output, err := lifecycleHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 		require.NoError(t, err)
 
 		assert.Equal(t, []string{"conn-remote-1"}, mock.UpdateCalls)
@@ -125,7 +132,7 @@ func TestUpdate(t *testing.T) {
 				return nil, errors.New("schedule is invalid")
 			},
 		}
-		_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+		_, err := lifecycleHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
 		assert.EqualError(t, err, `updating rETL connection "users-to-webhook": schedule is invalid`)
 	})
@@ -134,7 +141,7 @@ func TestUpdate(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{}
-		_, err := NewHandler(mock).Update(context.Background(), localID, graphData(t, jsonMapperConfig()), resources.ResourceData{})
+		_, err := lifecycleHandler(mock).Update(context.Background(), localID, graphData(t, jsonMapperConfig()), resources.ResourceData{})
 
 		assert.ErrorContains(t, err, "missing id in state")
 		assert.Equal(t, &MockConnectionClient{}, mock)
@@ -151,9 +158,6 @@ func TestUpdate(t *testing.T) {
 			},
 			"a missing enabled flag":        func(data, _ resources.ResourceData) { delete(data, EnabledKey) },
 			"a config that does not decode": func(data, _ resources.ResourceData) { data[ConfigKey] = map[string]any{"identifiers": "id"} },
-			"a stored config that does not decode": func(_, state resources.ResourceData) {
-				state[ConfigKey] = "upsert"
-			},
 			"a create body the api refuses": func(data, _ resources.ResourceData) {
 				configMap(data)["object"] = "Contact"
 				configMap(data)["event"] = map[string]any{"type": "track", "name": "signup"}
@@ -169,12 +173,28 @@ func TestUpdate(t *testing.T) {
 				corrupt(data, state)
 
 				mock := &MockConnectionClient{}
-				_, err := NewHandler(mock).Update(context.Background(), localID, data, state)
+				_, err := lifecycleHandler(mock).Update(context.Background(), localID, data, state)
 
 				assert.ErrorContains(t, err, `connection "users-to-webhook"`)
 				assert.Equal(t, &MockConnectionClient{}, mock)
 			})
 		}
+	})
+
+	// The stored config is the other half of the diff an update computes, so it
+	// has to decode before the PUT is built. A replacement never reads it: the
+	// create body comes from the desired entry alone.
+	t.Run("refuses an update whose stored config does not decode", func(t *testing.T) {
+		t.Parallel()
+
+		state := stateData(t, jsonMapperConfig())
+		state[ConfigKey] = "upsert"
+
+		mock := &MockConnectionClient{}
+		_, err := lifecycleHandler(mock).Update(context.Background(), localID, graphData(t, jsonMapperConfig()), state)
+
+		assert.ErrorContains(t, err, `connection "users-to-webhook": reading stored connection config`)
+		assert.Equal(t, &MockConnectionClient{}, mock)
 	})
 
 	t.Run("rejects an immutable field change without touching the api", func(t *testing.T) {
@@ -195,7 +215,7 @@ func TestUpdate(t *testing.T) {
 				change(configMap(data))
 
 				mock := &MockConnectionClient{}
-				_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+				_, err := lifecycleHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
 				assert.ErrorContains(t, err, field+" is immutable")
 				assert.ErrorContains(t, err, "delete and recreate the connection")
@@ -205,8 +225,8 @@ func TestUpdate(t *testing.T) {
 	})
 
 	// An endpoint change becomes one delete and one create, and whatever the
-	// create returns — a revived id for the same pair, a new one for a new pair
-	// — is what lands in state.
+	// create returns — a revived id, if the pair being moved to had a row of its
+	// own once, or a brand new one — is what lands in state.
 	t.Run("replaces on an endpoint change", func(t *testing.T) {
 		t.Parallel()
 
@@ -229,7 +249,7 @@ func TestUpdate(t *testing.T) {
 						return created, nil
 					},
 				}
-				output, err := NewHandler(mock).Update(context.Background(), localID, data, state)
+				output, err := lifecycleHandler(mock).Update(context.Background(), localID, data, state)
 				require.NoError(t, err)
 
 				assert.Equal(t, []string{"conn-remote-1"}, mock.DeleteCalls)
@@ -248,7 +268,7 @@ func TestUpdate(t *testing.T) {
 		data[DestinationKey] = "dst-2"
 
 		mock := &MockConnectionClient{DeleteFunc: func(_ string) error { return errors.New("forbidden") }}
-		_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+		_, err := lifecycleHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
 		assert.EqualError(t, err, `deleting rETL connection "users-to-webhook": forbidden`)
 		assert.Empty(t, mock.CreateCalls)
@@ -265,7 +285,7 @@ func TestUpdate(t *testing.T) {
 				return nil, errors.New("plan gate")
 			},
 		}
-		_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+		_, err := lifecycleHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
 		assert.EqualError(t, err, `recreating rETL connection "users-to-webhook" after an endpoint change (the previous connection was deleted): creating rETL connection "users-to-webhook": plan gate`)
 	})
@@ -278,7 +298,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{}
-		require.NoError(t, NewHandler(mock).Delete(context.Background(), localID, stateData(t, jsonMapperConfig())))
+		require.NoError(t, lifecycleHandler(mock).Delete(context.Background(), localID, stateData(t, jsonMapperConfig())))
 
 		assert.Equal(t, &MockConnectionClient{DeleteCalls: []string{"conn-remote-1"}}, mock)
 	})
@@ -287,7 +307,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{}
-		err := NewHandler(mock).Delete(context.Background(), localID, resources.ResourceData{})
+		err := lifecycleHandler(mock).Delete(context.Background(), localID, resources.ResourceData{})
 
 		assert.ErrorContains(t, err, "missing id in state")
 		assert.Empty(t, mock.DeleteCalls)
@@ -297,7 +317,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{DeleteFunc: func(_ string) error { return errors.New("forbidden") }}
-		err := NewHandler(mock).Delete(context.Background(), localID, stateData(t, jsonMapperConfig()))
+		err := lifecycleHandler(mock).Delete(context.Background(), localID, stateData(t, jsonMapperConfig()))
 
 		assert.EqualError(t, err, `deleting rETL connection "users-to-webhook": forbidden`)
 	})
