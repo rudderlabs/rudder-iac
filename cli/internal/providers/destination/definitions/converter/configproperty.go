@@ -103,8 +103,6 @@ func Equals(key, value string) ConfigConditionFunc {
 	}
 }
 
-// Discriminator returns a ConfigProperty that is not stored directly in local config.
-// The corresponding API config value is set based on the provided DiscriminatorValues.
 // DiscriminatorOption configures the exclusive group a Discriminator declares.
 type DiscriminatorOption func(*ExclusiveGroup)
 
@@ -117,6 +115,8 @@ func DropUnselected() DiscriminatorOption {
 	return func(group *ExclusiveGroup) { group.DropUnselected = true }
 }
 
+// Discriminator returns a ConfigProperty that is not stored directly in local config.
+// The corresponding API config value is set based on the provided DiscriminatorValues.
 func Discriminator(apiKey string, values DiscriminatorValues, opts ...DiscriminatorOption) ConfigProperty {
 	group := &ExclusiveGroup{APIKey: apiKey, LocalKeys: map[string]any(values)}
 	for _, opt := range opts {
