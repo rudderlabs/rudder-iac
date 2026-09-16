@@ -158,6 +158,11 @@ func TestUpdate(t *testing.T) {
 				configMap(data)["object"] = "Contact"
 				configMap(data)["event"] = map[string]any{"type": "track", "name": "signup"}
 			},
+			// The client refuses this one rather than the converter, so it only
+			// stays out of the API if toCreateRequest checks it before the delete.
+			"a schedule the client refuses": func(data, _ resources.ResourceData) {
+				delete(configMap(data), "schedule")
+			},
 		}
 
 		for name, corrupt := range tests {
