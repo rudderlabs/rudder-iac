@@ -5,10 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
+)
+
+// The mapping targets the backend reserves for identifiers — USER_ID,
+// ANONYMOUS_ID and SYSTEM_CONSTANTS.id in config-backend
+// src/modules/retl/api-gateway/connection-config/constants.ts. A user mapping
+// aimed at one of them is folded into the identifiers, or consumed outright, so
+// it never comes back where it was written.
+const (
+	userIDTarget      = "user_id"
+	anonymousIDTarget = "anonymous_id"
+	externalIDTarget  = "context.externalId[0].id"
 )
 
 // ErrUnrepresentableConfig marks a remote connection that the supported spec
@@ -208,10 +220,11 @@ func checkImmutableUnchanged(config, stored ConfigSpec) error {
 //
 // What it refuses, all wrapping ErrUnrepresentableConfig so a caller can skip
 // the row with errors.Is, are shapes the spec has no way to express: a
-// destination-specific config, no identifiers at all, and the object mapping
-// flow carrying constants or an event. Field-level rules — which targets an
-// identifier may use, the single-identifier limit on object mapping — stay with
-// DEX-829, so DEX-827 must still validate the rebuilt spec before writing it.
+// destination-specific config, no identifiers at all, the object mapping flow
+// carrying constants or an event, and — checked on the rebuilt spec — the
+// mapping shapes a re-apply would not reproduce. DEX-829 rejects the same
+// mapping shapes at spec load; they are caught here too because a remote row
+// reaches export and import without ever passing through the spec rules.
 func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if hasDestinationConfig(conn.DestinationConfig) {
 		return ConfigSpec{}, fmt.Errorf("connection %q: destination-specific configuration has no spec equivalent: %w", conn.ID, ErrUnrepresentableConfig)
@@ -244,7 +257,33 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if err := checkObjectMappingFlow(normalized); err != nil {
 		return ConfigSpec{}, fmt.Errorf("connection %q: %w: %w", conn.ID, err, ErrUnrepresentableConfig)
 	}
+	if err := checkRepresentableMappings(normalized); err != nil {
+		return ConfigSpec{}, fmt.Errorf("connection %q: %w: %w", conn.ID, err, ErrUnrepresentableConfig)
+	}
 	return normalized, nil
+}
+
+// checkRepresentableMappings rejects a rebuilt spec the backend would not hand
+// back unchanged if it were applied: a user mapping aimed at a reserved target
+// is folded into the identifiers or consumed as a synthetic one, and object
+// mapping stores a single identifier, so a row carrying more cannot be
+// recreated from the spec. Either way the connection would diff on every apply,
+// which is the drift these conversions exist to prevent.
+func checkRepresentableMappings(config ConfigSpec) error {
+	reserved := []string{userIDTarget, anonymousIDTarget}
+	if config.Object != nil {
+		reserved = []string{userIDTarget, externalIDTarget}
+		if len(config.Identifiers) > 1 {
+			return fmt.Errorf("object mapping supports a single identifier, found %d", len(config.Identifiers))
+		}
+	}
+
+	for _, mapping := range config.Mappings {
+		if slices.Contains(reserved, mapping.To) {
+			return fmt.Errorf("mapping to %q is reserved for identifiers", mapping.To)
+		}
+	}
+	return nil
 }
 
 // hasDestinationConfig reports whether a response carries integration-owned

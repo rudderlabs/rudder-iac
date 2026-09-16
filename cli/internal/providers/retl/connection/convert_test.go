@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The mapping targets the backend folds into identifiers and reconstructs on
-// read — USER_ID, ANONYMOUS_ID and SYSTEM_CONSTANTS.id in config-backend
-// src/modules/retl/api-gateway/connection-config/constants.ts.
-const (
-	userIDTarget      = "user_id"
-	anonymousIDTarget = "anonymous_id"
-	externalIDTarget  = "context.externalId[0].id"
-)
-
 // graphData builds the resource entry the syncer hands the lifecycle: endpoint
 // refs already dereferenced to remote ids, plus the canonical config map.
 func graphData(t *testing.T, config ConfigSpec) resources.ResourceData {
