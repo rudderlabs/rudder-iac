@@ -74,11 +74,9 @@ var destinationSnapshotIgnore = []string{
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
-	"12345678",
 	"123456789012345",
 	"1234567890123456",
 	"6543210987654321",
-	"87654321",
 	"AW-123456789",
 	"AW-987654321",
 	"C0000000000000000001",
@@ -141,6 +139,8 @@ var destinationRawSecrets = []string{
 	"rudderCliE2eFullProjectUpdated",
 	"rudderCliE2eGtmAuthToken",
 	"rudderCliE2eGtmAuthTokenUpdated",
+	"rudderCliE2eHubId",
+	"rudderCliE2eHubIdUpdated",
 	"rudderCliE2eHttpBasicUsername",
 	"rudderCliE2eIosKey",
 	"rudderCliE2eIosKeyUpdated",
