@@ -689,6 +689,36 @@ func TestHTTPConfigValidation(t *testing.T) {
 		assert.True(t, found, "expected /connection_mode/web to be rejected")
 	})
 
+	t.Run("warehouse settings accepted", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"warehouse": "cloud"}
+		config["consent_management"] = map[string]any{"warehouse": []any{
+			map[string]any{
+				"provider":            "custom",
+				"resolution_strategy": "and",
+				"consents":            []any{"marketing"},
+			},
+		}}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("connection_mode rejects device for warehouse", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"warehouse": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/warehouse" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/warehouse to be rejected")
+	})
 }
 
 func TestHTTPConversionRoundTrip(t *testing.T) {
@@ -868,7 +898,7 @@ func TestHTTPConversionRoundTrip(t *testing.T) {
 				"method": "POST",
 				"format": "JSON",
 				"connection_mode": {"warehouse": "cloud"},
-				"consent_management": {"warehouse": [{"provider": "custom", "consents": ["marketing"]}]}
+				"consent_management": {"warehouse": [{"provider": "custom", "resolution_strategy": "and", "consents": ["marketing"]}]}
 			}`,
 			APIJSON: `{
 				"apiUrl": "https://example.com/webhook",
@@ -876,7 +906,7 @@ func TestHTTPConversionRoundTrip(t *testing.T) {
 				"method": "POST",
 				"format": "JSON",
 				"connectionMode": {"warehouse": "cloud"},
-				"consentManagement": {"warehouse": [{"provider": "custom", "consents": [{"consent": "marketing"}]}]}
+				"consentManagement": {"warehouse": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent": "marketing"}]}]}
 			}`,
 		},
 	})
