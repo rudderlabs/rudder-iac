@@ -111,6 +111,15 @@
 - Redshift should keep the broad warehouse-style mapped db-config source-type set, not the older S3-like event-stream subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud connection mode for all retained source types.
 - Redshift local sync config should use flat schema/API-aligned keys `sync_frequency`, `sync_start_at`, and `exclude_window.{start_time,end_time}`; do not add a legacy `sync.{frequency,start_at,exclude_window_start_time,exclude_window_end_time}` alias layer inside the definition.
 - Existing old-shape Redshift specs with a top-level `sync` config block should fail closed as unknown-key input rather than being silently converted, because the destination converter/validator has no per-definition alias layer.
+
+## DEX-882 — Redshift and Postgres SSH Local Config Shape
+<!-- ticket:DEX-882 -->
+- Redshift and Postgres keep `use_ssh` as the top-level SSH branch selector while grouping SSH member keys under local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key`.
+- SSH grouping changes only the CLI local YAML shape: API payload keys remain the existing flat camelCase `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey`, matching the Kafka grouping precedent.
+- Existing flat local keys should not be aliased because destination config decoding is strict and DEX-882 treats the grouped local shape as an intentional spec change.
+- All three destinations carrying SSH tunnel keys — Kafka, Redshift, Postgres — now use the same nested shape, so a future SSH-bearing destination has one precedent to follow rather than two.
+- The selector stays top-level and the member keys group because `schema.json` declares all four only inside the `useSSH: true` branch; the per-destination pattern bounds are preserved as-is rather than unified.
+
 ## DEX-504 — Google Sheets Consent Config Surface
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
@@ -264,3 +273,10 @@
 
 - Destination definitions should reject the removed native-SDK source-type config block as an unknown key; keep `SourceTypeConfigKeys()` limited to `connection_mode`.
 - For this removal, treat the broad `useNativeSDK` grep gate as authoritative: remove similarly prefixed destination-definition settings such as GA4's `use_native_sdk_to_send` / `useNativeSDKToSend` unless a future task explicitly reintroduces a separately named schema-backed field.
+
+## DEX-881 — Postgres Storage Grouping
+
+- Postgres object-storage local YAML groups provider-specific keys under `s3`, `gcs`, `azure`, and `minio` blocks while preserving the flat upstream API payload shape.
+- Use `s3` rather than `aws` for the AWS-backed block because Postgres' selector value is `bucket_provider: S3`, task examples use `s3.role_based_auth`, and Snowflake already uses an `s3` local block for similar storage settings.
+- Preserve MinIO as its own nested local block (`minio.end_point`, `minio.secret_access_key`, `minio.use_ssl`) rather than leaving those keys flat.
+- Group only keys `schema.json` declares in exactly one `bucketProvider` branch. `bucket_name` (S3/GCS/MinIO) and `access_key_id` (S3/MinIO) are declared in several, so they stay top-level: the API carries one flat key for each, and routing it into a provider block would need a conditional that leaves a stale value from a third provider nowhere to land. Same rule as Snowflake.

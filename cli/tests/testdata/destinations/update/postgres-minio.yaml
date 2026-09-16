@@ -20,7 +20,8 @@ spec:
     use_rudder_storage: false
     bucket_provider: MINIO
     bucket_name: rudder-cli-e2e-updated
-    end_point: minio-updated.rudder-cli-e2e.internal:9000
     access_key_id: "{{ .POSTGRES_MINIO_ACCESS_KEY_ID }}"
-    secret_access_key: "{{ .POSTGRES_MINIO_SECRET_ACCESS_KEY }}"
-    use_ssl: false
+    minio:
+      end_point: minio-updated.rudder-cli-e2e.internal:9000
+      secret_access_key: "{{ .POSTGRES_MINIO_SECRET_ACCESS_KEY }}"
+      use_ssl: false

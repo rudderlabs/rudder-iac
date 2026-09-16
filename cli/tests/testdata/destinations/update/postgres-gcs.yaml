@@ -20,4 +20,5 @@ spec:
     use_rudder_storage: false
     bucket_provider: GCS
     bucket_name: rudder-cli-e2e-updated
-    credentials: '{{ .POSTGRES_GCP_CREDENTIALS }}'
+    gcs:
+      credentials: '{{ .POSTGRES_GCP_CREDENTIALS }}'

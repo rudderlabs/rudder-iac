@@ -421,6 +421,57 @@ func TestCompareData_Secret(t *testing.T) {
 		}, diffs)
 		assert.False(t, secretOnly)
 	})
+
+	// Snowflake's gcp block holds only credentials, so the API's secret stripping
+	// leaves nothing behind and the whole block goes missing from remote state.
+	t.Run("all-secret block vs missing key is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": block},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: block, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs all-secret block is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"gcp": block},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: nil, TargetValue: block, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	blocks := []struct {
+		name       string
+		block      map[string]any
+		wantSecret bool
+	}{
+		{"nested all-secret block", map[string]any{"inner": map[string]any{"credentials": secret.New("json")}}, true},
+		{"non-secret leaf makes the whole block a real change", map[string]any{"credentials": secret.New("json"), "region": "us-east1"}, false},
+		{"purely non-secret block", map[string]any{"start_time": "02:00", "end_time": "03:00"}, false},
+		// Vacuously "all secret": nothing inside justifies re-applying, so the
+		// len guard in isSecretValue has to keep it out.
+		{"empty block", map[string]any{}, false},
+	}
+
+	for _, b := range blocks {
+		t.Run(b.name+" vs missing key", func(t *testing.T) {
+			diffs, secretOnly := differ.CompareData(
+				resources.ResourceData{"block": b.block},
+				resources.ResourceData{},
+			)
+			require.Contains(t, diffs, "block")
+			assert.Equal(t, b.wantSecret, diffs["block"].SecretOnly)
+			assert.Equal(t, b.wantSecret, secretOnly)
+		})
+	}
 }
 
 // TestDiff_HasNonsecretDiff locks the import guard's discriminator. ResourceDiff.SecretOnly
