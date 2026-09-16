@@ -20,6 +20,9 @@ type ConfigProperty struct {
 	// connected to one of these local source types. Empty means the key is
 	// allowed for every connected source type.
 	SourceTypes []string
+	// Exclusive, when set via Discriminator, names the local keys the API
+	// discriminator chooses between. At most one of them is ever in force.
+	Exclusive *ExclusiveGroup
 }
 
 // Gated restricts prop's local key to the given local source types. The
@@ -102,15 +105,62 @@ func Equals(key, value string) ConfigConditionFunc {
 
 // Discriminator returns a ConfigProperty that is not stored directly in local config.
 // The corresponding API config value is set based on the provided DiscriminatorValues.
-func Discriminator(apiKey string, values DiscriminatorValues) ConfigProperty {
+// DiscriminatorOption configures the exclusive group a Discriminator declares.
+type DiscriminatorOption func(*ExclusiveGroup)
+
+// DropUnselected makes conversion drop every group member the discriminator
+// does not point at, values and all — including all members when it points at
+// none. Declare it only when upstream never reads unselected members, so the
+// data dropped is data nothing consumes; carrying it across instead produces a
+// spec that fails the group's own mutual-exclusion rule.
+func DropUnselected() DiscriminatorOption {
+	return func(group *ExclusiveGroup) { group.DropUnselected = true }
+}
+
+func Discriminator(apiKey string, values DiscriminatorValues, opts ...DiscriminatorOption) ConfigProperty {
+	group := &ExclusiveGroup{APIKey: apiKey, LocalKeys: map[string]any(values)}
+	for _, opt := range opts {
+		opt(group)
+	}
 	return ConfigProperty{
 		FromLocalFunc: discriminatorValue(apiKey, values),
 		ToLocalFunc:   func(local, config string) (string, error) { return local, nil },
+		Exclusive:     group,
 	}
 }
 
 // DiscriminatorValues maps local config keys to API discriminator values.
 type DiscriminatorValues map[string]any
+
+// ExclusiveGroup describes local config keys an API discriminator chooses
+// between. Upstream stores every one of them and names the live one separately,
+// so the others linger with whatever they last held; the discriminator value is
+// what tells the two apart.
+type ExclusiveGroup struct {
+	// APIKey names the discriminator in API config, e.g. "eventFilteringOption".
+	APIKey string
+	// LocalKeys maps each local config key to the value of APIKey selecting it.
+	LocalKeys map[string]any
+	// DropUnselected makes conversion drop the members the discriminator does
+	// not point at. Set via the DropUnselected option for groups whose
+	// unselected members are dead config that upstream never reads.
+	DropUnselected bool
+}
+
+// SelectedLocalKey returns the local key the discriminator points at in the
+// given API config, and whether it named one at all.
+func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (string, bool) {
+	selector, ok := api[g.APIKey]
+	if !ok {
+		return "", false
+	}
+	for localKey, value := range g.LocalKeys {
+		if value == selector {
+			return localKey, true
+		}
+	}
+	return "", false
+}
 
 func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigProperty {
 	return ConfigProperty{

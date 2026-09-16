@@ -3,6 +3,10 @@ package converter
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // LocalToAPI converts a snake_case local config map to camelCase API config
@@ -42,7 +46,61 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 		localJSON = r
 	}
 
+	localJSON, err = dropUnselectedMembers(localJSON, api, props)
+	if err != nil {
+		return nil, err
+	}
+
 	return unmarshalConfigMap(localJSON)
+}
+
+// dropUnselectedMembers removes, for each exclusive group declared with
+// DropUnselected, every member the API discriminator does not point at —
+// including all of them when it points at none. It runs after the whole
+// pipeline so it does not depend on where the group's properties sit in the
+// list.
+//
+// The webapp keeps every member and only switches the discriminator, so a
+// destination that changed filtering mode still stores the other list.
+// Converted as-is that yields a spec declaring mutually exclusive keys
+// together, which fails the definition's own validation and leaves the user to
+// delete one by hand. Groups declare the option only when upstream never reads
+// unselected members, so the data dropped is data nothing consumes.
+func dropUnselectedMembers(localJSON string, api map[string]any, props []ConfigProperty) (string, error) {
+	for _, p := range props {
+		if p.Exclusive == nil || !p.Exclusive.DropUnselected {
+			continue
+		}
+		selected, _ := p.Exclusive.SelectedLocalKey(api)
+
+		for localKey := range p.Exclusive.LocalKeys {
+			if localKey == selected || !gjson.Get(localJSON, localKey).Exists() {
+				continue
+			}
+
+			pruned, err := sjson.Delete(localJSON, localKey)
+			if err != nil {
+				return localJSON, fmt.Errorf("dropping unselected config key %q: %w", localKey, err)
+			}
+			localJSON = pruned
+
+			// A group emptied out entirely would otherwise linger as a bare
+			// `event_filtering: {}`, reading as configuration nobody wrote.
+			parentKey, _, found := strings.Cut(localKey, ".")
+			if !found {
+				continue
+			}
+			if parent := gjson.Get(localJSON, parentKey); parent.IsObject() && len(parent.Map()) == 0 {
+				pruned, err := sjson.Delete(localJSON, parentKey)
+				if err != nil {
+					return localJSON, fmt.Errorf("dropping emptied config block %q: %w", parentKey, err)
+				}
+				localJSON = pruned
+			}
+		}
+	}
+
+	return localJSON, nil
 }
 
 func unmarshalConfigMap(jsonStr string) (map[string]any, error) {

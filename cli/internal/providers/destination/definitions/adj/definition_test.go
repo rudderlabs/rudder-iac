@@ -350,6 +350,75 @@ func TestAdjustConfigValidation(t *testing.T) {
 	})
 }
 
+// Import drops the event list the selector does not point at (DropUnselected):
+// the SDK never reads it, and keeping it emits a spec declaring whitelist and
+// blacklist together, which this definition's own mutual-exclusion rule then
+// rejects — leaving the user to delete one by hand.
+func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		api  map[string]any
+		want any
+	}{
+		{
+			name: "unselected list cleared by the webapp",
+			api: map[string]any{
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": ""}},
+			},
+			want: map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			name: "unselected list left over from a mode switch",
+			api: map[string]any{
+				"eventFilteringOption": "blacklistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: map[string]any{"blacklist": []any{"Signup"}},
+		},
+		{
+			name: "filtering disabled leaves no block behind",
+			api: map[string]any{
+				"eventFilteringOption": "disable",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := map[string]any{"appToken": "app-token"}
+			for key, value := range tt.api {
+				api[key] = value
+			}
+
+			local, err := registered.APIToLocal(api)
+			require.NoError(t, err)
+
+			if tt.want == nil {
+				assert.NotContains(t, local, "event_filtering")
+			} else {
+				assert.Equal(t, tt.want, local["event_filtering"])
+			}
+			assert.Empty(t, registered.ValidateConfig(local), "the imported spec must pass its own validation")
+		})
+	}
+}
+
 func TestAdjustConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 

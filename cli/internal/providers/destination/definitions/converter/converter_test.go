@@ -115,6 +115,99 @@ func TestDiscriminator(t *testing.T) {
 	assert.JSONEq(t, `{ "p": true }`, s)
 }
 
+// The discriminator is the only thing that says which of the mutually exclusive
+// local keys is live, so it records the mapping for callers that need to tell a
+// cleared unselected key from a deliberately empty selected one.
+func TestDiscriminatorRecordsExclusiveGroup(t *testing.T) {
+	t.Parallel()
+
+	p := converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+		"event_filtering.whitelist": "whitelistedEvents",
+		"event_filtering.blacklist": "blacklistedEvents",
+	})
+
+	require.NotNil(t, p.Exclusive)
+	assert.Equal(t, converter.ExclusiveGroup{
+		APIKey: "eventFilteringOption",
+		LocalKeys: map[string]any{
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
+		},
+	}, *p.Exclusive)
+
+	selected, ok := p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "blacklistedEvents"})
+	assert.True(t, ok)
+	assert.Equal(t, "event_filtering.blacklist", selected)
+
+	_, ok = p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "disable"})
+	assert.False(t, ok, "a value naming no local key selects nothing")
+
+	_, ok = p.Exclusive.SelectedLocalKey(map[string]any{})
+	assert.False(t, ok, "an absent discriminator selects nothing")
+}
+
+// DropUnselected turns the empty-only prune into an unconditional one for
+// groups whose unselected members upstream never reads.
+func TestAPIToLocalDropUnselectedOption(t *testing.T) {
+	t.Parallel()
+
+	props := func(opts ...converter.DiscriminatorOption) []converter.ConfigProperty {
+		return []converter.ConfigProperty{
+			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+			converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+				"event_filtering.whitelist": "whitelistedEvents",
+				"event_filtering.blacklist": "blacklistedEvents",
+			}, opts...),
+		}
+	}
+	api := map[string]any{
+		"eventFilteringOption": "whitelistedEvents",
+		"whitelistedEvents":    []any{map[string]any{"eventName": "A"}},
+		"blacklistedEvents":    []any{map[string]any{"eventName": "B"}},
+	}
+
+	local, err := converter.APIToLocal(props(), api)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"whitelist": []any{"A"},
+		"blacklist": []any{"B"},
+	}, local["event_filtering"], "without the option every member is preserved")
+
+	local, err = converter.APIToLocal(props(converter.DropUnselected()), api)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"whitelist": []any{"A"},
+	}, local["event_filtering"])
+
+	// The webapp's usual leftover: the unselected list cleared, not removed.
+	cleared := map[string]any{
+		"eventFilteringOption": "whitelistedEvents",
+		"whitelistedEvents":    []any{map[string]any{"eventName": "A"}},
+		"blacklistedEvents":    []any{map[string]any{"eventName": ""}},
+	}
+	local, err = converter.APIToLocal(props(converter.DropUnselected()), cleared)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"whitelist": []any{"A"}}, local["event_filtering"])
+
+	// The drop runs in the APIToLocal driver, not in Discriminator's own
+	// ToLocalFunc, so declaration order cannot change the result.
+	reordered := append([]converter.ConfigProperty{props(converter.DropUnselected())[2]}, props(converter.DropUnselected())[:2]...)
+	local, err = converter.APIToLocal(reordered, api)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"whitelist": []any{"A"}}, local["event_filtering"])
+
+	// Pointing at no member means every member is unread; the whole group goes.
+	disabled := map[string]any{
+		"eventFilteringOption": "disable",
+		"whitelistedEvents":    []any{map[string]any{"eventName": "A"}},
+		"blacklistedEvents":    []any{map[string]any{"eventName": "B"}},
+	}
+	local, err = converter.APIToLocal(props(converter.DropUnselected()), disabled)
+	require.NoError(t, err)
+	assert.NotContains(t, local, "event_filtering")
+}
+
 func TestEquals(t *testing.T) {
 	t.Parallel()
 
