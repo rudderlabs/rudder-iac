@@ -2,12 +2,42 @@ package connection
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 )
+
+// ErrUnrepresentableConfig marks a remote connection that the supported spec
+// contract cannot express. Import and export use errors.Is to skip the row
+// explicitly rather than emit a spec that would fail validation or re-diff on
+// every apply; matching on message text would be fragile.
+var ErrUnrepresentableConfig = errors.New("connection config cannot be represented as a spec")
+
+// checkObjectMappingFlow reports user input the object mapping flow cannot
+// carry. Constants and events belong to the JSON mapper only, and the API
+// rejects a body carrying either alongside an object.
+//
+// Normalization has already turned an empty list into nil, so anything left
+// here was genuinely supplied. Omitting it instead of reporting it would lose
+// user input silently, which is the one thing these conversions must not do.
+// DEX-829 rejects the same combination at spec load; this check stands because
+// the handler is registered (DEX-826) before those rules land.
+func checkObjectMappingFlow(config ConfigSpec) error {
+	if config.Object == nil {
+		return nil
+	}
+	if len(config.Constants) > 0 {
+		return errors.New("constants are not supported with object mapping")
+	}
+	if config.Event != nil {
+		return errors.New("event is not supported with object mapping")
+	}
+	return nil
+}
 
 // endpointIDFromData reads one of the two endpoint ids out of a graph entry. The
 // syncer dereferences the spec's PropertyRefs before the lifecycle runs, so
@@ -53,6 +83,10 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 	config, err := configFromMap(data[ConfigKey])
 	if err != nil {
 		return nil, err
+	}
+
+	if err := checkObjectMappingFlow(config); err != nil {
+		return nil, fmt.Errorf("connection create: %w", err)
 	}
 
 	request := &retlClient.CreateRETLConnectionRequest{
@@ -103,6 +137,13 @@ func toUpdateRequest(data, state resources.ResourceData) (*retlClient.UpdateRETL
 		return nil, fmt.Errorf("reading stored connection config: %w", err)
 	}
 
+	if err := checkObjectMappingFlow(config); err != nil {
+		return nil, fmt.Errorf("connection update: %w", err)
+	}
+	if err := checkImmutableUnchanged(config, stored); err != nil {
+		return nil, err
+	}
+
 	request := &retlClient.UpdateRETLConnectionRequest{
 		Enabled:     &enabled,
 		Schedule:    toAPISchedule(config.Schedule),
@@ -134,6 +175,25 @@ func toResourceData(conn *retlClient.RETLConnection) *resources.ResourceData {
 	}
 }
 
+// checkImmutableUnchanged guards the fields the PUT body cannot carry. A
+// difference in any of them would apply nothing and re-diff on every apply —
+// exactly the drift these conversions exist to prevent — so it is reported
+// instead. DEX-825 routes such a change to delete-then-create before it gets
+// here, which makes reaching this a bug rather than user error.
+func checkImmutableUnchanged(config, stored ConfigSpec) error {
+	switch {
+	case config.SyncBehaviour != stored.SyncBehaviour:
+		return fmt.Errorf("connection update: sync_behaviour is immutable (%q -> %q); this change needs a replacement", stored.SyncBehaviour, config.SyncBehaviour)
+	case config.CursorColumn != stored.CursorColumn:
+		return fmt.Errorf("connection update: cursor_column is immutable (%q -> %q); this change needs a replacement", stored.CursorColumn, config.CursorColumn)
+	case !reflect.DeepEqual(config.Object, stored.Object):
+		return fmt.Errorf("connection update: object is immutable (%q -> %q); this change needs a replacement", lo.FromPtr(stored.Object), lo.FromPtr(config.Object))
+	case !reflect.DeepEqual(config.Event, stored.Event):
+		return errors.New("connection update: event is immutable; this change needs a replacement")
+	}
+	return nil
+}
+
 // configFromRemote turns an API connection back into the config that produces
 // it.
 //
@@ -146,9 +206,19 @@ func toResourceData(conn *retlClient.RETLConnection) *resources.ResourceData {
 // targets are therefore forbidden in user mappings — DEX-829 validates it — and
 // nothing here moves or drops entries to paper over one. Destination and source
 // eligibility is checked before this runs.
+//
+// What it refuses, all wrapping ErrUnrepresentableConfig so a caller can skip
+// the row with errors.Is, are shapes the spec has no way to express: a
+// destination-specific config, no identifiers at all, and the object mapping
+// flow carrying constants or an event. Field-level rules — which targets an
+// identifier may use, the single-identifier limit on object mapping — stay with
+// DEX-829, so DEX-827 must still validate the rebuilt spec before writing it.
 func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if hasDestinationConfig(conn.DestinationConfig) {
-		return ConfigSpec{}, fmt.Errorf("connection %q: destination-specific configuration has no spec equivalent", conn.ID)
+		return ConfigSpec{}, fmt.Errorf("connection %q: destination-specific configuration has no spec equivalent: %w", conn.ID, ErrUnrepresentableConfig)
+	}
+	if len(conn.Identifiers) == 0 {
+		return ConfigSpec{}, fmt.Errorf("connection %q: no identifiers: %w", conn.ID, ErrUnrepresentableConfig)
 	}
 
 	config := ConfigSpec{
@@ -167,7 +237,15 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if conn.Object != "" {
 		config.Object = lo.ToPtr(conn.Object)
 	}
-	return normalizeConfig(config), nil
+
+	// Checked after normalization so an empty constants list reads as absent,
+	// and on the same rule the create path uses — a spec this rejects on the
+	// way out must not be emitted on the way in.
+	normalized := normalizeConfig(config)
+	if err := checkObjectMappingFlow(normalized); err != nil {
+		return ConfigSpec{}, fmt.Errorf("connection %q: %w: %w", conn.ID, err, ErrUnrepresentableConfig)
+	}
+	return normalized, nil
 }
 
 // hasDestinationConfig reports whether a response carries integration-owned

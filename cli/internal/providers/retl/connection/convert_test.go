@@ -263,9 +263,6 @@ func TestToCreateRequestObjectMapping(t *testing.T) {
 
 	config := objectMappingConfig()
 	config.Mappings = []MappingSpec{}
-	// Constants belong to the other flow; an empty list would be dropped by
-	// omitempty either way, so only a populated one proves they are omitted.
-	config.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
 
 	request, err := toCreateRequest(graphData(t, config))
 	require.NoError(t, err)
@@ -281,6 +278,42 @@ func TestToCreateRequestObjectMapping(t *testing.T) {
 		"identifiers": [{"from": "id", "to": "user_id"}],
 		"object": "Contact"
 	}`, string(body))
+}
+
+// Constants and events belong to the JSON mapper flow. Supplying either beside
+// an object is invalid input, and dropping it to satisfy the API would lose it
+// silently — so both paths report it instead.
+func TestObjectMappingRejectsJSONMapperFields(t *testing.T) {
+	t.Parallel()
+
+	withConstants := objectMappingConfig()
+	withConstants.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
+
+	withEvent := objectMappingConfig()
+	withEvent.Event = &EventSpec{Type: "track", Name: "signed_up"}
+
+	tests := []struct {
+		name    string
+		config  ConfigSpec
+		wantErr string
+	}{
+		{name: "constants", config: withConstants, wantErr: "constants are not supported with object mapping"},
+		{name: "an event", config: withEvent, wantErr: "event is not supported with object mapping"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			data := graphData(t, tc.config)
+
+			_, err := toCreateRequest(data)
+			assert.ErrorContains(t, err, tc.wantErr)
+
+			_, err = toUpdateRequest(data, graphData(t, objectMappingConfig()))
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func TestToUpdateRequest(t *testing.T) {
@@ -475,13 +508,67 @@ func TestConfigFromRemoteRejectsDestinationConfig(t *testing.T) {
 	} {
 		_, err := configFromRemote(&retlClient.RETLConnection{ID: "conn-1", DestinationConfig: raw})
 		assert.ErrorContainsf(t, err, `connection "conn-1": destination-specific configuration has no spec equivalent`, "%s must be refused", raw)
+		assert.ErrorIsf(t, err, ErrUnrepresentableConfig, "%s must be skippable", raw)
 	}
 
 	// An absent one arrives as an empty, null or empty-object payload; none of
 	// those carries anything to lose.
 	for _, raw := range []json.RawMessage{nil, json.RawMessage("null"), json.RawMessage(" {} ")} {
-		_, err := configFromRemote(&retlClient.RETLConnection{ID: "conn-1", DestinationConfig: raw})
+		conn := representableConnection()
+		conn.DestinationConfig = raw
+		_, err := configFromRemote(conn)
 		assert.NoErrorf(t, err, "%q must not read as destination config", raw)
+	}
+}
+
+// representableConnection is the smallest response the spec contract accepts:
+// a JSON mapper connection with one identifier.
+func representableConnection() *retlClient.RETLConnection {
+	return &retlClient.RETLConnection{
+		ID:            "conn-1",
+		SyncBehaviour: retlClient.SyncBehaviourUpsert,
+		Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
+		Identifiers:   []retlClient.Mapping{{From: "id", To: userIDTarget}},
+		Mappings:      []retlClient.Mapping{{From: "email", To: "traits.email"}},
+		SyncSettings:  mergedSyncSettings(nil),
+	}
+}
+
+// A response the supported spec contract cannot express is surfaced for an
+// explicit skip rather than exported as a spec that would fail validation or
+// never stop diffing. Field-level rules stay with DEX-829.
+func TestConfigFromRemoteRefusesUnrepresentableShapes(t *testing.T) {
+	t.Parallel()
+
+	noIdentifiers := representableConnection()
+	noIdentifiers.Identifiers = nil
+
+	objectWithConstants := representableConnection()
+	objectWithConstants.Object = "Contact"
+	objectWithConstants.Constants = []retlClient.Constant{{Key: "source", Value: "warehouse"}}
+
+	objectWithEvent := representableConnection()
+	objectWithEvent.Object = "Contact"
+	objectWithEvent.Event = &retlClient.Event{Type: "track", Name: "signed_up"}
+
+	tests := []struct {
+		name    string
+		conn    *retlClient.RETLConnection
+		wantErr string
+	}{
+		{name: "no identifiers", conn: noIdentifiers, wantErr: "no identifiers"},
+		{name: "object mapping carrying constants", conn: objectWithConstants, wantErr: "constants are not supported with object mapping"},
+		{name: "object mapping carrying an event", conn: objectWithEvent, wantErr: "event is not supported with object mapping"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := configFromRemote(tc.conn)
+			assert.ErrorContains(t, err, tc.wantErr)
+			assert.ErrorIs(t, err, ErrUnrepresentableConfig)
+		})
 	}
 }
 
@@ -614,4 +701,133 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		assert.Equal(t, dropped, remote)
 		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
+}
+
+// A change to an immutable field cannot ride on a PUT: the body has no field
+// for it, so the server would apply nothing and the diff would return on every
+// apply. DEX-825 routes these to delete-then-create, so this guard only fires
+// on a bug — but a loud error beats silent perpetual drift.
+func TestToUpdateRequestRejectsImmutableChanges(t *testing.T) {
+	t.Parallel()
+
+	behaviour := jsonMapperConfig()
+	behaviour.SyncBehaviour = "mirror"
+
+	cursor := jsonMapperConfig()
+	cursor.CursorColumn = "updated_at"
+
+	object := jsonMapperConfig()
+	object.Object = ptr("Contact")
+
+	event := jsonMapperConfig()
+	event.Event = &EventSpec{Type: "track", Name: "signed_up"}
+
+	tests := []struct {
+		name    string
+		config  ConfigSpec
+		wantErr string
+	}{
+		{name: "sync behaviour", config: behaviour, wantErr: "sync_behaviour is immutable"},
+		{name: "cursor column", config: cursor, wantErr: "cursor_column is immutable"},
+		{name: "object", config: object, wantErr: "object is immutable"},
+		{name: "event", config: event, wantErr: "event is immutable"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := toUpdateRequest(graphData(t, tc.config), graphData(t, jsonMapperConfig()))
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+// backendUpdate replays mergeUpdate: fields the PUT omits keep their stored
+// value, present ones replace it. The merged result is stored in the same shape
+// a create produces, so it reuses backendResponse for the identifier/mapping
+// recombination. Mirrors connection-crud.service.ts mergeUpdate.
+func backendUpdate(stored *retlClient.RETLConnection, request *retlClient.UpdateRETLConnectionRequest) *retlClient.RETLConnection {
+	constants := stored.Constants
+	if request.Constants != nil {
+		constants = *request.Constants
+	}
+	mappings := stored.Mappings
+	if request.Mappings != nil {
+		mappings = *request.Mappings
+	}
+	settings := stored.SyncSettings
+	if request.SyncSettings != nil {
+		settings = request.SyncSettings
+	}
+
+	return backendResponse(&retlClient.CreateRETLConnectionRequest{
+		SourceID:      stored.SourceID,
+		DestinationID: stored.DestinationID,
+		Enabled:       request.Enabled,
+		Schedule:      request.Schedule,
+		SyncBehaviour: lo.ToPtr(stored.SyncBehaviour),
+		Identifiers:   request.Identifiers,
+		Mappings:      mappings,
+		Constants:     constants,
+		Event:         stored.Event,
+		CursorColumn:  stored.CursorColumn,
+		Object:        stored.Object,
+		SyncSettings:  settings,
+	})
+}
+
+// The create round trip proves a new connection converges; this proves an
+// edited one does. A PUT that reads back as anything but the desired config
+// would re-diff on every apply.
+func TestUpdateRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	withConstants := jsonMapperConfig()
+	withConstants.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
+
+	otherConstants := jsonMapperConfig()
+	otherConstants.Constants = []ConstantSpec{{Key: "source", Value: "lake"}}
+
+	moreMappings := jsonMapperConfig()
+	moreMappings.Mappings = []MappingSpec{{From: "email", To: "traits.email"}, {From: "name", To: "traits.name"}}
+
+	nondefaultSettings := jsonMapperConfig()
+	nondefaultSettings.SyncSettings = &SyncSettingsSpec{SyncLogs: &SyncLogsSpec{Enabled: ptr(false), SnapshotsToRetain: ptr(0)}}
+
+	objectWithMappings := objectMappingConfig()
+	objectWithMappings.Mappings = []MappingSpec{{From: "email", To: "Email"}}
+
+	objectCleared := objectMappingConfig()
+	objectCleared.Mappings = []MappingSpec{}
+
+	tests := []struct {
+		name         string
+		stored, want ConfigSpec
+	}{
+		{name: "constants added", stored: jsonMapperConfig(), want: withConstants},
+		{name: "constants changed", stored: withConstants, want: otherConstants},
+		{name: "constants cleared", stored: withConstants, want: jsonMapperConfig()},
+		{name: "mappings added", stored: jsonMapperConfig(), want: moreMappings},
+		{name: "object mappings cleared", stored: objectWithMappings, want: objectCleared},
+		{name: "sync settings made nondefault", stored: jsonMapperConfig(), want: nondefaultSettings},
+		{name: "nondefault sync settings removed", stored: nondefaultSettings, want: jsonMapperConfig()},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			created, err := toCreateRequest(graphData(t, tc.stored))
+			require.NoError(t, err)
+			stored := backendResponse(created)
+
+			request, err := toUpdateRequest(graphData(t, tc.want), graphData(t, tc.stored))
+			require.NoError(t, err)
+
+			remote, err := configFromRemote(backendUpdate(stored, request))
+			require.NoError(t, err)
+			assert.Equal(t, normalizeConfig(tc.want), remote)
+		})
+	}
 }
