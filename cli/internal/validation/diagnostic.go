@@ -27,8 +27,9 @@ type Diagnostic struct {
 	File string
 
 	// Kind is the resource kind of the spec the issue was found in (e.g.
-	// "properties", "events", "import-manifest"). Empty when the spec could not
-	// be parsed far enough to determine its kind.
+	// "properties", "events", "import-manifest"). Empty when the spec declares
+	// no kind; a spec that fails to parse never reaches the rules that produce
+	// diagnostics.
 	Kind string
 
 	// Position contains the resolved location information (line, column, lineText)

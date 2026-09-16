@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 )
 
-// ruleDocRef points at the rule's entry in the generated rule catalog, which is
-// the single source of truth for every code. The fragment is the stable code
+// ruleDocBase points at the generated rule catalog, which is the single source
+// of truth for every code. The fragment appended to it is the stable code
 // (== RuleID), so tooling can resolve a diagnostic's code to its documentation.
 const ruleDocBase = "docs/generated/rules.yaml"
 
@@ -24,7 +24,6 @@ type jsonDiagnostic struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Kind     string `json:"kind,omitempty"`
-	Resource string `json:"resource,omitempty"`
 	File     string `json:"file"`
 	Line     int    `json:"line"`
 	Col      int    `json:"col"`
