@@ -30,11 +30,13 @@ var SourceKinds = []SourceKind{
 
 // The graph data every rETL source handler publishes about its source,
 // whatever its kind, so connection validation can read a source's warehouse,
-// primary key and enabled flag without knowing which kind it is.
+// primary key and enabled flag without knowing which kind it is. Aliased to
+// the SQL model handler's keys rather than restated, so renaming one there
+// breaks the build instead of a test.
 const (
-	SourceDefinitionKey = "source_definition"
-	SourcePrimaryKeyKey = "primary_key"
-	SourceEnabledKey    = "enabled"
+	SourceDefinitionKey = sqlmodel.SourceDefinitionKey
+	SourcePrimaryKeyKey = sqlmodel.PrimaryKeyKey
+	SourceEnabledKey    = sqlmodel.EnabledKey
 )
 
 func SourceKindByKind(kind string) (SourceKind, bool) {

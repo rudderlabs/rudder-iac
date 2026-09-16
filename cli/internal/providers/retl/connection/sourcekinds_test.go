@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,17 +57,6 @@ func TestSourceKindLookups(t *testing.T) {
 		_, ok = SourceKindBySourceType(retlClient.TableSourceType)
 		assert.False(t, ok)
 	})
-}
-
-// TestSharedSourceKeysMatchSQLModel guards the contract every rETL source
-// handler honours: connection validation reads these keys off a source's graph
-// data without knowing which kind it is.
-func TestSharedSourceKeysMatchSQLModel(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, sqlmodel.SourceDefinitionKey, SourceDefinitionKey)
-	assert.Equal(t, sqlmodel.PrimaryKeyKey, SourcePrimaryKeyKey)
-	assert.Equal(t, sqlmodel.EnabledKey, SourceEnabledKey)
 }
 
 func TestParseSourceRef(t *testing.T) {
