@@ -259,7 +259,12 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	dcp := datacatalog.New(catalogClient)
-	retlp := retl.New(retlClient.NewRudderRETLStore(c))
+
+	var retlOpts []retl.Option
+	if cfg.ExperimentalFlags.RetlConnectionSupport {
+		retlOpts = append(retlOpts, retl.WithConnectionSupport(destRegistry))
+	}
+	retlp := retl.New(retlClient.NewRudderRETLStore(c), retlOpts...)
 
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esProvider.WithDestinationRegistry(destRegistry))
 	trp := transformations.NewProvider(c)
