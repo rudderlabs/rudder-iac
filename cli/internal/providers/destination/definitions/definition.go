@@ -136,6 +136,14 @@ var defaultSyncBehaviours = []string{"upsert", "mirror", "full"}
 
 // SyncBehaviours returns the accepted rETL sync behaviours, falling back to the
 // backend default only when the definition declares none at all.
+//
+// This is the destination-level list, not the set a connection may actually
+// use: the backend intersects it with the source's own list and rejects
+// "mirror" outright for the JSON-mapper flow (FLOWS_DISALLOWING_MIRROR in
+// config-backend retl/api-gateway/connection-config/assembler.ts). So HTTP
+// reads back [upsert mirror full] yet can never use "mirror", and a
+// mirror-only destination like bingads_offline_conversions has no valid
+// behaviour at all unless the connection carries an object.
 func (d *RegisteredDefinition) SyncBehaviours() []string {
 	behaviours := d.DestinationDefinition.SyncBehaviours
 	if behaviours == nil {
