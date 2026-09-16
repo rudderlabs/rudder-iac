@@ -6,7 +6,6 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	graphrender "github.com/rudderlabs/rudder-iac/cli/internal/graph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
@@ -61,7 +60,7 @@ func NewCmdGraph() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			projectOpts, err := app.NewProjectOptions(config.GetConfig(), varFiles)
+			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}
