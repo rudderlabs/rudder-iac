@@ -15,6 +15,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -32,12 +34,29 @@ type Provider struct {
 	client     retlClient.RETLStore
 	handlers   map[string]resourceHandler
 	kindToType map[string]string
+	// destinationRegistry is nil unless WithConnectionSupport was applied; the connection semantic rules read it.
+	destinationRegistry *definitions.Registry
 }
 
 const importDir = "retl"
 
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithConnectionSupport registers the rETL connection kind and its handler.
+// The app applies it only while the retlConnectionSupport experimental flag is
+// effective, so without it the provider keeps exactly the SQL-model surface it
+// had.
+func WithConnectionSupport(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		p.destinationRegistry = registry
+		p.kindToType[connection.ResourceKind] = connection.ResourceType
+		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
+	}
+}
+
 // New creates a new RETL provider instance
-func New(client retlClient.RETLStore) *Provider {
+func New(client retlClient.RETLStore, opts ...Option) *Provider {
 	p := &Provider{
 		client:   client,
 		handlers: make(map[string]resourceHandler),
@@ -48,6 +67,10 @@ func New(client retlClient.RETLStore) *Provider {
 
 	// Register handlers
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
+
+	for _, opt := range opts {
+		opt(p)
+	}
 
 	return p
 }
@@ -73,10 +96,18 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	connection.ResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -92,9 +123,16 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for SQL models.
+// --merge smart linking for SQL models, and for connections once connection
+// support is registered. The connection matcher is listed after the SQL model
+// matcher so its endpoint lookups can rely on source matches being recorded
+// already.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sqlmodel.Matcher()}
+	matchers := []importmatcher.Matcher{sqlmodel.Matcher()}
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		matchers = append(matchers, connection.Matcher())
+	}
+	return matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
