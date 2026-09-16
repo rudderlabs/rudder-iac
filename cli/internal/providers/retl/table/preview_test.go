@@ -101,6 +101,24 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		assert.Empty(t, store.requests)
 	})
 
+	// #851 puts a PropertyRef under the account key when the spec references an
+	// account, and preview runs before the ref resolves to a remote id.
+	t.Run("account reference", func(t *testing.T) {
+		t.Parallel()
+		store := &previewStore{}
+		h := table.NewHandler(store, "retl")
+
+		_, err := h.Preview(context.Background(), "users-table", resources.ResourceData{
+			sqlmodel.AccountIDKey:        &resources.PropertyRef{URN: "account:prod-pg", Property: "id"},
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+		}, 10)
+
+		require.EqualError(t, err, "preview does not support table sources that reference their account yet: set account_id on users-table to preview it")
+		assert.Empty(t, store.requests)
+	})
+
 	t.Run("unknown source definition", func(t *testing.T) {
 		t.Parallel()
 		store := &previewStore{}

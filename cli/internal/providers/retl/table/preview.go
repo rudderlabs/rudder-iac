@@ -23,11 +23,18 @@ var bigQueryEscaper = strings.NewReplacer(`'`, `\'`, `"`, `\"`, "`", "\\`")
 // SQL models. The limit travels in the request, as it does for SQL models, and
 // bounds the query too, so reading a table never depends on the server
 // capping the rows.
-func (h *Handler) Preview(ctx context.Context, _ string, data resources.ResourceData, limit int) ([]map[string]any, error) {
+func (h *Handler) Preview(ctx context.Context, id string, data resources.ResourceData, limit int) ([]map[string]any, error) {
 	t := fromData(data)
 	sql, err := previewSQL(t, limit)
 	if err != nil {
 		return nil, err
+	}
+	// Preview reads the project graph without remote state, so the remote id a
+	// referenced account resolves to is not known here. fromData reads the key
+	// through a checked assert, so a reference reads back as an empty id and
+	// would otherwise surface as "account ID not found".
+	if _, ok := data[sqlmodel.AccountIDKey].(*resources.PropertyRef); ok {
+		return nil, fmt.Errorf("preview does not support table sources that reference their account yet: set account_id on %s to preview it", id)
 	}
 	if t.AccountID == "" {
 		return nil, fmt.Errorf("account ID not found in resource data")
