@@ -98,7 +98,7 @@ func TestCanonicalConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.want, canonicalConfig(tc.config))
+			assert.Equal(t, tc.want, normalizeConfig(tc.config))
 		})
 	}
 }
@@ -116,7 +116,7 @@ func TestCanonicalConfigLeavesTheCallerCopyAlone(t *testing.T) {
 	}
 
 	config := build()
-	canonicalConfig(config)
+	normalizeConfig(config)
 	assert.Equal(t, build(), config)
 }
 
@@ -182,7 +182,7 @@ func TestConfigDataRoundTrip(t *testing.T) {
 
 	decoded, err := configFromMap(data)
 	require.NoError(t, err)
-	assert.Equal(t, canonicalConfig(config), decoded)
+	assert.Equal(t, normalizeConfig(config), decoded)
 }
 
 func TestConfigFromDataErrors(t *testing.T) {

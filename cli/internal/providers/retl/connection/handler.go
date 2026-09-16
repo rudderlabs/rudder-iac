@@ -353,7 +353,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: reading stored connection config: %w", id, err)
 	}
-	desired, stored = canonicalConfig(desired), canonicalConfig(stored)
+	desired, stored = normalizeConfig(desired), normalizeConfig(stored)
 
 	if field := immutableChange(sourceID, storedSourceID, destinationID, storedDestinationID, desired, stored); field != "" {
 		if err := h.Delete(ctx, id, state); err != nil {

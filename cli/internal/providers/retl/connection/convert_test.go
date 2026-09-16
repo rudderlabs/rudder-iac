@@ -557,7 +557,7 @@ func TestRoundTrip(t *testing.T) {
 
 			remote, err := configFromRemote(backendResponse(request))
 			require.NoError(t, err)
-			assert.Equal(t, canonicalConfig(tc.config), remote)
+			assert.Equal(t, normalizeConfig(tc.config), remote)
 		})
 	}
 }
@@ -589,7 +589,7 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		reclassified := jsonMapperConfig()
 		reclassified.Identifiers = []MappingSpec{{From: "id", To: userIDTarget}, {From: "device", To: anonymousIDTarget}}
 		assert.Equal(t, reclassified, remote)
-		assert.NotEqual(t, canonicalConfig(config), remote)
+		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
 
 	t.Run("an object mapping aimed at the external id is dropped", func(t *testing.T) {
@@ -612,6 +612,6 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		dropped := objectMappingConfig()
 		dropped.Mappings = []MappingSpec{{From: "email", To: "Email"}}
 		assert.Equal(t, dropped, remote)
-		assert.NotEqual(t, canonicalConfig(config), remote)
+		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
 }
