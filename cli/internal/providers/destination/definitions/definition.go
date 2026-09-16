@@ -78,60 +78,29 @@ func (d *RegisteredDefinition) APIToLocal(api map[string]any) (map[string]any, e
 	return converter.APIToLocal(d.Properties, api)
 }
 
-// ExclusiveKeyRoots returns the top-level config keys holding the selected
-// member of a mutually exclusive group. Callers that prune empty values use it
-// to leave those blocks alone, because an empty selected member is a real
-// setting: whitelisting with no event named discards every event.
-//
-// Only a member the discriminator actually names is protected. A member that
-// survived conversion merely because no discriminator was present carries no
-// such meaning — upstream applies no filtering at all in that state — and
-// keeping it would emit a spec whose next apply supplies the missing
+// ExclusiveKeyRoots returns the top-level config keys holding the discriminator-
+// selected member of an exclusive group. Callers that prune empty values use it
+// to leave those blocks alone: an empty selected member is a real setting, since
+// whitelisting with no event named discards every event. A member surviving only
+// because no discriminator was present carries no such meaning and is not
+// protected — keeping it would emit a spec whose next apply supplies the missing
 // discriminator and turns filtering on.
-func (d *RegisteredDefinition) ExclusiveKeyRoots(local, api map[string]any) []string {
+func (d *RegisteredDefinition) ExclusiveKeyRoots(api map[string]any) []string {
 	var roots []string
 	for _, prop := range d.Properties {
 		if prop.Exclusive == nil {
 			continue
 		}
-
-		selected, present := prop.Exclusive.SelectedLocalKey(api)
-		if !present || selected == "" {
+		// An absent discriminator also yields "", so this covers both.
+		selected, _ := prop.Exclusive.SelectedLocalKey(api)
+		if selected == "" {
 			continue
 		}
-
-		root, _, _ := strings.Cut(selected, ".")
-		if slices.Contains(roots, root) {
-			continue
-		}
-		if _, ok := lookupLocalPath(local, selected); ok {
+		if root, _, _ := strings.Cut(selected, "."); !slices.Contains(roots, root) {
 			roots = append(roots, root)
 		}
 	}
 	return roots
-}
-
-// lookupLocalPath resolves a dotted local config path.
-func lookupLocalPath(config map[string]any, path string) (any, bool) {
-	segments := strings.Split(path, ".")
-	current := config
-
-	for i, segment := range segments {
-		value, ok := current[segment]
-		if !ok {
-			return nil, false
-		}
-		if i == len(segments)-1 {
-			return value, true
-		}
-		next, ok := value.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		current = next
-	}
-
-	return nil, false
 }
 
 func (d *RegisteredDefinition) SecretKeys() []string {

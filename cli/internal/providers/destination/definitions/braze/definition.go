@@ -211,7 +211,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
-		}, converter.DropUnselected()),
+		}),
 		converter.Simple("useEcommerceRecommendedEvents", "use_ecommerce_recommended_events"),
 		converter.Simple("usePlatformSpecificApiKeys", "use_platform_specific_api_keys"),
 		converter.Simple("androidApiKey", "android_api_key"),

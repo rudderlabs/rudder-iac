@@ -54,24 +54,13 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 	return unmarshalConfigMap(localJSON)
 }
 
-// dropUnselectedMembers removes, for each exclusive group declared with
-// DropUnselected, every member the API discriminator does not point at —
-// including all of them when it is present and points at none. A group whose
-// discriminator is absent is left untouched: absence says nothing about which
-// member is live, and dropping on it would discard a populated list that the
-// outbound conversion would otherwise re-derive a selector for. It runs after
-// the whole pipeline so it does not depend on where the group's properties sit
-// in the list.
-//
-// The webapp keeps every member and only switches the discriminator, so a
-// destination that changed filtering mode still stores the other list.
-// Converted as-is that yields a spec declaring mutually exclusive keys
-// together, which fails the definition's own validation and leaves the user to
-// delete one by hand. Groups declare the option only when upstream never reads
-// unselected members, so the data dropped is data nothing consumes.
+// dropUnselectedMembers removes, for each exclusive group, every member the API
+// discriminator does not point at — including all of them when it names none.
+// See Discriminator for why. It runs after the whole pipeline so it does not
+// depend on where the group's properties sit in the list.
 func dropUnselectedMembers(localJSON string, api map[string]any, props []ConfigProperty) (string, error) {
 	for _, p := range props {
-		if p.Exclusive == nil || !p.Exclusive.DropUnselected {
+		if p.Exclusive == nil {
 			continue
 		}
 		selected, present := p.Exclusive.SelectedLocalKey(api)

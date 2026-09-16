@@ -103,63 +103,39 @@ func Equals(key, value string) ConfigConditionFunc {
 	}
 }
 
-// DiscriminatorOption configures the exclusive group a Discriminator declares.
-type DiscriminatorOption func(*ExclusiveGroup)
-
-// DropUnselected makes conversion drop every group member the discriminator
-// does not point at, values and all — including all members when it points at
-// none. Declare it only when upstream never reads unselected members, so the
-// data dropped is data nothing consumes; carrying it across instead produces a
-// spec that fails the group's own mutual-exclusion rule.
-func DropUnselected() DiscriminatorOption {
-	return func(group *ExclusiveGroup) { group.DropUnselected = true }
-}
-
 // Discriminator returns a ConfigProperty that is not stored directly in local config.
 // The corresponding API config value is set based on the provided DiscriminatorValues.
-func Discriminator(apiKey string, values DiscriminatorValues, opts ...DiscriminatorOption) ConfigProperty {
-	group := &ExclusiveGroup{APIKey: apiKey, LocalKeys: map[string]any(values)}
-	for _, opt := range opts {
-		opt(group)
-	}
+//
+// Upstream stores every local key in values and names the live one separately,
+// so the others linger holding whatever they last did. Converting back to local
+// config drops them: upstream never reads an unselected member, and carrying it
+// across yields a spec that fails the group's own mutual-exclusion rule. An
+// absent discriminator names nothing and drops nothing — see SelectedLocalKey.
+func Discriminator(apiKey string, values DiscriminatorValues) ConfigProperty {
 	return ConfigProperty{
 		FromLocalFunc: discriminatorValue(apiKey, values),
 		ToLocalFunc:   func(local, config string) (string, error) { return local, nil },
-		Exclusive:     group,
+		Exclusive:     &ExclusiveGroup{APIKey: apiKey, LocalKeys: map[string]any(values)},
 	}
 }
 
 // DiscriminatorValues maps local config keys to API discriminator values.
 type DiscriminatorValues map[string]any
 
-// ExclusiveGroup describes local config keys an API discriminator chooses
-// between. Upstream stores every one of them and names the live one separately,
-// so the others linger with whatever they last held; the discriminator value is
-// what tells the two apart.
+// ExclusiveGroup describes local config keys an API discriminator chooses between.
 type ExclusiveGroup struct {
 	// APIKey names the discriminator in API config, e.g. "eventFilteringOption".
 	APIKey string
 	// LocalKeys maps each local config key to the value of APIKey selecting it.
 	LocalKeys map[string]any
-	// DropUnselected makes conversion drop the members the discriminator does
-	// not point at. Set via the DropUnselected option for groups whose
-	// unselected members are dead config that upstream never reads.
-	DropUnselected bool
 }
 
-// SelectedLocalKey returns the local key the discriminator points at in the
-// given API config, and whether the discriminator was present at all.
-//
-// The two results distinguish three states that must not be conflated. An
-// absent discriminator says nothing about the members, so callers leave them
-// alone: a config written through the Public API can carry a populated list
-// with no selector, and the outbound conversion re-derives one. A discriminator
-// naming no member ("disable") positively says none is live. A discriminator
-// naming one identifies it.
-//
-// Matching is by equality on the decoded API value, so a group whose declared
-// values are not plain strings — a number, say, which JSON decodes to float64 —
-// will not match and reads as naming no member.
+// SelectedLocalKey returns the local key the discriminator points at, and
+// whether the discriminator was present at all. The pair separates three states
+// that must not be conflated: absent says nothing about the members, a value
+// naming none ("disable") says none is live, and a value naming one identifies
+// it. Matching is by equality on the decoded value, so a non-string declared
+// value (an int against JSON's float64) reads as naming none.
 func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (selected string, present bool) {
 	selector, ok := api[g.APIKey]
 	if !ok {

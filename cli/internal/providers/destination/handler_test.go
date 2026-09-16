@@ -59,7 +59,7 @@ func eventFilteringTestDefinition() *definitions.DestinationDefinition {
 			converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 				"event_filtering.whitelist": "whitelistedEvents",
 				"event_filtering.blacklist": "blacklistedEvents",
-			}, converter.DropUnselected()),
+			}),
 		},
 		NewConfig: func() any {
 			return &struct {

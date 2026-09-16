@@ -492,11 +492,11 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// Import drops the event list the selector does not point at (DropUnselected):
-// the SDK never reads it, and keeping it emits a spec that fails this
-// definition's own mutual-exclusion rule, leaving the user to delete one list
-// by hand. This deliberately supersedes the earlier keep-everything stance —
-// what the next apply erases upstream is config nothing consumes.
+// Import drops the event list the selector does not point at: the SDK never
+// reads it, and keeping it emits a spec that fails this definition's own
+// mutual-exclusion rule, leaving the user to delete one list by hand. This
+// deliberately supersedes the earlier keep-everything stance — what the next
+// apply erases upstream is config nothing consumes.
 func TestGoogleAnalyticsAPIToLocalDropsUnselectedList(t *testing.T) {
 	t.Parallel()
 

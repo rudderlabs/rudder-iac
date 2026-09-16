@@ -49,7 +49,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
-		}, converter.DropUnselected()),
+		}),
 		converter.ArrayWithObjects("eventToConversionIdMap", "event_to_conversion_id_map", map[string]any{
 			"from": "from",
 			"to":   "to",
