@@ -492,10 +492,12 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// Import keeps every stored value, including a list the selector does not
-// currently point at. Gating APIToLocal on the selector would emit a spec that
-// silently drops the other list, which the next apply then erases upstream.
-func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
+// Import drops the event list the selector does not point at: the SDK never
+// reads it, and keeping it emits a spec that fails this definition's own
+// mutual-exclusion rule, leaving the user to delete one list by hand. This
+// deliberately supersedes the earlier keep-everything stance — what the next
+// apply erases upstream is config nothing consumes.
+func TestGoogleAnalyticsAPIToLocalDropsUnselectedList(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
@@ -521,13 +523,13 @@ func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
 		"enable_server_side_identify": false,
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Order Completed"},
-			"blacklist": []any{"Application Opened"},
 		},
 		"server_side_identify": map[string]any{
 			"event_category": "All",
 			"event_action":   "User Enriched",
 		},
 	}, local)
+	assert.Empty(t, registered.ValidateConfig(local), "the imported spec must pass its own validation")
 }
 
 func validMinimalConfig() map[string]any {

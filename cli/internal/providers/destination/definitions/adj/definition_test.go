@@ -350,6 +350,97 @@ func TestAdjustConfigValidation(t *testing.T) {
 	})
 }
 
+// Import drops the event list the selector does not point at:
+// the SDK never reads it, and keeping it emits a spec declaring whitelist and
+// blacklist together, which this definition's own mutual-exclusion rule then
+// rejects — leaving the user to delete one by hand.
+func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		apiConfig map[string]any
+		want      any
+	}{
+		{
+			name: "unselected list cleared by the webapp",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": ""}},
+			},
+			want: map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			name: "unselected list left over from a mode switch",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "blacklistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: map[string]any{"blacklist": []any{"Signup"}},
+		},
+		{
+			name: "filtering disabled leaves no block behind",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "disable",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: nil,
+		},
+		{
+			// An absent discriminator is not a selection of none. Configs written
+			// through the Public API can carry a list with no selector, and the
+			// outbound conversion re-derives one, so dropping here would lose a
+			// populated list and erase it upstream on the next apply.
+			name: "absent discriminator leaves members alone",
+			apiConfig: map[string]any{
+				"whitelistedEvents": []any{map[string]any{"eventName": "Order Completed"}},
+			},
+			want: map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			// Whitelisting with no event named discards every event, so the
+			// emptiness is the setting rather than absence.
+			name: "empty selected list survives",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": ""}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: map[string]any{"whitelist": []any{""}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			apiConfig := map[string]any{"appToken": "app-token"}
+			for key, value := range tt.apiConfig {
+				apiConfig[key] = value
+			}
+
+			local, err := registered.APIToLocal(apiConfig)
+			require.NoError(t, err)
+
+			if tt.want == nil {
+				assert.NotContains(t, local, "event_filtering")
+			} else {
+				assert.Equal(t, tt.want, local["event_filtering"])
+			}
+			assert.Empty(t, registered.ValidateConfig(local), "the imported spec must pass its own validation")
+		})
+	}
+}
+
 func TestAdjustConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
