@@ -177,21 +177,42 @@ func TestUpdate(t *testing.T) {
 		}
 	})
 
-	// Each change the API refuses on a PUT becomes one delete and one create,
-	// and whatever the create returns — a revived id for the same pair, a new
-	// one for a new pair — is what lands in state.
-	t.Run("replaces on an endpoint or immutable field change", func(t *testing.T) {
+	t.Run("rejects an immutable field change without touching the api", func(t *testing.T) {
+		t.Parallel()
+
+		tests := map[string]func(config map[string]any){
+			"sync_behaviour": func(config map[string]any) { config["sync_behaviour"] = "mirror" },
+			"cursor_column":  func(config map[string]any) { config["cursor_column"] = "updated_at" },
+			"object":         func(config map[string]any) { config["object"] = "Contact" },
+			"event":          func(config map[string]any) { config["event"] = map[string]any{"type": "track", "name": "signup"} },
+		}
+
+		for field, change := range tests {
+			t.Run(field, func(t *testing.T) {
+				t.Parallel()
+
+				data := graphData(t, jsonMapperConfig())
+				change(configMap(data))
+
+				mock := &MockConnectionClient{}
+				_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
+
+				assert.ErrorContains(t, err, field+" is immutable")
+				assert.ErrorContains(t, err, "delete and recreate the connection")
+				assert.Equal(t, &MockConnectionClient{}, mock)
+			})
+		}
+	})
+
+	// An endpoint change becomes one delete and one create, and whatever the
+	// create returns — a revived id for the same pair, a new one for a new pair
+	// — is what lands in state.
+	t.Run("replaces on an endpoint change", func(t *testing.T) {
 		t.Parallel()
 
 		tests := map[string]func(data, state resources.ResourceData){
-			"source":         func(_, state resources.ResourceData) { state[SourceIDKey] = "src-9" },
-			"destination":    func(data, _ resources.ResourceData) { data[DestinationKey] = "dst-2" },
-			"sync behaviour": func(data, _ resources.ResourceData) { configMap(data)["sync_behaviour"] = "mirror" },
-			"cursor column":  func(data, _ resources.ResourceData) { configMap(data)["cursor_column"] = "updated_at" },
-			"object":         func(data, _ resources.ResourceData) { configMap(data)["object"] = "Contact" },
-			"event": func(data, _ resources.ResourceData) {
-				configMap(data)["event"] = map[string]any{"type": "track", "name": "signup"}
-			},
+			"source":      func(_, state resources.ResourceData) { state[SourceIDKey] = "src-9" },
+			"destination": func(data, _ resources.ResourceData) { data[DestinationKey] = "dst-2" },
 		}
 
 		for name, change := range tests {
@@ -246,7 +267,7 @@ func TestUpdate(t *testing.T) {
 		}
 		_, err := NewHandler(mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
-		assert.EqualError(t, err, `recreating rETL connection "users-to-webhook" after an immutable change (the previous connection was deleted): creating rETL connection "users-to-webhook": plan gate`)
+		assert.EqualError(t, err, `recreating rETL connection "users-to-webhook" after an endpoint change (the previous connection was deleted): creating rETL connection "users-to-webhook": plan gate`)
 	})
 }
 

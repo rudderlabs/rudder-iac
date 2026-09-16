@@ -177,18 +177,18 @@ func toResourceData(conn *retlClient.RETLConnection) *resources.ResourceData {
 // checkImmutableUnchanged guards the fields the PUT body cannot carry. A
 // difference in any of them would apply nothing and re-diff on every apply —
 // exactly the drift these conversions exist to prevent — so it is reported
-// instead. DEX-825 routes such a change to delete-then-create before it gets
-// here, which makes reaching this a bug rather than user error.
+// instead, with the remedy the UI imposes too: delete and recreate the
+// connection.
 func checkImmutableUnchanged(config, stored ConfigSpec) error {
 	switch {
 	case config.SyncBehaviour != stored.SyncBehaviour:
-		return fmt.Errorf("connection update: sync_behaviour is immutable (%q -> %q); this change needs a replacement", stored.SyncBehaviour, config.SyncBehaviour)
+		return fmt.Errorf("connection update: sync_behaviour is immutable (%q -> %q); delete and recreate the connection to apply it", stored.SyncBehaviour, config.SyncBehaviour)
 	case config.CursorColumn != stored.CursorColumn:
-		return fmt.Errorf("connection update: cursor_column is immutable (%q -> %q); this change needs a replacement", stored.CursorColumn, config.CursorColumn)
+		return fmt.Errorf("connection update: cursor_column is immutable (%q -> %q); delete and recreate the connection to apply it", stored.CursorColumn, config.CursorColumn)
 	case !reflect.DeepEqual(config.Object, stored.Object):
-		return fmt.Errorf("connection update: object is immutable (%q -> %q); this change needs a replacement", lo.FromPtr(stored.Object), lo.FromPtr(config.Object))
+		return fmt.Errorf("connection update: object is immutable (%q -> %q); delete and recreate the connection to apply it", lo.FromPtr(stored.Object), lo.FromPtr(config.Object))
 	case !reflect.DeepEqual(config.Event, stored.Event):
-		return errors.New("connection update: event is immutable; this change needs a replacement")
+		return errors.New("connection update: event is immutable; delete and recreate the connection to apply it")
 	}
 	return nil
 }

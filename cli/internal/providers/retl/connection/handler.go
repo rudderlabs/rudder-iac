@@ -194,11 +194,11 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 	return toResourceData(created), nil
 }
 
-// Update changes the mutable fields in one PUT. A change to an endpoint or to a
-// field the API refuses on update is a replacement — delete then create —
-// because the backend allows one connection per source–destination pair.
-// Recreating the same pair revives the soft-deleted row and its remote id while
-// a new pair returns a new one, so the create response is what lands in state.
+// Update changes the mutable fields in one PUT; toUpdateRequest rejects a change
+// to a field the API refuses on update, as every other handler does. An
+// endpoint change is a replacement — delete then create — because the backend
+// allows one connection per source–destination pair, and the create response
+// is what lands in state.
 func (h *Handler) Update(ctx context.Context, id string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
 	remoteID, ok := state[IDKey].(string)
 	if !ok || remoteID == "" {
@@ -225,7 +225,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		return nil, fmt.Errorf("connection %q: reading stored connection config: %w", id, err)
 	}
 
-	if sourceID != state[SourceIDKey] || destinationID != state[DestinationIDKey] || checkImmutableUnchanged(desired, stored) != nil {
+	if sourceID != state[SourceIDKey] || destinationID != state[DestinationIDKey] {
 		// Build the create body before the delete: a config the API would
 		// refuse must not cost the live connection.
 		if _, err := toCreateRequest(data); err != nil {
@@ -236,7 +236,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		}
 		created, err := h.Create(ctx, id, data)
 		if err != nil {
-			return nil, fmt.Errorf("recreating rETL connection %q after an immutable change (the previous connection was deleted): %w", id, err)
+			return nil, fmt.Errorf("recreating rETL connection %q after an endpoint change (the previous connection was deleted): %w", id, err)
 		}
 		return created, nil
 	}
