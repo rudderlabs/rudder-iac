@@ -155,6 +155,6 @@ TIKTOK_ADS_BLACKLIST_PIXEL_CODE: C0000000000000000002
 TIKTOK_ADS_BLACKLIST_PIXEL_CODE_UPDATED: C0000000000000000012
 VWO_ACCOUNT_ID: rudderCliE2eAccount
 VWO_ACCOUNT_ID_UPDATED: rudderCliE2eAccountUpdated
-WEBHOOK_WEBHOOK_URL: https://webhooks.example.com/rudder
-WEBHOOK_WEBHOOK_URL_UPDATED: https://webhooks.example.com/rudder/updated
+WEBHOOK_WEBHOOK_URL: https://secret-webhook.example.com/rudder
+WEBHOOK_WEBHOOK_URL_UPDATED: https://secret-webhook-updated.example.com/rudder
 ZENDESK_EMAIL: rudder-cli-e2e-zendesk-email@example.com
