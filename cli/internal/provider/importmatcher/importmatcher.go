@@ -172,6 +172,25 @@ func ResolveLocalURN(scope Scope, resourceType string, remoteID string) (urn str
 	return "", false
 }
 
+// EndpointURN maps a resource referenced by remote ID to the local resource URN
+// it corresponds to: through ResolveLocalURN — matched earlier in this import,
+// or linked by local import metadata — or, for an already-managed resource,
+// straight from its externalId, which is its local resource id. ok is false
+// when there is no local counterpart, so the referencing remote stays
+// unmatched. For matchers whose remotes are only identified by what they point
+// at, such as the connection matchers' source–destination pairs.
+func EndpointURN(scope Scope, resourceType string, remoteID string, externalID string) (string, bool) {
+	if urn, ok := ResolveLocalURN(scope, resourceType, remoteID); ok {
+		return urn, true
+	}
+	if externalID == "" {
+		return "", false
+	}
+	urn := resources.URN(externalID, resourceType)
+	_, ok := scope.LocalGraph.GetResource(urn)
+	return urn, ok
+}
+
 // rewriteTrailingID swaps the trailing ID segment of a reference with the
 // local ID. Every provider reference shape ends with the external ID as the
 // final ':' or '/' delimited segment (e.g. "#category:id",
