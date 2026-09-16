@@ -18,8 +18,8 @@ const (
 	BucketNameKey   = "bucket_name"
 	ObjectPrefixKey = "object_prefix"
 
-	// SourceDefinitionS3 selects the bucket-backed config shape. The API also
-	// exempts s3 sources from its primary key requirement.
+	// SourceDefinitionS3 selects the bucket-backed config shape, which carries
+	// no primary key: rudder-api rejects one on s3.
 	SourceDefinitionS3 = "s3"
 )
 
