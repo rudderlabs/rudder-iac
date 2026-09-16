@@ -11,9 +11,13 @@ In a destination spec:
 
 ## Modes
 
-The mode a source uses is set per source type in `config.connection_mode`. Five
-of the ten supported source types accept `device`; the rest are cloud only — see
-[Source types](#source-types).
+`config.connection_mode` sets how each **source type** connecting to **this
+destination instance** routes its events. It is a property of the connection
+between the two, not of the source or the destination alone — so two
+destinations fed by the same source can run in different modes.
+
+Five of the ten supported source types accept `device`; the rest are cloud only
+— see [Source types](#source-types).
 
 Each key below is badged with where it applies:
 
@@ -30,10 +34,10 @@ where the setting takes effect.
 version: rudder/v1
 kind: destination
 metadata:
-  name: amplitude
+  name: amplitude-prod
 spec:
-  id: amplitude
-  display_name: Amplitude
+  id: amplitude-prod
+  display_name: Amplitude Production
   type: am
   definition_version: 1
   enabled: true
@@ -259,10 +263,11 @@ Set as the `versionName` of the Amplitude SDK. At most 100 characters.
 Send the device brand information (`context.device.brand`) to Amplitude.
 
 #### `event_filtering` — object
-`cloud` `device`
+`device`
 
-Filter which events are sent to Amplitude. Exactly one of the two lists may be
-set — declaring both fails validation.
+Filter which events are sent to Amplitude in device mode connections. Client-side
+filtering is applied by the SDK, so it has no effect on a cloud mode connection.
+Exactly one of the two lists may be set — declaring both fails validation.
 
 - `whitelist` — event names to allowlist
 - `blacklist` — event names to denylist
@@ -283,13 +288,28 @@ declare a platform ahead of connecting a source of that type.
 #### `sdk_version` — object, default `{web: 2}`
 `device` · web
 
-The Amplitude Browser SDK version to load for web sources: `1` or `2`.
+The Amplitude Browser SDK version to load for web sources: `1` or `2`, written as
+a number rather than a string.
+
+New destinations default to `2`; existing ones keep the version already saved.
+The choice gates several other keys — `auto_capture` and web
+`track_session_events` require `2`, while `track_new_campaigns` requires `1`.
+
+```yaml
+sdk_version:
+  web: 2
+```
 
 #### `proxy_server_url` \* — object
 `device` · web
 
-Route SDK traffic through your own proxy instead of Amplitude's endpoint. Must
-not begin with `http://` and must not contain `.ngrok.io`.
+Relay requests to Amplitude through a domain proxy you control. Must not begin
+with `http://` and must not contain `.ngrok.io`.
+
+```yaml
+proxy_server_url:
+  web: "https://amplitude-proxy.example.com"
+```
 
 #### `prefer_anonymous_id_for_device_id` — object
 `device` · web
@@ -300,19 +320,39 @@ one set via `setAnonymousId()`.
 #### `attribution` \* — object
 `device` · web
 
-Enable Amplitude's attribution tracking.
+Disable Amplitude's attribution tracking. Note the key name reads opposite to its
+effect: setting `attribution.web: true` **turns attribution off**.
+
+```yaml
+attribution:
+  web: false   # attribution stays on
+```
 
 #### `track_new_campaigns` \* — object
-`device` · web
+`device` · web · Browser SDK v1 only
 
-Start a new session when a new campaign is detected. Browser SDK v2 only — see
-`sdk_version`.
+Save referrer, URL params and GCLID only once per session, ignoring any new
+values that arrive later in that session.
+
+Applies only when `sdk_version.web` is `1`. Browser SDK v2 tracks new campaigns
+automatically and ignores this key.
+
+```yaml
+sdk_version:
+  web: 1
+track_new_campaigns:
+  web: true
+```
 
 #### Auto-capture
 
-`auto_capture` configures the AutoCapture settings of Amplitude Browser SDK v2
-for web sources. Each setting is an object with a single boolean `web` key, and
-all eight default to `false`:
+`auto_capture` configures the AutoCapture settings of the Amplitude Browser SDK.
+
+**All eight apply only when `sdk_version.web` is `2`** and the web source runs in
+device mode. On Browser SDK v1 they are ignored.
+
+Each is an object with a single boolean `web` key, and all eight default to
+`false`:
 
 - `page_views` — track page views automatically
 - `page_url_enrichment` — enrich page view events with URL properties
@@ -337,18 +377,41 @@ auto_capture:
 `device` · web, android, ios, react_native, flutter
 
 How long the SDK waits before uploading batched events, in milliseconds. Written
-as a digit string, not a number.
+as a digit string — `"1000"`, not `1000`.
+
+```yaml
+event_upload_period_millis:
+  web: "1000"
+  android: "30000"
+```
 
 #### `event_upload_threshold` — object
 `device` · web, android, ios, react_native, flutter
 
 The minimum number of events the Amplitude SDK batches together before
-uploading. Written as a digit string, not a number.
+uploading. Written as a digit string — `"30"`, not `30`.
+
+```yaml
+event_upload_threshold:
+  web: "30"
+  ios: "50"
+```
 
 #### `track_session_events` — object, default `{web: false}`
 `device` · web, android, ios, react_native, flutter
 
-Track Amplitude's session events.
+Emit Amplitude's automatic session start and end events.
+
+On mobile this applies in device mode on any supported platform. **On web it
+additionally requires `sdk_version.web` to be `2`** — Browser SDK v1 ignores it.
+
+```yaml
+sdk_version:
+  web: 2
+track_session_events:
+  web: true
+  android: true
+```
 
 ### Mobile
 
@@ -455,8 +518,8 @@ Amplitude requires no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`api_secret` is the only secret key. Write it as a `{{ .VAR }}` reference and
-supply the value at apply time:
+`api_secret` is currently the only key the CLI masks. Write it as a `{{ .VAR }}`
+reference and supply the value at apply time:
 
 ```yaml
 api_secret: "{{ .AMPLITUDE_API_SECRET }}"
@@ -473,3 +536,7 @@ rudder-cli apply --var-file secrets.vars.yaml
 `rudder-cli import` writes `api_secret` back as a `{{ .VAR }}` placeholder rather
 than its value, since the API does not return secrets. Fill the placeholder in
 before the first apply.
+
+`api_key` is already marked secret upstream and is expected to become a masked
+key here too, in a separate change. Writing it as a `{{ .VAR }}` reference now
+means nothing changes for you when that lands.
