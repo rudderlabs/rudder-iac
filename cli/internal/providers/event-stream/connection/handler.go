@@ -107,7 +107,7 @@ func (h *Handler) loadConnection(c ConnectionSpec) (*connectionResource, error) 
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: parsing source reference: %w", c.LocalID, err)
 	}
-	destinationRef, err := parseDestinationRef(c.Destination)
+	destinationRef, err := ParseDestinationRef(c.Destination)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: parsing destination reference: %w", c.LocalID, err)
 	}
@@ -177,10 +177,10 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	}, nil
 }
 
-// parseDestinationRef parses a scalar "#destination:<id>" reference into a
+// ParseDestinationRef parses a scalar "#destination:<id>" reference into a
 // PropertyRef whose Resolve function reads DestinationState.ID, mirroring the
 // destination provider's transformation ref.
-func parseDestinationRef(ref string) (*resources.PropertyRef, error) {
+func ParseDestinationRef(ref string) (*resources.PropertyRef, error) {
 	id, err := refID(ref, destination.DestinationSpecKind)
 	if err != nil {
 		return nil, err
@@ -577,7 +577,7 @@ func toImportItem(externalID string, data *RemoteConnection, inputResolver resol
 // file metadata on its graph entry — or, for an already-managed endpoint the
 // resolver cannot serve (BaseHandler-backed destinations carry no file
 // metadata), built from its externalId, which is the endpoint's local resource
-// id. The ref shape mirrors what parseSourceRef/parseDestinationRef accept.
+// id. The ref shape mirrors what parseSourceRef/ParseDestinationRef accept.
 func endpointRef(inputResolver resolver.ReferenceResolver, resourceType string, kind string, remoteID string, externalID string) (string, error) {
 	ref, err := inputResolver.ResolveToReference(resourceType, remoteID)
 	if err == nil {

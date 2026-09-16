@@ -62,8 +62,7 @@ func enabledFromData(data resources.ResourceData) (bool, error) {
 // toCreateRequest builds the flattened POST /v2/retl-connections body: the API
 // takes every setting at the top level and derives the flow itself from the
 // destination and the object, so there is no nested config field to fill.
-// externalId is left out on purpose — the per-flow allow-list rejects it on
-// create, and the handler claims the identity in a separate call afterwards.
+// The handler stamps ExternalID, which is the local id it owns.
 func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnectionRequest, error) {
 	sourceID, err := endpointIDFromData(data, SourceKey)
 	if err != nil {
@@ -87,6 +86,12 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 
 	if err := checkObjectMappingFlow(config); err != nil {
 		return nil, fmt.Errorf("connection create: %w", err)
+	}
+	// CreateConnection refuses a body with no schedule type. Catching it here
+	// keeps a replacement from deleting the live connection for a create the
+	// client was never going to send.
+	if config.Schedule.Type == "" {
+		return nil, errors.New("connection create: schedule.type is required")
 	}
 
 	request := &retlClient.CreateRETLConnectionRequest{
@@ -178,18 +183,18 @@ func toResourceData(conn *retlClient.RETLConnection) *resources.ResourceData {
 // checkImmutableUnchanged guards the fields the PUT body cannot carry. A
 // difference in any of them would apply nothing and re-diff on every apply —
 // exactly the drift these conversions exist to prevent — so it is reported
-// instead. DEX-825 routes such a change to delete-then-create before it gets
-// here, which makes reaching this a bug rather than user error.
+// instead, with the remedy the UI imposes too: delete and recreate the
+// connection.
 func checkImmutableUnchanged(config, stored ConfigSpec) error {
 	switch {
 	case config.SyncBehaviour != stored.SyncBehaviour:
-		return fmt.Errorf("connection update: sync_behaviour is immutable (%q -> %q); this change needs a replacement", stored.SyncBehaviour, config.SyncBehaviour)
+		return fmt.Errorf("connection update: sync_behaviour is immutable (%q -> %q); delete and recreate the connection to apply it", stored.SyncBehaviour, config.SyncBehaviour)
 	case config.CursorColumn != stored.CursorColumn:
-		return fmt.Errorf("connection update: cursor_column is immutable (%q -> %q); this change needs a replacement", stored.CursorColumn, config.CursorColumn)
+		return fmt.Errorf("connection update: cursor_column is immutable (%q -> %q); delete and recreate the connection to apply it", stored.CursorColumn, config.CursorColumn)
 	case !reflect.DeepEqual(config.Object, stored.Object):
-		return fmt.Errorf("connection update: object is immutable (%q -> %q); this change needs a replacement", lo.FromPtr(stored.Object), lo.FromPtr(config.Object))
+		return fmt.Errorf("connection update: object is immutable (%q -> %q); delete and recreate the connection to apply it", lo.FromPtr(stored.Object), lo.FromPtr(config.Object))
 	case !reflect.DeepEqual(config.Event, stored.Event):
-		return errors.New("connection update: event is immutable; this change needs a replacement")
+		return errors.New("connection update: event is immutable; delete and recreate the connection to apply it")
 	}
 	return nil
 }
