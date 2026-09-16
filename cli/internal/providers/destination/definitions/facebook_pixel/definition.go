@@ -166,7 +166,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
-		}),
+		}, converter.DropUnselected()),
 		converter.Gated(
 			converter.Simple("autoConfig.web", "auto_config.web"),
 			common.SourceTypeWeb,

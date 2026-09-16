@@ -148,8 +148,19 @@ type ExclusiveGroup struct {
 }
 
 // SelectedLocalKey returns the local key the discriminator points at in the
-// given API config, and whether it named one at all.
-func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (string, bool) {
+// given API config, and whether the discriminator was present at all.
+//
+// The two results distinguish three states that must not be conflated. An
+// absent discriminator says nothing about the members, so callers leave them
+// alone: a config written through the Public API can carry a populated list
+// with no selector, and the outbound conversion re-derives one. A discriminator
+// naming no member ("disable") positively says none is live. A discriminator
+// naming one identifies it.
+//
+// Matching is by equality on the decoded API value, so a group whose declared
+// values are not plain strings — a number, say, which JSON decodes to float64 —
+// will not match and reads as naming no member.
+func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (selected string, present bool) {
 	selector, ok := api[g.APIKey]
 	if !ok {
 		return "", false
@@ -159,7 +170,7 @@ func (g ExclusiveGroup) SelectedLocalKey(api map[string]any) (string, bool) {
 			return localKey, true
 		}
 	}
-	return "", false
+	return "", true
 }
 
 func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigProperty {

@@ -135,15 +135,20 @@ func TestDiscriminatorRecordsExclusiveGroup(t *testing.T) {
 		},
 	}, *p.Exclusive)
 
-	selected, ok := p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "blacklistedEvents"})
-	assert.True(t, ok)
+	// Three states, deliberately distinguishable: an absent discriminator says
+	// nothing about the members, while one naming no member positively says
+	// none is live.
+	selected, present := p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "blacklistedEvents"})
+	assert.True(t, present)
 	assert.Equal(t, "event_filtering.blacklist", selected)
 
-	_, ok = p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "disable"})
-	assert.False(t, ok, "a value naming no local key selects nothing")
+	selected, present = p.Exclusive.SelectedLocalKey(map[string]any{"eventFilteringOption": "disable"})
+	assert.True(t, present, "the discriminator is present, it just names no member")
+	assert.Empty(t, selected)
 
-	_, ok = p.Exclusive.SelectedLocalKey(map[string]any{})
-	assert.False(t, ok, "an absent discriminator selects nothing")
+	selected, present = p.Exclusive.SelectedLocalKey(map[string]any{})
+	assert.False(t, present, "an absent discriminator is not a selection of none")
+	assert.Empty(t, selected)
 }
 
 // DropUnselected turns the empty-only prune into an unconditional one for

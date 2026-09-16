@@ -98,6 +98,17 @@ func TestAPIToLocalDropUnselectedImportsValid(t *testing.T) {
 			},
 			want: nil,
 		},
+		{
+			// An absent discriminator is not a selection of none. Configs written
+			// through the Public API can carry a list with no selector, and the
+			// outbound conversion re-derives one, so dropping here would lose a
+			// populated list and erase it upstream on the next apply.
+			name: "absent discriminator leaves members alone",
+			api: map[string]any{
+				"whitelistedEvents": events("A"),
+			},
+			want: map[string]any{"whitelist": []any{"A"}},
+		},
 	}
 
 	for _, tt := range tests {

@@ -103,10 +103,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		),
 		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
 		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
-		// DropUnselected: the SDK reads only the list eventFilteringOption
-		// points at (rudder-sdk-js nativeDestinationQueue/utilities.ts), so an
-		// unselected list is dead config; importing it yields a spec that fails
-		// this definition's own mutual-exclusion rule.
 		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",

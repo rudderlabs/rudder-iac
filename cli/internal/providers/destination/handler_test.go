@@ -44,7 +44,37 @@ func testRegistry(t *testing.T) *definitions.Registry {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(webhookTestDefinition()))
 	require.NoError(t, registry.Register(ga4TestDefinition()))
+	require.NoError(t, registry.Register(eventFilteringTestDefinition()))
 	return registry
+}
+
+func eventFilteringTestDefinition() *definitions.DestinationDefinition {
+	return &definitions.DestinationDefinition{
+		Type:    "FILTERED",
+		Version: 1,
+		Properties: []converter.ConfigProperty{
+			converter.Simple("trackingID", "tracking_id"),
+			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+			converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+				"event_filtering.whitelist": "whitelistedEvents",
+				"event_filtering.blacklist": "blacklistedEvents",
+			}, converter.DropUnselected()),
+		},
+		NewConfig: func() any {
+			return &struct {
+				TrackingID     string `mapstructure:"tracking_id" validate:"required"`
+				EventFiltering *struct {
+					Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist"`
+					Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist"`
+				} `mapstructure:"event_filtering"`
+			}{}
+		},
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+	}
 }
 
 func webhookTestDefinition() *definitions.DestinationDefinition {
@@ -1663,6 +1693,71 @@ func TestHandlerImpl_Import_TranslatesAPITypeToLocal(t *testing.T) {
 	}, "dst-s3")
 	require.NoError(t, err)
 	assert.Equal(t, &destination.DestinationState{ID: "dst-s3", TransformationID: ""}, state)
+}
+
+// Dropping the unselected member can leave the selected one as the block's only
+// key. When that selected list is deliberately empty — whitelisting with no
+// events named, which discards everything — pruning would delete the block,
+// while MapRemoteToState keeps it: import would hand back a spec that diffs
+// against the state it was generated from, and applying it would erase the
+// setting upstream.
+func TestHandlerImpl_FormatForExport_KeepsEmptySelectedEventFilter(t *testing.T) {
+	t.Parallel()
+
+	registry := testRegistry(t)
+
+	tests := []struct {
+		name   string
+		config string
+		want   any
+	}{
+		{
+			name:   "empty selected list survives pruning",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"whitelistedEvents","whitelistedEvents":[{"eventName":""}],"blacklistedEvents":[{"eventName":"B"}]}`,
+			want:   map[string]any{"whitelist": []any{""}},
+		},
+		{
+			name:   "cleared unselected list never reaches the spec",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"whitelistedEvents","whitelistedEvents":[{"eventName":"Order Completed"}],"blacklistedEvents":[{"eventName":""}]}`,
+			want:   map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			name:   "filtering switched off leaves no block behind",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"disable","whitelistedEvents":[{"eventName":""}],"blacklistedEvents":[{"eventName":""}]}`,
+			want:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := destination.NewHandler(nil, registry)
+			entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
+				"filtered-1": {Destination: &client.Destination{
+					ID:        "dst-f1",
+					Name:      "Filtered",
+					Type:      "FILTERED",
+					Version:   1,
+					IsEnabled: true,
+					Config:    []byte(tt.config),
+				}},
+			}, nil, stubResolver{})
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			config, ok := spec.Spec["config"].(map[string]any)
+			require.True(t, ok)
+
+			if tt.want == nil {
+				assert.NotContains(t, config, "event_filtering")
+				return
+			}
+			assert.Equal(t, tt.want, config["event_filtering"])
+		})
+	}
 }
 
 func TestHandlerImpl_FormatForExport_EmitsLocalType(t *testing.T) {

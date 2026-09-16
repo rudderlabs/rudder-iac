@@ -56,9 +56,12 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 
 // dropUnselectedMembers removes, for each exclusive group declared with
 // DropUnselected, every member the API discriminator does not point at —
-// including all of them when it points at none. It runs after the whole
-// pipeline so it does not depend on where the group's properties sit in the
-// list.
+// including all of them when it is present and points at none. A group whose
+// discriminator is absent is left untouched: absence says nothing about which
+// member is live, and dropping on it would discard a populated list that the
+// outbound conversion would otherwise re-derive a selector for. It runs after
+// the whole pipeline so it does not depend on where the group's properties sit
+// in the list.
 //
 // The webapp keeps every member and only switches the discriminator, so a
 // destination that changed filtering mode still stores the other list.
@@ -71,7 +74,10 @@ func dropUnselectedMembers(localJSON string, api map[string]any, props []ConfigP
 		if p.Exclusive == nil || !p.Exclusive.DropUnselected {
 			continue
 		}
-		selected, _ := p.Exclusive.SelectedLocalKey(api)
+		selected, present := p.Exclusive.SelectedLocalKey(api)
+		if !present {
+			continue
+		}
 
 		for localKey := range p.Exclusive.LocalKeys {
 			if localKey == selected || !gjson.Get(localJSON, localKey).Exists() {
@@ -86,10 +92,11 @@ func dropUnselectedMembers(localJSON string, api map[string]any, props []ConfigP
 
 			// A group emptied out entirely would otherwise linger as a bare
 			// `event_filtering: {}`, reading as configuration nobody wrote.
-			parentKey, _, found := strings.Cut(localKey, ".")
-			if !found {
+			lastDot := strings.LastIndex(localKey, ".")
+			if lastDot < 0 {
 				continue
 			}
+			parentKey := localKey[:lastDot]
 			if parent := gjson.Get(localJSON, parentKey); parent.IsObject() && len(parent.Map()) == 0 {
 				pruned, err := sjson.Delete(localJSON, parentKey)
 				if err != nil {

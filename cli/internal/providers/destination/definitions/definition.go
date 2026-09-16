@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -75,6 +76,54 @@ func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any,
 
 func (d *RegisteredDefinition) APIToLocal(api map[string]any) (map[string]any, error) {
 	return converter.APIToLocal(d.Properties, api)
+}
+
+// ExclusiveKeyRoots returns the top-level config keys holding a member of a
+// mutually exclusive group that survived conversion. Callers that prune empty
+// values use it to leave those blocks alone: conversion has already dropped the
+// members the discriminator does not point at, so a member still present is the
+// selected one even when it is empty — and an empty selected event filter list
+// is a real setting, not absence.
+func (d *RegisteredDefinition) ExclusiveKeyRoots(local map[string]any) []string {
+	var roots []string
+	for _, prop := range d.Properties {
+		if prop.Exclusive == nil {
+			continue
+		}
+		for localKey := range prop.Exclusive.LocalKeys {
+			root, _, _ := strings.Cut(localKey, ".")
+			if _, ok := local[root]; !ok || slices.Contains(roots, root) {
+				continue
+			}
+			if _, ok := lookupLocalPath(local, localKey); ok {
+				roots = append(roots, root)
+			}
+		}
+	}
+	return roots
+}
+
+// lookupLocalPath resolves a dotted local config path.
+func lookupLocalPath(config map[string]any, path string) (any, bool) {
+	segments := strings.Split(path, ".")
+	current := config
+
+	for i, segment := range segments {
+		value, ok := current[segment]
+		if !ok {
+			return nil, false
+		}
+		if i == len(segments)-1 {
+			return value, true
+		}
+		next, ok := value.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current = next
+	}
+
+	return nil, false
 }
 
 func (d *RegisteredDefinition) SecretKeys() []string {

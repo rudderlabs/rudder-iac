@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -465,7 +466,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	}
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
-	pruneEmptyValues(localConfig)
+	pruneEmptyValues(localConfig, registered.ExclusiveKeyRoots(localConfig)...)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
@@ -496,9 +497,13 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 // pruneEmptyValues drops keys carrying no value. The webapp persists cleared
 // fields rather than unsetting them, so they reach export as noise the user has
-// to read past.
-func pruneEmptyValues(config map[string]any) {
+// to read past. Keys named in protected are left alone even when empty, for
+// values whose emptiness is itself the setting.
+func pruneEmptyValues(config map[string]any, protected ...string) {
 	for key, value := range config {
+		if slices.Contains(protected, key) {
+			continue
+		}
 		if isEmptyConfigValue(value) {
 			delete(config, key)
 		}
