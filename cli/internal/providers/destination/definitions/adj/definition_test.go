@@ -350,7 +350,7 @@ func TestAdjustConfigValidation(t *testing.T) {
 	})
 }
 
-// Import drops the event list the selector does not point at (DropUnselected):
+// Import drops the event list the selector does not point at:
 // the SDK never reads it, and keeping it emits a spec declaring whitelist and
 // blacklist together, which this definition's own mutual-exclusion rule then
 // rejects — leaving the user to delete one by hand.
