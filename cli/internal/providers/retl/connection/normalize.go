@@ -20,11 +20,11 @@ const (
 	defaultFailedKeysRetry       = true
 )
 
-// canonicalConfig rewrites a config into the single form the spec and the API
+// normalizeConfig rewrites a config into the single form the spec and the API
 // response both settle on, so an unchanged connection does not re-diff on
 // every apply. It never writes through the pointers or slices it is handed:
 // the config it normalizes belongs to the caller.
-func canonicalConfig(config ConfigSpec) ConfigSpec {
+func normalizeConfig(config ConfigSpec) ConfigSpec {
 	// The API drops empty mapping and constant lists from its responses, so a
 	// spec that spells one out as [] has to lose it too.
 	if len(config.Mappings) == 0 {
@@ -33,7 +33,7 @@ func canonicalConfig(config ConfigSpec) ConfigSpec {
 	if len(config.Constants) == 0 {
 		config.Constants = nil
 	}
-	config.SyncSettings = canonicalSyncSettings(config.SyncSettings)
+	config.SyncSettings = normalizeSyncSettings(config.SyncSettings)
 	// Object stays untouched. An explicitly empty object is a spec error
 	// DEX-829 reports, not something to normalize out of sight; and events are
 	// preserved as supplied, because the backend invents no event default the
@@ -41,10 +41,10 @@ func canonicalConfig(config ConfigSpec) ConfigSpec {
 	return config
 }
 
-// canonicalSyncSettings mirrors the backend merge: every missing field takes
+// normalizeSyncSettings mirrors the backend merge: every missing field takes
 // its default. Omitting the block produces exactly the fully defaulted object,
 // so that object collapses back to omission instead of reading as drift.
-func canonicalSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
+func normalizeSyncSettings(settings *SyncSettingsSpec) *SyncSettingsSpec {
 	if settings == nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func syncSettingsWithDefaults(settings *SyncSettingsSpec) *SyncSettingsSpec {
 // gives the local and the remote path identical maps, and canonicalizing here
 // is the single choke point for everything that reaches the graph or state.
 func configToMap(config ConfigSpec) (map[string]any, error) {
-	encoded, err := json.Marshal(canonicalConfig(config))
+	encoded, err := json.Marshal(normalizeConfig(config))
 	if err != nil {
 		return nil, fmt.Errorf("encoding connection config: %w", err)
 	}

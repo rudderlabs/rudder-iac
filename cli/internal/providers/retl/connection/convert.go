@@ -167,7 +167,7 @@ func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if conn.Object != "" {
 		config.Object = lo.ToPtr(conn.Object)
 	}
-	return canonicalConfig(config), nil
+	return normalizeConfig(config), nil
 }
 
 // hasDestinationConfig reports whether a response carries integration-owned
@@ -271,7 +271,7 @@ func fromAPIEvent(event *retlClient.Event) *EventSpec {
 }
 
 // toAPISyncSettings renders the complete settings object the API stores. A nil
-// spec is the fully defaulted object — canonicalConfig collapses exactly that
+// spec is the fully defaulted object — normalizeConfig collapses exactly that
 // to nil — so an update that has to state the settings explicitly can pass nil
 // to reset them.
 func toAPISyncSettings(settings *SyncSettingsSpec) *retlClient.SyncSettings {
