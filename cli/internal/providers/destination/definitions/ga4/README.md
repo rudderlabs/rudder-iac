@@ -158,10 +158,12 @@ Filter sensitive PII fields out of events before sending them to GA4. Each entry
 takes a `pii_property` name, at most 100 characters.
 
 #### `event_filtering` — object
-`cloud` `device`
+`device`
 
-Determine which events are blocked or allowed to flow through to GA4. Exactly one
-of the two lists may be set — declaring both fails validation.
+Determine which events are blocked or allowed to flow through to GA4, in device
+mode connections. Client-side filtering is applied by the SDK, so it has no
+effect on a cloud mode connection. Exactly one of the two lists may be set —
+declaring both fails validation.
 
 - `whitelist` — event names to allowlist
 - `blacklist` — event names to denylist

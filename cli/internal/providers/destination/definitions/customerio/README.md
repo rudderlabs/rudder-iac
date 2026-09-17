@@ -130,10 +130,12 @@ Name of the event fired immediately after setting the device token. At most 100
 characters.
 
 #### `event_filtering` — object
-`cloud` `device`
+`device` · web
 
-Determine which events are allowed to flow through to Customer.io or blocked.
-Exactly one of the two lists may be set — declaring both fails validation.
+Determine which events are allowed to flow through to Customer.io or blocked, in
+device mode connections. Client-side filtering is applied by the SDK, so it has
+no effect on a cloud mode connection. Exactly one of the two lists may be set —
+declaring both fails validation.
 
 - `whitelist` — event names to allowlist
 - `blacklist` — event names to denylist

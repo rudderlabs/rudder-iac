@@ -196,10 +196,12 @@ Map ecommerce events to Braze's recommended event names rather than sending them
 under their original names.
 
 #### `event_filtering` — object
-`cloud` `device`
+`device`
 
-Filter which events are sent to Braze. Exactly one of the two lists may be set —
-declaring both fails validation.
+Filter which events are sent to Braze in device or hybrid mode connections.
+Client-side filtering is applied by the SDK, so it has no effect on a cloud mode
+connection. Exactly one of the two lists may be set — declaring both fails
+validation.
 
 - `whitelist` — event names to allowlist
 - `blacklist` — event names to denylist

@@ -183,10 +183,11 @@ Track `page` calls that carry a category.
 Track `page` calls that carry a name.
 
 #### `event_filtering` \* — object
-`cloud` `device`
+`device` · web
 
-Filter which events are sent to Iterable. Exactly one of the two lists may be set
-— declaring both fails validation.
+Filter which events are sent to Iterable in device mode connections. Client-side
+filtering is applied by the SDK, so it has no effect on a cloud mode connection.
+Exactly one of the two lists may be set — declaring both fails validation.
 
 - `whitelist` — event names to allowlist
 - `blacklist` — event names to denylist
