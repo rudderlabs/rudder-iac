@@ -5,18 +5,25 @@
 // would run every three minutes - is accepted by the server and only discovered
 // once the connection misbehaves. CheckCron closes that gap locally.
 //
-// # Why there is a parser here instead of a dependency
+// # What robfig/cron owns and what this file owns
 //
-// Rejecting @every and the Quartz extensions is a pre-pass (detectExtension)
-// that would sit in front of any parser, and robfig/cron/v3 covers the rest of
-// the grammar - but parsing is the cheap half. The frequency proof needs the
-// per-field masks and, for Vixie's day semantics, the star flags. robfig does
-// expose the masks, but only on the concrete *cron.SpecSchedule behind its
-// Schedule interface, and it packs the star flag into an unexported starBit
-// that would have to be hardcoded. Its Next() also gives up after roughly five
-// years, so it cannot prove that "0 0 30 2 *" never fires. Owning the parser is
-// a judgement call rather than a forced one; what tips it is that the analysis,
-// not the grammar, is the part with no library answer.
+// robfig/cron/v3 owns the grammar: it parses the five standard fields and hands
+// back the per-field bitmasks the frequency proof reasons over. It does not
+// answer the question this package exists for - whether a schedule is too
+// frequent, or whether it fires at all - and it is permissive in three places
+// rETL cannot afford to be, so the expression is fenced before it gets there:
+//
+//   - it reads "?" as a synonym for "*" and silently strips a CRON_TZ= or TZ=
+//     prefix. Both are reported here rather than quietly reinterpreted.
+//   - it drops an empty list entry, so "0,,5" would parse as "0,5".
+//   - it caps day-of-week at 6, while Vixie - and rETL specs - also spell Sunday
+//     as 7, so a 7 is folded onto 0 before parsing.
+//
+// One further difference is deliberate on robfig's side and wrong for this
+// check: it clears its wildcard flag for a stepped wildcard, so "*/2" stops
+// counting as "*" and the two day fields switch from AND to OR. Vixie keys
+// those semantics off the literal "*", so the two flags are read from the
+// expression text here instead of from the parsed schedule.
 //
 // # Compatibility matrix
 //
@@ -35,17 +42,24 @@
 //	duration shortcuts                         @every 1h            invalid
 //	unknown descriptor                         @fortnightly         invalid
 //	date that no calendar day matches          0 0 30 2 *           invalid
-//	@reboot                                    @reboot              invalid
-//	L / W / # / ? extensions                   0 0 L * *            unsupported dialect
+//	L / W / # / ? on numeric day values        0 0 L * *, 0 0 5#3   unsupported dialect
 //	six or seven fields (seconds, year)        0 0 0 * * *          unsupported dialect
 //	CRON_TZ= or TZ= prefix                     CRON_TZ=UTC ...      unsupported dialect
+//
+// The day extensions are recognised only where Quartz writes them: in the two
+// day fields, on a day number inside that field's range. Everything else keeps
+// its usual reading, so "0 0 WED * *" and "0 0 * * 9#3" stay malformed rather
+// than being excused as extensions - and so do the name spellings Quartz would
+// accept, "0 0 * * FRI#2" and "0 0 * * FRIL".
 //
 // "@every" and "@reboot" are invalid rather than unsupported on purpose.
 // Unsupported means "the product may well run this, we just cannot check it
 // here", and a warning lets the apply go through. rETL schedules neither a
 // duration shortcut nor a reboot, so warning about them would ship a connection
 // that never syncs. For the same reason malformed text outranks an unsupported
-// construct: an expression carrying both is an error.
+// construct: an expression carrying both is an error. That ordering is why each
+// field is parsed on its own below - robfig reports one error for the whole
+// expression, which cannot say which field was at fault.
 //
 // # Analysis
 //
@@ -55,12 +69,14 @@
 // rather than by sampling occurrences: fire times are never enumerated.
 //
 // The only loop is over calendar days, and it is bounded by one Gregorian cycle
-// (146097 days), which is a proof rather than a sample because the matching
-// dates repeat with that cycle. A call walks the cycle at most once, and only
-// an impossible date walks all of it: that worst case measures ~2ms on an M3
-// Pro, pinned by BenchmarkCheckCronWorstCase. So there is no cutoff and no
-// result that needs qualifying: CronInconclusive is part of the contract for
-// DEX-829 but nothing here returns it.
+// (146097 days), which makes the scan a proof rather than a sample because the
+// matching dates repeat with that cycle. Walking a whole cycle is not rare and
+// not limited to a bad expression: any schedule whose matching days are never
+// calendar-adjacent walks all of it before returning valid, "0,57 0,23 29 2 *"
+// among them. A call can walk the cycle twice, once to find the first matching
+// day and once to look for an adjacent pair. BenchmarkCheckCron pins both
+// shapes; the cost is a few milliseconds, which is why there is no cutoff and
+// no result that has to be qualified.
 package connection
 
 import (
@@ -69,6 +85,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 type CronStatus string
@@ -78,21 +96,18 @@ const (
 	CronInvalid            CronStatus = "invalid"
 	CronTooFrequent        CronStatus = "too_frequent"
 	CronUnsupportedDialect CronStatus = "unsupported_dialect"
-	// CronInconclusive is reserved for an analysis that cannot reach a verdict;
-	// DEX-829 maps it, like CronUnsupportedDialect, to a warning. The analysis
-	// below is exact and has no cutoff, so it never returns this today.
-	CronInconclusive CronStatus = "inconclusive"
 )
 
 // CronCheckResult is the whole contract: a status to branch on, a reason
 // written for the spec author, and for CronTooFrequent the first pair of
 // consecutive syncs that breaks the floor. Both timestamps are zero for every
-// other status.
+// other status, which is why they are named for the violation rather than for
+// the schedule.
 type CronCheckResult struct {
-	Status         CronStatus
-	Reason         string
-	Occurrence     time.Time
-	NextOccurrence time.Time
+	Status            CronStatus
+	Reason            string
+	ViolatingSync     time.Time
+	NextViolatingSync time.Time
 }
 
 const (
@@ -115,6 +130,12 @@ const (
 // cronOrigin is where every scan starts. Pinned so results are reproducible and
 // independent of when validation runs.
 var cronOrigin = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+
+// cronParser is the five-field standard parser. The descriptor option is left
+// off deliberately: descriptors are expanded below instead, because robfig's
+// set includes @every and @reboot and its error for an unknown one does not
+// name the set that is supported.
+var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 // CheckCron classifies expression against the cron grammar documented on this
 // package and the five-minute minimum sync interval, in UTC.
@@ -144,37 +165,34 @@ func unsupportedCron(format string, args ...any) *CronCheckResult {
 }
 
 type cronField struct {
-	name  string
-	min   int
-	max   int
-	names map[string]int
+	name string
+	min  int
+	max  int
 }
 
 var (
-	monthNames = map[string]int{
-		"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-		"jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-	}
-	dayNames = map[string]int{
-		"sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6,
-	}
-
-	// Day-of-week allows 7 as a second spelling of Sunday; it is folded onto 0
-	// once the mask is built.
+	// Day-of-week allows 7 as a second spelling of Sunday, so its range is
+	// wider than robfig's; foldSunday reconciles the two.
 	cronFields = [cronFieldCount]cronField{
 		{name: "minute", min: 0, max: 59},
 		{name: "hour", min: 0, max: 23},
 		{name: "day-of-month", min: 1, max: 31},
-		{name: "month", min: 1, max: 12, names: monthNames},
-		{name: "day-of-week", min: 0, max: 7, names: dayNames},
+		{name: "month", min: 1, max: 12},
+		{name: "day-of-week", min: 0, max: 7},
 	}
 
+	// A seconds field carries the same bounds as a minute field, so it probes
+	// as one under a different name.
 	secondsField = cronField{name: "seconds", min: 0, max: 59}
 
-	// The year bounds are a syntax check - a year is at most four digits - and
-	// not a product range, which has never been established. So "garbage" is
+	// The year is checked for shape - a year is at most four digits - and not
+	// for a product range, which has never been established. So "garbage" is
 	// malformed while "1969" is merely a dialect we do not analyse.
-	yearField = cronField{name: "year", min: 0, max: 9999}
+	yearShape = regexp.MustCompile(`^[\d*][\d*,/-]*$`)
+
+	dayNames = map[string]int{
+		"sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6,
+	}
 
 	descriptors = map[string]string{
 		"@yearly":   "0 0 1 1 *",
@@ -188,14 +206,15 @@ var (
 )
 
 // cronSchedule is the expression reduced to the sets it selects. minutes and
-// hours are ascending; daysStar and weekdaysStar record whether the field was
-// written as a wildcard, which decides the day matching semantics.
+// hours are ascending; days, months and weekdays stay as robfig's bitmasks.
+// daysStar and weekdaysStar record whether the field was written as a wildcard,
+// which decides the day matching semantics.
 type cronSchedule struct {
 	minutes      []int
 	hours        []int
-	days         [32]bool
-	months       [13]bool
-	weekdays     [7]bool
+	days         uint64
+	months       uint64
+	weekdays     uint64
 	daysStar     bool
 	weekdaysStar bool
 }
@@ -238,36 +257,32 @@ func isTimezoneDirective(field string) bool {
 func parseDescriptor(fields []string) (*cronSchedule, *CronCheckResult) {
 	descriptor := strings.ToLower(fields[0])
 
-	if expansion, ok := descriptors[descriptor]; ok {
-		if len(fields) > 1 {
-			return nil, invalidCron("descriptor %q does not take arguments", fields[0])
-		}
-		return parseFields(strings.Fields(expansion))
-	}
-
-	switch descriptor {
-	case "@reboot":
-		// Invalid for the same reason as @every: rETL has no reboot to fire on,
-		// so a warning would ship a connection that never syncs.
-		return nil, invalidCron("@reboot is not part of the supported cron grammar; use a five-field expression such as %q", "0 * * * *")
-	case "@every":
+	if descriptor == "@every" {
 		return nil, invalidCron(
 			"duration shortcuts such as %q are not part of the supported cron grammar; use a five-field expression such as %q",
 			strings.Join(fields, " "), "*/15 * * * *",
 		)
 	}
 
-	return nil, invalidCron(
-		"unknown descriptor %q; supported descriptors are @hourly, @daily, @midnight, @weekly, @monthly, @yearly and @annually",
-		fields[0],
-	)
+	expansion, ok := descriptors[descriptor]
+	if !ok {
+		return nil, invalidCron(
+			"unknown descriptor %q; supported descriptors are @hourly, @daily, @midnight, @weekly, @monthly, @yearly and @annually",
+			fields[0],
+		)
+	}
+	if len(fields) > 1 {
+		return nil, invalidCron("descriptor %q does not take arguments", fields[0])
+	}
+
+	return parseFields(strings.Fields(expansion))
 }
 
 // classifyExtendedForm decides whether a six or seven field expression really is
 // the seconds (and year) dialect, or just text that happens to have six words.
 // Only the former earns a warning; garbage stays invalid.
 func classifyExtendedForm(fields []string) *CronCheckResult {
-	if _, _, failure := secondsField.parse(fields[0]); failure != nil {
+	if failure := secondsField.probe(0, fields[0], fields[0]); failure != nil {
 		return failure
 	}
 
@@ -279,33 +294,31 @@ func classifyExtendedForm(fields []string) *CronCheckResult {
 		return unsupportedCron("six-field expressions (leading seconds field) are not supported; use the five-field %s form", cronFieldLayout)
 	}
 
-	if _, _, failure := yearField.parse(fields[6]); failure != nil {
-		return failure
+	if !yearShape.MatchString(fields[6]) {
+		return invalidCron("year field %q: %q is not a number", fields[6], fields[6])
 	}
 
 	return unsupportedCron("seven-field expressions (leading seconds and trailing year fields) are not supported; use the five-field %s form", cronFieldLayout)
 }
 
 func parseFields(fields []string) (*cronSchedule, *CronCheckResult) {
-	var (
-		masks       [cronFieldCount][]bool
-		stars       [cronFieldCount]bool
-		unsupported *CronCheckResult
-	)
-	for i, field := range cronFields {
-		values, star, failure := field.parse(fields[i])
-		if failure == nil {
-			masks[i], stars[i] = values, star
-			continue
-		}
+	var normalised [cronFieldCount]string
+	copy(normalised[:], fields)
+	normalised[dowFieldIndex] = foldSunday(fields[dowFieldIndex])
 
-		// Malformed text outranks an unsupported construct: an expression
-		// carrying both is an error, never a warning that lets the apply run.
-		extension := detectExtension(i, field, fields[i])
-		if extension == nil {
+	// A malformed field outranks an unsupported construct in another, so every
+	// field is examined before either verdict is returned - and the extension
+	// check runs even when the field parsed, because robfig accepts "?".
+	var unsupported *CronCheckResult
+	for i, field := range cronFields {
+		var (
+			failure   = field.probe(i, fields[i], normalised[i])
+			extension = detectExtension(i, field, fields[i])
+		)
+		if failure != nil && extension == nil {
 			return nil, failure
 		}
-		if unsupported == nil {
+		if extension != nil && unsupported == nil {
 			unsupported = extension
 		}
 	}
@@ -314,41 +327,156 @@ func parseFields(fields []string) (*cronSchedule, *CronCheckResult) {
 		return nil, unsupported
 	}
 
-	schedule := cronSchedule{
-		minutes:      selected(masks[0]),
-		hours:        selected(masks[1]),
-		daysStar:     stars[2],
-		weekdaysStar: stars[4],
-	}
-	copy(schedule.days[:], masks[2])
-	copy(schedule.months[:], masks[3])
-	copy(schedule.weekdays[:], masks[4][:7])
-	if masks[4][7] {
-		schedule.weekdays[0] = true
+	schedule, err := cronParser.Parse(strings.Join(normalised[:], " "))
+	spec, ok := schedule.(*cron.SpecSchedule)
+	if err != nil || !ok {
+		// Unreachable: every field has just parsed on its own, and without the
+		// descriptor option a five-field expression is always a spec schedule.
+		return nil, invalidCron("%q is not a valid cron expression", strings.Join(fields, " "))
 	}
 
-	return &schedule, nil
+	return &cronSchedule{
+		minutes:      selected(spec.Minute, cronFields[0]),
+		hours:        selected(spec.Hour, cronFields[1]),
+		days:         spec.Dom,
+		months:       spec.Month,
+		weekdays:     spec.Dow,
+		daysStar:     isWildcard(fields[domFieldIndex]),
+		weekdaysStar: isWildcard(fields[dowFieldIndex]),
+	}, nil
+}
+
+// probe parses raw on its own, with wildcards standing in for every other
+// field, because robfig reports a single error for the whole expression and
+// cannot say which field produced it. normalised carries any Sunday fold; raw
+// is what the author wrote and what the message quotes.
+func (f cronField) probe(index int, raw, normalised string) *CronCheckResult {
+	for _, element := range strings.Split(raw, ",") {
+		if element == "" {
+			// robfig drops an empty list entry silently, so "0,,5" would parse
+			// as "0,5". Vixie rejects it and so does this.
+			return invalidCron("%s field %q: value must not be empty", f.name, raw)
+		}
+		if strings.Contains(element, "?") {
+			// robfig reads "?" as "*" in every field. Quartz writes it only in
+			// the two day fields, where detectExtension names it as a dialect
+			// we decline to analyse; anywhere else it is not grammar at all and
+			// must not quietly widen the field to a wildcard.
+			return invalidCron("%s field %q: %q is not part of the supported cron grammar", f.name, raw, "?")
+		}
+	}
+
+	probe := [cronFieldCount]string{"*", "*", "*", "*", "*"}
+	probe[index] = normalised
+	if _, err := cronParser.Parse(strings.Join(probe[:], " ")); err != nil {
+		// robfig wraps strconv's error verbatim. The tail repeats the token and
+		// names a standard library function, neither of which tells a spec
+		// author anything, so only the sentence robfig wrote is kept.
+		reason, _, _ := strings.Cut(err.Error(), ": strconv.")
+
+		return invalidCron("%s field %q: %s", f.name, raw, reason)
+	}
+
+	return nil
+}
+
+// foldSunday rewrites the day-of-week field so robfig, which stops at 6, sees
+// the same set Vixie does. Only a lone value or a range end can be 7, so the
+// element keeps its shape with the range clamped to 6 and an explicit "0" is
+// appended when the step actually lands on Sunday. Anything malformed is left
+// alone for the parser to reject.
+func foldSunday(field string) string {
+	var (
+		elements = strings.Split(field, ",")
+		folded   = make([]string, 0, len(elements)+1)
+		sunday   bool
+	)
+
+	for _, element := range elements {
+		spec, rawStep, stepped := strings.Cut(element, "/")
+		start, end, isRange := strings.Cut(spec, "-")
+
+		if (isRange && end != "7") || (!isRange && start != "7") {
+			folded = append(folded, element)
+			continue
+		}
+
+		// "7" and "7/n" both select Sunday and nothing else.
+		if !isRange {
+			sunday = true
+			continue
+		}
+
+		low, err := dayValue(start)
+		step := 1
+		if stepped {
+			step, err = strconv.Atoi(rawStep)
+		}
+		if err != nil || step < 1 || low > 7 {
+			folded = append(folded, element)
+			continue
+		}
+
+		if (7-low)%step == 0 {
+			sunday = true
+		}
+		if low <= 6 {
+			clamped := start + "-6"
+			if stepped {
+				clamped += "/" + rawStep
+			}
+			folded = append(folded, clamped)
+		}
+	}
+
+	if sunday {
+		folded = append(folded, "0")
+	}
+
+	return strings.Join(folded, ",")
+}
+
+func dayValue(token string) (int, error) {
+	if value, ok := dayNames[strings.ToLower(token)]; ok {
+		return value, nil
+	}
+
+	return strconv.Atoi(token)
+}
+
+// isWildcard reports whether the field was written as a wildcard, which is what
+// Vixie keys the day semantics off. A stepped wildcard still counts, which is
+// where robfig's own flag differs.
+func isWildcard(field string) bool {
+	for _, element := range strings.Split(field, ",") {
+		if strings.HasPrefix(element, "*") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // quartzExtensions are the Quartz-dialect constructs this package can name but
 // cannot analyse. Each pattern matches a whole element rather than a marker
 // character, which is what keeps "HELLO" and "WED" malformed instead of being
-// mistaken for the L and W extensions.
+// mistaken for the L and W extensions, and captures the day number so it can be
+// range-checked.
 var quartzExtensions = []struct {
 	pattern     *regexp.Regexp
 	description string
 }{
-	{pattern: regexp.MustCompile(`^\d{1,2}#[1-5]$`), description: `"#" (nth weekday of the month)`},
-	{pattern: regexp.MustCompile(`^(?:L(?:W|-\d{1,2})?|\d{1,2}L)$`), description: `"L" (last day)`},
-	{pattern: regexp.MustCompile(`^\d{1,2}W$`), description: `"W" (nearest weekday)`},
+	{pattern: regexp.MustCompile(`^(\d{1,2})#[1-5]$`), description: `"#" (nth weekday of the month)`},
+	{pattern: regexp.MustCompile(`^(?:L(?:W|-(\d{1,2}))?|(\d{1,2})L)$`), description: `"L" (last day)`},
+	{pattern: regexp.MustCompile(`^(\d{1,2})W$`), description: `"W" (nearest weekday)`},
 	{pattern: regexp.MustCompile(`^\?$`), description: `"?" (no specific value)`},
 }
 
-// detectExtension explains a field that failed to parse as an unsupported
-// construct, or returns nil to leave it malformed. Quartz confines these forms
-// to the two day fields, so the same characters elsewhere stay garbage, and
-// every element has to be either a recognised extension or otherwise valid -
-// "1,nonsense#2" is malformed, not unsupported.
+// detectExtension explains a field as an unsupported construct, or returns nil
+// to leave it to the parser. Quartz confines these forms to the two day fields,
+// so the same characters elsewhere stay garbage, and every element has to be
+// either a recognised extension or otherwise valid - "1,nonsense#2" is
+// malformed, not unsupported.
 func detectExtension(index int, field cronField, raw string) *CronCheckResult {
 	if index != domFieldIndex && index != dowFieldIndex {
 		return nil
@@ -356,9 +484,9 @@ func detectExtension(index int, field cronField, raw string) *CronCheckResult {
 
 	var found *CronCheckResult
 	for _, element := range strings.Split(raw, ",") {
-		extension := matchExtension(field, raw, element)
+		extension := field.matchExtension(raw, element)
 		if extension == nil {
-			if _, _, failure := field.parse(element); failure != nil {
+			if failure := field.probe(index, element, element); failure != nil {
 				return nil
 			}
 			continue
@@ -371,138 +499,58 @@ func detectExtension(index int, field cronField, raw string) *CronCheckResult {
 	return found
 }
 
-func matchExtension(field cronField, raw, element string) *CronCheckResult {
+// matchExtension names the Quartz extension an element spells, or returns nil
+// when it is not one - including when it carries a day number outside the
+// field's range. "9#3" and "32L" are malformed in every dialect, so excusing
+// them as a recognised extension would downgrade an error to a warning and let
+// a schedule nothing can run reach the apply.
+func (f cronField) matchExtension(raw, element string) *CronCheckResult {
 	upper := strings.ToUpper(element)
 	for _, extension := range quartzExtensions {
-		if extension.pattern.MatchString(upper) {
-			return unsupportedCron("%s field %q: the %s extension is not supported", field.name, raw, extension.description)
+		match := extension.pattern.FindStringSubmatch(upper)
+		if match == nil || !f.inRange(match[1:]) {
+			continue
 		}
+
+		return unsupportedCron("%s field %q: the %s extension is not supported", f.name, raw, extension.description)
 	}
 
 	return nil
 }
 
-// parse returns the values the field selects, indexed by value, and whether the
-// field is a wildcard.
-func (f cronField) parse(raw string) ([]bool, bool, *CronCheckResult) {
-	var (
-		values = make([]bool, f.max+1)
-		star   bool
-	)
-
-	for _, element := range strings.Split(raw, ",") {
-		elementStar, failure := f.parseElement(raw, element, values)
-		if failure != nil {
-			return nil, false, failure
+// inRange reports whether every day number a pattern captured is a legal value
+// for the field. The patterns match at most two digits, so the capture is
+// always a number and only its range is in question.
+func (f cronField) inRange(numbers []string) bool {
+	for _, number := range numbers {
+		if number == "" {
+			continue
 		}
-		star = star || elementStar
-	}
 
-	return values, star, nil
-}
-
-func (f cronField) parseElement(raw, element string, values []bool) (bool, *CronCheckResult) {
-	var (
-		spec    = element
-		step    = 1
-		stepped = false
-	)
-
-	if base, rawStep, found := strings.Cut(element, "/"); found {
-		parsed, err := strconv.Atoi(rawStep)
-		if err != nil || parsed < 1 {
-			return false, invalidCron("%s field %q: step must be a positive integer", f.name, raw)
-		}
-		spec, step, stepped = base, parsed, true
-	}
-
-	// A stepped wildcard is still a wildcard, as in Vixie cron, where the day
-	// semantics key off the leading "*" rather than the set it expands to.
-	if spec == "*" {
-		fill(values, f.min, f.max, step)
-		return true, nil
-	}
-
-	low, high, failure := f.parseRange(raw, spec, stepped)
-	if failure != nil {
-		return false, failure
-	}
-	fill(values, low, high, step)
-
-	return false, nil
-}
-
-func (f cronField) parseRange(raw, spec string, stepped bool) (int, int, *CronCheckResult) {
-	start, end, isRange := strings.Cut(spec, "-")
-
-	low, failure := f.parseValue(raw, start)
-	if failure != nil {
-		return 0, 0, failure
-	}
-
-	if !isRange {
-		// A step without a range runs to the end of the field, as in "15/20".
-		if stepped {
-			return low, f.max, nil
-		}
-		return low, low, nil
-	}
-
-	high, failure := f.parseValue(raw, end)
-	if failure != nil {
-		return 0, 0, failure
-	}
-	if high < low {
-		return 0, 0, invalidCron("%s field %q: range start %d is greater than range end %d", f.name, raw, low, high)
-	}
-
-	return low, high, nil
-}
-
-func (f cronField) parseValue(raw, token string) (int, *CronCheckResult) {
-	if token == "" {
-		return 0, invalidCron("%s field %q: value must not be empty", f.name, raw)
-	}
-
-	if value, ok := f.names[strings.ToLower(token)]; ok {
-		return value, nil
-	}
-
-	value, err := strconv.Atoi(token)
-	if err != nil {
-		if f.names != nil {
-			return 0, invalidCron("%s field %q: %q is not a number or %s name", f.name, raw, token, f.name)
-		}
-		return 0, invalidCron("%s field %q: %q is not a number", f.name, raw, token)
-	}
-	if value < f.min || value > f.max {
-		return 0, invalidCron("%s field %q: %d is out of range %d-%d", f.name, raw, value, f.min, f.max)
-	}
-
-	return value, nil
-}
-
-// step is whatever positive integer the author typed, so the loop stops on the
-// remaining headroom rather than on value+step, which would overflow into a
-// negative index for a step near math.MaxInt.
-func fill(values []bool, low, high, step int) {
-	for value := low; value <= high; value += step {
-		values[value] = true
-		if step > high-value {
-			return
+		value, _ := strconv.Atoi(number)
+		if value < f.min || value > f.max {
+			return false
 		}
 	}
+
+	return true
 }
 
-func selected(values []bool) []int {
+func selected(bits uint64, field cronField) []int {
 	var out []int
-	for value, ok := range values {
-		if ok {
+	for value := field.min; value <= field.max; value++ {
+		if bits&bit(value) != 0 {
 			out = append(out, value)
 		}
 	}
 
 	return out
+}
+
+// bit indexes a robfig field mask. Its wildcard flag lives in the top bit, well
+// clear of every value any field can hold, so it never has to be masked off.
+func bit(value int) uint64 {
+	return 1 << uint(value)
 }
 
 // check proves or disproves the five-minute floor from the field masks alone.
@@ -595,13 +643,13 @@ func (s *cronSchedule) adjacentDays(from time.Time) (time.Time, time.Time, bool)
 // a date matches if either field matches, and a wildcard in one field leaves the
 // other in charge.
 func (s *cronSchedule) matchesDay(day time.Time) bool {
-	if !s.months[int(day.Month())] {
+	if s.months&bit(int(day.Month())) == 0 {
 		return false
 	}
 
 	var (
-		dayMatches     = s.days[day.Day()]
-		weekdayMatches = s.weekdays[int(day.Weekday())]
+		dayMatches     = s.days&bit(day.Day()) != 0
+		weekdayMatches = s.weekdays&bit(int(day.Weekday())) != 0
 	)
 	if s.daysStar || s.weekdaysStar {
 		return dayMatches && weekdayMatches
@@ -622,9 +670,9 @@ func at(day time.Time, hour, minute int) time.Time {
 
 func tooFrequent(gap int, occurrence, next time.Time) CronCheckResult {
 	return CronCheckResult{
-		Status:         CronTooFrequent,
-		Reason:         fmt.Sprintf("consecutive syncs have a %d-minute gap; the minimum supported interval is %d minutes", gap, minGapMinutes),
-		Occurrence:     occurrence,
-		NextOccurrence: next,
+		Status:            CronTooFrequent,
+		Reason:            fmt.Sprintf("consecutive syncs have a %d-minute gap; the minimum supported interval is %d minutes", gap, minGapMinutes),
+		ViolatingSync:     occurrence,
+		NextViolatingSync: next,
 	}
 }
