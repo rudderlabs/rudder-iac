@@ -83,7 +83,10 @@ func validateConnectionsSemantic(
 		pair := esRules.ConnectionEdge{SourceURN: endpoints.sourceURN, DestinationURN: endpoints.destinationURN}
 		results = append(results, esRules.ValidatePairUniqueness(edges, pair, connectionRef(index))...)
 		results = append(results, validateDestinationSources(edges, index, endpoints)...)
-		results = append(results, validateCompatibility(registry, index, endpoints, c.Config)...)
+
+		entry := connectionEntry{index: index, endpoints: endpoints, config: c.Config}
+		results = append(results, validateDestinationCompatibility(registry, entry)...)
+		results = append(results, validateSourceCapability(entry)...)
 	}
 	return results
 }
@@ -146,6 +149,26 @@ type connectionEndpoints struct {
 	destinationURN   string
 	destinationRefOK bool
 	destination      *resources.Resource
+}
+
+// sourceDefinition is the warehouse definition the source resource names. The
+// source's own spec rules require one before a graph is built, so it is empty
+// only on a resource no check here can say anything about.
+func (e connectionEndpoints) sourceDefinition() string {
+	definition, _ := e.source.Data()[retlConnection.SourceDefinitionKey].(string)
+	return definition
+}
+
+// connectionEntry is what the compatibility checks read about one connection
+// entry whose endpoints both resolved. registered and flow are known only once
+// the destination has passed its prerequisites, so only the checks behind those
+// read them.
+type connectionEntry struct {
+	index      int
+	endpoints  connectionEndpoints
+	config     retlConnection.ConfigSpec
+	registered *definitions.RegisteredDefinition
+	flow       retlConnection.Flow
 }
 
 // resolved reports whether both endpoints are references this rule owns and
@@ -227,22 +250,18 @@ func validateDestinationSources(edges []esRules.ConnectionEdge, index int, endpo
 	return results
 }
 
-// validateCompatibility runs the checks that need the destination definition
-// and, through it, the flow the connection runs. A prerequisite failure stops
-// the rest: a check written in terms of a flow that could not be derived, or of
-// a destination that takes no warehouse source at all, would only bury the
-// error the author has to fix first. Independent prerequisites are still all
-// reported before stopping.
-func validateCompatibility(
-	registry *definitions.Registry,
-	index int,
-	endpoints connectionEndpoints,
-	config retlConnection.ConfigSpec,
-) []rules.ValidationResult {
+// validateDestinationCompatibility runs the checks that need the destination
+// definition and, through it, the flow the connection runs — V-R2 among them,
+// since the sync behaviour has to suit both endpoints. A prerequisite failure
+// stops the rest: a check written in terms of a flow that could not be
+// derived, or of a destination that takes no warehouse source at all, would
+// only bury the error the author has to fix first. Independent prerequisites
+// are still all reported before stopping.
+func validateDestinationCompatibility(registry *definitions.Registry, entry connectionEntry) []rules.ValidationResult {
 	// Destination resources always carry *destination.DestinationResource;
 	// anything else is the destination provider's corruption, not this rule's
 	// to report.
-	destinationData, ok := endpoints.destination.RawData().(*destination.DestinationResource)
+	destinationData, ok := entry.endpoints.destination.RawData().(*destination.DestinationResource)
 	if !ok {
 		return nil
 	}
@@ -263,25 +282,25 @@ func validateCompatibility(
 	// rather than hiding it.
 	var (
 		supported        = registered.SupportedSourceTypes()
-		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), config.Object)
+		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), entry.config.Object)
 		acceptsWarehouse = slices.Contains(supported, common.SourceTypeWarehouse)
 	)
 
 	if flowErr != nil && retlConnection.IsDestinationSpecificAPIType(registered.APIType) {
-		return []rules.ValidationResult{result(destinationRef(index), flowErr.Error())}
+		return []rules.ValidationResult{result(destinationRef(entry.index), flowErr.Error())}
 	}
 
 	// V-C4: rETL sources reach a destination as warehouse sources, so the
 	// definition has to declare that source type.
 	var blocking []rules.ValidationResult
 	if !acceptsWarehouse {
-		blocking = append(blocking, result(destinationRef(index), fmt.Sprintf(
+		blocking = append(blocking, result(destinationRef(entry.index), fmt.Sprintf(
 			"destination '%s' (type '%s') does not accept rETL sources: source type '%s' is not among supported source types: %s",
-			endpoints.destinationID, destinationData.Type, common.SourceTypeWarehouse, strings.Join(supported, ", "),
+			entry.endpoints.destinationID, destinationData.Type, common.SourceTypeWarehouse, strings.Join(supported, ", "),
 		)))
 	}
 	if flowErr != nil {
-		blocking = append(blocking, result(configRef(index)+"/object", flowErr.Error()))
+		blocking = append(blocking, result(configRef(entry.index)+"/object", flowErr.Error()))
 	}
 	// Everything below is written in terms of a flow and a warehouse-capable
 	// destination, so neither can be checked past these.
@@ -289,36 +308,33 @@ func validateCompatibility(
 		return blocking
 	}
 
-	results := validateDestinationConfig(registered, index, endpoints, destinationData.Config, flow)
+	entry.registered, entry.flow = registered, flow
+
+	results := validateDestinationConfig(entry, destinationData.Config)
 	if flow == retlConnection.FlowObjectMapping {
-		results = append(results, validateObjectMappings(index, config)...)
+		results = append(results, validateObjectMappings(entry.index, entry.config)...)
 	} else {
-		results = append(results, validateJSONMappings(index, config)...)
+		results = append(results, validateJSONMappings(entry.index, entry.config)...)
 	}
-	return append(results, validateSourceCapability(registered, index, endpoints, config, flow)...)
+	return append(results, validateSyncBehaviour(entry)...)
 }
 
 // validateDestinationConfig runs the destination-side config checks for a
 // warehouse source that the event stream rules share (V-C5, V-C8), plus the
 // object-mapping restriction on hyphenated destination names (V-R10).
-func validateDestinationConfig(
-	registered *definitions.RegisteredDefinition,
-	index int,
-	endpoints connectionEndpoints,
-	config map[string]any,
-	flow retlConnection.Flow,
-) []rules.ValidationResult {
+func validateDestinationConfig(entry connectionEntry, config map[string]any) []rules.ValidationResult {
 	results := esRules.ValidateDestinationConfig(
-		registered, destinationRef(index), endpoints.destinationID, common.SourceTypeWarehouse, config,
+		entry.registered, destinationRef(entry.index), entry.endpoints.destinationID, common.SourceTypeWarehouse, config,
 	)
 
 	// The object mapping response mapper splits the destination name on "-", so
 	// a hyphenated name cannot be put back together; the backend refuses the
 	// combination rather than delivering to the wrong object.
-	if flow == retlConnection.FlowObjectMapping && (strings.Contains(registered.APIType, "-") || strings.Contains(registered.Type, "-")) {
-		results = append(results, result(destinationRef(index), fmt.Sprintf(
+	registered := entry.registered
+	if entry.flow == retlConnection.FlowObjectMapping && (strings.Contains(registered.APIType, "-") || strings.Contains(registered.Type, "-")) {
+		results = append(results, result(destinationRef(entry.index), fmt.Sprintf(
 			"destination '%s' (type '%s', api type '%s') cannot be used with object mapping: its name contains a hyphen, which the backend cannot reconstruct",
-			endpoints.destinationID, registered.Type, registered.APIType,
+			entry.endpoints.destinationID, registered.Type, registered.APIType,
 		)))
 	}
 
@@ -388,23 +404,17 @@ func reservedMappingTargets(index int, mappings []retlConnection.MappingSpec, re
 	return results
 }
 
-// validateSourceCapability runs the checks that depend on what the source's
-// warehouse can do: a primary key unless its definition is exempt (V-R11), SQL
-// model support for a model source (V-R13), sync settings support (V-R14), and
-// a sync behaviour both endpoints accept (V-R2).
-func validateSourceCapability(
-	registered *definitions.RegisteredDefinition,
-	index int,
-	endpoints connectionEndpoints,
-	config retlConnection.ConfigSpec,
-	flow retlConnection.Flow,
-) []rules.ValidationResult {
-	sourceData := endpoints.source.Data()
-
-	// A rETL source resource without a definition cannot reach a built graph —
-	// the source's own spec rules require one — so there is nothing to check
-	// here without it.
-	sourceDefinition, _ := sourceData[retlConnection.SourceDefinitionKey].(string)
+// validateSourceCapability runs the checks that depend only on what the
+// source's warehouse can do: a primary key unless its definition is exempt
+// (V-R11), SQL model support for a model source (V-R13) and sync settings
+// support (V-R14). None of them reads the destination, so they run whatever
+// state it is in rather than surfacing one fix at a time.
+func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
+	var (
+		index            = entry.index
+		endpoints        = entry.endpoints
+		sourceDefinition = endpoints.sourceDefinition()
+	)
 	if sourceDefinition == "" {
 		return nil
 	}
@@ -413,7 +423,7 @@ func validateSourceCapability(
 
 	// V-R11: a sync needs a key to identify rows by, except for the source
 	// definitions that let the backend derive one.
-	primaryKey, _ := sourceData[retlConnection.SourcePrimaryKeyKey].(string)
+	primaryKey, _ := endpoints.source.Data()[retlConnection.SourcePrimaryKeyKey].(string)
 	if primaryKey == "" && sourceDefinition != primaryKeyExemptDefinition {
 		results = append(results, result(sourceRef(index), fmt.Sprintf(
 			"rETL source '%s' declares no primary_key, which source definition '%s' requires to sync",
@@ -438,38 +448,38 @@ func validateSourceCapability(
 		)))
 	}
 
-	if config.SyncSettings != nil && !warehouse.SupportsSyncSettings {
+	if entry.config.SyncSettings != nil && !warehouse.SupportsSyncSettings {
 		results = append(results, result(configRef(index)+"/sync_settings", fmt.Sprintf(
 			"'sync_settings' is not allowed: source definition '%s' does not support sync settings", sourceDefinition,
 		)))
 	}
 
-	return append(results, validateSyncBehaviour(index, endpoints, config, sourceDefinition, warehouse, registered, flow)...)
+	return results
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
 // accept, and the JSON mapper flow drops mirror from whatever the two agree on.
 // An empty intersection is reported as such rather than falling back to a
 // permissive set — that would let a connection the backend refuses pass here.
-func validateSyncBehaviour(
-	index int,
-	endpoints connectionEndpoints,
-	config retlConnection.ConfigSpec,
-	sourceDefinition string,
-	warehouse retlConnection.WarehouseMetadata,
-	registered *definitions.RegisteredDefinition,
-	flow retlConnection.Flow,
-) []rules.ValidationResult {
+// A source whose capabilities are unknown is validateSourceCapability's to
+// report, so there is nothing to intersect.
+func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
+	sourceDefinition := entry.endpoints.sourceDefinition()
+	warehouse, known := retlConnection.WarehouseDefinition(sourceDefinition)
+	if !known {
+		return nil
+	}
+
 	var (
-		reference           = configRef(index) + "/sync_behaviour"
-		destinationAccepted = registered.SyncBehaviours()
+		reference           = configRef(entry.index) + "/sync_behaviour"
+		destinationAccepted = entry.registered.SyncBehaviours()
 	)
 
 	// WarehouseDefinition hands back a clone, so filtering in place is safe.
 	// "mirror" is offered for object mapping only, so the JSON mapper flow drops
 	// it however the two endpoints feel about it.
 	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
-		if flow == retlConnection.FlowJSONMapper && behaviour == "mirror" {
+		if entry.flow == retlConnection.FlowJSONMapper && behaviour == "mirror" {
 			return true
 		}
 		return !slices.Contains(destinationAccepted, behaviour)
@@ -478,15 +488,15 @@ func validateSyncBehaviour(
 	if len(accepted) == 0 {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
 			"source definition '%s' and destination '%s' share no sync behaviour for the %s flow; the connection cannot sync",
-			sourceDefinition, endpoints.destinationID, flow,
+			sourceDefinition, entry.endpoints.destinationID, entry.flow,
 		))}
 	}
-	if slices.Contains(accepted, config.SyncBehaviour) {
+	if slices.Contains(accepted, entry.config.SyncBehaviour) {
 		return nil
 	}
 
 	return []rules.ValidationResult{result(reference, fmt.Sprintf(
 		"'sync_behaviour' must be one of [%s] for source definition '%s' and destination '%s' on the %s flow",
-		strings.Join(accepted, " "), sourceDefinition, endpoints.destinationID, flow,
+		strings.Join(accepted, " "), sourceDefinition, entry.endpoints.destinationID, entry.flow,
 	))}
 }

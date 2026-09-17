@@ -6,9 +6,10 @@ match_behavior:
   # and rETL sources (V-E1) nor from two different rETL sources (V-R1), the
   # destination must accept warehouse sources (V-C4) and carry the config that
   # source type needs to connect (V-C5) plus an entry for it in a settings block
-  # (V-C8), and the mappings, sync behaviour and source capabilities must match
-  # the flow the destination runs (V-R2, V-R4, V-R5, V-R9b, V-R10, V-R11, V-R13,
-  # V-R14). Known limitation: these checks see only project-managed connections;
+  # (V-C8), the mappings and sync behaviour must match the flow the destination
+  # runs (V-R2, V-R4, V-R5, V-R9b, V-R10), and the source's warehouse must support
+  # the connection whatever state the destination is in (V-R11, V-R13, V-R14).
+  # Known limitation: these checks see only project-managed connections;
   # a connection that exists remotely but is not in the project is invisible at
   # validate time.
   - applies_to:
