@@ -157,10 +157,11 @@ jobs:
           # backstop for one that forgets and a way to flip it without a code change.
           # The variable does not exist yet; unset, this resolves to empty.
           RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: ${{ vars.RUDDERSTACK_X_UNVERIFIED_DESTINATIONS }}
-          # Gates TestDestinationsApply, which opens by destroying every resource in
-          # the workspace RUDDERSTACK_ACCESS_TOKEN points at. Set the repository
-          # variable to 1 only while that workspace is disposable.
-          RUN_DESTINATION_E2E: ${{ vars.RUN_DESTINATION_E2E }}
+          # RUN_DESTINATION_E2E is deliberately not passed: TestDestinationsApply
+          # makes ~225 destination writes, each posting to the production outbox, so
+          # it runs once a day in destination-e2e-nightly.yml instead of on every
+          # commit.
+          #
           # Gates TestConnectionsApply, which opens with the same workspace-wide
           # destroy. Same rule: set the repository variable to 1 only while that
           # workspace is disposable.
