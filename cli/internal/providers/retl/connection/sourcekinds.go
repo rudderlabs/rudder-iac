@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -31,12 +32,16 @@ var SourceKinds = []SourceKind{
 // The graph data every rETL source handler publishes about its source,
 // whatever its kind, so connection validation can read a source's warehouse,
 // primary key and enabled flag without knowing which kind it is. Aliased to
-// the SQL model handler's keys rather than restated, so renaming one there
+// the shared source vocabulary rather than restated, so renaming one there
 // breaks the build instead of a test.
+//
+// These aliased the sqlmodel handler's keys until the sourcekeys package existed;
+// pointing them at the vocabulary itself means a connection no longer depends
+// on a source kind to describe a source.
 const (
-	SourceDefinitionKey = sqlmodel.SourceDefinitionKey
-	SourcePrimaryKeyKey = sqlmodel.PrimaryKeyKey
-	SourceEnabledKey    = sqlmodel.EnabledKey
+	SourceDefinitionKey = sourcekeys.SourceDefinitionKey
+	SourcePrimaryKeyKey = sourcekeys.PrimaryKeyKey
+	SourceEnabledKey    = sourcekeys.EnabledKey
 )
 
 func SourceKindByKind(kind string) (SourceKind, bool) {

@@ -1,10 +1,13 @@
 package sqlmodel
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-type SourceDefinition string
+// SourceDefinition aliases sourcekeys.Definition so existing signatures keep
+// working; new kinds should use sourcekeys.Definition directly.
+type SourceDefinition = sourcekeys.Definition
 
 // ResourceType is the type identifier for SQL Model resources
 const (
@@ -13,39 +16,44 @@ const (
 	MetadataName = "retl-source-sql-model"
 	ImportPath   = "sql-models"
 
-	LocalIDKey          = "local_id"
-	DisplayNameKey      = "display_name"
-	DescriptionKey      = "description"
-	AccountIDKey        = "account_id"
-	PrimaryKeyKey       = "primary_key"
-	SourceDefinitionKey = "source_definition"
-	EnabledKey          = "enabled"
-	SQLKey              = "sql"
-	FileKey             = "file"
-	IDKey               = "id"
-	SourceTypeKey       = "source_type"
-	CreatedAtKey        = "createdAt"
-	UpdatedAtKey        = "updatedAt"
+	// SQL-model's own payload keys. Everything else a source carries is
+	// shared vocabulary and lives in the sourcekeys package.
+	DescriptionKey = "description"
+	SQLKey         = "sql"
+	FileKey        = "file"
 
-	SourceDefinitionPostgres   SourceDefinition = "postgres"
-	SourceDefinitionRedshift   SourceDefinition = "redshift"
-	SourceDefinitionSnowflake  SourceDefinition = "snowflake"
-	SourceDefinitionBigQuery   SourceDefinition = "bigquery"
-	SourceDefinitionMySQL      SourceDefinition = "mysql"
-	SourceDefinitionDatabricks SourceDefinition = "databricks"
-	SourceDefinitionTrino      SourceDefinition = "trino"
+	// Aliases for the shared keys, kept so the references already spread
+	// through this package and its tests keep compiling. New code should
+	// read them from the sourcekeys package.
+	LocalIDKey          = sourcekeys.LocalIDKey
+	DisplayNameKey      = sourcekeys.DisplayNameKey
+	AccountIDKey        = sourcekeys.AccountIDKey
+	PrimaryKeyKey       = sourcekeys.PrimaryKeyKey
+	SourceDefinitionKey = sourcekeys.SourceDefinitionKey
+	EnabledKey          = sourcekeys.EnabledKey
+	IDKey               = sourcekeys.IDKey
+	SourceTypeKey       = sourcekeys.SourceTypeKey
+	CreatedAtKey        = sourcekeys.CreatedAtKey
+	UpdatedAtKey        = sourcekeys.UpdatedAtKey
+
+	SourceDefinitionPostgres   = sourcekeys.DefinitionPostgres
+	SourceDefinitionRedshift   = sourcekeys.DefinitionRedshift
+	SourceDefinitionSnowflake  = sourcekeys.DefinitionSnowflake
+	SourceDefinitionBigQuery   = sourcekeys.DefinitionBigQuery
+	SourceDefinitionMySQL      = sourcekeys.DefinitionMySQL
+	SourceDefinitionDatabricks = sourcekeys.DefinitionDatabricks
+	SourceDefinitionTrino      = sourcekeys.DefinitionTrino
 )
 
-// validSourceDefinitions contains all valid source definition values
-var validSourceDefinitions = map[SourceDefinition]bool{
-	SourceDefinitionPostgres:   true,
-	SourceDefinitionRedshift:   true,
-	SourceDefinitionSnowflake:  true,
-	SourceDefinitionBigQuery:   true,
-	SourceDefinitionMySQL:      true,
-	SourceDefinitionDatabricks: true,
-	SourceDefinitionTrino:      true,
-}
+// validSourceDefinitions contains all valid source definition values. SQL
+// models run a query, so they accept the warehouse definitions and not s3.
+var validSourceDefinitions = func() map[SourceDefinition]bool {
+	m := make(map[SourceDefinition]bool, len(sourcekeys.WarehouseDefinitions))
+	for _, d := range sourcekeys.WarehouseDefinitions {
+		m[d] = true
+	}
+	return m
+}()
 
 type ImportResourceInfo struct {
 	WorkspaceId string
