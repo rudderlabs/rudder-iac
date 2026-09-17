@@ -46,7 +46,7 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 		localJSON = r
 	}
 
-	localJSON, err = dropUnselectedMembers(localJSON, api, props)
+	localJSON, err = applySelectors(localJSON, api, props)
 	if err != nil {
 		return nil, err
 	}
@@ -54,11 +54,14 @@ func APIToLocal(props []ConfigProperty, api map[string]any) (map[string]any, err
 	return unmarshalConfigMap(localJSON)
 }
 
-// dropUnselectedMembers removes, for each exclusive group, every member the API
-// discriminator does not point at — including all of them when it names none.
-// See Discriminator for why. It runs after the whole pipeline so it does not
-// depend on where the group's properties sit in the list.
-func dropUnselectedMembers(localJSON string, apiConfig map[string]any, props []ConfigProperty) (string, error) {
+// applySelectors makes each selector's local keys agree with the API
+// discriminator: keys it does not point at are removed, and the key it does
+// point at is materialized when the API carried no value for it — naming a list
+// while storing none means that list is in force and empty. See Discriminator.
+//
+// It runs after the whole pipeline so it does not depend on where the
+// selector's properties sit in the list.
+func applySelectors(localJSON string, apiConfig map[string]any, props []ConfigProperty) (string, error) {
 	for _, p := range props {
 		if p.Selector == nil {
 			continue
@@ -94,6 +97,17 @@ func dropUnselectedMembers(localJSON string, apiConfig map[string]any, props []C
 				localJSON = pruned
 			}
 		}
+
+		// Every selector in use governs lists, so an in-force key the API left
+		// out is an empty one.
+		if selected == "" || gjson.Get(localJSON, selected).Exists() {
+			continue
+		}
+		materialized, err := sjson.SetRaw(localJSON, selected, "[]")
+		if err != nil {
+			return localJSON, fmt.Errorf("materializing selected config key %q: %w", selected, err)
+		}
+		localJSON = materialized
 	}
 
 	return localJSON, nil
