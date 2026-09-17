@@ -474,6 +474,24 @@ func TestConnectionSpecSyntaxValid_StrictShape(t *testing.T) {
 			}},
 		},
 		{
+			name: "a fractional number for an integer field",
+			mutate: func(raw map[string]any) {
+				rawConfig(raw)["schedule"] = map[string]any{"type": "basic", "every_minutes": 7.5}
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/schedule/every_minutes",
+				Message:   "'every_minutes' is not valid: expected an integer, got 7.5",
+			}},
+		},
+		{
+			// The rule engine's JSON round-trip hands every YAML number over as a float64.
+			name: "a whole number decoded as a float",
+			mutate: func(raw map[string]any) {
+				rawConfig(raw)["schedule"] = map[string]any{"type": "basic", "every_minutes": 30.0}
+			},
+			expected: []rules.ValidationResult{},
+		},
+		{
 			name:   "a list field given a scalar",
 			mutate: func(raw map[string]any) { rawConfig(raw)["mappings"] = "email" },
 			expected: []rules.ValidationResult{{

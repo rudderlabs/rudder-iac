@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -37,7 +38,11 @@ func validateRawConnectionsSpec(
 		md   mapstructure.Metadata
 	)
 
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{Result: &spec, Metadata: &md})
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &spec,
+		Metadata:   &md,
+		DecodeHook: mapstructure.DecodeHookFuncKind(rejectFractionalInts),
+	})
 	if err != nil {
 		return []rules.ValidationResult{{Message: fmt.Sprintf("creating spec decoder: %v", err)}}
 	}
@@ -50,6 +55,18 @@ func validateRawConnectionsSpec(
 	}
 
 	return append(unknownFieldResults(md.Unused), validateConnectionsSpec(spec)...)
+}
+
+// rejectFractionalInts refuses a fractional number for an int field, which
+// mapstructure would otherwise truncate without a word.
+func rejectFractionalInts(from, to reflect.Kind, data any) (any, error) {
+	if from != reflect.Float64 || to != reflect.Int {
+		return data, nil
+	}
+	if f := data.(float64); f != math.Trunc(f) {
+		return nil, fmt.Errorf("expected an integer, got %v", f)
+	}
+	return data, nil
 }
 
 // mapstructurePathIndex matches the "[0]" element suffixes mapstructure writes
