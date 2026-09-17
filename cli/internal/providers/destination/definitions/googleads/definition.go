@@ -136,6 +136,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "GOOGLEADS",
 		Version:    1,
 		Properties: properties,
+		SecretKeys: []string{"conversion_id"},
 		NewConfig: func() any {
 			return &googleAdsConfig{}
 		},

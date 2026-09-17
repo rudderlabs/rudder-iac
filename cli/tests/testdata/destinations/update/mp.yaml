@@ -13,7 +13,7 @@ spec:
     data_residency: eu
     identity_merge_api: original
     user_deletion_api: engage
-    service_account_user_name: rudderCliE2eServiceUserUpdated
+    service_account_user_name: "{{ .MP_SERVICE_ACCOUNT_USER_NAME_UPDATED }}"
     service_account_secret: "{{ .MP_SERVICE_ACCOUNT_SECRET }}"
     project_id: rudderCliE2eProjectUpdated
     strict_mode: false

@@ -239,7 +239,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ITERABLE",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"register_device_or_browser_api_key"},
+		SecretKeys: []string{"register_device_or_browser_api_key", "api_key"},
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "iterable_package_name_required", Func: packageNameConditional},
 		},

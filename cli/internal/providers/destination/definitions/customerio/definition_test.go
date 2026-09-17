@@ -29,7 +29,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "customerio", registered.Type)
 	assert.Equal(t, "CUSTOMERIO", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"api_key", "site_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -435,7 +435,9 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 
 	resource := extracted["customerio-production"]
 	require.NotNil(t, resource)
-	assert.Equal(t, "site-id-1", resource.Config["site_id"])
+	siteID, ok := resource.Config["site_id"].(*secret.String)
+	require.True(t, ok, "site_id must be wrapped as a secret")
+	assert.Equal(t, "site-id-1", siteID.Reveal())
 
 	wrapped, ok := resource.Config["api_key"].(*secret.String)
 	require.True(t, ok, "api_key must be wrapped as a secret")
@@ -459,7 +461,10 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, remoteKey.IsUnknown(),
 		"a returned value wrapped as a secret reads back unknown, so every plan re-applies it")
-	assert.Equal(t, "site-id-1", remoteResource.Config["site_id"])
+	remoteSiteID, ok := remoteResource.Config["site_id"].(*secret.String)
+	require.True(t, ok)
+	assert.True(t, remoteSiteID.IsUnknown(),
+		"the API returns siteID, but marking it secret makes it read back unknown — so it re-applies on every plan")
 
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
 		"customerio-production": {Destination: &client.Destination{
@@ -479,7 +484,7 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	config, ok := spec.Spec["config"].(map[string]any)
 	require.True(t, ok)
 	assert.NotEqual(t, "customerio-api-key", config["api_key"], "export must not leak the raw key")
-	assert.Equal(t, "site-id-1", config["site_id"])
+	assert.NotEqual(t, "site-id-1", config["site_id"], "export must not leak the raw site id")
 }
 
 func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinition {

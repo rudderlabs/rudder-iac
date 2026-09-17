@@ -92,7 +92,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "HS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "hub_id"},
 		NewConfig: func() any {
 			return &hsConfig{}
 		},

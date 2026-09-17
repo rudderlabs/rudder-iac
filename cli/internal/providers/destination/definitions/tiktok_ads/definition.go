@@ -87,7 +87,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "TIKTOK_ADS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "pixel_code"},
 		NewConfig: func() any {
 			return &tiktokAdsConfig{}
 		},

@@ -76,7 +76,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ACTIVE_CAMPAIGN",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_key", "event_key"},
+		SecretKeys: []string{"actid", "api_key", "event_key"},
 		NewConfig: func() any {
 			return &activeCampaignConfig{}
 		},

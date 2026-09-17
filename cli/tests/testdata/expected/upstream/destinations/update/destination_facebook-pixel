@@ -23,7 +23,7 @@
     "eventsToEvents": [
       {
         "from": "Order Completed",
-        "to": "Lead"
+        "to": "rudderCliE2eLegacyPixelIdUpdated"
       }
     ],
     "blacklistPiiProperties": [

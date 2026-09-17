@@ -23,7 +23,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "tiktok_ads", registered.Type)
 	assert.Equal(t, "TIKTOK_ADS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "pixel_code"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

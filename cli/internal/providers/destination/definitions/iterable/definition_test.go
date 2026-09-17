@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "iterable", registered.Type)
 	assert.Equal(t, "ITERABLE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"register_device_or_browser_api_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"register_device_or_browser_api_key", "api_key"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

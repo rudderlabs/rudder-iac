@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    conversion_id: AW-987654321
+    conversion_id: "{{ .GOOGLEADS_CONVERSION_ID_UPDATED }}"
     v2: false
     allow_identify: true
     sdk_base_url: cdn-updated.rudder-cli-e2e.com/gtag

@@ -13,14 +13,14 @@ spec:
     host: rudder-cli-e2e-ssh.redshift.amazonaws.com
     port: "5439"
     database: analytics
-    user: rudder
+    user: "{{ .RS_SSH_DB_USER }}"
     password: "{{ .RS_PASSWORD }}"
     namespace: rudder_events_ssh
     use_ssh: true
     ssh:
       host: bastion.rudder-cli-e2e.internal
       port: "22"
-      user: rudder-updated
+      user: "{{ .RS_SSH_USER_UPDATED }}"
       public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABrudderE2E
     sync_frequency: "360"
     use_rudder_storage: true

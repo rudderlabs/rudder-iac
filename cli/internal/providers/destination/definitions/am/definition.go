@@ -392,7 +392,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "AM",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_secret"},
+		SecretKeys: []string{"api_secret", "api_key"},
 		NewConfig: func() any {
 			return &amplitudeConfig{}
 		},

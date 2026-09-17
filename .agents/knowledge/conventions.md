@@ -103,7 +103,7 @@
 <!-- ticket:DEX-520 -->
 - S3 Datalake should keep the broad warehouse/datalake-style source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud-only connection mode.
 - S3 Datalake sync settings are flat local YAML keys `sync_frequency` and `sync_start_at` mapped directly to API keys `syncFrequency` and `syncStartAt`; do not mirror Terraform's nested local `sync` block for this CLI definition.
-- S3 Datalake should keep optional local secret key `password` in `SecretKeys` and map it directly to API `password` because db-config lists it as secret-only metadata even though schema/default config/Terraform do not expose it.
+- S3 Datalake does not model `password`. It was carried only because db-config listed it as secret-only metadata; the revision-2 secrecy policy drops it, and schema/default config/Terraform never exposed it, so there is no local key, no property mapping, and no `SecretKeys` entry.
 - S3 Datalake validation should use schema/db-config as the boundary for enums and named patterns: sync frequency accepts `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, and `1440` rather than Terraform's narrower validator.
 
 ## DEX-690 — Redshift Validation And Sources

@@ -162,7 +162,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		// (terraform does not model it at all). The cost is accepted: the API
 		// returns both, so each reads back as an unknown secret and re-applies on
 		// every plan — the same trade recorded for customerio and posthog.
-		SecretKeys: []string{"token", "gdpr_api_token", "service_account_secret"},
+		SecretKeys: []string{
+			"token",
+			"gdpr_api_token",
+			"service_account_secret",
+			"service_account_user_name",
+		},
 		NewConfig: func() any {
 			return &mpConfig{}
 		},

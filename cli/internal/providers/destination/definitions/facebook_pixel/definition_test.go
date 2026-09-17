@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "facebook_pixel", registered.Type)
 	assert.Equal(t, "FACEBOOK_PIXEL", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "legacy_conversion_pixel_id.to", "pixel_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",

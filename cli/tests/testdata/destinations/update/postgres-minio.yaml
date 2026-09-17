@@ -11,7 +11,7 @@ spec:
   config:
     host: postgres-minio.rudder-cli-e2e.internal
     database: analytics
-    user: rudder
+    user: "{{ .POSTGRES_MINIO_USER }}"
     password: "{{ .POSTGRES_PASSWORD }}"
     port: "5432"
     namespace: rudder_e2e_minio_updated

@@ -352,6 +352,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"azure.account_key",
 			"azure.sas_token",
 			"gcp.credentials",
+			"user",
 		},
 		NewConfig: func() any {
 			return &snowflakeConfig{}

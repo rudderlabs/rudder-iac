@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    api_key: rudderCliE2eApiKey
+    api_key: "{{ .ITERABLE_API_KEY }}"
     data_center: USDC
     package_name: com.rudderstack.e2e
     prefer_user_id: false

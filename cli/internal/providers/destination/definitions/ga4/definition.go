@@ -189,7 +189,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "GA4",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_secret"},
+		SecretKeys: []string{"api_secret", "measurement_id"},
 		NewConfig: func() any {
 			return &ga4Config{}
 		},
