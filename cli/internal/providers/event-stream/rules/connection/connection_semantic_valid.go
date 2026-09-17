@@ -66,7 +66,11 @@ func validateConnectionsSemantic(
 
 		results = append(results, validateEndpointsExist(index, endpoints)...)
 		if endpoints.sourceRefOK && endpoints.destinationRefOK {
-			results = append(results, validatePairUniqueness(edges, index, endpoints)...)
+			pair := ConnectionEdge{
+				SourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
+				DestinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
+			}
+			results = append(results, ValidatePairUniqueness(edges, pair, connectionRef(index))...)
 		}
 		// Sharing a destination is only meaningful for a destination that
 		// exists; a dangling ref already carries the V-C1 error above.
@@ -173,16 +177,12 @@ func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.Va
 	return results
 }
 
-// validatePairUniqueness (V-C3): the same source–destination pair can only be
-// connected once in the project. The count runs over every project
-// connection, so duplicates are flagged whether they sit in this spec or in
-// another one.
-func validatePairUniqueness(edges []ConnectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
-	pair := ConnectionEdge{
-		SourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
-		DestinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
-	}
-
+// ValidatePairUniqueness (V-C3): the same source–destination pair can only be
+// connected once in the project. The count runs over every project connection
+// of either family, so duplicates are flagged whether they sit in this spec or
+// in another one. Shared with the rETL connection rules so both families word
+// the failure identically; reference is where the caller reports it.
+func ValidatePairUniqueness(edges []ConnectionEdge, pair ConnectionEdge, reference string) []rules.ValidationResult {
 	count := 0
 	for _, e := range edges {
 		if e == pair {
@@ -193,11 +193,13 @@ func validatePairUniqueness(edges []ConnectionEdge, index int, endpoints connect
 		return nil
 	}
 
+	_, sourceID, _ := strings.Cut(pair.SourceURN, ":")
+	_, destinationID, _ := strings.Cut(pair.DestinationURN, ":")
 	return []rules.ValidationResult{{
-		Reference: connectionRef(index),
+		Reference: reference,
 		Message: fmt.Sprintf(
 			"source '%s' and destination '%s' are connected more than once in the project; a source-destination pair can only be connected once",
-			endpoints.sourceID, endpoints.destinationID,
+			sourceID, destinationID,
 		),
 	}}
 }
@@ -276,37 +278,50 @@ func validateSourceTypeCompatibility(
 		}}
 	}
 
+	return ValidateDestinationConfig(registered, destinationRef(index), endpoints.destinationID, token, destinationData.Config)
+}
+
+// ValidateDestinationConfig runs the two destination config checks connecting a
+// source of sourceType depends on: the fields the definition requires for it
+// (V-C5) and an entry for it in a settings block (V-C8). Shared with the rETL
+// connection rules so both families demand the same config and word the
+// failures identically; reference is where the caller reports them.
+func ValidateDestinationConfig(
+	registered *definitions.RegisteredDefinition,
+	reference string,
+	destinationID string,
+	sourceType string,
+	config map[string]any,
+) []rules.ValidationResult {
 	var results []rules.ValidationResult
-	if missing := MissingRequiredConfigKeys(registered, token, destinationData.Config); len(missing) > 0 {
+	if missing := missingRequiredConfigKeys(registered, sourceType, config); len(missing) > 0 {
 		results = append(results, rules.ValidationResult{
-			Reference: destinationRef(index),
+			Reference: reference,
 			Message: fmt.Sprintf(
 				"destination '%s' config is missing fields required to connect a '%s' source: %s",
-				endpoints.destinationID, token, strings.Join(missing, ", "),
+				destinationID, sourceType, strings.Join(missing, ", "),
 			),
 		})
 	}
-	if candidates := SettingsBlocksMissingSourceType(registered, token, destinationData.Config); len(candidates) > 0 {
+	if candidates := settingsBlocksMissingSourceType(registered, sourceType, config); len(candidates) > 0 {
 		results = append(results, rules.ValidationResult{
-			Reference: destinationRef(index),
+			Reference: reference,
 			Message: fmt.Sprintf(
 				"destination '%s' config has no '%s' entry for source type '%s'",
-				endpoints.destinationID, strings.Join(candidates, "' or '"), token,
+				destinationID, strings.Join(candidates, "' or '"), sourceType,
 			),
 		})
 	}
 	return results
 }
 
-// SettingsBlocksMissingSourceType (V-C8): a destination declares its per-source
+// settingsBlocksMissingSourceType (V-C8): a destination declares its per-source
 // settings in blocks keyed by source type — connection_mode and
 // use_native_sdk — so connecting a source needs an entry for its type in at
 // least one of them. It returns the blocks that could hold the entry but do
 // not, so the caller's error names only the ones the author can actually write
-// to; a nil result means there is nothing to report. Shared with the rETL
-// connection rules so both families demand the same entries and word the
-// failure identically.
-func SettingsBlocksMissingSourceType(
+// to; a nil result means there is nothing to report.
+func settingsBlocksMissingSourceType(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
 	config map[string]any,
@@ -350,11 +365,9 @@ func SettingsBlocksMissingSourceType(
 	return candidates
 }
 
-// MissingRequiredConfigKeys (V-C5) returns the definition-required config keys
+// missingRequiredConfigKeys (V-C5) returns the definition-required config keys
 // for the given source type that the destination's config does not carry.
-// Shared with the rETL connection rules, which run it for the warehouse source
-// type.
-func MissingRequiredConfigKeys(
+func missingRequiredConfigKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
 	config map[string]any,

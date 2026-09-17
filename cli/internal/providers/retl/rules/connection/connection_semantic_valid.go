@@ -80,7 +80,8 @@ func validateConnectionsSemantic(
 			continue
 		}
 
-		results = append(results, validatePairUniqueness(edges, index, endpoints)...)
+		pair := esRules.ConnectionEdge{SourceURN: endpoints.sourceURN, DestinationURN: endpoints.destinationURN}
+		results = append(results, esRules.ValidatePairUniqueness(edges, pair, connectionRef(index))...)
 		results = append(results, validateDestinationSources(edges, index, endpoints)...)
 		results = append(results, validateCompatibility(registry, index, endpoints, c.Config)...)
 	}
@@ -195,32 +196,6 @@ func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.Va
 	return results
 }
 
-// validatePairUniqueness (V-C3): the same source–destination pair can only be
-// connected once in the project. The count runs over every project connection
-// of either family, so duplicates are flagged whether they sit in this spec or
-// in another one.
-func validatePairUniqueness(edges []esRules.ConnectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
-	pair := esRules.ConnectionEdge{
-		SourceURN:      endpoints.sourceURN,
-		DestinationURN: endpoints.destinationURN,
-	}
-
-	count := 0
-	for _, e := range edges {
-		if e == pair {
-			count++
-		}
-	}
-	if count <= 1 {
-		return nil
-	}
-
-	return []rules.ValidationResult{result(connectionRef(index), fmt.Sprintf(
-		"source '%s' and destination '%s' are connected more than once in the project; a source-destination pair can only be connected once",
-		endpoints.sourceID, endpoints.destinationID,
-	))}
-}
-
 // validateDestinationSources enforces the two rules about who else may feed a
 // destination: an event stream source may not share it (V-E1), and neither may
 // a second rETL source (V-R1). Both are enforced in the webapp only, so the CLI
@@ -324,10 +299,8 @@ func validateCompatibility(
 }
 
 // validateDestinationConfig runs the destination-side config checks for a
-// warehouse source: the fields the definition requires to connect one (V-C5)
-// and the per-source settings block that has to name it (V-C8), both shared
-// with the event stream rules. It also carries the object-mapping restriction
-// on hyphenated destination names (V-R10).
+// warehouse source that the event stream rules share (V-C5, V-C8), plus the
+// object-mapping restriction on hyphenated destination names (V-R10).
 func validateDestinationConfig(
 	registered *definitions.RegisteredDefinition,
 	index int,
@@ -335,21 +308,9 @@ func validateDestinationConfig(
 	config map[string]any,
 	flow retlConnection.Flow,
 ) []rules.ValidationResult {
-	var results []rules.ValidationResult
-
-	if missing := esRules.MissingRequiredConfigKeys(registered, common.SourceTypeWarehouse, config); len(missing) > 0 {
-		results = append(results, result(destinationRef(index), fmt.Sprintf(
-			"destination '%s' config is missing fields required to connect a '%s' source: %s",
-			endpoints.destinationID, common.SourceTypeWarehouse, strings.Join(missing, ", "),
-		)))
-	}
-
-	if candidates := esRules.SettingsBlocksMissingSourceType(registered, common.SourceTypeWarehouse, config); len(candidates) > 0 {
-		results = append(results, result(destinationRef(index), fmt.Sprintf(
-			"destination '%s' config has no '%s' entry for source type '%s'",
-			endpoints.destinationID, strings.Join(candidates, "' or '"), common.SourceTypeWarehouse,
-		)))
-	}
+	results := esRules.ValidateDestinationConfig(
+		registered, destinationRef(index), endpoints.destinationID, common.SourceTypeWarehouse, config,
+	)
 
 	// The object mapping response mapper splits the destination name on "-", so
 	// a hyphenated name cannot be put back together; the backend refuses the
