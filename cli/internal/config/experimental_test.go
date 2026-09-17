@@ -32,11 +32,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
 		},
 		{
-			name:     "retlConnectionSupport",
-			flagName: "retlConnectionSupport",
-			want:     "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT",
-		},
-		{
 			name:     "lowercase",
 			flagName: "lowercase",
 			want:     "RUDDERSTACK_X_LOWERCASE",

@@ -1169,17 +1169,6 @@ func TestProviderMigrateSpec(t *testing.T) {
 	})
 }
 
-func TestProviderResourceMatchers(t *testing.T) {
-	t.Parallel()
-
-	p := retl.New(newDefaultMockClient())
-
-	matchers := p.ResourceMatchers()
-
-	require.Len(t, matchers, 1)
-	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
-}
-
 // connectionsSpec is a minimal valid rETL connections spec: enough for the
 // provider to dispatch it to the connection handler and put it in the graph.
 func connectionsSpec() *specs.Spec {

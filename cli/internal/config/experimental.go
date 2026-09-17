@@ -25,6 +25,11 @@ type ExperimentalConfig struct {
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
 	// RetlConnectionSupport enables the rETL connection kind in the rETL
 	// provider: its spec kind, resource type, lifecycle and import matcher.
+	//
+	// Turning it on also puts retl-connections@rudder/v1 in scope for rule-doc
+	// generation, where no authored fragment covers it yet, so `make
+	// gen-rule-docs` and TestGenerateRuleCatalog_CompleteAndDriftFree fail until
+	// DEX-829 lands the fragments. CLI validation is unaffected either way.
 	RetlConnectionSupport bool `mapstructure:"retlConnectionSupport"`
 }
 

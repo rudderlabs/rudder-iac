@@ -34,7 +34,8 @@ type Provider struct {
 	client     retlClient.RETLStore
 	handlers   map[string]resourceHandler
 	kindToType map[string]string
-	// destinationRegistry is nil unless WithConnectionSupport was applied; the connection semantic rules read it.
+	// destinationRegistry is parked for DEX-829's connection semantic rules;
+	// nothing reads it yet. It is nil unless WithConnectionSupport was applied.
 	destinationRegistry *definitions.Registry
 }
 
@@ -44,11 +45,14 @@ const importDir = "retl"
 type Option func(*Provider)
 
 // WithConnectionSupport registers the rETL connection kind and its handler.
-// The app applies it only while the retlConnectionSupport experimental flag is
-// effective, so without it the provider keeps exactly the SQL-model surface it
-// had.
+//
+// A nil registry is replaced with an empty one: registry.Get indexes a map on
+// its receiver, so nil constructs fine and only panics later, mid remote load.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
+		if registry == nil {
+			registry = definitions.NewRegistry()
+		}
 		p.destinationRegistry = registry
 		p.kindToType[connection.ResourceKind] = connection.ResourceType
 		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)

@@ -40,8 +40,10 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 
 // The recording server stands in for the backend so the remote load is
 // observable without credentials. The flags travel through the environment
-// rather than viper.Set so InitConfig resolves them the way the CLI does and
-// t.Setenv unwinds them, leaving no override behind for later tests.
+// rather than viper.Set so InitConfig resolves them the way the CLI does, and
+// t.Setenv unwinds them afterwards. Only the environment unwinds: InitConfig
+// mutates process-global viper, so the package is left holding whatever the
+// last subtest resolved. Later tests that read config must re-init.
 func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
 	cases := []struct {
 		name      string
