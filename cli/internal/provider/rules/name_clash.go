@@ -12,23 +12,29 @@ import (
 // included, so a name clashes when it appears twice exactly, or once alongside
 // a different spelling of itself.
 //
-// Names are folded with strings.EqualFold rather than strings.ToLower: the
-// control planes that reject these clashes compare with JavaScript's
-// toLowerCase, whose full case mapping EqualFold matches and Go's simple
-// per-rune mapping does not. "İstanbul" folds to "istanbul" under ToLower,
-// dropping the combining dot, and so would clash with a literal "istanbul"
-// that the control plane accepts.
+// Names are folded with strings.ToLower, not strings.EqualFold, to mirror the
+// server check this anticipates: config-backend's assertSourceNameAvailable
+// compares with Postgres `LOWER(name) = LOWER(:name)`, whose per-character
+// mapping is the one ToLower implements. The two disagree on characters with a
+// multi-character lower-casing — ToLower folds "İstanbul" to "istanbul" and
+// EqualFold does not — and folding more narrowly than the server would accept a
+// pair at validate that apply then rejects, which is the split this rule
+// exists to close.
+//
+// Names are not trimmed, because stored names were never normalized
+// server-side and the server check does not trim either.
 //
 // The message reads "duplicate <field> '<name>'", followed by
 // "(case-insensitive match with '<other>')" when no other name matches
 // exactly. Callers say why the clash matters for their resource.
 func NameClashMessage(field, name string, names []string) string {
 	var (
+		key     = strings.ToLower(name)
 		exact   int
 		variant string
 	)
 	for _, n := range names {
-		if !strings.EqualFold(n, name) {
+		if strings.ToLower(n) != key {
 			continue
 		}
 		if n == name {

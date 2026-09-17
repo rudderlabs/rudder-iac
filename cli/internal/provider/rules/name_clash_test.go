@@ -48,12 +48,15 @@ func TestNameClashMessage(t *testing.T) {
 			want:  "duplicate display_name 'Orders'",
 		},
 		{
-			// Full case mapping, as the control plane's toLowerCase does it:
-			// "İstanbul" is not a clash with "istanbul". Go's strings.ToLower
-			// folds it to exactly "istanbul" and would report one.
-			name:  "dotted capital I is not a clash with plain i",
+			// Folded the way Postgres LOWER() folds, which is what the server
+			// check uses: LOWER('İstanbul') drops the combining dot to exactly
+			// 'istanbul', so the server rejects this pair and so do we.
+			// strings.EqualFold would not report it, and validate would then
+			// pass something apply fails.
+			name:  "dotted capital I clashes with plain i, as LOWER() has it",
 			spec:  "istanbul",
 			names: []string{"istanbul", "İstanbul"},
+			want:  "duplicate display_name 'istanbul' (case-insensitive match with 'İstanbul')",
 		},
 	}
 
