@@ -8,6 +8,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -23,8 +24,8 @@ func scopeWith(rs ...*resources.Resource) importmatcher.Scope {
 
 func localSource(id, resourceType, displayName, accountID string) *resources.Resource {
 	return resources.NewResource(id, resourceType, resources.ResourceData{
-		sqlmodel.DisplayNameKey: displayName,
-		sqlmodel.AccountIDKey:   accountID,
+		sourcekeys.DisplayNameKey: displayName,
+		sourcekeys.AccountIDKey:   accountID,
 	}, []string{})
 }
 

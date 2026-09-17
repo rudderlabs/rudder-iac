@@ -11,7 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -51,7 +51,7 @@ func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 // ParseSpec leaves LegacyResourceType empty: retl-source-table is v1-only, so
 // import metadata must use urn rather than the legacy local_id.
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
-	id, ok := s.Spec[sqlmodel.IDKey].(string)
+	id, ok := s.Spec[sourcekeys.IDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("id not found in table source spec")
 	}
@@ -118,7 +118,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	result := make([]*resources.Resource, 0, len(h.resources))
 	for _, t := range h.resources {
 		data := t.data()
-		data[sqlmodel.LocalIDKey] = t.ID
+		data[sourcekeys.LocalIDKey] = t.ID
 
 		var opts []resources.ResourceOpts
 		if info, ok := h.importMetadata[resources.URN(t.ID, ResourceType)]; ok {
@@ -150,14 +150,14 @@ func (h *Handler) Create(ctx context.Context, ID string, data resources.Resource
 // request has no field for it, so the API would keep the old value and report
 // success.
 func (h *Handler) Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error) {
-	sourceID, ok := state[sqlmodel.IDKey].(string)
+	sourceID, ok := state[sourcekeys.IDKey].(string)
 	if !ok || sourceID == "" {
-		return nil, fmt.Errorf("missing %s in resource state", sqlmodel.IDKey)
+		return nil, fmt.Errorf("missing %s in resource state", sourcekeys.IDKey)
 	}
 
 	var (
 		desired    = fromData(data)
-		current, _ = state[sqlmodel.SourceDefinitionKey].(string)
+		current, _ = state[sourcekeys.SourceDefinitionKey].(string)
 	)
 	if desired.SourceDefinition != current {
 		return nil, fmt.Errorf("updating table source %s: source_definition cannot be changed from %q to %q", ID, current, desired.SourceDefinition)
@@ -179,9 +179,9 @@ func (h *Handler) update(ctx context.Context, sourceID string, t TableSpec) (*re
 }
 
 func (h *Handler) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
-	sourceID, ok := state[sqlmodel.IDKey].(string)
+	sourceID, ok := state[sourcekeys.IDKey].(string)
 	if !ok || sourceID == "" {
-		return fmt.Errorf("missing %s in resource state", sqlmodel.IDKey)
+		return fmt.Errorf("missing %s in resource state", sourcekeys.IDKey)
 	}
 	if err := h.client.DeleteRetlSource(ctx, sourceID); err != nil {
 		return fmt.Errorf("deleting RETL source: %w", err)
@@ -202,13 +202,13 @@ func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.Re
 			return nil, err
 		}
 		result = append(result, resources.ResourceData{
-			sqlmodel.IDKey:               source.ID,
-			"name":                       source.Name,
-			sqlmodel.AccountIDKey:        source.AccountID,
-			sqlmodel.SourceDefinitionKey: source.SourceDefinitionName,
-			sqlmodel.CreatedAtKey:        source.CreatedAt,
-			sqlmodel.UpdatedAtKey:        source.UpdatedAt,
-			"config":                     map[string]any(t.configData()),
+			sourcekeys.IDKey:               source.ID,
+			"name":                         source.Name,
+			sourcekeys.AccountIDKey:        source.AccountID,
+			sourcekeys.SourceDefinitionKey: source.SourceDefinitionName,
+			sourcekeys.CreatedAtKey:        source.CreatedAt,
+			sourcekeys.UpdatedAtKey:        source.UpdatedAt,
+			"config":                       map[string]any(t.configData()),
 		})
 	}
 	return result, nil
@@ -289,7 +289,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		}
 
 		input := remote.data()
-		input[sqlmodel.LocalIDKey] = source.ExternalID
+		input[sourcekeys.LocalIDKey] = source.ExternalID
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     source.ExternalID,

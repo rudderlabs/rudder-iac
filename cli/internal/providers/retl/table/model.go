@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -72,9 +72,9 @@ func (t TableSpec) configData() resources.ResourceData {
 		}
 	}
 	return resources.ResourceData{
-		sqlmodel.PrimaryKeyKey: t.PrimaryKey,
-		SchemaKey:              t.Schema,
-		TableKey:               t.Table,
+		sourcekeys.PrimaryKeyKey: t.PrimaryKey,
+		SchemaKey:                t.Schema,
+		TableKey:                 t.Table,
 	}
 }
 
@@ -83,11 +83,11 @@ func (t TableSpec) configData() resources.ResourceData {
 // for s3 — so a connection reads either RETL source kind through one shape.
 func (t TableSpec) data() resources.ResourceData {
 	data := t.configData()
-	data[sqlmodel.DisplayNameKey] = t.DisplayName
-	data[sqlmodel.AccountIDKey] = t.AccountID
-	data[sqlmodel.SourceDefinitionKey] = t.SourceDefinition
-	data[sqlmodel.PrimaryKeyKey] = t.PrimaryKey
-	data[sqlmodel.EnabledKey] = t.Enabled
+	data[sourcekeys.DisplayNameKey] = t.DisplayName
+	data[sourcekeys.AccountIDKey] = t.AccountID
+	data[sourcekeys.SourceDefinitionKey] = t.SourceDefinition
+	data[sourcekeys.PrimaryKeyKey] = t.PrimaryKey
+	data[sourcekeys.EnabledKey] = t.Enabled
 	return data
 }
 
@@ -99,11 +99,11 @@ func (t TableSpec) specFields(id string) map[string]any {
 	if t.isS3() && t.ObjectPrefix == "" {
 		delete(fields, ObjectPrefixKey)
 	}
-	fields[sqlmodel.IDKey] = id
-	fields[sqlmodel.DisplayNameKey] = t.DisplayName
-	fields[sqlmodel.AccountIDKey] = t.AccountID
-	fields[sqlmodel.SourceDefinitionKey] = t.SourceDefinition
-	fields[sqlmodel.EnabledKey] = t.Enabled
+	fields[sourcekeys.IDKey] = id
+	fields[sourcekeys.DisplayNameKey] = t.DisplayName
+	fields[sourcekeys.AccountIDKey] = t.AccountID
+	fields[sourcekeys.SourceDefinitionKey] = t.SourceDefinition
+	fields[sourcekeys.EnabledKey] = t.Enabled
 	return fields
 }
 
@@ -128,13 +128,13 @@ func fromData(data resources.ResourceData) TableSpec {
 		v, _ := data[key].(string)
 		return v
 	}
-	enabled, _ := data[sqlmodel.EnabledKey].(bool)
+	enabled, _ := data[sourcekeys.EnabledKey].(bool)
 	return TableSpec{
-		ID:               str(sqlmodel.LocalIDKey),
-		DisplayName:      str(sqlmodel.DisplayNameKey),
-		AccountID:        str(sqlmodel.AccountIDKey),
-		SourceDefinition: str(sqlmodel.SourceDefinitionKey),
-		PrimaryKey:       str(sqlmodel.PrimaryKeyKey),
+		ID:               str(sourcekeys.LocalIDKey),
+		DisplayName:      str(sourcekeys.DisplayNameKey),
+		AccountID:        str(sourcekeys.AccountIDKey),
+		SourceDefinition: str(sourcekeys.SourceDefinitionKey),
+		PrimaryKey:       str(sourcekeys.PrimaryKeyKey),
 		Schema:           str(SchemaKey),
 		Table:            str(TableKey),
 		BucketName:       str(BucketNameKey),
@@ -179,13 +179,13 @@ func toOutput(source *retlClient.RETLSource) (*resources.ResourceData, error) {
 		return nil, err
 	}
 	output := t.data()
-	output[sqlmodel.IDKey] = source.ID
-	output[sqlmodel.SourceTypeKey] = source.SourceType
+	output[sourcekeys.IDKey] = source.ID
+	output[sourcekeys.SourceTypeKey] = source.SourceType
 	if source.CreatedAt != nil {
-		output[sqlmodel.CreatedAtKey] = source.CreatedAt
+		output[sourcekeys.CreatedAtKey] = source.CreatedAt
 	}
 	if source.UpdatedAt != nil {
-		output[sqlmodel.UpdatedAtKey] = source.UpdatedAt
+		output[sourcekeys.UpdatedAtKey] = source.UpdatedAt
 	}
 	return &output, nil
 }

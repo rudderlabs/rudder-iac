@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -206,14 +206,14 @@ func TestLoadSpec(t *testing.T) {
 		assert.Equal(t, "users-table", r.ID())
 		assert.Equal(t, table.ResourceType, r.Type())
 		assert.Equal(t, resources.ResourceData{
-			sqlmodel.LocalIDKey:          "users-table",
-			sqlmodel.DisplayNameKey:      "Users",
-			sqlmodel.AccountIDKey:        "acc-123",
-			sqlmodel.SourceDefinitionKey: "postgres",
-			sqlmodel.PrimaryKeyKey:       "id",
-			table.SchemaKey:              "public",
-			table.TableKey:               "users",
-			sqlmodel.EnabledKey:          true,
+			sourcekeys.LocalIDKey:          "users-table",
+			sourcekeys.DisplayNameKey:      "Users",
+			sourcekeys.AccountIDKey:        "acc-123",
+			sourcekeys.SourceDefinitionKey: "postgres",
+			sourcekeys.PrimaryKeyKey:       "id",
+			table.SchemaKey:                "public",
+			table.TableKey:                 "users",
+			sourcekeys.EnabledKey:          true,
 		}, r.Data())
 	})
 
@@ -222,14 +222,14 @@ func TestLoadSpec(t *testing.T) {
 		_, r := loadResource(t, newFakeStore(), withField(s3Spec(), "enabled", false))
 
 		assert.Equal(t, resources.ResourceData{
-			sqlmodel.LocalIDKey:          "events-bucket",
-			sqlmodel.DisplayNameKey:      "Events",
-			sqlmodel.AccountIDKey:        "acc-s3",
-			sqlmodel.SourceDefinitionKey: "s3",
-			sqlmodel.PrimaryKeyKey:       "",
-			table.BucketNameKey:          "events",
-			table.ObjectPrefixKey:        "daily/",
-			sqlmodel.EnabledKey:          false,
+			sourcekeys.LocalIDKey:          "events-bucket",
+			sourcekeys.DisplayNameKey:      "Events",
+			sourcekeys.AccountIDKey:        "acc-s3",
+			sourcekeys.SourceDefinitionKey: "s3",
+			sourcekeys.PrimaryKeyKey:       "",
+			table.BucketNameKey:            "events",
+			table.ObjectPrefixKey:          "daily/",
+			sourcekeys.EnabledKey:          false,
 		}, r.Data())
 	})
 
@@ -376,9 +376,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       warehouseSpec,
 			wantConfig: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Users",
-				Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+				ID:     "src-1",
+				Name:   "Users",
+				Config: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,
@@ -397,9 +397,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       s3Spec,
 			wantConfig: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Events",
-				Config:               retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
+				ID:     "src-1",
+				Name:   "Events",
+				Config: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,
@@ -425,7 +425,7 @@ func TestLifecycle(t *testing.T) {
 			// Create sends a table source carrying the local id as external id.
 			output, err := h.Create(ctx, r.ID(), r.Data())
 			require.NoError(t, err)
-			sourceID := (*output)[sqlmodel.IDKey].(string)
+			sourceID := (*output)[sourcekeys.IDKey].(string)
 			assert.Equal(t, &tc.wantCreated, store.sources[sourceID])
 
 			// Remote state rebuilds exactly the local graph data, so a plan
@@ -437,7 +437,7 @@ func TestLifecycle(t *testing.T) {
 			rs := st.GetResource(r.URN())
 			require.NotNil(t, rs)
 			assert.Equal(t, map[string]any(r.Data()), rs.Input)
-			assert.Equal(t, sourceID, rs.Output[sqlmodel.IDKey])
+			assert.Equal(t, sourceID, rs.Output[sourcekeys.IDKey])
 
 			// Update sends every mutable field.
 			_, changed := loadResource(t, store, tc.change(tc.spec()))
@@ -459,8 +459,8 @@ func TestUpdate(t *testing.T) {
 		store := newFakeStore()
 		h, r := loadResource(t, store, withField(warehouseSpec(), "source_definition", "snowflake"))
 		state := resources.ResourceData{
-			sqlmodel.IDKey:               "src-1",
-			sqlmodel.SourceDefinitionKey: "postgres",
+			sourcekeys.IDKey:               "src-1",
+			sourcekeys.SourceDefinitionKey: "postgres",
 		}
 
 		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
@@ -485,7 +485,7 @@ func TestUpdate(t *testing.T) {
 		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
 		store.failOn = "update:src-1"
 		h, r := loadResource(t, store, warehouseSpec())
-		state := resources.ResourceData{sqlmodel.IDKey: "src-1", sqlmodel.SourceDefinitionKey: "postgres"}
+		state := resources.ResourceData{sourcekeys.IDKey: "src-1", sourcekeys.SourceDefinitionKey: "postgres"}
 
 		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
 
@@ -515,7 +515,7 @@ func TestDelete(t *testing.T) {
 		store.failOn = "delete:src-1"
 		h := table.NewHandler(store, "retl")
 
-		err := h.Delete(context.Background(), "users-table", resources.ResourceData{sqlmodel.IDKey: "src-1"})
+		err := h.Delete(context.Background(), "users-table", resources.ResourceData{sourcekeys.IDKey: "src-1"})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "deleting RETL source")
@@ -547,7 +547,7 @@ func TestImport(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"get:src-remote", "setExternalId:src-remote"}, store.calls)
 		assert.Equal(t, "users-table", store.sources["src-remote"].ExternalID)
-		assert.Equal(t, "src-remote", (*output)[sqlmodel.IDKey])
+		assert.Equal(t, "src-remote", (*output)[sourcekeys.IDKey])
 	})
 
 	t.Run("updates a diverged source to match the spec", func(t *testing.T) {
