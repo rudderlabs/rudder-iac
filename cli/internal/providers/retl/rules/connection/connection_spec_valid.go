@@ -288,7 +288,7 @@ func NewConnectionSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"retl connection spec syntax must be valid",
 		rules.Examples{},
-		prules.NewRawPatternValidator(
+		prules.NewPatternValidator(
 			prules.V1VersionPatterns(retlConnection.ResourceKind),
 			validateRawConnectionsSpec,
 		),

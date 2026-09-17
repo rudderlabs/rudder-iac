@@ -403,9 +403,8 @@ func TestConnectionSpecSyntaxValid_PerEntryReferences(t *testing.T) {
 
 // TestConnectionSpecSyntaxValid_StrictShape covers what only the raw map can
 // express: a key the spec type does not carry, and a value whose type it cannot
-// hold. Neither survives the typed engine's json round-trip — the first is
-// dropped, the second collapses into one verdict at the spec root — so both are
-// read here through the rule's own decoding.
+// hold. Decoding into the spec struct would drop the first and fail the whole
+// spec on the second, so the rule decodes the map itself.
 func TestConnectionSpecSyntaxValid_StrictShape(t *testing.T) {
 	t.Parallel()
 
