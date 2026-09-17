@@ -5,6 +5,7 @@ import (
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -72,13 +73,13 @@ func ValidateAccountReference(ref, sourceDefinition string, graph *resources.Gra
 // other SQL models. A clash with a table source is retl/table/semantic-valid's
 // to report, on the table source, so it is reported once.
 func validateDisplayNameUniqueness(spec sqlmodel.SQLModelSpec, graph *resources.Graph) []rules.ValidationResult {
-	names := prules.NamesByKey(graph, sqlmodel.DisplayNameKey, sqlmodel.ResourceType)
-	clash := prules.NameClashMessage(sqlmodel.DisplayNameKey, spec.DisplayName, names)
+	names := prules.NamesByKey(graph, sourcekeys.DisplayNameKey, sqlmodel.ResourceType)
+	clash := prules.NameClashMessage(sourcekeys.DisplayNameKey, spec.DisplayName, names)
 	if clash == "" {
 		return nil
 	}
 	return []rules.ValidationResult{{
-		Reference: "/" + sqlmodel.DisplayNameKey,
+		Reference: "/" + sourcekeys.DisplayNameKey,
 		Message:   fmt.Sprintf("%s within kind '%s'", clash, sqlmodel.ResourceKind),
 	}}
 }

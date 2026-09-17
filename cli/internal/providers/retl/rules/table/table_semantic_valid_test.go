@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -114,7 +115,7 @@ func TestTableSemanticValidRule_DisplayNameUniqueness(t *testing.T) {
 	t.Parallel()
 
 	source := func(resourceType, id, displayName string) *resources.Resource {
-		return resources.NewResource(id, resourceType, resources.ResourceData{sqlmodel.DisplayNameKey: displayName}, nil)
+		return resources.NewResource(id, resourceType, resources.ResourceData{sourcekeys.DisplayNameKey: displayName}, nil)
 	}
 	spec := map[string]any{
 		"id":                "users-table",

@@ -100,7 +100,7 @@ func TestSQLModelSemanticValid_DisplayNameUniqueness(t *testing.T) {
 		graph := resources.NewGraph()
 		graph.AddResource(sqlModelResource("model-1", "Orders"))
 		graph.AddResource(resources.NewResource("orders-table", table.ResourceType, resources.ResourceData{
-			sqlmodel.DisplayNameKey: "Orders",
+			sourcekeys.DisplayNameKey: "Orders",
 		}, nil))
 
 		spec := sqlmodel.SQLModelSpec{
