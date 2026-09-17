@@ -70,27 +70,15 @@ func ValidateAccountReference(ref, sourceDefinition string, graph *resources.Gra
 // other SQL models. A clash with a table source is retl/table/semantic-valid's
 // to report, on the table source, so it is reported once.
 func validateDisplayNameUniqueness(spec sqlmodel.SQLModelSpec, graph *resources.Graph) []rules.ValidationResult {
-	clash, ok := prules.NameClash(sqlmodel.DisplayNameKey, spec.DisplayName, DisplayNames(graph, sqlmodel.ResourceType))
-	if !ok {
+	names := prules.NamesByKey(graph, sqlmodel.DisplayNameKey, sqlmodel.ResourceType)
+	clash := prules.NameClashMessage(sqlmodel.DisplayNameKey, spec.DisplayName, names)
+	if clash == "" {
 		return nil
 	}
 	return []rules.ValidationResult{{
 		Reference: "/" + sqlmodel.DisplayNameKey,
 		Message:   fmt.Sprintf("%s within kind '%s'", clash, sqlmodel.ResourceKind),
 	}}
-}
-
-// DisplayNames returns the display_name of every RETL source of the given
-// resource types in the graph.
-func DisplayNames(graph *resources.Graph, resourceTypes ...string) []string {
-	var names []string
-	for _, resourceType := range resourceTypes {
-		for _, resource := range graph.ResourcesByType(resourceType) {
-			name, _ := resource.Data()[sqlmodel.DisplayNameKey].(string)
-			names = append(names, name)
-		}
-	}
-	return names
 }
 
 func NewSQLModelSemanticValidRule() rules.Rule {

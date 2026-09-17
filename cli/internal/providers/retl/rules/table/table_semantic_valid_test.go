@@ -143,7 +143,7 @@ func TestTableSemanticValidRule_DisplayNameUniqueness(t *testing.T) {
 			others: []*resources.Resource{source(sqlmodel.ResourceType, "users-model", "Users")},
 			want: []rules.ValidationResult{{
 				Reference: "/spec/display_name",
-				Message:   "duplicate display_name 'users' (case-insensitive match with 'Users') within kinds 'retl-source-sql-model' and 'retl-source-table'",
+				Message:   "duplicate display_name 'users' (case-insensitive match with 'Users') across RETL sources",
 			}},
 		},
 		{
@@ -151,7 +151,7 @@ func TestTableSemanticValidRule_DisplayNameUniqueness(t *testing.T) {
 			others: []*resources.Resource{source(table.ResourceType, "users-copy", "users")},
 			want: []rules.ValidationResult{{
 				Reference: "/spec/display_name",
-				Message:   "duplicate display_name 'users' within kinds 'retl-source-sql-model' and 'retl-source-table'",
+				Message:   "duplicate display_name 'users' across RETL sources",
 			}},
 		},
 		{
@@ -162,7 +162,7 @@ func TestTableSemanticValidRule_DisplayNameUniqueness(t *testing.T) {
 			},
 			want: []rules.ValidationResult{{
 				Reference: "/spec/display_name",
-				Message:   "duplicate display_name 'users' (case-insensitive match with 'USERS', 'Users') within kinds 'retl-source-sql-model' and 'retl-source-table'",
+				Message:   "duplicate display_name 'users' (case-insensitive match with 'USERS') across RETL sources",
 			}},
 		},
 	}

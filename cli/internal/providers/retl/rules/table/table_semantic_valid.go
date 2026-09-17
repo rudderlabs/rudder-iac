@@ -27,14 +27,17 @@ var validateTableSemantic = func(
 // kinds from one namespace. retl/sqlmodel/semantic-valid checks SQL models
 // only against each other, so a table/SQL model clash is reported once, here.
 func validateDisplayNameUniqueness(spec table.TableSpec, graph *resources.Graph) []rules.ValidationResult {
-	names := sqlmodelRules.DisplayNames(graph, sqlmodel.ResourceType, table.ResourceType)
-	clash, ok := prules.NameClash(sqlmodel.DisplayNameKey, spec.DisplayName, names)
-	if !ok {
+	names := prules.NamesByKey(graph, sqlmodel.DisplayNameKey, sqlmodel.ResourceType, table.ResourceType)
+	clash := prules.NameClashMessage(sqlmodel.DisplayNameKey, spec.DisplayName, names)
+	if clash == "" {
 		return nil
 	}
+	// "across RETL sources" rather than naming both kinds: a table-to-table
+	// clash in a project with no SQL model would otherwise name a kind the
+	// user has never used.
 	return []rules.ValidationResult{{
 		Reference: "/" + sqlmodel.DisplayNameKey,
-		Message:   fmt.Sprintf("%s within kinds '%s' and '%s'", clash, sqlmodel.ResourceKind, table.ResourceKind),
+		Message:   fmt.Sprintf("%s across RETL sources", clash),
 	}}
 }
 
