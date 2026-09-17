@@ -53,6 +53,12 @@ func AccountRef(id string) *resources.PropertyRef {
 	)
 	// Stamped so the differ compares it field for field with the state-side
 	// ref AccountInput builds, as event stream connections do for destinations.
+	//
+	// Third copy of this workaround, after providers/destination/handler.go and
+	// providers/event-stream/connection/handler.go. The latter carries the TODO
+	// naming the fix — take property as a parameter in
+	// handler.CreatePropertyRef so callers cannot forget it — which is a change
+	// across seven call sites in five providers, so it stays its own PR.
 	ref.Property = "id"
 	return ref
 }
@@ -64,9 +70,11 @@ func AccountRef(id string) *resources.PropertyRef {
 // project. It has none for an account of a definition the accounts provider
 // does not support, which the CLI cannot manage. Either form reads back into
 // the state input AccountInput builds, so the plan after import is empty.
-func ExportAccount(accountID string, inputResolver resolver.ReferenceResolver) (string, string) {
+func ExportAccount(accountID string, inputResolver resolver.ReferenceResolver) (specField, value string) {
 	ref, err := inputResolver.ResolveToReference(accounts.AccountResourceType, accountID)
-	if err != nil {
+	// An empty reference is not a usable one: fall back to the raw id rather
+	// than exporting `account: ""`.
+	if err != nil || ref == "" {
 		return AccountIDKey, accountID
 	}
 	return AccountKey, ref
