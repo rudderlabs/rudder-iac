@@ -19,7 +19,8 @@ func Matcher() importmatcher.Matcher {
 }
 
 func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
-	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
+	// Both loaders of this resource type store *RemoteConnection, and Match has
+	// no error to return, so a wrong payload is a wiring bug — panic.
 	remote := r.Data.(*RemoteConnection)
 
 	sourceURN, ok := importmatcher.EndpointURN(scope, remote.SourceKind.ResourceType, remote.SourceID, remote.SourceExternalID)

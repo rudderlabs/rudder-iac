@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	apiClient "github.com/rudderlabs/rudder-iac/api/client"
@@ -31,20 +30,7 @@ import (
 
 var log = logger.New("retl-connection")
 
-const (
-	listPageSize = 100
-
-	// maxListPages bounds the paging walk when the API keeps reporting another
-	// page. At 100 rows a page it sits far beyond any real workspace, so
-	// reaching it means the cursor is not advancing and an explicit error beats
-	// looping forever.
-	maxListPages = 1000
-
-	// claimConfirmTimeout bounds the read-back that confirms a claim. The call
-	// it confirms may well have failed by running the caller's context out, so
-	// the confirmation gets a fresh deadline of its own.
-	claimConfirmTimeout = 30 * time.Second
-)
+const listPageSize = 100
 
 // Handler manages rETL connections the way the event stream connection handler
 // does: one graph resource per spec entry, an endpoint change handled as a
@@ -251,7 +237,7 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	if !ok || remoteID == "" {
 		return nil, fmt.Errorf("connection %q: missing id in state", id)
 	}
-	replace, err := replacementNeeded(data, state)
+	sourceID, destinationID, replace, err := replacementNeeded(data, state)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
@@ -286,12 +272,10 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	}
 
 	if enabled == state[EnabledKey] && reflect.DeepEqual(desired, stored) {
-		// The endpoints are the ones state recorded: replacementNeeded read them
-		// out of data as nonempty strings and found them unchanged.
 		return toResourceData(&retlClient.RETLConnection{
 			ID:            remoteID,
-			SourceID:      data[SourceKey].(string),
-			DestinationID: data[DestinationKey].(string),
+			SourceID:      sourceID,
+			DestinationID: destinationID,
 		}), nil
 	}
 
@@ -311,16 +295,19 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 // handler applies as a delete followed by a create. Import asks the same
 // question, because a replacement leaves it holding a row Create made rather
 // than the row it set out to adopt.
-func replacementNeeded(data, state resources.ResourceData) (bool, error) {
-	sourceID, err := endpointIDFromData(data, SourceKey)
+//
+// The two endpoint ids it validated come back with the verdict so callers can
+// use them without asserting on the map a second time.
+func replacementNeeded(data, state resources.ResourceData) (sourceID, destinationID string, replace bool, err error) {
+	sourceID, err = endpointIDFromData(data, SourceKey)
 	if err != nil {
-		return false, err
+		return "", "", false, err
 	}
-	destinationID, err := endpointIDFromData(data, DestinationKey)
+	destinationID, err = endpointIDFromData(data, DestinationKey)
 	if err != nil {
-		return false, err
+		return "", "", false, err
 	}
-	return sourceID != state[SourceIDKey] || destinationID != state[DestinationIDKey], nil
+	return sourceID, destinationID, sourceID != state[SourceIDKey] || destinationID != state[DestinationIDKey], nil
 }
 
 // Delete removes the connection only; the endpoints are their own resources.
@@ -351,15 +338,12 @@ func (h *Handler) FetchImportData(_ context.Context, _ specs.ImportIds) (writer.
 // also means a short — or even empty — page while next is set is not the end of
 // the list; only an empty next is.
 //
-// paging.total never ends the walk — next alone decides that — but it is what
-// tells a finished list from a truncated one: the API emits next exactly while
-// page*pageSize stays below total, so a last page that contradicts its own
-// arithmetic is an error rather than a short list reported as complete. The
-// rows collected cannot be counted against total instead, because the API
-// discounts total by the rows it skips on the page in hand alone.
+// The walk terminates by construction: the API emits next exactly while
+// page*pageSize stays below total, and page strictly increases, so it stops
+// after ceil(total/pageSize) requests.
 func (h *Handler) listAll(ctx context.Context, hasExternalID *bool) ([]retlClient.RETLConnection, error) {
 	var all []retlClient.RETLConnection
-	for page := 1; page <= maxListPages; page++ {
+	for page := 1; ; page++ {
 		result, err := h.client.ListConnections(ctx, &retlClient.ListRETLConnectionsRequest{
 			HasExternalID: hasExternalID,
 			Page:          page,
@@ -373,15 +357,10 @@ func (h *Handler) listAll(ctx context.Context, hasExternalID *bool) ([]retlClien
 		}
 		all = append(all, result.Data...)
 
-		if result.Paging.Next != "" {
-			continue
+		if result.Paging.Next == "" {
+			return all, nil
 		}
-		if total := result.Paging.Total; total > page*listPageSize {
-			return nil, fmt.Errorf("listing rETL connections: page %d reported %d connections in total but no further page", page, total)
-		}
-		return all, nil
 	}
-	return nil, fmt.Errorf("listing rETL connections: the API kept reporting another page past page %d", maxListPages)
 }
 
 // endpoints reads the two catalogs a connection row cannot be judged without:
@@ -468,12 +447,16 @@ func (h *Handler) remoteConnection(
 	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), object); err != nil {
 		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
 	}
-	if _, err := configFromRemote(&conn); err != nil {
+	// configFromRemote names the connection in its own errors, so wrapping here
+	// would only repeat the prefix the other arms add.
+	config, err := configFromRemote(&conn)
+	if err != nil {
 		return nil, err
 	}
 
 	return &RemoteConnection{
 		RETLConnection:        conn,
+		Config:                config,
 		WorkspaceID:           source.WorkspaceID,
 		SourceKind:            sourceKind,
 		SourceName:            source.Name,
@@ -490,16 +473,6 @@ func logSkip(conn retlClient.RETLConnection, err error) {
 	log.Warn("skipping rETL connection the CLI cannot manage: it stays in the workspace unchanged; importing its source and destination, or a CLI version that supports it, may be needed",
 		"connection", conn.ID, "externalId", conn.ExternalID, "sourceId", conn.SourceID,
 		"destinationId", conn.DestinationID, "reason", err.Error())
-}
-
-// canonicalConfig rebuilds a remote connection's config in the one shape the
-// spec side also produces, so state, export and import all compare equal.
-func canonicalConfig(conn *retlClient.RETLConnection) (map[string]any, error) {
-	config, err := configFromRemote(conn)
-	if err != nil {
-		return nil, err
-	}
-	return configToMap(config)
 }
 
 // eligible lists the connections on the given side of the managed filter and
@@ -532,9 +505,11 @@ func (h *Handler) eligible(ctx context.Context, hasExternalID *bool) ([]*RemoteC
 }
 
 // LoadResourcesFromRemote lists the CLI-managed connections — those carrying an
-// externalId — and keeps the ones the spec contract can express. The API value
-// itself is the payload: MapRemoteToState reads the endpoints out of the merged
-// cross-provider collection rather than out of a second endpoint fetch.
+// externalId — and keeps the ones the spec contract can express. The payload is
+// the same *RemoteConnection LoadImportable stores, so every consumer of this
+// resource type reads one type: MapRemoteToState resolves the endpoints out of
+// the merged cross-provider collection rather than out of a second fetch, and
+// the config it needs is already rebuilt on the value.
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	remotes, err := h.eligible(ctx, lo.ToPtr(true))
 	if err != nil {
@@ -546,7 +521,7 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 		resourceMap[remote.ID] = &resources.RemoteResource{
 			ID:         remote.ID,
 			ExternalID: remote.ExternalID,
-			Data:       remote.RETLConnection,
+			Data:       remote,
 		}
 	}
 	collection := resources.NewRemoteResources()
@@ -563,10 +538,11 @@ func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.Remot
 func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	for _, remote := range collection.GetAll(ResourceType) {
-		conn, ok := remote.Data.(retlClient.RETLConnection)
+		managed, ok := remote.Data.(*RemoteConnection)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to rETL connection")
 		}
+		conn := managed.RETLConnection
 
 		sourceURN, err := resolveSourceURN(collection, conn.SourceID)
 		switch {
@@ -588,7 +564,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 			return nil, fmt.Errorf("resolving destination urn for connection %q: %w", conn.ExternalID, err)
 		}
 
-		config, err := canonicalConfig(&conn)
+		config, err := configToMap(managed.Config)
 		if err != nil {
 			return nil, fmt.Errorf("reading remote connection %q: %w", conn.ExternalID, err)
 		}
@@ -611,14 +587,21 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 // resolveSourceURN looks the source up under every rETL source kind: the
 // connection row names an id, and which kind's collection holds it is exactly
 // what SourceKinds enumerates.
+//
+// The error starts out as "not found" so an empty SourceKinds reports a miss
+// rather than an empty URN with no error, and a kind that failed for any other
+// reason wins over a plain miss — the caller skips the row on a miss but fails
+// the apply on anything else.
 func resolveSourceURN(collection *resources.RemoteResources, sourceID string) (string, error) {
-	var err error
+	err := error(resources.ErrRemoteResourceNotFound)
 	for _, sourceKind := range SourceKinds {
 		urn, kindErr := collection.GetURNByID(sourceKind.ResourceType, sourceID)
 		if kindErr == nil {
 			return urn, nil
 		}
-		err = kindErr
+		if errors.Is(err, resources.ErrRemoteResourceNotFound) {
+			err = kindErr
+		}
 	}
 	return "", err
 }
@@ -676,14 +659,13 @@ func (h *Handler) FormatForExport(
 	})
 
 	var (
+		// The id doubles as the "not set yet" sentinel: remoteConnection
+		// already refuses a row whose source reports no workspace, so an empty
+		// one cannot reach here.
 		workspaceMetadata = specs.WorkspaceImportMetadata{
 			Resources: make([]specs.ImportIds, 0, len(remotes)),
 		}
-		// Whether a workspace has been seen is tracked on its own: the id
-		// itself cannot double as the sentinel without letting an empty one
-		// pass as "not set yet" and mix workspaces after all.
-		workspaceSeen bool
-		entries       []importmanifest.ImportEntry
+		entries []importmanifest.ImportEntry
 	)
 	items := make([]map[string]any, 0, len(remotes))
 	for _, remote := range remotes {
@@ -691,31 +673,34 @@ func (h *Handler) FormatForExport(
 		if !ok {
 			return nil, nil, fmt.Errorf("unable to cast remote resource to rETL connection")
 		}
-		if workspaceSeen && workspaceMetadata.WorkspaceID != data.WorkspaceID {
+		// Matched connections (import --merge) adopt an existing local spec:
+		// manifest entry only, no spec entry. Every other row has to survive
+		// toImportItem first, because a row skipped there contributes nothing —
+		// the export's workspace included.
+		var item map[string]any
+		if remote.MatchedWith == nil {
+			built, err := toImportItem(remote.ExternalID, data, inputResolver)
+			if err != nil {
+				logSkip(data.RETLConnection, err)
+				continue
+			}
+			item = built
+		}
+
+		if workspaceMetadata.WorkspaceID != "" && workspaceMetadata.WorkspaceID != data.WorkspaceID {
 			return nil, nil, fmt.Errorf("cannot export resources from multiple workspaces into a single spec file")
 		}
-		workspaceMetadata.WorkspaceID, workspaceSeen = data.WorkspaceID, true
+		workspaceMetadata.WorkspaceID = data.WorkspaceID
 
 		urn := resources.URN(remote.ExternalID, ResourceType)
-		entry := importmanifest.ImportEntry{
+		entries = append(entries, importmanifest.ImportEntry{
 			WorkspaceID: data.WorkspaceID,
 			URN:         urn,
 			RemoteID:    remote.ID,
-		}
-
-		// Matched connections (import --merge) adopt an existing local spec:
-		// manifest entry only — no spec entry is written for them.
-		if remote.MatchedWith != nil {
-			entries = append(entries, entry)
+		})
+		if item == nil {
 			continue
 		}
-
-		item, err := toImportItem(remote.ExternalID, data, inputResolver)
-		if err != nil {
-			logSkip(data.RETLConnection, err)
-			continue
-		}
-		entries = append(entries, entry)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: remote.ID,
@@ -755,7 +740,7 @@ func toImportItem(externalID string, data *RemoteConnection, inputResolver resol
 	if err != nil {
 		return nil, fmt.Errorf("resolving destination reference: %w", err)
 	}
-	config, err := canonicalConfig(&data.RETLConnection)
+	config, err := configToMap(data.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -770,8 +755,11 @@ func toImportItem(externalID string, data *RemoteConnection, inputResolver resol
 
 // List reports the workspace's rETL connections, honouring the provider's
 // hasExternalId filter; rows carrying an externalId are the CLI-managed ones.
-// The endpoint serves the rETL family alone, so there is no foreign row to
-// filter out here.
+//
+// Deliberately unfiltered by the eligibility rules the other remote-reading
+// paths apply: this answers "what exists in the workspace", not "what can the
+// CLI express". A connection whose destination has no registered definition, or
+// whose flow is unsupported, is listed here even though apply skips it.
 func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.ResourceData, error) {
 	conns, err := h.listAll(ctx, hasExternalID)
 	if err != nil {
@@ -811,11 +799,12 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	if err != nil {
 		return nil, err
 	}
-	if _, err := h.remoteConnection(*remote, sources, destinations); err != nil {
+	eligible, err := h.remoteConnection(*remote, sources, destinations)
+	if err != nil {
 		return nil, fmt.Errorf("importing rETL connection: %w", err)
 	}
 
-	config, err := canonicalConfig(remote)
+	config, err := configToMap(eligible.Config)
 	if err != nil {
 		return nil, fmt.Errorf("importing rETL connection %q: %w", remoteID, err)
 	}
@@ -827,7 +816,7 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 		ConfigKey:        config,
 	}
 
-	replace, err := replacementNeeded(data, existing)
+	_, _, replace, err := replacementNeeded(data, existing)
 	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", id, err)
 	}
@@ -851,34 +840,15 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	if remote.ExternalID == id {
 		return result, nil
 	}
-	if err := h.claim(ctx, claimed, id); err != nil {
-		return nil, err
+
+	// Adoption is the one path with something left to claim: the row predates
+	// this apply, so no create body carried the externalId, and a PUT cannot —
+	// UpdateRETLConnectionRequest has no such field. A failure here leaves the
+	// connection reconciled but unowned; re-running the import adopts it.
+	if err := h.client.SetConnectionExternalId(ctx, &retlClient.SetRETLConnectionExternalIDRequest{
+		ID: claimed, ExternalID: id,
+	}); err != nil {
+		return nil, fmt.Errorf("setting external ID for rETL connection during import: %w", err)
 	}
 	return result, nil
-}
-
-// claim names the remote row as this connection's. A failure says nothing about
-// what the server did — a timeout least of all — so ownership is read back from
-// the exact row rather than assumed. The connection exists either way, so
-// nothing here may delete or recreate it to compensate.
-func (h *Handler) claim(ctx context.Context, remoteID, externalID string) error {
-	err := h.client.SetConnectionExternalId(ctx, &retlClient.SetRETLConnectionExternalIDRequest{ID: remoteID, ExternalID: externalID})
-	if err == nil {
-		return nil
-	}
-
-	// The call may have failed by exhausting the caller's context, which would
-	// fail the read-back before it left the process; it runs detached from that
-	// cancellation under a deadline of its own.
-	confirmCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), claimConfirmTimeout)
-	defer cancel()
-
-	confirmed, getErr := h.client.GetConnection(confirmCtx, remoteID)
-	if getErr != nil {
-		return fmt.Errorf("setting external ID for rETL connection during import: %w (confirming it: %w)", err, getErr)
-	}
-	if confirmed == nil || confirmed.ExternalID != externalID {
-		return fmt.Errorf("setting external ID for rETL connection during import: %w", err)
-	}
-	return nil
 }

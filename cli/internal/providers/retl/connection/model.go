@@ -45,8 +45,13 @@ const (
 // endpoints' local resource ids. Both endpoint catalogs are read once per
 // operation, so carrying the result here is what keeps naming, export and
 // matching free of further API calls.
+//
+// Config is the spec-shaped config remoteConnection already rebuilt to prove
+// the row representable; carrying it spares state, export and import a second
+// conversion of the same row.
 type RemoteConnection struct {
 	retlClient.RETLConnection
+	Config                ConfigSpec
 	WorkspaceID           string
 	SourceKind            SourceKind
 	SourceName            string
