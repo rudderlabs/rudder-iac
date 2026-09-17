@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "siteID": "<ignored>",
+    "siteID": "rudderCliE2eSiteId",
     "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
     "apiVersion": "v1",
     "datacenter": "US",

@@ -32,9 +32,9 @@
       "web": false
     },
     "usePlatformSpecificApiKeys": true,
-    "androidApiKey": "<ignored>",
-    "iOSApiKey": "<ignored>",
-    "webApiKey": "<ignored>"
+    "androidApiKey": "android-key",
+    "iOSApiKey": "ios-android-key",
+    "webApiKey": "web-android-key"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

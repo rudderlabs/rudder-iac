@@ -7,16 +7,16 @@
   "type": "INTERCOM",
   "enabled": true,
   "config": {
-    "appId": "<ignored>",
+    "appId": "rudderCliE2eDeviceAppId",
     "apiServer": "standard",
     "apiVersion": "v2",
     "sendAnonymousId": false,
     "updateLastRequestAt": true,
     "mobileApiKeyAndroid": {
-      "android": "<ignored>"
+      "android": "rudderCliE2eDeviceAndroidKey"
     },
     "mobileApiKeyIOS": {
-      "ios": "<ignored>"
+      "ios": "rudderCliE2eDeviceIosKey"
     },
     "eventFilteringOption": "disable"
   },

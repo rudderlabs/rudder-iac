@@ -9,7 +9,7 @@
   "config": {
     "convertToAvro": false,
     "enableMultiTopic": false,
-    "hostName": "<ignored>",
+    "hostName": "kafka-ssh.rudder-cli-e2e.internal",
     "port": "9092",
     "saslType": "plain",
     "sshHost": "bastion.rudder-cli-e2e.internal:22",

@@ -21,7 +21,7 @@
     "underscoreDivideNumbers": false,
     "useIAMForAuth": false,
     "useRudderStorage": false,
-    "user": "<ignored>",
+    "user": "rudderCliE2eRsOwnStorageRoleUser",
     "useServerless": false,
     "useSSH": false,
     "skipTracksTable": false,

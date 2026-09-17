@@ -22,7 +22,7 @@
     "useRudderStorage": true,
     "useSSH": false,
     "useServerless": false,
-    "user": "<ignored>",
+    "user": "rudderCliE2eRsIamClusterUser",
     "roleBasedAuth": true,
     "enableSSE": false,
     "cleanupObjectStorageFiles": false

@@ -34,7 +34,7 @@ spec:
       web: false
     legacy_conversion_pixel_id:
       - from: Product Viewed
-        to: "1111111111"
+        to: "{{ .FACEBOOK_PIXEL_LEGACY_CONVERSION_PIXEL_ID_TO_UPDATED }}"
     consent_management:
       web:
         - provider: oneTrust

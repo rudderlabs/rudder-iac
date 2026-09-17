@@ -11,7 +11,7 @@
         "blacklistPiiProperties": "email"
       }
     ],
-    "datasetId": "<ignored>",
+    "datasetId": "123456789012345",
     "eventsToEvents": [
       {
         "from": "Product Viewed",

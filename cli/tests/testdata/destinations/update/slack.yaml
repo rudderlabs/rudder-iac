@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    webhook_url: "{{ .SLACK_WEBHOOK_URL }}"
+    webhook_url: https://hooks.slack.com/services/T000/B000/example
     incoming_webhooks_type: modern
     identify_template: Identify user
     event_channel_settings:

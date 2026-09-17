@@ -35,7 +35,7 @@
     "allowUserSuppliedJavascript": {
       "web": true
     },
-    "appKey": "<ignored>",
+    "appKey": "rudder-cli-e2e-app-key-updated",
     "usePlatformSpecificApiKeys": false,
     "consentManagement": {
       "web": [

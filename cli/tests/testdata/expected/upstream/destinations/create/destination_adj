@@ -7,7 +7,7 @@
   "type": "ADJ",
   "enabled": true,
   "config": {
-    "appToken": "<ignored>",
+    "appToken": "rudderCliE2eAppToken",
     "blacklistedEvents": [
       {
         "eventName": "Password Reset"

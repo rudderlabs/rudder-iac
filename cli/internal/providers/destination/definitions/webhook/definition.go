@@ -90,7 +90,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "WEBHOOK",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"headers.to", "webhook_url"},
+		SecretKeys: []string{"headers.to"},
 		NewConfig: func() any {
 			return &webhookConfig{}
 		},

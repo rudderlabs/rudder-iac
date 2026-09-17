@@ -25,8 +25,8 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "heartbeatTrackingServerUrl": "<ignored>",
-    "marketingCloudOrgId": "<ignored>",
+    "heartbeatTrackingServerUrl": "heartbeat.example.com",
+    "marketingCloudOrgId": "rudderCliE2eOrgId",
     "noFallbackVisitorId": false,
     "preferVisitorId": true,
     "productIdentifier": "sku",
@@ -36,7 +36,7 @@
     "timestampOptionalReporting": true,
     "trackPageName": true,
     "trackingServerSecureUrl": "secure.example.com",
-    "trackingServerUrl": "<ignored>",
+    "trackingServerUrl": "metrics.example.com",
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

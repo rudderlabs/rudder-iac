@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    project_id: "{{ .QUALTRICS_PROJECT_ID_UPDATED }}"
+    project_id: rudderCliE2eFullProjectUpdated
     brand_id: rudderCliE2eFullBrandUpdated
     enable_generic_page_title:
       web: false

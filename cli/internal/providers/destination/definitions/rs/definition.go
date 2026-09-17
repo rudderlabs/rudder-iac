@@ -226,6 +226,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"access_key_id",
 			"access_key",
 			"user",
+			"ssh.user",
 		},
 		NewConfig: func() any {
 			return &rsConfig{}

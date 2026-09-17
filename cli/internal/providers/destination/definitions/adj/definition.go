@@ -116,11 +116,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ADJ",
 		Version:    1,
 		Properties: properties,
-		// db-config declares no secretKeys, but the revision-2 secrecy policy marks
-		// app_token secret: it alone authorises the Adjust S2S call. Marking it
-		// ahead of upstream is deliberate — the API returns the value, so it reads
-		// back unknown and the destination re-applies on every plan.
-		SecretKeys: []string{"app_token"},
+		// db-config declares no secretKeys. Terraform marks app_token Sensitive, but
+		// db-config is authoritative for write-only values: the API returns app_token,
+		// so wrapping it as a secret would make the destination diff on every apply
+		// and export as a "{{ .VAR }}" the user has to fill in by hand.
+		SecretKeys: nil,
 		NewConfig: func() any {
 			return &adjustConfig{}
 		},

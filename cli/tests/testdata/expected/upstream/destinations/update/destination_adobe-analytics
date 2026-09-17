@@ -43,8 +43,8 @@
       }
     ],
     "eventFilteringOption": "blacklistedEvents",
-    "heartbeatTrackingServerUrl": "<ignored>",
-    "marketingCloudOrgId": "<ignored>",
+    "heartbeatTrackingServerUrl": "heartbeat-updated.example.com",
+    "marketingCloudOrgId": "rudderCliE2eOrgIdUpdated",
     "noFallbackVisitorId": false,
     "preferVisitorId": false,
     "productIdentifier": "id",
@@ -54,7 +54,7 @@
     "timestampOptionalReporting": false,
     "trackPageName": false,
     "trackingServerSecureUrl": "secure-updated.example.com",
-    "trackingServerUrl": "<ignored>"
+    "trackingServerUrl": "metrics-updated.example.com"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

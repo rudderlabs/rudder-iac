@@ -10,7 +10,7 @@ spec:
   definition_version: 1
   config:
     account_id: 123-ABC-456
-    client_id: "{{ .MARKETO_CLIENT_ID }}"
+    client_id: marketo-client-id
     client_secret: '{{ .MARKETO_CLIENT_SECRET }}'
     track_anonymous_events: false
     create_if_not_exist: true

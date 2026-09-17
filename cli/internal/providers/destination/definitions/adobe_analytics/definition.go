@@ -204,11 +204,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ADOBE_ANALYTICS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{
-			"heartbeat_tracking_server_url",
-			"marketing_cloud_org_id",
-			"tracking_server_url",
-		},
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

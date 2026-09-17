@@ -34,7 +34,7 @@ spec:
       web: true
     legacy_conversion_pixel_id:
       - from: Product Viewed
-        to: "9876543210"
+        to: "{{ .FACEBOOK_PIXEL_LEGACY_CONVERSION_PIXEL_ID_TO }}"
     connection_mode:
       web: cloud
       android_kotlin: cloud

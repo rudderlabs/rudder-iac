@@ -7,7 +7,7 @@
   "type": "TIKTOK_ADS",
   "enabled": true,
   "config": {
-    "pixelCode": "<ignored>",
+    "pixelCode": "C0000000000000000012",
     "version": "v2",
     "hashUserProperties": true,
     "sendCustomEvents": false,

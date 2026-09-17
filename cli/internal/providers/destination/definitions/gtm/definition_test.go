@@ -23,7 +23,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "gtm", registered.Type)
 	assert.Equal(t, "GTM", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"authorization_token", "container_id"}, registered.SecretKeys())
+	assert.Equal(t, []string{}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{"web"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())

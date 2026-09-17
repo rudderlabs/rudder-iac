@@ -183,7 +183,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "KAFKA",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"password", "host_name", "username"},
+		SecretKeys: []string{"password"},
 		NewConfig: func() any {
 			return &kafkaConfig{}
 		},

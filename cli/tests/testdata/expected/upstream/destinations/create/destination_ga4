@@ -8,7 +8,7 @@
   "enabled": true,
   "config": {
     "typesOfClient": "gtag",
-    "measurementId": "<ignored>",
+    "measurementId": "G-E2ECREATE1",
     "debugMode": false,
     "sdkBaseUrl": "https://www.googletagmanager.com",
     "serverContainerUrl": "https://gtm.example.com",

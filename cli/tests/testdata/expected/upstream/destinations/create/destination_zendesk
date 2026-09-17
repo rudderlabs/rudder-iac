@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "email": "<ignored>",
+    "email": "rudder-cli-e2e@example.com",
     "domain": "rudder-cli-e2e",
     "sourceName": "rudder",
     "createUsersAsVerified": false,

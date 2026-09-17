@@ -70,7 +70,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ZENDESK",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_token", "email"},
+		SecretKeys: []string{"api_token"},
 		NewConfig: func() any {
 			return &zendeskConfig{}
 		},

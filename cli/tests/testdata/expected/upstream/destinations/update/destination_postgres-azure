@@ -18,7 +18,7 @@
     "syncFrequency": "360",
     "useRudderStorage": false,
     "useSASTokens": true,
-    "user": "<ignored>",
+    "user": "rudderCliE2ePostgresAzureUser",
     "useSSH": false,
     "skipTracksTable": false,
     "skipUsersTable": true,

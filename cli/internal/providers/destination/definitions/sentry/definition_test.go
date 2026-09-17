@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "sentry", registered.Type)
 	assert.Equal(t, "SENTRY", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"dsn"}, registered.SecretKeys())
+	assert.Empty(t, registered.SecretKeys())
 
 	expectedSourceTypes := []string{"web"}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())

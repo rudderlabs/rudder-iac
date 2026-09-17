@@ -6,7 +6,7 @@
     "isBatchingEnabled": false,
     "isDefaultMapping": true,
     "method": "POST",
-    "username": "<ignored>"
+    "username": "rudderCliE2eHttpBasicUsername"
   },
   "createdAt": "<ignored>",
   "enabled": true,

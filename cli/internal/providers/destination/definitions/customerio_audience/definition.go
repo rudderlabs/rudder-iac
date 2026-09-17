@@ -47,7 +47,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "CUSTOMERIO_AUDIENCE",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"app_api_key", "api_key", "site_id"},
+		SecretKeys: []string{"app_api_key", "api_key"},
 		NewConfig: func() any {
 			return &customerioAudienceConfig{}
 		},

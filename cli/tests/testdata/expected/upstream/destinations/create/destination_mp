@@ -16,7 +16,7 @@
     "projectId": "rudderCliE2eProject",
     "secureCookie": true,
     "serviceAccountSecret": "mpServiceAccountSecretXXXXXXXX",
-    "serviceAccountUserName": "<ignored>",
+    "serviceAccountUserName": "rudderCliE2eServiceUser",
     "sessionReplayPercentage": {
       "web": "25"
     },

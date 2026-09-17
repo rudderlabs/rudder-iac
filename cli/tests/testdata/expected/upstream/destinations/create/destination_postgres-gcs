@@ -23,7 +23,7 @@
     "underscoreDivideNumbers": false,
     "useRudderStorage": false,
     "useSSH": false,
-    "user": "<ignored>"
+    "user": "rudderCliE2ePostgresGcsUser"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

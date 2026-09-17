@@ -11,7 +11,7 @@
     "connectionMode": {
       "web": "device"
     },
-    "conversionID": "<ignored>",
+    "conversionID": "AW-123456789",
     "conversionLinker": true,
     "defaultPageConversion": "home",
     "disableAdPersonalization": false,

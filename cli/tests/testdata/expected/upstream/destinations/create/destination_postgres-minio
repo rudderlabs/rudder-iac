@@ -25,7 +25,7 @@
     "useRudderStorage": false,
     "useSSH": false,
     "useSSL": true,
-    "user": "<ignored>"
+    "user": "rudderCliE2ePostgresMinioUser"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -224,6 +224,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"api_key_value",
 			"api_key_name",
 			"username",
+			"headers.from",
 		},
 		NewConfig: func() any {
 			return &httpConfig{}

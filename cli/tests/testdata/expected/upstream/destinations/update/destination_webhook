@@ -7,7 +7,7 @@
   "type": "WEBHOOK",
   "enabled": true,
   "config": {
-    "webhookUrl": "<ignored>",
+    "webhookUrl": "https://webhooks.example.com/rudder/updated",
     "webhookMethod": "PATCH",
     "headers": [
       {

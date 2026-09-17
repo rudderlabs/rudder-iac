@@ -84,7 +84,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "SENTRY",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"dsn"},
 		NewConfig: func() any {
 			return &sentryConfig{}
 		},

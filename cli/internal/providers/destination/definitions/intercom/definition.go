@@ -181,12 +181,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			{Tag: "intercom_app_id_required", Func: intercomModeConditional("device", intercomDeviceSources), CallEvenIfNull: true},
 			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", intercomCloudSources), CallEvenIfNull: true},
 		},
-		SecretKeys: []string{
-			"api_key",
-			"app_id",
-			"mobile_api_key_android",
-			"mobile_api_key_ios",
-		},
+		SecretKeys: []string{"api_key"},
 		NewConfig: func() any {
 			return &intercomConfig{}
 		},

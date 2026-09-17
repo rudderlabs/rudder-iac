@@ -3,7 +3,7 @@
     "animationDuration": {
       "web": "400"
     },
-    "apiKey": "<ignored>",
+    "apiKey": "rudderCliE2eApiKeyUpdated",
     "blacklistedEvents": [
       {
         "eventName": "Page Viewed"

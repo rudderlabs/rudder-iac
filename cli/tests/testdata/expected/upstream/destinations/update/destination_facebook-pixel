@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "pixelId": "<ignored>",
+    "pixelId": "6543210987654321",
     "standardPageCall": false,
     "valueFieldIdentifier": "properties.price",
     "advancedMapping": true,
@@ -23,7 +23,7 @@
     "eventsToEvents": [
       {
         "from": "Order Completed",
-        "to": "Lead"
+        "to": "rudderCliE2eLegacyPixelIdUpdated"
       }
     ],
     "blacklistPiiProperties": [

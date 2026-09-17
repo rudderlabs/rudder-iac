@@ -11,7 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
-    "pixelCode": "<ignored>",
+    "pixelCode": "C0000000000000000011",
     "version": "v2",
     "hashUserProperties": false,
     "sendCustomEvents": true,

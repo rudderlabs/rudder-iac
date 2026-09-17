@@ -17,7 +17,7 @@ spec:
     format: JSON
     headers:
       - to: X-Rudder-Source
-        from: rudder-cli
+        from: "{{ .HTTP_APIKEY_HEADERS_FROM }}"
     connection_mode:
       web: cloud
       android_kotlin: cloud

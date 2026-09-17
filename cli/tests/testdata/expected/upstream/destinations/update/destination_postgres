@@ -21,7 +21,7 @@
     "sslMode": "require",
     "syncFrequency": "360",
     "useRudderStorage": true,
-    "user": "<ignored>",
+    "user": "rudderCliE2ePostgresUser",
     "useSSH": false,
     "allowUsersContextTraits": false,
     "underscoreDivideNumbers": false,

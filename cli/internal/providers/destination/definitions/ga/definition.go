@@ -194,7 +194,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "GA",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"tracking_id"},
 		NewConfig: func() any {
 			return &googleAnalyticsConfig{}
 		},

@@ -27,7 +27,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "webhook", registered.Type)
 	assert.Equal(t, "WEBHOOK", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"headers.to", "webhook_url"}, registered.SecretKeys())
+	assert.Equal(t, []string{"headers.to"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{

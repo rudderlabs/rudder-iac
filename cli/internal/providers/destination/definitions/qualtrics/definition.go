@@ -67,7 +67,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "QUALTRICS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"project_id"},
+		SecretKeys: []string{},
 		NewConfig: func() any {
 			return &qualtricsConfig{}
 		},

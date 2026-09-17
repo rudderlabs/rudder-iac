@@ -26,7 +26,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "kafka", registered.Type)
 	assert.Equal(t, "KAFKA", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "host_name", "username"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -648,9 +648,7 @@ func TestKafkaDestinationSpecExtraction(t *testing.T) {
 	assert.Equal(t, "kafka", resource.Type)
 	assert.True(t, resource.Enabled)
 	assert.Equal(t, int64(1), resource.DefinitionVersion)
-	hostName, ok := resource.Config["host_name"].(*secret.String)
-	require.True(t, ok, "host_name must be wrapped as a secret")
-	assert.Equal(t, "broker1.example.com", hostName.Reveal())
+	assert.Equal(t, "broker1.example.com", resource.Config["host_name"])
 
 	password, ok := resource.Config["password"].(*secret.String)
 	require.True(t, ok)

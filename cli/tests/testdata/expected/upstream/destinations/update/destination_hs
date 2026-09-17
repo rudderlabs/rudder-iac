@@ -37,7 +37,7 @@
     },
     "doAssociation": false,
     "eventFilteringOption": "blacklistedEvents",
-    "hubID": "<ignored>"
+    "hubID": "rudderCliE2eHubIdUpdated"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

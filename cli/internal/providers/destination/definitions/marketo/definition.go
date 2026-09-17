@@ -99,7 +99,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "MARKETO",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"client_secret", "client_id"},
+		SecretKeys: []string{"client_secret"},
 		NewConfig: func() any {
 			return &marketoConfig{}
 		},

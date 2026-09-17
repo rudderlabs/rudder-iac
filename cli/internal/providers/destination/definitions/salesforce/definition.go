@@ -65,7 +65,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "SALESFORCE",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"password", "initial_access_token", "user_name"},
+		SecretKeys: []string{"password", "initial_access_token"},
 		NewConfig: func() any {
 			return &salesforceConfig{}
 		},

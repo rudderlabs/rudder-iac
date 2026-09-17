@@ -92,7 +92,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "POSTGRES", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Empty(t, registered.GatedKeyPaths())
-	assert.Equal(t, []string{"password", "access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcs.credentials", "minio.secret_access_key", "client_cert", "client_key", "user"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcs.credentials", "minio.secret_access_key", "client_cert", "client_key", "user", "ssh.user"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",

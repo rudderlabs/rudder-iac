@@ -14,7 +14,7 @@
     "apiVersion": "newApi",
     "doAssociation": true,
     "eventFilteringOption": "whitelistedEvents",
-    "hubID": "<ignored>",
+    "hubID": "rudderCliE2eHubId",
     "hubspotEvents": [
       {
         "eventProperties": [

@@ -1,6 +1,6 @@
 {
   "config": {
-    "apiKey": "<ignored>",
+    "apiKey": "rudderCliE2eAmFullKeyUpdated",
     "blacklistedEvents": [
       {
         "eventName": "Application Opened"

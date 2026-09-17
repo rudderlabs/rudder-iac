@@ -439,6 +439,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"client_cert",
 			"client_key",
 			"user",
+			"ssh.user",
 		},
 		NewConfig: func() any {
 			return &postgresConfig{}
