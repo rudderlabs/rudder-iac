@@ -255,6 +255,15 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'Type' must equal 'discriminator'",
 		},
 		{
+			name: "ne tag",
+			err: mockFieldError{
+				field:     "key",
+				actualTag: "ne",
+				param:     "context.mappedToDestination",
+			},
+			expected: "'key' must not equal 'context.mappedToDestination'",
+		},
+		{
 			name: "excluded_unless tag",
 			err: mockFieldError{
 				field:     "variants",

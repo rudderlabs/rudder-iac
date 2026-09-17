@@ -174,6 +174,9 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	case "eq":
 		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
 
+	case "ne":
+		return fmt.Sprintf("'%s' must not equal '%s'", fieldName, err.Param())
+
 	case "array_item_types":
 		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
 
