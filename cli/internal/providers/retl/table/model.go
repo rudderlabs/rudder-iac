@@ -19,9 +19,9 @@ const (
 	ObjectPrefixKey = "object_prefix"
 
 	// SourceDefinitionS3 selects the bucket-backed config shape, which carries
-	// no primary key. rudder-api only type-checks primaryKey and would accept
-	// one, so the spec forbids it here: RETLS3TableConfig has no field for it
-	// and an accepted value would be dropped on every apply.
+	// no primary key. rudder-api's RetlSourceS3ConfigSchema is .strict(), so a
+	// primaryKey inside an s3 config is rejected outright
+	// (rudder-control-plane apps/rudder-api/src/modules/retl/controller.ts).
 	SourceDefinitionS3 = "s3"
 )
 
@@ -33,11 +33,18 @@ const (
 // requires or forbids.
 //
 // There is no description: neither table config shape carries one, so it could
-// never round-trip. s3 forbids primary_key for the same reason: the s3 config
-// has no field for it, so an accepted value would be silently dropped on every
-// apply. object_prefix is optional on
-// s3 — rudder-api validates only bucketName — so a bucket-rooted source needs
-// no prefix.
+// never round-trip.
+//
+// The s3 field rules follow rudder-api's RetlSourceS3ConfigSchema, which is
+// z.object({bucketName, objectPrefix: z.string().min(1)}).strict() — so
+// object_prefix is required and non-empty, and primary_key is rejected as an
+// excess key. primary_key would be wrong here even if the schema allowed it:
+// RETLS3TableConfig has no field for it, so an accepted value would be dropped
+// on write and show as drift on every plan.
+//
+// Note that config-backend, behind rudder-api, is laxer on both — it validates
+// only that bucketName is a string. rudder-api is the boundary the CLI talks
+// to, so its schema is the one these tags mirror.
 type TableSpec struct {
 	ID               string `json:"id"                mapstructure:"id"                validate:"required"`
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
@@ -47,7 +54,7 @@ type TableSpec struct {
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Table            string `json:"table"             mapstructure:"table"             validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	BucketName       string `json:"bucket_name"       mapstructure:"bucket_name"       validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
-	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"excluded_unless=SourceDefinition s3"`
+	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
 	Enabled          bool   `json:"enabled"           mapstructure:"enabled"`
 }
 
@@ -87,8 +94,8 @@ func (t TableSpec) data() resources.ResourceData {
 // specFields returns the flat spec body export writes for the resource.
 func (t TableSpec) specFields(id string) map[string]any {
 	fields := t.configData()
-	// object_prefix is optional, so an s3 source rooted at the bucket exports
-	// without the key rather than with an empty one.
+	// The webapp can save an s3 source with an empty prefix; leaving the key out
+	// makes validate ask for one instead of exporting a value rudder-api rejects.
 	if t.isS3() && t.ObjectPrefix == "" {
 		delete(fields, ObjectPrefixKey)
 	}

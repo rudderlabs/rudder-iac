@@ -48,10 +48,9 @@ type RETLTableConfig struct {
 func (RETLTableConfig) isRETLConfig() {}
 
 // RETLS3TableConfig is the config shape for S3 TABLE sources
-// (sourceDefinitionName = s3). rudder-api validates only that bucketName is a
-// string, so objectPrefix is optional. There is no primaryKey: the backend
-// neither requires nor uses one for s3, and this shape gives the CLI nowhere
-// to put a value that would only be dropped.
+// (sourceDefinitionName = s3). rudder-api's RetlSourceS3ConfigSchema requires a
+// non-empty objectPrefix and, being .strict(), rejects a primaryKey; the
+// backend behind it neither requires nor uses one.
 type RETLS3TableConfig struct {
 	BucketName   string `json:"bucketName"`
 	ObjectPrefix string `json:"objectPrefix,omitempty"`

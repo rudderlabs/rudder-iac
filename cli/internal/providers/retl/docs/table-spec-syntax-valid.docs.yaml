@@ -38,6 +38,25 @@ match_behavior:
               bucket_name: events
               object_prefix: daily/
     invalid:
+      - example_id: "table-v1-s3-missing-object-prefix"
+        title: "s3 table source without the object prefix rudder-api requires"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: events-bucket
+            spec:
+              id: events-bucket
+              display_name: Events
+              account_id: acc-s3
+              source_definition: s3
+              bucket_name: events
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/object_prefix"
+            severity: "error"
+            message_contains: "'object_prefix' is required when 'source_definition' is s3"
       - example_id: "table-v1-warehouse-missing-table"
         title: "Warehouse table source missing the table it reads"
         files:
@@ -73,6 +92,7 @@ match_behavior:
               source_definition: s3
               primary_key: id
               bucket_name: events
+              object_prefix: daily/
         expected_diagnostics:
           - file: "spec.yaml"
             reference: "/primary_key"
