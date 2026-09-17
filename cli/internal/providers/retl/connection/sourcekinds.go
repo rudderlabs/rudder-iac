@@ -71,7 +71,7 @@ func SourceKindBySourceType(sourceType retlClient.SourceType) (SourceKind, bool)
 // A reference of the wrong family and a malformed one fail differently: only
 // the first can name the kind the author actually wrote.
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
-	kind, id, ok := refID(ref)
+	kind, id, ok := RefID(ref)
 	if !ok {
 		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, SourceKindRefForms())
 	}
@@ -85,11 +85,11 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	}, nil
 }
 
-// refID splits a scalar "#<kind>:<id>" reference into its parts, reporting
+// RefID splits a scalar "#<kind>:<id>" reference into its parts, reporting
 // whether it is well formed at all. The event stream connection regex is the
-// single definition of the reference grammar, so reference parsing here and
-// the spec syntax rules cannot drift apart.
-func refID(ref string) (kind string, id string, ok bool) {
+// single definition of the reference grammar; exported so the connection rules
+// parse references with this same function and cannot drift from the handler.
+func RefID(ref string) (kind string, id string, ok bool) {
 	matches := esConnection.ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return "", "", false

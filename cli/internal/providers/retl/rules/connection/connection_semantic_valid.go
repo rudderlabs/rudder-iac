@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
-	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
@@ -162,7 +161,7 @@ func (e connectionEndpoints) resolved() bool {
 func resolveEndpoints(graph *resources.Graph, c retlConnection.ConnectionSpec) connectionEndpoints {
 	var endpoints connectionEndpoints
 
-	if kind, id, ok := endpointRef(c.Source); ok {
+	if kind, id, ok := retlConnection.RefID(c.Source); ok {
 		if sourceKind, known := retlConnection.SourceKindByKind(kind); known {
 			endpoints.sourceID = id
 			endpoints.sourceKind = sourceKind
@@ -171,24 +170,13 @@ func resolveEndpoints(graph *resources.Graph, c retlConnection.ConnectionSpec) c
 			endpoints.source, _ = graph.GetResource(endpoints.sourceURN)
 		}
 	}
-	if kind, id, ok := endpointRef(c.Destination); ok && kind == destination.DestinationSpecKind {
+	if kind, id, ok := retlConnection.RefID(c.Destination); ok && kind == destination.DestinationSpecKind {
 		endpoints.destinationID = id
 		endpoints.destinationURN = resources.URN(id, destination.DestinationResourceType)
 		endpoints.destinationRefOK = true
 		endpoints.destination, _ = graph.GetResource(endpoints.destinationURN)
 	}
 	return endpoints
-}
-
-// endpointRef splits a "#<kind>:<id>" endpoint reference. It parses with
-// esConnection.ScalarRefRegex, the single definition of the reference grammar,
-// so the handler and the rules cannot disagree about what a reference is.
-func endpointRef(ref string) (kind string, id string, ok bool) {
-	matches := esConnection.ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
-	if matches == nil {
-		return "", "", false
-	}
-	return matches[1], matches[2], true
 }
 
 // validateEndpointsExist implements V-C1.

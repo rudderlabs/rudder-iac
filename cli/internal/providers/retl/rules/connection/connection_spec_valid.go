@@ -190,7 +190,7 @@ func validateEndpointRef(reference, field, ref, forms, label string, accepts fun
 		return nil
 	}
 
-	kind, _, ok := endpointRef(ref)
+	kind, _, ok := retlConnection.RefID(ref)
 	if !ok {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
 			"'%s' is invalid: must be of pattern %s", field, forms,
