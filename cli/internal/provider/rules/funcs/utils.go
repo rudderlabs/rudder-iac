@@ -207,7 +207,7 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 
 		// We need to resolve the "Type"
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
-		return fmt.Sprintf("'%s' is not allowed unless '%s %s'", fieldName, otherField, params[1])
+		return fmt.Sprintf("'%s' is not allowed unless '%s' is %s", fieldName, otherField, params[1])
 
 	case "required_without":
 		otherField := resolveFieldDisplayName(err.Param(), err, rootType, resolveTag)
