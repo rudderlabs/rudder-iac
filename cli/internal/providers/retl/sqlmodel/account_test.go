@@ -298,3 +298,19 @@ func TestPreviewReferencedAccount(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "set account_id on orders to preview it")
 }
+
+// emptyRefResolver hands back no reference and no error — the shape
+// ImportRefResolver's Importable branch can return verbatim.
+type emptyRefResolver struct{}
+
+func (emptyRefResolver) ResolveToReference(string, string) (string, error) { return "", nil }
+
+// An empty reference is not a usable one: naming the account with it would
+// export `account: ""`, a spec that fails its own next validate.
+func TestExportAccountRejectsEmptyReference(t *testing.T) {
+	t.Parallel()
+
+	field, value := sqlmodel.ExportAccount("acc-remote", emptyRefResolver{})
+	assert.Equal(t, sqlmodel.AccountIDKey, field)
+	assert.Equal(t, "acc-remote", value)
+}
