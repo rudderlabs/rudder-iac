@@ -17,6 +17,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -24,31 +25,57 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
 	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
+	tableRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/table"
 )
 
 // Provider implements the provider interface for RETL resources
 type Provider struct {
 	provider.EmptyProvider
-	client     retlClient.RETLStore
-	handlers   map[string]resourceHandler
-	kindToType map[string]string
+	client         retlClient.RETLStore
+	handlers       map[string]resourceHandler
+	kindToType     map[string]string
+	syntacticRules []rules.Rule
+	matchers       []importmatcher.Matcher
 }
 
 const importDir = "retl"
 
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithTableSupport registers the experimental retl-source-table kind: its spec
+// kind, resource type and handler, whose presence also enables its syntax rule
+// and import --merge matcher. Without it the provider behaves exactly as it did
+// before the kind existed, and never lists table sources.
+func WithTableSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[table.ResourceKind] = table.ResourceType
+		p.handlers[table.ResourceType] = table.NewHandler(p.client, importDir)
+		p.syntacticRules = append(p.syntacticRules, tableRules.NewTableSpecSyntaxValidRule())
+		p.matchers = append(p.matchers, table.Matcher())
+	}
+}
+
 // New creates a new RETL provider instance
-func New(client retlClient.RETLStore) *Provider {
+func New(client retlClient.RETLStore, opts ...Option) *Provider {
 	p := &Provider{
 		client:   client,
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
 			"retl-source-sql-model": sqlmodel.ResourceType,
 		},
+		syntacticRules: []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()},
+		// Source matchers must precede any matcher for a resource that
+		// references a source, so options append rather than prepend.
+		matchers: []importmatcher.Matcher{sqlmodel.Matcher()},
 	}
 
 	// Register handlers
 	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
+	for _, opt := range opts {
+		opt(p)
+	}
 	return p
 }
 
@@ -76,7 +103,11 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		// Only the SQL model kind shipped on rudder/0.1; every kind added since
+		// legacy versions were retired is v1-only.
+		if kind == sqlmodel.ResourceKind {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -92,9 +123,9 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for SQL models.
+// --merge smart linking for SQL models, and for table sources when registered.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	return []importmatcher.Matcher{sqlmodel.Matcher()}
+	return p.matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -147,9 +178,7 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
-		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),
-	}
+	return p.syntacticRules
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
