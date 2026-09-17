@@ -151,7 +151,6 @@ func TestS3DatalakeConfigValidation(t *testing.T) {
 	t.Run("valid full config", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(validKeyConfig())
-		cfg["password"] = "legacy-secret"
 		cfg["use_glue"] = true
 		cfg["region"] = "us-east-1"
 		cfg["prefix"] = "rudder/"
@@ -448,7 +447,6 @@ func TestS3DatalakeConversionRoundTrip(t *testing.T) {
 				"role_based_auth": false,
 				"access_key_id": "AKIAS3DATALAKE",
 				"access_key": "secret-access-key",
-				"password": "legacy-secret",
 				"enable_sse": true,
 				"sync_frequency": "30",
 				"sync_start_at": "10:00",
@@ -468,7 +466,6 @@ func TestS3DatalakeConversionRoundTrip(t *testing.T) {
 				"roleBasedAuth": false,
 				"accessKeyID": "AKIAS3DATALAKE",
 				"accessKey": "secret-access-key",
-				"password": "legacy-secret",
 				"enableSSE": true,
 				"syncFrequency": "30",
 				"syncStartAt": "10:00",

@@ -77,11 +77,7 @@ type s3DatalakeConfig struct {
 	IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKeyID   string `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=s3_datalake_access_key"`
 	AccessKey     string `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=s3_datalake_access_key"`
-	// db-config secretKeys lists password even though schema/defaultConfig/Terraform
-	// do not expose it; keep it modelled so imports/specs can preserve and wrap it.
-	Password string `mapstructure:"password"`
-
-	EnableSSE *bool `mapstructure:"enable_sse" default:"false"`
+	EnableSSE     *bool  `mapstructure:"enable_sse" default:"false"`
 
 	// schema.json requires only bucketName, so sync_frequency is optional here
 	// even though sibling warehouse destinations mark it required.
@@ -110,7 +106,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("iamRoleARN", "iam_role_arn"),
 		converter.Simple("accessKeyID", "access_key_id"),
 		converter.Simple("accessKey", "access_key"),
-		converter.Simple("password", "password"),
 		converter.Simple("enableSSE", "enable_sse"),
 		converter.Simple("syncFrequency", "sync_frequency"),
 		converter.Simple("syncStartAt", "sync_start_at"),
