@@ -32,8 +32,9 @@ const (
 //
 // There is no description: neither table config shape carries one, so it could
 // never round-trip. s3 forbids primary_key for the same reason: the s3 config
-// has no field for it, and rudder-api rejects one. s3 requires object_prefix
-// because rudder-api rejects an s3 config without it.
+// has no field for it, and rudder-api rejects one. object_prefix is optional on
+// s3 — rudder-api validates only bucketName — so a bucket-rooted source needs
+// no prefix.
 type TableSpec struct {
 	ID               string `json:"id"                mapstructure:"id"                validate:"required"`
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
@@ -43,7 +44,7 @@ type TableSpec struct {
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Table            string `json:"table"             mapstructure:"table"             validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	BucketName       string `json:"bucket_name"       mapstructure:"bucket_name"       validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
-	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
+	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"excluded_unless=SourceDefinition s3"`
 	Enabled          bool   `json:"enabled"           mapstructure:"enabled"`
 }
 
@@ -83,8 +84,8 @@ func (t TableSpec) data() resources.ResourceData {
 // specFields returns the flat spec body export writes for the resource.
 func (t TableSpec) specFields(id string) map[string]any {
 	fields := t.configData()
-	// The webapp can save an s3 source with an empty prefix; leaving the key out
-	// makes validate ask for one instead of exporting a value rudder-api rejects.
+	// object_prefix is optional, so an s3 source rooted at the bucket exports
+	// without the key rather than with an empty one.
 	if t.isS3() && t.ObjectPrefix == "" {
 		delete(fields, ObjectPrefixKey)
 	}

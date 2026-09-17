@@ -40,16 +40,22 @@ func TestTableSpecSyntaxValidRule_Metadata(t *testing.T) {
 
 	assert.Equal(t, "retl/table/spec-syntax-valid", rule.ID())
 	assert.Equal(t, rules.Error, rule.Severity())
-	assert.Equal(t, "retl table source spec syntax must be valid", rule.Description())
+	assert.Equal(t, "retl table source spec syntax must be valid (experimental kind)", rule.Description())
 	assert.Equal(t, prules.V1VersionPatterns(table.ResourceKind), rule.AppliesTo())
 }
 
 func TestTableSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 	t.Parallel()
 
+	s3NoPrefix := s3Spec()
+	s3NoPrefix.ObjectPrefix = ""
+
 	cases := map[string]table.TableSpec{
 		"postgres": warehouseSpec(),
 		"s3":       s3Spec(),
+		// The shape `import workspace` writes for a bucket-rooted source, which
+		// has no prefix to export: it has to pass the validate that follows.
+		"s3 without object prefix": s3NoPrefix,
 	}
 	for _, sd := range []string{"redshift", "snowflake", "bigquery", "mysql", "databricks", "trino"} {
 		spec := warehouseSpec()
@@ -118,20 +124,8 @@ func TestTableSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				return s
 			},
 			expect: []rules.ValidationResult{
-				{Reference: "/bucket_name", Message: "'bucket_name' is not allowed unless 'source_definition s3'"},
-				{Reference: "/object_prefix", Message: "'object_prefix' is not allowed unless 'source_definition s3'"},
-			},
-		},
-		{
-			// rudder-api rejects an s3 config without an object prefix.
-			name: "s3 without object prefix",
-			spec: func() table.TableSpec {
-				s := s3Spec()
-				s.ObjectPrefix = ""
-				return s
-			},
-			expect: []rules.ValidationResult{
-				{Reference: "/object_prefix", Message: "'object_prefix' is required when 'source_definition' is s3"},
+				{Reference: "/bucket_name", Message: "'bucket_name' is not allowed unless 'source_definition' is s3"},
+				{Reference: "/object_prefix", Message: "'object_prefix' is not allowed unless 'source_definition' is s3"},
 			},
 		},
 		{
