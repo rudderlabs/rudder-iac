@@ -53,18 +53,13 @@ func validateTrackingPlanExists(spec esSource.SourceSpec, graph *resources.Graph
 }
 
 func validateSourceNameUniqueness(spec esSource.SourceSpec, graph *resources.Graph) []rules.ValidationResult {
-	var names []string
-	for _, resource := range graph.ResourcesByType(esSource.ResourceType) {
-		name, _ := resource.Data()["name"].(string)
-		names = append(names, name)
-	}
-
-	clash, ok := prules.NameClash("name", spec.Name, names)
-	if !ok {
+	names := prules.NamesByKey(graph, esSource.NameKey, esSource.ResourceType)
+	clash := prules.NameClashMessage(esSource.NameKey, spec.Name, names)
+	if clash == "" {
 		return nil
 	}
 	return []rules.ValidationResult{{
-		Reference: "/name",
+		Reference: "/" + esSource.NameKey,
 		Message:   fmt.Sprintf("%s within kind '%s'", clash, esSource.ResourceKind),
 	}}
 }

@@ -106,4 +106,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/display_name"
             severity: "error"
-            message_contains: "duplicate display_name 'users' (case-insensitive match with 'Users') within kinds 'retl-source-sql-model' and 'retl-source-table'"
+            message_contains: "duplicate display_name 'users' (case-insensitive match with 'Users') across RETL sources"
