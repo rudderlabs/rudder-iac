@@ -80,6 +80,16 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	if spec.SQL != nil && spec.File != nil {
 		return fmt.Errorf("sql and file cannot be specified together")
 	}
+
+	// Checked before the file read below, so a spec that is wrong about both
+	// its SQL and its account does not report only the file error.
+	if spec.AccountID == "" && spec.Account == "" {
+		return fmt.Errorf("account_id or account must be specified")
+	}
+	if spec.AccountID != "" && spec.Account != "" {
+		return fmt.Errorf("account_id and account cannot be specified together")
+	}
+
 	sqlStr := ""
 	if spec.SQL != nil {
 		sqlStr = *spec.SQL
@@ -99,12 +109,6 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		sqlStr = string(sqlContent)
 	}
 
-	if spec.AccountID == "" && spec.Account == "" {
-		return fmt.Errorf("account_id or account must be specified")
-	}
-	if spec.AccountID != "" && spec.Account != "" {
-		return fmt.Errorf("account_id and account cannot be specified together")
-	}
 	var account string
 	if spec.Account != "" {
 		if account, err = ParseAccountRef(spec.Account); err != nil {
@@ -124,7 +128,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		DisplayName:      spec.DisplayName,
 		Description:      spec.Description,
 		AccountID:        spec.AccountID,
-		Account:          account,
+		AccountLocalID:   account,
 		PrimaryKey:       spec.PrimaryKey,
 		SourceDefinition: string(spec.SourceDefinition),
 		Enabled:          enabled,
@@ -450,7 +454,7 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		input := resources.ResourceData{
 			DisplayNameKey:      source.Name,
 			DescriptionKey:      cfg.Description,
-			AccountIDKey:        AccountInput(source.AccountID, ok && local.Account == "", collection),
+			AccountIDKey:        AccountInput(source.AccountID, ok && local.AccountLocalID == "", collection),
 			PrimaryKeyKey:       cfg.PrimaryKey,
 			SQLKey:              cfg.Sql,
 			EnabledKey:          source.IsEnabled,

@@ -82,7 +82,10 @@ func (t TableSpec) data() resources.ResourceData {
 	data := t.configData()
 	data[sqlmodel.DisplayNameKey] = t.DisplayName
 	data[sqlmodel.AccountIDKey] = t.AccountID
-	if id, err := sqlmodel.ParseAccountRef(t.Account); err == nil {
+	if t.Account != "" {
+		// Validation runs before LoadSpec and pins Account to the reference
+		// pattern, so a non-empty value always parses here.
+		id, _ := sqlmodel.ParseAccountRef(t.Account)
 		data[sqlmodel.AccountIDKey] = sqlmodel.AccountRef(id)
 	}
 	data[sqlmodel.SourceDefinitionKey] = t.SourceDefinition
@@ -91,8 +94,9 @@ func (t TableSpec) data() resources.ResourceData {
 	return data
 }
 
-// specFields returns the flat spec body export writes for the resource, but
-// for the account, which export names by reference when it can.
+// specFields returns the flat spec body export writes for the resource. The
+// account is not included: export names it by reference when it can (see
+// sqlmodel.ExportAccount).
 func (t TableSpec) specFields(id string) map[string]any {
 	fields := t.configData()
 	// The webapp can save an s3 source with an empty prefix; leaving the key out
