@@ -31,7 +31,7 @@ func NewTableSpecSyntaxValidRule() rules.Rule {
 	return prules.NewTypedRule(
 		"retl/table/spec-syntax-valid",
 		rules.Error,
-		"retl table source spec syntax must be valid",
+		"retl table source spec syntax must be valid (experimental kind)",
 		rules.Examples{},
 		prules.NewPatternValidator(
 			prules.V1VersionPatterns(table.ResourceKind),

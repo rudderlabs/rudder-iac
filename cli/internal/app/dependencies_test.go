@@ -41,16 +41,21 @@ func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
 	cases := []struct {
 		name         string
 		experimental string
+		tableFlag    string
 		wantTable    bool
 	}{
-		{name: "experimental mode on", experimental: "true", wantTable: true},
-		{name: "experimental mode off", experimental: "false", wantTable: false},
+		{name: "experimental mode on", experimental: "true", tableFlag: "true", wantTable: true},
+		{name: "experimental mode off", experimental: "false", tableFlag: "true", wantTable: false},
+		// Experimental mode is on for an unrelated flag: the kind must still be
+		// absent, which is what distinguishes the per-flag check from a bare
+		// experimental-mode check.
+		{name: "experimental mode on, table flag unset", experimental: "true", tableFlag: "", wantTable: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
-			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
+			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", tc.tableFlag)
 			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 			c, err := client.New("test-token")

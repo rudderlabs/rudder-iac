@@ -364,16 +364,29 @@ func TestLifecycle(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name       string
-		spec       func() *specs.Spec
-		wantConfig retlClient.RETLConfig
-		change     func(*specs.Spec) *specs.Spec
-		wantUpdate retlClient.RETLConfig
+		name        string
+		spec        func() *specs.Spec
+		wantConfig  retlClient.RETLConfig
+		wantCreated retlClient.RETLSource
+		change      func(*specs.Spec) *specs.Spec
+		wantUpdate  retlClient.RETLConfig
 	}{
 		{
 			name:       "warehouse",
 			spec:       warehouseSpec,
 			wantConfig: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+			wantCreated: retlClient.RETLSource{
+				ID:                   "src-1",
+				Name:                 "Users",
+				Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+				// A spec with no `enabled` key creates an enabled source.
+				IsEnabled:            true,
+				SourceType:           retlClient.TableSourceType,
+				SourceDefinitionName: "postgres",
+				AccountID:            "acc-123",
+				WorkspaceID:          "ws-1",
+				ExternalID:           "users-table",
+			},
 			change: func(s *specs.Spec) *specs.Spec {
 				return withField(withField(s, "schema", "analytics"), "primary_key", "user_id")
 			},
@@ -383,6 +396,18 @@ func TestLifecycle(t *testing.T) {
 			name:       "s3",
 			spec:       s3Spec,
 			wantConfig: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
+			wantCreated: retlClient.RETLSource{
+				ID:                   "src-1",
+				Name:                 "Events",
+				Config:               retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
+				// A spec with no `enabled` key creates an enabled source.
+				IsEnabled:            true,
+				SourceType:           retlClient.TableSourceType,
+				SourceDefinitionName: "s3",
+				AccountID:            "acc-s3",
+				WorkspaceID:          "ws-1",
+				ExternalID:           "events-bucket",
+			},
 			change: func(s *specs.Spec) *specs.Spec {
 				return withField(withField(s, "bucket_name", "events-v2"), "object_prefix", "hourly/")
 			},
@@ -401,11 +426,7 @@ func TestLifecycle(t *testing.T) {
 			output, err := h.Create(ctx, r.ID(), r.Data())
 			require.NoError(t, err)
 			sourceID := (*output)[sqlmodel.IDKey].(string)
-			created := store.sources[sourceID]
-			assert.Equal(t, retlClient.TableSourceType, created.SourceType)
-			assert.Equal(t, r.ID(), created.ExternalID)
-			assert.Equal(t, r.Data()[sqlmodel.SourceDefinitionKey], created.SourceDefinitionName)
-			assert.Equal(t, tc.wantConfig, created.Config)
+			assert.Equal(t, &tc.wantCreated, store.sources[sourceID])
 
 			// Remote state rebuilds exactly the local graph data, so a plan
 			// right after apply shows no change.

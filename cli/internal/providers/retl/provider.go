@@ -31,9 +31,11 @@ import (
 // Provider implements the provider interface for RETL resources
 type Provider struct {
 	provider.EmptyProvider
-	client     retlClient.RETLStore
-	handlers   map[string]resourceHandler
-	kindToType map[string]string
+	client         retlClient.RETLStore
+	handlers       map[string]resourceHandler
+	kindToType     map[string]string
+	syntacticRules []rules.Rule
+	matchers       []importmatcher.Matcher
 }
 
 const importDir = "retl"
@@ -49,6 +51,8 @@ func WithTableSupport() Option {
 	return func(p *Provider) {
 		p.kindToType[table.ResourceKind] = table.ResourceType
 		p.handlers[table.ResourceType] = table.NewHandler(p.client, importDir)
+		p.syntacticRules = append(p.syntacticRules, tableRules.NewTableSpecSyntaxValidRule())
+		p.matchers = append(p.matchers, table.Matcher())
 	}
 }
 
@@ -60,6 +64,10 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 		kindToType: map[string]string{
 			"retl-source-sql-model": sqlmodel.ResourceType,
 		},
+		syntacticRules: []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()},
+		// Source matchers must precede any matcher for a resource that
+		// references a source, so options append rather than prepend.
+		matchers: []importmatcher.Matcher{sqlmodel.Matcher()},
 	}
 
 	// Register handlers
@@ -116,14 +124,8 @@ func (p *Provider) SupportedTypes() []string {
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
 // --merge smart linking for SQL models, and for table sources when registered.
-// The order is fixed here rather than by option order: source matchers must
-// precede any matcher for a resource that references a source.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
-	matchers := []importmatcher.Matcher{sqlmodel.Matcher()}
-	if _, ok := p.handlers[table.ResourceType]; ok {
-		matchers = append(matchers, table.Matcher())
-	}
-	return matchers
+	return p.matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -176,11 +178,7 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	syntactic := []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()}
-	if _, ok := p.handlers[table.ResourceType]; ok {
-		syntactic = append(syntactic, tableRules.NewTableSpecSyntaxValidRule())
-	}
-	return syntactic
+	return p.syntacticRules
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
