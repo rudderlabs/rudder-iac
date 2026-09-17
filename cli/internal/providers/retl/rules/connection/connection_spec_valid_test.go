@@ -324,8 +324,13 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 				c.Config.CursorColumn = "updated_at"
 			},
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed when 'sync_behaviour' is mirror"},
+				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed unless 'sync_behaviour upsert'"},
 			},
+		},
+		{
+			name:     "no cursor column outside an upsert sync",
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			expected: []rules.ValidationResult{},
 		},
 		{
 			name: "event naming both a literal and a column",
@@ -347,7 +352,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			expected: []rules.ValidationResult{
 				{
 					Reference: "/connections/0/config/constants/1/key",
-					Message:   `'key' is not valid: "context.mappedToDestination" is reserved by the backend`,
+					Message:   "'key' must not equal 'context.mappedToDestination'",
 				},
 			},
 		},
@@ -355,14 +360,14 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			name:   "object declared but empty",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.Object = lo.ToPtr("") },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/object", Message: "'object' must not be empty"},
+				{Reference: "/connections/0/config/object", Message: "'object' is not valid: must not be empty or have leading or trailing whitespace"},
 			},
 		},
 		{
 			name:   "object padded with whitespace",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.Object = lo.ToPtr(" Account ") },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/object", Message: "'object' must not have leading or trailing whitespace"},
+				{Reference: "/connections/0/config/object", Message: "'object' is not valid: must not be empty or have leading or trailing whitespace"},
 			},
 		},
 	}

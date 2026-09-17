@@ -17,11 +17,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// mappedToDestinationKey is the constant key the backend writes itself
-// (config-backend src/modules/retl/api-gateway/connection-config/constants.ts),
-// so a user constant claiming it is overwritten rather than delivered.
-const mappedToDestinationKey = "context.mappedToDestination"
-
 // validateRawConnectionsSpec reads the spec map strictly before checking it.
 // The handler's mapstructure decode rejects unknown keys too, but only once
 // loading starts — after validation has already passed the spec — so a misspelt
@@ -172,9 +167,6 @@ func validateConnectionsSpec(spec retlConnection.ConnectionsSpec) []rules.Valida
 			func(kind string) bool { return kind == destination.DestinationSpecKind },
 		)...)
 		results = append(results, validateCron(index, c.Config.Schedule)...)
-		results = append(results, validateCursorColumn(index, c.Config)...)
-		results = append(results, validateConstants(index, c.Config.Constants)...)
-		results = append(results, validateObject(index, c.Config.Object)...)
 	}
 
 	return results
@@ -216,53 +208,6 @@ func validateCron(index int, schedule retlConnection.ScheduleSpec) []rules.Valid
 		[]CronStatus{CronInvalid, CronTooFrequent},
 		"'cron_expression' is not valid: %s",
 	)
-}
-
-// validateCursorColumn (V-R7): only an upsert sync tracks a cursor, so any
-// other behaviour would carry the column without ever reading it.
-func validateCursorColumn(index int, config retlConnection.ConfigSpec) []rules.ValidationResult {
-	if config.CursorColumn == "" || config.SyncBehaviour == "upsert" {
-		return nil
-	}
-	return []rules.ValidationResult{result(
-		configRef(index)+"/cursor_column",
-		fmt.Sprintf("'cursor_column' is not allowed when 'sync_behaviour' is %s", config.SyncBehaviour),
-	)}
-}
-
-// validateConstants (V-R9a): the backend owns one constant key, so a user
-// constant claiming it is dropped rather than delivered.
-func validateConstants(index int, constants []retlConnection.ConstantSpec) []rules.ValidationResult {
-	var results []rules.ValidationResult
-	for i, constant := range constants {
-		if constant.Key != mappedToDestinationKey {
-			continue
-		}
-		results = append(results, result(
-			fmt.Sprintf("%s/constants/%d/key", configRef(index), i),
-			fmt.Sprintf("'key' is not valid: %q is reserved by the backend", mappedToDestinationKey),
-		))
-	}
-	return results
-}
-
-// validateObject (V-R10): an omitted object is a JSON mapper connection and is
-// valid; a declared one names a destination object and has to be usable as
-// written, since the backend matches it verbatim.
-func validateObject(index int, object *string) []rules.ValidationResult {
-	if object == nil {
-		return nil
-	}
-
-	reference := configRef(index) + "/object"
-	switch {
-	case *object == "":
-		return []rules.ValidationResult{result(reference, "'object' must not be empty")}
-	case strings.TrimSpace(*object) != *object:
-		return []rules.ValidationResult{result(reference, "'object' must not have leading or trailing whitespace")}
-	}
-
-	return nil
 }
 
 func result(reference, message string) rules.ValidationResult {

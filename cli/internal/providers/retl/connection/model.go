@@ -13,6 +13,11 @@ const (
 	// column and the event name column.
 	columnNamePattern = `^[A-Za-z_][\w$.]*$`
 	columnNameTag     = "retl_column_name"
+
+	// objectNamePattern rejects an empty or whitespace-padded object: the
+	// backend matches a declared object verbatim.
+	objectNamePattern = `(?s)^\S(.*\S)?$`
+	objectNameTag     = "retl_object_name"
 )
 
 // Registering here rather than in the rules package keeps the pattern available
@@ -20,6 +25,7 @@ const (
 // registrar has to be reachable from this package alone.
 func init() {
 	funcs.NewPattern(columnNameTag, columnNamePattern, "must be a column name matching "+columnNamePattern)
+	funcs.NewPattern(objectNameTag, objectNamePattern, "must not be empty or have leading or trailing whitespace")
 }
 
 const (
@@ -104,8 +110,8 @@ type ConfigSpec struct {
 	Mappings      []MappingSpec     `json:"mappings,omitempty"      mapstructure:"mappings"       validate:"dive"`
 	Constants     []ConstantSpec    `json:"constants,omitempty"     mapstructure:"constants"      validate:"dive"`
 	Event         *EventSpec        `json:"event,omitempty"         mapstructure:"event"`
-	Object        *string           `json:"object,omitempty"        mapstructure:"object"`
-	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column" validate:"omitempty,pattern=retl_column_name"`
+	Object        *string           `json:"object,omitempty"        mapstructure:"object"         validate:"omitempty,pattern=retl_object_name"`
+	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column"  validate:"excluded_unless=SyncBehaviour upsert,omitempty,pattern=retl_column_name"`
 	SyncSettings  *SyncSettingsSpec `json:"sync_settings,omitempty" mapstructure:"sync_settings"`
 }
 
@@ -133,9 +139,13 @@ type MappingSpec struct {
 	To   string `json:"to"   mapstructure:"to"   validate:"required"`
 }
 
-// ConstantSpec is a user-defined constant added to every synced record.
+// ConstantSpec is a user-defined constant added to every synced record. The
+// backend writes context.mappedToDestination itself
+// (config-backend src/modules/retl/api-gateway/connection-config/constants.ts),
+// so a user constant claiming that key would be overwritten rather than
+// delivered.
 type ConstantSpec struct {
-	Key   string `json:"key"   mapstructure:"key"   validate:"required"`
+	Key   string `json:"key"   mapstructure:"key"   validate:"required,ne=context.mappedToDestination"`
 	Value string `json:"value" mapstructure:"value" validate:"required"`
 }
 
