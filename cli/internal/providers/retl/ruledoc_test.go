@@ -21,6 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,6 +107,11 @@ func loadExample(t *testing.T, registry *definitions.Registry, files map[string]
 func assertExpectedDiagnostics(t *testing.T, ruleID string, example docs.InvalidExample, diagnostics validation.Diagnostics, loadErr error) {
 	t.Helper()
 
+	// Warnings alone must not fail the load, or validate would exit non-zero on them.
+	wantErr := slices.ContainsFunc(example.ExpectedDiagnostics, func(d docs.ExpectedDiagnostic) bool {
+		return d.Severity == rules.Error.String()
+	})
+	assert.Equal(t, wantErr, loadErr != nil, "load error: %v", loadErr)
 	assert.Len(t, describe(diagnostics), len(example.ExpectedDiagnostics), "load error: %v", loadErr)
 	for _, expected := range example.ExpectedDiagnostics {
 		indexer, err := pathindex.NewPathIndexer([]byte(example.Files[expected.File]))
