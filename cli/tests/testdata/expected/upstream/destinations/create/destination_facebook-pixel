@@ -23,7 +23,7 @@
     "eventsToEvents": [
       {
         "from": "Order Completed",
-        "to": "rudderCliE2eLegacyPixelId"
+        "to": "Purchase"
       }
     ],
     "blacklistPiiProperties": [
@@ -50,7 +50,7 @@
       "web": [
         {
           "from": "Product Viewed",
-          "to": "9876543210"
+          "to": "rudderCliE2eLegacyPixelId"
         }
       ]
     }
