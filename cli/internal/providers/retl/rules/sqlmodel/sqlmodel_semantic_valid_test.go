@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
@@ -69,6 +70,46 @@ func TestSQLModelSemanticValid_DisplayNameUniqueness(t *testing.T) {
 		require.Len(t, results, 1)
 		assert.Equal(t, "/display_name", results[0].Reference)
 		assert.Contains(t, results[0].Message, "duplicate display_name 'Same Name' within kind 'retl-source-sql-model'")
+	})
+
+	// The control plane compares source names case-insensitively.
+	t.Run("display name differing only in case detected", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sqlModelResource("model-1", "orders"))
+		graph.AddResource(sqlModelResource("model-2", "Orders"))
+
+		spec := sqlmodel.SQLModelSpec{
+			ID:          "model-1",
+			DisplayName: "orders",
+		}
+
+		results := validateSQLModelSemantic("", "", nil, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/display_name",
+			Message:   "duplicate display_name 'orders' (case-insensitive match with 'Orders') within kind 'retl-source-sql-model'",
+		}}, results)
+	})
+
+	// A clash with a table source is reported on the table source, by
+	// retl/table/semantic-valid.
+	t.Run("table source with the same display name not reported here", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sqlModelResource("model-1", "Orders"))
+		graph.AddResource(resources.NewResource("orders-table", table.ResourceType, resources.ResourceData{
+			sqlmodel.DisplayNameKey: "Orders",
+		}, nil))
+
+		spec := sqlmodel.SQLModelSpec{
+			ID:          "model-1",
+			DisplayName: "Orders",
+		}
+
+		results := validateSQLModelSemantic("", "", nil, spec, graph)
+		assert.Empty(t, results)
 	})
 
 	t.Run("single resource — no false positive", func(t *testing.T) {
