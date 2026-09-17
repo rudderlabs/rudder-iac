@@ -45,9 +45,8 @@ type gcsConfig struct {
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
-// NewDefinition returns the Google Cloud Storage destination definition. GCS stays
-// behind the unverified destination gate; source support remains restricted to the
-// CLI-owned event-stream types above.
+// NewDefinition returns the Google Cloud Storage destination definition. Source
+// support remains restricted to the CLI-owned event-stream types above.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("bucketName", "bucket_name"),
