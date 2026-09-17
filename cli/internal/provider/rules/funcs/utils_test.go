@@ -261,7 +261,7 @@ func TestGetErrorMessage(t *testing.T) {
 				actualTag: "excluded_unless",
 				param:     "Type object",
 			},
-			expected: "'variants' is not allowed unless 'Type object'",
+			expected: "'variants' is not allowed unless 'Type' is object",
 		},
 		{
 			name: "excluded_if tag with nil rootType falls back to struct name",

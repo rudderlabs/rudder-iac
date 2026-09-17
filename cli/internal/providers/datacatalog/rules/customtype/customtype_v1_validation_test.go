@@ -146,7 +146,7 @@ func TestCustomTypeSpecSyntaxValidRule_V1InvalidSpecs(t *testing.T) {
 				},
 			},
 			expectedRefs: []string{"/types/0/variants"},
-			expectedMsgs: []string{"'variants' is not allowed unless 'type object'"},
+			expectedMsgs: []string{"'variants' is not allowed unless 'type' is object"},
 		},
 		{
 			name: "both item_type and item_types set(not allowed)",
