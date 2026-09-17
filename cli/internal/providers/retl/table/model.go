@@ -19,7 +19,9 @@ const (
 	ObjectPrefixKey = "object_prefix"
 
 	// SourceDefinitionS3 selects the bucket-backed config shape, which carries
-	// no primary key: rudder-api rejects one on s3.
+	// no primary key. rudder-api only type-checks primaryKey and would accept
+	// one, so the spec forbids it here: RETLS3TableConfig has no field for it
+	// and an accepted value would be dropped on every apply.
 	SourceDefinitionS3 = "s3"
 )
 
@@ -32,7 +34,8 @@ const (
 //
 // There is no description: neither table config shape carries one, so it could
 // never round-trip. s3 forbids primary_key for the same reason: the s3 config
-// has no field for it, and rudder-api rejects one. object_prefix is optional on
+// has no field for it, so an accepted value would be silently dropped on every
+// apply. object_prefix is optional on
 // s3 — rudder-api validates only bucketName — so a bucket-rooted source needs
 // no prefix.
 type TableSpec struct {
