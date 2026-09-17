@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.26.0](https://github.com/rudderlabs/rudder-iac/compare/v0.25.1...v0.26.0) (2026-09-17)
+
+
+### Features
+
+* **destination:** complete initial rETL metadata in the destination registry ([#836](https://github.com/rudderlabs/rudder-iac/issues/836)) ([3eedc1c](https://github.com/rudderlabs/rudder-iac/commit/3eedc1c0f839a44213394985805c26f5d5612cb5))
+* **destination:** group postgres storage config blocks ([#854](https://github.com/rudderlabs/rudder-iac/issues/854)) ([5da012a](https://github.com/rudderlabs/rudder-iac/commit/5da012afcf3731dd84df07491dc7836f5f3180d7))
+* **destination:** group snowflake storage config sections ([#808](https://github.com/rudderlabs/rudder-iac/issues/808)) ([5ddffb7](https://github.com/rudderlabs/rudder-iac/commit/5ddffb778da459372585448d6b1391956301fed3))
+* **destination:** mark 18 destinations as verified ([#878](https://github.com/rudderlabs/rudder-iac/issues/878)) ([aab14eb](https://github.com/rudderlabs/rudder-iac/commit/aab14eb85c72796ea458b3a5b4b0d641b17cfaf9))
+* **retl:** add connection handler lifecycle and immutable replacement ([#843](https://github.com/rudderlabs/rudder-iac/issues/843)) ([80cfac8](https://github.com/rudderlabs/rudder-iac/commit/80cfac800e31914876c913e6b5cc4e88c72b8688))
+* **retl:** add connection model, reference contracts and source metadata ([#840](https://github.com/rudderlabs/rudder-iac/issues/840)) ([3b94c5a](https://github.com/rudderlabs/rudder-iac/commit/3b94c5a5d6a769cfe9ea4ddf5467497899227501))
+* **retl:** add destination lookup to the rETL API client ([#839](https://github.com/rudderlabs/rudder-iac/issues/839)) ([7617674](https://github.com/rudderlabs/rudder-iac/commit/7617674e7f499fc146f3e01de7c2ba90f6317d99))
+* **retl:** canonical connection config and lossless API conversions ([#842](https://github.com/rudderlabs/rudder-iac/issues/842)) ([db61585](https://github.com/rudderlabs/rudder-iac/commit/db61585df1d597e1aaf078e1365e1ff82a3eef8a))
+
+
+### Bug Fixes
+
+* **ci:** cut e2e write volume against the production control plane ([#828](https://github.com/rudderlabs/rudder-iac/issues/828)) ([06ce781](https://github.com/rudderlabs/rudder-iac/commit/06ce78147ac9ce28b94de26b00a7a9938247188e))
+* **destination:** apply revision-2 secret keys to the 24 verified destinations ([#861](https://github.com/rudderlabs/rudder-iac/issues/861)) ([0250346](https://github.com/rudderlabs/rudder-iac/commit/0250346dc13880cb0584aea3411d97e694ccc48f))
+* **destination:** drop the unselected event filter list on import ([#862](https://github.com/rudderlabs/rudder-iac/issues/862)) ([1a6f999](https://github.com/rudderlabs/rudder-iac/commit/1a6f999dae99621428b2c1b6a421c8488b39a3da))
+* **destination:** remove native SDK config surface ([#846](https://github.com/rudderlabs/rudder-iac/issues/846)) ([5d9ef71](https://github.com/rudderlabs/rudder-iac/commit/5d9ef7134d50b40992509b2fd454aa43851669a4))
+* **destination:** round-trip an empty selected event filter list ([#875](https://github.com/rudderlabs/rudder-iac/issues/875)) ([1e49936](https://github.com/rudderlabs/rudder-iac/commit/1e499363ac74f5b30b8aefcc8f490fee503ea2f3))
+* **differ:** classify an all-secret config block as secret-only ([#848](https://github.com/rudderlabs/rudder-iac/issues/848)) ([82f9122](https://github.com/rudderlabs/rudder-iac/commit/82f91225611e791cfa4a7fe324e868e06d21ad70))
+* **import:** substitute variables when loading the project for workspace import ([#833](https://github.com/rudderlabs/rudder-iac/issues/833)) ([022ca2c](https://github.com/rudderlabs/rudder-iac/commit/022ca2c7677da4d6b33a926a861ca70a9b614f22))
+* **tests:** repair destination e2e fixture data ([#879](https://github.com/rudderlabs/rudder-iac/issues/879)) ([1fb6a4a](https://github.com/rudderlabs/rudder-iac/commit/1fb6a4a584547d1fb75707ed5ca52b38f856deef))
+* **transformations:** dedupe code file names on import across transformations and libraries ([#859](https://github.com/rudderlabs/rudder-iac/issues/859)) ([56ff705](https://github.com/rudderlabs/rudder-iac/commit/56ff705cad092085fcf1a8b21ec92f1b46f56ce8))
+
+
+### Miscellaneous
+
+* **ci:** run destination e2e nightly instead of on every commit ([#874](https://github.com/rudderlabs/rudder-iac/issues/874)) ([a759066](https://github.com/rudderlabs/rudder-iac/commit/a759066f43eaf927c2e7185ca19c48bf66bdd1fe))
+* **destination:** document the bq definition config surface ([#826](https://github.com/rudderlabs/rudder-iac/issues/826)) ([fa6ac85](https://github.com/rudderlabs/rudder-iac/commit/fa6ac853363e8412736d59814c2127d0b290acae))
+* **destination:** expose connection mode for native SDK configs ([#845](https://github.com/rudderlabs/rudder-iac/issues/845)) ([13131ac](https://github.com/rudderlabs/rudder-iac/commit/13131ac1c7884bc6b879c6908266ced439745e44))
+* **destination:** pin Slack create array defaults ([#844](https://github.com/rudderlabs/rudder-iac/issues/844)) ([9eef77e](https://github.com/rudderlabs/rudder-iac/commit/9eef77ed4c9003508dbb628631aa34a343c8a911))
+* group ssh config under nested block ([#855](https://github.com/rudderlabs/rudder-iac/issues/855)) ([7b7e60f](https://github.com/rudderlabs/rudder-iac/commit/7b7e60faf1b9de7eed7ee6b4dae0bef236711152))
+
 ## [0.25.1](https://github.com/rudderlabs/rudder-iac/compare/v0.25.0...v0.25.1) (2026-09-08)
 
 
