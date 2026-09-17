@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -79,6 +80,13 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 	}
 	if err := decoder.Decode(s.Spec); err != nil {
 		return fmt.Errorf("decoding table source spec: %w", err)
+	}
+	// The syntax rule already checks the form; this guards data(), which has
+	// no way to report a reference it cannot parse.
+	if spec.Account != "" {
+		if _, err := sqlmodel.ParseAccountRef(spec.Account); err != nil {
+			return fmt.Errorf("parsing account reference of table source %s: %w", spec.ID, err)
+		}
 	}
 
 	if _, ok := h.resources[spec.ID]; ok {
@@ -288,8 +296,10 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 			return nil, err
 		}
 
+		local, ok := h.resources[source.ExternalID]
 		input := remote.data()
 		input[sourcekeys.LocalIDKey] = source.ExternalID
+		input[sourcekeys.AccountIDKey] = sqlmodel.AccountInput(source.AccountID, ok && local.Account == "", collection)
 		s.AddResource(&state.ResourceState{
 			Type:   ResourceType,
 			ID:     source.ExternalID,
@@ -344,7 +354,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	_ namer.Namer,
-	_ resolver.ReferenceResolver,
+	inputResolver resolver.ReferenceResolver,
 ) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
@@ -392,12 +402,16 @@ func (h *Handler) FormatForExport(
 			return nil, nil, fmt.Errorf("converting metadata for table source %s: %w", source.ExternalID, err)
 		}
 
+		fields := remote.specFields(source.ExternalID)
+		accountKey, account := sqlmodel.ExportAccount(data.AccountID, inputResolver)
+		fields[accountKey] = account
+
 		entities = append(entities, writer.FormattableEntity{
 			Content: &specs.Spec{
 				Version:  specs.SpecVersionV1,
 				Kind:     ResourceKind,
 				Metadata: metadataMap,
-				Spec:     remote.specFields(source.ExternalID),
+				Spec:     fields,
 			},
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})

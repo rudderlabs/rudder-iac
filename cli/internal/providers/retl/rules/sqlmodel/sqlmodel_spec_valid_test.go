@@ -80,6 +80,17 @@ func TestSQLModelSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 				Enabled:          func() *bool { b := false; return &b }(),
 			},
 		},
+		{
+			name: "with account reference instead of account_id",
+			spec: sqlmodel.SQLModelSpec{
+				ID:               "model-5",
+				DisplayName:      "My Model",
+				Account:          "#account:prod-pg",
+				PrimaryKey:       "id",
+				SourceDefinition: "postgres",
+				SQL:              ptr("SELECT 1"),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -154,7 +165,7 @@ func TestSQLModelSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				SourceDefinition: "postgres",
 				SQL:              ptr("SELECT 1"),
 			},
-			wantMessages: []string{"'account_id' is required"},
+			wantMessages: []string{"'account_id' is required when 'account' is not specified"},
 		},
 		{
 			name: "missing primary_key",
@@ -217,13 +228,38 @@ func TestSQLModelSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			wantMessages: []string{"'sql' and 'file' cannot be specified together"},
 		},
 		{
+			name: "both account_id and account",
+			spec: sqlmodel.SQLModelSpec{
+				ID:               "model-1",
+				DisplayName:      "My Model",
+				AccountID:        "acc-1",
+				Account:          "#account:prod-pg",
+				PrimaryKey:       "id",
+				SourceDefinition: "postgres",
+				SQL:              ptr("SELECT 1"),
+			},
+			wantMessages: []string{"'account_id' and 'account' cannot be specified together"},
+		},
+		{
+			name: "account that is not an account reference",
+			spec: sqlmodel.SQLModelSpec{
+				ID:               "model-1",
+				DisplayName:      "My Model",
+				Account:          "#destination:prod-pg",
+				PrimaryKey:       "id",
+				SourceDefinition: "postgres",
+				SQL:              ptr("SELECT 1"),
+			},
+			wantMessages: []string{"'account' is not valid: must be of the form #account:<id>"},
+		},
+		{
 			name: "all required fields missing",
 			spec: sqlmodel.SQLModelSpec{},
 			wantMessages: []string{
 				"'id' is required",
 				"'display_name' is required",
 				"'sql' is required when 'file' is not specified",
-				"'account_id' is required",
+				"'account_id' is required when 'account' is not specified",
 				"'primary_key' is required",
 				"'source_definition' is required",
 			},
@@ -361,7 +397,7 @@ func TestSQLModelV1SpecValidation_InvalidSpecs(t *testing.T) {
 				SourceDefinition: "postgres",
 				SQL:              ptr("SELECT 1"),
 			},
-			wantMessages: []string{"'account_id' is required"},
+			wantMessages: []string{"'account_id' is required when 'account' is not specified"},
 		},
 		{
 			name: "missing primary_key",
@@ -430,7 +466,7 @@ func TestSQLModelV1SpecValidation_InvalidSpecs(t *testing.T) {
 				"'id' is required",
 				"'display_name' is required",
 				"'sql' is required when 'file' is not specified",
-				"'account_id' is required",
+				"'account_id' is required when 'account' is not specified",
 				"'primary_key' is required",
 				"'source_definition' is required",
 			},

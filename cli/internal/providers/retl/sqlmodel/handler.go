@@ -80,6 +80,16 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 	if spec.SQL != nil && spec.File != nil {
 		return fmt.Errorf("sql and file cannot be specified together")
 	}
+
+	// Checked before the file read below, so a spec that is wrong about both
+	// its SQL and its account does not report only the file error.
+	if spec.AccountID == "" && spec.Account == "" {
+		return fmt.Errorf("account_id or account must be specified")
+	}
+	if spec.AccountID != "" && spec.Account != "" {
+		return fmt.Errorf("account_id and account cannot be specified together")
+	}
+
 	sqlStr := ""
 	if spec.SQL != nil {
 		sqlStr = *spec.SQL
@@ -99,6 +109,13 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		sqlStr = string(sqlContent)
 	}
 
+	var account string
+	if spec.Account != "" {
+		if account, err = ParseAccountRef(spec.Account); err != nil {
+			return fmt.Errorf("parsing account reference: %w", err)
+		}
+	}
+
 	// Default Enabled to true if not specified
 	enabled := true
 	if spec.Enabled != nil {
@@ -111,6 +128,7 @@ func (h *Handler) LoadSpec(path string, s *specs.Spec) error {
 		DisplayName:      spec.DisplayName,
 		Description:      spec.Description,
 		AccountID:        spec.AccountID,
+		AccountLocalID:   account,
 		PrimaryKey:       spec.PrimaryKey,
 		SourceDefinition: string(spec.SourceDefinition),
 		Enabled:          enabled,
@@ -166,7 +184,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			LocalIDKey:          spec.ID,
 			DisplayNameKey:      spec.DisplayName,
 			DescriptionKey:      spec.Description,
-			AccountIDKey:        spec.AccountID,
+			AccountIDKey:        spec.accountValue(),
 			PrimaryKeyKey:       spec.PrimaryKey,
 			SourceDefinitionKey: spec.SourceDefinition,
 			EnabledKey:          spec.Enabled,
@@ -432,10 +450,11 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if err != nil {
 			return nil, err
 		}
+		local, ok := h.resources[source.ExternalID]
 		input := resources.ResourceData{
 			DisplayNameKey:      source.Name,
 			DescriptionKey:      cfg.Description,
-			AccountIDKey:        source.AccountID,
+			AccountIDKey:        AccountInput(source.AccountID, ok && local.AccountLocalID == "", collection),
 			PrimaryKeyKey:       cfg.PrimaryKey,
 			SQLKey:              cfg.Sql,
 			EnabledKey:          source.IsEnabled,
@@ -531,6 +550,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			return nil, nil, err
 		}
 
+		accountKey, account := ExportAccount(sourceData.AccountID, inputResolver)
 		spec := &specs.Spec{
 			Version:  specs.SpecVersionV1,
 			Kind:     ResourceKind,
@@ -538,7 +558,7 @@ func (h *Handler) FormatForExport(collection *resources.RemoteResources, idNamer
 			Spec: map[string]interface{}{
 				DisplayNameKey:      sourceData.Name,
 				DescriptionKey:      cfg.Description,
-				AccountIDKey:        sourceData.AccountID,
+				accountKey:          account,
 				PrimaryKeyKey:       cfg.PrimaryKey,
 				SQLKey:              cfg.Sql,
 				SourceDefinitionKey: sourceData.SourceDefinitionName,

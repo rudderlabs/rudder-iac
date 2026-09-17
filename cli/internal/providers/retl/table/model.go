@@ -5,6 +5,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sourcekeys"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -18,10 +19,8 @@ const (
 	BucketNameKey   = "bucket_name"
 	ObjectPrefixKey = "object_prefix"
 
-	// SourceDefinitionS3 selects the bucket-backed config shape, which carries
-	// no primary key. rudder-api's RetlSourceS3ConfigSchema is .strict(), so a
-	// primaryKey inside an s3 config is rejected outright
-	// (rudder-control-plane apps/rudder-api/src/modules/retl/controller.ts).
+	// SourceDefinitionS3 selects the bucket-backed config shape. The API also
+	// exempts s3 sources from its primary key requirement.
 	SourceDefinitionS3 = "s3"
 )
 
@@ -33,22 +32,20 @@ const (
 // requires or forbids.
 //
 // There is no description: neither table config shape carries one, so it could
-// never round-trip.
+// never round-trip. s3 forbids primary_key for the same reason: the s3 config
+// has no field for it, and rudder-api rejects one. s3 requires object_prefix
+// because rudder-api rejects an s3 config without it.
 //
-// The s3 field rules follow rudder-api's RetlSourceS3ConfigSchema, which is
-// z.object({bucketName, objectPrefix: z.string().min(1)}).strict() — so
-// object_prefix is required and non-empty, and primary_key is rejected as an
-// excess key. primary_key would be wrong here even if the schema allowed it:
-// RETLS3TableConfig has no field for it, so an accepted value would be dropped
-// on write and show as drift on every plan.
-//
-// Note that config-backend, behind rudder-api, is laxer on both — it validates
-// only that bucketName is a string. rudder-api is the boundary the CLI talks
-// to, so its schema is the one these tags mirror.
+// Account holds the spec's "#account:<id>" reference, empty when the spec sets
+// account_id; remote sources and dereferenced data carry only AccountID.
+// account_id stays beside the reference because the accounts provider cannot
+// manage every account a table source may use (s3 accounts among them), and
+// those can only be named by id.
 type TableSpec struct {
 	ID               string `json:"id"                mapstructure:"id"                validate:"required"`
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
-	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required"`
+	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
+	Account          string `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
 	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino s3"`
 	PrimaryKey       string `json:"primary_key"       mapstructure:"primary_key"       validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
@@ -81,17 +78,26 @@ func (t TableSpec) configData() resources.ResourceData {
 // data returns the resource's graph data, without the local id. The keys are
 // sqlmodel's and primary_key is present for every source definition — empty
 // for s3 — so a connection reads either RETL source kind through one shape.
+// account_id holds the raw id, or a reference that resolves to it.
 func (t TableSpec) data() resources.ResourceData {
 	data := t.configData()
 	data[sourcekeys.DisplayNameKey] = t.DisplayName
 	data[sourcekeys.AccountIDKey] = t.AccountID
+	if t.Account != "" {
+		// Validation runs before LoadSpec and pins Account to the reference
+		// pattern, so a non-empty value always parses here.
+		id, _ := sqlmodel.ParseAccountRef(t.Account)
+		data[sourcekeys.AccountIDKey] = sqlmodel.AccountRef(id)
+	}
 	data[sourcekeys.SourceDefinitionKey] = t.SourceDefinition
 	data[sourcekeys.PrimaryKeyKey] = t.PrimaryKey
 	data[sourcekeys.EnabledKey] = t.Enabled
 	return data
 }
 
-// specFields returns the flat spec body export writes for the resource.
+// specFields returns the flat spec body export writes for the resource. The
+// account is not included: export names it by reference when it can (see
+// sqlmodel.ExportAccount).
 func (t TableSpec) specFields(id string) map[string]any {
 	fields := t.configData()
 	// The webapp can save an s3 source with an empty prefix; leaving the key out
@@ -101,7 +107,6 @@ func (t TableSpec) specFields(id string) map[string]any {
 	}
 	fields[sourcekeys.IDKey] = id
 	fields[sourcekeys.DisplayNameKey] = t.DisplayName
-	fields[sourcekeys.AccountIDKey] = t.AccountID
 	fields[sourcekeys.SourceDefinitionKey] = t.SourceDefinition
 	fields[sourcekeys.EnabledKey] = t.Enabled
 	return fields

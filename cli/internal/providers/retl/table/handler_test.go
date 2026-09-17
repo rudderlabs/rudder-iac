@@ -251,6 +251,13 @@ func TestLoadSpec(t *testing.T) {
 			spec:    withField(warehouseSpec(), "config", map[string]any{"schema": "public"}),
 			wantErr: "decoding table source spec",
 		},
+		{
+			// The syntax rule rejects this first; LoadSpec must not build a
+			// reference from it either way.
+			name:    "account that is not an account reference",
+			spec:    withField(withoutField(warehouseSpec(), "account_id"), "account", "prod-pg"),
+			wantErr: `parsing account reference of table source users-table: invalid account reference "prod-pg"`,
+		},
 	}
 	for _, tc := range invalid {
 		t.Run("rejects "+tc.name, func(t *testing.T) {
@@ -653,7 +660,9 @@ func TestImportWorkspace(t *testing.T) {
 	assert.Equal(t, "users", users.ExternalID)
 	assert.Equal(t, "#retl-source-table:users", users.Reference)
 
-	entities, entries, err := h.FormatForExport(importable, nil, nil)
+	// The postgres account is imported alongside; the s3 one is of a
+	// definition the accounts provider does not import.
+	entities, entries, err := h.FormatForExport(importable, nil, importResolver(t, importable, map[string]string{"acc-123": "prod-pg"}, nil))
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []importmanifest.ImportEntry{
 		{WorkspaceID: "ws-1", URN: "retl-source-table:users", RemoteID: "src-1"},
@@ -674,7 +683,7 @@ func TestImportWorkspace(t *testing.T) {
 	assert.Equal(t, map[string]any{
 		"id":                "users",
 		"display_name":      "Users",
-		"account_id":        "acc-123",
+		"account":           "#account:prod-pg",
 		"source_definition": "postgres",
 		"primary_key":       "id",
 		"schema":            "public",

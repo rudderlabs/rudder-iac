@@ -181,10 +181,16 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	return p.syntacticRules
 }
 
+// SemanticRules registers the table rule only with the table kind, so with the
+// flag off validation is exactly what it was before the kind existed.
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	semantic := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),
 	}
+	if _, ok := p.handlers[table.ResourceType]; ok {
+		semantic = append(semantic, tableRules.NewTableSemanticValidRule())
+	}
+	return semantic
 }
 
 // RuleDocEntries returns the authored documentation fragments embedded with
