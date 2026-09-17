@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"testing"
@@ -11,8 +12,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
@@ -432,4 +435,40 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			assert.Equal(t, tc.wantSpecs, proj.Specs())
 		})
 	}
+}
+
+// syntacticWarningProvider adds one syntactic rule that warns on every fixture
+// spec.
+type syntacticWarningProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *syntacticWarningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{prules.NewTypedRule(
+		"test/syntactic-warning",
+		rules.Warning,
+		"fixture specs always warn",
+		rules.Examples{},
+		prules.NewPatternValidator(fixtureMatchPatterns, func(string, string, map[string]any, map[string]any) []rules.ValidationResult {
+			return []rules.ValidationResult{{Message: "check this spec"}}
+		}),
+	)}
+}
+
+func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := &syntacticWarningProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"path/to/spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: my_source\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var buf bytes.Buffer
+	proj := project.New(mockProvider, project.WithLoader(mockLoader), project.WithRenderer(renderer.NewTextRenderer(&buf)))
+
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Contains(t, buf.String(), "warning[test/syntactic-warning]: check this spec")
 }
