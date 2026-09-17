@@ -35,7 +35,17 @@ import (
 // rules too; without it those four fragments would be orphans, which is exactly
 // what the gen-rule-docs workflow sets the experimental flag for.
 func TestProviderRuleDocs(t *testing.T) {
-	registry := exampleDestinationRegistry(t)
+	// Bing, Customer.io Audience and Firebase are unverified, so the app
+	// registers them only behind a flag; the examples need them unconditionally.
+	registry := definitions.NewRegistry()
+	for _, definition := range []*definitions.DestinationDefinition{
+		httpdest.NewDefinition(),
+		bingads.NewDefinition(),
+		customerioaudience.NewDefinition(),
+		firebase.NewDefinition(),
+	} {
+		require.NoError(t, registry.Register(definition))
+	}
 	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(registry))
 
 	syntactic := p.SyntacticRules()
@@ -71,24 +81,6 @@ func TestProviderRuleDocs(t *testing.T) {
 	}
 }
 
-// exampleDestinationRegistry registers the definitions the examples use. Bing,
-// Customer.io Audience and Firebase are unverified, so the app registers them
-// only behind a flag; the examples need them unconditionally.
-func exampleDestinationRegistry(t *testing.T) *definitions.Registry {
-	t.Helper()
-
-	registry := definitions.NewRegistry()
-	for _, definition := range []*definitions.DestinationDefinition{
-		httpdest.NewDefinition(),
-		bingads.NewDefinition(),
-		customerioaudience.NewDefinition(),
-		firebase.NewDefinition(),
-	} {
-		require.NoError(t, registry.Register(definition))
-	}
-	return registry
-}
-
 // loadExample runs the example files through project.Load, the path validate
 // takes, with every provider that owns a kind the examples use.
 func loadExample(t *testing.T, registry *definitions.Registry, files map[string]string) (validation.Diagnostics, error) {
@@ -109,29 +101,26 @@ func loadExample(t *testing.T, registry *definitions.Registry, files map[string]
 // assertExpectedDiagnostics requires the example to produce exactly its
 // expected diagnostics, at least one of them from the rule it documents.
 // Diagnostics carry positions rather than JSON pointers, so each reference is
-// resolved against its file the way the validation engine resolves it.
+// resolved against its file. The lookup is exact: the engine's fallback to the
+// nearest ancestor would let a pointer to a missing key match its parent.
 func assertExpectedDiagnostics(t *testing.T, ruleID string, example docs.InvalidExample, diagnostics validation.Diagnostics, loadErr error) {
 	t.Helper()
 
-	remaining := slices.Clone(diagnostics)
+	assert.Len(t, describe(diagnostics), len(example.ExpectedDiagnostics), "load error: %v", loadErr)
 	for _, expected := range example.ExpectedDiagnostics {
 		indexer, err := pathindex.NewPathIndexer([]byte(example.Files[expected.File]))
 		require.NoError(t, err)
-		position := indexer.NearestPosition(expected.Reference)
+		position, err := indexer.PositionLookup(expected.Reference)
+		require.NoError(t, err)
 
-		index := slices.IndexFunc(remaining, func(d validation.Diagnostic) bool {
+		assert.True(t, slices.ContainsFunc(diagnostics, func(d validation.Diagnostic) bool {
 			return d.File == expected.File &&
 				d.Position.Line == position.Line &&
 				d.Position.Column == position.Column &&
 				d.Severity.String() == expected.Severity &&
 				strings.Contains(d.Message, expected.MessageContains)
-		})
-		if !assert.NotEqual(t, -1, index, "expected %+v, got %v (load error: %v)", expected, describe(remaining), loadErr) {
-			continue
-		}
-		remaining = slices.Delete(remaining, index, index+1)
+		}), "expected %+v, got %v (load error: %v)", expected, describe(diagnostics), loadErr)
 	}
-	assert.Empty(t, describe(remaining), "unexpected diagnostics")
 
 	assert.True(t, slices.ContainsFunc(diagnostics, func(d validation.Diagnostic) bool {
 		return d.RuleID == ruleID
