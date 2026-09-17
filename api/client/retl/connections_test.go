@@ -642,3 +642,131 @@ func TestUpdateConnection_CronSchedule(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+func TestGetDestinations(t *testing.T) {
+	cases := []struct {
+		name          string
+		calls         []testutils.Call
+		want          []client.Destination
+		wantErrSubstr string
+		wantAPIErr    *client.APIError
+	}{
+		{
+			name: "decodes destinations across pages",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "dest-1",
+							"externalId": "webhook-prod",
+							"name": "Webhook Prod",
+							"type": "WEBHOOK",
+							"version": 2,
+							"enabled": true,
+							"workspaceId": "ws-1",
+							"config": {"webhookUrl":"https://example.com"}
+						}],
+						"paging": {"total": 2, "next": "/destinations?page=2"}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return assertCall(t, req, "GET", "https://api.rudderstack.com/destinations?page=2", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"destinations": [{
+							"id": "dest-2",
+							"name": "GA4 Staging",
+							"type": "GA4",
+							"enabled": false,
+							"workspaceId": "ws-1",
+							"config": {}
+						}],
+						"paging": {"total": 2}
+					}`,
+				},
+			},
+			want: []client.Destination{
+				{
+					ID:          "dest-1",
+					ExternalID:  "webhook-prod",
+					Name:        "Webhook Prod",
+					Type:        "WEBHOOK",
+					Version:     2,
+					IsEnabled:   true,
+					WorkspaceID: "ws-1",
+					Config:      []byte(`{"webhookUrl":"https://example.com"}`),
+				},
+				{
+					ID:          "dest-2",
+					Name:        "GA4 Staging",
+					Type:        "GA4",
+					WorkspaceID: "ws-1",
+					Config:      []byte(`{}`),
+				},
+			},
+		},
+		{
+			name: "no destinations",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 200,
+					ResponseBody:   `{"destinations": [], "paging": {"total": 0}}`,
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "propagates API failure",
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return assertCall(t, req, "GET", "https://api.rudderstack.com/v2/destinations", "")
+					},
+					ResponseStatus: 500,
+					ResponseBody:   `{"error":"Internal Server Error"}`,
+				},
+			},
+			wantErrSubstr: "listing destinations",
+			wantAPIErr: &client.APIError{
+				HTTPStatusCode: 500,
+				Message:        "Internal Server Error",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpClient := testutils.NewMockHTTPClient(t, tc.calls...)
+
+			c, err := client.New("test-token", client.WithHTTPClient(httpClient))
+			require.NoError(t, err)
+
+			got, err := retl.NewRudderRETLStore(c).GetDestinations(context.Background())
+			if tc.wantErrSubstr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrSubstr)
+				assert.Nil(t, got)
+
+				// The wrapper prefix alone would still match if the APIError
+				// were swallowed, so assert it survives the hop intact.
+				var apiErr *client.APIError
+				require.ErrorAs(t, err, &apiErr)
+				assert.Equal(t, tc.wantAPIErr, apiErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			}
+
+			httpClient.AssertNumberOfCalls()
+		})
+	}
+}

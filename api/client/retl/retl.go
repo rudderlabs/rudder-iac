@@ -32,6 +32,9 @@ type RETLConnectionStore interface {
 
 	// SetConnectionExternalId sets the external ID for a RETL connection.
 	SetConnectionExternalId(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
+
+	// GetDestinations lists the workspace's destinations.
+	GetDestinations(ctx context.Context) ([]client.Destination, error)
 }
 
 type ListRetlSourcesOption func(*ListRetlSourcesOptions)

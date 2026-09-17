@@ -264,8 +264,17 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// For the actual file entity, we need just <language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(langFolder, externalID+ext)
+		// External IDs are unique per resource type only, so a transformation can
+		// share this ID; the spec and code file take the name deduplicated across the dir.
+		fileName, err := idNamer.Name(namer.ScopeName{
+			Name:  externalID,
+			Scope: handlers.TransformationsDir,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
+		}
+
+		codeFilePath := filepath.Join(langFolder, fileName+ext)
 
 		// Build import metadata
 		urn := resources.URN(externalID, HandlerMetadata.ResourceType)
@@ -296,15 +305,6 @@ func (h *HandlerImpl) FormatForExport(
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating spec for library %s: %w", remote.ID, err)
-		}
-
-		// Generate unique filename for YAML spec
-		fileName, err := idNamer.Name(namer.ScopeName{
-			Name:  externalID,
-			Scope: handlers.TransformationsDir,
-		})
-		if err != nil {
-			return nil, nil, fmt.Errorf("generating file name for library %s: %w", remote.ID, err)
 		}
 
 		// Add YAML spec entity
