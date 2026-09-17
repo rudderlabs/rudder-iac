@@ -48,20 +48,8 @@ type Option func(*Provider)
 // The app applies it only while the retlConnectionSupport experimental flag is
 // effective, so without it the provider keeps exactly the SQL-model surface it
 // had.
-//
-// A nil registry leaves connection support off entirely. Both the semantic
-// rules and remote import index a map on the registry, so a nil one constructs
-// fine and panics later, mid-run. Substituting an empty registry would trade
-// that for something quieter and worse: a registered kind whose validation
-// finds no definition for any destination and so passes everything it cannot
-// see. Keeping the SQL-model-only surface is the state the provider is already
-// built and tested for.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
-		if registry == nil {
-			return
-		}
-
 		p.destinationRegistry = registry
 		p.kindToType[connection.ResourceKind] = connection.ResourceType
 		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)

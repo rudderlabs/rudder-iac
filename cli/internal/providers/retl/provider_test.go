@@ -1225,24 +1225,6 @@ func TestProviderWithoutConnectionSupport(t *testing.T) {
 	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
 }
 
-// TestProviderWithNilConnectionRegistry pins the option's refusal: the rules
-// and the connection handler both index a map on the registry, so a nil one
-// would construct fine and panic mid-validate or mid-import. Declining leaves
-// the flag-off surface, which is a state the provider is built for.
-func TestProviderWithNilConnectionRegistry(t *testing.T) {
-	t.Parallel()
-
-	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(nil))
-
-	assert.Equal(t, []string{sqlmodel.ResourceKind}, p.SupportedKinds())
-	assert.Equal(t, []string{sqlmodel.ResourceType}, p.SupportedTypes())
-	assert.Equal(t, []string{sqlmodel.ResourceType}, matcherTypes(p.ResourceMatchers()))
-	assert.Equal(t, []string{"retl/sqlmodel/spec-syntax-valid"}, ruleIDs(p.SyntacticRules()))
-	assert.Equal(t, []string{"retl/sqlmodel/semantic-valid"}, ruleIDs(p.SemanticRules()))
-
-	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
-}
-
 func ruleIDs(registered []vrules.Rule) []string {
 	ids := make([]string, 0, len(registered))
 	for _, rule := range registered {
