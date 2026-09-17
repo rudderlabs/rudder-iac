@@ -37,28 +37,30 @@ func ValidateAccountReference(ref, sourceDefinition string, graph *resources.Gra
 		return nil
 	}
 
-	reference := "/" + sqlmodel.AccountKey
+	pointer := "/" + sqlmodel.AccountKey
 	account, ok := graph.GetResource(resources.URN(id, accounts.AccountResourceType))
 	if !ok {
 		return []rules.ValidationResult{{
-			Reference: reference,
+			Reference: pointer,
 			Message:   fmt.Sprintf("account '%s' not found in the project; reference an account spec in the project, or set account_id instead", id),
 		}}
 	}
 
-	// An account spec with an unregistered definition fails to load, so an
-	// account in the graph always has a known type; the guards only keep a
-	// corrupt graph from panicking.
+	// Only a corrupt graph can fail this assertion, and only a panic would
+	// come of ignoring it.
 	data, ok := account.RawData().(*accounts.AccountResource)
 	if !ok {
 		return nil
 	}
+	// An account spec with an unregistered definition fails to load, so an
+	// account in the graph always has a known type. Guarded anyway: without it
+	// an unknown definition would report "is a '' account".
 	accountType, ok := accounts.DefinitionType(data.AccountDefinitionName)
 	if !ok || accountType == sourceDefinition {
 		return nil
 	}
 	return []rules.ValidationResult{{
-		Reference: reference,
+		Reference: pointer,
 		Message: fmt.Sprintf(
 			"account '%s' is a '%s' account (%s) and cannot back source_definition '%s'",
 			id, accountType, data.AccountDefinitionName, sourceDefinition,

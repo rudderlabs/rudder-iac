@@ -86,17 +86,19 @@ type SQLModelResource struct {
 	PrimaryKey       string `json:"primary_key"`
 	SourceDefinition string `json:"source_definition"`
 	Enabled          bool   `json:"enabled"`
-	// Account is the local id of the account the spec references, empty when
-	// the spec sets account_id. Only loaded specs carry it: remote sources and
-	// dereferenced data hold the resolved AccountID.
-	Account string `json:"account"`
+	// AccountLocalID is the local id of the account the spec references, parsed
+	// out of its "#account:<id>" form, and empty when the spec sets account_id.
+	// Only loaded specs carry it: remote sources and dereferenced data hold the
+	// resolved AccountID. Named for the parsed id because table.TableSpec's
+	// Account field holds the raw reference instead.
+	AccountLocalID string `json:"account"`
 }
 
 // accountValue is the resource's graph value under AccountIDKey: the raw id, or
 // a reference that resolves to it.
 func (s *SQLModelResource) accountValue() any {
-	if s.Account != "" {
-		return AccountRef(s.Account)
+	if s.AccountLocalID != "" {
+		return AccountRef(s.AccountLocalID)
 	}
 	return s.AccountID
 }

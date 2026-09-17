@@ -170,11 +170,10 @@ func TestExtractResourcesFromSpec_UnsupportedDefinition(t *testing.T) {
 // Every definition an account spec may name has a type, so a source that
 // references the account can always be checked against it.
 func TestDefinitionType_CoversRegisteredDefinitions(t *testing.T) {
-	for name := range registeredAccountSecretKeys {
+	for name := range registeredAccounts {
 		_, ok := DefinitionType(name)
 		assert.True(t, ok, "account definition %s has no type", name)
 	}
-	assert.Len(t, accountDefinitionTypes, len(registeredAccountSecretKeys))
 
 	got, ok := DefinitionType("SOURCE_POSTGRES")
 	assert.True(t, ok)
@@ -268,8 +267,8 @@ func TestToExportSpecMap_UnsupportedDefinition(t *testing.T) {
 // non-secret options payload. The split must refuse rather than leak.
 func TestSplitConfig_RejectsNestedSecretKey(t *testing.T) {
 	const definition = "SOURCE_NESTED_TEST"
-	registeredAccountSecretKeys[definition] = []string{"headers.to"}
-	t.Cleanup(func() { delete(registeredAccountSecretKeys, definition) })
+	registeredAccounts[definition] = accountDefinition{Type: "webhook", SecretKeys: []string{"headers.to"}}
+	t.Cleanup(func() { delete(registeredAccounts, definition) })
 
 	s := secret.New("plaintext-that-must-not-leak")
 	m := &mockStore{createReturnID: "remote-1"}
@@ -292,8 +291,8 @@ func TestSplitConfig_RejectsNestedSecretKey(t *testing.T) {
 // account secret key must be a top-level key until splitConfig and the seeding
 // loops in MapRemoteToState/toExportSpecMap become path-aware.
 func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
-	for definition, keys := range registeredAccountSecretKeys {
-		for _, key := range keys {
+	for definition, def := range registeredAccounts {
+		for _, key := range def.SecretKeys {
 			assert.NotContains(t, key, ".",
 				"definition %q: the accounts config split does not support nested secret keys yet", definition)
 		}
