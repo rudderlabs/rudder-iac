@@ -211,19 +211,11 @@ func validateEndpointRef(reference, field, ref, forms, label string, accepts fun
 // stay above the frequency floor. Only verdicts this severity owns are reported
 // — an unsupported dialect is the cron-expression warning rule's.
 func validateCron(index int, schedule retlConnection.ScheduleSpec) []rules.ValidationResult {
-	if schedule.Type != "cron" || schedule.CronExpression == "" {
-		return nil
-	}
-
-	check := CheckCron(schedule.CronExpression)
-	if check.Status != CronInvalid && check.Status != CronTooFrequent {
-		return nil
-	}
-
-	return []rules.ValidationResult{result(
-		scheduleRef(index)+"/cron_expression",
-		fmt.Sprintf("'cron_expression' is not valid: %s", check.Reason),
-	)}
+	return cronResults(
+		index, schedule.Type, schedule.CronExpression,
+		[]CronStatus{CronInvalid, CronTooFrequent},
+		"'cron_expression' is not valid: %s",
+	)
 }
 
 // validateCursorColumn (V-R7): only an upsert sync tracks a cursor, so any
