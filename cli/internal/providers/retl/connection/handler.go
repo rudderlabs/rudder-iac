@@ -590,22 +590,20 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 // connection row names an id, and which kind's collection holds it is exactly
 // what SourceKinds enumerates.
 //
-// The error starts out as "not found" so an empty SourceKinds reports a miss
-// rather than an empty URN with no error, and a kind that failed for any other
-// reason wins over a plain miss — the caller skips the row on a miss but fails
-// the apply on anything else.
+// Every failure reports as a plain miss. GetURNByID separates an id no
+// collection holds from one whose resource carries no externalId, but
+// MapRemoteToState skips the row on either, so keeping them apart here could
+// not change what the caller does. Returning the miss after the loop also
+// covers an empty SourceKinds, which would otherwise yield an empty URN and no
+// error at all.
 func resolveSourceURN(collection *resources.RemoteResources, sourceID string) (string, error) {
-	err := error(resources.ErrRemoteResourceNotFound)
 	for _, sourceKind := range SourceKinds {
-		urn, kindErr := collection.GetURNByID(sourceKind.ResourceType, sourceID)
-		if kindErr == nil {
+		urn, err := collection.GetURNByID(sourceKind.ResourceType, sourceID)
+		if err == nil {
 			return urn, nil
 		}
-		if errors.Is(err, resources.ErrRemoteResourceNotFound) {
-			err = kindErr
-		}
 	}
-	return "", err
+	return "", resources.ErrRemoteResourceNotFound
 }
 
 // LoadImportable lists the connections not yet managed by the CLI and names
