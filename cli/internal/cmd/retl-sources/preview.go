@@ -27,13 +27,7 @@ func newCmdPreview() *cobra.Command {
 			$ rudder-cli retl-sources preview my-model --interactive=false
 			$ rudder-cli retl-sources preview my-model --json
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("retl-source external id is required")
-			}
-			externalID := args[0]
-
-			var err error
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				telemetry.TrackCommand("retl-sources preview", err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
@@ -41,6 +35,11 @@ func newCmdPreview() *cobra.Command {
 					{K: "limit", V: limit},
 				}...)
 			}()
+
+			if len(args) == 0 {
+				return fmt.Errorf("retl-source external id is required")
+			}
+			externalID := args[0]
 
 			d, err := app.NewDeps()
 			if err != nil {

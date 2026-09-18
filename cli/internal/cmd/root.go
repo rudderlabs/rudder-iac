@@ -103,6 +103,9 @@ func init() {
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)
+
+	// Must run after every command is registered.
+	telemetryCmd.TrackPreRunFailures(rootCmd)
 }
 
 func initConfig() {
@@ -157,6 +160,12 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
+		// Outside every hook, so this is the only place that sees the failures
+		// cobra rejects before PreRunE or between PreRunE and RunE — a missing
+		// required flag, a stray argument, a mistyped command. It reports only
+		// when nothing else did.
+		telemetryCmd.TrackUnreportedFailure(rootCmd, os.Args[1:], err)
+
 		var silent *cmderrors.SilentError
 		if !errors.As(err, &silent) {
 			ui.PrintError(err)
