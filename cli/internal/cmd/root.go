@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/MakeNowJust/heredoc/v2"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -139,9 +140,18 @@ func SetVersion(v string) {
 }
 
 var rootCmd = &cobra.Command{
-	Use:           "rudder-cli",
-	Short:         "Rudder CLI",
-	Long:          `Rudder is a CLI tool for managing your projects.`,
+	Use:   "rudder-cli",
+	Short: "Rudder CLI",
+	Long: heredoc.Doc(`
+		Rudder is a CLI tool for managing your projects.
+
+		Exit codes:
+		  0  success
+		  1  unclassified failure
+		  2  validation failed — correct the specs and retry
+		  3  not authenticated, or the token lacks permission
+		  4  the API rejected or could not serve the request
+	`),
 	SilenceUsage:  true,
 	SilenceErrors: true, // We will handle errors directly in Execute
 	Run: func(cmd *cobra.Command, args []string) {
@@ -150,9 +160,10 @@ var rootCmd = &cobra.Command{
 }
 
 // Execute runs the root command. If the command returns an error, it is printed
-// to stderr and the process exits with code 1. Errors wrapped in SilentError
-// skip the stderr output — the command is expected to have already communicated
-// the failure through its primary output (e.g., JSON to stdout).
+// to stderr and the process exits with a code classifying the failure — see
+// cmderrors.ExitCode. Errors wrapped in SilentError skip the stderr output — the
+// command is expected to have already communicated the failure through its
+// primary output (e.g., JSON to stdout).
 func Execute() {
 	defer recovery()
 
@@ -161,6 +172,6 @@ func Execute() {
 		if !errors.As(err, &silent) {
 			ui.PrintError(err)
 		}
-		os.Exit(1)
+		os.Exit(cmderrors.ExitCode(err))
 	}
 }
