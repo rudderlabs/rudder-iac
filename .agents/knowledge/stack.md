@@ -20,3 +20,9 @@ Build/runtime tooling:
 - `Makefile`: build target compiles `./cli/cmd/rudder-cli`; linter runner pinned as `GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0`; test targets include `test`, `test-e2e`, `test-it`, `test-all`; image target `docker-build` uses `cli/Dockerfile`.
 - `cli/Dockerfile`: builder `FROM golang:1.24.9-alpine@sha256:8f8959f38530d159bf71d0b3eb0c547dc61e7959d8225d1599cf762477384923`; runtime `FROM alpine:latest@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412`; entrypoint `"/usr/local/bin/rudder-cli"`.
 - CI workflows (`.github/workflows/*.yml` names): `Docker Build and Push`, `lint`, `Release Please`, `goreleaser`, `Semantic pull requests`, `test with code coverage`, `typer swift validate`, `typer typescript validate`.
+
+## ACT2-756 — Published CLI Installability
+<!-- ticket:ACT2-756 -->
+- Downstream projects may install a pinned public CLI with `go install github.com/rudderlabs/rudder-iac/cli/cmd/rudder-cli@<tag>`, so future release tags must avoid local-path `replace` directives that cannot resolve outside a developer checkout.
+- Published tags v0.21.0 through v0.25.1 were not reproducibly installable through that `go install` path because `go.mod` contained `replace github.com/rudderlabs/rudder-data-catalog-provider/sdk => ../rudder-data-catalog-provider/sdk`.
+- ACT2-756 removed that unused local replace so a future tag can satisfy downstream CI pinning without requiring a local rudder-data-catalog-provider checkout.
