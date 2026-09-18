@@ -213,6 +213,28 @@ func newCompositeProvider() (provider.Provider, error) {
 	return cp, nil
 }
 
+// NewOfflineProject builds a project that loads and validates local specs
+// without credentials or network access.
+//
+// Every other project constructor goes through NewDeps, which demands an access
+// token and resolves the active workspace up front. Read-only consumers that
+// only ever look at files on disk — the editor graph command — must keep
+// working in a repository checkout with no login, so this shares
+// newCompositeProvider with the authenticated path to guarantee the same
+// providers, kinds and rules, and simply never hands anyone a usable client.
+//
+// The one behavioural difference is workspace scoping: without a resolved
+// workspace ID, workspace-aware rules (import-manifest orphaned-urn) fall back
+// to unscoped behaviour, so their diagnostics can differ from `validate`.
+func NewOfflineProject(opts ...project.ProjectOption) (project.Project, error) {
+	cp, err := newCompositeProvider()
+	if err != nil {
+		return nil, fmt.Errorf("building composite provider: %w", err)
+	}
+
+	return project.New(cp, opts...), nil
+}
+
 // composeProviders builds the provider set and aggregates it into a composite
 // provider. Shared by NewDeps and newCompositeProvider so every consumer
 // observes the same providers (and therefore the same registered rules).
