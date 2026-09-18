@@ -2,14 +2,9 @@ package retl
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 )
-
-// ErrUnsupportedSourceType is returned when decoding a RETL source whose
-// sourceType this client doesn't model (e.g. audience, profiles-table).
-var ErrUnsupportedSourceType = errors.New("unsupported RETL source type")
 
 type SourceType string
 
@@ -144,7 +139,11 @@ func decodeConfigFor(sourceType SourceType, sourceDefinitionName string, raw jso
 		}
 		return cfg, nil
 	default:
-		return nil, fmt.Errorf("%w %q", ErrUnsupportedSourceType, sourceType)
+		// Reachable from GetRetlSource, which must fail on a type it cannot
+		// represent, and unreachable from the list path: RETLSources filters on
+		// modelsSourceType before decoding. TestSourceTypeDispatchAgree pins the
+		// two together.
+		return nil, fmt.Errorf("unsupported RETL source type %q", sourceType)
 	}
 }
 
@@ -185,35 +184,48 @@ type RETLSources struct {
 	Data []RETLSource `json:"data"`
 }
 
-// UnmarshalJSON drops sources of a type this client doesn't model, so one
-// unfamiliar source (the workspace can hold audience/profiles sources) doesn't
-// fail the whole list. Any other decode error still fails it.
+// UnmarshalJSON drops sources of a type this client does not model, so one
+// unfamiliar source — a workspace can hold audience and profiles sources —
+// does not fail the whole list. Every other decode error still fails it.
+//
+// The drop is silent because this package cannot reach a logger: cli/internal
+// is closed to it. Filtering one layer up in the retl provider, which has a
+// logger, would not help — the client has to tolerate the source before any
+// caller can see it, so tolerating and reporting are one decision made here. If
+// the skip needs to be observable, the shape is a Skipped field on this type
+// that the provider logs, not a log statement in this package.
+//
+// Only Data is read, so a field added to RETLSources later (paging, say) has to
+// be added to the wire struct below as well. api/client/common.go's Paging
+// carries a Total, which will not agree with len(Data) once sources are
+// dropped; whoever adds it has to decide that deliberately.
 func (s *RETLSources) UnmarshalJSON(data []byte) error {
-	// plain sheds this method so any field added next to Data (e.g. paging)
-	// still decodes instead of being silently dropped.
-	type plain RETLSources
-	wire := struct {
-		*plain
+	var wire struct {
 		Data []json.RawMessage `json:"data"`
-	}{plain: (*plain)(s)}
+	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
 
 	sources := make([]RETLSource, 0, len(wire.Data))
 	for i, raw := range wire.Data {
-		var source RETLSource
-		err := json.Unmarshal(raw, &source)
-		if errors.Is(err, ErrUnsupportedSourceType) {
-			continue
+		// The type is read before the source is decoded, which is what makes one
+		// filter enough: an unmodelled type is skipped whether or not its config
+		// would have decoded, so a null or absent config needs no second check
+		// after the fact.
+		var probe struct {
+			SourceType SourceType `json:"sourceType"`
 		}
-		if err != nil {
+		if err := json.Unmarshal(raw, &probe); err != nil {
 			return fmt.Errorf("decoding RETL source at index %d: %w", i, err)
 		}
-		// A null or missing config skips the config dispatch, so an unknown
-		// type can decode cleanly and has to be filtered here too.
-		if !isModeledSourceType(source.SourceType) {
+		if !modelsSourceType(probe.SourceType) {
 			continue
+		}
+
+		var source RETLSource
+		if err := json.Unmarshal(raw, &source); err != nil {
+			return fmt.Errorf("decoding RETL source at index %d: %w", i, err)
 		}
 		sources = append(sources, source)
 	}
@@ -221,8 +233,18 @@ func (s *RETLSources) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func isModeledSourceType(sourceType SourceType) bool {
-	return sourceType == ModelSourceType || sourceType == TableSourceType
+// modelsSourceType reports whether this client has a config shape for
+// sourceType. It partitions source types the same way decodeConfigFor's switch
+// does, and TestSourceTypeDispatchAgree pins the two together: adding a type to
+// the dispatch without adding it here would silently drop a source the client
+// can represent.
+func modelsSourceType(sourceType SourceType) bool {
+	switch sourceType {
+	case ModelSourceType, TableSourceType:
+		return true
+	default:
+		return false
+	}
 }
 
 // PreviewResultError represents an error in the preview result

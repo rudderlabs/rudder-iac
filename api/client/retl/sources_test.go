@@ -326,49 +326,6 @@ func TestListRetlSourcesSkipsUnsupportedSourceType(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
-func TestListRetlSourcesToleratesSiblingFields(t *testing.T) {
-	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
-		Validate: func(req *http.Request) bool {
-			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/retl-sources", "")
-		},
-		ResponseStatus: 200,
-		ResponseBody: `{
-			"data": [
-				{
-					"id": "src1",
-					"name": "Model Source",
-					"config": {"primaryKey":"id","sql":"SELECT * FROM users"},
-					"sourceType": "model",
-					"sourceDefinitionName": "postgres"
-				}
-			],
-			"paging": {"total": 1, "next": "/v2/retl-sources?page=2"}
-		}`,
-	})
-
-	c, err := client.New("test-token", client.WithHTTPClient(httpClient))
-	require.NoError(t, err)
-
-	retlClient := retl.NewRudderRETLStore(c)
-
-	sources, err := retlClient.ListRetlSources(context.Background())
-	require.NoError(t, err)
-
-	assert.Equal(t, &retl.RETLSources{
-		Data: []retl.RETLSource{
-			{
-				ID:                   "src1",
-				Name:                 "Model Source",
-				Config:               retl.RETLSQLModelConfig{PrimaryKey: "id", Sql: "SELECT * FROM users"},
-				SourceType:           retl.ModelSourceType,
-				SourceDefinitionName: "postgres",
-			},
-		},
-	}, sources)
-
-	httpClient.AssertNumberOfCalls()
-}
-
 func TestListRetlSourcesMalformedKnownSourceConfig(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {
@@ -377,6 +334,13 @@ func TestListRetlSourcesMalformedKnownSourceConfig(t *testing.T) {
 		ResponseStatus: 200,
 		ResponseBody: `{
 			"data": [
+				{
+					"id": "src0",
+					"name": "Good Model Source",
+					"config": {"primaryKey":"id","sql":"SELECT 1"},
+					"sourceType": "model",
+					"sourceDefinitionName": "postgres"
+				},
 				{
 					"id": "src1",
 					"name": "Model Source",
@@ -395,8 +359,11 @@ func TestListRetlSourcesMalformedKnownSourceConfig(t *testing.T) {
 
 	_, err = retlClient.ListRetlSources(context.Background())
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, retl.ErrUnsupportedSourceType)
+	// The bad source sits at index 1, so the index in the message is pinned
+	// rather than passing for any value the way an index-0 fixture would.
+	assert.Contains(t, err.Error(), "decoding RETL source at index 1")
 	assert.Contains(t, err.Error(), "unmarshalling RETL model config")
+	assert.NotContains(t, err.Error(), "unsupported RETL source type")
 
 	httpClient.AssertNumberOfCalls()
 }
@@ -424,7 +391,11 @@ func TestGetRetlSourceUnsupportedSourceType(t *testing.T) {
 	retlClient := retl.NewRudderRETLStore(c)
 
 	_, err = retlClient.GetRetlSource(context.Background(), "src2")
-	require.ErrorIs(t, err, retl.ErrUnsupportedSourceType)
+	// Get must keep failing on a type the client cannot represent. The list path
+	// skips such sources on purpose, and this is the only guard against someone
+	// later making Get do the same and handing back zero-value sources.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported RETL source type")
 	assert.Contains(t, err.Error(), `"audience"`)
 
 	httpClient.AssertNumberOfCalls()
