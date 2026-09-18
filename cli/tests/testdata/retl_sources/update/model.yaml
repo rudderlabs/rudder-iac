@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: orders-model
+spec:
+  id: orders-model
+  # Renamed to prove the update path carries a name change. Kept within the
+  # server's NAME_REGEX (/^[\w .-]{2,100}$/) — parentheses 400 with "Invalid
+  # name", and the CLI's own validate does not enforce that charset.
+  display_name: Orders Model - revised
+  account_id: "{{ .RETL_ACCOUNT_ID }}"
+  primary_key: id
+  source_definition: postgres
+  enabled: true
+  sql: SELECT id, email, created_at FROM orders
