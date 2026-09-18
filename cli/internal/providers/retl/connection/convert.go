@@ -214,10 +214,11 @@ func checkImmutableUnchanged(config, stored ConfigSpec) error {
 //
 // What it refuses, all wrapping ErrUnrepresentableConfig so a caller can skip
 // the row with errors.Is, are shapes the spec has no way to express: a
-// destination-specific config, no identifiers at all, and the object mapping
-// flow carrying constants or an event. Field-level rules — which targets an
-// identifier may use, the single-identifier limit on object mapping — stay with
-// DEX-829, so DEX-827 must still validate the rebuilt spec before writing it.
+// destination-specific config, no identifiers at all, the object mapping flow
+// carrying constants or an event, and — checked on the rebuilt spec — the
+// mapping shapes a re-apply would not reproduce. DEX-829 rejects the same
+// mapping shapes at spec load; they are caught here too because a remote row
+// reaches export and import without ever passing through the spec rules.
 func configFromRemote(conn *retlClient.RETLConnection) (ConfigSpec, error) {
 	if hasDestinationConfig(conn.DestinationConfig) {
 		return ConfigSpec{}, fmt.Errorf("connection %q: destination-specific configuration has no spec equivalent: %w", conn.ID, ErrUnrepresentableConfig)

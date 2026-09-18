@@ -12,9 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The mapping targets the backend folds into identifiers and reconstructs on
-// read — USER_ID, ANONYMOUS_ID and SYSTEM_CONSTANTS.id in config-backend
-// src/modules/retl/api-gateway/connection-config/constants.ts.
+// The mapping targets config-backend reserves for identifiers, per flow —
+// connection-config/constants.ts and assembler.ts. The JSON mapper reserves
+// IDENTIFIER_TARGETS, exactly [user_id, anonymous_id], and treats
+// context.externalId[0].id as an ordinary target. Object mapping reserves the
+// two targets it synthesises from the single identifier, user_id and
+// SYSTEM_CONSTANTS.id, and never writes an anonymous_id mapping at all — so a
+// user mapping aimed at anonymous_id round-trips fine there.
 const (
 	userIDTarget      = "user_id"
 	anonymousIDTarget = "anonymous_id"
@@ -704,8 +708,8 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 
 // A change to an immutable field cannot ride on a PUT: the body has no field
 // for it, so the server would apply nothing and the diff would return on every
-// apply. DEX-825 routes these to delete-then-create, so this guard only fires
-// on a bug — but a loud error beats silent perpetual drift.
+// apply. Only an endpoint change is replaced; the rest are reported here, with
+// the remedy the UI imposes too.
 func TestToUpdateRequestRejectsImmutableChanges(t *testing.T) {
 	t.Parallel()
 
