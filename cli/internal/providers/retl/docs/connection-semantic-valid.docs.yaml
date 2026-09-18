@@ -12,7 +12,11 @@ match_behavior:
   # warehouse source yet, so V-C5 has no example here. Every source_definition a
   # SQL model accepts is a SQL warehouse whose metadata this CLI knows, so the
   # unknown-metadata, SQL-model and sync-settings capability checks cannot be
-  # reached from a valid SQL model and have no example either. Known
+  # reached from a valid SQL model and have no example either. V-R11 is
+  # unreachable for the same reason — primary_key is a required field on every
+  # source definition a SQL model accepts, and the one exempt definition (s3) is
+  # not among them — and so is V-R10, because the only destination that supports
+  # object mapping today carries no hyphen in its type or API type. Known
   # limitation: these checks see only project-managed connections; a connection
   # that exists remotely but is not in the project is invisible at validate
   # time.
