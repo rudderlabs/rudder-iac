@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -133,10 +134,25 @@ func Initialise(version string) {
 	v = version
 }
 
+// ErrNotAuthenticated marks the pre-flight failure where no access token is
+// configured, which never reaches the API and so never yields an APIError.
+var ErrNotAuthenticated = errors.New("not authenticated")
+
+// notAuthenticated tags a message with ErrNotAuthenticated without prefixing it
+// — the user should read the remediation, not the classification.
+type notAuthenticatedError struct{ err error }
+
+func (e notAuthenticatedError) Error() string   { return e.err.Error() }
+func (e notAuthenticatedError) Unwrap() []error { return []error{ErrNotAuthenticated, e.err} }
+
+func notAuthenticated(format string, args ...any) error {
+	return notAuthenticatedError{fmt.Errorf(format, args...)}
+}
+
 func validateDependencies() error {
 	cfg := config.GetConfig()
 	if cfg.Auth.AccessToken == "" {
-		return fmt.Errorf("access token is required, please run `rudder-cli auth login`, or set the access token via the RUDDERSTACK_ACCESS_TOKEN environment variable")
+		return notAuthenticated("access token is required, please run `rudder-cli auth login`, or set the access token via the RUDDERSTACK_ACCESS_TOKEN environment variable")
 	}
 
 	return nil
