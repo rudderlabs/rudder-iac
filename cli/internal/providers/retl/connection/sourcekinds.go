@@ -7,6 +7,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -22,10 +23,20 @@ type SourceKind struct {
 // SourceKinds are the rETL source kinds a connection may reference. Adding one
 // is more than a line here: the kind's handler must publish the shared source
 // keys below plus an "id" in its output, the warehouse table must cover the
-// source definitions it accepts, and both need tests. Table and audience
-// sources are absent because none of that exists for them yet.
+// source definitions it accepts, and both need tests. Audience sources are
+// absent because none of that exists for them yet.
+//
+// The table row is safe to register unconditionally even though the kind is
+// gated behind retlTableSupport. This table only decides which references a
+// connection may *name*; whether the referenced resource exists is the source
+// handler's business. With the flag off the table spec kind fails to load in
+// its own right, and the connection's reference is then reported as
+// unresolved — two errors, the first of which names the flag. Narrowing this
+// list to the enabled kinds is DEX-826's job, not a correctness fix here; see
+// the note in the PR.
 var SourceKinds = []SourceKind{
 	{Kind: sqlmodel.ResourceKind, ResourceType: sqlmodel.ResourceType, SourceType: retlClient.ModelSourceType},
+	{Kind: table.ResourceKind, ResourceType: table.ResourceType, SourceType: retlClient.TableSourceType},
 }
 
 // The graph data every rETL source handler publishes about its source,
