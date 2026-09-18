@@ -87,12 +87,17 @@ func eligibleRemote(t *testing.T, conn retlClient.RETLConnection) *RemoteConnect
 	require.True(t, ok, "destination %q is not one of the shared fixtures", conn.DestinationID)
 	config, err := configFromRemote(&conn)
 	require.NoError(t, err)
+	// Resolved from the source's type rather than pinned to SourceKinds[0]:
+	// with more than one kind registered, the index silently produced the
+	// sql-model kind for a table-backed source.
+	kind, ok := SourceKindBySourceType(source.SourceType)
+	require.True(t, ok, "source type %q is not a registered source kind", source.SourceType)
 
 	return &RemoteConnection{
 		RETLConnection:        conn,
 		Config:                config,
 		WorkspaceID:           source.WorkspaceID,
-		SourceKind:            SourceKinds[0],
+		SourceKind:            kind,
 		SourceName:            source.Name,
 		SourceExternalID:      source.ExternalID,
 		DestinationName:       dst.Name,
@@ -278,12 +283,17 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		unrepresentable := remoteRow("conn-config", "users-to-webhook-2", "src-1", "dst-1")
 		unrepresentable.DestinationConfig = []byte(`{"listId":"42"}`)
 
+		// A table-backed source is expressible now that retl-source-table is a
+		// registered source kind. Before that it was dropped here alongside the
+		// genuinely unrepresentable rows, which is the behaviour this PR changes.
+		tableSource := remoteRow("conn-table-source", "b", "src-table", "dst-1")
+
 		mock := remoteClient([]retlClient.RETLConnection{
 			supported,
 			objectMapping,
 			unrepresentable,
 			remoteRow("conn-missing-source", "a", "src-gone", "dst-1"),
-			remoteRow("conn-table-source", "b", "src-table", "dst-1"),
+			tableSource,
 			remoteRow("conn-missing-destination", "c", "src-1", "dst-gone"),
 			remoteRow("conn-unregistered-version", "d", "src-1", "dst-old"),
 			remoteRow("conn-not-warehouse", "e", "src-1", "dst-eventstream"),
@@ -297,8 +307,9 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		require.Len(t, mock.ListCalls, 1)
 		assert.Equal(t, lo.ToPtr(true), mock.ListCalls[0].HasExternalID)
 		assert.Equal(t, map[string]*resources.RemoteResource{
-			"conn-1":      {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
-			"conn-object": {ID: "conn-object", ExternalID: "users-to-bingads", Data: eligibleRemote(t, objectMapping)},
+			"conn-1":            {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
+			"conn-object":       {ID: "conn-object", ExternalID: "users-to-bingads", Data: eligibleRemote(t, objectMapping)},
+			"conn-table-source": {ID: "conn-table-source", ExternalID: "b", Data: eligibleRemote(t, tableSource)},
 		}, collection.GetAll(ResourceType))
 	})
 
