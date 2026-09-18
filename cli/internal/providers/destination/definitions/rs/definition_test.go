@@ -57,10 +57,12 @@ func fullConfig() map[string]any {
 	cfg["workgroup_name"] = "rudder-redshift-workgroup"
 	cfg["namespace"] = "rudder_events"
 	cfg["use_ssh"] = true
-	cfg["ssh_host"] = "bastion.example.com"
-	cfg["ssh_port"] = "22"
-	cfg["ssh_user"] = "rudder"
-	cfg["ssh_public_key"] = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+	cfg["ssh"] = map[string]any{
+		"host":       "bastion.example.com",
+		"port":       "22",
+		"user":       "rudder",
+		"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+	}
 	cfg["sync_frequency"] = "10"
 	cfg["sync_start_at"] = "01:00"
 	cfg["exclude_window"] = map[string]any{"start_time": "02:00", "end_time": "03:00"}
@@ -90,6 +92,21 @@ func copyConfig(src map[string]any) map[string]any {
 	return out
 }
 
+func setConfigValue(config map[string]any, path string, value any) {
+	parent, field, ok := strings.Cut(path, ".")
+	if !ok {
+		config[path] = value
+		return
+	}
+
+	nested, ok := config[parent].(map[string]any)
+	if !ok {
+		nested = map[string]any{}
+		config[parent] = nested
+	}
+	nested[field] = value
+}
+
 func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -102,7 +119,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "rs", registered.Type)
 	assert.Equal(t, "RS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "access_key_id", "access_key", "user", "ssh.user"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
@@ -285,10 +302,23 @@ func TestRSConfigValidation(t *testing.T) {
 		cfg["use_ssh"] = true
 
 		errors := registered.ValidateConfig(cfg)
-		assertHasPath(t, errors, "/ssh_host")
-		assertHasPath(t, errors, "/ssh_port")
-		assertHasPath(t, errors, "/ssh_user")
-		assertHasPath(t, errors, "/ssh_public_key")
+		assertHasPath(t, errors, "/ssh/host")
+		assertHasPath(t, errors, "/ssh/port")
+		assertHasPath(t, errors, "/ssh/user")
+		assertHasPath(t, errors, "/ssh/public_key")
+	})
+
+	t.Run("ssh enabled requires missing nested tunnel fields", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["use_ssh"] = true
+		cfg["ssh"] = map[string]any{"host": "bastion.example.com"}
+
+		errors := registered.ValidateConfig(cfg)
+		assertHasPath(t, errors, "/ssh/port")
+		assertHasPath(t, errors, "/ssh/user")
+		assertHasPath(t, errors, "/ssh/public_key")
 	})
 
 	t.Run("valid ssh config", func(t *testing.T) {
@@ -361,9 +391,9 @@ func TestRSConfigValidation(t *testing.T) {
 			{field: "prefix", value: "bad prefix", cfg: validCustomRoleStorageConfig()},
 			{field: "cluster_region", value: "bad\nregion", cfg: validIAMClusterConfig()},
 			{field: "workgroup_name", value: "bad\nworkgroup", cfg: validIAMServerlessConfig()},
-			{field: "ssh_host", value: "bad\nhost", cfg: validSSHConfig()},
-			{field: "ssh_port", value: "bad\nport", cfg: validSSHConfig()},
-			{field: "ssh_user", value: "bad\nuser", cfg: validSSHConfig()},
+			{field: "ssh.host", value: "bad\nhost", cfg: validSSHConfig()},
+			{field: "ssh.port", value: "bad\nport", cfg: validSSHConfig()},
+			{field: "ssh.user", value: "bad\nuser", cfg: validSSHConfig()},
 			{field: "iam_role_arn_for_auth", value: "bad\narn", cfg: validIAMClusterConfig()},
 			{field: "cluster_id", value: "bad\ncluster", cfg: validIAMClusterConfig()},
 			{field: "iam_role_arn", value: "bad\narn", cfg: validCustomRoleStorageConfig()},
@@ -377,8 +407,8 @@ func TestRSConfigValidation(t *testing.T) {
 
 		for _, tc := range cases {
 			cfg := copyConfig(tc.cfg)
-			cfg[tc.field] = tc.value
-			assertHasPath(t, registered.ValidateConfig(cfg), "/"+tc.field)
+			setConfigValue(cfg, tc.field, tc.value)
+			assertHasPath(t, registered.ValidateConfig(cfg), "/"+strings.ReplaceAll(tc.field, ".", "/"))
 		}
 	})
 
@@ -424,6 +454,17 @@ func TestRSConfigValidation(t *testing.T) {
 		cfg["not_a_field"] = true
 
 		assertHasPath(t, registered.ValidateConfig(cfg), "/not_a_field")
+	})
+
+	// Redshift now follows Kafka's nested SSH local shape; flat SSH tunnel keys
+	// remain unknown rather than becoming an alias layer.
+	t.Run("legacy flat ssh key is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := copyConfig(minimalPasswordConfig())
+		cfg["ssh_host"] = "bastion.example.com"
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/ssh_host")
 	})
 
 	t.Run("unsupported consent source rejected", func(t *testing.T) {
@@ -681,10 +722,12 @@ func TestRSConversionRoundTrip(t *testing.T) {
 				"user": "rudder",
 				"password": "secret",
 				"use_ssh": true,
-				"ssh_host": "bastion.example.com",
-				"ssh_port": "22",
-				"ssh_user": "rudder",
-				"ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+				"ssh": {
+					"host": "bastion.example.com",
+					"port": "22",
+					"user": "rudder",
+					"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+				},
 				"sync_frequency": "180",
 				"use_rudder_storage": true,
 				"consent_management": {
@@ -763,10 +806,12 @@ func validCustomKeyStorageConfig() map[string]any {
 func validSSHConfig() map[string]any {
 	cfg := copyConfig(minimalPasswordConfig())
 	cfg["use_ssh"] = true
-	cfg["ssh_host"] = "bastion.example.com"
-	cfg["ssh_port"] = "22"
-	cfg["ssh_user"] = "rudder"
-	cfg["ssh_public_key"] = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder"
+	cfg["ssh"] = map[string]any{
+		"host":       "bastion.example.com",
+		"port":       "22",
+		"user":       "rudder",
+		"public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDrudder",
+	}
 	return cfg
 }
 

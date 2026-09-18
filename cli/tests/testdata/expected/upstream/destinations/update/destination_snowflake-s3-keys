@@ -10,7 +10,7 @@
     "account": "rudder-cli-e2e.us-east-1",
     "database": "RUDDER_E2E_S3K_UPD",
     "warehouse": "RUDDER_WH",
-    "user": "RUDDER_CLI_E2E",
+    "user": "RUDDER_CLI_E2E_SNOWFLAKE_S3_KEYS_USER",
     "role": "RUDDER_ROLE",
     "namespace": "rudder_cli_e2e_s3k",
     "useKeyPairAuth": false,
@@ -27,8 +27,7 @@
     "bucketName": "rudder-cli-e2e-s3keys-updated",
     "storageIntegration": "RUDDER_S3_KEYS_INTEGRATION",
     "enableSSE": false,
-    "roleBasedAuth": false,
-    "useSASTokens": false
+    "roleBasedAuth": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

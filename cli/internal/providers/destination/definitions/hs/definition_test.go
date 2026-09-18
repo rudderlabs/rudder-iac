@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "hs", registered.Type)
 	assert.Equal(t, "HS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "hub_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -278,9 +278,6 @@ func TestHSConfigValidation(t *testing.T) {
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Viewed", "Order Completed"},
 			},
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 			"consent_management": map[string]any{
 				"web": []any{
 					map[string]any{
@@ -357,16 +354,6 @@ func TestHSConfigValidation(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "expected /connection_mode/web to be rejected")
-	})
-
-	t.Run("unsupported source key rejected in use_native_sdk", func(t *testing.T) {
-		t.Parallel()
-		config := minimalConfig()
-		config["use_native_sdk"] = map[string]any{"android": true}
-
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android", errors[0].Path)
 	})
 
 	// schema.json declares oneTrustCookieCategories and ketchConsentPurposes, but
@@ -468,9 +455,6 @@ func TestHSConversionRoundTrip(t *testing.T) {
 				],
 				"event_filtering": {
 					"whitelist": ["Product Viewed", "Order Completed"]
-				},
-				"use_native_sdk": {
-					"web": true
 				}
 			}`,
 			APIJSON: `{
@@ -493,10 +477,7 @@ func TestHSConversionRoundTrip(t *testing.T) {
 					{"eventName": "Product Viewed"},
 					{"eventName": "Order Completed"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {
-					"web": true
-				}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

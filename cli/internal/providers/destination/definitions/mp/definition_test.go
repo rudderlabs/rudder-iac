@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "mp", registered.Type)
 	assert.Equal(t, "MP", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret"}, registered.SecretKeys())
+	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret", "service_account_user_name"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
@@ -384,7 +384,9 @@ func TestMPSecretKeysWrapSensitiveValues(t *testing.T) {
 		require.True(t, ok, "expected %s to be wrapped as a secret", key)
 		assert.NotContains(t, wrapped.String(), "raw-")
 	}
-	assert.Equal(t, "visible-user", config["service_account_user_name"])
+	userName, ok := config["service_account_user_name"].(*secret.String)
+	require.True(t, ok, "service_account_user_name must be wrapped as a secret")
+	assert.Equal(t, "visible-user", userName.Reveal())
 }
 
 func TestMPConversionRoundTrip(t *testing.T) {
@@ -443,7 +445,6 @@ func TestMPConversionRoundTrip(t *testing.T) {
 				"persistence_name": "mp_cookie",
 				"secure_cookie": true,
 				"event_filtering": {"whitelist": ["Product Viewed", "Order Completed"]},
-				"use_native_sdk": {"web": true},
 				"use_new_mapping": true,
 				"connection_mode": {"web": "device", "android": "cloud"}
 			}`,
@@ -484,7 +485,6 @@ func TestMPConversionRoundTrip(t *testing.T) {
 				"secureCookie": true,
 				"eventFilteringOption": "whitelistedEvents",
 				"whitelistedEvents": [{"eventName": "Product Viewed"}, {"eventName": "Order Completed"}],
-				"useNativeSDK": {"web": true},
 				"useNewMapping": true,
 				"connectionMode": {"web": "device", "android": "cloud"}
 			}`,
@@ -591,9 +591,6 @@ func validFullConfig() map[string]any {
 		"secure_cookie":          true,
 		"event_filtering": map[string]any{
 			"blacklist": []any{"Internal Event"},
-		},
-		"use_native_sdk": map[string]any{
-			"web": true,
 		},
 		"use_new_mapping": true,
 		"connection_mode": map[string]any{

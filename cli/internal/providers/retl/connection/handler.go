@@ -34,8 +34,8 @@ const listPageSize = 100
 
 // Handler manages rETL connections the way the event stream connection handler
 // does: one graph resource per spec entry, an endpoint change handled as a
-// delete-then-create replacement, and every other change the API refuses on
-// update reported rather than applied.
+// delete-then-create replacement, and an immutable config change rejected with
+// the remedy rather than silently not applied.
 type Handler struct {
 	client     retlClient.RETLStore
 	registry   *definitions.Registry
@@ -248,6 +248,8 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		if _, err := toCreateRequest(data); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
+		log.Warn("replacing rETL connection after an endpoint change",
+			"connection", id, "connectionId", remoteID)
 		if err := h.Delete(ctx, id, state); err != nil {
 			return nil, err
 		}

@@ -11,7 +11,7 @@ spec:
   config:
     host: postgres-minio.rudder-cli-e2e.internal
     database: analytics
-    user: rudder
+    user: "{{ .POSTGRES_MINIO_USER }}"
     password: "{{ .POSTGRES_PASSWORD }}"
     port: "5432"
     namespace: rudder_e2e_minio
@@ -20,7 +20,8 @@ spec:
     use_rudder_storage: false
     bucket_provider: MINIO
     bucket_name: rudder-cli-e2e
-    end_point: minio.rudder-cli-e2e.internal:9000
     access_key_id: "{{ .POSTGRES_MINIO_ACCESS_KEY_ID }}"
-    secret_access_key: "{{ .POSTGRES_MINIO_SECRET_ACCESS_KEY }}"
-    use_ssl: true
+    minio:
+      end_point: minio.rudder-cli-e2e.internal:9000
+      secret_access_key: "{{ .POSTGRES_MINIO_SECRET_ACCESS_KEY }}"
+      use_ssl: true

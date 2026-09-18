@@ -22,7 +22,7 @@
     "underscoreDivideNumbers": false,
     "useIAMForAuth": false,
     "useRudderStorage": true,
-    "user": "rudder",
+    "user": "rudderCliE2eRsUser",
     "useServerless": false,
     "useSSH": false,
     "preferAppend": true,

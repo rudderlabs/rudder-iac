@@ -26,11 +26,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true,
-      "android": false,
-      "ios": false
-    },
     "connectionMode": {
       "web": "hybrid",
       "android": "cloud",
@@ -46,9 +41,6 @@
       "web": false
     },
     "extendPageViewParams": {
-      "web": false
-    },
-    "useNativeSDKToSend": {
       "web": false
     }
   },

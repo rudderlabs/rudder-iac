@@ -11,7 +11,7 @@ spec:
   config:
     host: postgres-gcs.rudder-cli-e2e.internal
     database: analytics
-    user: rudder
+    user: "{{ .POSTGRES_GCS_USER }}"
     password: "{{ .POSTGRES_PASSWORD }}"
     port: "5432"
     namespace: rudder_e2e_gcs
@@ -20,4 +20,5 @@ spec:
     use_rudder_storage: false
     bucket_provider: GCS
     bucket_name: rudder-cli-e2e
-    credentials: '{{ .POSTGRES_GCP_CREDENTIALS }}'
+    gcs:
+      credentials: '{{ .POSTGRES_GCP_CREDENTIALS }}'

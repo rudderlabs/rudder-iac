@@ -21,6 +21,10 @@ spec:
     enable_install_attribution_tracking:
       android: false
       ios: true
+    connection_mode:
+      android: cloud
+      ios: device
+      cloud: cloud
     event_filtering:
       whitelist:
         - Order Completed

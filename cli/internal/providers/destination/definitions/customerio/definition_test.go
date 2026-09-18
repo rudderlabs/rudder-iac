@@ -29,7 +29,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "customerio", registered.Type)
 	assert.Equal(t, "CUSTOMERIO", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"api_key", "site_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -207,18 +207,6 @@ func TestCustomerioConfigValidation(t *testing.T) {
 		assertValidationPaths(t, errors, "/event_filtering/whitelist", "/event_filtering/blacklist")
 	})
 
-	t.Run("unknown nested source key rejected", func(t *testing.T) {
-		t.Parallel()
-
-		config := minimalConfig()
-		config["use_native_sdk"] = map[string]any{"android_kotlin": true}
-
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android_kotlin", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "unknown config field")
-	})
-
 	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
 
@@ -343,7 +331,6 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"api_key": "api-key-1",
 				"device_token_event_name": "Device Token Registered",
 				"datacenter": "EU",
-				"use_native_sdk": {"web": true, "android": true, "ios": false},
 				"send_page_name_in_sdk": {"web": true},
 				"data_use_in_app": {"web": false},
 				"auto_track_device_attributes": {"android": true, "ios": true},
@@ -355,7 +342,6 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"apiKey": "api-key-1",
 				"deviceTokenEventName": "Device Token Registered",
 				"datacenter": "EU",
-				"useNativeSDK": {"web": true, "android": true, "ios": false},
 				"sendPageNameInSDK": {"web": true},
 				"dataUseInApp": {"web": false},
 				"autoTrackDeviceAttributes": {"android": true, "ios": true},
@@ -449,7 +435,9 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 
 	resource := extracted["customerio-production"]
 	require.NotNil(t, resource)
-	assert.Equal(t, "site-id-1", resource.Config["site_id"])
+	siteID, ok := resource.Config["site_id"].(*secret.String)
+	require.True(t, ok, "site_id must be wrapped as a secret")
+	assert.Equal(t, "site-id-1", siteID.Reveal())
 
 	wrapped, ok := resource.Config["api_key"].(*secret.String)
 	require.True(t, ok, "api_key must be wrapped as a secret")
@@ -473,7 +461,10 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, remoteKey.IsUnknown(),
 		"a returned value wrapped as a secret reads back unknown, so every plan re-applies it")
-	assert.Equal(t, "site-id-1", remoteResource.Config["site_id"])
+	remoteSiteID, ok := remoteResource.Config["site_id"].(*secret.String)
+	require.True(t, ok)
+	assert.True(t, remoteSiteID.IsUnknown(),
+		"the API returns siteID, but marking it secret makes it read back unknown — so it re-applies on every plan")
 
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
 		"customerio-production": {Destination: &client.Destination{
@@ -493,7 +484,7 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	config, ok := spec.Spec["config"].(map[string]any)
 	require.True(t, ok)
 	assert.NotEqual(t, "customerio-api-key", config["api_key"], "export must not leak the raw key")
-	assert.Equal(t, "site-id-1", config["site_id"])
+	assert.NotEqual(t, "site-id-1", config["site_id"], "export must not leak the raw site id")
 }
 
 func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinition {
@@ -520,7 +511,6 @@ func fullConfig() map[string]any {
 		"api_key":                              "api-key-1",
 		"device_token_event_name":              "Device Token Registered",
 		"datacenter":                           "EU",
-		"use_native_sdk":                       map[string]any{"web": true, "android": true, "ios": false},
 		"send_page_name_in_sdk":                map[string]any{"web": true},
 		"data_use_in_app":                      map[string]any{"web": false},
 		"auto_track_device_attributes":         map[string]any{"android": true, "ios": true},
@@ -553,7 +543,6 @@ func exampleConfig() map[string]any {
 		"api_key":                 "cio-api-key",
 		"datacenter":              "US",
 		"device_token_event_name": "Device Token Registered",
-		"use_native_sdk":          map[string]any{"web": true, "android": true, "ios": true},
 		"send_page_name_in_sdk":   map[string]any{"web": true},
 		"data_use_in_app":         map[string]any{"web": false},
 		"auto_track_device_attributes": map[string]any{

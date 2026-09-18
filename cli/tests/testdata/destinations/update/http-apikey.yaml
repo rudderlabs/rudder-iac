@@ -11,13 +11,13 @@ spec:
   config:
     api_url: https://webhooks.example.com/rudder/events
     auth: apiKeyAuth
-    api_key_name: X-Api-Key
+    api_key_name: "{{ .HTTP_APIKEY_API_KEY_NAME }}"
     api_key_value: "{{ .HTTP_API_KEY_VALUE }}"
     method: POST
     format: JSON
     headers:
       - to: X-Rudder-Source
-        from: rudder-cli
+        from: "{{ .HTTP_APIKEY_HEADERS_FROM }}"
     connection_mode:
       web: cloud
       android_kotlin: cloud

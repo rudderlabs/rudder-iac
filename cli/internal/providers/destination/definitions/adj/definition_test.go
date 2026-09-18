@@ -53,7 +53,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	// One flag per platform, matching schema.json's four sub-keys and db-config's
-	// per-source-type destConfig. use_native_sdk is a source-type block key and is
 	// deliberately ungated, so it does not appear here.
 	assert.Equal(t, map[string][]string{
 		"enable_install_attribution_tracking/android":        {"android"},
@@ -142,6 +141,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 				"android": true,
 				"ios":     true,
 			},
+			"connection_mode": map[string]any{
+				"android":      "device",
+				"react_native": "cloud",
+			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Purchase", "Signup"},
 			},
@@ -171,6 +174,46 @@ func TestAdjustConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "cannot be specified together")
 	})
 
+	t.Run("connection_mode validates mode per source type", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"app_token": "token",
+			"connection_mode": map[string]any{
+				"android":        "device",
+				"android_kotlin": "cloud",
+				"react_native":   "cloud",
+			},
+		}))
+
+		for _, value := range []string{"device", "hybrid", "{{ .ADJ_CONNECTION_MODE || cloud }}", ""} {
+			errors := registered.ValidateConfig(map[string]any{
+				"app_token": "token",
+				"connection_mode": map[string]any{
+					"react_native": value,
+				},
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/connection_mode/react_native", errors[0].Path, value)
+			assert.Contains(t, errors[0].Message, "must be one of", value)
+		}
+	})
+
+	t.Run("connection_mode rejects non-string values", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"app_token": "token",
+			"connection_mode": map[string]any{
+				"android": true,
+			},
+		})
+		require.NotEmpty(t, errors)
+		for _, err := range errors {
+			assert.Equal(t, "/connection_mode/android", err.Path)
+		}
+	})
+
 	t.Run("example yaml config", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{
@@ -187,6 +230,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 			"enable_install_attribution_tracking": map[string]any{
 				"android": true,
 				"ios":     true,
+			},
+			"connection_mode": map[string]any{
+				"android": "device",
+				"cloud":   "cloud",
 			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Product Purchased", "Signup"},
@@ -235,10 +282,10 @@ func TestAdjustConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		assert.Empty(t, registered.ValidateConfig(map[string]any{
-			"app_token":                 "token",
-			"custom_mappings":           []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
-			"partner_params_keys":       []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
-			"event_filtering":           map[string]any{"blacklist": []any{"{{ config.event || Password Reset }}"}},
+			"app_token":           "token",
+			"custom_mappings":     []any{map[string]any{"from": "{{ config.from || evt }}", "to": "abc"}},
+			"partner_params_keys": []any{map[string]any{"from": "userId", "to": "{{ config.to || user_id }}"}},
+			"event_filtering":     map[string]any{"blacklist": []any{"{{ config.event || Password Reset }}"}},
 		}))
 
 		for _, field := range []string{"app_token", "delay"} {
@@ -303,6 +350,146 @@ func TestAdjustConfigValidation(t *testing.T) {
 	})
 }
 
+// Import drops the event list the selector does not point at:
+// the SDK never reads it, and keeping it emits a spec declaring whitelist and
+// blacklist together, which this definition's own mutual-exclusion rule then
+// rejects — leaving the user to delete one by hand.
+func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		apiConfig map[string]any
+		want      any
+	}{
+		{
+			name: "unselected list cleared by the webapp",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": ""}},
+			},
+			want: map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			name: "unselected list left over from a mode switch",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "blacklistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: map[string]any{"blacklist": []any{"Signup"}},
+		},
+		{
+			name: "filtering disabled leaves no block behind",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "disable",
+				"whitelistedEvents":    []any{map[string]any{"eventName": "Order Completed"}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: nil,
+		},
+		{
+			// An absent discriminator is not a selection of none. Configs written
+			// through the Public API can carry a list with no selector, and the
+			// outbound conversion re-derives one, so dropping here would lose a
+			// populated list and erase it upstream on the next apply.
+			name: "absent discriminator leaves members alone",
+			apiConfig: map[string]any{
+				"whitelistedEvents": []any{map[string]any{"eventName": "Order Completed"}},
+			},
+			want: map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			// Whitelisting with no event named discards every event, so the
+			// emptiness is the setting rather than absence.
+			name: "empty selected list survives",
+			apiConfig: map[string]any{
+				"eventFilteringOption": "whitelistedEvents",
+				"whitelistedEvents":    []any{map[string]any{"eventName": ""}},
+				"blacklistedEvents":    []any{map[string]any{"eventName": "Signup"}},
+			},
+			want: map[string]any{"whitelist": []any{""}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			apiConfig := map[string]any{"appToken": "app-token"}
+			for key, value := range tt.apiConfig {
+				apiConfig[key] = value
+			}
+
+			local, err := registered.APIToLocal(apiConfig)
+			require.NoError(t, err)
+
+			if tt.want == nil {
+				assert.NotContains(t, local, "event_filtering")
+			} else {
+				assert.Equal(t, tt.want, local["event_filtering"])
+			}
+			assert.Empty(t, registered.ValidateConfig(local), "the imported spec must pass its own validation")
+		})
+	}
+}
+
+// A spec that selects a list but names no events discards every event, so it
+// has to survive a round trip. It used to convert to nothing outbound — no list
+// and no discriminator — so the next plan saw local config the remote state
+// never carried, and the destination showed a pending update on every apply.
+func TestAdjustEmptySelectedListRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		filter   map[string]any
+		wantWire map[string]any
+	}{
+		{
+			name:     "empty whitelist discards every event",
+			filter:   map[string]any{"whitelist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "whitelistedEvents"},
+		},
+		{
+			name:     "empty blacklist filters nothing",
+			filter:   map[string]any{"blacklist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "blacklistedEvents"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			local := map[string]any{"app_token": "app-token", "event_filtering": tt.filter}
+
+			api, err := registered.LocalToAPI(local)
+			require.NoError(t, err)
+			for key, want := range tt.wantWire {
+				assert.Equal(t, want, api[key], "the selector must reach the API")
+			}
+
+			back, err := registered.APIToLocal(api)
+			require.NoError(t, err)
+			assert.Equal(t, tt.filter, back["event_filtering"], "apply then plan must converge")
+		})
+	}
+}
+
 func TestAdjustConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -334,7 +521,12 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 					"android": true,
 					"ios": true
 				},
-				"event_filtering": {"whitelist": ["one", "two"]}
+				"event_filtering": {"whitelist": ["one", "two"]},
+				"connection_mode": {
+					"android_kotlin": "device",
+					"ios_swift": "cloud",
+					"react_native": "cloud"
+				}
 			}`,
 			APIJSON: `{
 				"appToken": "abc123",
@@ -355,7 +547,12 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 				"whitelistedEvents": [
 					{"eventName": "one"},
 					{"eventName": "two"}
-				]
+				],
+				"connectionMode": {
+					"androidKotlin": "device",
+					"iosSwift": "cloud",
+					"reactnative": "cloud"
+				}
 			}`,
 		},
 		{
@@ -394,7 +591,6 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// use_native_sdk and the two added attribution sub-keys are declared by
 // schema.json; unmodelled they were dropped from the payload and erased upstream
 // on the first apply.
 func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
@@ -402,17 +598,8 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 
 	testutil.AssertConversion(t, adj.NewDefinition().Properties, []testutil.ConversionCase{
 		{
-			Name: "use_native_sdk and per-platform attribution",
 			LocalJSON: `{
 				"app_token": "adjToken",
-				"use_native_sdk": {
-					"android": true,
-					"android_kotlin": true,
-					"ios": false,
-					"ios_swift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enable_install_attribution_tracking": {
 					"android": true,
 					"android_kotlin": false,
@@ -422,14 +609,6 @@ func TestAdjustNativeSDKAndAttributionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"appToken": "adjToken",
-				"useNativeSDK": {
-					"android": true,
-					"androidKotlin": true,
-					"ios": false,
-					"iosSwift": true,
-					"unity": false,
-					"flutter": true
-				},
 				"enableInstallAttributionTracking": {
 					"android": true,
 					"androidKotlin": false,

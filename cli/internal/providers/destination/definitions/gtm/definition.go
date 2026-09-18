@@ -34,10 +34,6 @@ type eventFilteringConfig struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDKConfig struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // gtmConfig is the local YAML config model. Field set mirrors the keys upstream
 // declares in db-config.json destConfig; validation constraints mirror
 // schema.json.
@@ -49,7 +45,6 @@ type gtmConfig struct {
 	EnvironmentID      string                   `mapstructure:"environment_id" validate:"omitempty,pattern=single_line_100"`
 	AuthorizationToken string                   `mapstructure:"authorization_token" validate:"omitempty,pattern=single_line_100"`
 	EventFiltering     *eventFilteringConfig    `mapstructure:"event_filtering"`
-	UseNativeSDK       *useNativeSDKConfig      `mapstructure:"use_native_sdk"`
 	ConnectionMode     common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement  common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -69,7 +64,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

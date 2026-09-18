@@ -23,7 +23,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "tiktok_ads", registered.Type)
 	assert.Equal(t, "TIKTOK_ADS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "pixel_code"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -155,9 +155,6 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 			},
 			"event_filtering": map[string]any{
 				"whitelist": []any{"Order Completed", "Product Added"},
-			},
-			"use_native_sdk": map[string]any{
-				"web": true,
 			},
 			"consent_management": map[string]any{
 				"web": []any{
@@ -330,8 +327,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 				"events_to_standard": [
 					{"from": "Order Completed", "to": "CompletePayment"}
 				],
-				"event_filtering": {"whitelist": ["Order Completed", "Product Added"]},
-				"use_native_sdk": {"web": true}
+				"event_filtering": {"whitelist": ["Order Completed", "Product Added"]}
 			}`,
 			APIJSON: `{
 				"pixelCode": "C12345",
@@ -346,8 +342,7 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Order Completed"},
 					{"eventName": "Product Added"}
 				],
-				"eventFilteringOption": "whitelistedEvents",
-				"useNativeSDK": {"web": true}
+				"eventFilteringOption": "whitelistedEvents"
 			}`,
 		},
 		{

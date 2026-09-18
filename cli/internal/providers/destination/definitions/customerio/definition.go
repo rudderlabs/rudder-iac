@@ -46,7 +46,6 @@ type customerioConfig struct {
 	// matches what the backend stores instead of diffing on every apply.
 	APIVersion                  string                   `mapstructure:"api_version" validate:"omitempty,oneof=v1 v2" default:"v1"`
 	UserIDIdentifierType        string                   `mapstructure:"user_id_identifier_type" validate:"required_if=APIVersion v2,omitempty,oneof=id email phone cio_id"`
-	UseNativeSDK                *sdkSourceBools          `mapstructure:"use_native_sdk"`
 	SendPageNameInSDK           *webBool                 `mapstructure:"send_page_name_in_sdk"`
 	DataUseInApp                *webBool                 `mapstructure:"data_use_in_app"`
 	AutoTrackDeviceAttributes   *mobileSourceBools       `mapstructure:"auto_track_device_attributes"`
@@ -90,9 +89,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("datacenter", "datacenter"),
 		converter.Simple("apiVersion", "api_version"),
 		converter.Simple("userIdIdentifierType", "user_id_identifier_type"),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
-		converter.Simple("useNativeSDK.android", "use_native_sdk.android"),
-		converter.Simple("useNativeSDK.ios", "use_native_sdk.ios"),
 		converter.Gated(
 			converter.Simple("sendPageNameInSDK.web", "send_page_name_in_sdk.web"),
 			common.SourceTypeWeb,
@@ -136,7 +132,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		// Sensitive and it is a real credential, so it is wrapped write-only here.
 		// Note the API does still return apiKey, so the value is never absent from
 		// remote state — see the churn note in the PR.
-		SecretKeys: []string{"api_key"},
+		SecretKeys: []string{"api_key", "site_id"},
 		NewConfig: func() any {
 			return &customerioConfig{}
 		},

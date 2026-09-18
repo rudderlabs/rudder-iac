@@ -18,11 +18,12 @@ var sqlWarehouse = WarehouseMetadata{
 	SupportsSyncSettings: true,
 }
 
-// warehouseDefinitions mirrors the options block of rudder-integrations-config
-// src/configurations/sources/<name>/db-config.json at revision 9fa7b26, which
-// is what the backend reads in src/modules/retl/api-gateway/connection-config
-// (constants.ts, assembler.ts, connection-constraints.ts).
-var warehouseDefinitions = map[string]WarehouseMetadata{
+// warehouseMetadataBySourceDefinition mirrors the options block of
+// rudder-integrations-config src/configurations/sources/<name>/db-config.json
+// at revision 9fa7b26, which is what the backend reads in
+// src/modules/retl/api-gateway/connection-config (constants.ts, assembler.ts,
+// connection-constraints.ts).
+var warehouseMetadataBySourceDefinition = map[string]WarehouseMetadata{
 	"bigquery":   sqlWarehouse,
 	"databricks": sqlWarehouse,
 	"mysql":      sqlWarehouse,
@@ -39,12 +40,12 @@ var warehouseDefinitions = map[string]WarehouseMetadata{
 	"clickhouse": {SyncBehaviours: []string{"upsert", "mirror", "full"}},
 }
 
-// WarehouseDefinition returns the metadata for a source definition name. A
+// SourceWarehouseMetadata returns the metadata for a source definition name. A
 // definition missing from the table is unknown, not unsupported: callers must
 // skip the checks that need this metadata rather than guess support, because a
 // guess turns a backend rejection into a locally passing validation.
-func WarehouseDefinition(sourceDefinition string) (WarehouseMetadata, bool) {
-	metadata, ok := warehouseDefinitions[sourceDefinition]
+func SourceWarehouseMetadata(sourceDefinition string) (WarehouseMetadata, bool) {
+	metadata, ok := warehouseMetadataBySourceDefinition[sourceDefinition]
 	// The SQL warehouses share one backing array, so hand out a copy: a caller
 	// that sorts or appends in place would otherwise rewrite the table for
 	// every warehouse at once.

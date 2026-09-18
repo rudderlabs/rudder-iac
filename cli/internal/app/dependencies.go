@@ -316,6 +316,60 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 	if err := registry.Register(bq.NewDefinition()); err != nil {
 		return nil, fmt.Errorf("registering bq destination definition: %w", err)
 	}
+	if err := registry.Register(am.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering am destination definition: %w", err)
+	}
+	if err := registry.Register(braze.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering braze destination definition: %w", err)
+	}
+	if err := registry.Register(customerio.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering customerio destination definition: %w", err)
+	}
+	if err := registry.Register(facebookconversions.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering facebook_conversions destination definition: %w", err)
+	}
+	if err := registry.Register(facebookpixel.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering facebook_pixel destination definition: %w", err)
+	}
+	if err := registry.Register(ga4.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
+	}
+	if err := registry.Register(gcs.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering gcs destination definition: %w", err)
+	}
+	if err := registry.Register(googleads.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering googleads destination definition: %w", err)
+	}
+	if err := registry.Register(hs.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering hs destination definition: %w", err)
+	}
+	if err := registry.Register(iterable.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering iterable destination definition: %w", err)
+	}
+	if err := registry.Register(mp.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering mp destination definition: %w", err)
+	}
+	if err := registry.Register(postgres.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering postgres destination definition: %w", err)
+	}
+	if err := registry.Register(posthog.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering posthog destination definition: %w", err)
+	}
+	if err := registry.Register(rs.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering rs destination definition: %w", err)
+	}
+	if err := registry.Register(s3datalake.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering s3_datalake destination definition: %w", err)
+	}
+	if err := registry.Register(snowflake.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering snowflake destination definition: %w", err)
+	}
+	if err := registry.Register(tiktokads.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering tiktok_ads destination definition: %w", err)
+	}
+	if err := registry.Register(webhook.NewDefinition()); err != nil {
+		return nil, fmt.Errorf("registering webhook destination definition: %w", err)
+	}
 
 	if cfg.ExperimentalFlags.UnverifiedDestinations {
 		if err := registry.Register(adj.NewDefinition()); err != nil {
@@ -324,29 +378,14 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(adobeanalytics.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering adobe_analytics destination definition: %w", err)
 		}
-		if err := registry.Register(am.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering am destination definition: %w", err)
-		}
 		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(braze.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering braze destination definition: %w", err)
 		}
 		if err := registry.Register(confluentcloud.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering confluent_cloud destination definition: %w", err)
 		}
-		if err := registry.Register(customerio.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering customerio destination definition: %w", err)
-		}
 		if err := registry.Register(customerioaudience.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering customerio_audience destination definition: %w", err)
-		}
-		if err := registry.Register(facebookconversions.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering facebook_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(facebookpixel.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering facebook_pixel destination definition: %w", err)
 		}
 		if err := registry.Register(firebase.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering firebase destination definition: %w", err)
@@ -354,17 +393,8 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(ga.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering ga destination definition: %w", err)
 		}
-		if err := registry.Register(ga4.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
-		}
-		if err := registry.Register(gcs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
-		}
 		if err := registry.Register(googleadwordsofflineconversions.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering google_adwords_offline_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(googleads.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
 		}
 		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
@@ -375,17 +405,11 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(gtm.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering gtm destination definition: %w", err)
 		}
-		if err := registry.Register(hs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
 		if err := registry.Register(intercom.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering intercom destination definition: %w", err)
 		}
 		if err := registry.Register(kinesis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kinesis destination definition: %w", err)
-		}
-		if err := registry.Register(iterable.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering iterable destination definition: %w", err)
 		}
 		if err := registry.Register(kafka.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering kafka destination definition: %w", err)
@@ -399,26 +423,11 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(marketo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
 		}
-		if err := registry.Register(mp.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering mp destination definition: %w", err)
-		}
-		if err := registry.Register(postgres.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering postgres destination definition: %w", err)
-		}
-		if err := registry.Register(posthog.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering posthog destination definition: %w", err)
-		}
 		if err := registry.Register(qualtrics.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering qualtrics destination definition: %w", err)
 		}
 		if err := registry.Register(redis.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering redis destination definition: %w", err)
-		}
-		if err := registry.Register(rs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering rs destination definition: %w", err)
-		}
-		if err := registry.Register(s3datalake.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering s3_datalake destination definition: %w", err)
 		}
 		if err := registry.Register(salesforce.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering salesforce destination definition: %w", err)
@@ -429,23 +438,14 @@ func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
 		if err := registry.Register(slack.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering slack destination definition: %w", err)
 		}
-		if err := registry.Register(snowflake.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering snowflake destination definition: %w", err)
-		}
 		if err := registry.Register(snowpipestreaming.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering snowpipe_streaming destination definition: %w", err)
 		}
 		if err := registry.Register(statsig.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering statsig destination definition: %w", err)
 		}
-		if err := registry.Register(tiktokads.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering tiktok_ads destination definition: %w", err)
-		}
 		if err := registry.Register(vwo.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering vwo destination definition: %w", err)
-		}
-		if err := registry.Register(webhook.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering webhook destination definition: %w", err)
 		}
 		if err := registry.Register(zendesk.NewDefinition()); err != nil {
 			return nil, fmt.Errorf("registering zendesk destination definition: %w", err)

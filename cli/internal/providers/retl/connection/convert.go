@@ -87,6 +87,12 @@ func toCreateRequest(data resources.ResourceData) (*retlClient.CreateRETLConnect
 	if err := checkObjectMappingFlow(config); err != nil {
 		return nil, fmt.Errorf("connection create: %w", err)
 	}
+	// CreateConnection refuses a body with no schedule type. Catching it here
+	// keeps a replacement from deleting the live connection for a create the
+	// client was never going to send.
+	if config.Schedule.Type == "" {
+		return nil, errors.New("connection create: schedule.type is required")
+	}
 
 	request := &retlClient.CreateRETLConnectionRequest{
 		SourceID:      sourceID,

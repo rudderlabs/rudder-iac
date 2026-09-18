@@ -92,3 +92,9 @@
 <!-- ticket:DEX-731 -->
 - CI live E2E can observe stale upstream state immediately after project apply/destroy moves through the composite provider; observed symptoms included catalog snapshot counts such as 0 resources instead of 37 and a follow-up dry-run still listing a transformation deletion like `transformation:py_transform`.
 - Durable mitigation: poll the existing exact live E2E assertions for a bounded consistency window after apply/destroy operations instead of treating the first immediate remote read as definitive.
+
+## DEX-888 — Destination Raw-Secret Substring Guard
+<!-- ticket:DEX-888 -->
+- CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
+- The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
+- Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.

@@ -16,8 +16,9 @@
       }
     ],
     "eventFilteringOption": "blacklistedEvents",
-    "useNativeSDK": {
-      "web": false
+    "connectionMode": {
+      "web": "cloud",
+      "cloud": "cloud"
     },
     "autocapture": {
       "web": true

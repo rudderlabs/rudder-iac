@@ -43,9 +43,6 @@
       }
     ],
     "eventFilteringOption": "blacklistedEvents",
-    "useNativeSDK": {
-      "web": false
-    },
     "autoConfig": {
       "web": false
     },
@@ -53,7 +50,7 @@
       "web": [
         {
           "from": "Product Viewed",
-          "to": "1111111111"
+          "to": "rudderCliE2eLegacyPixelIdUpdated"
         }
       ]
     },

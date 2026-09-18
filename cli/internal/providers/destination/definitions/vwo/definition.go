@@ -21,10 +21,6 @@ type eventFilteringConfig struct {
 	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
 }
 
-type useNativeSDKConfig struct {
-	Web *bool `mapstructure:"web"`
-}
-
 // vwoConfig is the local YAML config model. Field set mirrors the
 // terraform-provider VWO mapping contract plus shared source-scoped settings.
 type vwoConfig struct {
@@ -36,7 +32,6 @@ type vwoConfig struct {
 	SettingsTolerance      string                   `mapstructure:"settings_tolerance" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	UseExistingJquery      *bool                    `mapstructure:"use_existing_jquery" default:"false"`
 	EventFiltering         *eventFilteringConfig    `mapstructure:"event_filtering"`
-	UseNativeSDK           *useNativeSDKConfig      `mapstructure:"use_native_sdk"`
 	ConnectionMode         common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement      common.ConsentManagement `mapstructure:"consent_management"`
 }
@@ -57,7 +52,6 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"event_filtering.whitelist": "whitelistedEvents",
 			"event_filtering.blacklist": "blacklistedEvents",
 		}),
-		converter.Simple("useNativeSDK.web", "use_native_sdk.web"),
 	}
 	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
 	properties = append(properties, common.Properties(sourceTypes)...)

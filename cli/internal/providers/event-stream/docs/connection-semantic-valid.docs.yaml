@@ -6,7 +6,7 @@ match_behavior:
   # source's mapped type (V-C4), its config must carry the fields that type
   # requires to connect in the connection_mode it declares for it (V-C5 —
   # skipped where no mode is declared, since which fields are required
-  # depends on it) and, in connection_mode or use_native_sdk, an
+  # depends on it) and, in connection_mode, an
   # entry for that type (V-C8 — skipped where the config surface has neither
   # block, or cannot name that source type in one), and a destination cannot
   # receive from both
@@ -216,7 +216,6 @@ match_behavior:
             message_contains: "does not support source 'my-python-source'"
       - example_id: "es-connection-semantic-missing-connection-mode"
         title: "Destination declaring no settings for the source's type"
-        description: "S3 has a connection_mode block and no use_native_sdk block, and its connection_mode names android only. The connecting JavaScript source maps to the web source type."
         files:
           source.yaml: |
             version: rudder/v1

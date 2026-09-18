@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -184,10 +185,15 @@ func (p *project) Load(location string) error {
 	}
 
 	if p.substitutor != nil {
-		substituted, subDiags := p.substituteSpecs(rawSpecs)
+		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
 			if err := p.renderer.Render(subDiags); err != nil {
 				return fmt.Errorf("rendering diagnostics: %w", err)
+			}
+			// An undefined variable almost always means a var file was not
+			// passed, not a broken spec, so point at the fix.
+			if hasUndefined {
+				return fmt.Errorf("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 			}
 			return fmt.Errorf("variable substitution failed")
 		}
@@ -300,14 +306,18 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 // the diagnostics carry the substitution errors. This stops downstream
 // parsing and validation from surfacing cascading false errors (e.g. missing
 // references) for resources whose definitions failed substitution.
-func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*specs.RawSpec, validation.Diagnostics) {
-	var (
-		diags       = make(validation.Diagnostics, 0)
-		substituted = make(map[string]*specs.RawSpec, len(raw))
-	)
+//
+// hasUndefined reports whether any failure was an undefined variable, which
+// callers can resolve by passing a var file.
+func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (substituted map[string]*specs.RawSpec, diags validation.Diagnostics, hasUndefined bool) {
+	diags = make(validation.Diagnostics, 0)
+	substituted = make(map[string]*specs.RawSpec, len(raw))
 	for path, rawSpec := range raw {
 		data, subErrs := p.substitutor.SubstituteBytes(rawSpec.Data)
 		if len(subErrs) > 0 {
+			for _, e := range subErrs {
+				hasUndefined = hasUndefined || errors.Is(e.Err, varsubst.ErrUndefinedVariable)
+			}
 			diags = append(diags, substitutionDiagnostics(path, subErrs)...)
 			continue
 		}
@@ -315,9 +325,9 @@ func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (map[string]*sp
 	}
 	if diags.HasErrors() {
 		diags.Sort()
-		return nil, diags
+		return nil, diags, hasUndefined
 	}
-	return substituted, nil
+	return substituted, nil, false
 }
 
 // parseSpecs converts raw spec bytes into parsed specs, collecting any

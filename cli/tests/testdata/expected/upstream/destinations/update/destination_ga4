@@ -23,11 +23,6 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true,
-      "android": false,
-      "ios": false
-    },
     "connectionMode": {
       "web": "device",
       "android": "device",
@@ -43,9 +38,6 @@
       "web": false
     },
     "extendPageViewParams": {
-      "web": false
-    },
-    "useNativeSDKToSend": {
       "web": false
     },
     "consentManagement": {

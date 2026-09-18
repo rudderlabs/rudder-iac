@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    api_key: rudderCliE2eApiKeyUpdated
+    api_key: "{{ .ITERABLE_API_KEY_UPDATED }}"
     data_center: EUDC
     package_name: com.rudderstack.e2e.updated
     prefer_user_id: true
@@ -19,8 +19,6 @@ spec:
     track_named_pages: true
     track_categorized_pages: true
     register_device_or_browser_api_key: "{{ .ITERABLE_REGISTER_DEVICE_API_KEY }}"
-    use_native_sdk:
-      web: true
     connection_mode:
       web: cloud
     initialisation_identifier:

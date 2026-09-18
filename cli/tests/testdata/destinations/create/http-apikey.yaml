@@ -11,7 +11,7 @@ spec:
   config:
     api_url: https://webhooks.example.com/rudder/events
     auth: apiKeyAuth
-    api_key_name: X-Api-Key
+    api_key_name: "{{ .HTTP_APIKEY_API_KEY_NAME }}"
     api_key_value: "{{ .HTTP_API_KEY_VALUE }}"
     method: POST
     format: JSON
