@@ -7,11 +7,16 @@ import (
 )
 
 // Matcher returns the import --merge matcher for SQL models. A remote model
-// links to a local model of the same display_name AND account_id. The local
-// uniqueness rule keys on display_name alone, but a SQL model belongs to an
-// account, so matching on account_id too avoids falsely linking same-named
-// models across accounts — a false link is worse than falling back to the
-// namer (which then produces a new spec the user can reconcile).
+// links to a local model whose display_name folds to the same value.
+//
+// account_id used to be a second conjunct, guarding against falsely linking
+// same-named models across accounts. That case can no longer arise: source
+// names are unique case-insensitively across the whole workspace regardless of
+// account or category, so display_name alone already identifies the source
+// upstream. Keeping the conjunct was actively harmful — a spec naming its
+// account by reference holds a PropertyRef whose remote id is unknown until
+// apply, so it never matched, and import wrote a second spec for a source that
+// already existed.
 func Matcher() importmatcher.Matcher {
 	return importmatcher.Matcher{
 		ResourceType: ResourceType,
@@ -26,14 +31,9 @@ func matchSQLModel(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 		return nil
 	}
 
-	// A model that references its account holds a PropertyRef under
-	// AccountIDKey, whose remote id is unknown until apply, so it never matches.
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
-		var (
-			displayName  = data[DisplayNameKey].(string)
-			accountID, _ = data[AccountIDKey].(string)
-		)
-		return displayName == remote.Name && accountID == remote.AccountID
+		displayName, _ := data[DisplayNameKey].(string)
+		return importmatcher.SameName(displayName, remote.Name)
 	})
 	return local
 }
