@@ -71,7 +71,7 @@ func TestRETLSourcesApply(t *testing.T) {
 
 	t.Run("apply update", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials, accountVars)
-		assertRETLModel(t, accountID, "Orders Model (revised)", "SELECT id, email, created_at FROM orders")
+		assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders")
 	})
 
 	// Not assertable as "No changes to apply": the project carries the account
@@ -81,7 +81,7 @@ func TestRETLSourcesApply(t *testing.T) {
 	// the same thing — prove nothing else churned by reading the state back.
 	t.Run("re-apply leaves the model unchanged", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials, accountVars)
-		assertRETLModel(t, accountID, "Orders Model (revised)", "SELECT id, email, created_at FROM orders")
+		assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders")
 	})
 }
 
