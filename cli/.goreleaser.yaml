@@ -52,3 +52,17 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+brews:
+  - repository:
+      owner: rudderlabs
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/rudderlabs/rudder-iac"
+    description: "RudderStack Infrastructure-as-Code CLI"
+    license: "MIT"
+    install: |
+      bin.install "rudder-cli"
+    test: |
+      system "#{bin}/rudder-cli", "--version"
