@@ -58,7 +58,7 @@ func newCmdValidate() *cobra.Command {
 
 			// Validate by attempting to preview with limit=0
 			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
-			reportValidation(cmd.OutOrStdout(), err)
+			err = reportValidation(cmd.OutOrStdout(), err)
 			return err
 		},
 	}
@@ -68,16 +68,25 @@ func newCmdValidate() *cobra.Command {
 	return cmd
 }
 
-// reportValidation prints the outcome of validating a source. A source with no
-// query to run is reported apart from a query that failed, so an s3 table
-// source does not read as a broken warehouse query.
-func reportValidation(w io.Writer, err error) {
+// reportValidation prints the outcome of validating a source and returns the
+// error the command should exit with.
+//
+// A source with no query to run is not a failure. An s3 table source has no
+// warehouse query, and that is its steady state rather than a defect — so a CI
+// step that validates every source in a project must not go red the day someone
+// adds one. ErrPreviewUnsupported carries exactly that distinction, which is why
+// it prints and returns nil, while a query that genuinely failed returns the
+// error and exits non-zero.
+func reportValidation(w io.Writer, err error) error {
 	switch {
 	case err == nil:
-		fmt.Fprintln(w, "✅ SQL query executed successfully")
+		fmt.Fprintln(w, "✅ Query executed successfully")
+		return nil
 	case errors.Is(err, table.ErrPreviewUnsupported):
-		fmt.Fprintf(w, "❌ Cannot validate this source: %s\n", err)
+		fmt.Fprintf(w, "✅ Nothing to validate: %s\n", err)
+		return nil
 	default:
-		fmt.Fprintf(w, "❌ SQL query failed to execute: %s\n", err)
+		fmt.Fprintf(w, "❌ Query failed to execute: %s\n", err)
+		return err
 	}
 }

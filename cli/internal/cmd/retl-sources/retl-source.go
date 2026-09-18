@@ -2,6 +2,7 @@ package retlsource
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
@@ -29,7 +30,13 @@ func findSource(graph *resources.Graph, externalID string) (*resources.Resource,
 	case 1:
 		return found[0], nil
 	}
-	return nil, fmt.Errorf("external id '%s' is used by both %s and %s in the project", externalID, found[0].Type(), found[1].Type())
+	types := make([]string, 0, len(found))
+	for _, r := range found {
+		types = append(types, r.Type())
+	}
+	// Listed rather than named pairwise: a third rETL source kind (audience) is
+	// coming, and "used by both" would then report two of three collisions.
+	return nil, fmt.Errorf("external id '%s' is used by %s in the project", externalID, strings.Join(types, ", "))
 }
 
 func NewCmdRetlSources() *cobra.Command {
