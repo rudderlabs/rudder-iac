@@ -62,6 +62,7 @@ type project struct {
 	renderer               renderer.Renderer
 	substitutor            varsubst.Substitutor
 	ignoreUnknownKinds     bool
+	sourceIndex            map[string]SourceLocation
 }
 
 // ProjectOption defines a functional option for configuring a Project.
@@ -212,6 +213,11 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	// Parse the raw specs into structured form before syntactic validation.
 	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
+
+	// Built before the syntax gate below so a project that fails validation
+	// still reports positions for the URNs that did parse — editors need to
+	// point at resources precisely when the project is broken.
+	p.sourceIndex = buildSourceIndex(p.provider, parsedRawSpecs)
 
 	registry, err := p.registry()
 	if err != nil {
