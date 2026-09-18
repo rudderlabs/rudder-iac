@@ -119,6 +119,24 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		assert.Empty(t, store.requests)
 	})
 
+	// The same ref stored by value, as datacatalog stores it. Matching only the
+	// pointer form would fall through to "account ID not found in resource data".
+	t.Run("account reference held by value", func(t *testing.T) {
+		t.Parallel()
+		store := &previewStore{}
+		h := table.NewHandler(store, "retl")
+
+		_, err := h.Preview(context.Background(), "users-table", resources.ResourceData{
+			sqlmodel.AccountIDKey:        resources.PropertyRef{URN: "account:prod-pg", Property: "id"},
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+		}, 10)
+
+		require.EqualError(t, err, "preview does not support table sources that reference their account yet: set account_id on users-table to preview it")
+		assert.Empty(t, store.requests)
+	})
+
 	t.Run("unknown source definition", func(t *testing.T) {
 		t.Parallel()
 		store := &previewStore{}
@@ -131,8 +149,12 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 			table.TableKey:               "users",
 		}, 10)
 
-		require.EqualError(t, err, `preview is not supported for source_definition "oracle"`)
-		assert.ErrorIs(t, err, table.ErrPreviewUnsupported)
+		require.EqualError(t, err, `preview cannot quote identifiers for source_definition "oracle": add its quoting to previewSQL`)
+		// Deliberately NOT ErrPreviewUnsupported. That sentinel means "this source
+		// has no query to run", which `validate` now treats as a pass; an unknown
+		// definition is a gap in previewSQL and must keep failing. Wrapping both in
+		// one sentinel would let a missing quoting rule exit 0.
+		assert.NotErrorIs(t, err, table.ErrPreviewUnsupported)
 		assert.Empty(t, store.requests)
 	})
 

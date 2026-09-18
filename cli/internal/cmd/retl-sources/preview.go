@@ -31,6 +31,14 @@ func newCmdPreview() *cobra.Command {
 				return fmt.Errorf("retl-source external id is required")
 			}
 			externalID := args[0]
+			// Rejected here rather than clamped downstream: previewSQL bounds the
+			// query with max(limit, 1) while the limit also travels in the request
+			// unchanged, so a negative value would ask the server for -1 rows and
+			// the warehouse for 1. validate's limit of 0 is the one deliberate
+			// mismatch (no rows returned, one row read to prove the table reads).
+			if limit < 0 {
+				return fmt.Errorf("--limit cannot be negative, got %d", limit)
+			}
 
 			var err error
 			defer func() {

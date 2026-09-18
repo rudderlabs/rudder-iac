@@ -33,7 +33,14 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 	// referenced account resolves to is not known here. fromData reads the key
 	// through a checked assert, so a reference reads back as an empty id and
 	// would otherwise surface as "account ID not found".
-	if _, ok := data[sqlmodel.AccountIDKey].(*resources.PropertyRef); ok {
+	//
+	// Both shapes are matched deliberately. Account references arrive with #851,
+	// where sqlmodel.AccountRef returns the pointer form — but the repo is split:
+	// retl and event-stream store *resources.PropertyRef while datacatalog stores
+	// it by value. Matching only one shape would turn a later change of mind into
+	// a silent fallthrough to the obscure message this branch exists to replace.
+	switch data[sqlmodel.AccountIDKey].(type) {
+	case *resources.PropertyRef, resources.PropertyRef:
 		return nil, fmt.Errorf("preview does not support table sources that reference their account yet: set account_id on %s to preview it", id)
 	}
 	if t.AccountID == "" {
@@ -72,12 +79,17 @@ func previewSQL(t TableSpec, limit int) (string, error) {
 		// identifier, and escapes with backslashes rather than by doubling.
 		relation = "`" + bigQueryEscaper.Replace(path) + "`"
 	default:
-		return "", fmt.Errorf("%w for source_definition %q", ErrPreviewUnsupported, t.SourceDefinition)
+		// Not ErrPreviewUnsupported: the definition IS supported as a source,
+		// only its identifier quoting is unknown here. Reporting it as
+		// unsupported would send the reader looking for a missing feature
+		// rather than for this switch. Reachable only by adding a warehouse to
+		// TableSpec's oneof tag without adding it here; collapsing the three
+		// enumerations into one is DEX-877.
+		return "", fmt.Errorf("preview cannot quote identifiers for source_definition %q: add its quoting to previewSQL", t.SourceDefinition)
 	}
 	return "select * from " + relation + " limit " + strconv.Itoa(max(limit, 1)), nil
 }
 
-// quote wraps name in q, doubling any q inside it.
 func quote(name, q string) string {
 	return q + strings.ReplaceAll(name, q, q+q) + q
 }
