@@ -31,6 +31,10 @@ type ExperimentalConfig struct {
 	// gen-rule-docs` and TestGenerateRuleCatalog_CompleteAndDriftFree fail until
 	// DEX-829 lands the fragments. CLI validation is unaffected either way.
 	RetlConnectionSupport bool `mapstructure:"retlConnectionSupport"`
+
+	// RETLTableSupport registers the retl-source-table spec kind with the RETL
+	// provider.
+	RETLTableSupport bool `mapstructure:"retlTableSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

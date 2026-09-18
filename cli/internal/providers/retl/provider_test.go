@@ -927,11 +927,12 @@ func TestProviderLoadImportable(t *testing.T) {
 	})
 }
 
-// minimal resolver implementation; not used by current FormatForExport flow
+// noopResolver resolves nothing, as for an import set without the sources'
+// accounts, so exported sources keep their account_id.
 type noopResolver struct{}
 
 func (n noopResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
-	return "", nil
+	return "", fmt.Errorf("%s %s is not in the import set", entityType, remoteID)
 }
 
 func TestProviderFormatForExport(t *testing.T) {

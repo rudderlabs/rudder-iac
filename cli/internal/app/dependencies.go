@@ -259,12 +259,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	dcp := datacatalog.New(catalogClient)
-
-	var retlOpts []retl.Option
-	if cfg.ExperimentalFlags.RetlConnectionSupport {
-		retlOpts = append(retlOpts, retl.WithConnectionSupport(destRegistry))
-	}
-	retlp := retl.New(retlClient.NewRudderRETLStore(c), retlOpts...)
+	retlp := retl.New(retlClient.NewRudderRETLStore(c), retlOptions(cfg, destRegistry)...)
 
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esProvider.WithDestinationRegistry(destRegistry))
 	trp := transformations.NewProvider(c)
@@ -295,6 +290,20 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	return providers, providerMap, nil
+}
+
+// retlOptions returns the RETL provider options gated by experimental flags.
+// cfg comes from config.GetConfig, which clears every flag unless experimental
+// mode is on.
+func retlOptions(cfg config.Config, destRegistry *definitions.Registry) []retl.Option {
+	var opts []retl.Option
+	if cfg.ExperimentalFlags.RetlConnectionSupport {
+		opts = append(opts, retl.WithConnectionSupport(destRegistry))
+	}
+	if cfg.ExperimentalFlags.RETLTableSupport {
+		opts = append(opts, retl.WithTableSupport())
+	}
+	return opts
 }
 
 // newDestinationRegistry builds the destination definition registry.

@@ -69,4 +69,14 @@ func TestMatcher(t *testing.T) {
 
 		assert.Nil(t, m.Match(scope, remoteModel("src_1", "", "acc_1")))
 	})
+
+	t.Run("model referencing its account never matches", func(t *testing.T) {
+		t.Parallel()
+		scope := scopeWith(resources.NewResource("orders", sqlmodel.ResourceType, resources.ResourceData{
+			sqlmodel.DisplayNameKey: "Orders",
+			sqlmodel.AccountIDKey:   sqlmodel.AccountRef("prod-pg"),
+		}, []string{}))
+
+		assert.Nil(t, m.Match(scope, remoteModel("src_1", "Orders", "acc_1")))
+	})
 }

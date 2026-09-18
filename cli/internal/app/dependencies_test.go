@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,6 +82,45 @@ func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
 			_, err = providers.RETL.LoadResourcesFromRemote(t.Context())
 			require.NoError(t, err)
 			assert.Equal(t, tc.supported, hitConnections.Load())
+		})
+	}
+}
+
+// The composed RETL provider picks the flag up from the environment, and only
+// while experimental mode is on — the same umbrella every experimental flag
+// sits under.
+func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
+	cases := []struct {
+		name         string
+		experimental string
+		tableFlag    string
+		wantTable    bool
+	}{
+		{name: "experimental mode on", experimental: "true", tableFlag: "true", wantTable: true},
+		{name: "experimental mode off", experimental: "false", tableFlag: "true", wantTable: false},
+		// Experimental mode is on for an unrelated flag: the kind must still be
+		// absent, which is what distinguishes the per-flag check from a bare
+		// experimental-mode check.
+		{name: "experimental mode on, table flag unset", experimental: "true", tableFlag: "", wantTable: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
+			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", tc.tableFlag)
+			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+			c, err := client.New("test-token")
+			require.NoError(t, err)
+
+			_, providers, err := composeProviders(c)
+			require.NoError(t, err)
+
+			if tc.wantTable {
+				assert.Contains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
+				return
+			}
+			assert.NotContains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
 		})
 	}
 }
