@@ -68,26 +68,19 @@ func ValidateAccountReference(ref, sourceDefinition string, graph *resources.Gra
 	}}
 }
 
+// validateDisplayNameUniqueness checks the model's display_name against the
+// other SQL models. A clash with a table source is retl/table/semantic-valid's
+// to report, on the table source, so it is reported once.
 func validateDisplayNameUniqueness(spec sqlmodel.SQLModelSpec, graph *resources.Graph) []rules.ValidationResult {
-	countMap := make(map[string]int)
-	for _, resource := range graph.ResourcesByType(sqlmodel.ResourceType) {
-		data := resource.Data()
-		displayName := data[sqlmodel.DisplayNameKey].(string)
-		countMap[displayName]++
+	names := prules.NamesByKey(graph, sqlmodel.DisplayNameKey, sqlmodel.ResourceType)
+	clash := prules.NameClashMessage(sqlmodel.DisplayNameKey, spec.DisplayName, names)
+	if clash == "" {
+		return nil
 	}
-
-	if countMap[spec.DisplayName] > 1 {
-		return []rules.ValidationResult{{
-			Reference: "/display_name",
-			Message: fmt.Sprintf(
-				"duplicate display_name '%s' within kind '%s'",
-				spec.DisplayName,
-				sqlmodel.ResourceKind,
-			),
-		}}
-	}
-
-	return nil
+	return []rules.ValidationResult{{
+		Reference: "/" + sqlmodel.DisplayNameKey,
+		Message:   fmt.Sprintf("%s within kind '%s'", clash, sqlmodel.ResourceKind),
+	}}
 }
 
 func NewSQLModelSemanticValidRule() rules.Rule {
