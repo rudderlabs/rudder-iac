@@ -1,0 +1,75 @@
+rule_id: "retl/table/semantic-valid"
+match_behavior:
+  # retl-source-table is v1-only. The rule checks an account: reference
+  # against the project; a raw account_id is opaque locally and not checked.
+  - applies_to:
+      - kind: "retl-source-table"
+        version: "rudder/v1"
+    valid:
+      - example_id: "table-semantic-v1-account-reference-valid"
+        title: "Valid table source referencing a project account of its source_definition"
+        files:
+          account.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: prod-pg
+            spec:
+              id: prod-pg
+              name: Production Postgres
+              account_definition_name: SOURCE_POSTGRES
+              config:
+                host: db.internal
+                dbname: analytics
+                user: rudder
+                port: "5432"
+                password: "{{ .PG_PASSWORD }}"
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account: "#account:prod-pg"
+              source_definition: postgres
+              primary_key: id
+              schema: public
+              table: users
+    invalid:
+      - example_id: "table-semantic-v1-account-definition-mismatch"
+        title: "s3 table source referencing an account that cannot back its source_definition"
+        files:
+          account.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: prod-pg
+            spec:
+              id: prod-pg
+              name: Production Postgres
+              account_definition_name: SOURCE_POSTGRES
+              config:
+                host: db.internal
+                dbname: analytics
+                user: rudder
+                port: "5432"
+                password: "{{ .PG_PASSWORD }}"
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: events-bucket
+            spec:
+              id: events-bucket
+              display_name: Events
+              account: "#account:prod-pg"
+              source_definition: s3
+              bucket_name: events
+              object_prefix: daily/
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account"
+            severity: "error"
+            message_contains: "account 'prod-pg' is a 'postgres' account (SOURCE_POSTGRES) and cannot back source_definition 's3'"
