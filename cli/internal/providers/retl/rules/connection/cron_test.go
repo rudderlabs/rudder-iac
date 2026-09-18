@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -88,6 +89,26 @@ func TestCheckCronFrequency(t *testing.T) {
 		{
 			// Exactly five minutes across midnight is accepted.
 			expression: "0,55 0,23 * * *",
+			expected:   CronCheckResult{Status: CronValid},
+		},
+		{
+			// Vixie reads the wildcard flag off the first character of the
+			// field, so this day-of-month is not a wildcard even though it
+			// selects every day. The two day fields are therefore ORed, every
+			// date matches, and the midnight gap violates.
+			expression: "0,57 0,23 3,* * MON",
+			expected: CronCheckResult{
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 23, 57),
+				NextViolatingSync: utc(2026, time.January, 2, 0, 0),
+			},
+		},
+		{
+			// The same values written the other way round do set the flag, so
+			// the day fields are ANDed and only Mondays match - never two days
+			// running, which is what keeps the midnight gap out of reach.
+			expression: "0,57 0,23 *,3 * MON",
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
@@ -358,6 +379,51 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `minute field "?": "?" is not a number`,
 		},
 		{
+			// A directive is reported only once the expression it prefixes has
+			// been checked, or it would shield anything written after it behind
+			// a warning that lets the apply through.
+			name:       "timezone directive in front of a malformed field",
+			expression: "TZ=UTC 0 0 * * 9#3",
+			reason:     `day-of-week field "9#3": "9#3" is not a number or day-of-week name`,
+		},
+		{
+			name:       "timezone directive with no expression",
+			expression: "TZ=UTC",
+			reason:     "timezone directive is not followed by a cron expression",
+		},
+		{
+			// The year is checked even though the day field already produced a
+			// warning, so an extension cannot carry a malformed year past it.
+			name:       "extension does not excuse a malformed year",
+			expression: "0 0 0 L * ? garbage",
+			reason:     `year field "garbage": "garbage" is not a number`,
+		},
+		{
+			// Quartz writes "#" in day-of-week only. Accepted in day-of-month
+			// it would check a weekday number against the day numbers 1-31 and
+			// pass a weekday that does not exist.
+			name:       "nth weekday in the day-of-month field",
+			expression: "0 0 9#3 * *",
+			reason:     `day-of-month field "9#3": "9#3" is not a number`,
+		},
+		{
+			name:       "nearest weekday in the day-of-week field",
+			expression: "0 0 * * 5W",
+			reason:     `day-of-week field "5W": "5W" is not a number or day-of-week name`,
+		},
+		{
+			name:       "last given weekday in the day-of-month field",
+			expression: "0 0 31L * *",
+			reason:     `day-of-month field "31L": "31L" is not a number`,
+		},
+		{
+			// An L- offset runs 0-30, not over the day numbers, so 31 could
+			// never select a day no matter how long the month.
+			name:       "out of range offset in L- extension",
+			expression: "0 0 L-31 * *",
+			reason:     `day-of-month field "L-31": "L" is not a number`,
+		},
+		{
 			// A schedule the server would happily store and never run.
 			name:       "impossible date",
 			expression: "0 0 30 2 *",
@@ -398,7 +464,25 @@ func TestCheckCronUnsupportedDialect(t *testing.T) {
 		{
 			name:       "last weekday of month",
 			expression: "0 0 LW * *",
-			reason:     `day-of-month field "LW": the "L" (last day) extension is not supported`,
+			reason:     `day-of-month field "LW": the "LW" (last weekday of the month) extension is not supported`,
+		},
+		{
+			// Quartz writes this one in day-of-week: the last Friday of the
+			// month. It is a dialect we decline to analyse, not malformed.
+			name:       "last given weekday of month",
+			expression: "0 0 * * 5L",
+			reason:     `day-of-week field "5L": the "L" (last given weekday of the month) extension is not supported`,
+		},
+		{
+			// The lower bound of the offset range, which is 0 and not 1.
+			name:       "zero offset from the last day",
+			expression: "0 0 L-0 * *",
+			reason:     `day-of-month field "L-0": the "L-n" (offset from the last day) extension is not supported`,
+		},
+		{
+			name:       "extension inside a seven-field expression",
+			expression: "0 0 0 L * ? 2030",
+			reason:     `day-of-month field "L": the "L" (last day) extension is not supported`,
 		},
 		{
 			name:       "nearest weekday",
@@ -572,5 +656,17 @@ func BenchmarkCheckCron(b *testing.B) {
 				CheckCron(expression)
 			}
 		})
+	}
+}
+
+// A field of repeated extensions used to be formatted into a diagnostic once
+// per matching element while only the first was ever kept, which is quadratic
+// in the length of the field: 8000 elements allocated 252MB. Only the first
+// match is built now, and this is what would show a regression.
+func BenchmarkCheckCronRepeatedExtensions(b *testing.B) {
+	expression := "0 0 " + strings.Repeat("L,", 4000) + "garbage * *"
+
+	for b.Loop() {
+		CheckCron(expression)
 	}
 }
