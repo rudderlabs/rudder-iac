@@ -96,6 +96,12 @@ func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("unverifiedDestinations"))
 }
 
+func TestIsValidExperimentalFlag_RetlConnectionSupport(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("retlConnectionSupport"))
+}
+
 func TestIsValidExperimentalFlag_RETLTableSupport(t *testing.T) {
 	t.Parallel()
 

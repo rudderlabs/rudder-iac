@@ -1,8 +1,12 @@
 package app
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -10,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +37,53 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
 	assert.Same(t, providers.Account, cp.Providers["account"])
 	assert.Same(t, providers.Destination, cp.Providers["destination"])
+}
+
+// The recording server stands in for the backend so the remote load is
+// observable without credentials. The flags travel through the environment
+// rather than viper.Set so InitConfig resolves them the way the CLI does, and
+// t.Setenv unwinds them afterwards. Only the environment unwinds: InitConfig
+// mutates process-global viper, so the package is left holding whatever the
+// last subtest resolved. Later tests that read config must re-init.
+func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
+	cases := []struct {
+		name      string
+		umbrella  string
+		flag      string
+		supported bool
+	}{
+		{name: "flag off keeps connections out of the provider", umbrella: "true", flag: "false"},
+		{name: "flag on registers the connection kind", umbrella: "true", flag: "true", supported: true},
+		{name: "umbrella off ignores the flag", umbrella: "false", flag: "true"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.umbrella)
+			t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", tc.flag)
+			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+			var hitConnections atomic.Bool
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, "/v2/retl-connections") {
+					hitConnections.Store(true)
+				}
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			t.Cleanup(server.Close)
+
+			c, err := client.New("test-token", client.WithBaseURL(server.URL))
+			require.NoError(t, err)
+
+			_, providers, err := composeProviders(c)
+			require.NoError(t, err)
+			assert.Equal(t, tc.supported, slices.Contains(providers.RETL.SupportedKinds(), connection.ResourceKind))
+
+			_, err = providers.RETL.LoadResourcesFromRemote(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, tc.supported, hitConnections.Load())
+		})
+	}
 }
 
 // The composed RETL provider picks the flag up from the environment, and only

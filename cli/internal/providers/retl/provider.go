@@ -15,6 +15,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
@@ -36,12 +38,34 @@ type Provider struct {
 	kindToType     map[string]string
 	syntacticRules []rules.Rule
 	matchers       []importmatcher.Matcher
+	// destinationRegistry is parked for DEX-829's connection semantic rules;
+	// nothing reads it yet. It is nil unless WithConnectionSupport was applied.
+	destinationRegistry *definitions.Registry
 }
 
 const importDir = "retl"
 
 // Option configures the provider at construction.
 type Option func(*Provider)
+
+// WithConnectionSupport registers the rETL connection kind and its handler.
+//
+// A nil registry is replaced with an empty one: registry.Get indexes a map on
+// its receiver, so nil constructs fine and only panics later, mid remote load.
+//
+// The matcher is appended, so it trails the SQL model matcher New seeds and its
+// endpoint lookups can rely on source matches being recorded already.
+func WithConnectionSupport(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		if registry == nil {
+			registry = definitions.NewRegistry()
+		}
+		p.destinationRegistry = registry
+		p.kindToType[connection.ResourceKind] = connection.ResourceType
+		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
+		p.matchers = append(p.matchers, connection.Matcher())
+	}
+}
 
 // WithTableSupport registers the experimental retl-source-table kind: its spec
 // kind, resource type and handler, whose presence also enables its syntax rule
@@ -123,7 +147,8 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for SQL models, and for table sources when registered.
+// --merge smart linking for SQL models, and for connections and table sources
+// once registered.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 	return p.matchers
 }
