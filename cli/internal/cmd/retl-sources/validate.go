@@ -1,12 +1,14 @@
 package retlsource
 
 import (
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/spf13/cobra"
 )
 
@@ -15,8 +17,8 @@ func newCmdValidate() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <external-id>",
-		Short: "Validate a RETL source SQL model",
-		Long:  "Validate a RETL source SQL model by executing the query without returning data",
+		Short: "Validate a RETL source (SQL model or table)",
+		Long:  "Validate a RETL source (SQL model or warehouse table) by executing its query without returning data. s3 table sources have no query to validate.",
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
@@ -45,9 +47,9 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
-			if !ok {
-				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
+			resource, err := findSource(graph, externalID)
+			if err != nil {
+				return err
 			}
 			resourceData := resource.Data()
 
@@ -55,18 +57,36 @@ func newCmdValidate() *cobra.Command {
 			retlProvider := d.Providers().RETL
 
 			// Validate by attempting to preview with limit=0
-			_, err = retlProvider.Preview(cmd.Context(), externalID, sqlmodel.ResourceType, resourceData, 0)
-			if err != nil {
-				fmt.Printf("❌ SQL query failed to execute: %s\n", err.Error())
-				return err
-			}
-
-			fmt.Println("✅ SQL query executed successfully")
-			return nil
+			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
+			err = reportValidation(cmd.OutOrStdout(), err)
+			return err
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory")
 
 	return cmd
+}
+
+// reportValidation prints the outcome of validating a source and returns the
+// error the command should exit with.
+//
+// A source with no query to run is not a failure. An s3 table source has no
+// warehouse query, and that is its steady state rather than a defect — so a CI
+// step that validates every source in a project must not go red the day someone
+// adds one. ErrPreviewUnsupported carries exactly that distinction, which is why
+// it prints and returns nil, while a query that genuinely failed returns the
+// error and exits non-zero.
+func reportValidation(w io.Writer, err error) error {
+	switch {
+	case err == nil:
+		fmt.Fprintln(w, "✅ Query executed successfully")
+		return nil
+	case errors.Is(err, table.ErrPreviewUnsupported):
+		fmt.Fprintf(w, "✅ Nothing to validate: %s\n", err)
+		return nil
+	default:
+		fmt.Fprintf(w, "❌ Query failed to execute: %s\n", err)
+		return err
+	}
 }

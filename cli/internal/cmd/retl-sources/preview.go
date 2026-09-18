@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/previewer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +18,8 @@ func newCmdPreview() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "preview <external-id>",
-		Short: "Preview a RETL source SQL model",
-		Long:  "Preview a RETL source SQL model to see the data structure and sample rows",
+		Short: "Preview a RETL source (SQL model or table)",
+		Long:  "Preview a RETL source (SQL model or warehouse table) to see the data structure and sample rows. s3 table sources have no query to preview.",
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources preview my-model
 			$ rudder-cli retl-sources preview my-model --location ./project --limit 5
@@ -32,6 +31,14 @@ func newCmdPreview() *cobra.Command {
 				return fmt.Errorf("retl-source external id is required")
 			}
 			externalID := args[0]
+			// Rejected here rather than clamped downstream: previewSQL bounds the
+			// query with max(limit, 1) while the limit also travels in the request
+			// unchanged, so a negative value would ask the server for -1 rows and
+			// the warehouse for 1. validate's limit of 0 is the one deliberate
+			// mismatch (no rows returned, one row read to prove the table reads).
+			if limit < 0 {
+				return fmt.Errorf("--limit cannot be negative, got %d", limit)
+			}
 
 			var err error
 			defer func() {
@@ -56,9 +63,9 @@ func newCmdPreview() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
-			resource, ok := graph.GetResource(sqlmodel.ResourceType + ":" + externalID)
-			if !ok {
-				return fmt.Errorf("resource with external id '%s' not found in project", externalID)
+			resource, err := findSource(graph, externalID)
+			if err != nil {
+				return err
 			}
 			resourceData := resource.Data()
 			resourceType := resource.Type()
