@@ -7,17 +7,25 @@ import (
 )
 
 func Error(err error) string {
+	return ErrorMessage(err.Error())
+}
+
+func ErrorMessage(message string) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ColorRed)).
 		Bold(true).
 		Render
 
-	return fmt.Sprintf("%s %s", style("Error:"), err.Error())
+	return fmt.Sprintf("%s %s", style("Error:"), message)
 }
 
 // PrintError prints the given error message to stderr in a styled format.
 func PrintError(err error) {
-	fmt.Fprintln(uiErrWriter, Error(err))
+	PrintErrorMessage(err.Error())
+}
+
+func PrintErrorMessage(message string) {
+	fmt.Fprintln(uiErrWriter, ErrorMessage(message))
 }
 
 func Warning(message string) string {

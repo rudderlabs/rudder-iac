@@ -44,6 +44,14 @@ Read these first when working on account API contract fields:
 Read this first when working on destination external IDs or destination ownership metadata:
 - `api/client/destinations.go`: centralized destination DTO and CRUD transport, including the dedicated external-ID setter and the update-path scrubbing rule.
 
+## DEX-657 — Forbidden API Error Formatting Entry
+<!-- ticket:DEX-657 -->
+Read these first when working on user-facing formatting for HTTP 403 API errors:
+- `api/client/common.go`: `APIError` predicates for feature-disabled and permission-denied 403 classification.
+- `cli/internal/cmd/cmderrors`: command-boundary error helpers, including `FormatUserFacingError` and `SilentError` handling.
+- `cli/internal/cmd/root.go`: root command `Execute()` path where user-facing formatting is applied before printing errors.
+- `cli/internal/ui/messages.go`: low-level message/error printing helpers that should remain transport-agnostic.
+
 ## DEX-545 — Named Pattern Validation Entry
 <!-- ticket:DEX-545 -->
 Read these first when working on named `validate:"pattern=<name>"` behavior:
