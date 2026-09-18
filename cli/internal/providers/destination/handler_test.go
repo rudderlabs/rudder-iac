@@ -1494,6 +1494,8 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 
+	// The managed-transformation case, with the real ImportRefResolver and the
+	// export/load round trip, is in export_ref_test.go.
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 
