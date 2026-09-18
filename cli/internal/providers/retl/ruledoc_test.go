@@ -57,10 +57,9 @@ func TestProviderRuleDocs(t *testing.T) {
 	require.Len(t, doc.Rules, len(syntactic)+len(semantic))
 
 	for _, entry := range p.RuleDocEntries() {
-		// ponytail: only the connection fragments run as projects. The SQL model
-		// fragments predate this check (references without /spec, duplicates
-		// against models their files do not carry); drop the filter once they
-		// are fixed.
+		// Only the connection fragments run as projects. The SQL model fragments
+		// predate this check (references without /spec, duplicates against
+		// models their files do not carry); drop the filter once they are fixed.
 		if !strings.HasPrefix(entry.RuleID, "retl/connection/") {
 			continue
 		}
@@ -69,7 +68,7 @@ func TestProviderRuleDocs(t *testing.T) {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					diagnostics, err := loadExample(t, registry, example.Files)
 					assert.NoError(t, err)
-					assert.Empty(t, describe(diagnostics))
+					assert.Empty(t, diagnostics, "unexpected diagnostics:\n%s", describe(diagnostics))
 				})
 			}
 			for _, example := range behaviour.Invalid {
@@ -112,7 +111,7 @@ func assertExpectedDiagnostics(t *testing.T, ruleID string, example docs.Invalid
 		return d.Severity == rules.Error.String()
 	})
 	assert.Equal(t, wantErr, loadErr != nil, "load error: %v", loadErr)
-	assert.Len(t, describe(diagnostics), len(example.ExpectedDiagnostics), "load error: %v", loadErr)
+	assert.Len(t, diagnostics, len(example.ExpectedDiagnostics), "diagnostics:\n%s\nload error: %v", describe(diagnostics), loadErr)
 	for _, expected := range example.ExpectedDiagnostics {
 		indexer, err := pathindex.NewPathIndexer([]byte(example.Files[expected.File]))
 		require.NoError(t, err)
@@ -125,20 +124,22 @@ func assertExpectedDiagnostics(t *testing.T, ruleID string, example docs.Invalid
 				d.Position.Column == position.Column &&
 				d.Severity.String() == expected.Severity &&
 				strings.Contains(d.Message, expected.MessageContains)
-		}), "expected %+v, got %v (load error: %v)", expected, describe(diagnostics), loadErr)
+		}), "expected %+v, got:\n%s\n(load error: %v)", expected, describe(diagnostics), loadErr)
 	}
 
 	assert.True(t, slices.ContainsFunc(diagnostics, func(d validation.Diagnostic) bool {
 		return d.RuleID == ruleID
-	}), "no diagnostic from %s, got %v", ruleID, describe(diagnostics))
+	}), "no diagnostic from %s, got:\n%s", ruleID, describe(diagnostics))
 }
 
-func describe(diagnostics validation.Diagnostics) []string {
+// describe renders diagnostics for failure output. Printing the structs
+// directly buries the four fields that matter under LineText and Examples.
+func describe(diagnostics validation.Diagnostics) string {
 	described := make([]string, 0, len(diagnostics))
 	for _, d := range diagnostics {
 		described = append(described, fmt.Sprintf("%s:%d:%d %s[%s] %s", d.File, d.Position.Line, d.Position.Column, d.Severity, d.RuleID, d.Message))
 	}
-	return described
+	return strings.Join(described, "\n")
 }
 
 type exampleFiles map[string]string
