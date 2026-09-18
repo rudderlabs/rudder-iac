@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -227,11 +228,8 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
 	// Both of them are part of the syntax validation although done at different places.
 	if specDiags.HasErrors() || syntaxDiags.HasErrors() {
-		if err := p.renderer.Render(append(
-			specDiags,
-			syntaxDiags...,
-		)); err != nil {
-			return fmt.Errorf("rendering diagnostics: %w", err)
+		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
+			return err
 		}
 		return fmt.Errorf("syntax validation failed")
 	}
@@ -281,18 +279,27 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
 
-	// Syntactic warnings did not stop the load, so they are rendered here with
-	// the semantic diagnostics instead of being dropped.
-	diagnostics := append(syntaxDiags, semanticDiags...)
-	diagnostics.Sort()
-	if err := p.renderer.Render(diagnostics); err != nil {
-		return fmt.Errorf("rendering diagnostics: %w", err)
+	// The syntax phase only stops the load on errors, so its warnings are
+	// carried here rather than dropped. specDiags is error-only by construction
+	// today and is folded in only so both render paths carry the same set.
+	if err := p.render(slices.Concat(specDiags, syntaxDiags, semanticDiags)); err != nil {
+		return err
 	}
 
 	if semanticDiags.HasErrors() {
 		return fmt.Errorf("semantic validation failed")
 	}
 
+	return nil
+}
+
+// render is the single exit for diagnostics, so both validation phases report
+// in the same file order whichever one reached the renderer.
+func (p *project) render(diagnostics validation.Diagnostics) error {
+	diagnostics.Sort()
+	if err := p.renderer.Render(diagnostics); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
 	return nil
 }
 
