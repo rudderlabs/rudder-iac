@@ -77,7 +77,6 @@ func NewCmdApply() *cobra.Command {
 
 			return nil
 		},
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
 			applyLog.Debug("identifying changes for the upstream catalog")

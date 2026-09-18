@@ -39,7 +39,7 @@ func TestGenerateTracksRunFailuresAsErrored(t *testing.T) {
 
 			require.Error(t, cmd.Execute())
 			assert.Equal(t, []telemetrytest.Call{{
-				Command: "typer",
+				Command: "typer generate",
 				Errored: true,
 				Extras: []telemetry.KV{
 					{K: "platform", V: tc.platform},

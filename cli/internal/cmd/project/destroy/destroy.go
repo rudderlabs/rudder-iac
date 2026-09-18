@@ -50,7 +50,6 @@ func NewCmdDestroy() *cobra.Command {
 
 			return nil
 		},
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			destroyLog.Debug("destroy", "dryRun", dryRun, "confirm", confirm)
 			destroyLog.Debug("identifying all resources to destroy")

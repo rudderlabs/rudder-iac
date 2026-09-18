@@ -21,7 +21,6 @@ func newCmdValidate() *cobra.Command {
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
 		`),
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				telemetry.TrackCommand("retl-sources validate", err)

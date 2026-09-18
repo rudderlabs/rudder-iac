@@ -23,7 +23,7 @@ func TestRetlSourceImportTracksRunFailureAsErrored(t *testing.T) {
 
 	require.Error(t, cmd.Execute())
 	assert.Equal(t, []telemetrytest.Call{{
-		Command: "import retl-source",
+		Command: "import retl-sources",
 		Errored: true,
 		Extras: []telemetry.KV{
 			{K: "localID", V: "my-model"},

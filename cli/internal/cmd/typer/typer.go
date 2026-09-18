@@ -51,10 +51,9 @@ func newCmdGenerate() *cobra.Command {
 			$ rudder-cli typer generate --tracking-plan-id <id> --platform kotlin
 			$ rudder-cli typer generate --local --location ./project --platform kotlin
 		`),
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("typer", err, []telemetry.KV{
+				telemetry.TrackCommand("typer generate", err, []telemetry.KV{
 					{K: "platform", V: platform},
 					{K: "local", V: local},
 				}...)

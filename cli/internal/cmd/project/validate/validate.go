@@ -64,7 +64,6 @@ func NewCmdValidate() *cobra.Command {
 			p = deps.NewProject(projectOpts...)
 			return nil
 		},
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			validateLog.Debug("validate", "location", location)
 

@@ -30,7 +30,7 @@ func newCmdListRetlSources() *cobra.Command {
 
 			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace retl-source list", err, []telemetry.KV{
+				telemetry.TrackCommand("workspace retl-sources list", err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 				}...)
 			}()

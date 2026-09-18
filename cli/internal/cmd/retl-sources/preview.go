@@ -27,7 +27,6 @@ func newCmdPreview() *cobra.Command {
 			$ rudder-cli retl-sources preview my-model --interactive=false
 			$ rudder-cli retl-sources preview my-model --json
 		`),
-		// Named return so the deferred telemetry sees the error RunE returns.
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				telemetry.TrackCommand("retl-sources preview", err, []telemetry.KV{
