@@ -14,9 +14,5 @@ spec:
     api_version: v2
     send_anonymous_id: false
     update_last_request_at: true
-    use_native_sdk:
-      web: true
-      android: true
-      ios: true
     mobile_api_key_android: rudderCliE2eDeviceAndroidKey
     mobile_api_key_ios: rudderCliE2eDeviceIosKey

@@ -209,14 +209,6 @@ func TestGoogleAnalyticsConfigValidation(t *testing.T) {
 			path   string
 		}{
 			{
-				name: "use_native_sdk",
-				key:  "use_native_sdk",
-				config: map[string]any{
-					"android": true,
-				},
-				path: "/use_native_sdk/android",
-			},
-			{
 				name: "sample_rate",
 				key:  "sample_rate",
 				config: map[string]any{
@@ -418,7 +410,6 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 				"event_filtering": {
 					"blacklist": ["Signed Out", "Viewed Admin"]
 				},
-				"use_native_sdk": {"web": true},
 				"track_categorized_pages": {"web": true},
 				"track_named_pages": {"web": true},
 				"use_rich_event_names": {"web": true},
@@ -458,7 +449,6 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 					{"eventName": "Viewed Admin"}
 				],
 				"eventFilteringOption": "blacklistedEvents",
-				"useNativeSDK": {"web": true},
 				"trackCategorizedPages": {"web": true},
 				"trackNamedPages": {"web": true},
 				"useRichEventNames": {"web": true},
@@ -502,10 +492,12 @@ func TestGoogleAnalyticsConversionRoundTrip(t *testing.T) {
 	})
 }
 
-// Import keeps every stored value, including a list the selector does not
-// currently point at. Gating APIToLocal on the selector would emit a spec that
-// silently drops the other list, which the next apply then erases upstream.
-func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
+// Import drops the event list the selector does not point at: the SDK never
+// reads it, and keeping it emits a spec that fails this definition's own
+// mutual-exclusion rule, leaving the user to delete one list by hand. This
+// deliberately supersedes the earlier keep-everything stance — what the next
+// apply erases upstream is config nothing consumes.
+func TestGoogleAnalyticsAPIToLocalDropsUnselectedList(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
@@ -531,13 +523,13 @@ func TestGoogleAnalyticsAPIToLocalKeepsUnselectedValues(t *testing.T) {
 		"enable_server_side_identify": false,
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Order Completed"},
-			"blacklist": []any{"Application Opened"},
 		},
 		"server_side_identify": map[string]any{
 			"event_category": "All",
 			"event_action":   "User Enriched",
 		},
 	}, local)
+	assert.Empty(t, registered.ValidateConfig(local), "the imported spec must pass its own validation")
 }
 
 func validMinimalConfig() map[string]any {
@@ -564,9 +556,6 @@ func validFullConfig() map[string]any {
 		"send_user_id":       true,
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Signed Up", "Order Completed"},
-		},
-		"use_native_sdk": map[string]any{
-			"web": true,
 		},
 		"track_categorized_pages": map[string]any{
 			"web": true,

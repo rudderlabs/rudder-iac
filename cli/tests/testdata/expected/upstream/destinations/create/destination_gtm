@@ -15,9 +15,6 @@
     "environmentID": "env-5",
     "eventFilteringOption": "whitelistedEvents",
     "serverUrl": "https://sgtm.rudder-cli-e2e.com",
-    "useNativeSDK": {
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

@@ -14,8 +14,9 @@ import (
     ".../destination/definitions/converter"
 )
 
-// 1. Source types: db-config supportedSourceTypes ∩ CLI event-stream ownership,
-//    as common.SourceType* constants.
+// 1. Source types: db-config supportedSourceTypes ∩ CLI ownership (the
+//    event-stream types, plus warehouse whenever db-config lists it), as
+//    common.SourceType* constants.
 var sourceTypes = []string{
     common.SourceTypeAndroid,
     // ...
@@ -109,8 +110,8 @@ converter.Gated(
 ```
 
 Do NOT gate the boilerplate consent/connection keys (`connection_mode`,
-`use_native_sdk`, `consent_management`) — those stay handled by the existing
-source-type-keyed block machinery. The registry builds a reverse index at
+`consent_management`) — those stay handled by the existing source-type-keyed
+block machinery. The registry builds a reverse index at
 Register(); `RegisteredDefinition.GatedKeyPaths()` returns
 `map[keypath][]sourceType` (JSON-pointer paths, e.g.
 `/event_upload_period_millis`) for validation to consume.
@@ -125,8 +126,11 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - `ConnectionRequiredKeys` keys ⊆
   `SourceTypes`, every inner mode ∈ `ConnectionModes[sourceType]`, each key list
   non-empty, and every required key must exist on the config struct or be a
-  source-type block key (`connection_mode`, `use_native_sdk`). Entries are
+  source-type block key (`connection_mode`). Entries are
   optional per source type and per mode.
+- `SyncBehaviours` entries ⊆ {`upsert`, `mirror`, `full`}, and any rETL
+  metadata (`SyncBehaviours`, including an empty list, or
+  `SupportsVisualMapper`) requires `warehouse` ∈ `SourceTypes`.
 - A `consent_management` config field must be `common.ConsentManagement`, and a
   `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
   either is rejected at registration: it would silently opt the key out of the

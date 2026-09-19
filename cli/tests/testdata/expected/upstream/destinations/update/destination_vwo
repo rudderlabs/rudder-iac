@@ -35,10 +35,7 @@
     "sendExperimentIdentify": true,
     "sendExperimentTrack": false,
     "settingsTolerance": "3000",
-    "useExistingJquery": true,
-    "useNativeSDK": {
-      "web": true
-    }
+    "useExistingJquery": true
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

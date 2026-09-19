@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -13,7 +14,6 @@ import (
 
 var sourceTypeConfigKeys = []string{
 	"connection_mode",
-	"use_native_sdk",
 }
 
 // DestinationDefinition is the input to Registry.Register().
@@ -36,6 +36,16 @@ type DestinationDefinition struct {
 	// connectionMode-conditioned configSchema.allOf branches; the backend calls
 	// its equivalent check supportedSourcesValidation.
 	ConnectionRequiredKeys map[string]map[string][]string
+	// SyncBehaviours lists the rETL sync behaviours the destination accepts
+	// (integrations-config db-config.json config.syncBehaviours). Nil means the
+	// destination declares none upstream and the backend fallback applies; an
+	// explicitly empty list accepts none, mirroring the backend's `??` fallback
+	// on absence only.
+	SyncBehaviours []string
+	// SupportsVisualMapper mirrors db-config.json config.supportsVisualMapper.
+	// With it, a rETL connection that names an object runs the object-mapping
+	// flow; without it every connection is a JSON-mapper one.
+	SupportsVisualMapper bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 	// ConfigValidateFuncs registers extra go-playground custom validate tags,
@@ -78,6 +88,31 @@ func (d *RegisteredDefinition) APIToLocal(api map[string]any) (map[string]any, e
 	return converter.APIToLocal(d.Properties, api)
 }
 
+// SelectedKeyRoots returns the top-level config keys holding the discriminator-
+// selected member of an exclusive group. Callers that prune empty values use it
+// to leave those blocks alone: an empty selected member is a real setting, since
+// whitelisting with no event named discards every event. A member surviving only
+// because no discriminator was present carries no such meaning and is not
+// protected — keeping it would emit a spec whose next apply supplies the missing
+// discriminator and turns filtering on.
+func (d *RegisteredDefinition) SelectedKeyRoots(apiConfig map[string]any) []string {
+	var roots []string
+	for _, prop := range d.Properties {
+		if prop.Selector == nil {
+			continue
+		}
+		// An absent discriminator also yields "", so this covers both.
+		selected, _ := prop.Selector.LocalKeyFor(apiConfig)
+		if selected == "" {
+			continue
+		}
+		if root, _, _ := strings.Cut(selected, "."); !slices.Contains(roots, root) {
+			roots = append(roots, root)
+		}
+	}
+	return roots
+}
+
 func (d *RegisteredDefinition) SecretKeys() []string {
 	if d.DestinationDefinition == nil || d.DestinationDefinition.SecretKeys == nil {
 		return []string{}
@@ -90,6 +125,39 @@ func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 		return nil
 	}
 	return append([]string(nil), d.SourceTypes...)
+}
+
+// defaultSyncBehaviours is the fallback the backend applies to a definition
+// that declares no syncBehaviours (config-backend
+// retl/api-gateway/connection-config/constants.ts DEFAULT_SYNC_BEHAVIOURS). It
+// doubles as the enum registration validates declared behaviours against; split
+// the two if the backend default ever narrows below the accepted set.
+var defaultSyncBehaviours = []string{"upsert", "mirror", "full"}
+
+// SyncBehaviours returns the accepted rETL sync behaviours, falling back to the
+// backend default only when the definition declares none at all.
+//
+// This is the destination-level list, not the set a connection may actually
+// use: the backend intersects it with the source's own list and rejects
+// "mirror" outright for the JSON-mapper flow (FLOWS_DISALLOWING_MIRROR in
+// config-backend retl/api-gateway/connection-config/assembler.ts). So HTTP
+// reads back [upsert mirror full] yet can never use "mirror", and a
+// mirror-only destination like bingads_offline_conversions has no valid
+// behaviour at all unless the connection carries an object.
+func (d *RegisteredDefinition) SyncBehaviours() []string {
+	behaviours := d.DestinationDefinition.SyncBehaviours
+	if behaviours == nil {
+		behaviours = defaultSyncBehaviours
+	}
+	// Copied by length rather than appended onto a nil slice, which would hand
+	// back nil for a declared-empty list and read as absence to the caller.
+	copied := make([]string, len(behaviours))
+	copy(copied, behaviours)
+	return copied
+}
+
+func (d *RegisteredDefinition) SupportsVisualMapper() bool {
+	return d.DestinationDefinition.SupportsVisualMapper
 }
 
 // LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.
@@ -120,10 +188,8 @@ func (d *RegisteredDefinition) SourceTypeConfigKeys() []string {
 }
 
 // AcceptsSourceTypeEntry reports whether the config model would accept an entry
-// for sourceType under the source-type-scoped block key. The two blocks are
-// shaped differently: connection_mode is an open map, so every source type
-// fits, while use_native_sdk is a struct naming one field per source type, so
-// only those do.
+// for sourceType under the source-type-scoped block key. connection_mode is an
+// open map, so every source type fits.
 func (d *RegisteredDefinition) AcceptsSourceTypeEntry(key, sourceType string) bool {
 	field, ok := structFieldsByMapstructureTag(d.configType)[key]
 	if !ok {

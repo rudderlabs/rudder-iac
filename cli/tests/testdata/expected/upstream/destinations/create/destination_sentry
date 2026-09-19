@@ -33,9 +33,6 @@
     "logger": "rudder-cli",
     "release": "1.0.0",
     "serverName": "rudder-cli-e2e",
-    "useNativeSDK": {
-      "web": true
-    },
     "whitelistedEvents": [
       {
         "eventName": "Order Completed"

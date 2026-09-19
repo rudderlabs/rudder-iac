@@ -37,10 +37,7 @@
     },
     "doAssociation": false,
     "eventFilteringOption": "blacklistedEvents",
-    "hubID": "87654321",
-    "useNativeSDK": {
-      "web": false
-    }
+    "hubID": "rudderCliE2eHubIdUpdated"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

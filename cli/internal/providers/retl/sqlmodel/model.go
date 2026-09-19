@@ -69,7 +69,8 @@ type SQLModelSpec struct {
 	Description      string           `json:"description"       mapstructure:"description"`
 	File             *string          `json:"file"              mapstructure:"file"`
 	SQL              *string          `json:"sql"               mapstructure:"sql"               validate:"required_without=File,excluded_with=File"`
-	AccountID        string           `json:"account_id"        mapstructure:"account_id"        validate:"required"`
+	AccountID        string           `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
+	Account          string           `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
 	PrimaryKey       string           `json:"primary_key"       mapstructure:"primary_key"       validate:"required"`
 	SourceDefinition SourceDefinition `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino"`
 	Enabled          *bool            `json:"enabled"           mapstructure:"enabled"`
@@ -85,6 +86,21 @@ type SQLModelResource struct {
 	PrimaryKey       string `json:"primary_key"`
 	SourceDefinition string `json:"source_definition"`
 	Enabled          bool   `json:"enabled"`
+	// AccountLocalID is the local id of the account the spec references, parsed
+	// out of its "#account:<id>" form, and empty when the spec sets account_id.
+	// Only loaded specs carry it: remote sources and dereferenced data hold the
+	// resolved AccountID. Named for the parsed id because table.TableSpec's
+	// Account field holds the raw reference instead.
+	AccountLocalID string `json:"account"`
+}
+
+// accountValue is the resource's graph value under AccountIDKey: the raw id, or
+// a reference that resolves to it.
+func (s *SQLModelResource) accountValue() any {
+	if s.AccountLocalID != "" {
+		return AccountRef(s.AccountLocalID)
+	}
+	return s.AccountID
 }
 
 func (s *SQLModelResource) FromResourceData(data resources.ResourceData) {

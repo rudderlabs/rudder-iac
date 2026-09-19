@@ -30,16 +30,7 @@
         }
       ]
     },
-    "eventFilteringOption": "blacklistedEvents",
-    "useNativeSDK": {
-      "android": false,
-      "androidKotlin": false,
-      "flutter": true,
-      "ios": false,
-      "iosSwift": true,
-      "reactnative": false,
-      "unity": true
-    }
+    "eventFilteringOption": "blacklistedEvents"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

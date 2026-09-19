@@ -194,7 +194,7 @@
 <!-- ticket:DEX-487 -->
 - ActiveCampaign destination support is implemented as CLI local type `active_campaign`, API type `ACTIVE_CAMPAIGN`, and destination version `1`.
 - `active_campaign` is treated as an unverified destination definition: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
-- ActiveCampaign local config is intentionally flat: `api_url`, `api_key`, `actid`, `event_key`, plus shared `consent_management`; `connection_mode`, `use_native_sdk`, and legacy oneTrust/Ketch include-key blocks are not ordinary definition config fields.
+- ActiveCampaign local config is intentionally flat: `api_url`, `api_key`, `actid`, `event_key`, plus shared `consent_management`; legacy oneTrust/Ketch include-key blocks are not ordinary definition config fields.
 
 ## DEX-492 — Braze Destination Onboarding
 <!-- ticket:DEX-492 -->
@@ -205,14 +205,14 @@
 - Customer.io destination support is implemented as CLI local type `customerio`, API type `CUSTOMERIO`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/customerio`.
 - `customerio` is treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
 - Customer.io source-type support intentionally keeps the broad mapped upstream set rather than the S3/GCS-style storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
-- Customer.io local config maps `site_id`, `api_key`, `device_token_event_name`, `datacenter`, SDK/device nested source blocks, `event_filtering` whitelist/blacklist discriminator, and shared `consent_management`; `use_native_sdk` remains a source-type config block rather than an ordinary gated property.
+- Customer.io local config maps `site_id`, `api_key`, `device_token_event_name`, `datacenter`, SDK/device nested source blocks, `event_filtering` whitelist/blacklist discriminator, and shared `consent_management`; native-SDK source-type config is no longer modeled by CLI destination definitions.
 
 ## DEX-508 — Intercom Destination Onboarding
 <!-- ticket:DEX-508 -->
 - Intercom destination support is implemented as the legacy CLI destination type `intercom`, API type `INTERCOM`, and destination version `1`; do not substitute `intercom_v2` / `INTERCOM_V2` for this onboarding path.
 - The `INTERCOM_V2` contract remains excluded because it has no Terraform destination registration/mapping source and represents a separate OAuth/account-management contract.
 - `intercom` should be treated as an unverified destination definition for registry wiring: register it only when `ExperimentalFlags.UnverifiedDestinations` is enabled.
-- Intercom's modeled config surface includes `app_id`, `api_key`, `api_server`, `api_version`, `send_anonymous_id`, `update_last_request_at`, source-scoped `connection_mode`, source-scoped `use_native_sdk`, Android-only `mobile_api_key_android`, iOS-only `mobile_api_key_ios`, `event_filtering`, and shared `consent_management`; `api_key` is the sole db-config secret key.
+- Intercom's modeled config surface includes `app_id`, `api_key`, `api_server`, `api_version`, `send_anonymous_id`, `update_last_request_at`, source-scoped `connection_mode`, Android-only `mobile_api_key_android`, iOS-only `mobile_api_key_ios`, `event_filtering`, and shared `consent_management`; `api_key` is the sole db-config secret key.
 ## DEX-497 — Facebook Pixel Destination Onboarding
 <!-- ticket:DEX-497 -->
 - Facebook Pixel destination support is implemented as CLI local type `facebook_pixel`, API type `FACEBOOK_PIXEL`, destination version `1`, and definition package path `cli/internal/providers/destination/definitions/facebook_pixel`.
@@ -324,3 +324,10 @@
 - BigQuery (`bq.NewDefinition`) is a verified destination after QA verification: `cli/internal/app/dependencies.go` should register it whenever `ExperimentalFlags.DestinationSupport` is enabled, alongside verified destinations such as S3.
 - BigQuery promotion is registry-only; do not change the BigQuery destination definition, config surface, source types, fixtures, or snapshots when the task is only to move `bq` from unverified to verified.
 - Destinations not named by this promotion remain under the unverified-destination gate unless a separate verified-promotion task explicitly moves them.
+
+## DEX-848 — Destination Native SDK Config Removal
+
+- CLI destination definitions no longer model the native-SDK source-type config block. Do not add it to definition config structs, converter mappings, fixtures, snapshots, docs, or source-type config keys when onboarding or updating destinations.
+- The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
+- Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
+- GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.

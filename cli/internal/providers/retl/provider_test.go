@@ -9,12 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -33,6 +37,9 @@ type mockRETLStore struct {
 	// Preview functions
 	submitPreviewFunc    func(ctx context.Context, request *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error)
 	getPreviewResultFunc func(ctx context.Context, resultID string) (*retlClient.PreviewResultResponse, error)
+	// Connection functions
+	getDestinationsFunc func(ctx context.Context) ([]client.Destination, error)
+	listConnectionsFunc func(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error)
 }
 
 // Mock RETL source operations
@@ -85,6 +92,23 @@ func (m *mockRETLStore) GetSourcePreviewResult(ctx context.Context, resultID str
 		return m.getPreviewResultFunc(ctx, resultID)
 	}
 	return &retlClient.PreviewResultResponse{Status: retlClient.Completed}, nil
+}
+
+// Connection methods — the defaults keep callers with no connection handler
+// enabled off the nil embedded RETLStore.
+
+func (m *mockRETLStore) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	if m.getDestinationsFunc != nil {
+		return m.getDestinationsFunc(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockRETLStore) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if m.listConnectionsFunc != nil {
+		return m.listConnectionsFunc(ctx, req)
+	}
+	return &retlClient.RETLConnectionsPage{}, nil
 }
 
 // newDefaultMockClient creates a new mock client with default behavior
@@ -903,11 +927,12 @@ func TestProviderLoadImportable(t *testing.T) {
 	})
 }
 
-// minimal resolver implementation; not used by current FormatForExport flow
+// noopResolver resolves nothing, as for an import set without the sources'
+// accounts, so exported sources keep their account_id.
 type noopResolver struct{}
 
 func (n noopResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
-	return "", nil
+	return "", fmt.Errorf("%s %s is not in the import set", entityType, remoteID)
 }
 
 func TestProviderFormatForExport(t *testing.T) {
@@ -1145,13 +1170,78 @@ func TestProviderMigrateSpec(t *testing.T) {
 	})
 }
 
-func TestProviderResourceMatchers(t *testing.T) {
+// connectionsSpec is a minimal valid rETL connections spec: enough for the
+// provider to dispatch it to the connection handler and put it in the graph.
+func connectionsSpec() *specs.Spec {
+	return &specs.Spec{
+		Version: specs.SpecVersionV1,
+		Kind:    connection.ResourceKind,
+		Spec: map[string]any{
+			connection.ConnectionsKey: []any{map[string]any{
+				"id":          "users-to-webhook",
+				"source":      "#retl-source-sql-model:users",
+				"destination": "#destination:webhook",
+			}},
+		},
+	}
+}
+
+func matcherTypes(matchers []importmatcher.Matcher) []string {
+	types := make([]string, 0, len(matchers))
+	for _, m := range matchers {
+		types = append(types, m.ResourceType)
+	}
+	return types
+}
+
+// TestProviderWithoutConnectionSupport pins the flag-off surface: the provider
+// is exactly what it was before connections existed.
+func TestProviderWithoutConnectionSupport(t *testing.T) {
 	t.Parallel()
 
 	p := retl.New(newDefaultMockClient())
 
-	matchers := p.ResourceMatchers()
+	assert.Equal(t, []string{sqlmodel.ResourceKind}, p.SupportedKinds())
+	assert.Equal(t, []string{sqlmodel.ResourceType}, p.SupportedTypes())
+	assert.Equal(t, []string{sqlmodel.ResourceType}, matcherTypes(p.ResourceMatchers()))
 
-	require.Len(t, matchers, 1)
-	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
+	var want []vrules.MatchPattern
+	want = append(want, prules.LegacyVersionPatterns(sqlmodel.ResourceKind)...)
+	want = append(want, prules.V1VersionPatterns(sqlmodel.ResourceKind)...)
+	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+
+	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
+}
+
+func TestProviderWithConnectionSupport(t *testing.T) {
+	t.Parallel()
+
+	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
+
+	assert.ElementsMatch(t, []string{sqlmodel.ResourceKind, connection.ResourceKind}, p.SupportedKinds())
+	assert.ElementsMatch(t, []string{sqlmodel.ResourceType, connection.ResourceType}, p.SupportedTypes())
+	assert.Equal(t, []string{sqlmodel.ResourceType, connection.ResourceType}, matcherTypes(p.ResourceMatchers()))
+
+	var want []vrules.MatchPattern
+	want = append(want, prules.LegacyVersionPatterns(sqlmodel.ResourceKind)...)
+	want = append(want, prules.V1VersionPatterns(sqlmodel.ResourceKind)...)
+	want = append(want, prules.V1VersionPatterns(connection.ResourceKind)...)
+	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+
+	require.NoError(t, p.LoadSpec("connections.yaml", connectionsSpec()))
+	require.NoError(t, p.LoadImportManifest(&specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-1",
+		Resources: []specs.ImportIds{
+			{URN: resources.URN("users-to-webhook", connection.ResourceType), RemoteID: "conn-remote-9"},
+		},
+	}))
+
+	graph, err := p.ResourceGraph()
+	require.NoError(t, err)
+
+	r, ok := graph.GetResource(resources.URN("users-to-webhook", connection.ResourceType))
+	require.True(t, ok)
+	require.NotNil(t, r.ImportMetadata())
+	assert.Equal(t, "conn-remote-9", r.ImportMetadata().RemoteId)
+	assert.Equal(t, "ws-1", r.ImportMetadata().WorkspaceId)
 }
