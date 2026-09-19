@@ -84,6 +84,45 @@ func TestCreate(t *testing.T) {
 	})
 }
 
+// A connection the read path will not map back must not be created. Without the
+// check, Create succeeds, MapRemoteToState skips the row for the same reason,
+// the differ sees no state and plans the create again — and the backend then
+// refuses the duplicate with "Destination does not support multiple
+// connections", which names neither the real cause nor anything the author can
+// act on. DEX-917.
+func TestCreateRefusesWhatTheReadPathSkips(t *testing.T) {
+	t.Parallel()
+
+	t.Run("destination that does not accept warehouse sources", func(t *testing.T) {
+		t.Parallel()
+
+		mock := remoteClient(nil)
+		data := graphData(t, jsonMapperConfig())
+		// dst-eventstream is an S3 destination: registered, but its definition
+		// declares no warehouse source type.
+		data[DestinationKey] = "dst-eventstream"
+
+		_, err := remoteHandler(mock, t).Create(context.Background(), localID, data)
+
+		assert.ErrorContains(t, err, `creating rETL connection "users-to-webhook"`)
+		assert.ErrorContains(t, err, `destination type "S3" does not accept warehouse sources`)
+		assert.Empty(t, mock.CreateCalls, "the api must not be called for a connection that cannot be read back")
+	})
+
+	t.Run("a usable destination still creates", func(t *testing.T) {
+		t.Parallel()
+
+		mock := remoteClient(nil)
+		data := graphData(t, jsonMapperConfig())
+		data[DestinationKey] = "dst-1"
+
+		_, err := remoteHandler(mock, t).Create(context.Background(), localID, data)
+
+		require.NoError(t, err)
+		require.Len(t, mock.CreateCalls, 1)
+	})
+}
+
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
