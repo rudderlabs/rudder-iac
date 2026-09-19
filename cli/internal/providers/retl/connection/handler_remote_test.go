@@ -55,6 +55,7 @@ func remoteSources() []retlClient.RETLSource {
 func remoteDestinations() []apiClient.Destination {
 	return []apiClient.Destination{
 		{ID: "dst-1", Name: "Webhook", Type: "HTTP", Version: 1, ExternalID: "webhook"},
+		{ID: "dst-2", Name: "Webhook Two", Type: "HTTP", Version: 1, ExternalID: "webhook-two"},
 		{ID: "dst-object", Name: "Bing Ads", Type: "BINGADS_OFFLINE_CONVERSIONS", Version: 1},
 		{ID: "dst-specific", Name: "Customer IO", Type: "CUSTOMERIO_AUDIENCE", Version: 1},
 		{ID: "dst-eventstream", Name: "S3 Bucket", Type: "S3", Version: 1},
