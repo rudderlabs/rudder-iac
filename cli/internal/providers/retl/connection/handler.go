@@ -220,7 +220,6 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 	}
 	request.ExternalID = id
 
-	// Refused here rather than discovered later: see destinationUsable.
 	if err := h.assertCreatable(ctx, request); err != nil {
 		return nil, fmt.Errorf("creating rETL connection %q: %w", id, err)
 	}
@@ -233,25 +232,12 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 }
 
 // assertCreatable refuses a create the read path would not be able to map back.
-// The destination catalog is the one already cached for this handler, so the
-// check costs nothing beyond the first fetch; a destination missing from it is
-// left to the API to reject, since the catalog is a snapshot and the API is
-// authoritative.
 func (h *Handler) assertCreatable(ctx context.Context, request *retlClient.CreateRETLConnectionRequest) error {
-	_, destinations, err := h.endpoints(ctx)
+	dst, err := h.destination(ctx, request.DestinationID)
 	if err != nil {
 		return err
 	}
-	dst, ok := destinations[request.DestinationID]
-	if !ok {
-		return nil
-	}
-
-	var object *string
-	if request.Object != "" {
-		object = &request.Object
-	}
-	return h.destinationUsable(dst, object)
+	return h.destinationUsable(dst, request.Object)
 }
 
 // Update changes the mutable fields in one PUT; toUpdateRequest rejects a change
@@ -270,9 +256,14 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	}
 
 	if replace {
-		// Build the create body before the delete: a config the API would
+		// Vet the whole create before the delete: anything the create would
 		// refuse must not cost the live connection.
-		if _, err := toCreateRequest(data); err != nil {
+		request, err := toCreateRequest(data)
+		if err != nil {
+			return nil, fmt.Errorf("connection %q: %w", id, err)
+		}
+		request.ExternalID = id
+		if err := h.assertCreatable(ctx, request); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
 		log.Warn("replacing rETL connection after an endpoint change",
@@ -400,9 +391,10 @@ func (h *Handler) listAll(ctx context.Context, hasExternalID *bool) ([]retlClien
 // is for an endpoint that a remote connection row already references, so it
 // existed before the run started: an endpoint this apply creates can never be
 // one of them, and a stale snapshot cannot hide it. A failed read is not kept,
-// so a transient error does not poison the handler. The maps are never written
-// to after they are built, which is what makes sharing them across the syncer's
-// concurrent imports safe.
+// so a transient error does not poison the handler. A built map is never
+// written to, only ever replaced wholesale (see destination), so a reader that
+// already holds one keeps a consistent snapshot across the syncer's concurrent
+// imports.
 func (h *Handler) endpoints(ctx context.Context) (map[string]retlClient.RETLSource, map[string]apiClient.Destination, error) {
 	h.endpointsMu.Lock()
 	defer h.endpointsMu.Unlock()
@@ -424,24 +416,51 @@ func (h *Handler) endpoints(ctx context.Context) (map[string]retlClient.RETLSour
 	for _, source := range sources.Data {
 		sourcesByID[source.ID] = source
 	}
-	destinationsByID := make(map[string]apiClient.Destination, len(destinations))
-	for _, d := range destinations {
-		destinationsByID[d.ID] = d
-	}
+	destinationsByID := destinationIndex(destinations)
 
 	h.sourcesByID, h.destinationsByID = sourcesByID, destinationsByID
 	return sourcesByID, destinationsByID, nil
 }
 
+func destinationIndex(destinations []apiClient.Destination) map[string]apiClient.Destination {
+	byID := make(map[string]apiClient.Destination, len(destinations))
+	for _, d := range destinations {
+		byID[d.ID] = d
+	}
+	return byID
+}
+
+// destination finds a workspace destination for the write path. A miss is
+// refetched before it is believed: the cached catalog is a snapshot taken
+// before the apply, so a create can legitimately name a destination this same
+// apply just built. Still missing after that is fatal, because the API accepts
+// such a create and the read path then skips the row forever.
+func (h *Handler) destination(ctx context.Context, id string) (apiClient.Destination, error) {
+	h.endpointsMu.Lock()
+	defer h.endpointsMu.Unlock()
+
+	if dst, ok := h.destinationsByID[id]; ok {
+		return dst, nil
+	}
+	// ponytail: refetched under the lock, so concurrent creates naming the same
+	// new destination cost one call; coalesce per id if apply ever goes wide.
+	destinations, err := h.client.GetDestinations(ctx)
+	if err != nil {
+		return apiClient.Destination{}, fmt.Errorf("listing destinations: %w", err)
+	}
+	h.destinationsByID = destinationIndex(destinations)
+	dst, ok := h.destinationsByID[id]
+	if !ok {
+		return apiClient.Destination{}, fmt.Errorf("destination %q was not found in this workspace", id)
+	}
+	return dst, nil
+}
+
 // destinationUsable reports why a destination cannot carry a rETL connection,
-// or nil when it can. It is the destination half of the eligibility rules,
-// extracted because both directions have to agree: the read path skips a row
-// this rejects, so the write path must refuse it too. A connection created
-// against a destination the handler will not read back leaves no state behind,
-// and every later apply plans the same create again — which the backend then
-// refuses as a duplicate, with a message that says nothing about the real
-// cause.
-func (h *Handler) destinationUsable(dst apiClient.Destination, object *string) error {
+// or nil when it can. Read and write both consult it, so a create cannot write
+// a row the read path would skip. It covers the destination rules only; the
+// source-side reasons remoteConnection skips for stay read-path only.
+func (h *Handler) destinationUsable(dst apiClient.Destination, object string) error {
 	registered, err := h.registry.GetByAPIType(dst.Type, dst.Version)
 	if err != nil {
 		return err
@@ -449,7 +468,7 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object *string) e
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
 		return fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
 	}
-	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), object); err != nil {
+	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object)); err != nil {
 		return err
 	}
 	return nil
@@ -481,13 +500,7 @@ func (h *Handler) remoteConnection(
 	if !ok {
 		return nil, fmt.Errorf("connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
 	}
-	// The object is what tells the two generic flows apart, here as in the
-	// backend; ClassifyFlow also refuses the destination-specific flows.
-	var object *string
-	if conn.Object != "" {
-		object = &conn.Object
-	}
-	if err := h.destinationUsable(dst, object); err != nil {
+	if err := h.destinationUsable(dst, conn.Object); err != nil {
 		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
 	}
 	// configFromRemote names the connection in its own errors, so wrapping here
