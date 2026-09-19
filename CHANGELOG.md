@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.27.0](https://github.com/rudderlabs/rudder-iac/compare/v0.26.0...v0.27.0) (2026-09-19)
+
+
+### Features
+
+* **retl:** add retl-source-table spec kind behind an experimental flag ([#849](https://github.com/rudderlabs/rudder-iac/issues/849)) ([50f3424](https://github.com/rudderlabs/rudder-iac/commit/50f34248ecd8fcfb9d59e3e59de57ad1bdebe407))
+* **retl:** complete connection remote state, lossless import/export and matcher ([#866](https://github.com/rudderlabs/rudder-iac/issues/866)) ([e83c1a6](https://github.com/rudderlabs/rudder-iac/commit/e83c1a6eb8905b6e71f999c51c3ce6a92343ca36))
+* **retl:** reference accounts by URN from RETL source specs ([#851](https://github.com/rudderlabs/rudder-iac/issues/851)) ([acee859](https://github.com/rudderlabs/rudder-iac/commit/acee859675c9c38e97a86c600cb64797db490096))
+* **retl:** register the connection handler behind retlConnectionSupport ([#868](https://github.com/rudderlabs/rudder-iac/issues/868)) ([214e975](https://github.com/rudderlabs/rudder-iac/commit/214e975f4e0af30999d554d2142123a4e24c9c0b))
+* **validation:** compare source names case-insensitively ([#856](https://github.com/rudderlabs/rudder-iac/issues/856)) ([d28d047](https://github.com/rudderlabs/rudder-iac/commit/d28d047f52b87b8053c50e4efa240b8d43d93c2f))
+
+
+### Bug Fixes
+
+* **tests:** send the Postgres account port as a number, not a string ([#827](https://github.com/rudderlabs/rudder-iac/issues/827)) ([ce79745](https://github.com/rudderlabs/rudder-iac/commit/ce79745b2fdcb2a3167c3fda4f80e8e86488918a))
+
+
+### Miscellaneous
+
+* ignore .DS_Store ([#890](https://github.com/rudderlabs/rudder-iac/issues/890)) ([7a1be5a](https://github.com/rudderlabs/rudder-iac/commit/7a1be5ab7a63d6e0afafb26e3b4bd35ef2e014ac))
+
 ## [0.26.0](https://github.com/rudderlabs/rudder-iac/compare/v0.25.1...v0.26.0) (2026-09-17)
 
 
