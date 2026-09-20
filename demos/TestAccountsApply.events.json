@@ -1,20 +1,20 @@
-{"Time":"2026-09-20T12:49:26.739266-04:00","Action":"start","Package":"github.com/rudderlabs/rudder-iac/cli/tests"}
-{"Time":"2026-09-20T12:49:31.59715-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply"}
-{"Time":"2026-09-20T12:49:31.597422-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Output":"=== RUN   TestAccountsApply\n"}
-{"Time":"2026-09-20T12:49:35.556722-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create"}
-{"Time":"2026-09-20T12:49:35.556826-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Output":"=== RUN   TestAccountsApply/apply_create\n"}
-{"Time":"2026-09-20T12:49:36.810401-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update"}
-{"Time":"2026-09-20T12:49:36.813582-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Output":"=== RUN   TestAccountsApply/apply_update\n"}
-{"Time":"2026-09-20T12:49:38.296255-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged"}
-{"Time":"2026-09-20T12:49:38.296913-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Output":"=== RUN   TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged\n"}
-{"Time":"2026-09-20T12:49:39.268859-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Output":"--- PASS: TestAccountsApply (7.67s)\n"}
-{"Time":"2026-09-20T12:49:39.268911-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Output":"    --- PASS: TestAccountsApply/apply_create (1.25s)\n"}
-{"Time":"2026-09-20T12:49:39.268927-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Elapsed":1.25}
-{"Time":"2026-09-20T12:49:39.269255-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Output":"    --- PASS: TestAccountsApply/apply_update (1.49s)\n"}
-{"Time":"2026-09-20T12:49:39.269265-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Elapsed":1.49}
-{"Time":"2026-09-20T12:49:39.269271-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Output":"    --- PASS: TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged (0.97s)\n"}
-{"Time":"2026-09-20T12:49:39.269679-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Elapsed":0.97}
-{"Time":"2026-09-20T12:49:39.269705-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Elapsed":7.67}
-{"Time":"2026-09-20T12:49:39.269719-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"PASS\n"}
-{"Time":"2026-09-20T12:49:39.27605-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"ok  \tgithub.com/rudderlabs/rudder-iac/cli/tests\t12.531s\n"}
-{"Time":"2026-09-20T12:49:39.282424-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Elapsed":12.543}
+{"Time":"2026-09-20T12:56:56.448861-04:00","Action":"start","Package":"github.com/rudderlabs/rudder-iac/cli/tests"}
+{"Time":"2026-09-20T12:56:59.991065-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply"}
+{"Time":"2026-09-20T12:56:59.991404-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Output":"=== RUN   TestAccountsApply\n"}
+{"Time":"2026-09-20T12:57:02.941587-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create"}
+{"Time":"2026-09-20T12:57:02.942364-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Output":"=== RUN   TestAccountsApply/apply_create\n"}
+{"Time":"2026-09-20T12:57:04.418472-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update"}
+{"Time":"2026-09-20T12:57:04.418563-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Output":"=== RUN   TestAccountsApply/apply_update\n"}
+{"Time":"2026-09-20T12:57:05.708513-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged"}
+{"Time":"2026-09-20T12:57:05.708616-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Output":"=== RUN   TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged\n"}
+{"Time":"2026-09-20T12:57:07.039213-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Output":"--- PASS: TestAccountsApply (7.05s)\n"}
+{"Time":"2026-09-20T12:57:07.039282-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Output":"    --- PASS: TestAccountsApply/apply_create (1.48s)\n"}
+{"Time":"2026-09-20T12:57:07.039296-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_create","Elapsed":1.48}
+{"Time":"2026-09-20T12:57:07.039731-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Output":"    --- PASS: TestAccountsApply/apply_update (1.29s)\n"}
+{"Time":"2026-09-20T12:57:07.039743-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/apply_update","Elapsed":1.29}
+{"Time":"2026-09-20T12:57:07.039749-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Output":"    --- PASS: TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged (1.33s)\n"}
+{"Time":"2026-09-20T12:57:07.040005-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged","Elapsed":1.33}
+{"Time":"2026-09-20T12:57:07.040075-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsApply","Elapsed":7.05}
+{"Time":"2026-09-20T12:57:07.040084-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"PASS\n"}
+{"Time":"2026-09-20T12:57:07.045428-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"ok  \tgithub.com/rudderlabs/rudder-iac/cli/tests\t10.595s\n"}
+{"Time":"2026-09-20T12:57:07.045547-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Elapsed":10.597}

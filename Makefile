@@ -102,7 +102,7 @@ demo-record: ## Run one e2e test with journaling on (TEST=..., PROFILE=mini|clou
 	mkdir -p $(DEMO_OUT); \
 	rm -f $(DEMO_JOURNAL); \
 	RUDDER_DEMO_JOURNAL=$(abspath $(DEMO_JOURNAL)) \
-	$(GO) test -json -timeout 20m ./cli/tests -run '^$(DEMO_TEST)$$' -v > $(DEMO_EVENTS) || \
+	$(GO) test -json -count=1 -timeout 20m ./cli/tests -run '^$(DEMO_TEST)$$' -v > $(DEMO_EVENTS) || \
 		{ echo "e2e run failed — see $(DEMO_EVENTS)"; exit 1; }
 	@echo "journal: $(DEMO_JOURNAL)"
 	@echo "events:  $(DEMO_EVENTS)"

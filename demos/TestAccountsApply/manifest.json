@@ -1,10 +1,10 @@
 {
   "test": "TestAccountsApply",
-  "recordedAt": "2026-09-20T16:49:41.253949Z",
+  "recordedAt": "2026-09-20T16:57:08.332133Z",
   "git": {
     "ref": "refs/heads/claude/e2e-demo-framework-cb81bd",
-    "sha": "78ae842d",
-    "describe": "v0.26.0-28-g78ae842d5",
+    "sha": "5e61c053",
+    "describe": "v0.26.0-29-g5e61c0532",
     "dirty": true
   },
   "backend": {
@@ -12,14 +12,14 @@
     "kind": "local",
     "apiURL": "http://localhost:15580"
   },
-  "cliVersion": "v0.26.0-28-g78ae842d5",
+  "cliVersion": "v0.26.0-29-g5e61c0532",
   "flags": [
     "RUDDERSTACK_API_URL=http://localhost:15580",
     "RUDDERSTACK_CLI_EXPERIMENTAL=true",
     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true"
   ],
   "annotated": true,
-  "durationSeconds": 7.625147,
+  "durationSeconds": 7.006272,
   "steps": [
     {
       "test": "TestAccountsApply",
