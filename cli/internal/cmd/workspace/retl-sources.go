@@ -1,12 +1,45 @@
 package workspace
 
 import (
+	"context"
+	"slices"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/spf13/cobra"
 )
+
+// sourceKinds are the rETL source resource types this command lists, in the
+// order they are printed. A kind whose handler is not registered is skipped, so
+// the listed set follows the experimental flags rather than a fixed type.
+var sourceKinds = []string{sqlmodel.ResourceType, table.ResourceType}
+
+// allKinds lists several resource types as one set, tagging every row with the
+// kind it came from. Without the tag a merged table cannot say which rows are
+// SQL models and which are tables.
+type allKinds struct {
+	provider lister.ListProvider
+	kinds    []string
+}
+
+func (a allKinds) List(ctx context.Context, _ string, filters lister.Filters) ([]resources.ResourceData, error) {
+	var all []resources.ResourceData
+	for _, kind := range a.kinds {
+		rs, err := a.provider.List(ctx, kind, filters)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rs {
+			r["kind"] = kind
+			all = append(all, r)
+		}
+	}
+	return all, nil
+}
 
 func NewCmdRetlSource() *cobra.Command {
 	cmd := &cobra.Command{
@@ -30,7 +63,7 @@ func newCmdListRetlSources() *cobra.Command {
 
 			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace retl-source list", err, []telemetry.KV{
+				telemetry.TrackCommand("workspace retl-sources list", err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 				}...)
 			}()
@@ -40,16 +73,23 @@ func newCmdListRetlSources() *cobra.Command {
 				return err
 			}
 
-			// Cast the RETL provider to access the List method
 			retlProvider := d.Providers().RETL
+
+			registered := retlProvider.SupportedTypes()
+			kinds := make([]string, 0, len(sourceKinds))
+			for _, kind := range sourceKinds {
+				if slices.Contains(registered, kind) {
+					kinds = append(kinds, kind)
+				}
+			}
 
 			format := lister.TableFormat
 			if jsonOutput {
 				format = lister.JSONFormat
 			}
-			l := lister.New(retlProvider, lister.WithFormat(format))
+			l := lister.New(allKinds{provider: retlProvider, kinds: kinds}, lister.WithFormat(format))
 
-			err = l.List(cmd.Context(), sqlmodel.ResourceType, nil)
+			err = l.List(cmd.Context(), "retl-sources", nil)
 			return err
 		},
 	}
