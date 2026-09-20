@@ -23,9 +23,12 @@ const (
 	SQLKey              = "sql"
 	FileKey             = "file"
 	IDKey               = "id"
-	SourceTypeKey       = "source_type"
-	CreatedAtKey        = "createdAt"
-	UpdatedAtKey        = "updatedAt"
+	// ExternalIDKey marks CLI-managed rows in List output and is how an
+	// author addresses a source in a spec.
+	ExternalIDKey = "externalId"
+	SourceTypeKey = "source_type"
+	CreatedAtKey  = "createdAt"
+	UpdatedAtKey  = "updatedAt"
 
 	SourceDefinitionPostgres   SourceDefinition = "postgres"
 	SourceDefinitionRedshift   SourceDefinition = "redshift"

@@ -210,6 +210,7 @@ func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.Re
 		}
 		result = append(result, resources.ResourceData{
 			sqlmodel.IDKey:               source.ID,
+			sqlmodel.ExternalIDKey:       source.ExternalID,
 			"name":                       source.Name,
 			sqlmodel.AccountIDKey:        source.AccountID,
 			sqlmodel.SourceDefinitionKey: source.SourceDefinitionName,

@@ -211,8 +211,8 @@ func TestPropertySpecSyntaxValidRuleV1_CustomValidations(t *testing.T) {
 			Properties: []localcatalog.PropertyV1{
 				{
 					LocalID:   "tags",
-					Name:     "Tags",
-					Type:     "array",
+					Name:      "Tags",
+					Type:      "array",
 					ItemTypes: []string{"string", "number", "string"},
 				},
 			},

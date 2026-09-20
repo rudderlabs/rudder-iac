@@ -655,10 +655,10 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 			spec: localcatalog.CustomTypeSpecV1{
 				Types: []localcatalog.CustomTypeV1{
 					{
-						LocalID:   "tags",
-						Name:      "Tags",
-						Type:      "array",
-						ItemType:  "string",
+						LocalID:  "tags",
+						Name:     "Tags",
+						Type:     "array",
+						ItemType: "string",
 						Config: map[string]any{
 							"min_items":    1,
 							"max_items":    10,
@@ -779,7 +779,7 @@ func TestCustomTypeConfigV1ValidRule_ArrayType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		
+
 		t.Run(tt.name, func(t *testing.T) {
 			results := validateCustomTypeConfigV1(
 				localcatalog.KindCustomTypes,

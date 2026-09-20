@@ -3,6 +3,8 @@ package workspace
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,15 +17,20 @@ func TestNewCmdRetlConnections(t *testing.T) {
 
 	assert.Equal(t, "retl-connections", cmd.Use)
 	assert.Equal(t, "Manage RETL connections in the workspace", cmd.Short)
-	require.Len(t, cmd.Commands(), 1)
+	subs := map[string]*cobra.Command{}
+	for _, c := range cmd.Commands() {
+		subs[c.Name()] = c
+	}
+	require.Contains(t, subs, "list")
+	require.Contains(t, subs, "view")
 
-	listCmd := cmd.Commands()[0]
-	assert.Equal(t, "list", listCmd.Use)
-	assert.NotNil(t, listCmd.RunE)
-
-	jsonFlag := listCmd.Flags().Lookup("json")
-	require.NotNil(t, jsonFlag)
-	assert.Equal(t, "false", jsonFlag.DefValue)
+	for name, sub := range subs {
+		assert.NotNil(t, sub.RunE, name)
+		jsonFlag := sub.Flags().Lookup("json")
+		require.NotNil(t, jsonFlag, name+" needs --json")
+		assert.Equal(t, "false", jsonFlag.DefValue)
+	}
+	assert.Equal(t, "view <external-id>", subs["view"].Use)
 }
 
 func TestNewCmdWorkspace_RegistersRetlConnections(t *testing.T) {

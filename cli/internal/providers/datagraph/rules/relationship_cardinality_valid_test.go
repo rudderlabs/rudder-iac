@@ -185,4 +185,3 @@ func TestRelationshipCardinalityValid(t *testing.T) {
 		})
 	}
 }
-

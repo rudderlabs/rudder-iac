@@ -11,7 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
- 
+
 const noResourcesFoundMsg = "No resources found"
 
 type model struct {
