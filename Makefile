@@ -68,6 +68,66 @@ docker-build: ## Build Docker image
 .PHONY: test-all
 test-all: test test-e2e ## Run all unit and end-to-end tests
 
+##@ Demos
+
+# Matches api/client/client.go's BASE_URL — the host the CLI silently falls
+# back to (with whatever real token ~/.rudder/config.json holds) whenever
+# RUDDERSTACK_API_URL is unset. The e2e suite's first act is a workspace-
+# wiping `destroy --confirm=false`, so demo-record refuses rather than risk
+# aiming that at production.
+PROD_API_HOST := api.rudderstack.com
+
+DEMO_TEST ?= TestAccountsApply
+DEMO_PROFILE ?= mini
+DEMO_OUT ?= demos
+DEMO_JOURNAL ?= $(DEMO_OUT)/$(DEMO_TEST).jsonl
+DEMO_EVENTS ?= $(DEMO_OUT)/$(DEMO_TEST).events.json
+
+.PHONY: demo-record
+demo-record: ## Run one e2e test with journaling on (TEST=..., PROFILE=mini|cloud)
+	@test -f ./demos/profiles/$(DEMO_PROFILE).env || \
+		{ echo "refusing: no such profile ./demos/profiles/$(DEMO_PROFILE).env"; exit 1; }
+	@set -a; . ./demos/profiles/$(DEMO_PROFILE).env; set +a; \
+	if [ -z "$$RUDDERSTACK_API_URL" ]; then \
+		echo "refusing: RUDDERSTACK_API_URL is unset, so the CLI would target $(PROD_API_HOST)."; \
+		echo "  The e2e suite runs 'destroy --confirm=false' first — it wipes the target workspace."; \
+		echo "  Source a profile: . ./demos/profiles/mini.env"; \
+		exit 1; \
+	fi; \
+	case "$$RUDDERSTACK_API_URL" in \
+		*$(PROD_API_HOST)*) \
+			echo "refusing: RUDDERSTACK_API_URL points at production, and this target wipes its workspace."; \
+			exit 1 ;; \
+	esac; \
+	mkdir -p $(DEMO_OUT); \
+	rm -f $(DEMO_JOURNAL); \
+	RUDDER_DEMO_JOURNAL=$(abspath $(DEMO_JOURNAL)) \
+	$(GO) test -json -timeout 20m ./cli/tests -run '^$(DEMO_TEST)$$' -v > $(DEMO_EVENTS) || \
+		{ echo "e2e run failed — see $(DEMO_EVENTS)"; exit 1; }
+	@echo "journal: $(DEMO_JOURNAL)"
+	@echo "events:  $(DEMO_EVENTS)"
+
+.PHONY: demo-generate
+demo-generate: ## Generate demos/<Test>/ from the last demo-record
+	@set -a; . ./demos/profiles/$(DEMO_PROFILE).env; set +a; \
+	bin="$$(grep -o '"argv":\["[^"]*"' $(DEMO_JOURNAL) | sed -E 's/.*\["//;s/"$$//' | grep -E '/rudder-cli(\.exe)?$$' | head -1)"; \
+	if [ -z "$$bin" ]; then \
+		echo "refusing: no rudder-cli invocation found in $(DEMO_JOURNAL) to discover the CLI binary from"; \
+		exit 1; \
+	fi; \
+	$(GO) run ./cli/tests/demo/cmd/demogen \
+		-journal $(DEMO_JOURNAL) \
+		-events $(DEMO_EVENTS) \
+		-out $(DEMO_OUT) \
+		-repo-root . \
+		-bin "$$bin" \
+		-profile "$$RUDDER_DEMO_PROFILE" \
+		-backend-kind "$$RUDDER_DEMO_BACKEND_KIND" \
+		-api-url "$$RUDDERSTACK_API_URL"
+
+.PHONY: demo
+demo: demo-record demo-generate ## Record and generate one demo end to end
+
 .PHONY: typer-kotlin-validate
 typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 	cd cli/internal/typer/generator/platforms/kotlin/testdata/validator && make run
