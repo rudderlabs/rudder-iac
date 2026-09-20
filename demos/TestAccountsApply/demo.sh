@@ -21,9 +21,15 @@ p "# (verified in Go, not visible here — see TestAccountsApply)"
 
 p "# Apply create"
 pe "rudder-cli apply -l accounts/create --var-file accounts/credentials.vars.yaml --confirm=false"
-pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
-pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# (verified in Go, not visible here — see TestAccountsApply/apply_create)"
+
+p "# Apply update"
+pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
+p "# (verified in Go, not visible here — see TestAccountsApply/apply_update)"
+
+p "# Re-apply leaves non-secret upstream state unchanged"
+pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
+p "# (verified in Go, not visible here — see TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged)"
 
 
 if [ -z "${RUDDER_DEMO_RECORDING:-}" ] && [ -f ANNOTATE.md ]; then
