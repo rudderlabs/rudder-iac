@@ -35,6 +35,13 @@ const (
 
 	// ExternalIDKey marks CLI-managed rows in List output.
 	ExternalIDKey = "externalId"
+
+	// Name keys exist for List only. A connection is a relationship, and the
+	// webapp never shows one as a pair of opaque ids — it joins both endpoints
+	// and names them. A list that prints only ids makes the reader run two more
+	// lookups to learn what the row connects.
+	SourceNameKey      = "sourceName"
+	DestinationNameKey = "destinationName"
 )
 
 // RemoteConnection carries a remote connection through import and export

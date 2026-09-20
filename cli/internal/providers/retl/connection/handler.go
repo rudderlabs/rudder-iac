@@ -856,14 +856,26 @@ func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.Re
 		return nil, err
 	}
 
+	// Endpoint names are best-effort: a catalog read that fails, or an endpoint
+	// missing from it, leaves the names empty rather than dropping the row or
+	// failing the list. listAll is what makes this a report of the workspace
+	// rather than of what the CLI can manage, and enrichment must not undo that.
+	sources, destinations, err := h.endpoints(ctx)
+	if err != nil {
+		log.Debug("listing rETL connections without endpoint names", "reason", err.Error())
+		sources, destinations = nil, nil
+	}
+
 	result := make([]resources.ResourceData, 0, len(conns))
 	for _, conn := range conns {
 		result = append(result, resources.ResourceData{
-			IDKey:            conn.ID,
-			SourceIDKey:      conn.SourceID,
-			DestinationIDKey: conn.DestinationID,
-			EnabledKey:       conn.Enabled,
-			ExternalIDKey:    conn.ExternalID,
+			IDKey:              conn.ID,
+			SourceIDKey:        conn.SourceID,
+			SourceNameKey:      sources[conn.SourceID].Name,
+			DestinationIDKey:   conn.DestinationID,
+			DestinationNameKey: destinations[conn.DestinationID].Name,
+			EnabledKey:         conn.Enabled,
+			ExternalIDKey:      conn.ExternalID,
 		})
 	}
 	return result, nil
