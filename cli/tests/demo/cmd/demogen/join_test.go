@@ -13,19 +13,28 @@ func at(sec int) time.Time {
 	return time.Date(2026, 9, 20, 10, 0, sec, 0, time.UTC)
 }
 
-func TestJoinAttributesRecordsToDeepestActiveSubtest(t *testing.T) {
+// This is the test that would have caught R18's bug: go test -json batches
+// every subtest's pass event at the instant the parent completes, so all
+// three siblings here "pass" at the identical timestamp — mirroring the real
+// TestAccountsApply trace that exposed the defect. A depth/span-based
+// attribution treated all three as simultaneously "active" and collapsed
+// every record onto whichever subtest happened to start first. Attribution
+// must instead follow `run` order, which go test never batches.
+func TestJoinAttributesRecordsBySubtestsMostRecentRun(t *testing.T) {
 	events := []Event{
-		{Time: at(0), Action: "run", Test: "TestProjectApply"},
-		{Time: at(1), Action: "run", Test: "TestProjectApply/rudder_specs"},
-		{Time: at(2), Action: "run", Test: "TestProjectApply/rudder_specs/should_create_entities"},
-		{Time: at(6), Action: "pass", Test: "TestProjectApply/rudder_specs/should_create_entities"},
-		{Time: at(7), Action: "run", Test: "TestProjectApply/rudder_specs/should_update_entities"},
-		{Time: at(9), Action: "pass", Test: "TestProjectApply/rudder_specs/should_update_entities"},
+		{Time: at(0), Action: "run", Test: "TestAccountsApply"},
+		{Time: at(1), Action: "run", Test: "TestAccountsApply/apply_create"},
+		{Time: at(3), Action: "run", Test: "TestAccountsApply/apply_update"},
+		{Time: at(5), Action: "run", Test: "TestAccountsApply/re-apply_leaves_state_unchanged"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply/apply_create"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply/apply_update"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply/re-apply_leaves_state_unchanged"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply"},
 	}
 	records := []demo.Record{
-		{Kind: demo.KindExec, Start: at(3), Argv: []string{"rudder-cli", "apply", "-l", "create"}},
-		{Kind: demo.KindExec, Start: at(5), Argv: []string{"rudder-cli", "apply", "-l", "create"}},
-		{Kind: demo.KindExec, Start: at(8), Argv: []string{"rudder-cli", "apply", "-l", "update"}},
+		{Kind: demo.KindExec, Start: at(2), Argv: []string{"rudder-cli", "apply", "-l", "accounts/create"}},
+		{Kind: demo.KindExec, Start: at(4), Argv: []string{"rudder-cli", "apply", "-l", "accounts/update"}},
+		{Kind: demo.KindExec, Start: at(6), Argv: []string{"rudder-cli", "apply", "-l", "accounts/reapply"}},
 	}
 
 	got, err := Join(events, records)
@@ -33,17 +42,16 @@ func TestJoinAttributesRecordsToDeepestActiveSubtest(t *testing.T) {
 
 	assert.Equal(t, []Step{
 		{
-			Test: "TestProjectApply/rudder_specs/should_create_entities",
-			Records: []demo.Record{
-				{Kind: demo.KindExec, Start: at(3), Argv: []string{"rudder-cli", "apply", "-l", "create"}},
-				{Kind: demo.KindExec, Start: at(5), Argv: []string{"rudder-cli", "apply", "-l", "create"}},
-			},
+			Test:    "TestAccountsApply/apply_create",
+			Records: []demo.Record{{Kind: demo.KindExec, Start: at(2), Argv: []string{"rudder-cli", "apply", "-l", "accounts/create"}}},
 		},
 		{
-			Test: "TestProjectApply/rudder_specs/should_update_entities",
-			Records: []demo.Record{
-				{Kind: demo.KindExec, Start: at(8), Argv: []string{"rudder-cli", "apply", "-l", "update"}},
-			},
+			Test:    "TestAccountsApply/apply_update",
+			Records: []demo.Record{{Kind: demo.KindExec, Start: at(4), Argv: []string{"rudder-cli", "apply", "-l", "accounts/update"}}},
+		},
+		{
+			Test:    "TestAccountsApply/re-apply_leaves_state_unchanged",
+			Records: []demo.Record{{Kind: demo.KindExec, Start: at(6), Argv: []string{"rudder-cli", "apply", "-l", "accounts/reapply"}}},
 		},
 	}, got)
 }
@@ -52,6 +60,29 @@ func TestJoinAttributesToParentWhenNoSubtestActive(t *testing.T) {
 	events := []Event{
 		{Time: at(0), Action: "run", Test: "TestAccountsApply"},
 		{Time: at(5), Action: "pass", Test: "TestAccountsApply"},
+	}
+	records := []demo.Record{
+		{Kind: demo.KindExec, Start: at(1), Argv: []string{"rudder-cli", "destroy", "--confirm=false"}},
+	}
+
+	got, err := Join(events, records)
+	require.NoError(t, err)
+
+	assert.Equal(t, []Step{{
+		Test:    "TestAccountsApply",
+		Records: []demo.Record{{Kind: demo.KindExec, Start: at(1), Argv: []string{"rudder-cli", "destroy", "--confirm=false"}}},
+	}}, got)
+}
+
+// A record can also land on the parent while subtests exist, as long as it
+// starts before the first subtest's `run` — e.g. setup the parent test does
+// itself before delegating to t.Run.
+func TestJoinAttributesToParentBeforeAnySubtestStarts(t *testing.T) {
+	events := []Event{
+		{Time: at(0), Action: "run", Test: "TestAccountsApply"},
+		{Time: at(5), Action: "run", Test: "TestAccountsApply/apply_create"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply/apply_create"},
+		{Time: at(9), Action: "pass", Test: "TestAccountsApply"},
 	}
 	records := []demo.Record{
 		{Kind: demo.KindExec, Start: at(1), Argv: []string{"rudder-cli", "destroy", "--confirm=false"}},
@@ -119,24 +150,4 @@ func TestJoinSkipsTestsThatRanNoCommands(t *testing.T) {
 
 	require.Len(t, got, 1)
 	assert.Equal(t, "TestA/busy", got[0].Test)
-}
-
-// A well-formed, complete serial trace never has two active spans at the same
-// depth: an active span's ancestors are also active, so concurrently active
-// depths form a strictly increasing chain, and go test emits a pass or fail
-// for every test — panics included — so a span always closes. A same-depth
-// tie can therefore only arise from a truncated or malformed stream, input
-// this package should not be trusting in the first place.
-//
-// "Earlier wins" is not claimed to be the more correct answer for that
-// degenerate case — "later wins" is arguably just as defensible. This test
-// exists only to pin whichever choice depth > bestDepth already makes, so the
-// tie-break can't drift silently if someone touches deepestActive later.
-func TestDeepestActiveKeepsEarlierSpanOnDepthTie(t *testing.T) {
-	spans := []span{
-		{test: "TestA", start: 0, stop: maxInt64},
-		{test: "TestB", start: 5, stop: 15},
-	}
-
-	assert.Equal(t, "TestA", deepestActive(spans, 7))
 }

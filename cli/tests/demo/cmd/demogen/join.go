@@ -1,13 +1,10 @@
 package main
 
 import (
-	"strings"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 )
-
-// maxInt64 stands in for "has not finished yet" in a span's stop time.
-const maxInt64 = int64(^uint64(0) >> 1)
 
 // Step is one subtest and the records it ran, in order.
 type Step struct {
@@ -15,38 +12,34 @@ type Step struct {
 	Records []demo.Record
 }
 
-// span is one test's start and finish, in unix nanoseconds.
-type span struct {
-	test        string
-	start, stop int64
-}
-
 // Join attributes each journal record to the subtest that was running when it
 // started.
 //
-// The suite is serial, so "which test was running" is a well-defined question:
-// walk the events in time order maintaining the set of started-but-not-finished
-// tests, and a record belongs to the deepest one active at its start. Records
-// that precede the first test — TestMain's `go build`, notably — belong to no
-// step and are dropped.
+// go test -json batches every subtest's pass/fail event at the instant the
+// parent test itself completes, so sibling subtests' [start, finish) windows
+// all appear to end at once and cannot be told apart by depth or by "which
+// span is still open" — an earlier version of this function did exactly
+// that, and silently merged every sibling's records onto whichever one
+// happened to start first (see git history for R18). What batching does not
+// disturb is `run`: each test emits exactly one, at the instant it starts,
+// and — because ParseEvents already requires the run to be serial — those
+// events arrive in the order the tests actually ran. So a record's owner is
+// the test whose `run` event most recently precedes the record's start: the
+// test that was current when the command began.
+//
+// This cannot resolve one case. Because pass/fail is batched and carries no
+// reliable timing of the work it reports on, a record the *parent* emits
+// after its last subtest's `run` — but logically after that subtest's own
+// work has finished — is indistinguishable on the wire from a record the
+// subtest emitted itself; there is no event marking that boundary. Such a
+// record is attributed to the subtest. That is narrower than the bug this
+// replaces, which could misattribute a record across unrelated siblings;
+// here the only remaining ambiguity is between a subtest and its own parent.
 func Join(events []Event, records []demo.Record) ([]Step, error) {
-	var (
-		open  = map[string]int{} // test name -> index into spans
-		spans []span
-	)
-
+	var runs []Event
 	for _, e := range events {
-		switch e.Action {
-		case "run":
-			open[e.Test] = len(spans)
-			spans = append(spans, span{test: e.Test, start: e.Time.UnixNano(), stop: maxInt64})
-		case "pass", "fail", "skip":
-			idx, ok := open[e.Test]
-			if !ok {
-				continue
-			}
-			spans[idx].stop = e.Time.UnixNano()
-			delete(open, e.Test)
+		if e.Action == "run" {
+			runs = append(runs, e)
 		}
 	}
 
@@ -54,7 +47,7 @@ func Join(events []Event, records []demo.Record) ([]Step, error) {
 	var order []string
 
 	for _, r := range records {
-		owner := deepestActive(spans, r.Start.UnixNano())
+		owner := currentTest(runs, r.Start)
 		if owner == "" {
 			continue
 		}
@@ -75,25 +68,18 @@ func Join(events []Event, records []demo.Record) ([]Step, error) {
 	return out, nil
 }
 
-// deepestActive returns the most deeply nested test covering ts, or "" if none
-// does. Depth is the number of "/" separators, so a subtest always wins over
-// the parent whose span contains it.
-func deepestActive(spans []span, ts int64) string {
-	var (
-		best      string
-		bestDepth = -1
-	)
-
-	for _, s := range spans {
-		if ts < s.start || ts > s.stop {
-			continue
+// currentTest returns the Test of whichever run event most recently precedes
+// ts, or "" if none does — ts arrived before the first test started (e.g.
+// TestMain's `go build`). runs must be in chronological order, which they
+// are: they're a filtered subsequence of events, and this package never
+// reorders events (see Join's own "no sorting anywhere" precedent).
+func currentTest(runs []Event, ts time.Time) string {
+	var owner string
+	for _, r := range runs {
+		if r.Time.After(ts) {
+			break
 		}
-
-		depth := strings.Count(s.test, "/")
-		if depth > bestDepth {
-			best, bestDepth = s.test, depth
-		}
+		owner = r.Test
 	}
-
-	return best
+	return owner
 }
