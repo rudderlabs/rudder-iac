@@ -128,6 +128,12 @@ demo-generate: ## Generate demos/<Test>/ from the last demo-record
 .PHONY: demo
 demo: demo-record demo-generate ## Record and generate one demo end to end
 
+CASTS_OUT ?= casts
+
+.PHONY: demo-cast
+demo-cast: ## Record demos/<TEST>/demo.sh to casts/<TEST>.cast with provenance (TEST=...)
+	@./scripts/demo-cast.sh $(DEMO_TEST) $(CASTS_OUT)
+
 .PHONY: typer-kotlin-validate
 typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 	cd cli/internal/typer/generator/platforms/kotlin/testdata/validator && make run
