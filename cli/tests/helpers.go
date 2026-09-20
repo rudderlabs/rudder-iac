@@ -2,10 +2,13 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 )
 
 // Executor allows callers to run external commands and capture their combined output.
@@ -68,6 +71,41 @@ func (c *CmdExecutor) Execute(cmd string, args ...string) ([]byte, error) {
 		command.Dir = c.WorkDir
 	}
 
+	start := time.Now().UTC()
 	output, err := command.CombinedOutput()
+
+	journal(start, command, output, err)
+
 	return output, err
+}
+
+// journal records the invocation for demo generation. Every CLI call in this
+// package funnels through Execute, which is what lets a whole suite run be
+// captured without touching a single test.
+func journal(start time.Time, command *exec.Cmd, output []byte, runErr error) {
+	if !demo.Enabled() {
+		return
+	}
+
+	dir := command.Dir
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+
+	exitCode := 0
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) {
+		exitCode = exitErr.ExitCode()
+	}
+
+	demo.Append(demo.Record{
+		Kind:     demo.KindExec,
+		Start:    start,
+		End:      time.Now().UTC(),
+		Dir:      dir,
+		Argv:     command.Args,
+		Env:      demo.CollectEnv(),
+		ExitCode: exitCode,
+		Output:   string(output),
+	})
 }
