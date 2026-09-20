@@ -46,6 +46,18 @@ func TestParseEventsIgnoresParallelismOutsidePackage(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestParseEventsRejectsBareContWithoutPause(t *testing.T) {
+	// A complete stream always emits `pause` before `cont`, so this can only
+	// arrive from a truncated or filtered stream — one that began mid-run.
+	// That is precisely when a silently reordered demo would be worst, so the
+	// run is refused rather than trusted.
+	in := `{"Time":"2026-09-20T10:00:00Z","Action":"cont","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestA"}`
+
+	_, err := ParseEvents(strings.NewReader(in), e2ePackage)
+	require.ErrorIs(t, err, ErrParallelSubtest)
+	assert.Contains(t, err.Error(), "TestA")
+}
+
 func TestParseEventsSkipsPackageLevelEvents(t *testing.T) {
 	in := `{"Time":"2026-09-20T10:00:00Z","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests"}`
 

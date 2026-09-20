@@ -121,14 +121,17 @@ func TestJoinSkipsTestsThatRanNoCommands(t *testing.T) {
 	assert.Equal(t, "TestA/busy", got[0].Test)
 }
 
-// A well-formed serial trace never has two active spans at the same depth: an
-// active span's ancestors are also active, so concurrently active depths form
-// a strictly increasing chain. The one way to get a same-depth tie is a span
-// that never closed — e.g. a subtest whose pass/fail event was lost — left
-// open when an unrelated, later span at the same depth starts. deepestActive
-// must not let that later span silently steal a timestamp that arrived while
-// the earlier span was still the best (and only) match; ties keep whichever
-// span claimed the depth first.
+// A well-formed, complete serial trace never has two active spans at the same
+// depth: an active span's ancestors are also active, so concurrently active
+// depths form a strictly increasing chain, and go test emits a pass or fail
+// for every test — panics included — so a span always closes. A same-depth
+// tie can therefore only arise from a truncated or malformed stream, input
+// this package should not be trusting in the first place.
+//
+// "Earlier wins" is not claimed to be the more correct answer for that
+// degenerate case — "later wins" is arguably just as defensible. This test
+// exists only to pin whichever choice depth > bestDepth already makes, so the
+// tie-break can't drift silently if someone touches deepestActive later.
 func TestDeepestActiveKeepsEarlierSpanOnDepthTie(t *testing.T) {
 	spans := []span{
 		{test: "TestA", start: 0, stop: maxInt64},
