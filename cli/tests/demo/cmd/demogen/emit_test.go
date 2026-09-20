@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -313,4 +314,146 @@ func TestDurationOfHandlesZeroEndWithoutGoingNegative(t *testing.T) {
 
 	assert.GreaterOrEqual(t, got, 0.0, "a single record with a zero End must not yield a negative duration")
 	assert.Less(t, got, 60.0, "must not report an absurd multi-decade duration measured from the zero time")
+}
+
+// Ruling R15: quote() alone protects the outer double-quoted string literal
+// in demo.sh, but demo-magic's run_cmd runs `eval $@` on the *result* of that
+// string being word-split again at playback time (see
+// /Users/shanmukh/workspace/demo-magic/demo-magic.sh). A token carrying
+// $(...), a backtick, or a bare pipe survives quote()'s escaping and then
+// executes or re-parses during that eval. These tests exercise the real
+// playback path end to end — through Emit's actual demo.sh output, through a
+// faithful reproduction of pe -> run_cmd -> eval — rather than only the
+// outer-embedding boundary TestQuoteRoundTripsShellMetacharactersWithoutExecutingThem
+// already covers (that test uses printf, which never evaluates its argument;
+// it could not have caught this).
+
+// emitPeLine runs one exec record through the real Emit/build pipeline and
+// returns the "pe ..." line demo.sh contains for it, so these tests exercise
+// production code rather than a hand-rolled mirror of it.
+func emitPeLine(t *testing.T, argv []string) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	steps := []Step{{
+		Test: "TestX/step",
+		Records: []demo.Record{
+			{Kind: demo.KindExec, Start: at(1), End: at(2), Argv: argv},
+		},
+	}}
+	require.NoError(t, Emit(dir, steps, Rewriter{RepoRoot: t.TempDir()}, Manifest{Test: "TestX"}))
+
+	data, err := os.ReadFile(filepath.Join(dir, "demo.sh"))
+	require.NoError(t, err)
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "pe ") {
+			return line
+		}
+	}
+
+	t.Fatal("generated demo.sh has no pe line")
+	return ""
+}
+
+// evalPeLine runs a generated "pe ..." line through a faithful reproduction
+// of demo-magic's playback: pe prints then calls run_cmd, and run_cmd does
+// exactly `eval $@` (unquoted) on it. cmdStub, if non-empty, defines the bash
+// function argv[0] resolves to.
+func evalPeLine(t *testing.T, peLine, cmdStub string) string {
+	t.Helper()
+
+	script := "set -u\n" + cmdStub + "\n" +
+		"run_cmd() {\n  eval $@\n}\n" +
+		"pe() {\n  run_cmd \"$@\"\n}\n" +
+		peLine + "\n"
+
+	out, _ := exec.Command("bash", "-c", script).CombinedOutput()
+
+	return string(out)
+}
+
+func TestShellQuotePlaybackDoesNotExecuteDollarParenToken(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "pwned")
+
+	peLine := emitPeLine(t, []string{"true", "--filter", "$(touch " + marker + ")"})
+	evalPeLine(t, peLine, "")
+
+	_, err := os.Stat(marker)
+	assert.True(t, os.IsNotExist(err), "a $(...) token must not execute during demo-magic's eval playback")
+}
+
+func TestShellQuotePlaybackDoesNotExecuteBacktickToken(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "pwned")
+
+	peLine := emitPeLine(t, []string{"true", "--filter", "`touch " + marker + "`"})
+	evalPeLine(t, peLine, "")
+
+	_, err := os.Stat(marker)
+	assert.True(t, os.IsNotExist(err), "a backtick token must not execute during demo-magic's eval playback")
+}
+
+func TestShellQuotePlaybackKeepsJQFilterAsOneArgumentWithPipeIntact(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "args")
+
+	filter := `.data[] | select(.externalId=="vip")`
+	peLine := emitPeLine(t, []string{"capture", "events", "list", "--filter", filter})
+
+	stub := "capture() {\n" +
+		"  : > " + capture + "\n" +
+		"  printf '%s\\n' \"$#\" >> " + capture + "\n" +
+		"  for a in \"$@\"; do printf '%s\\x1f' \"$a\" >> " + capture + "; done\n" +
+		"}"
+	evalPeLine(t, peLine, stub)
+
+	data, err := os.ReadFile(capture)
+	require.NoError(t, err)
+
+	nl := strings.IndexByte(string(data), '\n')
+	require.GreaterOrEqual(t, nl, 0, "capture file missing arg count line")
+
+	count := string(data)[:nl]
+	args := strings.Split(strings.TrimSuffix(string(data)[nl+1:], "\x1f"), "\x1f")
+
+	// "capture" itself becomes the command name, not one of its own
+	// arguments, so $# counts the remaining four: events, list, --filter,
+	// and the jq filter as one argument.
+	assert.Equal(t, "4", count, "argv must arrive as 4 separate arguments, not re-split on the pipe")
+	assert.Equal(t, filter, args[len(args)-1], "the jq filter must arrive as a single argument with its pipe intact")
+}
+
+func TestShellQuotePlaybackRoundTripsLiteralSingleQuote(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "args")
+
+	peLine := emitPeLine(t, []string{"capture", "don't", "stop"})
+
+	stub := "capture() {\n" +
+		"  : > " + capture + "\n" +
+		"  for a in \"$@\"; do printf '%s\\x1f' \"$a\" >> " + capture + "; done\n" +
+		"}"
+	evalPeLine(t, peLine, stub)
+
+	data, err := os.ReadFile(capture)
+	require.NoError(t, err)
+
+	args := strings.Split(strings.TrimSuffix(string(data), "\x1f"), "\x1f")
+	assert.Equal(t, []string{"don't", "stop"}, args)
+}
+
+// The common case — a plain flag-and-path command — must stay readable: no
+// token in it needs quoting, so shellQuote must add none. This pins the
+// readability requirement so a later change cannot quietly over-quote every
+// token (à la shlex.quote's conservative default).
+func TestShellQuoteLeavesOrdinaryArgvBare(t *testing.T) {
+	peLine := emitPeLine(t, []string{"rudder-cli", "apply", "-l", "project/create", "--confirm=false"})
+
+	assert.Equal(t, `pe "rudder-cli apply -l project/create --confirm=false"`, peLine)
+}
+
+func TestShellQuoteOfEmptyStringIsTwoSingleQuotes(t *testing.T) {
+	assert.Equal(t, "''", shellQuote(""))
 }

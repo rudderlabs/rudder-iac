@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -129,7 +130,12 @@ func build(steps []Step, rw Rewriter, m Manifest) (script string, infos []StepIn
 			gaps = append(gaps, stepGaps...)
 			fixtures = append(fixtures, rw.Fixtures(r.Argv)...)
 
-			b.WriteString("pe " + quote(strings.Join(argv, " ")) + "\n")
+			safe := make([]string, len(argv))
+			for i, a := range argv {
+				safe[i] = shellQuote(a)
+			}
+
+			b.WriteString("pe " + quote(strings.Join(safe, " ")) + "\n")
 		}
 
 		if info.Verification == "none" {
@@ -167,6 +173,31 @@ func sayLine(s string) string {
 // recorded commands contain flags and JSON filters that must not be re-split.
 func quote(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`").Replace(s) + `"`
+}
+
+// shellSafe is the set of characters a token may carry and still be left
+// bare. It is a strict allowlist, never a denylist: a character not listed
+// here gets quoted, so an unanticipated metacharacter fails closed.
+var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+// shellQuote makes one recorded argv token safe for demo-magic's playback,
+// which runs `eval $@` on the line (see run_cmd in demo-magic.sh) — so a
+// token carrying $(…), a backtick or a pipe would otherwise execute or
+// re-parse rather than being passed through as a single argument. quote()
+// alone does not protect against this: it escapes the joined line for the
+// outer double-quoted string literal in demo.sh, but demo-magic's eval acts
+// on the *unquoted* result of that string being word-split again at runtime.
+//
+// Tokens that need no quoting are left bare: these scripts are written to be
+// read, and quoting every token (à la shlex.quote's conservative default)
+// would bury the command in punctuation for no safety benefit.
+func shellQuote(token string) string {
+	if token != "" && shellSafe.MatchString(token) {
+		return token
+	}
+
+	// A single quote cannot appear inside single quotes, so close, escape, reopen.
+	return "'" + strings.ReplaceAll(token, "'", `'\''`) + "'"
 }
 
 func anyAnnotated(infos []StepInfo) bool {
