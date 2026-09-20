@@ -2,6 +2,7 @@ package retlconnection
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,5 +46,52 @@ func compactDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm %ds", m, s)
 	default:
 		return fmt.Sprintf("%ds", s)
+	}
+}
+
+// renderSyncTable prints a run history the way the webapp's past-syncs tab
+// reads it: the outcome rather than the raw status, when it started in relative
+// terms, how long it took, and the two row counts that separate a clean run
+// from one that dropped records.
+func renderSyncTable(syncs []retlClient.Sync, now time.Time) string {
+	const format = "%-24s  %-10s  %-12s  %-10s  %8s  %8s\n"
+
+	var b strings.Builder
+	fmt.Fprintf(&b, format, "RUN ID", "OUTCOME", "STARTED", "DURATION", "CHANGED", "FAILED")
+	for _, sync := range syncs {
+		fmt.Fprintf(&b, format,
+			sync.ID,
+			sync.Outcome(),
+			relativeTime(sync.StartedAt, now),
+			compactDuration(sync.Duration(now)),
+			strconv.Itoa(sync.Metrics.Changed.Total),
+			strconv.Itoa(sync.Metrics.Failed.Total),
+		)
+	}
+	return b.String()
+}
+
+// relativeTime is how long ago something happened. A run history is read to
+// answer "when did this last go wrong", and an absolute timestamp makes the
+// reader do the subtraction. The JSON form keeps the absolute time.
+func relativeTime(t, now time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+
+	d := now.Sub(t)
+	if d < 0 {
+		return "just now"
+	}
+
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	}
 }
