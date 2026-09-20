@@ -78,6 +78,8 @@ func run() error {
 		backend.APIURL = ""
 	}
 
+	var allSteps []StepInfo
+
 	for test, group := range groupByTopLevel(steps) {
 		m := Manifest{
 			Test:            test,
@@ -95,6 +97,18 @@ func run() error {
 		}
 
 		fmt.Println("wrote", dir)
+
+		// Emit takes m by value, so its own Steps/Gaps/Annotated additions never
+		// reach this copy — read back what it wrote instead of duplicating build().
+		written, err := readManifest(dir)
+		if err != nil {
+			return fmt.Errorf("reading back %s: %w", dir, err)
+		}
+		allSteps = append(allSteps, written.Steps...)
+	}
+
+	if err := writeGaps(*outDir, allSteps); err != nil {
+		return err
 	}
 
 	return nil
@@ -120,6 +134,22 @@ func readJournal(path string) ([]demo.Record, error) {
 	}
 
 	return recs, nil
+}
+
+// readManifest reads back the manifest.json Emit just wrote, so its steps
+// (annotation, verification) can feed GAPS.md without recomputing them.
+func readManifest(dir string) (Manifest, error) {
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return Manifest{}, fmt.Errorf("reading manifest: %w", err)
+	}
+
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return Manifest{}, fmt.Errorf("decoding manifest: %w", err)
+	}
+
+	return m, nil
 }
 
 // groupByTopLevel splits steps by the test function they belong to, so each

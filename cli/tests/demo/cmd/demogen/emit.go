@@ -272,6 +272,50 @@ func fixtureRoots(fixtures []string) []string {
 	return out
 }
 
+// writeGaps records every step whose proof is invisible on screen. Where no
+// read-only CLI command exists to show a result, that absence is a defect in
+// the CLI, not in the demo — DEX-921 states the rule: "A demo that has to leave
+// the tool it is demonstrating is a gap in the tool." This file is the list.
+func writeGaps(outDir string, steps []StepInfo) error {
+	var missing []StepInfo
+	for _, s := range steps {
+		if s.Verification == "none" {
+			missing = append(missing, s)
+		}
+	}
+
+	path := filepath.Join(outDir, "GAPS.md")
+	if len(missing) == 0 {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("removing stale GAPS.md: %w", err)
+		}
+
+		return nil
+	}
+
+	// Ruling R5: groupByTopLevel returns a map, and Go randomises map
+	// iteration order, so allSteps arrives in a different order every run.
+	// Sort by test name before writing so regeneration does not churn the
+	// diff for no reason.
+	sort.Slice(missing, func(i, j int) bool { return missing[i].Test < missing[j].Test })
+
+	var b strings.Builder
+	b.WriteString("# Verification gaps\n\n")
+	b.WriteString("These steps prove their result in Go, where a viewer cannot see it.\n")
+	b.WriteString("Each one wants a read-only CLI command that shows the same thing on screen.\n")
+	b.WriteString("Where no such command exists, that is a ticket against the CLI.\n\n")
+
+	for _, s := range missing {
+		b.WriteString("- `" + s.Test + "` — " + s.Prose + "\n")
+	}
+
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return fmt.Errorf("writing GAPS.md: %w", err)
+	}
+
+	return nil
+}
+
 func writeAnnotate(dir string, m Manifest) error {
 	var missing []StepInfo
 	for _, s := range m.Steps {

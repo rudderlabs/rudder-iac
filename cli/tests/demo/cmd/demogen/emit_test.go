@@ -148,6 +148,49 @@ func TestEmitOmitsAnnotateWhenEveryStepIsAnnotated(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "a fully annotated demo asks for nothing")
 }
 
+// Ruling R5: groupByTopLevel returns a map, so allSteps arrives in a
+// different, randomised order on every regeneration. writeGaps must sort by
+// test name itself so GAPS.md does not churn the diff for no reason.
+func TestWriteGapsSortsByTestNameRegardlessOfInputOrder(t *testing.T) {
+	dir := t.TempDir()
+	steps := []StepInfo{
+		{Test: "TestB/apply_create", Prose: "Apply create", Verification: "none"},
+		{Test: "TestA/apply_create", Prose: "Apply create", Verification: "none"},
+		{Test: "TestA", Prose: "A", Verification: "visible"},
+	}
+
+	require.NoError(t, writeGaps(dir, steps))
+
+	data, err := os.ReadFile(filepath.Join(dir, "GAPS.md"))
+	require.NoError(t, err)
+
+	body := string(data)
+	assert.Contains(t, body, "- `TestA/apply_create` — Apply create\n- `TestB/apply_create` — Apply create",
+		"missing steps must be listed sorted by test name, not input order")
+	assert.NotContains(t, body, "TestA\"", "a step with visible verification is not a gap")
+	assert.NotContains(t, body, "- `TestA` —", "a step with visible verification is not a gap")
+}
+
+func TestWriteGapsOmitsFileWhenEveryStepIsVisible(t *testing.T) {
+	dir := t.TempDir()
+	steps := []StepInfo{{Test: "TestA/step", Verification: "visible"}}
+
+	require.NoError(t, writeGaps(dir, steps))
+
+	_, err := os.Stat(filepath.Join(dir, "GAPS.md"))
+	assert.True(t, os.IsNotExist(err), "no invisible steps means nothing to file")
+}
+
+func TestWriteGapsRemovesStaleFileOnceStepsBecomeVisible(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "GAPS.md"), []byte("stale"), 0o644))
+
+	require.NoError(t, writeGaps(dir, []StepInfo{{Test: "TestA/step", Verification: "visible"}}))
+
+	_, err := os.Stat(filepath.Join(dir, "GAPS.md"))
+	assert.True(t, os.IsNotExist(err), "a demo that no longer has invisible steps must stop being listed")
+}
+
 func TestEmitWritesReadme(t *testing.T) {
 	dir, _ := emitFixture(t)
 
@@ -275,6 +318,20 @@ func TestFlagsOfDropsRedactedValues(t *testing.T) {
 	assert.Equal(t, []string{"RUDDERSTACK_X_RETL_TABLE_SUPPORT=true"}, got)
 	assert.NotContains(t, got, "RUDDERSTACK_ACCESS_TOKEN="+demo.Redacted,
 		"a demo must never instruct a reader to export a redacted literal")
+}
+
+// readManifest is how run() recovers what Emit wrote to feed GAPS.md: Emit
+// takes a Manifest by value, so its own Steps/Gaps/Annotated additions never
+// reach the caller's copy.
+func TestReadManifestReturnsWhatEmitWrote(t *testing.T) {
+	dir, _ := emitFixture(t)
+
+	got, err := readManifest(dir)
+	require.NoError(t, err)
+
+	assert.Equal(t, "TestProjectApply", got.Test)
+	assert.True(t, got.Annotated)
+	assert.Len(t, got.Steps, 2)
 }
 
 func TestGroupByTopLevelSplitsByTestFunction(t *testing.T) {

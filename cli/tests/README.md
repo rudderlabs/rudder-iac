@@ -59,6 +59,56 @@ Fields such as `id`, `createdAt`, and `updatedAt` change on every run. The compa
 4. Copy the JSON into `expected/state/` and `expected/upstream/`, following the URN-based filename convention.
 5. Commit the snapshots and run `make test-e2e`.
 
+## Demos
+
+Every test in this suite can be turned into a narrated, reproducible terminal
+demo from a real run. Nothing is hand-written and nothing is simulated: the
+demo replays the commands the test actually executed.
+
+```bash
+make demo DEMO_TEST=TestAccountsApply DEMO_PROFILE=mini   # record + generate
+make demo-cast DEMO_TEST=TestAccountsApply                # record a .cast
+make demo-check DEMO_TEST=TestAccountsApply                # fail if it drifted
+```
+
+The result is `demos/<Test>/` — a `demo.sh` you can run by hand, the spec
+fixtures it needs, and a `manifest.json` naming the branch, commit and backend
+it was recorded against.
+
+**Narration.** Step prose is derived from subtest names, so every test is
+demoable with no work. Where the *reason* matters and a subtest name cannot
+carry it, add one line in the test:
+
+```go
+demo.Say(t, "The API never returns write-only secrets, so the CLI re-sends them every time.")
+```
+
+It writes into the demo journal and is inert when no demo is being recorded. A
+demo with no narration writes an `ANNOTATE.md` naming the steps that want it,
+and exits 3 when run non-interactively, so an agent is told to add the lines
+and open a PR rather than leaving the gap unnoticed.
+
+`demo.Say` records carry no duration, so place the call where the demo journal
+can attribute it unambiguously — right after the command it explains, not as
+the literal first statement of a subtest. `go test -json` reports a subtest's
+`run` event asynchronously, a fraction of a millisecond behind the subtest
+body starting; a zero-duration record placed before any command in that
+subtest can lose that race and get attributed to whatever ran immediately
+before it. A multi-second CLI invocation gives the event stream all the
+margin it needs, so narration that follows the command it is about is placed
+after test2json has certainly caught up.
+
+**Verification.** A step whose last command writes rather than reads proves
+itself in Go, invisibly. Those steps are listed in `demos/GAPS.md`; each one
+wants a read-only CLI command that shows the result on screen. Where no such
+command exists, file it — a demo that has to leave the tool it demonstrates is
+a gap in the tool, not in the demo.
+
+**Backends.** A profile is an env file under `demos/profiles/`. The CLI already
+selects its backend from `RUDDERSTACK_API_URL` and `RUDDERSTACK_ACCESS_TOKEN`,
+so a demo runs against rudder-mini locally and a cloud backend in CI with no
+code change. The manifest records which.
+
 ---
 
 Happy testing! 🚀

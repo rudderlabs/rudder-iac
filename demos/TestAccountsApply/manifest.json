@@ -1,52 +1,52 @@
 {
   "test": "TestAccountsApply",
-  "recordedAt": "2026-09-20T15:42:26.91949Z",
+  "recordedAt": "2026-09-20T16:36:53.606733Z",
   "git": {
     "ref": "refs/heads/claude/e2e-demo-framework-cb81bd",
-    "sha": "9fde5930",
-    "describe": "v0.26.0-23-g9fde5930f",
-    "dirty": false
+    "sha": "17586458",
+    "describe": "v0.26.0-27-g17586458a",
+    "dirty": true
   },
   "backend": {
     "profile": "mini",
     "kind": "local",
     "apiURL": "http://localhost:15580"
   },
-  "cliVersion": "v0.26.0-23-g9fde5930f",
+  "cliVersion": "v0.26.0-27-g17586458a",
   "flags": [
     "RUDDERSTACK_API_URL=http://localhost:15580",
     "RUDDERSTACK_CLI_EXPERIMENTAL=true",
     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true"
   ],
-  "annotated": false,
-  "durationSeconds": 9.20239,
+  "annotated": true,
+  "durationSeconds": 8.15697,
   "steps": [
     {
       "test": "TestAccountsApply",
       "prose": "Accounts apply",
       "verification": "none",
-      "annotated": false,
+      "annotated": true,
       "thin": false
     },
     {
       "test": "TestAccountsApply/apply_create",
       "prose": "Apply create",
       "verification": "none",
-      "annotated": false,
+      "annotated": true,
       "thin": false
     },
     {
       "test": "TestAccountsApply/apply_update",
       "prose": "Apply update",
       "verification": "none",
-      "annotated": false,
+      "annotated": true,
       "thin": false
     },
     {
       "test": "TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged",
       "prose": "Re-apply leaves non-secret upstream state unchanged",
       "verification": "none",
-      "annotated": false,
+      "annotated": true,
       "thin": false
     }
   ]
