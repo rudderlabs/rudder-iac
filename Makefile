@@ -46,7 +46,7 @@ gen-rule-docs: ## Generate the validation rule documentation artifact
 
 .PHONY: test
 test: ## Run all unit tests (excluding e2e)
-	@go test --race --covermode=atomic --coverprofile=coverage-unit.out $(shell go list ./... | grep -v /cli/tests)
+	@go test --race --covermode=atomic --coverprofile=coverage-unit.out $(shell go list ./... | grep -v '/cli/tests$$')
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
