@@ -1,19 +1,19 @@
 # TestAccountsImportWorkspace
 
-Generated from a real run of `TestAccountsImportWorkspace`. Run it yourself:
+Generated from a real run of `TestAccountsImportWorkspace`.
 
-```bash
-./demo.sh
-```
+**Not runnable as recorded.** It references absolute paths from the machine
+it was recorded on; see "Not portable yet" below. Re-record it (`make demo`)
+to fix this.
 
 ## Provenance
 
 | | |
 |---|---|
-| recorded | 2026-09-20T16:49:53Z |
+| recorded | 2026-09-20T17:22:15Z |
 | ref | `refs/heads/claude/e2e-demo-framework-cb81bd` |
-| commit | `78ae842d` (working tree dirty) |
-| cli | `v0.26.0-28-g78ae842d5` |
+| commit | `05a72352` (working tree dirty) |
+| cli | `v0.26.0-30-g05a723526` |
 | backend | mini (local) — `http://localhost:15580` |
 | narration | derived from subtest names only |
 

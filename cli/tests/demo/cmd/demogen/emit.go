@@ -50,7 +50,10 @@ type Manifest struct {
 	Annotated       bool        `json:"annotated"`
 	DurationSeconds float64     `json:"durationSeconds"`
 	Steps           []StepInfo  `json:"steps"`
-	Gaps            []string    `json:"gaps,omitempty"`
+	// PortabilityGaps are absolute paths Rewriter.Argv could not make
+	// portable. Distinct from a GAPS.md gap (a missing read-only CLI
+	// command) — same word, different meaning, so it gets its own name here.
+	PortabilityGaps []string `json:"portabilityGaps,omitempty"`
 }
 
 // Emit writes a complete demo directory: the script, its fixtures, the
@@ -63,7 +66,7 @@ func Emit(dir string, steps []Step, rw Rewriter, m Manifest) error {
 	script, infos, gaps, fixtures := build(steps, rw, m)
 
 	m.Steps = infos
-	m.Gaps = gaps
+	m.PortabilityGaps = gaps
 	m.Annotated = anyAnnotated(infos)
 
 	if err := os.WriteFile(filepath.Join(dir, "demo.sh"), []byte(script), 0o755); err != nil {
@@ -99,11 +102,19 @@ func build(steps []Step, rw Rewriter, m Manifest) (script string, infos []StepIn
 	b.WriteString(`. "$DEMO_MAGIC"` + "\n")
 	b.WriteString("TYPE_SPEED=90\nNO_WAIT=true\n")
 	b.WriteString(`DEMO_PROMPT="${GREEN}➜ ${CYAN}` + m.Test + ` ${COLOR_RESET}\$ "` + "\n")
-	b.WriteString(`[ -f ./profile.env ] && . ./profile.env` + "\n")
 
+	// Flags are emitted before profile.env is sourced, and conditionally, so
+	// profile.env — whatever it contains, however it's written — always has
+	// the last word on the values that matter to it. Placing this after the
+	// source (as a plain `export`, the previous behaviour) would silently
+	// override whatever backend a profile selected; see IMPORTANT 2 in the
+	// review this fixes.
 	for _, f := range m.Flags {
-		b.WriteString("export " + f + "\n")
+		b.WriteString(flagAssignment(f) + "\n")
 	}
+
+	b.WriteString(`[ -f ./profile.env ] && . ./profile.env` + "\n")
+	b.WriteString(productionGuard())
 
 	b.WriteString("\nclear\n")
 
@@ -169,10 +180,71 @@ func sayLine(s string) string {
 	return "p " + quote(s) + "\n"
 }
 
+// prodAPIHost mirrors api/client/client.go's BASE_URL — the host the CLI
+// silently falls back to (with whatever real token ~/.rudder/config.json
+// holds) whenever RUDDERSTACK_API_URL is unset. It is also what the Makefile's
+// demo-record guard and scripts/demo-cast.sh already refuse against (R17);
+// this is the third place that needs to, since a generated demo.sh is the
+// one a human is actually told to run.
+const prodAPIHost = "api.rudderstack.com"
+
+// productionGuard refuses to run the rest of the script when
+// RUDDERSTACK_API_URL is unset or points at production. It must be emitted
+// after both the flags block and the profile.env source, so it sees the
+// value the run will actually use, not a value about to be overridden.
+//
+// This is not redundant with the Makefile/demo-cast guards: recording with
+// credentials taken from ~/.rudder/config.json — the method
+// demos/profiles/mini.env itself blesses — never puts RUDDERSTACK_API_URL
+// into os.Environ(), so flagsOf captures nothing for it and no flag line
+// above sets it. Without this, a demo.sh recorded that way opens with
+// `destroy --confirm=false` against production using a real token.
+func productionGuard() string {
+	return `
+if [ -z "${RUDDERSTACK_API_URL:-}" ]; then
+  echo "refusing: RUDDERSTACK_API_URL is unset, so this script would target ` + prodAPIHost + `." >&2
+  echo "  The first command below is 'destroy --confirm=false' — it wipes the target workspace." >&2
+  echo "  Source a profile first, e.g.: . ./profile.env" >&2
+  exit 1
+fi
+case "$RUDDERSTACK_API_URL" in
+*` + prodAPIHost + `*)
+  echo "refusing: RUDDERSTACK_API_URL points at production, and this script wipes its workspace." >&2
+  echo "  The first command below is 'destroy --confirm=false'." >&2
+  exit 1
+  ;;
+esac
+`
+}
+
+// flagAssignment turns one recorded "KEY=VALUE" flag into a conditional
+// shell assignment — `: "${KEY:=VALUE}"` only takes effect when KEY is not
+// already set. Emitted before profile.env is sourced, this makes the flag a
+// default a profile (or the invoking shell) can always override, rather than
+// a value that clobbers whatever they chose.
+//
+// The value is escaped for the double-quoted context it sits in, the same
+// character set quote() escapes for the same reason (R15): unescaped, a
+// value carrying $(…) would execute at script load, before any command runs
+// and before demo-magic's eval-based playback is even reached.
+func flagAssignment(f string) string {
+	key, value, _ := strings.Cut(f, "=")
+
+	return `: "${` + key + `:=` + doubleQuoteEscape(value) + `}"`
+}
+
+// doubleQuoteEscape escapes a string for embedding inside a double-quoted
+// shell context, without adding the surrounding quotes itself — the inverse
+// of what quote() returns, needed here because flagAssignment nests the
+// value inside "${KEY:=...}" rather than emitting a standalone quoted word.
+func doubleQuoteEscape(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`").Replace(s)
+}
+
 // quote wraps a line for the shell. demo-magic takes a single argument, and the
 // recorded commands contain flags and JSON filters that must not be re-split.
 func quote(s string) string {
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`").Replace(s) + `"`
+	return `"` + doubleQuoteEscape(s) + `"`
 }
 
 // shellSafe is the set of characters a token may carry and still be left
@@ -235,8 +307,12 @@ func copyFixtures(dir, repoRoot string, fixtures []string) error {
 		)
 
 		if _, err := os.Stat(src); err != nil {
-			// A fixture the recording referenced but this checkout lacks is a
-			// portability gap, not a reason to abandon the demo.
+			// A fixture the recording referenced but this checkout lacks is
+			// skipped rather than abandoning the demo — it is not recorded
+			// as a portability gap (it never reaches m.PortabilityGaps or the
+			// README), so a demo missing part of its fixture set here still
+			// reports as fully portable. That's a known blind spot, not
+			// silent-by-design: revisit if it ever bites.
 			continue
 		}
 
@@ -401,8 +477,22 @@ func readme(m Manifest) string {
 	var b strings.Builder
 
 	b.WriteString("# " + m.Test + "\n\n")
-	b.WriteString("Generated from a real run of `" + m.Test + "`. Run it yourself:\n\n")
-	b.WriteString("```bash\n./demo.sh\n```\n\n")
+	b.WriteString("Generated from a real run of `" + m.Test + "`.\n\n")
+
+	if len(m.PortabilityGaps) > 0 {
+		// -temp-root has no caller (neither the Makefile nor demo-check.sh
+		// passes it), so a step that ran under t.TempDir() leaves an absolute
+		// path here that exists only on the machine that recorded it. Saying
+		// "run it yourself" over that path would be a lie — README must not
+		// invite a run this script cannot actually make.
+		b.WriteString("**Not runnable as recorded.** It references absolute paths from the machine\n")
+		b.WriteString("it was recorded on; see \"Not portable yet\" below. Re-record it (`make demo`)\n")
+		b.WriteString("to fix this.\n\n")
+	} else {
+		b.WriteString("Run it yourself:\n\n")
+		b.WriteString("```bash\n./demo.sh\n```\n\n")
+	}
+
 	b.WriteString("## Provenance\n\n")
 	b.WriteString("| | |\n|---|---|\n")
 	b.WriteString("| recorded | " + m.RecordedAt.Format(time.RFC3339) + " |\n")
@@ -427,9 +517,9 @@ func readme(m Manifest) string {
 	}
 	b.WriteString(" |\n")
 
-	if len(m.Gaps) > 0 {
+	if len(m.PortabilityGaps) > 0 {
 		b.WriteString("\n## Not portable yet\n\nThese absolute paths could not be rewritten:\n\n")
-		for _, g := range m.Gaps {
+		for _, g := range m.PortabilityGaps {
 			b.WriteString("- `" + g + "`\n")
 		}
 	}

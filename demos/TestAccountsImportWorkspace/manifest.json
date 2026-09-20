@@ -1,10 +1,10 @@
 {
   "test": "TestAccountsImportWorkspace",
-  "recordedAt": "2026-09-20T16:49:53.250673Z",
+  "recordedAt": "2026-09-20T17:22:15.818271Z",
   "git": {
     "ref": "refs/heads/claude/e2e-demo-framework-cb81bd",
-    "sha": "78ae842d",
-    "describe": "v0.26.0-28-g78ae842d5",
+    "sha": "05a72352",
+    "describe": "v0.26.0-30-g05a723526",
     "dirty": true
   },
   "backend": {
@@ -12,7 +12,7 @@
     "kind": "local",
     "apiURL": "http://localhost:15580"
   },
-  "cliVersion": "v0.26.0-28-g78ae842d5",
+  "cliVersion": "v0.26.0-30-g05a723526",
   "flags": [
     "RUDDERSTACK_API_URL=http://localhost:15580",
     "RUDDERSTACK_CLI_EXPERIMENTAL=true",
@@ -29,7 +29,7 @@
       "thin": false
     }
   ],
-  "gaps": [
+  "portabilityGaps": [
     "/var/folders/sn/1hbr6wkd37v51zh7zcv920vr0000gn/T/TestAccountsImportWorkspace1735749527/001",
     "/var/folders/sn/1hbr6wkd37v51zh7zcv920vr0000gn/T/TestAccountsImportWorkspace1735749527/001/imported/secrets.vars.yaml"
   ]

@@ -39,6 +39,16 @@ make demo-check       replay demo.sh     ──► diff its journal against the 
 
 Four passes, each a file in and a file out. Any one can be run alone.
 
+> **Superseded (R21).** `make demo-check` does not replay `demo.sh` — the
+> shipped `rudder-cli` has no hook to journal against, so a replay would
+> produce an empty journal with nothing to diff. It instead re-runs `demogen`
+> over the same committed `journal.jsonl` + `events.json` and diffs the
+> regenerated `demos/<Test>/` against what's committed. This is deterministic
+> and needs no backend, which is what let it become a per-PR check
+> (`make demo-test`) instead of the on-demand/nightly job "### Pass 4" below
+> still describes. See `scripts/demo-check.sh`'s own header for the full
+> rationale.
+
 ## Diagrams
 
 ### Components
@@ -100,6 +110,13 @@ The generator never imports the test suite and the suite never imports the
 generator. They share one type — `demo.Record` — and meet only as JSONL on
 disk. That is what lets a demo be generated long after the run that produced
 it, on a different machine, by a different tool.
+
+> **Superseded (R21).** The diagram's `DRIFT` node ("diff.go") and its
+> "replay with journaling on" edge describe a design that was never built.
+> There is no `diff.go` and nothing replays `demo.sh`. The drift check is
+> `demogen` itself, run a second time over the same committed
+> `journal.jsonl` + `events.json`, with its output diffed against what's
+> committed — see the note under "What this builds" above.
 
 ### Recording a run, end to end
 
@@ -181,6 +198,18 @@ demo with a compiler invocation.
 A `pause` event anywhere in this package means a subtest went parallel and the
 question stops having one answer. The generator refuses the run instead of
 producing a demo whose steps are silently shuffled.
+
+> **Superseded (R19).** "The deepest span covering it" (and the gantt diagram
+> above) assumed `run` events are on the wire by the instant a subtest's
+> first command starts. Measured against a real run, `test2json` flushes
+> `run` asynchronously — roughly half a subtest's own first command starts
+> *before* its `run` event exists on the stream — so depth-based attribution
+> silently misattributes those to the previous, still-open subtest. The
+> actual rule (`Join` in `cli/tests/demo/cmd/demogen/join.go`) is: a record's
+> owner is the *nearest* `run` event to the record's start, among `run`
+> events eligible by causality (at or before the record's own End) — not the
+> deepest span active at that instant. See that file's doc comment for the
+> full reasoning and the measured numbers.
 
 ### The annotation loop
 
@@ -361,7 +390,8 @@ line to add `demo.Say` to. It never prompts during recording, which would ruin
 the cast.
 
 When run non-interactively — no TTY, or `RUDDER_DEMO_AGENT=1` — it instead
-writes `ANNOTATE.md`: the derived steps, the `file:line` of each, and an
+writes `ANNOTATE.md`: the derived steps (by subtest name and derived prose,
+not `file:line` — the journal carries no source position) and an
 instruction to add `demo.Say` calls and open a PR. It exits `3`, distinct from
 a failure, so an agent harness notices without treating it as a broken demo.
 Detection is `[ -t 1 ]` plus that explicit override; nothing cleverer.
@@ -413,6 +443,15 @@ profile registry, no config schema, no new flag.
 
 ### Pass 4 — the drift check
 
+> **Superseded (R21).** This section describes a replay-and-diff-the-journal
+> design that was never built — there is no hook in the shipped `rudder-cli`
+> to journal against, so a replay's journal would be empty. What ships
+> instead: `demo-check` runs `demogen` a second time over the same committed
+> `journal.jsonl` + `events.json` and diffs the regenerated demo directory
+> against what's committed (see `scripts/demo-check.sh`). Because this needs
+> no live backend, it runs on every PR via `make demo-test`, not only on
+> demand and nightly as this section still says below.
+
 `make demo-check` re-runs the generated `demo.sh` with `RUDDER_DEMO_JOURNAL`
 set and diffs its argv sequence against the test's journal, modulo the
 rewritten paths. A mismatch means the generator or the script has drifted from
@@ -431,8 +470,9 @@ screen, so each section is classified:
 - The section ends in a read-only CLI command — `list`, `validate`,
   `--dry-run`, `--json`, `preview` — and counts as visibly verified.
 - It does not, and the demo prints
-  `# (verified in Go, not visible here — see command_apply_test.go:88)` and the
-  manifest records `verification: "none"`.
+  `# (verified in Go, not visible here — see TestProjectApply/apply_create)` —
+  the subtest name, not a `file:line` (the journal carries no source
+  position) — and the manifest records `verification: "none"`.
 
 Where no CLI command exists to read a thing back, the manifest records a gap
 and the generator collects these into `demos/GAPS.md`. That file is the input

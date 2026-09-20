@@ -86,7 +86,54 @@ func TestEmitScriptExportsRecordedFlags(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dir, "demo.sh"))
 	require.NoError(t, err)
 
-	assert.Contains(t, string(data), "export RUDDERSTACK_X_RETL_TABLE_SUPPORT=true")
+	script := string(data)
+	assert.Contains(t, script, `: "${RUDDERSTACK_X_RETL_TABLE_SUPPORT:=true}"`,
+		"a flag is a conditional default, not an unconditional export, so profile.env can still override it")
+	assert.Less(t,
+		strings.Index(script, `RUDDERSTACK_X_RETL_TABLE_SUPPORT`),
+		strings.Index(script, `[ -f ./profile.env ]`),
+		"flags must be assigned before profile.env is sourced, so the profile — however it's written — has the last word")
+}
+
+// The production guard must see the values the run will actually use, which
+// means it has to run after both the flags block and the profile.env source
+// — sourcing after the guard would let profile.env change RUDDERSTACK_API_URL
+// without the guard ever re-checking it.
+func TestEmitScriptGuardRunsAfterFlagsAndProfileSource(t *testing.T) {
+	dir, _ := emitFixture(t)
+
+	data, err := os.ReadFile(filepath.Join(dir, "demo.sh"))
+	require.NoError(t, err)
+
+	script := string(data)
+	profileIdx := strings.Index(script, `[ -f ./profile.env ]`)
+	guardIdx := strings.Index(script, `RUDDERSTACK_API_URL is unset`)
+	require.NotEqual(t, -1, profileIdx)
+	require.NotEqual(t, -1, guardIdx)
+	assert.Greater(t, guardIdx, profileIdx, "the guard must be emitted after profile.env is sourced")
+}
+
+// IMPORTANT 1: the generated script has no caller-supplied backend guard of
+// its own otherwise — it is the one a human is told to run directly, unlike
+// demo-record and demo-cast, which carry the refusal in the Makefile/shell
+// wrapper instead (R17). This must refuse before anything else so it is safe
+// even when recorded via ~/.rudder/config.json, where RUDDERSTACK_API_URL
+// never entered os.Environ() and so never became a flag line at all.
+func TestEmitScriptRefusesUnsetAndProductionAPIURL(t *testing.T) {
+	dir, _ := emitFixture(t)
+
+	data, err := os.ReadFile(filepath.Join(dir, "demo.sh"))
+	require.NoError(t, err)
+
+	script := string(data)
+	assert.Contains(t, script, `if [ -z "${RUDDERSTACK_API_URL:-}" ]; then`,
+		"must refuse when the URL is unset, not just report it")
+	assert.Contains(t, script, "so this script would target api.rudderstack.com",
+		"the message must name the production host, not just say 'unset'")
+	assert.Contains(t, script, "destroy --confirm=false",
+		"the refusal must name the risk: this script begins by destroying the target workspace")
+	assert.Contains(t, script, `*api.rudderstack.com*)`,
+		"must also refuse when the URL explicitly points at production")
 }
 
 func TestEmitWritesManifest(t *testing.T) {
@@ -234,6 +281,45 @@ func TestWriteGapsRemovesStaleFileOnceStepsBecomeVisible(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "a demo that no longer has invisible steps must stop being listed")
 }
 
+// IMPORTANT 2: flagAssignment's value sits inside "${KEY:=...}", a different
+// embedding than quote()'s own outer-quoted line, so this needs its own
+// end-to-end proof rather than trusting shellQuote's existing coverage.
+func TestFlagAssignmentHostileValueCannotExecute(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "pwned")
+	hostile := "$(touch " + marker + ")"
+
+	steps := []Step{{
+		Test: "TestX/step",
+		Records: []demo.Record{
+			{Kind: demo.KindExec, Start: at(1), End: at(2), Argv: []string{"rudder-cli", "validate", "-l", "project"}},
+		},
+	}}
+	m := Manifest{Test: "TestX", Flags: []string{"RUDDERSTACK_X_HOSTILE=" + hostile}}
+
+	require.NoError(t, Emit(dir, steps, Rewriter{RepoRoot: t.TempDir()}, m))
+
+	data, err := os.ReadFile(filepath.Join(dir, "demo.sh"))
+	require.NoError(t, err)
+
+	var flagLine string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, `: "${RUDDERSTACK_X_HOSTILE`) {
+			flagLine = line
+			break
+		}
+	}
+	require.NotEmpty(t, flagLine, "generated demo.sh has no flag assignment line for RUDDERSTACK_X_HOSTILE")
+
+	out, err := exec.Command("bash", "-c", "set -u\n"+flagLine+"\nprintf '%s' \"$RUDDERSTACK_X_HOSTILE\"").CombinedOutput()
+	require.NoError(t, err)
+
+	assert.Equal(t, hostile, string(out), "the recorded value must survive verbatim in the variable, not execute")
+
+	_, statErr := os.Stat(marker)
+	assert.True(t, os.IsNotExist(statErr), "a hostile flag value must not execute when the emitted line runs")
+}
+
 func TestEmitWritesReadme(t *testing.T) {
 	dir, _ := emitFixture(t)
 
@@ -244,6 +330,45 @@ func TestEmitWritesReadme(t *testing.T) {
 	assert.Contains(t, body, "./demo.sh", "a reader must be told how to run it")
 	assert.Contains(t, body, "http://localhost:15580", "and which backend it was recorded against")
 	assert.Contains(t, body, "1a2b3c4d")
+}
+
+// IMPORTANT 3: -temp-root has no caller, so a step that ran under
+// t.TempDir() leaves an absolute path in the manifest's portability gaps
+// that no longer exists anywhere. README must say so and must not invite a
+// run that cannot work — the bug this pins is demos/TestAccountsImportWorkspace,
+// which shipped "Run it yourself: ./demo.sh" over exactly such a path.
+func TestEmitReadmeRefusesToInviteARunWhenPathsAreUnportable(t *testing.T) {
+	dir := t.TempDir()
+	repoRoot := t.TempDir()
+	steps := []Step{{
+		Test: "TestX/step",
+		Records: []demo.Record{
+			{Kind: demo.KindExec, Start: at(1), End: at(2), Argv: []string{"rudder-cli", "apply", "-l", "/tmp/TestX123/migrated/create"}},
+		},
+	}}
+
+	require.NoError(t, Emit(dir, steps, Rewriter{RepoRoot: repoRoot}, Manifest{Test: "TestX"}))
+
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	require.NoError(t, err)
+
+	body := string(data)
+	assert.Contains(t, body, "Not runnable as recorded", "a demo with unrewritten paths must say so plainly")
+	assert.Contains(t, body, "/tmp/TestX123/migrated/create", "the offending path must be named")
+	assert.NotContains(t, body, "Run it yourself", "must not invite a run that cannot work")
+}
+
+// The other branch: a demo with no portability gaps must keep the existing
+// invitation, so the fix above doesn't quietly become "never say run it".
+func TestEmitReadmeKeepsRunInvitationWhenFullyPortable(t *testing.T) {
+	dir, _ := emitFixture(t)
+
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	require.NoError(t, err)
+
+	body := string(data)
+	assert.Contains(t, body, "Run it yourself", "a portable demo must still invite a run")
+	assert.NotContains(t, body, "Not runnable as recorded")
 }
 
 // The emitFixture narration text ("And the state the apply produced:") is

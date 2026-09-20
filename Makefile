@@ -110,11 +110,10 @@ demo-record: ## Run one e2e test with journaling on (TEST=..., PROFILE=mini|clou
 .PHONY: demo-generate
 demo-generate: ## Generate demos/<Test>/ from the last demo-record
 	@set -a; . ./demos/profiles/$(DEMO_PROFILE).env; set +a; \
-	bin="$$(grep -o '"argv":\["[^"]*"' $(DEMO_JOURNAL) | sed -E 's/.*\["//;s/"$$//' | grep -E '/rudder-cli(\.exe)?$$' | head -1)"; \
-	if [ -z "$$bin" ]; then \
+	bin="$$(./scripts/demo-find-binary.sh $(DEMO_JOURNAL))" || { \
 		echo "refusing: no rudder-cli invocation found in $(DEMO_JOURNAL) to discover the CLI binary from"; \
 		exit 1; \
-	fi; \
+	}; \
 	$(GO) run ./cli/tests/demo/cmd/demogen \
 		-journal $(DEMO_JOURNAL) \
 		-events $(DEMO_EVENTS) \
@@ -137,6 +136,21 @@ CASTS_OUT ?= casts
 .PHONY: demo-cast
 demo-cast: ## Record demos/<TEST>/demo.sh to casts/<TEST>.cast with provenance (TEST=...)
 	@./scripts/demo-cast.sh $(DEMO_TEST) $(CASTS_OUT)
+
+# Runs demo-check for every committed demo, not a hardcoded list, so a demo
+# added later is covered automatically. Needs no backend: demo_cast_test.py
+# exercises scripts/demo_cast.py's own PTY recorder against a throwaway
+# shell script, and demo-check only reads what's already on disk (see its
+# own header) — safe to run on every PR.
+.PHONY: demo-test
+demo-test: ## Run the demo framework's own tests: demo_cast_test.py + demo-check for every committed demo
+	python3 scripts/demo_cast_test.py
+	@for dir in demos/*/; do \
+		test="$$(basename "$$dir")"; \
+		[ "$$test" = "profiles" ] && continue; \
+		echo "== demo-check: $$test =="; \
+		$(MAKE) demo-check DEMO_TEST="$$test" DEMO_PROFILE=$(DEMO_PROFILE) || exit 1; \
+	done
 
 .PHONY: typer-kotlin-validate
 typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project

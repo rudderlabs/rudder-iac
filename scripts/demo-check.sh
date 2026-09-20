@@ -37,16 +37,25 @@ DEMO_PROFILE="${DEMO_PROFILE:-mini}"
 # t.TempDir the original test run built into). Rediscover it the same way
 # `make demo-generate` does — there is nothing to build here to get a fresh
 # one from.
-BIN="$(grep -o '"argv":\["[^"]*"' "$JOURNAL" | sed -E 's/.*\["//;s/"$//' | grep -E '/rudder-cli(\.exe)?$' | head -1)"
-if [ -z "$BIN" ]; then
+BIN="$(./scripts/demo-find-binary.sh "$JOURNAL")" || {
 	echo "refusing: no rudder-cli invocation found in $JOURNAL to discover the CLI binary path from" >&2
 	exit 1
-fi
+}
 
 set -a
 # shellcheck disable=SC1090
 . "demos/profiles/$DEMO_PROFILE.env"
 set +a
+
+# cloud.env deliberately never sets RUDDERSTACK_API_URL — it expects the
+# caller to already have it exported — so under `set -u` reading it below
+# would abort with an opaque "unbound variable" instead of a message naming
+# the actual problem.
+if [ -z "${RUDDERSTACK_API_URL:-}" ]; then
+	echo "refusing: RUDDERSTACK_API_URL is unset after sourcing demos/profiles/$DEMO_PROFILE.env" >&2
+	echo "  The $DEMO_PROFILE profile expects it to already be exported — set it before running demo-check." >&2
+	exit 1
+fi
 
 TMP_OUT="$(mktemp -d -t demo-check-XXXXXX)"
 trap 'rm -rf "$TMP_OUT"' EXIT
@@ -88,7 +97,7 @@ if ! diff -ru \
 fi
 
 # manifest.json as a whole carries recordedAt/git/cliVersion (see header), so
-# compare only its steps and gaps — stdlib json, no new dependency.
+# compare only its steps and portabilityGaps — stdlib json, no new dependency.
 if ! python3 - "$DEMO_DIR/manifest.json" "$GOT_DIR/manifest.json" <<'PY'
 import json
 import subprocess
@@ -99,7 +108,7 @@ import tempfile
 def steps_and_gaps(path):
     with open(path) as f:
         m = json.load(f)
-    return {"steps": m.get("steps", []), "gaps": m.get("gaps", [])}
+    return {"steps": m.get("steps", []), "portabilityGaps": m.get("portabilityGaps", [])}
 
 
 want_path, got_path = sys.argv[1], sys.argv[2]
@@ -109,7 +118,7 @@ got = steps_and_gaps(got_path)
 if want == got:
     sys.exit(0)
 
-print("manifest.json's steps/gaps have drifted from what the journal produces:")
+print("manifest.json's steps/portabilityGaps have drifted from what the journal produces:")
 sys.stdout.flush()
 
 with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as wf, \
@@ -121,8 +130,8 @@ with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as wf, \
 
 subprocess.run([
     "diff", "-u",
-    "--label", "committed manifest.json (steps/gaps)", wf.name,
-    "--label", "regenerated manifest.json (steps/gaps)", gf.name,
+    "--label", "committed manifest.json (steps/portabilityGaps)", wf.name,
+    "--label", "regenerated manifest.json (steps/portabilityGaps)", gf.name,
 ])
 print()
 sys.exit(1)

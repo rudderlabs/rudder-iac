@@ -8,10 +8,24 @@ cd "$(dirname "$0")" || exit 1
 TYPE_SPEED=90
 NO_WAIT=true
 DEMO_PROMPT="${GREEN}➜ ${CYAN}TestAccountsImportWorkspace ${COLOR_RESET}\$ "
+: "${RUDDERSTACK_API_URL:=http://localhost:15580}"
+: "${RUDDERSTACK_CLI_EXPERIMENTAL:=true}"
+: "${RUDDERSTACK_X_UNVERIFIED_DESTINATIONS:=true}"
 [ -f ./profile.env ] && . ./profile.env
-export RUDDERSTACK_API_URL=http://localhost:15580
-export RUDDERSTACK_CLI_EXPERIMENTAL=true
-export RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true
+
+if [ -z "${RUDDERSTACK_API_URL:-}" ]; then
+  echo "refusing: RUDDERSTACK_API_URL is unset, so this script would target api.rudderstack.com." >&2
+  echo "  The first command below is 'destroy --confirm=false' — it wipes the target workspace." >&2
+  echo "  Source a profile first, e.g.: . ./profile.env" >&2
+  exit 1
+fi
+case "$RUDDERSTACK_API_URL" in
+*api.rudderstack.com*)
+  echo "refusing: RUDDERSTACK_API_URL points at production, and this script wipes its workspace." >&2
+  echo "  The first command below is 'destroy --confirm=false'." >&2
+  exit 1
+  ;;
+esac
 
 clear
 

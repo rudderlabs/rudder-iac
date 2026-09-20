@@ -18,6 +18,9 @@ func TestDeriveProse(t *testing.T) {
 		{"terse subtest", "TestAccountsApply/apply_create", "Apply create"},
 		{"top-level test name", "TestConnectionsApply", "Connections apply"},
 		{"already a sentence", "TestDestinationsApply/re-apply_churns_only_the_write-only_secret", "Re-apply churns only the write-only secret"},
+		// joined[:1] would slice by byte and mangle a multi-byte leading rune
+		// (é is two UTF-8 bytes); DecodeRuneInString must be used instead.
+		{"multi-byte leading rune", "TestX/école_ouverte", "École ouverte"},
 	}
 
 	for _, tc := range cases {

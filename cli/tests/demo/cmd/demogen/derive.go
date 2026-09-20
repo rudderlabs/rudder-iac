@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 )
@@ -67,7 +68,11 @@ func DeriveProse(testName string) string {
 
 	joined := strings.Join(kept, " ")
 
-	return strings.ToUpper(joined[:1]) + joined[1:]
+	// joined[:1] would slice by byte, truncating a multi-byte leading rune
+	// mid-codepoint — decode the first rune explicitly instead.
+	r, size := utf8.DecodeRuneInString(joined)
+
+	return strings.ToUpper(string(r)) + joined[size:]
 }
 
 func hasInnerUpper(s string) bool {
