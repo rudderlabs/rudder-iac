@@ -137,6 +137,24 @@ func TestAppendRedactsRegisteredLiteralsFromOutput(t *testing.T) {
 	assert.Equal(t, "accessKeyId=<redacted> apiKey=<redacted> ok", recs[0].Output)
 }
 
+func TestAppendRedactsRegisteredLiteralsFromArgvAndDir(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.jsonl")
+	t.Setenv(EnvJournal, path)
+	reset()
+
+	RedactLiterals("not-a-real-token")
+	Append(Record{
+		Kind: KindExec,
+		Dir:  "/work/not-a-real-token",
+		Argv: []string{"rudder-cli", "apply", "--token", "not-a-real-token"},
+	})
+
+	recs := readRecords(t, path)
+	require.Len(t, recs, 1)
+	assert.Equal(t, []string{"rudder-cli", "apply", "--token", "<redacted>"}, recs[0].Argv)
+	assert.Equal(t, "/work/<redacted>", recs[0].Dir)
+}
+
 func TestAppendCapsOutput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "journal.jsonl")
 	t.Setenv(EnvJournal, path)

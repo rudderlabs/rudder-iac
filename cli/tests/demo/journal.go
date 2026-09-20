@@ -90,6 +90,17 @@ func RedactLiterals(values ...string) {
 // Append writes one record. It is a no-op when recording is off, and it never
 // fails a test: a demo is worth less than the run it observes, so a journal
 // that cannot be written is dropped silently rather than breaking the suite.
+//
+// The Enabled check below is a fast path, not the only thing standing between
+// a disabled run and a write: "disabled" is defined as EnvJournal being unset,
+// and os.OpenFile("") in writer fails too, so removing this guard would still
+// leave Append a no-op today — it would just cost a wasted getenv-and-open on
+// every call, and (if a handle from a previous enabled run were still cached)
+// close and reopen it in append mode, which reproduces the same bytes on
+// disk. It only becomes load-bearing for correctness, not just for cost, if
+// Enabled() ever treats some non-empty EnvJournal value as "disabled" while
+// that value is still a path os.OpenFile can open — at that point this needs
+// its own test.
 func Append(r Record) {
 	if !Enabled() {
 		return
@@ -104,6 +115,8 @@ func Append(r Record) {
 	}
 
 	r.Env = redactEnv(r.Env)
+	r.Dir = redactLiteralsIn(r.Dir)
+	r.Argv = redactLiteralsInArgv(r.Argv)
 	r.Output = capOutput(redactLiteralsIn(r.Output))
 	r.Text = redactLiteralsIn(r.Text)
 
@@ -192,6 +205,23 @@ func redactLiteralsIn(s string) string {
 	}
 
 	return s
+}
+
+// redactLiteralsInArgv returns a new slice with fixture credentials masked in
+// each element. Record is passed by value, but its Argv slice header still
+// points at the caller's backing array (often a live command.Args) — scrubbing
+// in place would mutate that array out from under the caller. Callers hold mu.
+func redactLiteralsInArgv(argv []string) []string {
+	if argv == nil {
+		return nil
+	}
+
+	out := make([]string, len(argv))
+	for i, a := range argv {
+		out[i] = redactLiteralsIn(a)
+	}
+
+	return out
 }
 
 func capOutput(s string) string {
