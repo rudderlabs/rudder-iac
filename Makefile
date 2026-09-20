@@ -128,6 +128,10 @@ demo-generate: ## Generate demos/<Test>/ from the last demo-record
 .PHONY: demo
 demo: demo-record demo-generate ## Record and generate one demo end to end
 
+.PHONY: demo-check
+demo-check: ## Regenerate demos/<TEST>/ from its committed journal and fail on drift (TEST=...)
+	@DEMO_PROFILE=$(DEMO_PROFILE) ./scripts/demo-check.sh $(DEMO_TEST)
+
 CASTS_OUT ?= casts
 
 .PHONY: demo-cast

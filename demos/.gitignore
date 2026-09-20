@@ -1,5 +1,0 @@
-# Recording intermediates. The generated demo directories are committed; the
-# raw journal and event stream that produced them are not — they are large,
-# machine-specific, and fully described by manifest.json.
-*.jsonl
-*.events.json
