@@ -39,6 +39,205 @@ make demo-check       replay demo.sh     ──► diff its journal against the 
 
 Four passes, each a file in and a file out. Any one can be run alone.
 
+## Diagrams
+
+### Components
+
+What exists, and which direction the dependencies point. The dashed edges are
+the ones that carry no code dependency at all — a file on disk is the only
+coupling between a test run and the thing that reads it.
+
+```mermaid
+graph TB
+  subgraph suite["package cli/tests — the e2e suite"]
+    TESTS["TestProjectApply<br/>TestAccountsApply<br/>TestDestinationsApply<br/>…3 more"]
+    EXEC["CmdExecutor.Execute<br/><b>single choke point</b>"]
+    TESTS -->|"every CLI invocation"| EXEC
+  end
+
+  subgraph demopkg["package cli/tests/demo"]
+    SAY["demo.Say<br/><i>narration, opt-in</i>"]
+    WRITER["journal writer<br/><i>gated on RUDDER_DEMO_JOURNAL</i>"]
+    SAY --> WRITER
+  end
+
+  subgraph demogen["cmd/demogen"]
+    EVENTS["events.go<br/>parse go test -json"]
+    JOIN["join.go<br/>attribute by time"]
+    DERIVE["derive.go<br/>prose + verification"]
+    REWRITE["rewrite.go<br/>portable paths"]
+    EMIT["emit.go<br/>script + manifest"]
+    EVENTS --> JOIN --> EMIT
+    DERIVE --> EMIT
+    REWRITE --> EMIT
+  end
+
+  CLI["rudder-cli binary"]
+  BACKEND[("backend<br/>mini · cloud · prod")]
+  JFILE[/"journal.jsonl"/]
+  EFILE[/"events.json"/]
+  DEMODIR[/"demos/{Test}/<br/>demo.sh · manifest.json<br/>project/ · README.md"/]
+  CAST[/"casts/{Test}.cast"/]
+
+  TESTS -.->|"demo.Say(t, …)"| SAY
+  EXEC --> CLI --> BACKEND
+  EXEC --> WRITER
+  WRITER ==> JFILE
+  JFILE -.-> JOIN
+  EFILE -.-> EVENTS
+  EMIT ==> DEMODIR
+  DEMODIR -->|"asciinema under a PTY"| CAST
+  DEMODIR -.->|"replay with journaling on"| DRIFT["diff.go<br/>drift check"]
+  JFILE -.-> DRIFT
+
+  classDef file fill:#fff8e1,stroke:#c79100,color:#000
+  classDef ext fill:#eceff1,stroke:#607d8b,color:#000
+  class JFILE,EFILE,DEMODIR,CAST file
+  class CLI,BACKEND ext
+```
+
+The generator never imports the test suite and the suite never imports the
+generator. They share one type — `demo.Record` — and meet only as JSONL on
+disk. That is what lets a demo be generated long after the run that produced
+it, on a different machine, by a different tool.
+
+### Recording a run, end to end
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Dev as make demo
+  participant GT as go test -json
+  participant TM as TestMain
+  participant ST as subtest
+  participant EX as Execute
+  participant W as journal writer
+  participant G as demogen
+
+  Dev->>GT: go test ./cli/tests -run '^TestX$'<br/>RUDDER_DEMO_JOURNAL=…
+  GT->>TM: build the CLI binary
+  TM-->>GT: /tmp/rudder-cli-bin-*/rudder-cli
+  Note over GT: this go build is journaled too,<br/>and Join drops it — it precedes<br/>the first "run" event
+
+  GT->>ST: === RUN TestX/apply_create
+  ST->>W: demo.Say(t, "why this matters")
+  W->>W: append {kind:"say"}
+  ST->>EX: Execute(bin, "apply", "-l", …)
+  EX->>EX: run, capture combined output
+  EX->>W: append {kind:"exec", argv, env, exit}
+  W->>W: redact secrets, cap output
+  EX-->>ST: output, err
+  ST->>ST: assert against snapshot (invisible)
+  GT->>ST: --- PASS TestX/apply_create
+
+  GT-->>Dev: events.json
+  W-->>Dev: journal.jsonl
+
+  Dev->>G: demogen -journal … -events …
+  G->>G: ParseEvents → refuse if a subtest paused
+  G->>G: Join: deepest test active at each record's start
+  G->>G: DeriveProse, Verification, Rewriter.Argv
+  G-->>Dev: demos/TestX/{demo.sh, manifest.json, project/, …}
+```
+
+Redaction happens at step 9, inside the writer — before the record reaches
+disk, never as a later scan. A value that was never written cannot leak from a
+committed artifact.
+
+### How a record finds its subtest
+
+The join is the one piece whose correctness is not obvious. Records carry
+timestamps; `go test -json` carries `run`/`pass` events. Because package
+`cli/tests` is serial, "which test was running" has exactly one answer at any
+instant — the most deeply nested span covering it.
+
+```mermaid
+gantt
+  dateFormat  X
+  axisFormat  %Ss
+  title       Spans from go test -json, records placed by start time
+
+  section TestProjectApply
+  span (parent)                 :active, p, 0, 10
+  section rudder_specs
+  span (child)                  :active, c, 1, 9
+  section should_create_entities
+  span (grandchild)             :active, g1, 2, 6
+  section should_update_entities
+  span (grandchild)             :active, g2, 7, 9
+  section journal records
+  apply -l create      (t=3)    :milestone, r1, 3, 0
+  apply -l create      (t=5)    :milestone, r2, 5, 0
+  apply -l update      (t=8)    :milestone, r3, 8, 0
+  go build             (t=0)    :milestone, r0, 0, 0
+```
+
+`t=3` and `t=5` fall inside three spans and go to the deepest,
+`should_create_entities`. `t=8` goes to `should_update_entities`. The `go build`
+at `t=0` is inside the parent only — but it precedes the first `run` event the
+generator saw, so it belongs to no step and is dropped rather than opening the
+demo with a compiler invocation.
+
+A `pause` event anywhere in this package means a subtest went parallel and the
+question stops having one answer. The generator refuses the run instead of
+producing a demo whose steps are silently shuffled.
+
+### The annotation loop
+
+A demo that lacks narration asks for it, and the way it asks depends on who is
+running it. This is the mechanism that turns thin derived demos into written
+ones over time, instead of leaving them thin forever.
+
+```mermaid
+stateDiagram-v2
+    state "Derived — prose from subtest names only" as Derived
+    state "Prints the file and line to edit, exit 0" as AsksHuman
+    state "Writes ANNOTATE.md, exit 3" as AsksAgent
+    state "Says nothing — a prompt would ruin the cast" as Silent
+    state "Someone adds demo.Say" as Annotating
+    state "Annotated — ANNOTATE.md removed, exit 0" as Annotated
+
+    [*] --> Derived: demogen emits a run carrying no demo.Say records
+
+    Derived --> AsksHuman: ./demo.sh with a TTY
+    Derived --> AsksAgent: no TTY, or RUDDER_DEMO_AGENT=1
+    Derived --> Silent: RUDDER_DEMO_RECORDING=1
+
+    Silent --> Derived: recording only, state unchanged
+    AsksHuman --> Derived: ignored for now
+    AsksAgent --> Derived: ignored for now
+
+    AsksHuman --> Annotating: developer writes the reason
+    AsksAgent --> Annotating: agent writes it and opens a PR
+
+    Annotating --> Annotated: re-record, regenerate
+    Annotated --> [*]
+```
+
+### Where verification goes when it cannot be seen
+
+```mermaid
+flowchart LR
+  S["a step's last<br/>CLI command"] --> Q{"read-only?<br/>list · validate · preview<br/>--json · --dry-run"}
+  Q -->|yes| V["verification: visible<br/><i>the proof is on screen</i>"]
+  Q -->|no| N["verification: none"]
+  N --> P["demo.sh prints<br/><i>verified in Go,<br/>not visible here</i>"]
+  N --> G[/"demos/GAPS.md"/]
+  G --> T["a ticket against the CLI<br/><small>DEX-919 · DEX-920 · DEX-921 · DEX-922</small>"]
+  T -->|"command ships"| S
+
+  classDef good fill:#e8f5e9,stroke:#2e7d32,color:#000
+  classDef bad fill:#fdecea,stroke:#b42318,color:#000
+  class V good
+  class N,P bad
+```
+
+The loop closes on itself deliberately. A step that cannot show its result is
+not a demo problem to be worked around — it is a missing read-only command, and
+`GAPS.md` is the standing list of them. DEX-921 states the rule this design
+adopts: *"A demo that has to leave the tool it is demonstrating is a gap in the
+tool."*
+
 ## Scope
 
 **In:** the six existing top-level e2e tests.
