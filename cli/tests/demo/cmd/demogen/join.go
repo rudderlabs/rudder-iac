@@ -46,6 +46,25 @@ type Step struct {
 // finished is indistinguishable, on the wire, from a record the subtest
 // itself emitted — there is no event marking that boundary. Such a record is
 // attributed to the subtest.
+//
+// This is R19's rule, and it applies to demo.KindExec records only. A
+// demo.KindSay record has Start == End — a single instant, no duration — so
+// R19's own nearest-run comparison has no margin to work with: test2json's
+// sub-millisecond lag on flushing a subtest's `run` event is exactly as
+// likely to land on either side of that instant. Measured on a real
+// TestAccountsApply run, a demo.Say placed as a subtest's first statement
+// (the natural place to put narration that introduces a step) landed on the
+// *previous* subtest's step three times out of four.
+//
+// Ruling R23: a say is bound to the command it introduces, not to its own
+// timestamp. A demo.KindSay record's owner is the owner of the next
+// demo.KindExec record in journal order — narration precedes and explains
+// the command it sits in front of, so that is what it means to "introduce"
+// a step. A trailing say with no following exec falls back to the owner of
+// the preceding exec (there is nothing left to introduce, so it is treated
+// as commentary on what just ran). A say with no exec on either side — the
+// whole recording has no commands at all — attaches to nothing and is
+// dropped, the same as any other record with no eligible owner.
 func Join(events []Event, records []demo.Record) ([]Step, error) {
 	var runs []Event
 	for _, e := range events {
@@ -54,11 +73,28 @@ func Join(events []Event, records []demo.Record) ([]Step, error) {
 		}
 	}
 
+	owners := make([]string, len(records))
+	for i, r := range records {
+		if r.Kind == demo.KindExec {
+			owners[i] = currentTest(runs, r.Start, r.End)
+		}
+	}
+
+	for i, r := range records {
+		if r.Kind != demo.KindSay {
+			continue
+		}
+		owners[i] = nextExecOwner(records, owners, i)
+		if owners[i] == "" {
+			owners[i] = prevExecOwner(records, owners, i)
+		}
+	}
+
 	byTest := map[string][]demo.Record{}
 	var order []string
 
-	for _, r := range records {
-		owner := currentTest(runs, r.Start, r.End)
+	for i, r := range records {
+		owner := owners[i]
 		if owner == "" {
 			continue
 		}
@@ -77,6 +113,30 @@ func Join(events []Event, records []demo.Record) ([]Step, error) {
 	}
 
 	return out, nil
+}
+
+// nextExecOwner returns the owner already computed for the nearest
+// demo.KindExec record after i in journal order, or "" if none follows.
+func nextExecOwner(records []demo.Record, owners []string, i int) string {
+	for j := i + 1; j < len(records); j++ {
+		if records[j].Kind == demo.KindExec {
+			return owners[j]
+		}
+	}
+
+	return ""
+}
+
+// prevExecOwner returns the owner already computed for the nearest
+// demo.KindExec record before i in journal order, or "" if none precedes.
+func prevExecOwner(records []demo.Record, owners []string, i int) string {
+	for j := i - 1; j >= 0; j-- {
+		if records[j].Kind == demo.KindExec {
+			return owners[j]
+		}
+	}
+
+	return ""
 }
 
 // currentTest returns the Test of whichever run event is nearest to start,

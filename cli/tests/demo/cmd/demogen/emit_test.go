@@ -148,34 +148,76 @@ func TestEmitOmitsAnnotateWhenEveryStepIsAnnotated(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "a fully annotated demo asks for nothing")
 }
 
-// Ruling R5: groupByTopLevel returns a map, so allSteps arrives in a
-// different, randomised order on every regeneration. writeGaps must sort by
-// test name itself so GAPS.md does not churn the diff for no reason.
-func TestWriteGapsSortsByTestNameRegardlessOfInputOrder(t *testing.T) {
+// writeManifestFixture drops a manifest.json at outDir/<test>/manifest.json,
+// standing in for what Emit would have written — writeGaps reads every such
+// file back off disk rather than taking steps as an argument (R24).
+func writeManifestFixture(t *testing.T, outDir, test string, steps []StepInfo) {
+	t.Helper()
+
+	dir := filepath.Join(outDir, test)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, writeJSON(filepath.Join(dir, "manifest.json"), Manifest{Test: test, Steps: steps}))
+}
+
+// Ruling R5: byTest is a map, so Go randomises its iteration order.
+// writeGaps must sort both the test groups and each group's own steps so
+// GAPS.md does not churn the diff for no reason.
+func TestWriteGapsGroupsByTestAndSortsRegardlessOfDiskOrder(t *testing.T) {
 	dir := t.TempDir()
-	steps := []StepInfo{
+	writeManifestFixture(t, dir, "TestB", []StepInfo{
 		{Test: "TestB/apply_create", Prose: "Apply create", Verification: "none"},
+	})
+	writeManifestFixture(t, dir, "TestA", []StepInfo{
 		{Test: "TestA/apply_create", Prose: "Apply create", Verification: "none"},
 		{Test: "TestA", Prose: "A", Verification: "visible"},
-	}
+	})
 
-	require.NoError(t, writeGaps(dir, steps))
+	require.NoError(t, writeGaps(dir))
 
 	data, err := os.ReadFile(filepath.Join(dir, "GAPS.md"))
 	require.NoError(t, err)
 
 	body := string(data)
-	assert.Contains(t, body, "- `TestA/apply_create` — Apply create\n- `TestB/apply_create` — Apply create",
-		"missing steps must be listed sorted by test name, not input order")
-	assert.NotContains(t, body, "TestA\"", "a step with visible verification is not a gap")
+	assert.Contains(t, body, "## TestA\n\n- `TestA/apply_create` — Apply create",
+		"gaps are grouped under the demo they belong to")
+	assert.Contains(t, body, "## TestB\n\n- `TestB/apply_create` — Apply create")
+	assert.Less(t, strings.Index(body, "## TestA"), strings.Index(body, "## TestB"),
+		"groups must be sorted by test name, not disk read order")
 	assert.NotContains(t, body, "- `TestA` —", "a step with visible verification is not a gap")
+}
+
+// This is the R24 regression: demogen processes one test per invocation, so
+// generating TestB's demo must not erase TestA's already-recorded gap — the
+// bug was exactly that GAPS.md reflected only whichever demo ran last.
+func TestWriteGapsUnionsAcrossInvocationsInsteadOfOverwriting(t *testing.T) {
+	dir := t.TempDir()
+
+	writeManifestFixture(t, dir, "TestA", []StepInfo{
+		{Test: "TestA/apply_create", Prose: "Apply create", Verification: "none"},
+	})
+	require.NoError(t, writeGaps(dir))
+
+	// A second, later demogen invocation writes only TestB's manifest — TestA's
+	// is untouched on disk, simulating `make demo DEMO_TEST=TestB` running
+	// after `make demo DEMO_TEST=TestA` already committed its manifest.
+	writeManifestFixture(t, dir, "TestB", []StepInfo{
+		{Test: "TestB/import_workspace", Prose: "Import workspace", Verification: "none"},
+	})
+	require.NoError(t, writeGaps(dir))
+
+	data, err := os.ReadFile(filepath.Join(dir, "GAPS.md"))
+	require.NoError(t, err)
+
+	body := string(data)
+	assert.Contains(t, body, "TestA/apply_create", "TestA's gap must survive TestB's regeneration")
+	assert.Contains(t, body, "TestB/import_workspace")
 }
 
 func TestWriteGapsOmitsFileWhenEveryStepIsVisible(t *testing.T) {
 	dir := t.TempDir()
-	steps := []StepInfo{{Test: "TestA/step", Verification: "visible"}}
+	writeManifestFixture(t, dir, "TestA", []StepInfo{{Test: "TestA/step", Verification: "visible"}})
 
-	require.NoError(t, writeGaps(dir, steps))
+	require.NoError(t, writeGaps(dir))
 
 	_, err := os.Stat(filepath.Join(dir, "GAPS.md"))
 	assert.True(t, os.IsNotExist(err), "no invisible steps means nothing to file")
@@ -184,8 +226,9 @@ func TestWriteGapsOmitsFileWhenEveryStepIsVisible(t *testing.T) {
 func TestWriteGapsRemovesStaleFileOnceStepsBecomeVisible(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "GAPS.md"), []byte("stale"), 0o644))
+	writeManifestFixture(t, dir, "TestA", []StepInfo{{Test: "TestA/step", Verification: "visible"}})
 
-	require.NoError(t, writeGaps(dir, []StepInfo{{Test: "TestA/step", Verification: "visible"}}))
+	require.NoError(t, writeGaps(dir))
 
 	_, err := os.Stat(filepath.Join(dir, "GAPS.md"))
 	assert.True(t, os.IsNotExist(err), "a demo that no longer has invisible steps must stop being listed")
@@ -318,20 +361,6 @@ func TestFlagsOfDropsRedactedValues(t *testing.T) {
 	assert.Equal(t, []string{"RUDDERSTACK_X_RETL_TABLE_SUPPORT=true"}, got)
 	assert.NotContains(t, got, "RUDDERSTACK_ACCESS_TOKEN="+demo.Redacted,
 		"a demo must never instruct a reader to export a redacted literal")
-}
-
-// readManifest is how run() recovers what Emit wrote to feed GAPS.md: Emit
-// takes a Manifest by value, so its own Steps/Gaps/Annotated additions never
-// reach the caller's copy.
-func TestReadManifestReturnsWhatEmitWrote(t *testing.T) {
-	dir, _ := emitFixture(t)
-
-	got, err := readManifest(dir)
-	require.NoError(t, err)
-
-	assert.Equal(t, "TestProjectApply", got.Test)
-	assert.True(t, got.Annotated)
-	assert.Len(t, got.Steps, 2)
 }
 
 func TestGroupByTopLevelSplitsByTestFunction(t *testing.T) {

@@ -145,6 +145,106 @@ func TestJoinKeepsNarrationInStreamOrder(t *testing.T) {
 	assert.Equal(t, demo.KindExec, got[0].Records[1].Kind)
 }
 
+// Ruling R23 regression fixture: the exact shape measured recording
+// TestAccountsApply with demo.Say placed as the first statement of each
+// subtest, before R23 existed. R19's nearest-run rule has no duration to
+// work with on a demo.KindSay record (Start == End), so test2json's
+// sub-millisecond lag on flushing a subtest's `run` event landed each of
+// these on the wrong side of it:
+//
+//   - the top-level say ran 197µs *before* TestAccountsApply's own run event
+//     had even been flushed — no eligible run at all under R19, dropped.
+//   - apply_update's say ran 81µs before its own run flushed — R19's nearest
+//     eligible run was apply_create's, two seconds earlier.
+//   - the re-apply say ran 295µs before its own run flushed — R19's nearest
+//     eligible run was apply_update's.
+//
+// Only apply_create's say happened to land correctly under R19 (its run
+// flushed 32µs before the say) — one out of four. R23 fixes all four by
+// binding each say to the step of the exec that follows it in journal order,
+// which needs no timestamp comparison at all.
+func TestJoinBindsSayToItsFollowingExecEvenWhenTimestampFallsInThePreviousWindow(t *testing.T) {
+	base := at(0)
+	events := []Event{
+		{Time: base, Action: "run", Test: "TestAccountsApply"},
+		{Time: base.Add(2 * time.Second), Action: "run", Test: "TestAccountsApply/apply_create"},
+		{Time: base.Add(4 * time.Second), Action: "run", Test: "TestAccountsApply/apply_update"},
+		{Time: base.Add(6 * time.Second), Action: "run", Test: "TestAccountsApply/re-apply"},
+		{Time: base.Add(9 * time.Second), Action: "pass", Test: "TestAccountsApply/apply_create"},
+		{Time: base.Add(9 * time.Second), Action: "pass", Test: "TestAccountsApply/apply_update"},
+		{Time: base.Add(9 * time.Second), Action: "pass", Test: "TestAccountsApply/re-apply"},
+		{Time: base.Add(9 * time.Second), Action: "pass", Test: "TestAccountsApply"},
+	}
+
+	say := func(start time.Time, text string) demo.Record {
+		return demo.Record{Kind: demo.KindSay, Start: start, End: start, Text: text}
+	}
+
+	topSay := say(base.Add(-197*time.Microsecond), "clean workspace")
+	destroy := execRecord(base.Add(405*time.Microsecond), "rudder-cli", "destroy", "--confirm=false")
+
+	createSay := say(base.Add(2*time.Second+32*time.Microsecond), "accounts created")
+	applyCreate := execRecord(base.Add(2*time.Second+400*time.Microsecond), "rudder-cli", "apply", "-l", "accounts/create")
+
+	updateSay := say(base.Add(4*time.Second-81*time.Microsecond), "updates in place")
+	applyUpdate := execRecord(base.Add(4*time.Second+400*time.Microsecond), "rudder-cli", "apply", "-l", "accounts/update")
+
+	reapplySay := say(base.Add(6*time.Second-295*time.Microsecond), "no-op except the secret")
+	applyReapply := execRecord(base.Add(6*time.Second+400*time.Microsecond), "rudder-cli", "apply", "-l", "accounts/update")
+
+	records := []demo.Record{
+		topSay, destroy,
+		createSay, applyCreate,
+		updateSay, applyUpdate,
+		reapplySay, applyReapply,
+	}
+
+	got, err := Join(events, records)
+	require.NoError(t, err)
+
+	assert.Equal(t, []Step{
+		{Test: "TestAccountsApply", Records: []demo.Record{topSay, destroy}},
+		{Test: "TestAccountsApply/apply_create", Records: []demo.Record{createSay, applyCreate}},
+		{Test: "TestAccountsApply/apply_update", Records: []demo.Record{updateSay, applyUpdate}},
+		{Test: "TestAccountsApply/re-apply", Records: []demo.Record{reapplySay, applyReapply}},
+	}, got, "every say must land with the exec that follows it, not with whichever subtest its own timestamp is nearest to")
+}
+
+// A trailing say with nothing after it falls back to the exec that precedes
+// it — there is no step left to introduce, so it reads as commentary on what
+// just ran.
+func TestJoinBindsTrailingSayToPrecedingExec(t *testing.T) {
+	events := []Event{
+		{Time: at(0), Action: "run", Test: "TestA"},
+		{Time: at(9), Action: "pass", Test: "TestA"},
+	}
+	exec := execRecord(at(1), "rudder-cli", "apply")
+	trailing := demo.Record{Kind: demo.KindSay, Start: at(3), End: at(3), Text: "and that proves it"}
+	records := []demo.Record{exec, trailing}
+
+	got, err := Join(events, records)
+	require.NoError(t, err)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, []demo.Record{exec, trailing}, got[0].Records)
+}
+
+// A say with no exec anywhere in the recording — before or after — has
+// nothing to introduce and nothing to comment on, so it is dropped like any
+// other record with no eligible owner.
+func TestJoinDropsSayWithNoExecOnEitherSide(t *testing.T) {
+	events := []Event{
+		{Time: at(0), Action: "run", Test: "TestA"},
+		{Time: at(9), Action: "pass", Test: "TestA"},
+	}
+	records := []demo.Record{{Kind: demo.KindSay, Start: at(1), End: at(1), Text: "orphaned"}}
+
+	got, err := Join(events, records)
+	require.NoError(t, err)
+
+	assert.Empty(t, got)
+}
+
 func TestJoinSkipsTestsThatRanNoCommands(t *testing.T) {
 	events := []Event{
 		{Time: at(0), Action: "run", Test: "TestA"},

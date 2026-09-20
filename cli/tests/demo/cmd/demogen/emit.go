@@ -272,20 +272,45 @@ func fixtureRoots(fixtures []string) []string {
 	return out
 }
 
-// writeGaps records every step whose proof is invisible on screen. Where no
-// read-only CLI command exists to show a result, that absence is a defect in
-// the CLI, not in the demo — DEX-921 states the rule: "A demo that has to leave
-// the tool it is demonstrating is a gap in the tool." This file is the list.
-func writeGaps(outDir string, steps []StepInfo) error {
-	var missing []StepInfo
-	for _, s := range steps {
-		if s.Verification == "none" {
-			missing = append(missing, s)
+// writeGaps records every step, across every demo under outDir, whose proof
+// is invisible on screen. Where no read-only CLI command exists to show a
+// result, that absence is a defect in the CLI, not in the demo — DEX-921
+// states the rule: "A demo that has to leave the tool it is demonstrating is
+// a gap in the tool." This file is the list.
+//
+// Ruling R24: demogen processes one test per invocation (one -journal,
+// one -events), so building this from only the steps this run just emitted
+// would make generating any one demo silently erase every other demo's
+// gaps — the opposite of "standing list." Instead this reads every
+// demos/<Test>/manifest.json already on disk, including the one(s) this
+// invocation just wrote, and unions their gaps.
+func writeGaps(outDir string) error {
+	manifests, err := filepath.Glob(filepath.Join(outDir, "*", "manifest.json"))
+	if err != nil {
+		return fmt.Errorf("listing manifests: %w", err)
+	}
+
+	byTest := map[string][]StepInfo{}
+	for _, path := range manifests {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
+
+		var m Manifest
+		if err := json.Unmarshal(data, &m); err != nil {
+			return fmt.Errorf("decoding %s: %w", path, err)
+		}
+
+		for _, s := range m.Steps {
+			if s.Verification == "none" {
+				byTest[m.Test] = append(byTest[m.Test], s)
+			}
 		}
 	}
 
 	path := filepath.Join(outDir, "GAPS.md")
-	if len(missing) == 0 {
+	if len(byTest) == 0 {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("removing stale GAPS.md: %w", err)
 		}
@@ -293,11 +318,14 @@ func writeGaps(outDir string, steps []StepInfo) error {
 		return nil
 	}
 
-	// Ruling R5: groupByTopLevel returns a map, and Go randomises map
-	// iteration order, so allSteps arrives in a different order every run.
-	// Sort by test name before writing so regeneration does not churn the
-	// diff for no reason.
-	sort.Slice(missing, func(i, j int) bool { return missing[i].Test < missing[j].Test })
+	// Ruling R5 / R24: byTest is a map, so Go randomises its iteration order —
+	// sort the test names, and each test's own steps, so regeneration does
+	// not churn the diff for no reason.
+	tests := make([]string, 0, len(byTest))
+	for test := range byTest {
+		tests = append(tests, test)
+	}
+	sort.Strings(tests)
 
 	var b strings.Builder
 	b.WriteString("# Verification gaps\n\n")
@@ -305,11 +333,18 @@ func writeGaps(outDir string, steps []StepInfo) error {
 	b.WriteString("Each one wants a read-only CLI command that shows the same thing on screen.\n")
 	b.WriteString("Where no such command exists, that is a ticket against the CLI.\n\n")
 
-	for _, s := range missing {
-		b.WriteString("- `" + s.Test + "` — " + s.Prose + "\n")
+	for _, test := range tests {
+		steps := byTest[test]
+		sort.Slice(steps, func(i, j int) bool { return steps[i].Test < steps[j].Test })
+
+		b.WriteString("## " + test + "\n\n")
+		for _, s := range steps {
+			b.WriteString("- `" + s.Test + "` — " + s.Prose + "\n")
+		}
+		b.WriteString("\n")
 	}
 
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(strings.TrimRight(b.String(), "\n")+"\n"), 0o644); err != nil {
 		return fmt.Errorf("writing GAPS.md: %w", err)
 	}
 

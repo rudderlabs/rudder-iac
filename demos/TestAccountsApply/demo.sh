@@ -16,23 +16,23 @@ export RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true
 clear
 
 p "# Accounts apply"
-pe "rudder-cli destroy --confirm=false"
 p "# Start from a clean workspace: destroy removes anything a previous run left behind, so the create below always starts from nothing."
+pe "rudder-cli destroy --confirm=false"
 p "# (verified in Go, not visible here — see TestAccountsApply)"
 
 p "# Apply create"
-pe "rudder-cli apply -l accounts/create --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# Accounts are created from spec with no ids anywhere — everything upstream is resolved by external ID reference, not by a value the user had to look up first."
+pe "rudder-cli apply -l accounts/create --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# (verified in Go, not visible here — see TestAccountsApply/apply_create)"
 
 p "# Apply update"
-pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# Re-applying the same accounts with changed values updates them in place upstream, rather than deleting and recreating."
+pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# (verified in Go, not visible here — see TestAccountsApply/apply_update)"
 
 p "# Re-apply leaves non-secret upstream state unchanged"
-pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# Applying this same spec again with nothing changed should be a no-op — except the API never returns write-only secrets, so the CLI cannot diff them and must re-send the secret on every apply. Watch the non-secret fields stay identical even though the request goes out again."
+pe "rudder-cli apply -l accounts/update --var-file accounts/credentials.vars.yaml --confirm=false"
 p "# (verified in Go, not visible here — see TestAccountsApply/re-apply_leaves_non-secret_upstream_state_unchanged)"
 
 

@@ -54,40 +54,33 @@ func TestAccountsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "accounts")
 	varFile := filepath.Join(projectDir, "credentials.vars.yaml")
 
+	demo.Say(t, "Start from a clean workspace: destroy removes anything a previous run left behind, so the create below always starts from nothing.")
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
-	// Narration lands after the command it explains, not before: go test -json
-	// flushes a subtest's "run" event asynchronously, a fraction of a
-	// millisecond behind the subtest body starting. demo.Say records carry no
-	// duration, so one placed as literally the first statement of a subtest
-	// can lose that race and get attributed to whichever subtest ran before
-	// it. A multi-second CLI invocation gives the event stream all the margin
-	// it needs, so narration goes right after the command it is about.
-	demo.Say(t, "Start from a clean workspace: destroy removes anything a previous run left behind, so the create below always starts from nothing.")
 
 	t.Run("apply create", func(t *testing.T) {
+		demo.Say(t, "Accounts are created from spec with no ids anywhere — everything upstream is resolved by external ID reference, not by a value the user had to look up first.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "create"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "create apply failed: %s", out)
-		demo.Say(t, "Accounts are created from spec with no ids anywhere — everything upstream is resolved by external ID reference, not by a value the user had to look up first.")
 		assertNoSecretsInOutput(t, out)
 		verifyAccountUpstream(t, "create")
 	})
 
 	t.Run("apply update", func(t *testing.T) {
+		demo.Say(t, "Re-applying the same accounts with changed values updates them in place upstream, rather than deleting and recreating.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "update"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "update apply failed: %s", out)
-		demo.Say(t, "Re-applying the same accounts with changed values updates them in place upstream, rather than deleting and recreating.")
 		assertNoSecretsInOutput(t, out)
 		verifyAccountUpstream(t, "update")
 	})
 
 	t.Run("re-apply leaves non-secret upstream state unchanged", func(t *testing.T) {
+		demo.Say(t, "Applying this same spec again with nothing changed should be a no-op — except the API never returns write-only secrets, so the CLI cannot diff them and must re-send the secret on every apply. Watch the non-secret fields stay identical even though the request goes out again.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "update"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "re-apply failed: %s", out)
-		demo.Say(t, "Applying this same spec again with nothing changed should be a no-op — except the API never returns write-only secrets, so the CLI cannot diff them and must re-send the secret on every apply. Watch the non-secret fields stay identical even though the request goes out again.")
 		// The credentials secret is always-unknown so it re-applies every time;
 		// the snapshot (non-secret fields) proves nothing else churned.
 		verifyAccountUpstream(t, "update")

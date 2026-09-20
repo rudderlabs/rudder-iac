@@ -10,9 +10,9 @@ Generated from a real run of `TestAccountsApply`. Run it yourself:
 
 | | |
 |---|---|
-| recorded | 2026-09-20T16:36:53Z |
+| recorded | 2026-09-20T16:49:41Z |
 | ref | `refs/heads/claude/e2e-demo-framework-cb81bd` |
-| commit | `17586458` (working tree dirty) |
-| cli | `v0.26.0-27-g17586458a` |
+| commit | `78ae842d` (working tree dirty) |
+| cli | `v0.26.0-28-g78ae842d5` |
 | backend | mini (local) — `http://localhost:15580` |
 | narration | annotated |

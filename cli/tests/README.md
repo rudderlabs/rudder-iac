@@ -88,16 +88,6 @@ demo with no narration writes an `ANNOTATE.md` naming the steps that want it,
 and exits 3 when run non-interactively, so an agent is told to add the lines
 and open a PR rather than leaving the gap unnoticed.
 
-`demo.Say` records carry no duration, so place the call where the demo journal
-can attribute it unambiguously — right after the command it explains, not as
-the literal first statement of a subtest. `go test -json` reports a subtest's
-`run` event asynchronously, a fraction of a millisecond behind the subtest
-body starting; a zero-duration record placed before any command in that
-subtest can lose that race and get attributed to whatever ran immediately
-before it. A multi-second CLI invocation gives the event stream all the
-margin it needs, so narration that follows the command it is about is placed
-after test2json has certainly caught up.
-
 **Verification.** A step whose last command writes rather than reads proves
 itself in Go, invisibly. Those steps are listed in `demos/GAPS.md`; each one
 wants a read-only CLI command that shows the result on screen. Where no such
