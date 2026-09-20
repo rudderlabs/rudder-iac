@@ -2047,3 +2047,18 @@ func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
 		assert.Equal(t, "rem-1", found.ImportMetadata().RemoteId)
 	})
 }
+
+// Sync operations are part of RETLStore; these handlers do not exercise them.
+func (m *mockRETLClient) StartSync(_ context.Context, _ string, _ retlClient.SyncType) (*retlClient.StartSyncResponse, error) {
+	return nil, nil
+}
+
+func (m *mockRETLClient) StopSync(_ context.Context, _ string) error { return nil }
+
+func (m *mockRETLClient) ListSyncs(_ context.Context, _ string, _ retlClient.ListSyncsRequest) (*retlClient.SyncsPage, error) {
+	return nil, nil
+}
+
+func (m *mockRETLClient) GetSync(_ context.Context, _, _ string) (*retlClient.Sync, error) {
+	return nil, nil
+}

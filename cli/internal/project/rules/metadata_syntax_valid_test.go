@@ -37,7 +37,6 @@ func noopParseSpec(path string, spec *specs.Spec) (*specs.ParsedSpec, error) {
 	return parseSpecWithIDs()(path, spec)
 }
 
-
 func TestMetadataSyntaxValidRule_Validate(t *testing.T) {
 	t.Parallel()
 

@@ -249,11 +249,11 @@ func computePositions(original []byte, rawErrors []rawError) []SubstitutionError
 				lineEnd++
 			}
 
-			// Line and column numbers are 1-indexed (matching how editors and error messages display positions), but byte offsets are 0-indexed. 
+			// Line and column numbers are 1-indexed (matching how editors and error messages display positions), but byte offsets are 0-indexed.
 			// The +1 converts from zero-based offset to one-based column.
 			result = append(result, SubstitutionError{
 				Name:     rawErrors[errorIdx].name,
-				Line:     line,				
+				Line:     line,
 				Column:   i - lineStart + 1,
 				LineText: string(original[lineStart:lineEnd]),
 				Err:      rawErrors[errorIdx].err,
@@ -273,4 +273,3 @@ func computePositions(original []byte, rawErrors []rawError) []SubstitutionError
 
 	return result
 }
-

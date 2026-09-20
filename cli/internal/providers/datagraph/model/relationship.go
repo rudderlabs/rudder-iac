@@ -10,9 +10,9 @@ import (
 type RelationshipResource struct {
 	ID             string                 `mapstructure:"id"`
 	DisplayName    string                 `mapstructure:"display_name"`
-	DataGraphRef   *resources.PropertyRef `mapstructure:"data_graph"`    // Parent data graph
-	SourceModelRef *resources.PropertyRef `mapstructure:"source"` // Source model
-	TargetModelRef *resources.PropertyRef `mapstructure:"target"` // Target model
+	DataGraphRef   *resources.PropertyRef `mapstructure:"data_graph"` // Parent data graph
+	SourceModelRef *resources.PropertyRef `mapstructure:"source"`     // Source model
+	TargetModelRef *resources.PropertyRef `mapstructure:"target"`     // Target model
 	SourceJoinKey  string                 `mapstructure:"source_join_key"`
 	TargetJoinKey  string                 `mapstructure:"target_join_key"`
 	Cardinality    string                 `mapstructure:"cardinality"` // "one-to-one", "one-to-many", or "many-to-one"

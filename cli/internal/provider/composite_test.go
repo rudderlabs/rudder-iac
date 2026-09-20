@@ -16,8 +16,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
-	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestNewCompositeProvider(t *testing.T) {

@@ -37,11 +37,11 @@ type SwiftMultiTypeEnum struct {
 
 // SwiftStructProperty is one stored property in a struct.
 type SwiftStructProperty struct {
-	Name        string // camelCase Swift identifier
-	SerialName  string // original JSON key (for toProperties/toTraits)
-	Type        string // Swift type string
-	Comment     string
-	Optional    bool   // true → T?
+	Name       string // camelCase Swift identifier
+	SerialName string // original JSON key (for toProperties/toTraits)
+	Type       string // Swift type string
+	Comment    string
+	Optional   bool // true → T?
 	// Pre-computed serialization expression set by generator, e.g.:
 	//   plain primitive   → "email"
 	//   enum              → "deviceType.rawValue"
@@ -101,12 +101,12 @@ type SwiftSDKCallArgument struct {
 
 // SwiftAnalyticsMethod is one method in RudderTyperAnalytics.
 type SwiftAnalyticsMethod struct {
-	Name            string
-	Comment         string
-	EventName       string
-	MethodArguments []SwiftMethodArgument
-	SDKMethodName   string // "track", "identify", "screen", "group", "alias"
-	SDKArguments    []SwiftSDKCallArgument
+	Name             string
+	Comment          string
+	EventName        string
+	MethodArguments  []SwiftMethodArgument
+	SDKMethodName    string // "track", "identify", "screen", "group", "alias"
+	SDKArguments     []SwiftSDKCallArgument
 	AddDataToContext bool // context.traits: merge traits into customContext instead of SDK traits param
 }
 

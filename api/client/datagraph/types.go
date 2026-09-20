@@ -214,8 +214,8 @@ type ListRelationshipsResponse struct {
 type ValidateModelRequest struct {
 	AccountID string `json:"accountId"` // Account ID from the data graph spec
 
-	Type      string `json:"type"`               // "entity" or "event" - REQUIRED
-	TableRef  string `json:"tableRef"`           // REQUIRED - 3-part catalog.schema.table
+	Type      string `json:"type"`                // "entity" or "event" - REQUIRED
+	TableRef  string `json:"tableRef"`            // REQUIRED - 3-part catalog.schema.table
 	PrimaryID string `json:"primaryId,omitempty"` // Required for entity models
 	Root      bool   `json:"root,omitempty"`      // Optional, entity models only
 	Timestamp string `json:"timestamp,omitempty"` // Required for event models
@@ -225,9 +225,9 @@ type ValidateModelRequest struct {
 type ValidateRelationshipRequest struct {
 	AccountID string `json:"accountId"` // Account ID from the data graph spec
 
-	Cardinality string               `json:"cardinality"` // REQUIRED
-	SourceModel ValidationModelRef   `json:"sourceModel"` // REQUIRED
-	TargetModel ValidationModelRef   `json:"targetModel"` // REQUIRED
+	Cardinality string             `json:"cardinality"` // REQUIRED
+	SourceModel ValidationModelRef `json:"sourceModel"` // REQUIRED
+	TargetModel ValidationModelRef `json:"targetModel"` // REQUIRED
 }
 
 // ValidationModelRef is a reference to a model used in relationship validation

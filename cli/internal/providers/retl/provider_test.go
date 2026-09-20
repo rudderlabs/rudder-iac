@@ -1245,3 +1245,18 @@ func TestProviderWithConnectionSupport(t *testing.T) {
 	assert.Equal(t, "conn-remote-9", r.ImportMetadata().RemoteId)
 	assert.Equal(t, "ws-1", r.ImportMetadata().WorkspaceId)
 }
+
+// Sync operations are part of RETLStore; these handlers do not exercise them.
+func (m *mockRETLStore) StartSync(_ context.Context, _ string, _ retlClient.SyncType) (*retlClient.StartSyncResponse, error) {
+	return nil, nil
+}
+
+func (m *mockRETLStore) StopSync(_ context.Context, _ string) error { return nil }
+
+func (m *mockRETLStore) ListSyncs(_ context.Context, _ string, _ retlClient.ListSyncsRequest) (*retlClient.SyncsPage, error) {
+	return nil, nil
+}
+
+func (m *mockRETLStore) GetSync(_ context.Context, _, _ string) (*retlClient.Sync, error) {
+	return nil, nil
+}

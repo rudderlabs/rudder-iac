@@ -197,7 +197,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	assert.True(t, errors.Is(err, expectedErr))
 }
 
-
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
 

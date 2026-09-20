@@ -19,7 +19,7 @@ type ValidationReporter interface {
 // noopReporter is a no-op implementation of ValidationReporter
 type noopReporter struct{}
 
-func (noopReporter) TaskStarted(string, string)        {}
+func (noopReporter) TaskStarted(string, string)          {}
 func (noopReporter) TaskCompleted(string, string, error) {}
 
 // validateTask implements tasker.Task for a single validation unit
