@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: e2e-retl-archive
+spec:
+  id: e2e-retl-archive
+  display_name: E2E RETL Archive
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: "https://archive.example.com/rudder"
