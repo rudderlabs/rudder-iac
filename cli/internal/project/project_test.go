@@ -480,19 +480,27 @@ func fixtureSpec(name string) *specs.RawSpec {
 
 // TestProject_Load_RendersSyntacticWarnings covers what handleValidation does
 // with syntactic diagnostics that do not stop the load: they used to be dropped
-// on the way to the semantic phase. The two-file case also pins the ordering,
-// since the merged set is sorted by file rather than by phase.
+// on the way to the semantic phase, and on the error paths in between. The
+// two-file case also pins the ordering, since the merged set is sorted by file
+// rather than by phase.
 func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
 		name      string
 		rawSpecs  map[string]*specs.RawSpec
+		graphErr  error
 		wantLines []string
 	}{
 		{
 			name:      "syntactic warning alone",
 			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
+		},
+		{
+			name:      "load fails after the syntax gate",
+			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			graphErr:  errors.New("graph is broken"),
 			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
 		},
 		{
@@ -512,6 +520,7 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 
 			mockProvider := &warningProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
 			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockProvider.GetResourceGraphErr = tc.graphErr
 			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
 				return tc.rawSpecs, nil
 			}}
@@ -519,7 +528,8 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 			var buf bytes.Buffer
 			proj := project.New(mockProvider, project.WithLoader(mockLoader), project.WithRenderer(renderer.NewTextRenderer(&buf)))
 
-			require.NoError(t, proj.Load("test_dir"))
+			err := proj.Load("test_dir")
+			assert.Equal(t, tc.graphErr != nil, err != nil, "load error: %v", err)
 
 			var rendered []string
 			for _, line := range strings.Split(buf.String(), "\n") {
