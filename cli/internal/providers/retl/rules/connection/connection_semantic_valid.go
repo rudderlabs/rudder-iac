@@ -17,10 +17,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// primaryKeyExemptDefinition is the one source definition a connection may
-// leave without a primary key — a source kind is not exempt just because an
+// fileBasedSourceDefinitions sync whole files rather than table rows, so they
+// carry no primary key. Mirrors the server's FILE_BASED_SOURCE_DEFINITIONS
+// (src/modules/retl/constants.ts) — a source kind is not exempt just because an
 // exemption exists for its warehouse.
-const primaryKeyExemptDefinition = "s3"
+var fileBasedSourceDefinitions = []string{"s3", "sftp"}
 
 // NewConnectionSemanticValidRule validates the cross-resource concerns of a
 // rETL connection: that both endpoints exist, that the topology they form is
@@ -424,7 +425,7 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 	// V-R11: a sync needs a key to identify rows by, except for the source
 	// definitions that let the backend derive one.
 	primaryKey, _ := endpoints.source.Data()[retlConnection.SourcePrimaryKeyKey].(string)
-	if primaryKey == "" && sourceDefinition != primaryKeyExemptDefinition {
+	if primaryKey == "" && !slices.Contains(fileBasedSourceDefinitions, sourceDefinition) {
 		results = append(results, result(sourceRef(index), fmt.Sprintf(
 			"rETL source '%s' declares no primary_key, which source definition '%s' requires to sync",
 			endpoints.sourceID, sourceDefinition,

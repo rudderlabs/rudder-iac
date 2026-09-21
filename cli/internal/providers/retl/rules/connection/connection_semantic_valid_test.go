@@ -788,6 +788,15 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			}},
 		},
 		{
+			name:        "an sftp source is exempt from the primary key too",
+			model:       modelFixture{id: "users-model", sourceDefinition: "sftp", enabled: true},
+			destination: httpDestination(),
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/source",
+				Message:   "rETL source 'users-model' is a SQL model, which source definition 'sftp' does not support",
+			}},
+		},
+		{
 			name:        "sync settings a source definition cannot carry",
 			model:       modelFixture{id: "users-model", sourceDefinition: "clickhouse", primaryKey: "user_id", enabled: true},
 			destination: httpDestination(),
