@@ -92,11 +92,11 @@ func TestCheckCronFrequency(t *testing.T) {
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
-			// A literal "*" anywhere in the field sets the flag, which is
-			// robfig's rule, so both spellings are wildcards and select the
-			// same schedule here as they do there. The day fields are ANDed,
-			// only Mondays match - never two days running, which is what keeps
-			// the midnight gap out of reach.
+			// A wildcard anywhere in the field sets the flag, which is robfig's
+			// rule, so every spelling below is a wildcard and selects the same
+			// schedule here as it does there. The day fields are ANDed, only
+			// Mondays match - never two days running, which is what keeps the
+			// midnight gap out of reach.
 			expression: "0,57 0,23 3,* * MON",
 			expected:   CronCheckResult{Status: CronValid},
 		},
@@ -105,7 +105,17 @@ func TestCheckCronFrequency(t *testing.T) {
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
-			// A stepped wildcard clears the flag, as it does in robfig, so the
+			// A step of 1 keeps the flag where a wider one clears it, and the
+			// step is read as a number, so "*/01" is the same wildcard.
+			expression: "0,57 0,23 */1 * MON",
+			expected:   CronCheckResult{Status: CronValid},
+		},
+		{
+			expression: "0,57 0,23 */01 * MON",
+			expected:   CronCheckResult{Status: CronValid},
+		},
+		{
+			// A step wider than 1 clears the flag, as it does in robfig, so the
 			// day fields are ORed: every odd day matches and so does every
 			// Monday. The first odd day followed by a Monday puts three minutes
 			// across midnight, and robfig fires exactly this pair.

@@ -26,16 +26,16 @@
 //
 // One robfig behaviour is not fenced off but adopted: its rule for what counts
 // as a wildcard, which decides whether the two day fields are ANDed or ORed. A
-// field is a wildcard when any element is the literal "*", and a stepped
-// wildcard is not one - "*/2" does not count - where Vixie keys those semantics
-// off the literal "*" alone. robfig's is the reading that matters, because
-// robfig is what fires the syncs: rudder-sources schedules through
+// field is a wildcard when any element is one, and a step wider than 1 drops
+// the flag - "*/1" is a wildcard, "*/2" is not - where Vixie keys those
+// semantics off the literal "*" alone. robfig's is the reading that matters,
+// because robfig is what fires the syncs: rudder-sources schedules through
 // cron.ParseStandard, and the expression reaches it verbatim - the public API
 // stores it without parsing it. So "0,57 0,23 */2 * MON" is too frequent here,
 // which is what robfig does with it: from 2026-01-01 it fires 2026-01-11 23:57
 // and again 2026-01-12 00:00, three minutes later. Adopting the rule whole,
-// rather than only its stepped half, is what keeps "3,*" and "*,3" the same
-// schedule here as they are there.
+// rather than the part of it that is easy to spot in the text, is what keeps
+// "3,*", "*,3" and "*/1" the same schedules here as they are there.
 //
 // So the parser stays - not because a library could not do it, but because the
 // fences cost what the parser costs, and this way nothing has to be pinned to a
@@ -99,7 +99,6 @@ package connection
 import (
 	"fmt"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -494,22 +493,23 @@ func (f cronField) parse(raw string) ([]bool, bool, *CronCheckResult) {
 		star   bool
 	)
 
+	// A field is a wildcard when any of its elements is one, which is robfig's
+	// rule and so the one the schedules actually run by.
 	for _, element := range strings.Split(raw, ",") {
-		if failure := f.parseElement(raw, element, values); failure != nil {
+		wildcard, failure := f.parseElement(raw, element, values)
+		if failure != nil {
 			return nil, false, failure
 		}
+		star = star || wildcard
 	}
-
-	// A field is a wildcard when any of its elements is the literal "*", which
-	// is robfig's rule and so the one the schedules actually run by. A stepped
-	// wildcard is not one: "*/2" does not count. The flag only decides the day
-	// semantics - it never changes which values match.
-	star = slices.Contains(strings.Split(raw, ","), "*")
 
 	return values, star, nil
 }
 
-func (f cronField) parseElement(raw, element string, values []bool) *CronCheckResult {
+// parseElement selects the element's values and reports whether it is a
+// wildcard. The wildcard flag only decides the day semantics - it never changes
+// which values match.
+func (f cronField) parseElement(raw, element string, values []bool) (bool, *CronCheckResult) {
 	var (
 		spec    = element
 		step    = 1
@@ -519,7 +519,7 @@ func (f cronField) parseElement(raw, element string, values []bool) *CronCheckRe
 	if base, rawStep, found := strings.Cut(element, "/"); found {
 		parsed, err := strconv.Atoi(rawStep)
 		if err != nil || parsed < 1 {
-			return invalidCron("%s field %q: step must be a positive integer", f.name, raw)
+			return false, invalidCron("%s field %q: step must be a positive integer", f.name, raw)
 		}
 		spec, step, stepped = base, parsed, true
 	}
@@ -527,16 +527,18 @@ func (f cronField) parseElement(raw, element string, values []bool) *CronCheckRe
 	if spec == "*" {
 		fill(values, f.min, f.max, step)
 
-		return nil
+		// robfig keeps the wildcard flag for a step of 1 and drops it for a
+		// wider one, so "*/1" is a wildcard and "*/2" is not.
+		return step == 1, nil
 	}
 
 	low, high, failure := f.parseRange(raw, spec, stepped)
 	if failure != nil {
-		return failure
+		return false, failure
 	}
 	fill(values, low, high, step)
 
-	return nil
+	return false, nil
 }
 
 func (f cronField) parseRange(raw, spec string, stepped bool) (int, int, *CronCheckResult) {
