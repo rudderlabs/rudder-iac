@@ -241,6 +241,9 @@ match_behavior:
               source_definition: postgres
               sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
           destination.yaml: &bing-destination |
+            # bingads_offline_conversions is the only destination supporting
+            # object mapping, and it is unverified: validate this project with
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
             version: rudder/v1
             kind: destination
             metadata:

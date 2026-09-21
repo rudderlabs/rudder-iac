@@ -11,9 +11,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
@@ -36,14 +36,18 @@ import (
 // rules too; without it those four fragments would be orphans, which is exactly
 // what the gen-rule-docs workflow sets the experimental flag for.
 func TestProviderRuleDocs(t *testing.T) {
-	// Bing, Customer.io Audience and Firebase are unverified, so the app
-	// registers them only behind a flag; the examples need them unconditionally.
+	// http and Attentive Tag are verified, so a default CLI registers them and
+	// the examples using them run as written. Bing and Customer.io Audience are
+	// unverified and registered only behind a flag, but they are the only
+	// destinations that support object mapping and the only ones running their
+	// own rETL flow, so those examples cannot avoid them; their fragments name
+	// the flag, and it is registered unconditionally here.
 	registry := definitions.NewRegistry()
 	for _, definition := range []*definitions.DestinationDefinition{
 		httpdest.NewDefinition(),
+		attentivetag.NewDefinition(),
 		bingads.NewDefinition(),
 		customerioaudience.NewDefinition(),
-		firebase.NewDefinition(),
 	} {
 		require.NoError(t, registry.Register(definition))
 	}

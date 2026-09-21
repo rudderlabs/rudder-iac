@@ -96,6 +96,9 @@ match_behavior:
               source_definition: postgres
               sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
           destination.yaml: &bing-destination |
+            # bingads_offline_conversions is the only destination supporting
+            # object mapping, and it is unverified: validate this project with
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
             version: rudder/v1
             kind: destination
             metadata:
@@ -308,21 +311,22 @@ match_behavior:
             message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination cannot receive from both event stream and rETL sources"
       - example_id: "retl-connection-semantic-destination-rejects-warehouse-sources"
         title: "Destination whose definition does not accept warehouse sources"
-        description: "Firebase supports only mobile event stream sources upstream, and rETL sources connect as warehouse sources."
+        description: "Attentive Tag supports only event stream sources upstream, and rETL sources connect as warehouse sources."
         files:
           model.yaml: *users-model
           destination.yaml: |
             version: rudder/v1
             kind: destination
             metadata:
-              name: my-firebase-destination
+              name: my-attentive-destination
             spec:
-              id: my-firebase-destination
-              display_name: Firebase
-              type: firebase
+              id: my-attentive-destination
+              display_name: Attentive Tag
+              type: attentive_tag
               enabled: true
               definition_version: 1
-              config: {}
+              config:
+                api_key: example-api-key
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -330,9 +334,9 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: users-to-firebase
+                - id: users-to-attentive
                   source: "#retl-source-sql-model:users-model"
-                  destination: "#destination:my-firebase-destination"
+                  destination: "#destination:my-attentive-destination"
                   config:
                     sync_behaviour: upsert
                     schedule:
@@ -347,7 +351,7 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/destination"
             severity: "error"
-            message_contains: "destination 'my-firebase-destination' (type 'firebase') does not accept rETL sources: source type 'warehouse' is not among supported source types"
+            message_contains: "destination 'my-attentive-destination' (type 'attentive_tag') does not accept rETL sources: source type 'warehouse' is not among supported source types"
       - example_id: "retl-connection-semantic-missing-warehouse-settings"
         title: "Destination with no connection_mode entry for warehouse sources"
         files:
@@ -380,6 +384,9 @@ match_behavior:
         files:
           model.yaml: *users-model
           destination.yaml: |
+            # customerio_audience is one of the two destinations running their own
+            # rETL flow, and it is unverified: validate this project with
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
             version: rudder/v1
             kind: destination
             metadata:
