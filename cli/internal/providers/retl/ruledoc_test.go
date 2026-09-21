@@ -63,7 +63,8 @@ func TestProviderRuleDocs(t *testing.T) {
 	for _, entry := range p.RuleDocEntries() {
 		// Only the connection fragments run as projects. The SQL model fragments
 		// predate this check (references without /spec, duplicates against
-		// models their files do not carry); drop the filter once they are fixed.
+		// models their files do not carry); DEX-915 fixes them and drops the
+		// filter.
 		if !strings.HasPrefix(entry.RuleID, "retl/connection/") {
 			continue
 		}
