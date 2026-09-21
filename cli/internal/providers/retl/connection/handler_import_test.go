@@ -400,12 +400,7 @@ func TestImport(t *testing.T) {
 		// A recreated row is a row of its own, hence an id of its own: the pair
 		// it belongs to is one this connection has never held.
 		mock.CreateFunc = func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-			return &retlClient.RETLConnection{
-				ID:            "conn-remote-2",
-				SourceID:      req.SourceID,
-				DestinationID: req.DestinationID,
-				ExternalID:    req.ExternalID,
-			}, nil
+			return echoCreated("conn-remote-2", req), nil
 		}
 
 		result, err := remoteHandler(mock, t).Import(t.Context(), localID, data, "conn-remote-1")
@@ -434,12 +429,7 @@ func TestImport(t *testing.T) {
 
 		mock := importClient(remoteRow("conn-remote-1", "", "src-1", "dst-1"))
 		mock.CreateFunc = func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-			return &retlClient.RETLConnection{
-				ID:            "conn-remote-1",
-				SourceID:      req.SourceID,
-				DestinationID: req.DestinationID,
-				ExternalID:    req.ExternalID,
-			}, nil
+			return echoCreated("conn-remote-1", req), nil
 		}
 
 		result, err := remoteHandler(mock, t).Import(t.Context(), localID, data, "conn-remote-1")

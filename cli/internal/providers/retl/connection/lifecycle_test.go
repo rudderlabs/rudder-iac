@@ -102,7 +102,7 @@ func TestCreate(t *testing.T) {
 		mock := lifecycleClient()
 		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, data)
 
-		assert.EqualError(t, err, `creating rETL connection "users-to-webhook": destination type "S3" does not accept warehouse sources`)
+		assert.EqualError(t, err, `vetting rETL connection "users-to-webhook": destination type "S3" does not accept warehouse sources`)
 		assert.Empty(t, mock.CreateCalls, "the api must not be called for a connection that cannot be read back")
 	})
 
@@ -117,7 +117,7 @@ func TestCreate(t *testing.T) {
 
 		// The first create caches the catalog as it stood before dst-1 existed.
 		_, err := handler.Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
-		require.Error(t, err)
+		require.EqualError(t, err, `vetting rETL connection "users-to-webhook": destination "dst-1" was not found in this workspace`)
 
 		mock.Destinations = remoteDestinations()
 		_, err = handler.Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
@@ -125,6 +125,56 @@ func TestCreate(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, mock.CreateCalls, 1)
 		assert.Equal(t, 2, mock.DestinationsCalls, "a miss must be refetched, not believed")
+	})
+
+	// The write path used to surface the registry lookup verbatim, naming
+	// neither the flag nor any remedy.
+	t.Run("names the flag when the destination definition is not registered", func(t *testing.T) {
+		t.Parallel()
+
+		// dst-old is HTTP at a version the registry does not carry.
+		data := graphData(t, jsonMapperConfig())
+		data[DestinationKey] = "dst-old"
+
+		mock := lifecycleClient()
+		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, data)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `vetting rETL connection "users-to-webhook": destination type "HTTP" version 9 is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`)
+		assert.Empty(t, mock.CreateCalls)
+	})
+
+	// The one skip reason that cannot be vetted before the call: the server may
+	// store a config the spec cannot express. Left in place, the row is skipped
+	// on read and re-created on every apply — DEX-917's loop — so it is undone.
+	t.Run("deletes a connection it cannot read back", func(t *testing.T) {
+		t.Parallel()
+
+		mock := lifecycleClient()
+		mock.CreateFunc = func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
+			created := echoCreated("conn-remote-1", req)
+			created.DestinationConfig = []byte(`{"audienceId":"a-1"}`)
+			return created, nil
+		}
+		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
+
+		assert.EqualError(t, err, `rETL connection "users-to-webhook" was created but cannot be read back, so it was deleted again: connection "conn-remote-1": destination-specific configuration has no spec equivalent: connection config cannot be represented as a spec`)
+		assert.Equal(t, []string{"conn-remote-1"}, mock.DeleteCalls)
+	})
+
+	t.Run("reports both failures when the undo fails too", func(t *testing.T) {
+		t.Parallel()
+
+		mock := lifecycleClient()
+		mock.CreateFunc = func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
+			created := echoCreated("conn-remote-1", req)
+			created.Identifiers = nil
+			return created, nil
+		}
+		mock.DeleteFunc = func(string) error { return errors.New("gateway timeout") }
+		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, graphData(t, jsonMapperConfig()))
+
+		assert.EqualError(t, err, `rETL connection "users-to-webhook" was created as "conn-remote-1" but cannot be read back (connection "conn-remote-1": no identifiers: connection config cannot be represented as a spec), and deleting it failed: gateway timeout`)
 	})
 
 	t.Run("refuses a destination that is not in the workspace at all", func(t *testing.T) {
@@ -136,7 +186,7 @@ func TestCreate(t *testing.T) {
 		mock := lifecycleClient()
 		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, data)
 
-		assert.EqualError(t, err, `creating rETL connection "users-to-webhook": destination "dst-missing" was not found in this workspace`)
+		assert.EqualError(t, err, `vetting rETL connection "users-to-webhook": destination "dst-missing" was not found in this workspace`)
 		assert.Empty(t, mock.CreateCalls)
 	})
 }
@@ -307,7 +357,7 @@ func TestUpdate(t *testing.T) {
 				var created *retlClient.RETLConnection
 				mock := lifecycleClient()
 				mock.CreateFunc = func(request *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-					created = &retlClient.RETLConnection{ID: "conn-remote-2", SourceID: request.SourceID, DestinationID: request.DestinationID}
+					created = echoCreated("conn-remote-2", request)
 					return created, nil
 				}
 				output, err := lifecycleHandler(t, mock).Update(context.Background(), localID, data, state)

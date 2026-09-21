@@ -221,12 +221,23 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 	request.ExternalID = id
 
 	if err := h.assertCreatable(ctx, request); err != nil {
-		return nil, fmt.Errorf("creating rETL connection %q: %w", id, err)
+		return nil, fmt.Errorf("vetting rETL connection %q: %w", id, err)
 	}
 
 	created, err := h.client.CreateConnection(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("creating rETL connection %q: %w", id, err)
+	}
+	// The one skip reason a create cannot be vetted for up front: the server
+	// may store a config the spec cannot express (destination-specific settings
+	// filled in on its side). The create response is flattened by the same
+	// mapper as GET, so this is exactly what MapRemoteToState will see — and a
+	// row it skips would be re-created on every apply. Undo it instead.
+	if _, err := configFromRemote(created); err != nil {
+		if delErr := h.client.DeleteConnection(ctx, created.ID); delErr != nil {
+			return nil, fmt.Errorf("rETL connection %q was created as %q but cannot be read back (%w), and deleting it failed: %w", id, created.ID, err, delErr)
+		}
+		return nil, fmt.Errorf("rETL connection %q was created but cannot be read back, so it was deleted again: %w", id, err)
 	}
 	return toResourceData(created), nil
 }
@@ -262,7 +273,6 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		if err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
-		request.ExternalID = id
 		if err := h.assertCreatable(ctx, request); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
@@ -387,10 +397,11 @@ func (h *Handler) listAll(ctx context.Context, hasExternalID *bool) ([]retlClien
 // GetConnection reports endpoint ids only, so the source kind, the destination
 // definition and both names come from the source and destination lists.
 //
-// The first successful read is kept for the life of the handler. Every lookup
-// is for an endpoint that a remote connection row already references, so it
-// existed before the run started: an endpoint this apply creates can never be
-// one of them, and a stale snapshot cannot hide it. A failed read is not kept,
+// The first successful read is kept for the read path. Every lookup there is
+// for an endpoint a remote connection row already references, so it existed
+// before the run started and a stale snapshot cannot hide it. The write path
+// can name a destination this apply just created, so destination refetches on
+// a miss and replaces the destination map. A failed read is not kept,
 // so a transient error does not poison the handler. A built map is never
 // written to, only ever replaced wholesale (see destination), so a reader that
 // already holds one keeps a consistent snapshot across the syncer's concurrent
@@ -442,8 +453,8 @@ func (h *Handler) destination(ctx context.Context, id string) (apiClient.Destina
 	if dst, ok := h.destinationsByID[id]; ok {
 		return dst, nil
 	}
-	// ponytail: refetched under the lock, so concurrent creates naming the same
-	// new destination cost one call; coalesce per id if apply ever goes wide.
+	// Refetched under the lock, so concurrent creates naming the same new
+	// destination cost one call; coalesce per id if apply ever goes wide.
 	destinations, err := h.client.GetDestinations(ctx)
 	if err != nil {
 		return apiClient.Destination{}, fmt.Errorf("listing destinations: %w", err)
@@ -463,7 +474,10 @@ func (h *Handler) destination(ctx context.Context, id string) (apiClient.Destina
 func (h *Handler) destinationUsable(dst apiClient.Destination, object string) error {
 	registered, err := h.registry.GetByAPIType(dst.Type, dst.Version)
 	if err != nil {
-		return err
+		// Usually a definition registered only behind a flag this run has off —
+		// bingads_offline_conversions and customerio_audience sit behind
+		// unverifiedDestinations — so say so rather than surface the lookup.
+		return fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
 	}
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
 		return fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
