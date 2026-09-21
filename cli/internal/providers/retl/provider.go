@@ -3,8 +3,9 @@ package retl
 import (
 	"context"
 	"fmt"
-	"github.com/samber/lo"
 	"strconv"
+
+	"github.com/samber/lo"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
