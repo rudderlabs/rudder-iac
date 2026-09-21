@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -148,6 +147,19 @@ func TestCheckCronFrequency(t *testing.T) {
 			expression: "0,57 0,23 29 2 *",
 			expected:   CronCheckResult{Status: CronValid},
 		},
+		{
+			// "?" widens the minute field to every minute, which is what robfig
+			// does with it: ParseStandard fires this at 2026-01-02 01:00 and
+			// again a minute later. Reading it as a Quartz "no specific value"
+			// and warning instead would ship exactly that schedule.
+			expression: "? 1 7 1 5",
+			expected: CronCheckResult{
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 1-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 2, 1, 0),
+				NextViolatingSync: utc(2026, time.January, 2, 1, 1),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -171,9 +183,11 @@ func TestCheckCronSupportedGrammar(t *testing.T) {
 		"0-30/10 * * * *",
 		"15/20 * * * *",
 		"0,15,30,45 * * * *",
-		"0 0 * * 7",
-		"0 0 * * 0-7",
 		"0 0 29 2 *",
+		// robfig reads "?" as "*", so it is a wildcard here too and the day
+		// fields are ANDed exactly as they would be for "0 0 * * MON".
+		"0 0 ? * MON",
+		"0 0 * * ?",
 		"@hourly",
 		"@daily",
 		"@midnight",
@@ -181,7 +195,6 @@ func TestCheckCronSupportedGrammar(t *testing.T) {
 		"@monthly",
 		"@yearly",
 		"@annually",
-		"@DAILY",
 		"  0   0   *   *   *  ",
 		// Day-of-month and day-of-week are both restricted, so Vixie's OR
 		// semantics apply and every Friday matches alongside the 13th.
@@ -228,14 +241,27 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `minute field "jibber": "jibber" is not a number`,
 		},
 		{
-			name:       "six garbage fields stay invalid",
-			expression: "a b c d e f",
-			reason:     `seconds field "a": "a" is not a number`,
+			// ParseStandard takes exactly five fields, so the seconds and year
+			// dialects never run. The count is what decides, which keeps six
+			// words of garbage on the same message.
+			name:       "seconds field",
+			expression: "0 0 0 * * *",
+			reason:     "six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form",
 		},
 		{
-			name:       "seven garbage fields stay invalid",
+			name:       "seconds and year fields",
+			expression: "0 0 0 * * * 2030",
+			reason:     "seven-field expressions (leading seconds and trailing year fields) are not supported; use the five-field minute hour day-of-month month day-of-week form",
+		},
+		{
+			name:       "six garbage fields",
+			expression: "a b c d e f",
+			reason:     "six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form",
+		},
+		{
+			name:       "seven garbage fields",
 			expression: "a b c d e f g",
-			reason:     `seconds field "a": "a" is not a number`,
+			reason:     "seven-field expressions (leading seconds and trailing year fields) are not supported; use the five-field minute hour day-of-month month day-of-week form",
 		},
 		{
 			// Garbage carrying an extension marker is still garbage: warning
@@ -255,28 +281,9 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `hour field "L": "L" is not a number`,
 		},
 		{
-			// Malformed text outranks an unsupported construct whichever order
-			// the two appear in, so an error is never downgraded to a warning.
-			name:       "malformed field before an unsupported one",
-			expression: "garbage 0 L * *",
-			reason:     `minute field "garbage": "garbage" is not a number`,
-		},
-		{
-			name:       "malformed field after an unsupported one",
-			expression: "0 0 L * garbage",
-			reason:     `day-of-week field "garbage": "garbage" is not a number or day-of-week name`,
-		},
-		{
 			name:       "garbage beside an extension in the same list",
 			expression: "0 0 1,nonsense#2 * *",
 			reason:     `day-of-month field "1,nonsense#2": "nonsense#2" is not a number`,
-		},
-		{
-			// The year is checked for shape, not for a product range, so text
-			// that is not a year at all stays malformed.
-			name:       "garbage year",
-			expression: "0 0 0 * * * garbage",
-			reason:     `year field "garbage": "garbage" is not a number`,
 		},
 		{
 			// rETL has no reboot to fire on. The descriptor table is what makes
@@ -330,6 +337,13 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `duration shortcuts such as "@every 1h" are not part of the supported cron grammar; use a five-field expression such as "*/15 * * * *"`,
 		},
 		{
+			// robfig switches on the raw descriptor, so an uppercase spelling
+			// is unrecognised there and the schedule would never fire.
+			name:       "descriptor in the wrong case",
+			expression: "@DAILY",
+			reason:     `unknown descriptor "@DAILY"; supported descriptors are @hourly, @daily, @midnight, @weekly, @monthly, @yearly and @annually`,
+		},
+		{
 			name:       "unknown descriptor",
 			expression: "@fortnightly",
 			reason:     `unknown descriptor "@fortnightly"; supported descriptors are @hourly, @daily, @midnight, @weekly, @monthly, @yearly and @annually`,
@@ -340,38 +354,75 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `descriptor "@daily" does not take arguments`,
 		},
 		{
-			// A day number outside the field's range is malformed in every
-			// dialect, so the extension shape must not excuse it. These are the
-			// cases where an error was being downgraded to a warning, which
-			// under DEX-829 would apply a schedule that can never run.
-			name:       "out of range day-of-week in # extension",
-			expression: "0 0 * * 9#3",
-			reason:     `day-of-week field "9#3": "9#3" is not a number or day-of-week name`,
+			// Vixie's second spelling of Sunday, which ParseStandard rejects
+			// with "end of range (7) above maximum (6)". A valid verdict here
+			// would ship a connection that never syncs.
+			name:       "day-of-week 7",
+			expression: "0 0 * * 7",
+			reason:     `day-of-week field "7": 7 is out of range 0-6`,
 		},
 		{
-			name:       "out of range day-of-month in L extension",
-			expression: "0 0 32L * *",
-			reason:     `day-of-month field "32L": "32L" is not a number`,
+			name:       "day-of-week range ending at 7",
+			expression: "0 0 * * 0-7",
+			reason:     `day-of-week field "0-7": 7 is out of range 0-6`,
 		},
 		{
-			name:       "out of range day-of-month in W extension",
-			expression: "0 0 0W * *",
-			reason:     `day-of-month field "0W": "0W" is not a number`,
+			// Every Quartz day extension fails in ParseStandard, so each is an
+			// error rather than a warning - one row per form, in the day field
+			// Quartz writes it in and in the one it does not.
+			name:       "last day of month",
+			expression: "0 0 L * *",
+			reason:     `day-of-month field "L": "L" is not a number`,
 		},
 		{
-			name:       "out of range offset in L- extension",
-			expression: "0 0 L-99 * *",
-			reason:     `day-of-month field "L-99": "L" is not a number`,
+			name:       "last weekday of month",
+			expression: "0 0 LW * *",
+			reason:     `day-of-month field "LW": "LW" is not a number`,
 		},
 		{
-			name:       "out of range day-of-week in L extension",
-			expression: "0 0 * * 8L",
-			reason:     `day-of-week field "8L": "8L" is not a number or day-of-week name`,
+			name:       "offset from the last day",
+			expression: "0 0 L-3 * *",
+			reason:     `day-of-month field "L-3": "L" is not a number`,
 		},
 		{
-			// Quartz spells these with day names too. Only the numeric forms
-			// are recognised, and erring towards an error is the safe
-			// direction: a warning would let the schedule through unchecked.
+			name:       "nearest weekday",
+			expression: "0 0 15W * *",
+			reason:     `day-of-month field "15W": "15W" is not a number`,
+		},
+		{
+			name:       "nearest weekday in the day-of-week field",
+			expression: "0 0 * * 5W",
+			reason:     `day-of-week field "5W": "5W" is not a number or day-of-week name`,
+		},
+		{
+			name:       "last given weekday of month",
+			expression: "0 0 * * 5L",
+			reason:     `day-of-week field "5L": "5L" is not a number or day-of-week name`,
+		},
+		{
+			name:       "last given weekday in the day-of-month field",
+			expression: "0 0 31L * *",
+			reason:     `day-of-month field "31L": "31L" is not a number`,
+		},
+		{
+			name:       "nth weekday",
+			expression: "0 0 * * 5#3",
+			reason:     `day-of-week field "5#3": "5#3" is not a number or day-of-week name`,
+		},
+		{
+			name:       "nth weekday in the day-of-month field",
+			expression: "0 0 9#3 * *",
+			reason:     `day-of-month field "9#3": "9#3" is not a number`,
+		},
+		{
+			// An extension anywhere in a list takes the whole field with it.
+			name:       "extension inside an otherwise valid list",
+			expression: "0 0 1,15W * *",
+			reason:     `day-of-month field "1,15W": "15W" is not a number`,
+		},
+		{
+			// Quartz spells these with day names too, and they fail the same
+			// way: the reading is the parser's, not the extension table's.
 			name:       "day name spelling of the # extension",
 			expression: "0 0 * * FRI#2",
 			reason:     `day-of-week field "FRI#2": "FRI#2" is not a number or day-of-week name`,
@@ -382,12 +433,11 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `day-of-week field "FRIL": "FRIL" is not a number or day-of-week name`,
 		},
 		{
-			// Quartz writes "?" only in the two day fields. A parser that read
-			// it as "*" anywhere would widen this to every minute of every day
-			// instead of rejecting it, so the boundary is pinned here.
-			name:       "no specific value outside the day fields",
-			expression: "? 1 7 1 5",
-			reason:     `minute field "?": "?" is not a number`,
+			// robfig strips only the exact uppercase spellings, so a lowercase
+			// prefix is just a sixth field there and has to be one here too.
+			name:       "lowercase timezone prefix",
+			expression: "tz=UTC 0 0 * * *",
+			reason:     "six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form",
 		},
 		{
 			// A directive is reported only once the expression it prefixes has
@@ -398,41 +448,14 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `day-of-week field "9#3": "9#3" is not a number or day-of-week name`,
 		},
 		{
+			name:       "timezone directive in front of a six-field expression",
+			expression: "TZ=UTC 0 0 0 * * *",
+			reason:     "six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form",
+		},
+		{
 			name:       "timezone directive with no expression",
 			expression: "TZ=UTC",
 			reason:     "timezone directive is not followed by a cron expression",
-		},
-		{
-			// The year is checked even though the day field already produced a
-			// warning, so an extension cannot carry a malformed year past it.
-			name:       "extension does not excuse a malformed year",
-			expression: "0 0 0 L * ? garbage",
-			reason:     `year field "garbage": "garbage" is not a number`,
-		},
-		{
-			// Quartz writes "#" in day-of-week only. Accepted in day-of-month
-			// it would check a weekday number against the day numbers 1-31 and
-			// pass a weekday that does not exist.
-			name:       "nth weekday in the day-of-month field",
-			expression: "0 0 9#3 * *",
-			reason:     `day-of-month field "9#3": "9#3" is not a number`,
-		},
-		{
-			name:       "nearest weekday in the day-of-week field",
-			expression: "0 0 * * 5W",
-			reason:     `day-of-week field "5W": "5W" is not a number or day-of-week name`,
-		},
-		{
-			name:       "last given weekday in the day-of-month field",
-			expression: "0 0 31L * *",
-			reason:     `day-of-month field "31L": "31L" is not a number`,
-		},
-		{
-			// An L- offset runs 0-30, not over the day numbers, so 31 could
-			// never select a day no matter how long the month.
-			name:       "out of range offset in L- extension",
-			expression: "0 0 L-31 * *",
-			reason:     `day-of-month field "L-31": "L" is not a number`,
 		},
 		{
 			// A schedule the server would happily store and never run.
@@ -459,6 +482,9 @@ func TestCheckCronInvalid(t *testing.T) {
 	}
 }
 
+// The timezone prefix is the only construct left that ParseStandard accepts
+// and this package still declines to analyse: it evaluates the expression in
+// that zone, and every scan here is in UTC.
 func TestCheckCronUnsupportedDialect(t *testing.T) {
 	t.Parallel()
 
@@ -467,71 +493,6 @@ func TestCheckCronUnsupportedDialect(t *testing.T) {
 		expression string
 		reason     string
 	}{
-		{
-			name:       "last day of month",
-			expression: "0 0 L * *",
-			reason:     `day-of-month field "L": the "L" (last day) extension is not supported`,
-		},
-		{
-			name:       "last weekday of month",
-			expression: "0 0 LW * *",
-			reason:     `day-of-month field "LW": the "LW" (last weekday of the month) extension is not supported`,
-		},
-		{
-			// Quartz writes this one in day-of-week: the last Friday of the
-			// month. It is a dialect we decline to analyse, not malformed.
-			name:       "last given weekday of month",
-			expression: "0 0 * * 5L",
-			reason:     `day-of-week field "5L": the "L" (last given weekday of the month) extension is not supported`,
-		},
-		{
-			// The lower bound of the offset range, which is 0 and not 1.
-			name:       "zero offset from the last day",
-			expression: "0 0 L-0 * *",
-			reason:     `day-of-month field "L-0": the "L-n" (offset from the last day) extension is not supported`,
-		},
-		{
-			name:       "extension inside a seven-field expression",
-			expression: "0 0 0 L * ? 2030",
-			reason:     `day-of-month field "L": the "L" (last day) extension is not supported`,
-		},
-		{
-			name:       "nearest weekday",
-			expression: "0 0 15W * *",
-			reason:     `day-of-month field "15W": the "W" (nearest weekday) extension is not supported`,
-		},
-		{
-			name:       "extension inside an otherwise valid list",
-			expression: "0 0 1,15W * *",
-			reason:     `day-of-month field "1,15W": the "W" (nearest weekday) extension is not supported`,
-		},
-		{
-			name:       "nth weekday",
-			expression: "0 0 * * 5#3",
-			reason:     `day-of-week field "5#3": the "#" (nth weekday of the month) extension is not supported`,
-		},
-		{
-			name:       "no specific value",
-			expression: "0 0 ? * MON",
-			reason:     `day-of-month field "?": the "?" (no specific value) extension is not supported`,
-		},
-		{
-			name:       "seconds field",
-			expression: "0 0 0 * * *",
-			reason:     "six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form",
-		},
-		{
-			name:       "seconds and year fields",
-			expression: "0 0 0 * * * 2030",
-			reason:     "seven-field expressions (leading seconds and trailing year fields) are not supported; use the five-field minute hour day-of-month month day-of-week form",
-		},
-		{
-			// Shaped like a year, so the dialect is identified even though no
-			// accepted year range has been established for the product.
-			name:       "year outside any range we can vouch for",
-			expression: "0 0 0 * * * 1969",
-			reason:     "seven-field expressions (leading seconds and trailing year fields) are not supported; use the five-field minute hour day-of-month month day-of-week form",
-		},
 		{
 			name:       "timezone directive",
 			expression: "CRON_TZ=Asia/Kolkata 0 0 * * *",
@@ -667,17 +628,5 @@ func BenchmarkCheckCron(b *testing.B) {
 				CheckCron(expression)
 			}
 		})
-	}
-}
-
-// A field of repeated extensions used to be formatted into a diagnostic once
-// per matching element while only the first was ever kept, which is quadratic
-// in the length of the field: 8000 elements allocated 252MB. Only the first
-// match is built now, and this is what would show a regression.
-func BenchmarkCheckCronRepeatedExtensions(b *testing.B) {
-	expression := "0 0 " + strings.Repeat("L,", 4000) + "garbage * *"
-
-	for b.Loop() {
-		CheckCron(expression)
 	}
 }
