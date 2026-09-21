@@ -24,11 +24,15 @@
 // which field was at fault, so the rule below - that malformed text outranks an
 // unsupported construct - needs every field parsed separately anyway.
 //
-// One difference is not a fence but a change of verdict: robfig deliberately
-// clears its wildcard flag for a stepped wildcard, so "*/2" stops counting as a
-// wildcard and the two day fields switch from AND to OR. Vixie keys those
-// semantics off the literal "*", and "0,57 0,23 */2 * MON" is valid under one
-// reading and too frequent under the other.
+// One robfig behaviour is not fenced off but adopted: it deliberately clears
+// its wildcard flag for a stepped wildcard, so "*/2" stops counting as a
+// wildcard and the two day fields switch from AND to OR, where Vixie keys those
+// semantics off the literal "*". robfig's is the reading that matters, because
+// robfig is what fires the syncs: rudder-sources schedules through
+// cron.ParseStandard, and the expression reaches it verbatim - the public API
+// stores it without parsing it. So "0,57 0,23 */2 * MON" is too frequent here,
+// which is what robfig does with it: from 2026-01-01 it fires 2026-01-11 23:57
+// and again 2026-01-12 00:00, three minutes later.
 //
 // So the parser stays - not because a library could not do it, but because the
 // fences cost what the parser costs, and this way nothing has to be pinned to a
@@ -492,11 +496,13 @@ func (f cronField) parse(raw string) ([]bool, bool, *CronCheckResult) {
 		}
 	}
 
-	// Vixie sets the flag from the first character of the field, before the
-	// list is parsed at all, so "*,3" is a wildcard and "3,*" is not - even
-	// though the two select exactly the same values. The flag only decides the
+	// The flag is read off the first list element, so "*,3" is a wildcard and
+	// "3,*" is not - even though the two select exactly the same values. A
+	// stepped wildcard is not one: "*/2" clears the flag, which is what robfig
+	// does and so what the schedules actually run. The flag only decides the
 	// day semantics, which is why the distinction survives at all.
-	star = strings.HasPrefix(raw, "*")
+	firstElement, _, _ := strings.Cut(raw, ",")
+	star = firstElement == "*"
 
 	return values, star, nil
 }

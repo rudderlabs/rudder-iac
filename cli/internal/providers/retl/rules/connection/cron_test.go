@@ -112,6 +112,19 @@ func TestCheckCronFrequency(t *testing.T) {
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
+			// A stepped wildcard clears the flag, as it does in robfig, so the
+			// day fields are ORed: every odd day matches and so does every
+			// Monday. The first odd day followed by a Monday puts three minutes
+			// across midnight, and robfig fires exactly this pair.
+			expression: "0,57 0,23 */2 * MON",
+			expected: CronCheckResult{
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 11, 23, 57),
+				NextViolatingSync: utc(2026, time.January, 12, 0, 0),
+			},
+		},
+		{
 			// Leap day: the reference origin is 2026, so the first occurrence is
 			// two years out and the violation still has to be reported.
 			expression: "0,3 0 29 2 *",
@@ -172,11 +185,6 @@ func TestCheckCronSupportedGrammar(t *testing.T) {
 		"0 0 13 * FRI",
 		// February 30th never exists, but the OR keeps Mondays in February.
 		"0 0 30 2 1",
-		// A stepped wildcard is still a wildcard, so the day fields are ANDed
-		// and only odd-numbered Mondays match - never two days running. Read as
-		// OR, Jan 31 and Feb 1 would both match and the three-minute midnight
-		// gap would make this too frequent.
-		"0,57 0,23 */2 * MON",
 		// A step wider than the field selects only its start value. The mask is
 		// filled by repeated addition, so a step near math.MaxInt used to
 		// overflow into a negative index and panic.
