@@ -15,6 +15,7 @@ import (
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/samber/lo"
@@ -88,12 +89,17 @@ func eligibleRemote(t *testing.T, conn retlClient.RETLConnection) *RemoteConnect
 	require.True(t, ok, "destination %q is not one of the shared fixtures", conn.DestinationID)
 	config, err := configFromRemote(&conn)
 	require.NoError(t, err)
+	// Resolved from the source's type rather than pinned to SourceKinds[0]:
+	// with more than one kind registered, the index silently produced the
+	// sql-model kind for a table-backed source.
+	kind, ok := SourceKindBySourceType(source.SourceType)
+	require.True(t, ok, "source type %q is not a registered source kind", source.SourceType)
 
 	return &RemoteConnection{
 		RETLConnection:        conn,
 		Config:                config,
 		WorkspaceID:           source.WorkspaceID,
-		SourceKind:            SourceKinds[0],
+		SourceKind:            kind,
 		SourceName:            source.Name,
 		SourceExternalID:      source.ExternalID,
 		DestinationName:       dst.Name,
@@ -279,12 +285,17 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		unrepresentable := remoteRow("conn-config", "users-to-webhook-2", "src-1", "dst-1")
 		unrepresentable.DestinationConfig = []byte(`{"listId":"42"}`)
 
+		// A table-backed source is expressible now that retl-source-table is a
+		// registered source kind. Before that it was dropped here alongside the
+		// genuinely unrepresentable rows, which is the behaviour this PR changes.
+		tableSource := remoteRow("conn-table-source", "b", "src-table", "dst-1")
+
 		mock := remoteClient([]retlClient.RETLConnection{
 			supported,
 			objectMapping,
 			unrepresentable,
 			remoteRow("conn-missing-source", "a", "src-gone", "dst-1"),
-			remoteRow("conn-table-source", "b", "src-table", "dst-1"),
+			tableSource,
 			remoteRow("conn-missing-destination", "c", "src-1", "dst-gone"),
 			remoteRow("conn-unregistered-version", "d", "src-1", "dst-old"),
 			remoteRow("conn-not-warehouse", "e", "src-1", "dst-eventstream"),
@@ -298,9 +309,35 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		require.Len(t, mock.ListCalls, 1)
 		assert.Equal(t, lo.ToPtr(true), mock.ListCalls[0].HasExternalID)
 		assert.Equal(t, map[string]*resources.RemoteResource{
-			"conn-1":      {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
-			"conn-object": {ID: "conn-object", ExternalID: "users-to-bingads", Data: eligibleRemote(t, objectMapping)},
+			"conn-1":            {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
+			"conn-object":       {ID: "conn-object", ExternalID: "users-to-bingads", Data: eligibleRemote(t, objectMapping)},
+			"conn-table-source": {ID: "conn-table-source", ExternalID: "b", Data: eligibleRemote(t, tableSource)},
 		}, collection.GetAll(ResourceType))
+	})
+
+	// Connections and table sources are independent flags. With the table kind
+	// off, a table-backed row must still be dropped with the flag named — not
+	// exported as a reference to a kind this CLI cannot load.
+	t.Run("drops a table-backed row when the table kind is not enabled", func(t *testing.T) {
+		t.Parallel()
+
+		supported := remoteRow("conn-1", "users-to-webhook", "src-1", "dst-1")
+		tableSource := remoteRow("conn-table-source", "b", "src-table", "dst-1")
+		mock := remoteClient([]retlClient.RETLConnection{supported, tableSource})
+
+		h := remoteHandler(mock, t)
+		h.EnableSourceKinds(sqlmodel.ResourceType, ResourceType)
+		collection, err := h.LoadResourcesFromRemote(t.Context())
+		require.NoError(t, err)
+
+		assert.Equal(t, map[string]*resources.RemoteResource{
+			"conn-1": {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
+		}, collection.GetAll(ResourceType))
+
+		sources, destinations, err := h.endpoints(t.Context())
+		require.NoError(t, err)
+		_, err = h.remoteConnection(tableSource, sources, destinations)
+		assert.EqualError(t, err, `connection "conn-table-source": its source is a retl-source-table, which is not enabled (set RUDDERSTACK_X_RETL_TABLE_SUPPORT=true)`)
 	})
 
 	t.Run("an empty workspace never reaches for the endpoint catalogs", func(t *testing.T) {
@@ -352,6 +389,9 @@ func managedCollection(t *testing.T, conns ...retlClient.RETLConnection) *resour
 		"src-1":         {ID: "src-1", ExternalID: "users"},
 		"src-unmanaged": {ID: "src-unmanaged"},
 	})
+	collection.Set(table.ResourceType, map[string]*resources.RemoteResource{
+		"src-table": {ID: "src-table", ExternalID: "customers"},
+	})
 	collection.Set(destination.DestinationResourceType, map[string]*resources.RemoteResource{
 		"dst-1": {ID: "dst-1", ExternalID: "webhook"},
 	})
@@ -392,6 +432,19 @@ func TestMapRemoteToState(t *testing.T) {
 			},
 		}, s.Resources)
 		assert.Equal(t, local.Source, s.Resources["retl-connection:users-to-webhook"].Input[SourceKey])
+	})
+
+	// resolveSourceURN walks every source kind; this is the table row's arm.
+	t.Run("resolves a table-backed row to its table source", func(t *testing.T) {
+		t.Parallel()
+
+		s, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(t,
+			remoteRow("conn-table", "customers-to-webhook", "src-table", "dst-1")))
+		require.NoError(t, err)
+
+		require.Contains(t, s.Resources, "retl-connection:customers-to-webhook")
+		assert.Equal(t, &resources.PropertyRef{URN: "retl-source-table:customers", Property: "id"},
+			s.Resources["retl-connection:customers-to-webhook"].Input[SourceKey])
 	})
 
 	t.Run("skips rows whose endpoints are not managed", func(t *testing.T) {

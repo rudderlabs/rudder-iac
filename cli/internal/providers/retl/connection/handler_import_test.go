@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +72,7 @@ func TestLoadImportable(t *testing.T) {
 					RETLConnection:        conn,
 					Config:                config,
 					WorkspaceID:           "ws-1",
-					SourceKind:            SourceKinds[0],
+					SourceKind:            sqlModelKind,
 					SourceName:            "Users",
 					SourceExternalID:      "users",
 					DestinationName:       "Webhook",
@@ -101,7 +102,7 @@ func importableConnection(t *testing.T, remoteID, externalID, sourceID, destinat
 			RETLConnection: row,
 			Config:         config,
 			WorkspaceID:    "ws-1",
-			SourceKind:     SourceKinds[0],
+			SourceKind:     sqlModelKind,
 		},
 	}
 }
@@ -207,6 +208,35 @@ func TestFormatForExport(t *testing.T) {
 			{WorkspaceID: "ws-1", URN: "retl-connection:orders-to-webhook", RemoteID: "conn-2"},
 			{WorkspaceID: "ws-1", URN: "retl-connection:users-to-webhook", RemoteID: "conn-1"},
 		}, entries)
+	})
+
+	// DEX-865: a table-backed row exports a table reference both ways the
+	// endpoint can be named — its source imported in this same run (the
+	// resolver serves it) or already managed (its externalId builds the ref).
+	t.Run("exports a table-backed source as a table reference", func(t *testing.T) {
+		t.Parallel()
+
+		imported := importableConnection(t, "conn-1", "customers-to-webhook", "src-table", "dst-1")
+		imported.Data.(*RemoteConnection).SourceKind = tableKind
+		managed := importableConnection(t, "conn-2", "leads-to-webhook", "src-table-2", "dst-1")
+		managed.Data.(*RemoteConnection).SourceKind = tableKind
+		managed.Data.(*RemoteConnection).SourceExternalID = "leads"
+
+		entities, _, err := remoteHandler(remoteClient(), t).FormatForExport(
+			connectionCollection(imported, managed),
+			&mockNamer{},
+			&mockResolver{refs: map[string]string{
+				table.ResourceType + "/src-table":              "#retl-source-table:customers",
+				destination.DestinationResourceType + "/dst-1": "#destination:webhook",
+			}},
+		)
+		require.NoError(t, err)
+
+		require.Len(t, entities, 1)
+		assert.Equal(t, []map[string]any{
+			exportedEntry(t, "customers-to-webhook", "#retl-source-table:customers", "#destination:webhook", true),
+			exportedEntry(t, "leads-to-webhook", "#retl-source-table:leads", "#destination:webhook", true),
+		}, entities[0].Content.(*specs.Spec).Spec[ConnectionsKey])
 	})
 
 	t.Run("matched connections write manifest entries only", func(t *testing.T) {
