@@ -48,6 +48,25 @@ type Handler struct {
 	endpointsMu      sync.Mutex
 	sourcesByID      map[string]retlClient.RETLSource
 	destinationsByID map[string]apiClient.Destination
+
+	// enabledSourceTypes is the set of source kinds this run registered; nil
+	// means all of SourceKinds. Set once by the provider, before any operation.
+	enabledSourceTypes map[string]bool
+}
+
+// EnableSourceKinds narrows the source kinds remote rows may use to those whose
+// resource type is registered. The provider calls it after every option, so a
+// connection on a kind whose flag is off is skipped with that flag named,
+// rather than exported as a reference this CLI cannot load.
+func (h *Handler) EnableSourceKinds(resourceTypes ...string) {
+	h.enabledSourceTypes = make(map[string]bool, len(resourceTypes))
+	for _, rt := range resourceTypes {
+		h.enabledSourceTypes[rt] = true
+	}
+}
+
+func (h *Handler) sourceKindEnabled(sk SourceKind) bool {
+	return h.enabledSourceTypes == nil || h.enabledSourceTypes[sk.ResourceType]
 }
 
 // NewHandler takes the destination registry because a remote row names its
@@ -220,11 +239,35 @@ func (h *Handler) Create(ctx context.Context, id string, data resources.Resource
 	}
 	request.ExternalID = id
 
+	if err := h.assertCreatable(ctx, request); err != nil {
+		return nil, fmt.Errorf("vetting rETL connection %q: %w", id, err)
+	}
+
 	created, err := h.client.CreateConnection(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("creating rETL connection %q: %w", id, err)
 	}
+	// The one skip reason a create cannot be vetted for up front: the server
+	// may store a config the spec cannot express (destination-specific settings
+	// filled in on its side). The create response is flattened by the same
+	// mapper as GET, so this is exactly what MapRemoteToState will see — and a
+	// row it skips would be re-created on every apply. Undo it instead.
+	if _, err := configFromRemote(created); err != nil {
+		if delErr := h.client.DeleteConnection(ctx, created.ID); delErr != nil {
+			return nil, fmt.Errorf("rETL connection %q was created as %q but cannot be read back (%w), and deleting it failed: %w", id, created.ID, err, delErr)
+		}
+		return nil, fmt.Errorf("rETL connection %q was created but cannot be read back, so it was deleted again: %w", id, err)
+	}
 	return toResourceData(created), nil
+}
+
+// assertCreatable refuses a create the read path would not be able to map back.
+func (h *Handler) assertCreatable(ctx context.Context, request *retlClient.CreateRETLConnectionRequest) error {
+	dst, err := h.destination(ctx, request.DestinationID)
+	if err != nil {
+		return err
+	}
+	return h.destinationUsable(dst, request.Object)
 }
 
 // Update changes the mutable fields in one PUT; toUpdateRequest rejects a change
@@ -243,9 +286,13 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 	}
 
 	if replace {
-		// Build the create body before the delete: a config the API would
+		// Vet the whole create before the delete: anything the create would
 		// refuse must not cost the live connection.
-		if _, err := toCreateRequest(data); err != nil {
+		request, err := toCreateRequest(data)
+		if err != nil {
+			return nil, fmt.Errorf("connection %q: %w", id, err)
+		}
+		if err := h.assertCreatable(ctx, request); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
 		}
 		log.Warn("replacing rETL connection after an endpoint change",
@@ -369,13 +416,15 @@ func (h *Handler) listAll(ctx context.Context, hasExternalID *bool) ([]retlClien
 // GetConnection reports endpoint ids only, so the source kind, the destination
 // definition and both names come from the source and destination lists.
 //
-// The first successful read is kept for the life of the handler. Every lookup
-// is for an endpoint that a remote connection row already references, so it
-// existed before the run started: an endpoint this apply creates can never be
-// one of them, and a stale snapshot cannot hide it. A failed read is not kept,
-// so a transient error does not poison the handler. The maps are never written
-// to after they are built, which is what makes sharing them across the syncer's
-// concurrent imports safe.
+// The first successful read is kept for the read path. Every lookup there is
+// for an endpoint a remote connection row already references, so it existed
+// before the run started and a stale snapshot cannot hide it. The write path
+// can name a destination this apply just created, so destination refetches on
+// a miss and replaces the destination map. A failed read is not kept,
+// so a transient error does not poison the handler. A built map is never
+// written to, only ever replaced wholesale (see destination), so a reader that
+// already holds one keeps a consistent snapshot across the syncer's concurrent
+// imports.
 func (h *Handler) endpoints(ctx context.Context) (map[string]retlClient.RETLSource, map[string]apiClient.Destination, error) {
 	h.endpointsMu.Lock()
 	defer h.endpointsMu.Unlock()
@@ -397,13 +446,65 @@ func (h *Handler) endpoints(ctx context.Context) (map[string]retlClient.RETLSour
 	for _, source := range sources.Data {
 		sourcesByID[source.ID] = source
 	}
-	destinationsByID := make(map[string]apiClient.Destination, len(destinations))
-	for _, d := range destinations {
-		destinationsByID[d.ID] = d
-	}
+	destinationsByID := destinationIndex(destinations)
 
 	h.sourcesByID, h.destinationsByID = sourcesByID, destinationsByID
 	return sourcesByID, destinationsByID, nil
+}
+
+func destinationIndex(destinations []apiClient.Destination) map[string]apiClient.Destination {
+	byID := make(map[string]apiClient.Destination, len(destinations))
+	for _, d := range destinations {
+		byID[d.ID] = d
+	}
+	return byID
+}
+
+// destination finds a workspace destination for the write path. A miss is
+// refetched before it is believed: the cached catalog is a snapshot taken
+// before the apply, so a create can legitimately name a destination this same
+// apply just built. Still missing after that is fatal, because the API accepts
+// such a create and the read path then skips the row forever.
+func (h *Handler) destination(ctx context.Context, id string) (apiClient.Destination, error) {
+	h.endpointsMu.Lock()
+	defer h.endpointsMu.Unlock()
+
+	if dst, ok := h.destinationsByID[id]; ok {
+		return dst, nil
+	}
+	// Refetched under the lock, so concurrent creates naming the same new
+	// destination cost one call; coalesce per id if apply ever goes wide.
+	destinations, err := h.client.GetDestinations(ctx)
+	if err != nil {
+		return apiClient.Destination{}, fmt.Errorf("listing destinations: %w", err)
+	}
+	h.destinationsByID = destinationIndex(destinations)
+	dst, ok := h.destinationsByID[id]
+	if !ok {
+		return apiClient.Destination{}, fmt.Errorf("destination %q was not found in this workspace", id)
+	}
+	return dst, nil
+}
+
+// destinationUsable reports why a destination cannot carry a rETL connection,
+// or nil when it can. Read and write both consult it, so a create cannot write
+// a row the read path would skip. It covers the destination rules only; the
+// source-side reasons remoteConnection skips for stay read-path only.
+func (h *Handler) destinationUsable(dst apiClient.Destination, object string) error {
+	registered, err := h.registry.GetByAPIType(dst.Type, dst.Version)
+	if err != nil {
+		// Usually a definition registered only behind a flag this run has off —
+		// bingads_offline_conversions and customerio_audience sit behind
+		// unverifiedDestinations — so say so rather than surface the lookup.
+		return fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
+	}
+	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
+		return fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
+	}
+	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // remoteConnection checks one remote row against everything the spec contract
@@ -423,6 +524,9 @@ func (h *Handler) remoteConnection(
 	if !ok {
 		return nil, fmt.Errorf("connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
 	}
+	if !h.sourceKindEnabled(sourceKind) {
+		return nil, fmt.Errorf("connection %q: its source is a %s, which is not enabled (set %s=true)", conn.ID, sourceKind.Kind, sourceKind.Flag)
+	}
 	// The workspace is what an import entry is filed under; without one there
 	// is no valid import metadata to write for the row.
 	if source.WorkspaceID == "" {
@@ -432,21 +536,7 @@ func (h *Handler) remoteConnection(
 	if !ok {
 		return nil, fmt.Errorf("connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
 	}
-	registered, err := h.registry.GetByAPIType(dst.Type, dst.Version)
-	if err != nil {
-		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
-	}
-	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
-		return nil, fmt.Errorf("connection %q: destination type %q does not accept warehouse sources", conn.ID, dst.Type)
-	}
-
-	// The object is what tells the two generic flows apart, here as in the
-	// backend; ClassifyFlow also refuses the destination-specific flows.
-	var object *string
-	if conn.Object != "" {
-		object = &conn.Object
-	}
-	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), object); err != nil {
+	if err := h.destinationUsable(dst, conn.Object); err != nil {
 		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
 	}
 	// configFromRemote names the connection in its own errors, so wrapping here

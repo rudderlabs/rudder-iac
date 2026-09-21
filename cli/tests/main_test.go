@@ -43,22 +43,31 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-// allowUnverifiedDestinationResidue lets remote state loading decode unverified
-// managed destinations that a previous TestDestinationsApply run left behind.
+// allowManagedResidue lets remote state loading see every managed kind a
+// previous run could have left behind in the shared workspace, so the destroy
+// each live test opens with can remove it.
 //
-// Destinations are GA, so the provider loads remote destination state on every
-// apply, destroy and dry-run — including in tests that touch no destinations.
-// These live tests share one workspace, and TestDestinationsApply creates
-// managed attentive_tag/http/rs/salesforce destinations there; if its cleanup
-// destroy fails, only s3 is registered on the next run and the residue fails
-// the whole load. Keep this with the tests that need it rather than as a CI
-// repository variable, so the requirement travels with the code.
+// Unverified destinations: destinations are GA, so remote destination state
+// loads on every apply, destroy and dry-run, even in tests that touch no
+// destinations. TestDestinationsApply creates managed
+// attentive_tag/http/rs/salesforce destinations; if its cleanup destroy fails,
+// only s3 is registered on the next run and the residue fails the whole load.
 //
-// Callers set RUDDERSTACK_CLI_EXPERIMENTAL themselves. This only reads as
-// redundant — the umbrella switch is what makes their own flags take effect, so
-// dropping this call must never be able to silently disable an unrelated one.
-func allowUnverifiedDestinationResidue(t *testing.T) {
+// rETL kinds: retl-source-table and retl-connections load only behind their
+// own flags, and a destroy cannot see a kind it has not loaded. PR runs are
+// cancelled in-progress by design, so a run killed mid TestRETLConnectionsApply
+// would otherwise leave rows the next run's opening destroy cannot reach —
+// the source then cannot be deleted either while a connection still uses it.
+//
+// Keep this with the tests rather than as CI repository variables, so the
+// requirement travels with the code. Callers still set
+// RUDDERSTACK_CLI_EXPERIMENTAL themselves for their own flags; it is set here
+// too because the rETL flags take effect only under it.
+func allowManagedResidue(t *testing.T) {
 	t.Helper()
 
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
+	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
+	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
 }
