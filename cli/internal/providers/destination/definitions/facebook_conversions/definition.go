@@ -95,7 +95,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "FACEBOOK_CONVERSIONS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "dataset_id"},
 		NewConfig: func() any {
 			return &facebookConversionsConfig{}
 		},

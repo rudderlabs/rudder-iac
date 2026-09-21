@@ -24,7 +24,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "facebook_pixel", registered.Type)
 	assert.Equal(t, "FACEBOOK_PIXEL", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"access_token", "legacy_conversion_pixel_id.to", "pixel_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -156,14 +156,6 @@ func TestFacebookPixelConfigValidation(t *testing.T) {
 			config map[string]any
 			path   string
 		}{
-			{
-				name: "use_native_sdk",
-				key:  "use_native_sdk",
-				config: map[string]any{
-					"android": true,
-				},
-				path: "/use_native_sdk/android",
-			},
 			{
 				name: "auto_config",
 				key:  "auto_config",
@@ -477,7 +469,6 @@ func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 			Name: "web device settings",
 			LocalJSON: `{
 				"pixel_id": "pixel-1",
-				"use_native_sdk": {"web": true},
 				"auto_config": {"web": false},
 				"legacy_conversion_pixel_id": [
 					{"from": "Signup", "to": "1234567890"},
@@ -486,7 +477,6 @@ func TestFacebookPixelConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"pixelId": "pixel-1",
-				"useNativeSDK": {"web": true},
 				"autoConfig": {"web": false},
 				"legacyConversionPixelId": {
 					"web": [
@@ -708,9 +698,6 @@ func validWebDeviceConfig() map[string]any {
 	return map[string]any{
 		"pixel_id":     "pixel-1",
 		"access_token": "fbAccessToken",
-		"use_native_sdk": map[string]any{
-			"web": true,
-		},
 		"auto_config": map[string]any{
 			"web": false,
 		},
@@ -745,9 +732,6 @@ func exampleYAMLConfig() map[string]any {
 		},
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Product Viewed", "Order Completed"},
-		},
-		"use_native_sdk": map[string]any{
-			"web": true,
 		},
 		"auto_config": map[string]any{
 			"web": false,

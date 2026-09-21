@@ -43,6 +43,8 @@ match_behavior:
         version: "rudder/v0.1"
       - kind: "retl-source-sql-model"
         version: "rudder/v1"
+      - kind: "retl-source-table"
+        version: "rudder/v1"
       - kind: "tp"
         version: "rudder/0.1"
       - kind: "tp"

@@ -316,11 +316,11 @@ func ValidateDestinationConfig(
 }
 
 // settingsBlocksMissingSourceType (V-C8): a destination declares its per-source
-// settings in blocks keyed by source type — connection_mode and
-// use_native_sdk — so connecting a source needs an entry for its type in at
-// least one of them. It returns the blocks that could hold the entry but do
-// not, so the caller's error names only the ones the author can actually write
-// to; a nil result means there is nothing to report.
+// connection settings in blocks keyed by source type — connection_mode today —
+// so connecting a source needs an entry for its type in one of them. It returns
+// the blocks that could hold the entry but do not, so the caller's error names
+// only the ones the author can actually write to; an empty result means there
+// is nothing to report.
 func settingsBlocksMissingSourceType(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -359,9 +359,8 @@ func settingsBlocksMissingSourceType(
 	}
 
 	// An empty result also covers the case where no block can name this source
-	// type — adj and posthog declare use_native_sdk as a closed struct and no
-	// connection_mode — so there is nowhere for the author to write the entry an
-	// error would ask for.
+	// type, so there is nowhere for the author to write the entry an error
+	// would ask for.
 	return candidates
 }
 
@@ -374,9 +373,7 @@ func missingRequiredConfigKeys(
 ) []string {
 	var missing []string
 	for _, key := range connectTimeRequiredKeys(registered, sourceType, config) {
-		// Source-type-scoped keys (connection_mode, use_native_sdk) are not
 		// flat config fields: the destination spec carries them as maps keyed
-		// by source type (e.g. config.use_native_sdk.web). For those,
 		// "present" means the map has an entry for the connecting source's
 		// type, and a miss is reported as <key>.<source type>.
 		if slices.Contains(registered.SourceTypeConfigKeys(), key) {

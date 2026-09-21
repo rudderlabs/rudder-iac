@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,8 +41,10 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 
 // The recording server stands in for the backend so the remote load is
 // observable without credentials. The flags travel through the environment
-// rather than viper.Set so InitConfig resolves them the way the CLI does and
-// t.Setenv unwinds them, leaving no override behind for later tests.
+// rather than viper.Set so InitConfig resolves them the way the CLI does, and
+// t.Setenv unwinds them afterwards. Only the environment unwinds: InitConfig
+// mutates process-global viper, so the package is left holding whatever the
+// last subtest resolved. Later tests that read config must re-init.
 func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -83,6 +86,45 @@ func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
 	}
 }
 
+// The composed RETL provider picks the flag up from the environment, and only
+// while experimental mode is on — the same umbrella every experimental flag
+// sits under.
+func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
+	cases := []struct {
+		name         string
+		experimental string
+		tableFlag    string
+		wantTable    bool
+	}{
+		{name: "experimental mode on", experimental: "true", tableFlag: "true", wantTable: true},
+		{name: "experimental mode off", experimental: "false", tableFlag: "true", wantTable: false},
+		// Experimental mode is on for an unrelated flag: the kind must still be
+		// absent, which is what distinguishes the per-flag check from a bare
+		// experimental-mode check.
+		{name: "experimental mode on, table flag unset", experimental: "true", tableFlag: "", wantTable: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
+			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", tc.tableFlag)
+			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+			c, err := client.New("test-token")
+			require.NoError(t, err)
+
+			_, providers, err := composeProviders(c)
+			require.NoError(t, err)
+
+			if tc.wantTable {
+				assert.Contains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
+				return
+			}
+			assert.NotContains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
+		})
+	}
+}
+
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 	t.Parallel()
 
@@ -94,7 +136,7 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 		{
 			name:                   "unverifiedDestinations disabled registers verified destinations",
 			unverifiedDestinations: false,
-			wantTypes:              []string{"active_campaign", "attentive_tag", "bq", "bqstream", "http", "s3"},
+			wantTypes:              []string{"active_campaign", "am", "attentive_tag", "bq", "bqstream", "braze", "customerio", "facebook_conversions", "facebook_pixel", "ga4", "gcs", "googleads", "hs", "http", "iterable", "mp", "postgres", "posthog", "rs", "s3", "s3_datalake", "snowflake", "tiktok_ads", "webhook"},
 		},
 		{
 			name:                   "unverifiedDestinations enabled registers verified and unverified destinations",

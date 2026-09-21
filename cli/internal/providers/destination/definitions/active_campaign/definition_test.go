@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 func TestNewDefinitionMetadata(t *testing.T) {
@@ -24,7 +25,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "active_campaign", registered.Type)
 	assert.Equal(t, "ACTIVE_CAMPAIGN", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key", "event_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"actid", "api_key", "event_key"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
@@ -55,6 +56,25 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	byAPI, err := registry.GetByAPIType("ACTIVE_CAMPAIGN", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)
+}
+
+func TestActiveCampaignSecretKeysWrapSensitiveValues(t *testing.T) {
+	t.Parallel()
+
+	registered := activecampaign.NewDefinition()
+	config := secret.WrapKnownSecrets(map[string]any{
+		"actid":     "raw-actid",
+		"api_key":   "raw-api-key",
+		"event_key": "raw-event-key",
+		"api_url":   "https://accountname.api-us1.com",
+	}, registered.SecretKeys)
+
+	for _, key := range []string{"actid", "api_key", "event_key"} {
+		wrapped, ok := config[key].(*secret.String)
+		require.True(t, ok, "expected %s to be wrapped as a secret", key)
+		assert.NotContains(t, wrapped.String(), "raw-", key)
+	}
+	assert.Equal(t, "https://accountname.api-us1.com", config["api_url"])
 }
 
 func TestActiveCampaignConfigValidation(t *testing.T) {
@@ -267,24 +287,8 @@ func TestActiveCampaignConfigValidation(t *testing.T) {
 		assert.True(t, found, "expected /connection_mode/android to be rejected")
 	})
 
-	// schema.json declares useNativeSDK with a web key, and web is the one source
 	// type offering device/hybrid modes, so it is genuine destination config. An
 	// unmodelled schema key would be erased upstream on the first apply.
-	t.Run("use_native_sdk is a supported key", func(t *testing.T) {
-		t.Parallel()
-
-		config := validMinimalConfig()
-		config["use_native_sdk"] = map[string]any{"web": true}
-		assert.Empty(t, registered.ValidateConfig(config))
-
-		// schema.json declares no other source type under useNativeSDK.
-		config = validMinimalConfig()
-		config["use_native_sdk"] = map[string]any{"android": true}
-		errors := registered.ValidateConfig(config)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/use_native_sdk/android", errors[0].Path)
-	})
-
 	t.Run("legacy consent blocks are not supported keys", func(t *testing.T) {
 		t.Parallel()
 

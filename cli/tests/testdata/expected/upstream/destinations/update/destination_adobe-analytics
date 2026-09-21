@@ -54,10 +54,7 @@
     "timestampOptionalReporting": false,
     "trackPageName": false,
     "trackingServerSecureUrl": "secure-updated.example.com",
-    "trackingServerUrl": "metrics-updated.example.com",
-    "useNativeSDK": {
-      "web": false
-    }
+    "trackingServerUrl": "metrics-updated.example.com"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

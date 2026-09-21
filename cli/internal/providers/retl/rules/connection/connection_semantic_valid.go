@@ -287,7 +287,7 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 		acceptsWarehouse = slices.Contains(supported, common.SourceTypeWarehouse)
 	)
 
-	if flowErr != nil && retlConnection.IsDestinationSpecificAPIType(registered.APIType) {
+	if flowErr != nil && retlConnection.UsesDestinationSpecificFlow(registered.APIType) {
 		return []rules.ValidationResult{result(destinationRef(entry.index), flowErr.Error())}
 	}
 
@@ -434,7 +434,7 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 
 	// Unknown metadata is reported rather than guessed around: guessing turns a
 	// backend rejection into a locally passing validation.
-	warehouse, known := retlConnection.WarehouseDefinition(sourceDefinition)
+	warehouse, known := retlConnection.SourceWarehouseMetadata(sourceDefinition)
 	if !known {
 		return append(results, result(sourceRef(index), fmt.Sprintf(
 			"rETL source '%s' uses source definition '%s', whose rETL capabilities this CLI version does not know; upgrade the CLI to validate this connection",
@@ -466,7 +466,7 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 // report, so there is nothing to intersect.
 func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	sourceDefinition := entry.endpoints.sourceDefinition()
-	warehouse, known := retlConnection.WarehouseDefinition(sourceDefinition)
+	warehouse, known := retlConnection.SourceWarehouseMetadata(sourceDefinition)
 	if !known {
 		return nil
 	}
@@ -476,7 +476,7 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 		destinationAccepted = entry.registered.SyncBehaviours()
 	)
 
-	// WarehouseDefinition hands back a clone, so filtering in place is safe.
+	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
 	// "mirror" is offered for object mapping only, so the JSON mapper flow drops
 	// it however the two endpoints feel about it.
 	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {

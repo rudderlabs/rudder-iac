@@ -86,20 +86,25 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 			Scope: h.metadata.ResourceType,
 		})
 
-		reference := fmt.Sprintf("#%s:%s", h.metadata.SpecKind, externalID)
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
 		}
 		resourceMap[metadata.ID] = &resources.RemoteResource{
 			ID:         metadata.ID,
 			ExternalID: externalID,
-			Reference:  reference,
+			Reference:  h.reference(externalID),
 			Data:       remoteData,
 		}
 	}
 
 	collection.Set(h.metadata.ResourceType, resourceMap)
 	return collection, nil
+}
+
+// reference is the "#<kind>:<id>" form other specs name a resource of this
+// handler by.
+func (h *BaseHandler[Spec, Res, State, Remote]) reference(id string) string {
+	return fmt.Sprintf("#%s:%s", h.metadata.SpecKind, id)
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
@@ -207,6 +212,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resour
 		urn := resources.URN(resourceId, h.metadata.ResourceType)
 		if importMetadata, ok := h.importMetadata[urn]; ok {
 			opts = append(opts, resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId))
+		}
+		if h.metadata.ReferencedByKind {
+			opts = append(opts, resources.WithResourceFileMetadata(h.reference(resourceId)))
 		}
 		r := resources.NewResource(
 			resourceId,

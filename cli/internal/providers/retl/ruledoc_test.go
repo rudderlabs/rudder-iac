@@ -14,11 +14,15 @@ import (
 // docs generator together with its live rules, asserting every rule resolves
 // and passes the DocumentedRules validation invariants.
 //
-// Connection support is on because the embedded fragments cover the connection
-// rules too; without it those four fragments would be orphans, which is exactly
-// what the gen-rule-docs workflow sets the experimental flag for.
+// Both experimental kinds are on, as in the CI catalog, because the embedded
+// fragments cover their rules too; without them those fragments would be
+// orphans, which is exactly what the gen-rule-docs workflow sets the flags for.
 func TestProviderRuleDocs(t *testing.T) {
-	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
+	p := retl.New(
+		newDefaultMockClient(),
+		retl.WithTableSupport(),
+		retl.WithConnectionSupport(definitions.NewRegistry()),
+	)
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()

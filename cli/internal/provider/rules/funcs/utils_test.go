@@ -270,7 +270,7 @@ func TestGetErrorMessage(t *testing.T) {
 				actualTag: "excluded_unless",
 				param:     "Type object",
 			},
-			expected: "'variants' is not allowed unless 'Type object'",
+			expected: "'variants' is not allowed unless 'Type' is object",
 		},
 		{
 			name: "excluded_if tag with nil rootType falls back to struct name",
@@ -380,6 +380,16 @@ func TestGetErrorMessage_CrossFieldWithRootType(t *testing.T) {
 				structNamespace: "testParentSpec.SQL",
 			},
 			expected: "'access_key_id' is not allowed when 'file' is true",
+		},
+		{
+			name: "required_unless resolves JSON tag from root type",
+			err: mockFieldError{
+				field:           "sql",
+				actualTag:       "required_unless",
+				param:           "File true",
+				structNamespace: "testParentSpec.SQL",
+			},
+			expected: "'sql' is required unless 'file' is true",
 		},
 	}
 

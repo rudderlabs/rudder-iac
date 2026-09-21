@@ -29,6 +29,11 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		return nil, fmt.Errorf("SQL not found in resource data")
 	}
 
+	// Preview reads the project graph without remote state, so the remote id a
+	// referenced account resolves to is not known here.
+	if _, ok := data[AccountIDKey].(*resources.PropertyRef); ok {
+		return nil, fmt.Errorf("preview does not support sql models that reference their account yet: set account_id on %s to preview it", ID)
+	}
 	accountID, ok := data[AccountIDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("account ID not found in resource data")

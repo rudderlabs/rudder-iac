@@ -1,0 +1,179 @@
+rule_id: "retl/table/spec-syntax-valid"
+match_behavior:
+  # retl-source-table is v1-only. Warehouse and s3 sources share one flat
+  # shape; source_definition decides which fields are required or forbidden.
+  - applies_to:
+      - kind: "retl-source-table"
+        version: "rudder/v1"
+    valid:
+      - example_id: "table-v1-warehouse-valid"
+        title: "Valid warehouse table source"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account_id: acc-123
+              source_definition: postgres
+              primary_key: id
+              schema: public
+              table: users
+      - example_id: "table-v1-s3-valid"
+        title: "Valid s3 table source"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: events-bucket
+            spec:
+              id: events-bucket
+              display_name: Events
+              account_id: acc-s3
+              source_definition: s3
+              bucket_name: events
+              object_prefix: daily/
+      - example_id: "table-v1-valid-account-reference"
+        title: "Valid warehouse table source referencing an account in the project instead of an account_id"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account: "#account:prod-pg"
+              source_definition: postgres
+              primary_key: id
+              schema: public
+              table: users
+    invalid:
+      - example_id: "table-v1-s3-missing-object-prefix"
+        title: "s3 table source without the object prefix rudder-api requires"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: events-bucket
+            spec:
+              id: events-bucket
+              display_name: Events
+              account_id: acc-s3
+              source_definition: s3
+              bucket_name: events
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/object_prefix"
+            severity: "error"
+            message_contains: "'object_prefix' is required when 'source_definition' is s3"
+      - example_id: "table-v1-missing-account-id"
+        title: "Table source with neither account_id nor an account reference"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              source_definition: postgres
+              primary_key: id
+              schema: public
+              table: users
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account_id"
+            severity: "error"
+            message_contains: "'account_id' is required when 'account' is not specified"
+      - example_id: "table-v1-both-account-id-and-account"
+        title: "Table source specifying both account_id and account (mutually exclusive)"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account_id: acc-123
+              account: "#account:prod-pg"
+              source_definition: postgres
+              primary_key: id
+              schema: public
+              table: users
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account_id"
+            severity: "error"
+            message_contains: "'account_id' and 'account' cannot be specified together"
+      - example_id: "table-v1-warehouse-missing-table"
+        title: "Warehouse table source missing the table it reads"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account_id: acc-123
+              source_definition: postgres
+              primary_key: id
+              schema: public
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/table"
+            severity: "error"
+            message_contains: "'table' is required unless 'source_definition' is s3"
+      - example_id: "table-v1-s3-primary-key"
+        title: "s3 table source declaring a primary key the s3 config cannot carry"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: events-bucket
+            spec:
+              id: events-bucket
+              display_name: Events
+              account_id: acc-s3
+              source_definition: s3
+              primary_key: id
+              bucket_name: events
+              object_prefix: daily/
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/primary_key"
+            severity: "error"
+            message_contains: "'primary_key' is not allowed when 'source_definition' is s3"
+      - example_id: "table-v1-invalid-source-definition"
+        title: "Table source with an unsupported source_definition"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-table
+            metadata:
+              name: users-table
+            spec:
+              id: users-table
+              display_name: Users
+              account_id: acc-123
+              source_definition: oracle
+              primary_key: id
+              schema: public
+              table: users
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/source_definition"
+            severity: "error"
+            message_contains: "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino s3]"

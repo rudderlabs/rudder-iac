@@ -9,6 +9,9 @@ import (
 // Flow is how a connection maps source rows onto the destination. The spec
 // never names one: it follows from the destination and from whether the spec
 // sets an object, exactly as the backend derives it.
+//
+// Classify once, then branch on the result: each flow allows a different set
+// of config fields.
 type Flow string
 
 const (
@@ -16,11 +19,11 @@ const (
 	FlowObjectMapping Flow = "object_mapping"
 )
 
-// IsDestinationSpecificAPIType reports whether a destination drives rETL
+// UsesDestinationSpecificFlow reports whether a destination drives rETL
 // through its own flow rather than the two generic ones. The list mirrors the
 // config-backend DESTINATION_SPECIFIC_REGISTRY in
 // src/modules/retl/api-gateway/connection-config/constants.ts.
-func IsDestinationSpecificAPIType(apiType string) bool {
+func UsesDestinationSpecificFlow(apiType string) bool {
 	return slices.Contains([]string{"CUSTOMERIO", "CUSTOMERIO_AUDIENCE"}, apiType)
 }
 
@@ -30,7 +33,7 @@ func IsDestinationSpecificAPIType(apiType string) bool {
 // destination-specific flows are not supported at all, and an object only
 // means object mapping on a destination that supports the visual mapper.
 func ClassifyFlow(apiType string, supportsVisualMapper bool, object *string) (Flow, error) {
-	if IsDestinationSpecificAPIType(apiType) {
+	if UsesDestinationSpecificFlow(apiType) {
 		return "", fmt.Errorf("destination api type %q uses a destination-specific rETL flow, which is not supported", apiType)
 	}
 	if object == nil {

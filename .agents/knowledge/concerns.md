@@ -47,3 +47,9 @@
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
 - Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+
+## DEX-846 — Destination Empty Array Defaults Gap
+<!-- ticket:DEX-846 -->
+- Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
+- Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
+- `converter.ArrayWithStrings` can drop explicitly empty lists because of its non-empty-content guard, so fixing array defaults requires both defaults-engine support and empty-list preservation in converters rather than only adding `default:"[]"` tags.

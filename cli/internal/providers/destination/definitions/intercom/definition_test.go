@@ -97,9 +97,6 @@ func TestIntercomConfigValidation(t *testing.T) {
 
 		assert.Empty(t, registered.ValidateConfig(map[string]any{
 			"app_id": "fll5vd90",
-			"use_native_sdk": map[string]any{
-				"web": true,
-			},
 		}))
 	})
 
@@ -339,9 +336,7 @@ func TestIntercomConfigValidation(t *testing.T) {
 			name  string
 			key   string
 			value any
-		}{
-			{name: "use_native_sdk", key: "use_native_sdk", value: true},
-		} {
+		}{} {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				config := validFullConfig()
@@ -411,11 +406,6 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 			Name: "device config",
 			LocalJSON: `{
 				"app_id": "fll5vd90",
-				"use_native_sdk": {
-					"web": true,
-					"android": true,
-					"ios": true
-				},
 				"mobile_api_key_android": "android-sdk-key",
 				"mobile_api_key_ios": "ios-sdk-key",
 				"event_filtering": {
@@ -424,11 +414,6 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 			}`,
 			APIJSON: `{
 				"appId": "fll5vd90",
-				"useNativeSDK": {
-					"web": true,
-					"android": true,
-					"ios": true
-				},
 				"mobileApiKeyAndroid": {"android": "android-sdk-key"},
 				"mobileApiKeyIOS": {"ios": "ios-sdk-key"},
 				"blacklistedEvents": [
@@ -538,11 +523,6 @@ func validFullConfig() map[string]any {
 		"update_last_request_at": true,
 		"mobile_api_key_android": "android-sdk-key",
 		"mobile_api_key_ios":     "ios-sdk-key",
-		"use_native_sdk": map[string]any{
-			"web":     true,
-			"android": true,
-			"ios":     true,
-		},
 		"event_filtering": map[string]any{
 			"whitelist": []any{"Product Viewed", "Order Completed"},
 		},

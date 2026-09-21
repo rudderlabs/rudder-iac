@@ -14,6 +14,7 @@ import (
 	essource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	retlconnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -48,6 +49,7 @@ func gatekeeperScopedPatterns() []rules.MatchPattern {
 	// v1-only kinds.
 	p = append(p, providerrules.V1VersionPatterns(esconnection.EventStreamConnectionResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(retlconnection.ResourceKind)...)
+	p = append(p, providerrules.V1VersionPatterns(table.ResourceKind)...)
 	p = append(p, providerrules.V1VersionPatterns(dgHandler.HandlerMetadata.SpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.TransformationSpecKind)...)
 	p = append(p, providerrules.V1VersionPatterns(ttypes.LibrarySpecKind)...)

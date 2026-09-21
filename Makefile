@@ -38,10 +38,12 @@ RULE_DOCS_OUTPUT_DIR ?= docs/generated
 .PHONY: gen-rule-docs
 # The catalog documents the complete rule set, so generation turns on the
 # experimental features whose rules ship with authored fragments; without them
-# those fragments read as stale. Defaulted rather than pinned so CI, which sets
-# both explicitly, still wins.
+# those fragments read as stale. That is also how a plain local run generates
+# the same catalog CI does. Defaulted rather than pinned so CI, which sets them
+# explicitly, still wins.
 gen-rule-docs: ## Generate the validation rule documentation artifact
 	RUDDERSTACK_CLI_EXPERIMENTAL=$${RUDDERSTACK_CLI_EXPERIMENTAL:-true} \
+	RUDDERSTACK_X_RETL_TABLE_SUPPORT=$${RUDDERSTACK_X_RETL_TABLE_SUPPORT:-true} \
 	RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=$${RUDDERSTACK_X_RETL_CONNECTION_SUPPORT:-true} \
 	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
 

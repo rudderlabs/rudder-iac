@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -38,19 +39,19 @@ func TestCheckCronFrequency(t *testing.T) {
 		{
 			expression: "* * * * *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 1-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2026, time.January, 1, 0, 0),
-				NextOccurrence: utc(2026, time.January, 1, 0, 1),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 1-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 0, 0),
+				NextViolatingSync: utc(2026, time.January, 1, 0, 1),
 			},
 		},
 		{
 			expression: "*/3 * * * *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2026, time.January, 1, 0, 0),
-				NextOccurrence: utc(2026, time.January, 1, 0, 3),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 0, 0),
+				NextViolatingSync: utc(2026, time.January, 1, 0, 3),
 			},
 		},
 		{
@@ -58,10 +59,10 @@ func TestCheckCronFrequency(t *testing.T) {
 			// list, which an "every N minutes" reading of the field would miss.
 			expression: "0,10,20,30,40,50,53 * * * *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2026, time.January, 1, 0, 50),
-				NextOccurrence: utc(2026, time.January, 1, 0, 53),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 0, 50),
+				NextViolatingSync: utc(2026, time.January, 1, 0, 53),
 			},
 		},
 		{
@@ -69,20 +70,20 @@ func TestCheckCronFrequency(t *testing.T) {
 			// inside either of them.
 			expression: "0,58 0,1 * * *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 2-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2026, time.January, 1, 0, 58),
-				NextOccurrence: utc(2026, time.January, 1, 1, 0),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 2-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 0, 58),
+				NextViolatingSync: utc(2026, time.January, 1, 1, 0),
 			},
 		},
 		{
 			// The violation only shows up across midnight.
 			expression: "0,57 0,23 * * *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2026, time.January, 1, 23, 57),
-				NextOccurrence: utc(2026, time.January, 2, 0, 0),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 1, 23, 57),
+				NextViolatingSync: utc(2026, time.January, 2, 0, 0),
 			},
 		},
 		{
@@ -91,14 +92,40 @@ func TestCheckCronFrequency(t *testing.T) {
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
+			// A literal "*" anywhere in the field sets the flag, which is
+			// robfig's rule, so both spellings are wildcards and select the
+			// same schedule here as they do there. The day fields are ANDed,
+			// only Mondays match - never two days running, which is what keeps
+			// the midnight gap out of reach.
+			expression: "0,57 0,23 3,* * MON",
+			expected:   CronCheckResult{Status: CronValid},
+		},
+		{
+			expression: "0,57 0,23 *,3 * MON",
+			expected:   CronCheckResult{Status: CronValid},
+		},
+		{
+			// A stepped wildcard clears the flag, as it does in robfig, so the
+			// day fields are ORed: every odd day matches and so does every
+			// Monday. The first odd day followed by a Monday puts three minutes
+			// across midnight, and robfig fires exactly this pair.
+			expression: "0,57 0,23 */2 * MON",
+			expected: CronCheckResult{
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2026, time.January, 11, 23, 57),
+				NextViolatingSync: utc(2026, time.January, 12, 0, 0),
+			},
+		},
+		{
 			// Leap day: the reference origin is 2026, so the first occurrence is
 			// two years out and the violation still has to be reported.
 			expression: "0,3 0 29 2 *",
 			expected: CronCheckResult{
-				Status:         CronTooFrequent,
-				Reason:         "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-				Occurrence:     utc(2028, time.February, 29, 0, 0),
-				NextOccurrence: utc(2028, time.February, 29, 0, 3),
+				Status:            CronTooFrequent,
+				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+				ViolatingSync:     utc(2028, time.February, 29, 0, 0),
+				NextViolatingSync: utc(2028, time.February, 29, 0, 3),
 			},
 		},
 		{
@@ -151,11 +178,6 @@ func TestCheckCronSupportedGrammar(t *testing.T) {
 		"0 0 13 * FRI",
 		// February 30th never exists, but the OR keeps Mondays in February.
 		"0 0 30 2 1",
-		// A stepped wildcard is still a wildcard, so the day fields are ANDed
-		// and only odd-numbered Mondays match - never two days running. Read as
-		// OR, Jan 31 and Feb 1 would both match and the three-minute midnight
-		// gap would make this too frequent.
-		"0,57 0,23 */2 * MON",
 		// A step wider than the field selects only its start value. The mask is
 		// filled by repeated addition, so a step near math.MaxInt used to
 		// overflow into a negative index and panic.
@@ -247,11 +269,12 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `year field "garbage": "garbage" is not a number`,
 		},
 		{
-			// rETL has no reboot to fire on, so this is rejected like @every
-			// rather than warned about.
+			// rETL has no reboot to fire on. The descriptor table is what makes
+			// that an error rather than a warning, so @reboot needs no case of
+			// its own to be rejected.
 			name:       "reboot descriptor",
 			expression: "@reboot",
-			reason:     `@reboot is not part of the supported cron grammar; use a five-field expression such as "0 * * * *"`,
+			reason:     `unknown descriptor "@reboot"; supported descriptors are @hourly, @daily, @midnight, @weekly, @monthly, @yearly and @annually`,
 		},
 		{
 			name:       "minute out of range",
@@ -307,6 +330,101 @@ func TestCheckCronInvalid(t *testing.T) {
 			reason:     `descriptor "@daily" does not take arguments`,
 		},
 		{
+			// A day number outside the field's range is malformed in every
+			// dialect, so the extension shape must not excuse it. These are the
+			// cases where an error was being downgraded to a warning, which
+			// under DEX-829 would apply a schedule that can never run.
+			name:       "out of range day-of-week in # extension",
+			expression: "0 0 * * 9#3",
+			reason:     `day-of-week field "9#3": "9#3" is not a number or day-of-week name`,
+		},
+		{
+			name:       "out of range day-of-month in L extension",
+			expression: "0 0 32L * *",
+			reason:     `day-of-month field "32L": "32L" is not a number`,
+		},
+		{
+			name:       "out of range day-of-month in W extension",
+			expression: "0 0 0W * *",
+			reason:     `day-of-month field "0W": "0W" is not a number`,
+		},
+		{
+			name:       "out of range offset in L- extension",
+			expression: "0 0 L-99 * *",
+			reason:     `day-of-month field "L-99": "L" is not a number`,
+		},
+		{
+			name:       "out of range day-of-week in L extension",
+			expression: "0 0 * * 8L",
+			reason:     `day-of-week field "8L": "8L" is not a number or day-of-week name`,
+		},
+		{
+			// Quartz spells these with day names too. Only the numeric forms
+			// are recognised, and erring towards an error is the safe
+			// direction: a warning would let the schedule through unchecked.
+			name:       "day name spelling of the # extension",
+			expression: "0 0 * * FRI#2",
+			reason:     `day-of-week field "FRI#2": "FRI#2" is not a number or day-of-week name`,
+		},
+		{
+			name:       "day name spelling of the L extension",
+			expression: "0 0 * * FRIL",
+			reason:     `day-of-week field "FRIL": "FRIL" is not a number or day-of-week name`,
+		},
+		{
+			// Quartz writes "?" only in the two day fields. A parser that read
+			// it as "*" anywhere would widen this to every minute of every day
+			// instead of rejecting it, so the boundary is pinned here.
+			name:       "no specific value outside the day fields",
+			expression: "? 1 7 1 5",
+			reason:     `minute field "?": "?" is not a number`,
+		},
+		{
+			// A directive is reported only once the expression it prefixes has
+			// been checked, or it would shield anything written after it behind
+			// a warning that lets the apply through.
+			name:       "timezone directive in front of a malformed field",
+			expression: "TZ=UTC 0 0 * * 9#3",
+			reason:     `day-of-week field "9#3": "9#3" is not a number or day-of-week name`,
+		},
+		{
+			name:       "timezone directive with no expression",
+			expression: "TZ=UTC",
+			reason:     "timezone directive is not followed by a cron expression",
+		},
+		{
+			// The year is checked even though the day field already produced a
+			// warning, so an extension cannot carry a malformed year past it.
+			name:       "extension does not excuse a malformed year",
+			expression: "0 0 0 L * ? garbage",
+			reason:     `year field "garbage": "garbage" is not a number`,
+		},
+		{
+			// Quartz writes "#" in day-of-week only. Accepted in day-of-month
+			// it would check a weekday number against the day numbers 1-31 and
+			// pass a weekday that does not exist.
+			name:       "nth weekday in the day-of-month field",
+			expression: "0 0 9#3 * *",
+			reason:     `day-of-month field "9#3": "9#3" is not a number`,
+		},
+		{
+			name:       "nearest weekday in the day-of-week field",
+			expression: "0 0 * * 5W",
+			reason:     `day-of-week field "5W": "5W" is not a number or day-of-week name`,
+		},
+		{
+			name:       "last given weekday in the day-of-month field",
+			expression: "0 0 31L * *",
+			reason:     `day-of-month field "31L": "31L" is not a number`,
+		},
+		{
+			// An L- offset runs 0-30, not over the day numbers, so 31 could
+			// never select a day no matter how long the month.
+			name:       "out of range offset in L- extension",
+			expression: "0 0 L-31 * *",
+			reason:     `day-of-month field "L-31": "L" is not a number`,
+		},
+		{
 			// A schedule the server would happily store and never run.
 			name:       "impossible date",
 			expression: "0 0 30 2 *",
@@ -347,7 +465,25 @@ func TestCheckCronUnsupportedDialect(t *testing.T) {
 		{
 			name:       "last weekday of month",
 			expression: "0 0 LW * *",
-			reason:     `day-of-month field "LW": the "L" (last day) extension is not supported`,
+			reason:     `day-of-month field "LW": the "LW" (last weekday of the month) extension is not supported`,
+		},
+		{
+			// Quartz writes this one in day-of-week: the last Friday of the
+			// month. It is a dialect we decline to analyse, not malformed.
+			name:       "last given weekday of month",
+			expression: "0 0 * * 5L",
+			reason:     `day-of-week field "5L": the "L" (last given weekday of the month) extension is not supported`,
+		},
+		{
+			// The lower bound of the offset range, which is 0 and not 1.
+			name:       "zero offset from the last day",
+			expression: "0 0 L-0 * *",
+			reason:     `day-of-month field "L-0": the "L-n" (offset from the last day) extension is not supported`,
+		},
+		{
+			name:       "extension inside a seven-field expression",
+			expression: "0 0 0 L * ? 2030",
+			reason:     `day-of-month field "L": the "L" (last day) extension is not supported`,
 		},
 		{
 			name:       "nearest weekday",
@@ -417,8 +553,9 @@ type enumeration struct {
 }
 
 // enumerate walks real occurrences, which is exactly what the analysis refuses
-// to do on the validate path. It is the independent check that reasoning over
-// the field masks describes the schedule it claims to.
+// to do on the validate path. It shares the parser and the day rule with the
+// implementation, so it vouches for neither: what it cross-checks is that the
+// three-join-point shortcut reports the same first violation a full walk finds.
 func enumerate(schedule *cronSchedule, origin time.Time, days int) enumeration {
 	var (
 		found    enumeration
@@ -496,31 +633,6 @@ func TestCheckCronDayNameIsNotAnExtension(t *testing.T) {
 	assert.Equal(t, CronCheckResult{Status: CronValid}, CheckCron("0 0 * * WED-FRI"))
 }
 
-// The analysis reads no clock and keeps no state, and the day scan has no
-// cutoff: repeated evaluations must agree exactly, and no expression may fall
-// back to CronInconclusive.
-func TestCheckCronIsRepeatableAndConclusive(t *testing.T) {
-	t.Parallel()
-
-	var (
-		first    []CronCheckResult
-		second   []CronCheckResult
-		statuses []CronStatus
-	)
-	for _, expression := range []string{
-		"* * * * *", "*/5 * * * *", "0,3 0 29 2 *", "0 0 30 2 *",
-		"@daily", "@every 1h", "0 0 L * *", "a b c d e f",
-	} {
-		result := CheckCron(expression)
-		first = append(first, result)
-		second = append(second, CheckCron(expression))
-		statuses = append(statuses, result.Status)
-	}
-
-	assert.Equal(t, first, second)
-	assert.NotContains(t, statuses, CronInconclusive)
-}
-
 // The leap-day violation is a property of the minute field, so moving the
 // origin lands on a different leap day with the same verdict: the origin only
 // moves the timestamps.
@@ -528,17 +640,34 @@ func TestCheckCronOriginOnlyMovesTimestamps(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, CronCheckResult{
-		Status:         CronTooFrequent,
-		Reason:         "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-		Occurrence:     utc(2032, time.February, 29, 0, 0),
-		NextOccurrence: utc(2032, time.February, 29, 0, 3),
+		Status:            CronTooFrequent,
+		Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
+		ViolatingSync:     utc(2032, time.February, 29, 0, 0),
+		NextViolatingSync: utc(2032, time.February, 29, 0, 3),
 	}, checkCronFrom("0,3 0 29 2 *", time.Date(2029, time.January, 1, 0, 0, 0, 0, time.UTC)))
 }
 
-// An impossible date is the worst case: it is only provable after the full
-// 146097-day scan, so this is the number the package doc quotes.
-func BenchmarkCheckCronWorstCase(b *testing.B) {
+// Two shapes walk the whole 146097-day cycle: a date that never occurs, which
+// cannot be disproved any sooner, and a valid schedule whose matching days are
+// never calendar-adjacent. Neither is a pathological input, so both are pinned.
+func BenchmarkCheckCron(b *testing.B) {
+	for _, expression := range []string{"0 0 30 2 *", "0,57 0,23 29 2 *"} {
+		b.Run(expression, func(b *testing.B) {
+			for b.Loop() {
+				CheckCron(expression)
+			}
+		})
+	}
+}
+
+// A field of repeated extensions used to be formatted into a diagnostic once
+// per matching element while only the first was ever kept, which is quadratic
+// in the length of the field: 8000 elements allocated 252MB. Only the first
+// match is built now, and this is what would show a regression.
+func BenchmarkCheckCronRepeatedExtensions(b *testing.B) {
+	expression := "0 0 " + strings.Repeat("L,", 4000) + "garbage * *"
+
 	for b.Loop() {
-		CheckCron("0 0 30 2 *")
+		CheckCron(expression)
 	}
 }

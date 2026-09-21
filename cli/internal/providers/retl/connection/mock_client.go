@@ -43,10 +43,7 @@ type MockConnectionClient struct {
 
 var _ retlClient.RETLStore = (*MockConnectionClient)(nil)
 
-func (m *MockConnectionClient) CreateConnection(ctx context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) CreateConnection(_ context.Context, req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
 	m.CreateCalls = append(m.CreateCalls, *req)
 	if m.CreateFunc != nil {
 		return m.CreateFunc(req)
@@ -59,10 +56,7 @@ func (m *MockConnectionClient) CreateConnection(ctx context.Context, req *retlCl
 	}, nil
 }
 
-func (m *MockConnectionClient) UpdateConnection(ctx context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) UpdateConnection(_ context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
 	m.UpdateCalls = append(m.UpdateCalls, id)
 	if m.UpdateFunc != nil {
 		return m.UpdateFunc(id, req)
@@ -70,10 +64,7 @@ func (m *MockConnectionClient) UpdateConnection(ctx context.Context, id string, 
 	return &retlClient.RETLConnection{ID: id}, nil
 }
 
-func (m *MockConnectionClient) DeleteConnection(ctx context.Context, id string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+func (m *MockConnectionClient) DeleteConnection(_ context.Context, id string) error {
 	m.DeleteCalls = append(m.DeleteCalls, id)
 	if m.DeleteFunc != nil {
 		return m.DeleteFunc(id)
@@ -81,10 +72,7 @@ func (m *MockConnectionClient) DeleteConnection(ctx context.Context, id string) 
 	return nil
 }
 
-func (m *MockConnectionClient) ListConnections(ctx context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) ListConnections(_ context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
 	m.ListCalls = append(m.ListCalls, *req)
 	if m.ListFunc != nil {
 		return m.ListFunc(req)
@@ -92,10 +80,7 @@ func (m *MockConnectionClient) ListConnections(ctx context.Context, req *retlCli
 	return &retlClient.RETLConnectionsPage{}, nil
 }
 
-func (m *MockConnectionClient) GetConnection(ctx context.Context, id string) (*retlClient.RETLConnection, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) GetConnection(_ context.Context, id string) (*retlClient.RETLConnection, error) {
 	m.GetCalls = append(m.GetCalls, id)
 	if m.GetFunc != nil {
 		return m.GetFunc(id)
@@ -103,10 +88,7 @@ func (m *MockConnectionClient) GetConnection(ctx context.Context, id string) (*r
 	return &retlClient.RETLConnection{ID: id}, nil
 }
 
-func (m *MockConnectionClient) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+func (m *MockConnectionClient) SetConnectionExternalId(_ context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
 	m.SetExternalIDCalls = append(m.SetExternalIDCalls, *req)
 	if m.SetExternalIDFunc != nil {
 		return m.SetExternalIDFunc(req)
@@ -114,10 +96,7 @@ func (m *MockConnectionClient) SetConnectionExternalId(ctx context.Context, req 
 	return nil
 }
 
-func (m *MockConnectionClient) ListRetlSources(ctx context.Context, _ ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) ListRetlSources(_ context.Context, _ ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
 	m.SourceListCalls++
 	if m.EndpointsErr != nil {
 		return nil, m.EndpointsErr
@@ -125,10 +104,7 @@ func (m *MockConnectionClient) ListRetlSources(ctx context.Context, _ ...retlCli
 	return &retlClient.RETLSources{Data: m.Sources}, nil
 }
 
-func (m *MockConnectionClient) GetDestinations(ctx context.Context) ([]apiClient.Destination, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (m *MockConnectionClient) GetDestinations(_ context.Context) ([]apiClient.Destination, error) {
 	m.DestinationsCalls++
 	if m.EndpointsErr != nil {
 		return nil, m.EndpointsErr

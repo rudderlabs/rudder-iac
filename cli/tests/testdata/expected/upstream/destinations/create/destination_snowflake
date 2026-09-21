@@ -29,12 +29,10 @@
     "underscoreDivideNumbers": false,
     "useKeyPairAuth": false,
     "useRudderStorage": true,
-    "user": "RUDDER_CLI_E2E",
+    "user": "RUDDER_CLI_E2E_SNOWFLAKE_USER",
     "warehouse": "RUDDER_WH",
     "cloudProvider": "AWS",
-    "cleanupObjectStorageFiles": false,
-    "enableSSE": false,
-    "useSASTokens": false
+    "cleanupObjectStorageFiles": false
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

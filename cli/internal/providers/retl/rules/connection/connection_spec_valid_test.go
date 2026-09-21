@@ -324,7 +324,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 				c.Config.CursorColumn = "updated_at"
 			},
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed unless 'sync_behaviour upsert'"},
+				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed unless 'sync_behaviour' is upsert"},
 			},
 		},
 		{

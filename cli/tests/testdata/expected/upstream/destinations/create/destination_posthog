@@ -16,8 +16,10 @@
       }
     ],
     "eventFilteringOption": "whitelistedEvents",
-    "useNativeSDK": {
-      "web": true
+    "connectionMode": {
+      "web": "device",
+      "androidKotlin": "cloud",
+      "reactnative": "cloud"
     },
     "autocapture": {
       "web": false

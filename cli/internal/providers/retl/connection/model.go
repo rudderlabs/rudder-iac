@@ -74,8 +74,13 @@ const (
 // endpoints' local resource ids. Both endpoint catalogs are read once per
 // operation, so carrying the result here is what keeps naming, export and
 // matching free of further API calls.
+//
+// Config is the spec-shaped config remoteConnection already rebuilt to prove
+// the row representable; carrying it spares state, export and import a second
+// conversion of the same row.
 type RemoteConnection struct {
 	retlClient.RETLConnection
+	Config                ConfigSpec
 	WorkspaceID           string
 	SourceKind            SourceKind
 	SourceName            string
@@ -94,7 +99,10 @@ type ConnectionsSpec struct {
 
 // ConnectionSpec is a single connection entry. Source and destination are
 // scalar references to the two endpoints; everything else that is configurable
-// lives under config. An omitted enabled means an enabled connection.
+// lives under config. An omitted enabled means an enabled connection. Config
+// needs no validate tag of its own — go-playground ignores required on a
+// non-pointer struct and descends into it, so its required members reject an
+// omitted config and name the fields it lacks.
 type ConnectionSpec struct {
 	LocalID     string     `json:"id"                mapstructure:"id"          validate:"required"`
 	Source      string     `json:"source"            mapstructure:"source"      validate:"required"`

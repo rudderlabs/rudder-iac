@@ -163,6 +163,31 @@ func TestConnectionsSpecDecodeObject(t *testing.T) {
 	})
 }
 
+// TestConnectionsSpecDecodeUnknownField pins the no-catch-all rule the spec
+// structs rely on: adding a ",remain" map to absorb unknown keys would turn a
+// misspelt field, or a foreign block like destination_config, into a silently
+// dropped setting instead of an error.
+func TestConnectionsSpecDecodeUnknownField(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{
+		"connections": []any{
+			map[string]any{
+				"id":          "users-to-amplitude",
+				"source":      "#retl-source-sql-model:users",
+				"destination": "#destination:amplitude",
+				"config": map[string]any{
+					"sync_behaviour":     "upsert",
+					"destination_config": map[string]any{"api_key": "secret"},
+				},
+			},
+		},
+	}
+
+	_, err := decode(t, raw)
+	assert.EqualError(t, err, "decoding failed due to the following error(s):\n\n'connections[0].config' has invalid keys: destination_config")
+}
+
 // TestSpecValidateTags exercises the spec's validate tags through the rule
 // engine: the tags are the contract for what a connection entry must carry,
 // and the JSON Pointers they produce are the snake_case paths users are
@@ -236,6 +261,32 @@ func TestSpecValidateTagsIdentifiers(t *testing.T) {
 			}, funcs.ParseValidationErrors(errs, nil))
 		})
 	}
+}
+
+// TestSpecValidateTagsOmittedConfig pins that config is required without
+// carrying a validate tag of its own: go-playground ignores required on a
+// non-pointer struct field, but descends into it, so the zero config is
+// rejected by its own required members — naming the fields a user left out
+// instead of the block. Making Config a pointer would silently drop all three.
+func TestSpecValidateTagsOmittedConfig(t *testing.T) {
+	t.Parallel()
+
+	spec := ConnectionsSpec{
+		Connections: []ConnectionSpec{{
+			LocalID:     "users-to-webhook",
+			Source:      "#retl-source-sql-model:users",
+			Destination: "#destination:webhook",
+		}},
+	}
+
+	errs, err := rules.ValidateStruct(spec, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, []rules.ValidationResult{
+		{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' is required"},
+		{Reference: "/connections/0/config/schedule/type", Message: "'type' is required"},
+		{Reference: "/connections/0/config/identifiers", Message: "'identifiers' is required"},
+	}, funcs.ParseValidationErrors(errs, nil))
 }
 
 // TestGraphKeysMatchEventStreamConnection guards the keys both connection

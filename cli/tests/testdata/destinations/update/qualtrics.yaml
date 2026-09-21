@@ -13,10 +13,6 @@ spec:
     brand_id: rudderCliE2eFullBrandUpdated
     enable_generic_page_title:
       web: false
-    use_native_sdk:
-      web: false
-      android: true
-      ios: true
     event_filtering:
       blacklist:
         - Application Opened

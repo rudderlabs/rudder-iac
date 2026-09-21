@@ -11,11 +11,9 @@ spec:
   config:
     api_version: newApi
     access_token: "{{ .HS_ACCESS_TOKEN }}"
-    hub_id: "12345678"
+    hub_id: "{{ .HS_HUB_ID }}"
     lookup_field: email
     do_association: true
-    use_native_sdk:
-      web: true
     hubspot_events:
       - rs_event_name: Order Completed
         hubspot_event_name: pe12345678_order_completed

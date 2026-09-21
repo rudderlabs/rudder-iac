@@ -37,7 +37,7 @@ var validateConnectionsCron = func(
 
 		results = append(results, cronResults(
 			index, scheduleType, expression,
-			[]CronStatus{CronUnsupportedDialect, CronInconclusive},
+			[]CronStatus{CronUnsupportedDialect},
 			"'cron_expression' could not be checked locally: %s; the backend stores cron expressions unparsed and accepts this one, so verify the schedule it produces yourself",
 		)...)
 	}

@@ -103,7 +103,7 @@
 <!-- ticket:DEX-520 -->
 - S3 Datalake should keep the broad warehouse/datalake-style source-type set, not the cloud-storage subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud-only connection mode.
 - S3 Datalake sync settings are flat local YAML keys `sync_frequency` and `sync_start_at` mapped directly to API keys `syncFrequency` and `syncStartAt`; do not mirror Terraform's nested local `sync` block for this CLI definition.
-- S3 Datalake should keep optional local secret key `password` in `SecretKeys` and map it directly to API `password` because db-config lists it as secret-only metadata even though schema/default config/Terraform do not expose it.
+- S3 Datalake does not model `password`. It was carried only because db-config listed it as secret-only metadata; the revision-2 secrecy policy drops it, and schema/default config/Terraform never exposed it, so there is no local key, no property mapping, and no `SecretKeys` entry.
 - S3 Datalake validation should use schema/db-config as the boundary for enums and named patterns: sync frequency accepts `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, and `1440` rather than Terraform's narrower validator.
 
 ## DEX-690 — Redshift Validation And Sources
@@ -111,6 +111,15 @@
 - Redshift should keep the broad warehouse-style mapped db-config source-type set, not the older S3-like event-stream subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `react_native`, `cloud_source`, `flutter`, `cordova`, and `shopify`, with cloud connection mode for all retained source types.
 - Redshift local sync config should use flat schema/API-aligned keys `sync_frequency`, `sync_start_at`, and `exclude_window.{start_time,end_time}`; do not add a legacy `sync.{frequency,start_at,exclude_window_start_time,exclude_window_end_time}` alias layer inside the definition.
 - Existing old-shape Redshift specs with a top-level `sync` config block should fail closed as unknown-key input rather than being silently converted, because the destination converter/validator has no per-definition alias layer.
+
+## DEX-882 — Redshift and Postgres SSH Local Config Shape
+<!-- ticket:DEX-882 -->
+- Redshift and Postgres keep `use_ssh` as the top-level SSH branch selector while grouping SSH member keys under local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key`.
+- SSH grouping changes only the CLI local YAML shape: API payload keys remain the existing flat camelCase `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey`, matching the Kafka grouping precedent.
+- Existing flat local keys should not be aliased because destination config decoding is strict and DEX-882 treats the grouped local shape as an intentional spec change.
+- All three destinations carrying SSH tunnel keys — Kafka, Redshift, Postgres — now use the same nested shape, so a future SSH-bearing destination has one precedent to follow rather than two.
+- The selector stays top-level and the member keys group because `schema.json` declares all four only inside the `useSSH: true` branch; the per-destination pattern bounds are preserved as-is rather than unified.
+
 ## DEX-504 — Google Sheets Consent Config Surface
 <!-- ticket:DEX-504 -->
 - Google Sheets models shared `consent_management` only; legacy/schema include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` are intentionally omitted for this onboarding to follow the task plan and current destination-definition tests that treat those blocks as unsupported outside definitions that explicitly model them.
@@ -143,7 +152,7 @@
 <!-- ticket:DEX-494 -->
 - Customer.io models shared `consent_management` only; legacy include-key blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unknown local config fields because the backend migrates those surfaces into `consentManagement` and drops the legacy keys.
 - Customer.io `SecretKeys` should stay empty because db-config `secretKeys` is authoritative for CLI write-only secret handling; Terraform sensitivity alone should not make `api_key` a CLI secret placeholder field.
-- Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; `useNativeSDK` is handled through source-type config rather than the ordinary gated-property list.
+- Customer.io gated API-key paths are `sendPageNameInSDK.web`, `dataUseInApp.web`, `autoTrackDeviceAttributes.{android,ios}`, `backgroundQueueMinNumberOfTasks.android`, and `backgroundQueueSecondsDelay.android`; native-SDK source-type config is no longer modeled by CLI destination definitions.
 
 ## DEX-508 — Intercom Config Surface
 <!-- ticket:DEX-508 -->
@@ -164,7 +173,7 @@
 - HubSpot should keep the broad mapped db-config source-type set, not the older event-stream-only subset: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `amp`, `cloud`, `warehouse`, `react_native`, `flutter`, `cordova`, and `shopify`.
 - HubSpot models shared `consent_management` only; legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` should remain unsupported even if upstream schema/db-config still mention their API keys, because re-sending legacy consent keys can cause non-converging applies after backend migration to `consentManagement`.
 - HubSpot local config should omit stale legacy auth fields `authorization_type` and `api_key`; current schema requires `accessToken` and `apiVersion`, so local YAML should model `access_token` as the only secret and require it with `api_version`.
-- HubSpot `lookup_field` remains required only for `api_version: newApi`, and `use_native_sdk.web` stays source-gated to `web`.
+- HubSpot `lookup_field` remains required only for `api_version: newApi`; native-SDK source-type config is no longer modeled by CLI destination definitions.
 
 ## DEX-518 — Qualtrics Config Surface
 <!-- ticket:DEX-518 -->
@@ -230,7 +239,7 @@
 
 ## DEX-730 — Amplitude Source Scope
 <!-- ticket:DEX-730 -->
-- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows every source-scoped block at once (`connection_mode`, `consent_management`, `use_native_sdk`) with no new metadata field.
+- Amplitude drops `amp`, `warehouse` and `shopify` from `SourceTypes` and `ConnectionModes` rather than keeping them and narrowing `connection_mode` separately. Dropping them narrows source-scoped blocks such as `connection_mode` and `consent_management` with no new metadata field.
 - A destination whose only source type is unreachable stays unverified and is documented in place (`customerio_audience`), rather than being dropped to an empty source set.
 
 ## DEX-745 — Bing Ads Offline Conversions Config Surface
@@ -253,3 +262,21 @@
 - Kafka keeps `use_ssh` as the top-level SSH branch selector while grouping the four SSH member keys under `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` in local YAML.
 - The nested SSH key names intentionally drop the redundant `ssh_` prefix inside the `ssh` block; there is no Terraform mapping precedent for Kafka SSH keys, so the shape is a CLI ergonomics convention rather than a Terraform parity rule.
 - Kafka's only CLI secret remains `password`; SSH config such as `ssh.public_key` is import/export visible and should not be added to `SecretKeys` unless upstream db-config secret metadata changes.
+
+## DEX-852 — Missing Destination Connection Mode Config Surface
+<!-- ticket:DEX-852 -->
+- `adj`, `firebase`, `linkedin_insight_tag`, `posthog`, and `qualtrics` expose `connection_mode` in CLI local config through the shared connection-mode property pattern, without changing their existing `SourceTypes` or `ConnectionModes` metadata.
+- Device-only destinations in this set (`firebase`, `linkedin_insight_tag`, and `qualtrics`) should explicitly model `connection_mode` so later removal of `use_native_sdk` cannot make them resolve as cloud by default.
+- This supersedes earlier Qualtrics guidance from DEX-518 that omitted `connection_mode` because schema metadata did not declare it; DEX-852 intentionally adds the missing config surface for the post-`use_native_sdk` path.
+
+## DEX-848 — Destination Native SDK Config Removal
+
+- Destination definitions should reject the removed native-SDK source-type config block as an unknown key; keep `SourceTypeConfigKeys()` limited to `connection_mode`.
+- For this removal, treat the broad `useNativeSDK` grep gate as authoritative: remove similarly prefixed destination-definition settings such as GA4's `use_native_sdk_to_send` / `useNativeSDKToSend` unless a future task explicitly reintroduces a separately named schema-backed field.
+
+## DEX-881 — Postgres Storage Grouping
+
+- Postgres object-storage local YAML groups provider-specific keys under `s3`, `gcs`, `azure`, and `minio` blocks while preserving the flat upstream API payload shape.
+- Use `s3` rather than `aws` for the AWS-backed block because Postgres' selector value is `bucket_provider: S3`, task examples use `s3.role_based_auth`, and Snowflake already uses an `s3` local block for similar storage settings.
+- Preserve MinIO as its own nested local block (`minio.end_point`, `minio.secret_access_key`, `minio.use_ssl`) rather than leaving those keys flat.
+- Group only keys `schema.json` declares in exactly one `bucketProvider` branch. `bucket_name` (S3/GCS/MinIO) and `access_key_id` (S3/MinIO) are declared in several, so they stay top-level: the API carries one flat key for each, and routing it into a provider block would need a conditional that leaves a stale value from a third provider nowhere to land. Same rule as Snowflake.

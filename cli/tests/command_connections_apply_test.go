@@ -28,10 +28,8 @@ var (
 
 // connScenarioEndpoints pairs each managed destination with the connection
 // linking the android source to it. Both are here because a destination
-// declares its per-source settings in one of two blocks and the connect-time
-// check accepts either: s3 satisfies it through connection_mode, while
-// firebase declares no connection_mode at all (schema.json has no such
-// property), so its use_native_sdk entry is the only thing that can.
+// declares per-source connection settings through connection_mode; s3 exercises
+// that path while firebase covers an unverified destination in the same flow.
 var connScenarioEndpoints = []struct {
 	destination string
 	connection  string
@@ -65,9 +63,8 @@ func TestConnectionsApply(t *testing.T) {
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	// This test needs the unverified gate for its own fixtures, not merely to
 	// tolerate residue: firebase is registered behind UnverifiedDestinations and
-	// is the use_native_sdk half of connScenarioEndpoints — verified definitions
-	// such as s3 and attentive_tag register without the flag, but model
-	// connection_mode alone.
+	// is the unverified half of connScenarioEndpoints; verified definitions such
+	// as s3 and attentive_tag register without the flag.
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 
 	executor, err := NewCmdExecutor("")
@@ -114,7 +111,7 @@ func TestConnectionsApply(t *testing.T) {
 	// write-only, so they map to always-unknown secrets that re-apply every run
 	// (see secret.String.Diff). A dry-run would therefore always report a diff.
 	// Snapshot the non-secret upstream fields instead to prove nothing else
-	// churns, matching TestDestinationsApply's re-apply subtest.
+	// churns, matching TestAccountsApply's re-apply subtest.
 	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
 		apply(t, "update")
 		verifyConnectionsState(t, "update")

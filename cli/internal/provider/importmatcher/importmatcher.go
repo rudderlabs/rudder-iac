@@ -177,8 +177,11 @@ func ResolveLocalURN(scope Scope, resourceType string, remoteID string) (urn str
 // or linked by local import metadata — or, for an already-managed resource,
 // straight from its externalId, which is its local resource id. ok is false
 // when there is no local counterpart, so the referencing remote stays
-// unmatched. For matchers whose remotes are only identified by what they point
-// at, such as the connection matchers' source–destination pairs.
+// unmatched.
+//
+// It exists for matchers whose remotes are identified only by what they point
+// at, such as the connection matchers' source–destination pairs: resolving both
+// endpoints to local URNs is what lets them find their local counterpart.
 func EndpointURN(scope Scope, resourceType string, remoteID string, externalID string) (string, bool) {
 	if urn, ok := ResolveLocalURN(scope, resourceType, remoteID); ok {
 		return urn, true
