@@ -746,10 +746,10 @@ func TestHandlerImpl_Delete(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "The destination has active connections",
 			"the backend's own reason must survive")
-		assert.Contains(t, err.Error(), `destination "crm-http" still has connections`,
-			"the failure must name which destination is blocked")
-		assert.Contains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
-			"the remedy must name the flag that lets the CLI remove them")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+			"the remedy must name the flags that let the CLI remove them")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
 	})
 
 	// Only the connections refusal earns the extra guidance; every other failure

@@ -5,17 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
@@ -192,7 +191,7 @@ func (h *HandlerImpl) Update(
 }
 
 // Delete disconnects any linked transformation first, then deletes the destination.
-func (h *HandlerImpl) Delete(ctx context.Context, id string, _ *DestinationResource, oldState *DestinationState) error {
+func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *DestinationResource, oldState *DestinationState) error {
 	if oldState.TransformationID != "" {
 		if err := h.client.Destinations.DisconnectTransformation(
 			ctx,
@@ -203,37 +202,10 @@ func (h *HandlerImpl) Delete(ctx context.Context, id string, _ *DestinationResou
 	}
 
 	if err := h.client.Destinations.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting destination: %w", explainBlockingConnections(id, err))
+		return fmt.Errorf("deleting destination: %w", provider.ExplainBlockingConnections(err))
 	}
 
 	return nil
-}
-
-// explainBlockingConnections adds to the backend's refusal to delete a
-// destination that still carries connections the one part the CLI is in a
-// position to explain: the blocking connection may be one this run cannot see.
-//
-// rETL connections sit behind an experimental flag. With the flag off the kind
-// is never loaded, so `destroy` does not plan the connection's deletion and the
-// destination delete then fails on a constraint nothing in the plan mentions —
-// a workspace the CLI cannot finish destroying, with no hint why. Turning the
-// flag on is enough to unblock it, because the connection carries an external
-// id the CLI wrote and is managed once the kind is loaded.
-//
-// A connection made in the workspace UI blocks the same delete and no flag
-// changes that, so the message names both routes: the API error does not
-// distinguish them.
-func explainBlockingConnections(id string, err error) error {
-	var apiErr *client.APIError
-	if !errors.As(err, &apiErr) ||
-		apiErr.HTTPStatusCode != http.StatusBadRequest ||
-		!strings.Contains(strings.ToLower(apiErr.Msg()), "active connections") {
-		return err
-	}
-
-	return fmt.Errorf(
-		"%w: destination %q still has connections, and connections this run is not managing are never removed with it. If they are rETL connections the CLI created, set %s=true and run again; otherwise delete them in the workspace first",
-		err, id, config.GetEnvironmentVariableName("retlConnectionSupport"))
 }
 
 // MapRemoteToState converts a remote destination into the spec-side resource
