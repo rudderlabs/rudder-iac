@@ -92,22 +92,15 @@ func TestCheckCronFrequency(t *testing.T) {
 			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
-			// Vixie reads the wildcard flag off the first character of the
-			// field, so this day-of-month is not a wildcard even though it
-			// selects every day. The two day fields are therefore ORed, every
-			// date matches, and the midnight gap violates.
+			// A literal "*" anywhere in the field sets the flag, which is
+			// robfig's rule, so both spellings are wildcards and select the
+			// same schedule here as they do there. The day fields are ANDed,
+			// only Mondays match - never two days running, which is what keeps
+			// the midnight gap out of reach.
 			expression: "0,57 0,23 3,* * MON",
-			expected: CronCheckResult{
-				Status:            CronTooFrequent,
-				Reason:            "consecutive syncs have a 3-minute gap; the minimum supported interval is 5 minutes",
-				ViolatingSync:     utc(2026, time.January, 1, 23, 57),
-				NextViolatingSync: utc(2026, time.January, 2, 0, 0),
-			},
+			expected:   CronCheckResult{Status: CronValid},
 		},
 		{
-			// The same values written the other way round do set the flag, so
-			// the day fields are ANDed and only Mondays match - never two days
-			// running, which is what keeps the midnight gap out of reach.
 			expression: "0,57 0,23 *,3 * MON",
 			expected:   CronCheckResult{Status: CronValid},
 		},
