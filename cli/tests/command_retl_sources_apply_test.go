@@ -107,15 +107,15 @@ func managedAccountID(t *testing.T, externalID string) string {
 	accounts, err := apiClient.Accounts.ListAll(context.Background(), client.WithHasExternalID(true))
 	require.NoError(t, err, "listing managed accounts")
 
+	var ids []string
 	for _, account := range accounts {
 		if account.ExternalID == externalID {
-			require.NotEmpty(t, account.ID, "managed account %q has no id", externalID)
-			return account.ID
+			ids = append(ids, account.ID)
 		}
 	}
-
-	t.Fatalf("managed account %q not found upstream", externalID)
-	return ""
+	require.Len(t, ids, 1, "managed accounts claiming %q", externalID)
+	require.NotEmpty(t, ids[0], "managed account %q has no id", externalID)
+	return ids[0]
 }
 
 // managedRETLSource reads back the one managed source of the given type
