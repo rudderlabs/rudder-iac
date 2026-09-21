@@ -226,6 +226,17 @@ func compatibleGraph() *resources.Graph {
 	return graph
 }
 
+// TestConnectionResourceTypes pins the whole list, not just the rETL row the
+// topology scan most recently gained: V-C3, V-E1 and V-R1 see only what
+// ProjectConnectionEdges walks, so a connection family left off this list is
+// silently excluded from all three — no compile error, no failing test, just
+// validation that quietly does not run.
+func TestConnectionResourceTypes(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, []string{"event-stream-connection", "retl-connection"}, connectionResourceTypes)
+}
+
 func TestConnectionSemanticValidRule_Metadata(t *testing.T) {
 	rule := NewConnectionSemanticValidRule(definitions.NewRegistry())
 
