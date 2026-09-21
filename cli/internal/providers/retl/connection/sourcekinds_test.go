@@ -19,6 +19,7 @@ var tableKind = SourceKind{
 	Kind:         "retl-source-table",
 	ResourceType: "retl-source-table",
 	SourceType:   retlClient.TableSourceType,
+	Flag:         "RUDDERSTACK_X_RETL_TABLE_SUPPORT",
 }
 
 // TestSourceKinds pins the whole table, not just the sql model row: registering

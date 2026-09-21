@@ -18,6 +18,7 @@ type SourceKind struct {
 	Kind         string                // spec reference kind, e.g. retl-source-sql-model
 	ResourceType string                // graph resource type
 	SourceType   retlClient.SourceType // API sourceType
+	Flag         string                // env var that enables the kind; empty when always on
 }
 
 // SourceKinds are the rETL source kinds a connection may reference. Adding one
@@ -26,17 +27,15 @@ type SourceKind struct {
 // source definitions it accepts, and both need tests. Audience sources are
 // absent because none of that exists for them yet.
 //
-// The table row is safe to register unconditionally even though the kind is
-// gated behind retlTableSupport. This table only decides which references a
-// connection may *name*; whether the referenced resource exists is the source
-// handler's business. With the flag off the table spec kind fails to load in
-// its own right, and the connection's reference is then reported as
-// unresolved — two errors, the first of which names the flag. Narrowing this
-// list to the enabled kinds is DEX-826's job, not a correctness fix here; see
-// the note in the PR.
+// The table row is listed unconditionally although its kind sits behind
+// retlTableSupport. On the spec side that is safe: with the flag off a table
+// spec fails to load ("'kind' must be one of [...]"), and a reference to one
+// is then unresolved. On the remote side it is not, because this list also
+// decides which rows are eligible and how their sources resolve, so the
+// provider narrows the handler to the registered kinds (EnableSourceKinds).
 var SourceKinds = []SourceKind{
 	{Kind: sqlmodel.ResourceKind, ResourceType: sqlmodel.ResourceType, SourceType: retlClient.ModelSourceType},
-	{Kind: table.ResourceKind, ResourceType: table.ResourceType, SourceType: retlClient.TableSourceType},
+	{Kind: table.ResourceKind, ResourceType: table.ResourceType, SourceType: retlClient.TableSourceType, Flag: "RUDDERSTACK_X_RETL_TABLE_SUPPORT"},
 }
 
 // The graph data every rETL source handler publishes about its source,

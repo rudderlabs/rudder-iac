@@ -3,6 +3,7 @@ package retl
 import (
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"strconv"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -38,6 +39,9 @@ type Provider struct {
 	kindToType     map[string]string
 	syntacticRules []rules.Rule
 	matchers       []importmatcher.Matcher
+	// connectionMatcher is held back and appended by New after every option,
+	// so it trails all source matchers whatever order the options come in.
+	connectionMatcher *importmatcher.Matcher
 	// destinationRegistry is parked for DEX-829's connection semantic rules;
 	// nothing reads it yet. It is nil unless WithConnectionSupport was applied.
 	destinationRegistry *definitions.Registry
@@ -53,8 +57,9 @@ type Option func(*Provider)
 // A nil registry is replaced with an empty one: registry.Get indexes a map on
 // its receiver, so nil constructs fine and only panics later, mid remote load.
 //
-// The matcher is appended, so it trails the SQL model matcher New seeds and its
-// endpoint lookups can rely on source matches being recorded already.
+// Its matcher resolves endpoints through source matches, so New appends it
+// after every option rather than here — a source kind registered by a later
+// option would otherwise match after it and leave its connections unmatched.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
 		if registry == nil {
@@ -63,7 +68,8 @@ func WithConnectionSupport(registry *definitions.Registry) Option {
 		p.destinationRegistry = registry
 		p.kindToType[connection.ResourceKind] = connection.ResourceType
 		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
-		p.matchers = append(p.matchers, connection.Matcher())
+		m := connection.Matcher()
+		p.connectionMatcher = &m
 	}
 }
 
@@ -99,6 +105,12 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 
 	for _, opt := range opts {
 		opt(p)
+	}
+	if p.connectionMatcher != nil {
+		p.matchers = append(p.matchers, *p.connectionMatcher)
+	}
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.EnableSourceKinds(lo.Keys(p.handlers)...)
 	}
 	return p
 }
