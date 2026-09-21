@@ -32,7 +32,7 @@ const transformationExternalID = "tag-source"
 // importer meets at runtime — assigned by the server, not by a fixture — is
 // matched back to the managed resource.
 func TestImportReferencesManagedTransformation(t *testing.T) {
-	allowUnverifiedDestinationResidue(t)
+	allowManagedResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
 	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
