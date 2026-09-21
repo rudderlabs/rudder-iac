@@ -239,16 +239,13 @@ func TestSpecValidateTagsIdentifiers(t *testing.T) {
 }
 
 // TestGraphKeysMatchEventStreamConnection guards the keys both connection
-// resource types share. The names repeat the event stream ones so the
-// project-wide connection topology scan, which reads event stream connections
-// only today, can fold rETL connections in without a second set of keys.
+// resource types share but do not alias: the graph input keys the topology scan
+// reads are aliased in model.go, so only these output-side names can still
+// drift apart.
 func TestGraphKeysMatchEventStreamConnection(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, esConnection.ConnectionsKey, ConnectionsKey)
-	assert.Equal(t, esConnection.SourceKey, SourceKey)
-	assert.Equal(t, esConnection.DestinationKey, DestinationKey)
-	assert.Equal(t, esConnection.EnabledKey, EnabledKey)
 	assert.Equal(t, esConnection.IDKey, IDKey)
 	assert.Equal(t, esConnection.SourceIDKey, SourceIDKey)
 	assert.Equal(t, esConnection.DestinationIDKey, DestinationIDKey)

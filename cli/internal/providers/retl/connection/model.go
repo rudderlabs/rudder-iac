@@ -3,6 +3,7 @@ package connection
 import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -42,10 +43,15 @@ const (
 	// and destination hold PropertyRefs the syncer dereferences to remote ids
 	// before the lifecycle runs, and config holds the canonical config map.
 	ConnectionsKey = "connections"
-	SourceKey      = "source"
-	DestinationKey = "destination"
-	EnabledKey     = "enabled"
 	ConfigKey      = "config"
+
+	// Aliased, not restated: the project-wide topology scan folds both
+	// connection families into one read shape keyed by these names, so renaming
+	// one on the event stream side has to break the build here rather than a
+	// test.
+	SourceKey      = esConnection.SourceKey
+	DestinationKey = esConnection.DestinationKey
+	EnabledKey     = esConnection.EnabledKey
 
 	// Output-side keys: the remote identifiers the lifecycle stores in state.
 	// They intentionally repeat the event stream connection names so that the
