@@ -60,6 +60,7 @@ func TestProviderRuleDocs(t *testing.T) {
 	assert.Empty(t, verrs, "expected no validation errors, got: %v", verrs)
 	require.Len(t, doc.Rules, len(syntactic)+len(semantic))
 
+	var examples int
 	for _, entry := range p.RuleDocEntries() {
 		// Only the connection fragments run as projects. The SQL model fragments
 		// predate this check (references without /spec, duplicates against
@@ -69,6 +70,7 @@ func TestProviderRuleDocs(t *testing.T) {
 			continue
 		}
 		for _, behaviour := range entry.MatchBehavior {
+			examples += len(behaviour.Valid) + len(behaviour.Invalid)
 			for _, example := range behaviour.Valid {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					diagnostics, err := loadExample(t, registry, example.Files)
@@ -84,6 +86,11 @@ func TestProviderRuleDocs(t *testing.T) {
 			}
 		}
 	}
+
+	// The filter is a prefix match on rule IDs: rename the connection rules or
+	// move their fragments and every subtest above disappears silently, leaving
+	// the docs.Generate assertions to report a pass on their own.
+	require.NotZero(t, examples, "no rule doc example ran")
 }
 
 // loadExample runs the example files through project.Load, the path validate
