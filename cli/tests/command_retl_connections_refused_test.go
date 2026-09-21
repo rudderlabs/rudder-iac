@@ -1,13 +1,11 @@
 package tests
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,10 +24,7 @@ import (
 // actually meets: one apply, one refusal, naming the destination type, with
 // nothing written upstream. That is what this asserts.
 func TestRETLConnectionRefusedAtCreate(t *testing.T) {
-	allowUnverifiedDestinationResidue(t)
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
+	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -54,33 +49,9 @@ func TestRETLConnectionRefusedAtCreate(t *testing.T) {
 		"the refusal must name the destination type, not just fail")
 
 	// Nothing was written: the point of refusing at create is that no
-	// unreadable row is left behind for the next apply to trip over.
-	assert.Empty(t, managedRETLConnectionExternalIDs(t),
-		"a refused connection must leave nothing upstream")
-}
-
-// managedRETLConnectionExternalIDs lists the external ids of every managed
-// connection in the workspace.
-func managedRETLConnectionExternalIDs(t *testing.T) []string {
-	t.Helper()
-
-	config.InitConfig(config.DefaultConfigFile())
-	apiClient, err := client.New(
-		config.GetConfig().Auth.AccessToken,
-		client.WithBaseURL(config.GetConfig().APIURL),
-		client.WithUserAgent("rudder-cli-test"),
-	)
-	require.NoError(t, err)
-
-	page, err := retlClient.NewRudderRETLStore(apiClient).ListConnections(
-		context.Background(), &retlClient.ListRETLConnectionsRequest{Page: 1})
-	require.NoError(t, err, "listing RETL connections")
-
-	ids := make([]string, 0, len(page.Data))
-	for _, conn := range page.Data {
-		if conn.ExternalID != "" {
-			ids = append(ids, conn.ExternalID)
-		}
-	}
-	return ids
+	// unreadable row is left behind for the next apply to trip over. Targeted
+	// at this connection, across every page, so an unrelated managed connection
+	// in the shared workspace cannot fail it and a leaked row cannot hide.
+	assert.NotContains(t, lo.Map(managedRETLConnections(t), func(c retlClient.RETLConnection, _ int) string { return c.ExternalID }),
+		"orders-to-archive", "a refused connection must leave nothing upstream")
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +38,7 @@ const (
 // This suite needs nothing TestAccountsApply does not already need (a live
 // stack carrying SOURCE_POSTGRES), so it runs in the same lane instead.
 func TestRETLSourcesApply(t *testing.T) {
-	allowUnverifiedDestinationResidue(t)
+	allowManagedResidue(t)
 	// Accounts are behind the experimental umbrella and the table kind behind
 	// its own flag; the SQL model kind is behind neither.
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
@@ -66,39 +66,35 @@ func TestRETLSourcesApply(t *testing.T) {
 		assertRETLTable(t, accountID, "Customers Table", "customers")
 	})
 
+	var modelID, tableID string
 	t.Run("apply update", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials)
 
 		accountID := managedAccountID(t, retlAccountExternalID)
-		assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders")
-		assertRETLTable(t, accountID, "Customers Table", "customers_v2")
+		modelID = assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders")
+		tableID = assertRETLTable(t, accountID, "Customers Table", "customers_v2")
 	})
 
 	// Not assertable as "No changes to apply": the project carries the account
 	// both sources hang off, and its password is write-only, so it maps to an
 	// always-unknown secret that re-plans every run (see secret.String.Diff).
 	// TestAccountsApply and TestConnectionsApply hit the same wall and settle for
-	// the same thing — prove nothing else churned by reading the state back.
+	// the same thing — prove nothing else churned by reading the state back. The
+	// ids are what tell convergence apart from a delete-and-recreate.
 	t.Run("re-apply leaves both sources unchanged", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials)
 
 		accountID := managedAccountID(t, retlAccountExternalID)
-		assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders")
-		assertRETLTable(t, accountID, "Customers Table", "customers_v2")
+		assert.Equal(t, modelID, assertRETLModel(t, accountID, "Orders Model - revised", "SELECT id, email, created_at FROM orders"), "the model was re-created")
+		assert.Equal(t, tableID, assertRETLTable(t, accountID, "Customers Table", "customers_v2"), "the table was re-created")
 	})
 }
 
-// applyRETLProject applies one fixture directory with the given var files.
-func applyRETLProject(t *testing.T, executor *CmdExecutor, dir, credentials string, extraVarFiles ...string) {
+// applyRETLProject applies one fixture directory with its credentials.
+func applyRETLProject(t *testing.T, executor *CmdExecutor, dir, credentials string) {
 	t.Helper()
 
-	args := []string{"apply", "-l", dir, "--var-file", credentials}
-	for _, varFile := range extraVarFiles {
-		args = append(args, "--var-file", varFile)
-	}
-	args = append(args, "--confirm=false")
-
-	out, err := executor.Execute(cliBinPath, args...)
+	out, err := executor.Execute(cliBinPath, "apply", "-l", dir, "--var-file", credentials, "--confirm=false")
 	require.NoError(t, err, "apply %s failed: %s", dir, out)
 }
 
@@ -122,49 +118,41 @@ func managedAccountID(t *testing.T, externalID string) string {
 	return ""
 }
 
-// managedRETLSource reads back the managed source of the given type claiming the
-// given externalId, with the server-assigned and time-varying fields cleared so
-// the caller can compare the whole struct. Comparing the struct rather than a
+// managedRETLSource reads back the one managed source of the given type
+// claiming the given externalId, with the time-varying fields cleared so the
+// caller can compare the whole struct. Comparing the struct rather than a
 // handful of fields is what catches a field the assertions never thought to
 // name — an `enabled` that silently flipped, or a config shape decoded as the
-// wrong union member.
+// wrong union member. More than one match fails: a duplicate is exactly what a
+// re-apply must not produce.
 func managedRETLSource(t *testing.T, sourceType retlClient.SourceType, externalID string) retlClient.RETLSource {
 	t.Helper()
 
-	config.InitConfig(config.DefaultConfigFile())
-	apiClient, err := client.New(
-		config.GetConfig().Auth.AccessToken,
-		client.WithBaseURL(config.GetConfig().APIURL),
-		client.WithUserAgent("rudder-cli-test"),
-	)
-	require.NoError(t, err)
-
 	hasExternalID := true
-	sources, err := retlClient.NewRudderRETLStore(apiClient).ListRetlSources(
+	sources, err := retlClient.NewRudderRETLStore(newAccountsAPIClient(t)).ListRetlSources(
 		context.Background(),
 		retlClient.WithSourceType(string(sourceType)),
 		retlClient.WithHasExternalId(&hasExternalID),
 	)
 	require.NoError(t, err, "listing managed RETL sources")
 
-	for _, source := range sources.Data {
-		if source.ExternalID != externalID {
-			continue
-		}
-		source.ID = ""
-		source.WorkspaceID = ""
-		source.CreatedAt = nil
-		source.UpdatedAt = nil
-		return source
-	}
-
-	t.Fatalf("managed RETL source %q missing upstream", externalID)
-	return retlClient.RETLSource{}
+	matches := lo.Filter(sources.Data, func(s retlClient.RETLSource, _ int) bool { return s.ExternalID == externalID })
+	require.Len(t, matches, 1, "managed RETL sources claiming %q", externalID)
+	source := matches[0]
+	require.NotEmpty(t, source.ID, "managed RETL source %q has no id", externalID)
+	source.WorkspaceID = ""
+	source.CreatedAt = nil
+	source.UpdatedAt = nil
+	return source
 }
 
-func assertRETLModel(t *testing.T, accountID, displayName, sql string) {
+// assertRETLModel checks the managed model source and returns its server id.
+func assertRETLModel(t *testing.T, accountID, displayName, sql string) string {
 	t.Helper()
 
+	actual := managedRETLSource(t, retlClient.ModelSourceType, retlModelExternalID)
+	id := actual.ID
+	actual.ID = ""
 	assert.Equal(t, retlClient.RETLSource{
 		Name:                 displayName,
 		Config:               retlClient.RETLSQLModelConfig{PrimaryKey: "id", Sql: sql},
@@ -173,12 +161,17 @@ func assertRETLModel(t *testing.T, accountID, displayName, sql string) {
 		SourceDefinitionName: "postgres",
 		AccountID:            accountID,
 		ExternalID:           retlModelExternalID,
-	}, managedRETLSource(t, retlClient.ModelSourceType, retlModelExternalID))
+	}, actual)
+	return id
 }
 
-func assertRETLTable(t *testing.T, accountID, displayName, table string) {
+// assertRETLTable checks the managed table source and returns its server id.
+func assertRETLTable(t *testing.T, accountID, displayName, table string) string {
 	t.Helper()
 
+	actual := managedRETLSource(t, retlClient.TableSourceType, retlTableExternalID)
+	id := actual.ID
+	actual.ID = ""
 	assert.Equal(t, retlClient.RETLSource{
 		Name:                 displayName,
 		Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "analytics", Table: table},
@@ -187,5 +180,6 @@ func assertRETLTable(t *testing.T, accountID, displayName, table string) {
 		SourceDefinitionName: "postgres",
 		AccountID:            accountID,
 		ExternalID:           retlTableExternalID,
-	}, managedRETLSource(t, retlClient.TableSourceType, retlTableExternalID))
+	}, actual)
+	return id
 }

@@ -5,14 +5,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/api/client"
-	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
-const retlConnectionExternalID = "orders-to-http"
+const (
+	retlConnectionExternalID  = "orders-to-http"
+	retlDestinationExternalID = "e2e-retl-http"
+)
 
 // TestRETLConnectionsApply drives a retl-connections entry end to end: the
 // project carries the account, the SQL model source and the destination the
@@ -25,14 +28,11 @@ const retlConnectionExternalID = "orders-to-http"
 // connection read path skips any row whose destination is not one of them,
 // which would leave this suite creating a connection it could never read back.
 //
-// Ungated, for the reason written into TestRETLSourcesApply: the two gated
-// suites in this package have never run because their repository variables were
-// never defined.
+// Ungated for the reason given on TestRETLSourcesApply. Against production it
+// fails until the config-backend release carrying DEX-892 (externalId on
+// connection create) ships; the PR that adds it is held until then.
 func TestRETLConnectionsApply(t *testing.T) {
-	allowUnverifiedDestinationResidue(t)
-	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_DESTINATION_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
+	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -56,54 +56,79 @@ func TestRETLConnectionsApply(t *testing.T) {
 	// A mutable change: schedule and mapping move in one PUT. An endpoint change
 	// would be a replacement instead, which is a different path and belongs in
 	// its own case once this one is established upstream.
+	var connectionID string
 	t.Run("apply update", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials)
-		assertRETLConnection(t, 60, "traits.emailAddress")
+		connectionID = assertRETLConnection(t, 60, "traits.emailAddress")
 	})
 
 	// The convergence assertion this suite exists for. Before #891, Create wrote
-	// a connection the read path then skipped, so state stayed empty and every
-	// later apply re-planned the same create until the backend refused it as a
-	// duplicate. A second apply that changes nothing but the account secret is
-	// what proves the row round-trips.
+	// a connection the read path then skipped, so every later apply re-planned
+	// the same create. The id is what tells convergence apart from a quiet
+	// delete-and-recreate.
 	t.Run("re-apply does not re-create the connection", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "update"), credentials)
-		assertRETLConnection(t, 60, "traits.emailAddress")
+		assert.Equal(t, connectionID, assertRETLConnection(t, 60, "traits.emailAddress"), "the connection was re-created")
 	})
 }
 
-// assertRETLConnection reads the managed connection back through the API and
-// checks the fields the fixture sets, plus that it still points at the managed
-// source and destination.
-func assertRETLConnection(t *testing.T, everyMinutes int, emailTarget string) {
+// assertRETLConnection reads the one managed connection back through the API,
+// checks every field the fixture sets and that it joins the managed source and
+// destination — not merely some pair — and returns its server id.
+func assertRETLConnection(t *testing.T, everyMinutes int, emailTarget string) string {
 	t.Helper()
 
-	config.InitConfig(config.DefaultConfigFile())
-	apiClient, err := client.New(
-		config.GetConfig().Auth.AccessToken,
-		client.WithBaseURL(config.GetConfig().APIURL),
-		client.WithUserAgent("rudder-cli-test"),
-	)
-	require.NoError(t, err)
-
-	store := retlClient.NewRudderRETLStore(apiClient)
-	page, err := store.ListConnections(context.Background(), &retlClient.ListRETLConnectionsRequest{Page: 1})
-	require.NoError(t, err, "listing RETL connections")
-
-	var actual *retlClient.RETLConnection
-	for i, conn := range page.Data {
-		if conn.ExternalID == retlConnectionExternalID {
-			actual = &page.Data[i]
-			break
-		}
-	}
-	require.NotNil(t, actual, "managed RETL connection %q missing upstream", retlConnectionExternalID)
+	matches := lo.Filter(managedRETLConnections(t), func(c retlClient.RETLConnection, _ int) bool {
+		return c.ExternalID == retlConnectionExternalID
+	})
+	require.Len(t, matches, 1, "managed RETL connections claiming %q", retlConnectionExternalID)
+	actual := matches[0]
 
 	assert.True(t, actual.Enabled, "connection should be enabled")
-	assert.NotEmpty(t, actual.SourceID, "connection lost its source")
-	assert.NotEmpty(t, actual.DestinationID, "connection lost its destination")
+	assert.Equal(t, managedRETLSource(t, retlClient.ModelSourceType, retlModelExternalID).ID, actual.SourceID, "connection is not on the managed source")
+	assert.Equal(t, managedDestinationID(t, retlDestinationExternalID), actual.DestinationID, "connection is not on the managed destination")
+	assert.Equal(t, retlClient.SyncBehaviourUpsert, actual.SyncBehaviour)
+	assert.Equal(t, &retlClient.Event{Type: retlClient.EventTypeIdentify}, actual.Event)
 	require.NotNil(t, actual.Schedule.EveryMinutes, "basic schedule came back without everyMinutes")
 	assert.Equal(t, everyMinutes, *actual.Schedule.EveryMinutes, "schedule did not follow the spec")
 	assert.Equal(t, []retlClient.Mapping{{From: "id", To: "user_id"}}, actual.Identifiers)
 	assert.Equal(t, []retlClient.Mapping{{From: "email", To: emailTarget}}, actual.Mappings)
+	return actual.ID
+}
+
+// managedRETLConnections lists every managed connection in the workspace,
+// walking all pages.
+func managedRETLConnections(t *testing.T) []retlClient.RETLConnection {
+	t.Helper()
+
+	store := retlClient.NewRudderRETLStore(newAccountsAPIClient(t))
+	var all []retlClient.RETLConnection
+	for page := 1; ; page++ {
+		result, err := store.ListConnections(context.Background(), &retlClient.ListRETLConnectionsRequest{
+			HasExternalID: lo.ToPtr(true), Page: page, PageSize: 100,
+		})
+		require.NoError(t, err, "listing managed RETL connections")
+		all = append(all, result.Data...)
+		if result.Paging.Next == "" {
+			return all
+		}
+	}
+}
+
+// managedDestinationID returns the server id of the one destination claiming
+// the given externalId.
+func managedDestinationID(t *testing.T, externalID string) string {
+	t.Helper()
+
+	destinations, err := retlClient.NewRudderRETLStore(newAccountsAPIClient(t)).GetDestinations(context.Background())
+	require.NoError(t, err, "listing destinations")
+
+	var ids []string
+	for _, d := range destinations {
+		if d.ExternalID == externalID {
+			ids = append(ids, d.ID)
+		}
+	}
+	require.Len(t, ids, 1, "destinations claiming %q", externalID)
+	return ids[0]
 }
