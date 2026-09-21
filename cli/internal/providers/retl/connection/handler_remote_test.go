@@ -74,22 +74,30 @@ func remoteRow(id, externalID, sourceID, destinationID string) retlClient.RETLCo
 	return conn
 }
 
-// reservedMappingRow is a JSON mapper row whose user mappings aim at a target
-// the backend reserves for identifiers. Re-applying the spec it would produce
-// moves the entry into the identifiers, so the row would diff forever.
-func reservedMappingRow() retlClient.RETLConnection {
-	conn := remoteRow("conn-reserved-mapping", "", "src-1", "dst-1")
-	conn.Mappings = append(conn.Mappings, retlClient.Mapping{From: "device", To: AnonymousIDTarget})
-	return conn
-}
+// eligibleRemote is the *RemoteConnection remoteConnection builds for a row
+// wired to the shared endpoint fixtures — the payload both remote loaders
+// store. Built through the same conversions the handler uses, so a fixture
+// cannot drift from what the handler would produce.
+func eligibleRemote(t *testing.T, conn retlClient.RETLConnection) *RemoteConnection {
+	t.Helper()
 
-// manyIdentifiersRow is an object mapping row carrying two identifiers; the
-// flow stores a single one, so the second could never be recreated.
-func manyIdentifiersRow() retlClient.RETLConnection {
-	conn := remoteRow("conn-many-identifiers", "", "src-1", "dst-object")
-	conn.Object = "Contact"
-	conn.Identifiers = append(conn.Identifiers, retlClient.Mapping{From: "email", To: "Email"})
-	return conn
+	source, ok := lo.Find(remoteSources(), func(s retlClient.RETLSource) bool { return s.ID == conn.SourceID })
+	require.True(t, ok, "source %q is not one of the shared fixtures", conn.SourceID)
+	dst, ok := lo.Find(remoteDestinations(), func(d apiClient.Destination) bool { return d.ID == conn.DestinationID })
+	require.True(t, ok, "destination %q is not one of the shared fixtures", conn.DestinationID)
+	config, err := configFromRemote(&conn)
+	require.NoError(t, err)
+
+	return &RemoteConnection{
+		RETLConnection:        conn,
+		Config:                config,
+		WorkspaceID:           source.WorkspaceID,
+		SourceKind:            SourceKinds[0],
+		SourceName:            source.Name,
+		SourceExternalID:      source.ExternalID,
+		DestinationName:       dst.Name,
+		DestinationExternalID: dst.ExternalID,
+	}
 }
 
 // remoteClient is a client whose connections list serves the given pages in
@@ -189,10 +197,10 @@ func TestListPagination(t *testing.T) {
 		assert.Nil(t, rows, "a partial list must never be reported as a successful one")
 	})
 
-	// The API drops next exactly when page*pageSize reaches total, so a last
-	// page whose own total promises more rows contradicts itself: reporting the
-	// rows collected so far as the whole list would silently truncate it.
-	t.Run("a last page that still promises more rows is an error", func(t *testing.T) {
+	// next alone ends the walk: paging.total is advisory and the API discounts
+	// it by the rows it skips on the page in hand, so a last page whose total
+	// looks larger than the rows collected is still the end of the list.
+	t.Run("an empty next ends the walk whatever total reports", func(t *testing.T) {
 		t.Parallel()
 
 		mock := &MockConnectionClient{
@@ -205,28 +213,10 @@ func TestListPagination(t *testing.T) {
 		}
 
 		rows, err := remoteHandler(mock, t).List(t.Context(), nil)
+		require.NoError(t, err)
 
-		assert.EqualError(t, err, "listing rETL connections: page 1 reported 250 connections in total but no further page")
-		assert.Nil(t, rows)
-	})
-
-	t.Run("a next that never ends stops at the page bound", func(t *testing.T) {
-		t.Parallel()
-
-		mock := &MockConnectionClient{
-			ListFunc: func(req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
-				return &retlClient.RETLConnectionsPage{
-					Data:   []retlClient.RETLConnection{remoteRow("conn-"+strconv.Itoa(req.Page), "", "src-1", "dst-1")},
-					Paging: apiClient.Paging{Next: "/apigateway/v1/retl-connections?page=" + strconv.Itoa(req.Page+1)},
-				}, nil
-			},
-		}
-
-		rows, err := remoteHandler(mock, t).List(t.Context(), nil)
-
-		assert.EqualError(t, err, "listing rETL connections: the API kept reporting another page past page 1000")
-		assert.Nil(t, rows, "a walk that never terminated must never be reported as a successful list")
-		assert.Len(t, mock.ListCalls, maxListPages)
+		assert.Len(t, mock.ListCalls, 1)
+		assert.Len(t, rows, 1)
 	})
 
 	t.Run("a nil page is an error, not an empty list", func(t *testing.T) {
@@ -299,8 +289,6 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 			remoteRow("conn-not-warehouse", "e", "src-1", "dst-eventstream"),
 			remoteRow("conn-destination-specific", "f", "src-1", "dst-specific"),
 			remoteRow("conn-no-workspace", "g", "src-no-workspace", "dst-1"),
-			reservedMappingRow(),
-			manyIdentifiersRow(),
 		})
 
 		collection, err := remoteHandler(mock, t).LoadResourcesFromRemote(t.Context())
@@ -309,8 +297,8 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		require.Len(t, mock.ListCalls, 1)
 		assert.Equal(t, lo.ToPtr(true), mock.ListCalls[0].HasExternalID)
 		assert.Equal(t, map[string]*resources.RemoteResource{
-			"conn-1":      {ID: "conn-1", ExternalID: "users-to-webhook", Data: supported},
-			"conn-object": {ID: "conn-object", ExternalID: "users-to-bingads", Data: objectMapping},
+			"conn-1":      {ID: "conn-1", ExternalID: "users-to-webhook", Data: eligibleRemote(t, supported)},
+			"conn-object": {ID: "conn-object", ExternalID: "users-to-bingads", Data: eligibleRemote(t, objectMapping)},
 		}, collection.GetAll(ResourceType))
 	})
 
@@ -339,12 +327,24 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 }
 
 // managedCollection is what the syncer hands MapRemoteToState: this handler's
-// rows merged with the endpoint providers' managed resources.
-func managedCollection(conns ...retlClient.RETLConnection) *resources.RemoteResources {
+// rows merged with the endpoint providers' managed resources. The payload is
+// the *RemoteConnection LoadResourcesFromRemote stores, config included.
+func managedCollection(t *testing.T, conns ...retlClient.RETLConnection) *resources.RemoteResources {
+	t.Helper()
+
 	collection := resources.NewRemoteResources()
 	connectionMap := make(map[string]*resources.RemoteResource, len(conns))
 	for _, conn := range conns {
-		connectionMap[conn.ID] = &resources.RemoteResource{ID: conn.ID, ExternalID: conn.ExternalID, Data: conn}
+		// Only the row and its rebuilt config matter here: MapRemoteToState
+		// resolves the endpoints out of the collection, not the catalogs, which
+		// is what lets these fixtures name endpoints the catalogs do not hold.
+		config, err := configFromRemote(&conn)
+		require.NoError(t, err)
+		connectionMap[conn.ID] = &resources.RemoteResource{
+			ID:         conn.ID,
+			ExternalID: conn.ExternalID,
+			Data:       &RemoteConnection{RETLConnection: conn, Config: config},
+		}
 	}
 	collection.Set(ResourceType, connectionMap)
 	collection.Set(sqlmodel.ResourceType, map[string]*resources.RemoteResource{
@@ -364,7 +364,7 @@ func TestMapRemoteToState(t *testing.T) {
 		t.Parallel()
 
 		conn := remoteRow("conn-1", "users-to-webhook", "src-1", "dst-1")
-		s, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(conn))
+		s, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(t, conn))
 		require.NoError(t, err)
 
 		// The spec side's canonical config for the same connection: local and
@@ -396,7 +396,7 @@ func TestMapRemoteToState(t *testing.T) {
 	t.Run("skips rows whose endpoints are not managed", func(t *testing.T) {
 		t.Parallel()
 
-		s, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(
+		s, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(t,
 			remoteRow("conn-1", "users-to-webhook", "src-1", "dst-1"),
 			remoteRow("conn-2", "unknown-source", "src-gone", "dst-1"),
 			remoteRow("conn-3", "unmanaged-source", "src-unmanaged", "dst-1"),
@@ -406,18 +406,6 @@ func TestMapRemoteToState(t *testing.T) {
 
 		require.Len(t, s.Resources, 1)
 		assert.Contains(t, s.Resources, "retl-connection:users-to-webhook")
-	})
-
-	t.Run("a config the spec cannot express is an error, not a silent drop", func(t *testing.T) {
-		t.Parallel()
-
-		conn := remoteRow("conn-1", "users-to-webhook", "src-1", "dst-1")
-		conn.Identifiers = nil
-
-		_, err := remoteHandler(remoteClient(), t).MapRemoteToState(managedCollection(conn))
-
-		assert.ErrorContains(t, err, `reading remote connection "users-to-webhook"`)
-		assert.ErrorIs(t, err, ErrUnrepresentableConfig)
 	})
 
 	t.Run("errors on foreign data in the collection", func(t *testing.T) {

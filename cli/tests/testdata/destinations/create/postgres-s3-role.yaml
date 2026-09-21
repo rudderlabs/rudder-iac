@@ -11,7 +11,7 @@ spec:
   config:
     host: postgres-s3-role.rudder-cli-e2e.internal
     database: analytics
-    user: rudder
+    user: "{{ .POSTGRES_S3_ROLE_USER }}"
     password: "{{ .POSTGRES_PASSWORD }}"
     port: "5432"
     namespace: rudder_e2e_s3_role
@@ -20,5 +20,6 @@ spec:
     use_rudder_storage: false
     bucket_provider: S3
     bucket_name: rudder-cli-e2e
-    role_based_auth: true
-    iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e
+    s3:
+      role_based_auth: true
+      iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e

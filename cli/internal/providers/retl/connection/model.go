@@ -3,6 +3,7 @@ package connection
 import (
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -13,6 +14,11 @@ const (
 	// column and the event name column.
 	columnNamePattern = `^[A-Za-z_][\w$.]*$`
 	columnNameTag     = "retl_column_name"
+
+	// objectNamePattern rejects an empty or whitespace-padded object: the
+	// backend matches a declared object verbatim.
+	objectNamePattern = `(?s)^\S(.*\S)?$`
+	objectNameTag     = "retl_object_name"
 )
 
 // Registering here rather than in the rules package keeps the pattern available
@@ -20,6 +26,7 @@ const (
 // registrar has to be reachable from this package alone.
 func init() {
 	funcs.NewPattern(columnNameTag, columnNamePattern, "must be a column name matching "+columnNamePattern)
+	funcs.NewPattern(objectNameTag, objectNamePattern, "must not be empty or have leading or trailing whitespace")
 }
 
 const (
@@ -36,10 +43,15 @@ const (
 	// and destination hold PropertyRefs the syncer dereferences to remote ids
 	// before the lifecycle runs, and config holds the canonical config map.
 	ConnectionsKey = "connections"
-	SourceKey      = "source"
-	DestinationKey = "destination"
-	EnabledKey     = "enabled"
 	ConfigKey      = "config"
+
+	// Aliased, not restated: the project-wide topology scan folds both
+	// connection families into one read shape keyed by these names, so renaming
+	// one on the event stream side has to break the build here rather than a
+	// test.
+	SourceKey      = esConnection.SourceKey
+	DestinationKey = esConnection.DestinationKey
+	EnabledKey     = esConnection.EnabledKey
 
 	// Output-side keys: the remote identifiers the lifecycle stores in state.
 	// They intentionally repeat the event stream connection names so that the
@@ -62,8 +74,13 @@ const (
 // endpoints' local resource ids. Both endpoint catalogs are read once per
 // operation, so carrying the result here is what keeps naming, export and
 // matching free of further API calls.
+//
+// Config is the spec-shaped config remoteConnection already rebuilt to prove
+// the row representable; carrying it spares state, export and import a second
+// conversion of the same row.
 type RemoteConnection struct {
 	retlClient.RETLConnection
+	Config                ConfigSpec
 	WorkspaceID           string
 	SourceKind            SourceKind
 	SourceName            string
@@ -82,7 +99,10 @@ type ConnectionsSpec struct {
 
 // ConnectionSpec is a single connection entry. Source and destination are
 // scalar references to the two endpoints; everything else that is configurable
-// lives under config. An omitted enabled means an enabled connection.
+// lives under config. An omitted enabled means an enabled connection. Config
+// needs no validate tag of its own — go-playground ignores required on a
+// non-pointer struct and descends into it, so its required members reject an
+// omitted config and name the fields it lacks.
 type ConnectionSpec struct {
 	LocalID     string     `json:"id"                mapstructure:"id"          validate:"required"`
 	Source      string     `json:"source"            mapstructure:"source"      validate:"required"`
@@ -104,8 +124,8 @@ type ConfigSpec struct {
 	Mappings      []MappingSpec     `json:"mappings,omitempty"      mapstructure:"mappings"       validate:"dive"`
 	Constants     []ConstantSpec    `json:"constants,omitempty"     mapstructure:"constants"      validate:"dive"`
 	Event         *EventSpec        `json:"event,omitempty"         mapstructure:"event"`
-	Object        *string           `json:"object,omitempty"        mapstructure:"object"`
-	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column" validate:"omitempty,pattern=retl_column_name"`
+	Object        *string           `json:"object,omitempty"        mapstructure:"object"         validate:"omitempty,pattern=retl_object_name"`
+	CursorColumn  string            `json:"cursor_column,omitempty" mapstructure:"cursor_column"  validate:"excluded_unless=SyncBehaviour upsert,omitempty,pattern=retl_column_name"`
 	SyncSettings  *SyncSettingsSpec `json:"sync_settings,omitempty" mapstructure:"sync_settings"`
 }
 
@@ -133,9 +153,13 @@ type MappingSpec struct {
 	To   string `json:"to"   mapstructure:"to"   validate:"required"`
 }
 
-// ConstantSpec is a user-defined constant added to every synced record.
+// ConstantSpec is a user-defined constant added to every synced record. The
+// backend writes context.mappedToDestination itself
+// (config-backend src/modules/retl/api-gateway/connection-config/constants.ts),
+// so a user constant claiming that key would be overwritten rather than
+// delivered.
 type ConstantSpec struct {
-	Key   string `json:"key"   mapstructure:"key"   validate:"required"`
+	Key   string `json:"key"   mapstructure:"key"   validate:"required,ne=context.mappedToDestination"`
 	Value string `json:"value" mapstructure:"value" validate:"required"`
 }
 

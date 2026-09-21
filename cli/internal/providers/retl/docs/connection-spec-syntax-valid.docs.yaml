@@ -285,7 +285,7 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/object"
             severity: "error"
-            message_contains: "'object' must not be empty"
+            message_contains: "'object' is not valid: must not be empty or have leading or trailing whitespace"
       - example_id: "retl-connection-spec-untrimmed-object"
         title: "Object name with surrounding whitespace"
         files:
@@ -316,4 +316,4 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/object"
             severity: "error"
-            message_contains: "'object' must not have leading or trailing whitespace"
+            message_contains: "'object' is not valid: must not be empty or have leading or trailing whitespace"

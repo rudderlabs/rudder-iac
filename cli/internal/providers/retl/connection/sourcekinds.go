@@ -2,10 +2,10 @@ package connection
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
-	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -30,11 +30,13 @@ var SourceKinds = []SourceKind{
 
 // The graph data every rETL source handler publishes about its source,
 // whatever its kind, so connection validation can read a source's warehouse,
-// primary key and enabled flag without knowing which kind it is.
+// primary key and enabled flag without knowing which kind it is. Aliased to
+// the SQL model handler's keys rather than restated, so renaming one there
+// breaks the build instead of a test.
 const (
-	SourceDefinitionKey = "source_definition"
-	SourcePrimaryKeyKey = "primary_key"
-	SourceEnabledKey    = "enabled"
+	SourceDefinitionKey = sqlmodel.SourceDefinitionKey
+	SourcePrimaryKeyKey = sqlmodel.PrimaryKeyKey
+	SourceEnabledKey    = sqlmodel.EnabledKey
 )
 
 func SourceKindByKind(kind string) (SourceKind, bool) {
@@ -71,7 +73,7 @@ func SourceKindBySourceType(sourceType retlClient.SourceType) (SourceKind, bool)
 // A reference of the wrong family and a malformed one fail differently: only
 // the first can name the kind the author actually wrote.
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
-	kind, id, ok := refID(ref)
+	kind, id, ok := RefID(ref)
 	if !ok {
 		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, SourceKindRefForms())
 	}
@@ -85,12 +87,17 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 	}, nil
 }
 
-// refID splits a scalar "#<kind>:<id>" reference into its parts, reporting
-// whether it is well formed at all. The event stream connection regex is the
-// single definition of the reference grammar, so reference parsing here and
-// the spec syntax rules cannot drift apart.
-func refID(ref string) (kind string, id string, ok bool) {
-	matches := esConnection.ScalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
+// scalarRefRegex matches a well-formed scalar reference "#<kind>:<id>". The id
+// side deliberately accepts any non-empty single-line value — endpoint local
+// ids carry no charset restriction, but neither the kind nor the id may span
+// multiple lines.
+var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
+
+// RefID splits a scalar "#<kind>:<id>" reference into its parts, reporting
+// whether it is well formed at all. Exported so the connection rules parse
+// references with this same function and cannot drift from the handler.
+func RefID(ref string) (kind string, id string, ok bool) {
+	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return "", "", false
 	}

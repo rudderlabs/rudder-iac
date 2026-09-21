@@ -28,8 +28,6 @@ spec:
     context_data_mapping:
       - from: campaign
         to: campaignName
-    use_native_sdk:
-      web: true
     connection_mode:
       web: device
     event_filtering:

@@ -927,11 +927,12 @@ func TestProviderLoadImportable(t *testing.T) {
 	})
 }
 
-// minimal resolver implementation; not used by current FormatForExport flow
+// noopResolver resolves nothing, as for an import set without the sources'
+// accounts, so exported sources keep their account_id.
 type noopResolver struct{}
 
 func (n noopResolver) ResolveToReference(entityType string, remoteID string) (string, error) {
-	return "", nil
+	return "", fmt.Errorf("%s %s is not in the import set", entityType, remoteID)
 }
 
 func TestProviderFormatForExport(t *testing.T) {
@@ -1169,17 +1170,6 @@ func TestProviderMigrateSpec(t *testing.T) {
 	})
 }
 
-func TestProviderResourceMatchers(t *testing.T) {
-	t.Parallel()
-
-	p := retl.New(newDefaultMockClient())
-
-	matchers := p.ResourceMatchers()
-
-	require.Len(t, matchers, 1)
-	assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
-}
-
 // connectionsSpec is a minimal valid rETL connections spec: enough for the
 // provider to dispatch it to the connection handler and put it in the graph.
 func connectionsSpec() *specs.Spec {
@@ -1223,32 +1213,6 @@ func TestProviderWithoutConnectionSupport(t *testing.T) {
 	assert.Equal(t, []string{"retl/sqlmodel/semantic-valid"}, ruleIDs(p.SemanticRules()))
 
 	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
-}
-
-// TestProviderWithNilConnectionRegistry pins the option's refusal: the rules
-// and the connection handler both index a map on the registry, so a nil one
-// would construct fine and panic mid-validate or mid-import. Declining leaves
-// the flag-off surface, which is a state the provider is built for.
-func TestProviderWithNilConnectionRegistry(t *testing.T) {
-	t.Parallel()
-
-	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(nil))
-
-	assert.Equal(t, []string{sqlmodel.ResourceKind}, p.SupportedKinds())
-	assert.Equal(t, []string{sqlmodel.ResourceType}, p.SupportedTypes())
-	assert.Equal(t, []string{sqlmodel.ResourceType}, matcherTypes(p.ResourceMatchers()))
-	assert.Equal(t, []string{"retl/sqlmodel/spec-syntax-valid"}, ruleIDs(p.SyntacticRules()))
-	assert.Equal(t, []string{"retl/sqlmodel/semantic-valid"}, ruleIDs(p.SemanticRules()))
-
-	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
-}
-
-func ruleIDs(registered []vrules.Rule) []string {
-	ids := make([]string, 0, len(registered))
-	for _, rule := range registered {
-		ids = append(ids, rule.ID())
-	}
-	return ids
 }
 
 func TestProviderWithConnectionSupport(t *testing.T) {

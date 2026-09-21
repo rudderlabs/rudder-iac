@@ -27,21 +27,51 @@ var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     AccountResourceType,
 	SpecKind:         AccountSpecKind,
 	SpecMetadataName: AccountMetadataName,
+	// RETL sources reference accounts as "#account:<id>".
+	ReferencedByKind: true,
 }
 
-// registeredAccountSecretKeys maps an account definition to its secret field set — the
-// account-side analogue of a destination definition's SecretKeys(). All other config
-// keys are treated as (non-secret) options by splitConfig. For Snowflake, only the auth
-// mode in play supplies one of the secrets; the others are simply absent from the user's
-// config and the split handles that generically.
+// accountDefinition is what the CLI knows about one account definition.
+//
+// Type is the account's role in the control plane, which for a source account
+// is the name of the source definition it backs ("type" in
+// integrations-config's sources/<type>/accounts/<name>/db-config.json).
+//
+// SecretKeys is its secret field set — the account-side analogue of a
+// destination definition's SecretKeys(). All other config keys are treated as
+// (non-secret) options by splitConfig. For Snowflake, only the auth mode in
+// play supplies one of the secrets; the others are simply absent from the
+// user's config and the split handles that generically.
+type accountDefinition struct {
+	Type       string
+	SecretKeys []string
+}
+
+// registeredAccounts is every account definition the CLI can manage. One entry
+// per definition, so a definition cannot have a type without a secret set or
+// the reverse.
 //
 // ponytail: hardcoded. The real registry fetches secretFields from the control-plane
 // account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
 // here stays a one-line map entry because the split logic below is definition-driven.
-var registeredAccountSecretKeys = map[string][]string{
-	"SOURCE_BIGQUERY":  {"credentials"},
-	"SOURCE_POSTGRES":  {"password"},
-	"SOURCE_SNOWFLAKE": {"password", "privateKey", "privateKeyPassphrase"},
+var registeredAccounts = map[string]accountDefinition{
+	"SOURCE_BIGQUERY":  {Type: "bigquery", SecretKeys: []string{"credentials"}},
+	"SOURCE_POSTGRES":  {Type: "postgres", SecretKeys: []string{"password"}},
+	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
+}
+
+// DefinitionType returns the type of a registered account definition, e.g.
+// "postgres" for SOURCE_POSTGRES. ok is false for an unregistered definition.
+func DefinitionType(accountDefinitionName string) (string, bool) {
+	d, ok := registeredAccounts[accountDefinitionName]
+	return d.Type, ok
+}
+
+// secretKeys returns the secret field set of a registered account definition.
+// ok is false for an unregistered definition.
+func secretKeys(accountDefinitionName string) ([]string, bool) {
+	d, ok := registeredAccounts[accountDefinitionName]
+	return d.SecretKeys, ok
 }
 
 // AccountStore is the subset of the accounts API client the handler needs;
@@ -75,7 +105,7 @@ func (h *HandlerImpl) NewSpec() *AccountSpec { return &AccountSpec{} }
 // minus the (type, version) registry lookup (account definitions are
 // unversioned).
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map[string]*AccountResource, error) {
-	keys, ok := registeredAccountSecretKeys[spec.AccountDefinitionName]
+	keys, ok := secretKeys(spec.AccountDefinitionName)
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
@@ -152,7 +182,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 		return nil, nil, fmt.Errorf("managed account %s has empty external ID", remote.ID)
 	}
 
-	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
+	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, nil, fmt.Errorf("managed account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -274,7 +304,7 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) (map[string]any, error) {
-	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
+	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -307,7 +337,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 // This is the one account-specific twist over destinations, which keep secrets
 // inside a single config blob.
 func (h *HandlerImpl) splitConfig(data *AccountResource) (json.RawMessage, json.RawMessage, error) {
-	keys, ok := registeredAccountSecretKeys[data.AccountDefinitionName]
+	keys, ok := secretKeys(data.AccountDefinitionName)
 	if !ok {
 		return nil, nil, fmt.Errorf("unsupported account definition %q", data.AccountDefinitionName)
 	}
@@ -371,7 +401,7 @@ func supportedRemoteAccounts(accounts []client.Account) []*RemoteAccount {
 	result := make([]*RemoteAccount, 0, len(accounts))
 	for i := range accounts {
 		a := &accounts[i]
-		if _, ok := registeredAccountSecretKeys[a.Definition.Name]; !ok {
+		if _, ok := registeredAccounts[a.Definition.Name]; !ok {
 			continue
 		}
 		result = append(result, &RemoteAccount{Account: a})

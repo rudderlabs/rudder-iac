@@ -24,7 +24,7 @@
     "underscoreDivideNumbers": false,
     "useRudderStorage": false,
     "useSSH": false,
-    "user": "rudder"
+    "user": "rudderCliE2ePostgresS3KeysUser"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

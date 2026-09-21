@@ -6,18 +6,20 @@ match_behavior:
   # and rETL sources (V-E1) nor from two different rETL sources (V-R1), the
   # destination must accept warehouse sources (V-C4) and carry the config that
   # source type needs to connect (V-C5) plus an entry for it in a settings block
-  # (V-C8), and the mappings, sync behaviour and source capabilities must match
-  # the flow the destination runs (V-R2, V-R4, V-R5, V-R9b, V-R10, V-R11, V-R13,
+  # (V-C8), the mappings and sync behaviour must match the flow the destination
+  # runs (V-R2, V-R4, V-R5, V-R9b, V-R10), and the source's warehouse must
+  # support the connection whatever state the destination is in (V-R11, V-R13,
   # V-R14). No committed destination definition requires config from a
   # warehouse source yet, so V-C5 has no example here. Every source_definition a
   # SQL model accepts is a SQL warehouse whose metadata this CLI knows, so the
   # unknown-metadata, SQL-model and sync-settings capability checks cannot be
   # reached from a valid SQL model and have no example either. V-R11 is
   # unreachable for the same reason — primary_key is a required field on every
-  # source definition a SQL model accepts, and the one exempt definition (s3) is
-  # not among them — and stays unreachable once connections reach table sources,
-  # which require primary_key unless the definition is s3 and forbid it when it
-  # is, so the only source that can omit it is the exempt one. So is V-R10,
+  # source definition a SQL model accepts, and the exempt file-based definitions
+  # (s3, sftp) are not among them — and stays unreachable once connections reach
+  # table sources, which require primary_key unless the definition is file-based
+  # and forbid it when it is, so the only sources that can omit it are the
+  # exempt ones. So is V-R10,
   # because the only destination that supports object mapping today carries no
   # hyphen in its type or API type. Known limitation: these checks see only
   # project-managed connections; a connection that exists remotely but is not in

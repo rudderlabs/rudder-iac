@@ -32,9 +32,9 @@ import (
 // examples are then loaded as projects, so a fragment cannot drift from what
 // validate reports.
 //
-// Connection support is on because the embedded fragments cover the connection
-// rules too; without it those four fragments would be orphans, which is exactly
-// what the gen-rule-docs workflow sets the experimental flag for.
+// Both experimental kinds are on, as in the CI catalog, because the embedded
+// fragments cover their rules too; without them those fragments would be
+// orphans, which is exactly what the gen-rule-docs workflow sets the flags for.
 func TestProviderRuleDocs(t *testing.T) {
 	// http and Attentive Tag are verified, so a default CLI registers them and
 	// the examples using them run as written. Bing and Customer.io Audience are
@@ -51,7 +51,11 @@ func TestProviderRuleDocs(t *testing.T) {
 	} {
 		require.NoError(t, registry.Register(definition))
 	}
-	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(registry))
+	p := retl.New(
+		newDefaultMockClient(),
+		retl.WithTableSupport(),
+		retl.WithConnectionSupport(registry),
+	)
 
 	syntactic := p.SyntacticRules()
 	semantic := p.SemanticRules()

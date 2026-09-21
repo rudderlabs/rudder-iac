@@ -174,6 +174,9 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	case "eq":
 		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
 
+	case "ne":
+		return fmt.Sprintf("'%s' must not equal '%s'", fieldName, err.Param())
+
 	case "array_item_types":
 		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
 
@@ -184,6 +187,14 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		}
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' is required when '%s' is %s", fieldName, otherField, params[1])
+
+	case "required_unless":
+		params := strings.Fields(err.Param())
+		if len(params) < 2 {
+			return fmt.Sprintf("'%s' is required", fieldName)
+		}
+		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
+		return fmt.Sprintf("'%s' is required unless '%s' is %s", fieldName, otherField, params[1])
 
 	case "excluded_if":
 		params := strings.Fields(err.Param())
@@ -199,7 +210,7 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 
 		// We need to resolve the "Type"
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
-		return fmt.Sprintf("'%s' is not allowed unless '%s %s'", fieldName, otherField, params[1])
+		return fmt.Sprintf("'%s' is not allowed unless '%s' is %s", fieldName, otherField, params[1])
 
 	case "required_without":
 		otherField := resolveFieldDisplayName(err.Param(), err, rootType, resolveTag)

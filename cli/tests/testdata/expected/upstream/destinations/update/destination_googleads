@@ -64,18 +64,15 @@
     "sendPageView": false,
     "trackConversions": false,
     "trackDynamicRemarketing": true,
-    "useNativeSDK": {
-      "web": true
-    },
     "v2": false
   },
-  "createdAt": "\u003cignored\u003e",
+  "createdAt": "<ignored>",
   "enabled": true,
   "externalId": "googleads",
-  "id": "\u003cignored\u003e",
+  "id": "<ignored>",
   "name": "E2E Google Ads Updated",
   "type": "GOOGLEADS",
-  "updatedAt": "\u003cignored\u003e",
-  "version": "\u003cignored\u003e",
-  "workspaceId": "\u003cignored\u003e"
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
 }

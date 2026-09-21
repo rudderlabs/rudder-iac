@@ -21,6 +21,11 @@
     },
     "environment": true,
     "eventFilteringOption": "whitelistedEvents",
+    "connectionMode": {
+      "android": "cloud",
+      "ios": "device",
+      "cloud": "cloud"
+    },
     "partnerParamsKeys": [
       {
         "from": "userId",

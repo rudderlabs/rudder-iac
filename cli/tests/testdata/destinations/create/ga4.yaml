@@ -11,7 +11,7 @@ spec:
   config:
     api_secret: "{{ .GA4_API_SECRET }}"
     client_type: gtag
-    measurement_id: G-E2ECREATE1
+    measurement_id: "{{ .GA4_MEASUREMENT_ID }}"
     debug_mode: false
     sdk_base_url: https://www.googletagmanager.com
     server_container_url: https://gtm.example.com
@@ -21,10 +21,6 @@ spec:
       whitelist:
         - Order Completed
         - Product Viewed
-    use_native_sdk:
-      web: true
-      android: false
-      ios: false
     connection_mode:
       web: hybrid
       android: cloud
@@ -36,6 +32,4 @@ spec:
     override_client_and_session_ids:
       web: false
     extend_page_view_params:
-      web: false
-    use_native_sdk_to_send:
       web: false

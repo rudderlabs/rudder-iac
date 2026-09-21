@@ -48,7 +48,9 @@ type RETLTableConfig struct {
 func (RETLTableConfig) isRETLConfig() {}
 
 // RETLS3TableConfig is the config shape for S3 TABLE sources
-// (sourceDefinitionName = s3). primaryKey is optional on S3.
+// (sourceDefinitionName = s3). rudder-api's RetlSourceS3ConfigSchema requires a
+// non-empty objectPrefix and, being .strict(), rejects a primaryKey; the
+// backend behind it neither requires nor uses one.
 type RETLS3TableConfig struct {
 	BucketName   string `json:"bucketName"`
 	ObjectPrefix string `json:"objectPrefix,omitempty"`

@@ -56,7 +56,7 @@ func TestMatcher(t *testing.T) {
 
 		scope := matcherScope(localConnection("users-to-webhook", "retl-source-sql-model:users", "destination:webhook"))
 
-		local := m.Match(scope, importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1"))
+		local := m.Match(scope, importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1"))
 
 		require.NotNil(t, local)
 		assert.Equal(t, "users-to-webhook", local.ID())
@@ -67,7 +67,7 @@ func TestMatcher(t *testing.T) {
 
 		scope := matcherScope(localConnection("orders-to-webhook", "retl-source-sql-model:orders", "destination:webhook"))
 
-		assert.Nil(t, m.Match(scope, importableConnection("conn-1", "orders-to-webhook", "src-2", "dst-1")))
+		assert.Nil(t, m.Match(scope, importableConnection(t, "conn-1", "orders-to-webhook", "src-2", "dst-1")))
 	})
 
 	t.Run("no match when the destination has no local counterpart", func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestMatcher(t *testing.T) {
 
 		scope := matcherScope(localConnection("users-to-webhook", "retl-source-sql-model:users", "destination:webhook"))
 
-		assert.Nil(t, m.Match(scope, importableConnection("conn-1", "users-to-webhook", "src-1", "dst-unknown")))
+		assert.Nil(t, m.Match(scope, importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-unknown")))
 	})
 
 	t.Run("no match when no local connection has the pair", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestMatcher(t *testing.T) {
 
 		scope := matcherScope(localConnection("users-to-s3", "retl-source-sql-model:users", "destination:s3"))
 
-		assert.Nil(t, m.Match(scope, importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1")))
+		assert.Nil(t, m.Match(scope, importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1")))
 	})
 
 	t.Run("matches endpoints managed without import metadata", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestMatcher(t *testing.T) {
 		g.AddResource(localConnection("users-to-webhook", "retl-source-sql-model:users", "destination:webhook"))
 		scope := importmatcher.Scope{LocalGraph: g, Importable: resources.NewRemoteResources()}
 
-		remote := importableConnection("conn-1", "users-to-webhook", "src-9", "dst-9")
+		remote := importableConnection(t, "conn-1", "users-to-webhook", "src-9", "dst-9")
 		data := remote.Data.(*RemoteConnection)
 		data.SourceExternalID = "users"
 		data.DestinationExternalID = "webhook"

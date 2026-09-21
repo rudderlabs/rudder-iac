@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    conversion_id: AW-987654321
+    conversion_id: "{{ .GOOGLEADS_CONVERSION_ID_UPDATED }}"
     v2: false
     allow_identify: true
     sdk_base_url: cdn-updated.rudder-cli-e2e.com/gtag
@@ -19,8 +19,6 @@ spec:
     enable_conversion_label: false
     allow_enhanced_conversions: true
     default_page_conversion: checkout
-    use_native_sdk:
-      web: true
     connection_mode:
       web: device
     dynamic_remarketing:

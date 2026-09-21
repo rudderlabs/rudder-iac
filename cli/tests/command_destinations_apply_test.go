@@ -28,6 +28,64 @@ var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versio
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
+	"-----BEGIN PRIVATE KEY-----snowflakePrivateKeyXXXXXXXXXXX-----END PRIVATE KEY-----",
+	"-----BEGIN PRIVATE KEY-----snowpipeStreamingPrivateKeyXXXXXXXXXX-----END PRIVATE KEY-----",
+	"123456789012345",
+	"1234567890123456",
+	"6543210987654321",
+	"AW-123456789",
+	"AW-987654321",
+	"C0000000000000000001",
+	"C0000000000000000002",
+	"C0000000000000000011",
+	"C0000000000000000012",
+	"G-E2ECREATE1",
+	"G-E2EUPDATE1",
+	"RUDDER_CLI_E2E_SNOWFLAKE_AZURE_USER",
+	"RUDDER_CLI_E2E_SNOWFLAKE_GCP_USER",
+	"RUDDER_CLI_E2E_SNOWFLAKE_KEYPAIR_USER",
+	"RUDDER_CLI_E2E_SNOWFLAKE_S3_KEYS_USER",
+	"RUDDER_CLI_E2E_SNOWFLAKE_USER",
+	"X-Api-Key",
+	"activeCampaignActidUpdatedXXXXX",
+	"activeCampaignActidXXXXXXXXXXXX",
+	"android-key",
+	"android-key-updated",
+	"ios-android-key",
+	"ios-android-key-updated",
+	"rudder-cli-e2e-app-key",
+	"rudder-cli-e2e-app-key-updated",
+	"rudderCliE2eAmFullKey",
+	"rudderCliE2eAmFullKeyUpdated",
+	"rudderCliE2eApiKey",
+	"rudderCliE2eApiKeyUpdated",
+	"rudderCliE2eHttpBasicUsername",
+	"rudderCliE2eHttpHeaderFrom",
+	"rudderCliE2eHubId",
+	"rudderCliE2eHubIdUpdated",
+	"rudderCliE2eLegacyPixelId",
+	"rudderCliE2eLegacyPixelIdUpdated",
+	"rudderCliE2ePostgresAzureUser",
+	"rudderCliE2ePostgresGcsUser",
+	"rudderCliE2ePostgresMinioUser",
+	"rudderCliE2ePostgresS3KeysUser",
+	"rudderCliE2ePostgresS3RoleUser",
+	"rudderCliE2ePostgresUser",
+	"rudderCliE2eRsIamClusterUser",
+	"rudderCliE2eRsIamServerlessUser",
+	"rudderCliE2eRsOwnStorageRoleUser",
+	"rudderCliE2eRsOwnStorageUser",
+	"rudderCliE2eRsSshDbUser",
+	"rudderCliE2eRsSshUser",
+	"rudderCliE2eRsSshUserUpdated",
+	"rudderCliE2eRsUser",
+	"rudderCliE2eServiceUser",
+	"rudderCliE2eServiceUserUpdated",
+	"rudderCliE2eSiteId",
+	"rudderCliE2eSiteIdUpdated",
+	"web-android-key",
+	"web-android-key-updated",
+	"webhookHeaderTokenXXXXXXXXXXXX",
 	"mpTokenXXXXXXXXXXXXXXXXXXXXXX",
 	"mpGdprApiTokenXXXXXXXXXXXXXXXX",
 	"mpServiceAccountSecretXXXXXXXX",
@@ -107,7 +165,7 @@ func assertNoRawSecrets(t *testing.T, out []byte) {
 }
 
 // TestDestinationsApply drives the destination provider end-to-end against a live
-// stack: apply create → apply update → re-apply churns only the write-only secret.
+// stack: apply create → apply update.
 // All destination specs live side by side under one folder and are applied
 // together (like the catalog e2e applies events, properties, etc. in one shot),
 // then the managed destinations are snapshot-compared upstream via
@@ -162,16 +220,6 @@ func TestDestinationsApply(t *testing.T) {
 	})
 
 	t.Run("apply update", func(t *testing.T) {
-		apply(t, "update")
-		verifyDestinationState(t, "update")
-	})
-
-	// Re-apply cannot be a full no-op here: the key-based spec's access keys are
-	// write-only, so they map to always-unknown secrets that re-apply every run
-	// (see secret.String.Diff). A dry-run would therefore always report a diff.
-	// Snapshot the non-secret upstream fields instead to prove nothing else churns,
-	// matching the accounts e2e (TestAccountsApply's re-apply subtest).
-	t.Run("re-apply churns only the write-only secret", func(t *testing.T) {
 		apply(t, "update")
 		verifyDestinationState(t, "update")
 	})

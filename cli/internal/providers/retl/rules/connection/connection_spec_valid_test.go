@@ -324,8 +324,13 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 				c.Config.CursorColumn = "updated_at"
 			},
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed when 'sync_behaviour' is mirror"},
+				{Reference: "/connections/0/config/cursor_column", Message: "'cursor_column' is not allowed unless 'sync_behaviour' is upsert"},
 			},
+		},
+		{
+			name:     "no cursor column outside an upsert sync",
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			expected: []rules.ValidationResult{},
 		},
 		{
 			name: "event naming both a literal and a column",
@@ -347,7 +352,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			expected: []rules.ValidationResult{
 				{
 					Reference: "/connections/0/config/constants/1/key",
-					Message:   `'key' is not valid: "context.mappedToDestination" is reserved by the backend`,
+					Message:   "'key' must not equal 'context.mappedToDestination'",
 				},
 			},
 		},
@@ -355,14 +360,14 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			name:   "object declared but empty",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.Object = lo.ToPtr("") },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/object", Message: "'object' must not be empty"},
+				{Reference: "/connections/0/config/object", Message: "'object' is not valid: must not be empty or have leading or trailing whitespace"},
 			},
 		},
 		{
 			name:   "object padded with whitespace",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.Object = lo.ToPtr(" Account ") },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/object", Message: "'object' must not have leading or trailing whitespace"},
+				{Reference: "/connections/0/config/object", Message: "'object' is not valid: must not be empty or have leading or trailing whitespace"},
 			},
 		},
 	}
@@ -403,9 +408,8 @@ func TestConnectionSpecSyntaxValid_PerEntryReferences(t *testing.T) {
 
 // TestConnectionSpecSyntaxValid_StrictShape covers what only the raw map can
 // express: a key the spec type does not carry, and a value whose type it cannot
-// hold. Neither survives the typed engine's json round-trip — the first is
-// dropped, the second collapses into one verdict at the spec root — so both are
-// read here through the rule's own decoding.
+// hold. Decoding into the spec struct would drop the first and fail the whole
+// spec on the second, so the rule decodes the map itself.
 func TestConnectionSpecSyntaxValid_StrictShape(t *testing.T) {
 	t.Parallel()
 
@@ -473,6 +477,24 @@ func TestConnectionSpecSyntaxValid_StrictShape(t *testing.T) {
 				Reference: "/connections/0/config/schedule/every_minutes",
 				Message:   "'every_minutes' is not valid: expected type 'int', got unconvertible type 'string'",
 			}},
+		},
+		{
+			name: "a fractional number for an integer field",
+			mutate: func(raw map[string]any) {
+				rawConfig(raw)["schedule"] = map[string]any{"type": "basic", "every_minutes": 7.5}
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/schedule/every_minutes",
+				Message:   "'every_minutes' is not valid: expected an integer, got 7.5",
+			}},
+		},
+		{
+			// The rule engine's JSON round-trip hands every YAML number over as a float64.
+			name: "a whole number decoded as a float",
+			mutate: func(raw map[string]any) {
+				rawConfig(raw)["schedule"] = map[string]any{"type": "basic", "every_minutes": 30.0}
+			},
+			expected: []rules.ValidationResult{},
 		},
 		{
 			name:   "a list field given a scalar",

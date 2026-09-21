@@ -20,6 +20,10 @@ import (
 // — verrs is non-empty and this fails locally, with no CI round-trip needed.
 func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	Initialise("test")
+	// The gen-rule-docs make target defaults the rETL flags on and CI runs it,
+	// so the kinds they register are documented while still experimental. Match
+	// that here.
+	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))

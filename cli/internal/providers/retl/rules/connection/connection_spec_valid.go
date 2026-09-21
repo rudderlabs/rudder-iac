@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -15,11 +16,6 @@ import (
 	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
-
-// mappedToDestinationKey is the constant key the backend writes itself
-// (config-backend src/modules/retl/api-gateway/connection-config/constants.ts),
-// so a user constant claiming it is overwritten rather than delivered.
-const mappedToDestinationKey = "context.mappedToDestination"
 
 // validateRawConnectionsSpec reads the spec map strictly before checking it.
 // The handler's mapstructure decode rejects unknown keys too, but only once
@@ -37,7 +33,11 @@ func validateRawConnectionsSpec(
 		md   mapstructure.Metadata
 	)
 
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{Result: &spec, Metadata: &md})
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &spec,
+		Metadata:   &md,
+		DecodeHook: mapstructure.DecodeHookFuncKind(rejectFractionalInts),
+	})
 	if err != nil {
 		return []rules.ValidationResult{{Message: fmt.Sprintf("creating spec decoder: %v", err)}}
 	}
@@ -50,6 +50,18 @@ func validateRawConnectionsSpec(
 	}
 
 	return append(unknownFieldResults(md.Unused), validateConnectionsSpec(spec)...)
+}
+
+// rejectFractionalInts refuses a fractional number for an int field, which
+// mapstructure would otherwise truncate without a word.
+func rejectFractionalInts(from, to reflect.Kind, data any) (any, error) {
+	if from != reflect.Float64 || to != reflect.Int {
+		return data, nil
+	}
+	if f := data.(float64); f != math.Trunc(f) {
+		return nil, fmt.Errorf("expected an integer, got %v", f)
+	}
+	return data, nil
 }
 
 // mapstructurePathIndex matches the "[0]" element suffixes mapstructure writes
@@ -155,9 +167,6 @@ func validateConnectionsSpec(spec retlConnection.ConnectionsSpec) []rules.Valida
 			func(kind string) bool { return kind == destination.DestinationSpecKind },
 		)...)
 		results = append(results, validateCron(index, c.Config.Schedule)...)
-		results = append(results, validateCursorColumn(index, c.Config)...)
-		results = append(results, validateConstants(index, c.Config.Constants)...)
-		results = append(results, validateObject(index, c.Config.Object)...)
 	}
 
 	return results
@@ -173,7 +182,7 @@ func validateEndpointRef(reference, field, ref, forms, label string, accepts fun
 		return nil
 	}
 
-	kind, _, ok := endpointRef(ref)
+	kind, _, ok := retlConnection.RefID(ref)
 	if !ok {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
 			"'%s' is invalid: must be of pattern %s", field, forms,
@@ -194,66 +203,11 @@ func validateEndpointRef(reference, field, ref, forms, label string, accepts fun
 // stay above the frequency floor. Only verdicts this severity owns are reported
 // — an unsupported dialect is the cron-expression warning rule's.
 func validateCron(index int, schedule retlConnection.ScheduleSpec) []rules.ValidationResult {
-	if schedule.Type != "cron" || schedule.CronExpression == "" {
-		return nil
-	}
-
-	check := CheckCron(schedule.CronExpression)
-	if check.Status != CronInvalid && check.Status != CronTooFrequent {
-		return nil
-	}
-
-	return []rules.ValidationResult{result(
-		scheduleRef(index)+"/cron_expression",
-		fmt.Sprintf("'cron_expression' is not valid: %s", check.Reason),
-	)}
-}
-
-// validateCursorColumn (V-R7): only an upsert sync tracks a cursor, so any
-// other behaviour would carry the column without ever reading it.
-func validateCursorColumn(index int, config retlConnection.ConfigSpec) []rules.ValidationResult {
-	if config.CursorColumn == "" || config.SyncBehaviour == "upsert" {
-		return nil
-	}
-	return []rules.ValidationResult{result(
-		configRef(index)+"/cursor_column",
-		fmt.Sprintf("'cursor_column' is not allowed when 'sync_behaviour' is %s", config.SyncBehaviour),
-	)}
-}
-
-// validateConstants (V-R9a): the backend owns one constant key, so a user
-// constant claiming it is dropped rather than delivered.
-func validateConstants(index int, constants []retlConnection.ConstantSpec) []rules.ValidationResult {
-	var results []rules.ValidationResult
-	for i, constant := range constants {
-		if constant.Key != mappedToDestinationKey {
-			continue
-		}
-		results = append(results, result(
-			fmt.Sprintf("%s/constants/%d/key", configRef(index), i),
-			fmt.Sprintf("'key' is not valid: %q is reserved by the backend", mappedToDestinationKey),
-		))
-	}
-	return results
-}
-
-// validateObject (V-R10): an omitted object is a JSON mapper connection and is
-// valid; a declared one names a destination object and has to be usable as
-// written, since the backend matches it verbatim.
-func validateObject(index int, object *string) []rules.ValidationResult {
-	if object == nil {
-		return nil
-	}
-
-	reference := configRef(index) + "/object"
-	switch {
-	case *object == "":
-		return []rules.ValidationResult{result(reference, "'object' must not be empty")}
-	case strings.TrimSpace(*object) != *object:
-		return []rules.ValidationResult{result(reference, "'object' must not have leading or trailing whitespace")}
-	}
-
-	return nil
+	return cronResults(
+		index, schedule.Type, schedule.CronExpression,
+		[]CronStatus{CronInvalid, CronTooFrequent},
+		"'cron_expression' is not valid: %s",
+	)
 }
 
 func result(reference, message string) rules.ValidationResult {
@@ -288,7 +242,7 @@ func NewConnectionSpecSyntaxValidRule() rules.Rule {
 		rules.Error,
 		"retl connection spec syntax must be valid",
 		rules.Examples{},
-		prules.NewRawPatternValidator(
+		prules.NewPatternValidator(
 			prules.V1VersionPatterns(retlConnection.ResourceKind),
 			validateRawConnectionsSpec,
 		),

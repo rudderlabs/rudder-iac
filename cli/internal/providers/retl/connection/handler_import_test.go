@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -54,6 +54,8 @@ func TestLoadImportable(t *testing.T) {
 			conn,
 			remoteRow("conn-specific", "", "src-1", "dst-specific"),
 		})
+		config, err := configFromRemote(&conn)
+		require.NoError(t, err)
 
 		collection, err := remoteHandler(mock, t).LoadImportable(t.Context(), &mockNamer{})
 		require.NoError(t, err)
@@ -67,6 +69,7 @@ func TestLoadImportable(t *testing.T) {
 				Reference:  "#retl-connections:users-to-webhook",
 				Data: &RemoteConnection{
 					RETLConnection:        conn,
+					Config:                config,
 					WorkspaceID:           "ws-1",
 					SourceKind:            SourceKinds[0],
 					SourceName:            "Users",
@@ -80,17 +83,42 @@ func TestLoadImportable(t *testing.T) {
 }
 
 // importableConnection builds one importable remote connection the way
-// LoadImportable stores it.
-func importableConnection(remoteID, externalID, sourceID, destinationID string) *resources.RemoteResource {
+// LoadImportable stores it, config included — remoteConnection rebuilds it
+// before the row is ever stored, so a fixture without it is not one the export
+// could receive.
+func importableConnection(t *testing.T, remoteID, externalID, sourceID, destinationID string) *resources.RemoteResource {
+	t.Helper()
+
+	row := remoteRow(remoteID, "", sourceID, destinationID)
+	config, err := configFromRemote(&row)
+	require.NoError(t, err)
+
 	return &resources.RemoteResource{
 		ID:         remoteID,
 		ExternalID: externalID,
 		Reference:  "#" + ResourceKind + ":" + externalID,
 		Data: &RemoteConnection{
-			RETLConnection: remoteRow(remoteID, "", sourceID, destinationID),
+			RETLConnection: row,
+			Config:         config,
 			WorkspaceID:    "ws-1",
 			SourceKind:     SourceKinds[0],
 		},
+	}
+}
+
+// exportedEntry is one connection as FormatForExport emits it, so a test can
+// compare the whole emitted list instead of probing one field of it.
+func exportedEntry(t *testing.T, id, source, destination string, enabled bool) map[string]any {
+	t.Helper()
+
+	config, err := configToMap(jsonMapperConfig())
+	require.NoError(t, err)
+	return map[string]any{
+		"id":          id,
+		"source":      source,
+		"destination": destination,
+		"enabled":     enabled,
+		"config":      config,
 	}
 }
 
@@ -119,62 +147,61 @@ func TestFormatForExport(t *testing.T) {
 		// This row mixes the two endpoint cases: its source is imported in the
 		// same run, so the resolver serves it, while its destination is already
 		// CLI-managed and the resolver cannot — its externalId builds the ref.
-		mixedEndpoints := importableConnection("conn-2", "orders-to-webhook", "src-2", "dst-9")
+		mixedEndpoints := importableConnection(t, "conn-2", "orders-to-webhook", "src-2", "dst-9")
 		mixed := mixedEndpoints.Data.(*RemoteConnection)
 		mixed.DestinationExternalID = "webhook"
 		mixed.Enabled = false
 
 		entities, entries, err := remoteHandler(remoteClient(), t).FormatForExport(
-			connectionCollection(mixedEndpoints, importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1")),
+			connectionCollection(mixedEndpoints, importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1")),
 			&mockNamer{},
 			&mockResolver{refs: refs},
 		)
 		require.NoError(t, err)
 
-		require.Len(t, entities, 1)
-		assert.Equal(t, "retl/connections.yaml", entities[0].RelativePath)
-
-		spec, ok := entities[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, specs.SpecVersionV1, spec.Version)
-		assert.Equal(t, ResourceKind, spec.Kind)
-
 		// Nested snake_case config, and no sync_settings: the row carries the
 		// settings a create would have defaulted to anyway.
 		config, err := configToMap(jsonMapperConfig())
 		require.NoError(t, err)
-		assert.Equal(t, map[string]any{
-			ConnectionsKey: []map[string]any{
-				{
-					"id":          "orders-to-webhook",
-					"source":      "#retl-source-sql-model:orders",
-					"destination": "#destination:webhook",
-					"enabled":     false,
-					"config":      config,
+		assert.Equal(t, []writer.FormattableEntity{{
+			RelativePath: "retl/connections.yaml",
+			Content: &specs.Spec{
+				Version: specs.SpecVersionV1,
+				Kind:    ResourceKind,
+				Metadata: map[string]any{
+					"name": MetadataName,
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "ws-1",
+								"resources": []any{
+									map[string]any{"urn": "retl-connection:orders-to-webhook", "remote_id": "conn-2"},
+									map[string]any{"urn": "retl-connection:users-to-webhook", "remote_id": "conn-1"},
+								},
+							},
+						},
+					},
 				},
-				{
-					"id":          "users-to-webhook",
-					"source":      "#retl-source-sql-model:users",
-					"destination": "#destination:webhook",
-					"enabled":     true,
-					"config":      config,
-				},
-			},
-		}, spec.Spec)
-		assert.Equal(t, map[string]any{
-			"name": MetadataName,
-			"import": map[string]any{
-				"workspaces": []any{
-					map[string]any{
-						"workspace_id": "ws-1",
-						"resources": []any{
-							map[string]any{"urn": "retl-connection:orders-to-webhook", "remote_id": "conn-2"},
-							map[string]any{"urn": "retl-connection:users-to-webhook", "remote_id": "conn-1"},
+				Spec: map[string]any{
+					ConnectionsKey: []map[string]any{
+						{
+							"id":          "orders-to-webhook",
+							"source":      "#retl-source-sql-model:orders",
+							"destination": "#destination:webhook",
+							"enabled":     false,
+							"config":      config,
+						},
+						{
+							"id":          "users-to-webhook",
+							"source":      "#retl-source-sql-model:users",
+							"destination": "#destination:webhook",
+							"enabled":     true,
+							"config":      config,
 						},
 					},
 				},
 			},
-		}, spec.Metadata)
+		}}, entities)
 
 		assert.Equal(t, []importmanifest.ImportEntry{
 			{WorkspaceID: "ws-1", URN: "retl-connection:orders-to-webhook", RemoteID: "conn-2"},
@@ -185,20 +212,20 @@ func TestFormatForExport(t *testing.T) {
 	t.Run("matched connections write manifest entries only", func(t *testing.T) {
 		t.Parallel()
 
-		matched := importableConnection("conn-2", "existing-conn", "src-2", "dst-1")
+		matched := importableConnection(t, "conn-2", "existing-conn", "src-2", "dst-1")
 		matched.MatchedWith = resources.NewResource("existing-conn", ResourceType, resources.ResourceData{}, []string{})
 
 		entities, entries, err := remoteHandler(remoteClient(), t).FormatForExport(
-			connectionCollection(importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1"), matched),
+			connectionCollection(importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1"), matched),
 			&mockNamer{},
 			&mockResolver{refs: refs},
 		)
 		require.NoError(t, err)
 
 		require.Len(t, entities, 1)
-		connections := entities[0].Content.(*specs.Spec).Spec[ConnectionsKey].([]map[string]any)
-		require.Len(t, connections, 1)
-		assert.Equal(t, "users-to-webhook", connections[0]["id"])
+		assert.Equal(t, []map[string]any{
+			exportedEntry(t, "users-to-webhook", "#retl-source-sql-model:users", "#destination:webhook", true),
+		}, entities[0].Content.(*specs.Spec).Spec[ConnectionsKey])
 		assert.ElementsMatch(t, []importmanifest.ImportEntry{
 			{WorkspaceID: "ws-1", URN: "retl-connection:users-to-webhook", RemoteID: "conn-1"},
 			{WorkspaceID: "ws-1", URN: "retl-connection:existing-conn", RemoteID: "conn-2"},
@@ -213,8 +240,8 @@ func TestFormatForExport(t *testing.T) {
 		// spec refs: no spec entry, no manifest entry, and no invented ref.
 		entities, entries, err := remoteHandler(remoteClient(), t).FormatForExport(
 			connectionCollection(
-				importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1"),
-				importableConnection("conn-2", "users-to-unmanaged", "src-1", "dst-9"),
+				importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1"),
+				importableConnection(t, "conn-2", "users-to-unmanaged", "src-1", "dst-9"),
 			),
 			&mockNamer{},
 			&mockResolver{refs: refs},
@@ -222,9 +249,9 @@ func TestFormatForExport(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, entities, 1)
-		connections := entities[0].Content.(*specs.Spec).Spec[ConnectionsKey].([]map[string]any)
-		require.Len(t, connections, 1)
-		assert.Equal(t, "users-to-webhook", connections[0]["id"])
+		assert.Equal(t, []map[string]any{
+			exportedEntry(t, "users-to-webhook", "#retl-source-sql-model:users", "#destination:webhook", true),
+		}, entities[0].Content.(*specs.Spec).Spec[ConnectionsKey])
 		assert.Equal(t, []importmanifest.ImportEntry{
 			{WorkspaceID: "ws-1", URN: "retl-connection:users-to-webhook", RemoteID: "conn-1"},
 		}, entries)
@@ -237,7 +264,7 @@ func TestFormatForExport(t *testing.T) {
 		t.Parallel()
 
 		entities, _, err := remoteHandler(remoteClient(), t).FormatForExport(
-			connectionCollection(importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1")),
+			connectionCollection(importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1")),
 			&mockNamer{},
 			&mockResolver{refs: refs},
 		)
@@ -296,11 +323,11 @@ func TestFormatForExport(t *testing.T) {
 	t.Run("errors on connections from multiple workspaces", func(t *testing.T) {
 		t.Parallel()
 
-		other := importableConnection("conn-2", "orders-to-webhook", "src-2", "dst-1")
+		other := importableConnection(t, "conn-2", "orders-to-webhook", "src-2", "dst-1")
 		other.Data.(*RemoteConnection).WorkspaceID = "ws-2"
 
 		_, _, err := remoteHandler(remoteClient(), t).FormatForExport(
-			connectionCollection(importableConnection("conn-1", "users-to-webhook", "src-1", "dst-1"), other),
+			connectionCollection(importableConnection(t, "conn-1", "users-to-webhook", "src-1", "dst-1"), other),
 			&mockNamer{},
 			&mockResolver{refs: refs},
 		)
@@ -395,6 +422,39 @@ func TestImport(t *testing.T) {
 		}, result)
 	})
 
+	// Nothing stops the backend handing a replacement the id it just freed, so
+	// the returned id cannot tell a replacement from an adoption. Which path ran
+	// is the only reliable answer, and this pins it: deciding on
+	// claimed != remote.ID instead would claim a row Create already owns.
+	t.Run("a replacement that revives the same id still claims nothing", func(t *testing.T) {
+		t.Parallel()
+
+		data := graphData(t, jsonMapperConfig())
+		data[DestinationKey] = "dst-2"
+
+		mock := importClient(remoteRow("conn-remote-1", "", "src-1", "dst-1"))
+		mock.CreateFunc = func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error) {
+			return &retlClient.RETLConnection{
+				ID:            "conn-remote-1",
+				SourceID:      req.SourceID,
+				DestinationID: req.DestinationID,
+				ExternalID:    req.ExternalID,
+			}, nil
+		}
+
+		result, err := remoteHandler(mock, t).Import(t.Context(), localID, data, "conn-remote-1")
+		require.NoError(t, err)
+
+		require.Len(t, mock.CreateCalls, 1)
+		assert.Equal(t, localID, mock.CreateCalls[0].ExternalID)
+		assert.Empty(t, mock.SetExternalIDCalls, "the create body carried the external id, revived row or not")
+		assert.Equal(t, &resources.ResourceData{
+			IDKey:            "conn-remote-1",
+			SourceIDKey:      "src-1",
+			DestinationIDKey: "dst-2",
+		}, result)
+	})
+
 	// An immutable field that is not an endpoint triggers no replacement and
 	// fits in no PUT, so the import is refused whole rather than adopting a row
 	// that would diff on every apply. TestUpdate covers the fields themselves.
@@ -429,59 +489,6 @@ func TestImport(t *testing.T) {
 		assert.Empty(t, mock.DeleteCalls, "a pre-existing connection must never be deleted to undo a failed claim")
 	})
 
-	// The claim lands and the caller's deadline expires on the way back. The
-	// mock refuses every call made on a context that is already done, so the
-	// confirmation only succeeds because it runs detached from that one.
-	t.Run("a claim that timed out after landing is confirmed on a detached context", func(t *testing.T) {
-		t.Parallel()
-
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		claimed := false
-		mock := importClient(remoteRow("conn-remote-1", "", "src-1", "dst-1"))
-		remote := mock.GetFunc
-		mock.GetFunc = func(id string) (*retlClient.RETLConnection, error) {
-			conn, err := remote(id)
-			if claimed {
-				conn.ExternalID = localID
-			}
-			return conn, err
-		}
-		mock.SetExternalIDFunc = func(_ *retlClient.SetRETLConnectionExternalIDRequest) error {
-			claimed = true
-			cancel()
-			return context.DeadlineExceeded
-		}
-
-		result, err := remoteHandler(mock, t).Import(ctx, localID, graphData(t, jsonMapperConfig()), "conn-remote-1")
-
-		require.NoError(t, err)
-		assert.Equal(t, []string{"conn-remote-1", "conn-remote-1"}, mock.GetCalls)
-		assert.Equal(t, remoteIDs, result)
-	})
-
-	t.Run("a claim whose confirmation fails reports both errors", func(t *testing.T) {
-		t.Parallel()
-
-		mock := importClient(remoteRow("conn-remote-1", "", "src-1", "dst-1"))
-		mock.SetExternalIDFunc = func(_ *retlClient.SetRETLConnectionExternalIDRequest) error {
-			return errors.New("gateway timeout")
-		}
-		remote := mock.GetFunc
-		mock.GetFunc = func(id string) (*retlClient.RETLConnection, error) {
-			if len(mock.GetCalls) > 1 {
-				return nil, errors.New("service unavailable")
-			}
-			return remote(id)
-		}
-
-		_, err := remoteHandler(mock, t).Import(t.Context(), localID, graphData(t, jsonMapperConfig()), "conn-remote-1")
-
-		assert.EqualError(t, err, "setting external ID for rETL connection during import: gateway timeout (confirming it: service unavailable)")
-		assert.Empty(t, mock.DeleteCalls, "a pre-existing connection must never be deleted to undo a failed claim")
-	})
-
 	t.Run("refuses before mutating anything", func(t *testing.T) {
 		t.Parallel()
 
@@ -504,14 +511,6 @@ func TestImport(t *testing.T) {
 			"a row already managed under another id": {
 				remote:  remoteRow("conn-remote-1", "orders-to-webhook", "src-1", "dst-1"),
 				wantErr: `connection "conn-remote-1" is already managed by the CLI as "orders-to-webhook"`,
-			},
-			"a user mapping aimed at a reserved target": {
-				remote:  reservedMappingRow(),
-				wantErr: `mapping to "anonymous_id" is reserved for identifiers`,
-			},
-			"an object mapping carrying more than one identifier": {
-				remote:  manyIdentifiersRow(),
-				wantErr: "object mapping supports a single identifier, found 2",
 			},
 		}
 

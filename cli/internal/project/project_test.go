@@ -175,6 +175,56 @@ func TestProject_Load_Success(t *testing.T) {
 	assert.True(t, foundSpec2, "Spec2 should have been loaded")
 }
 
+// syntaxWarningProvider registers a syntactic rule that only ever warns, so a
+// spec can pass syntax validation while still carrying a syntax diagnostic.
+type syntaxWarningProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *syntaxWarningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/source/syntax-warning",
+		rules.Warning,
+		"source specs always warn",
+		rules.Examples{},
+		provrules.NewPatternValidator(
+			fixtureMatchPatterns,
+			func(_ string, _ string, _ map[string]any, _ map[string]any) []rules.ValidationResult {
+				return []rules.ValidationResult{{Reference: "/k", Message: "k could not be checked"}}
+			},
+		),
+	)}
+}
+
+func TestProject_Load_RendersSyntaxWarningsWithoutSyntaxErrors(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(&syntaxWarningProvider{mockProvider},
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewTextRenderer(&out)),
+	)
+
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Equal(t, `
+warning[test/source/syntax-warning]: k could not be checked
+  --> spec.yaml:6:3
+     |
+   6 | k: v
+     | ^^^^
+
+Found 0 error(s), 1 warning(s)
+`, out.String())
+}
+
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	t.Parallel()
 
@@ -200,7 +250,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading spec path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
 }
-
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
@@ -373,6 +422,16 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+		{
+			// A var file cannot fix a malformed token, so no --var-file hint.
+			name:        "invalid variable syntax aborts load without var-file hint",
+			substitutor: varsubst.NewSubstitutor(mapResolver{}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: \"{{ .1A }}\"\nspec:\n  k: v"),
+			},
 			wantErr:   "variable substitution failed",
 			wantSpecs: map[string]*specs.Spec{},
 		},
@@ -400,7 +459,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
 				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
 			},
-			wantErr:   "variable substitution failed",
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
 			wantSpecs: map[string]*specs.Spec{},
 		},
 	}
@@ -427,8 +486,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 
 			err := proj.Load("test_dir")
 			if tc.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.wantErr)
+				require.EqualError(t, err, tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}

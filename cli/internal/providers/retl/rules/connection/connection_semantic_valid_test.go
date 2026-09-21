@@ -788,6 +788,15 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			}},
 		},
 		{
+			name:        "an sftp source is exempt from the primary key too",
+			model:       modelFixture{id: "users-model", sourceDefinition: "sftp", enabled: true},
+			destination: httpDestination(),
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/source",
+				Message:   "rETL source 'users-model' is a SQL model, which source definition 'sftp' does not support",
+			}},
+		},
+		{
 			name:        "sync settings a source definition cannot carry",
 			model:       modelFixture{id: "users-model", sourceDefinition: "clickhouse", primaryKey: "user_id", enabled: true},
 			destination: httpDestination(),
@@ -833,6 +842,47 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			model:       postgresModel(),
 			destination: httpDestination(),
 			mutate:      func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "full" },
+		},
+
+		// Source checks do not wait on the destination's prerequisites.
+		{
+			name:        "a source without a primary key aimed at a destination that takes no rETL sources",
+			model:       modelFixture{id: "users-model", sourceDefinition: "postgres", enabled: true},
+			destination: destinationFixture{id: "my-es-destination", typ: "eventstreamonly", enabled: true, config: map[string]any{}},
+			expected: []rules.ValidationResult{
+				{
+					Reference: "/connections/0/destination",
+					Message:   "destination 'my-es-destination' (type 'eventstreamonly') does not accept rETL sources: source type 'warehouse' is not among supported source types: web",
+				},
+				{
+					Reference: "/connections/0/source",
+					Message:   "rETL source 'users-model' declares no primary_key, which source definition 'postgres' requires to sync",
+				},
+			},
+		},
+		{
+			name:        "an unknown source definition behind a destination-specific flow",
+			model:       modelFixture{id: "users-model", sourceDefinition: "oracle", primaryKey: "user_id", enabled: true},
+			destination: destinationFixture{id: "my-cio-destination", typ: "customerio_audience", enabled: true, config: map[string]any{}},
+			expected: []rules.ValidationResult{
+				{
+					Reference: "/connections/0/destination",
+					Message:   `destination api type "CUSTOMERIO_AUDIENCE" uses a destination-specific rETL flow, which is not supported`,
+				},
+				{
+					Reference: "/connections/0/source",
+					Message:   "rETL source 'users-model' uses source definition 'oracle', whose rETL capabilities this CLI version does not know; upgrade the CLI to validate this connection",
+				},
+			},
+		},
+		{
+			name:        "a source without a primary key aimed at an unregistered destination type",
+			model:       modelFixture{id: "users-model", sourceDefinition: "postgres", enabled: true},
+			destination: destinationFixture{id: "my-unknown-destination", typ: "not-registered", enabled: true, config: map[string]any{}},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/source",
+				Message:   "rETL source 'users-model' declares no primary_key, which source definition 'postgres' requires to sync",
+			}},
 		},
 	}
 

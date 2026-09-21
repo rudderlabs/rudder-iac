@@ -10,17 +10,13 @@ spec:
   definition_version: 1
   config:
     api_version: v1
-    site_id: rudderCliE2eSiteIdUpdated
+    site_id: "{{ .CUSTOMERIO_SITE_ID_UPDATED }}"
     api_key: "{{ .CUSTOMERIO_API_KEY }}"
     datacenter: EU
     device_token_event_name: Token Refreshed
     event_filtering:
       blacklist:
         - Page Viewed
-    use_native_sdk:
-      web: false
-      android: true
-      ios: true
     send_page_name_in_sdk:
       web: true
     data_use_in_app:
