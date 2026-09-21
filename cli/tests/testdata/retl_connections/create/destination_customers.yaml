@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: e2e-retl-http-customers
+spec:
+  id: e2e-retl-http-customers
+  display_name: E2E RETL HTTP Customers
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/retl-customers
+    auth: noAuth
+    method: POST
+    format: JSON
