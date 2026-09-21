@@ -15,11 +15,13 @@ match_behavior:
   # reached from a valid SQL model and have no example either. V-R11 is
   # unreachable for the same reason — primary_key is a required field on every
   # source definition a SQL model accepts, and the one exempt definition (s3) is
-  # not among them — and so is V-R10, because the only destination that supports
-  # object mapping today carries no hyphen in its type or API type. Known
-  # limitation: these checks see only project-managed connections; a connection
-  # that exists remotely but is not in the project is invisible at validate
-  # time.
+  # not among them — and stays unreachable once connections reach table sources,
+  # which require primary_key unless the definition is s3 and forbid it when it
+  # is, so the only source that can omit it is the exempt one. So is V-R10,
+  # because the only destination that supports object mapping today carries no
+  # hyphen in its type or API type. Known limitation: these checks see only
+  # project-managed connections; a connection that exists remotely but is not in
+  # the project is invisible at validate time.
   - applies_to:
       - kind: "retl-connections"
         version: "rudder/v1"
