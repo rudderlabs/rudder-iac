@@ -1,0 +1,56 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: e2e-scn-connections
+spec:
+  connections:
+    # Everything the model connection sets is create-only except the schedule,
+    # the constants and the sync settings, which the update step moves.
+    - id: e2e-scn-orders-track
+      source: "#retl-source-sql-model:e2e-scn-model"
+      destination: "#destination:e2e-scn-http-track"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        cursor_column: updated_at
+        schedule:
+          type: cron
+          cron_expression: "0 */6 * * *"
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: properties.email
+          - from: plan
+            to: properties.plan
+        constants:
+          - key: properties.origin
+            value: rudder-cli-e2e
+        event:
+          type: track
+          name: Order Synced
+        sync_settings:
+          sync_logs:
+            enabled: false
+            retention_days: 7
+            snapshots_to_retain: 2
+          failed_keys:
+            retry: false
+    # enabled is omitted on purpose: an omitted flag means an enabled connection.
+    - id: e2e-scn-customers-full
+      source: "#retl-source-table:e2e-scn-table"
+      destination: "#destination:e2e-scn-http-column"
+      config:
+        sync_behaviour: full
+        schedule:
+          type: manual
+        identifiers:
+          - from: id
+            to: anonymous_id
+        mappings:
+          - from: email
+            to: properties.email
+        event:
+          type: track
+          name_column: event_name

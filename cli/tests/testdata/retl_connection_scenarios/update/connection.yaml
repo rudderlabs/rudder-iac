@@ -1,0 +1,55 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: e2e-scn-connections
+spec:
+  connections:
+    # cron -> manual, constants changed, and sync_settings dropped: dropping the
+    # block has to reset the remote settings to the backend defaults.
+    - id: e2e-scn-orders-track
+      source: "#retl-source-sql-model:e2e-scn-model"
+      destination: "#destination:e2e-scn-http-track"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        cursor_column: updated_at
+        schedule:
+          type: manual
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: properties.email
+          - from: plan
+            to: properties.plan
+        constants:
+          - key: properties.origin
+            value: rudder-cli-e2e-v2
+          - key: properties.team
+            value: dex
+        event:
+          type: track
+          name: Order Synced
+    # manual -> cron, and a partial sync_settings block: the fields it leaves
+    # out take the backend defaults.
+    - id: e2e-scn-customers-full
+      source: "#retl-source-table:e2e-scn-table"
+      destination: "#destination:e2e-scn-http-column"
+      config:
+        sync_behaviour: full
+        schedule:
+          type: cron
+          cron_expression: "30 2 * * *"
+        identifiers:
+          - from: id
+            to: anonymous_id
+        mappings:
+          - from: email
+            to: properties.email
+        event:
+          type: track
+          name_column: event_name
+        sync_settings:
+          failed_keys:
+            retry: false
