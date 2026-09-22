@@ -1,0 +1,40 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: orders-to-http
+spec:
+  connections:
+    - id: orders-to-http
+      source: "#retl-source-sql-model:orders-model"
+      destination: "#destination:e2e-retl-http"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        schedule:
+          type: basic
+          every_minutes: 60
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: traits.emailAddress
+        event:
+          type: identify
+    - id: customers-to-http
+      source: "#retl-source-table:customers-table"
+      destination: "#destination:e2e-retl-http"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        schedule:
+          type: basic
+          every_minutes: 45
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: traits.emailAddress
+        event:
+          type: identify

@@ -7,6 +7,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -17,15 +18,24 @@ type SourceKind struct {
 	Kind         string                // spec reference kind, e.g. retl-source-sql-model
 	ResourceType string                // graph resource type
 	SourceType   retlClient.SourceType // API sourceType
+	Flag         string                // env var that enables the kind; empty when always on
 }
 
 // SourceKinds are the rETL source kinds a connection may reference. Adding one
 // is more than a line here: the kind's handler must publish the shared source
 // keys below plus an "id" in its output, the warehouse table must cover the
-// source definitions it accepts, and both need tests. Table and audience
-// sources are absent because none of that exists for them yet.
+// source definitions it accepts, and both need tests. Audience sources are
+// absent because none of that exists for them yet.
+//
+// The table row is listed unconditionally although its kind sits behind
+// retlTableSupport. On the spec side that is safe: with the flag off a table
+// spec fails to load ("'kind' must be one of [...]"), and a reference to one
+// is then unresolved. On the remote side it is not, because this list also
+// decides which rows are eligible and how their sources resolve, so the
+// provider narrows the handler to the registered kinds (EnableSourceKinds).
 var SourceKinds = []SourceKind{
 	{Kind: sqlmodel.ResourceKind, ResourceType: sqlmodel.ResourceType, SourceType: retlClient.ModelSourceType},
+	{Kind: table.ResourceKind, ResourceType: table.ResourceType, SourceType: retlClient.TableSourceType, Flag: "RUDDERSTACK_X_RETL_TABLE_SUPPORT"},
 }
 
 // The graph data every rETL source handler publishes about its source,

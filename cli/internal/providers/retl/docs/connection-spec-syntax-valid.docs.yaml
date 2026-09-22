@@ -93,4 +93,4 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/source"
             severity: "error"
-            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id>)"
+            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id> or #retl-source-table:<id>)"
