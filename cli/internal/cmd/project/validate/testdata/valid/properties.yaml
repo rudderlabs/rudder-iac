@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: app_properties
+spec:
+  properties:
+    - id: email_address
+      name: Email Address
+      type: string
+    - id: status_code
+      name: Status Code
+      type: integer
