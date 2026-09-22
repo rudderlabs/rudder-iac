@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -233,13 +234,22 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
 	// Both of them are part of the syntax validation although done at different places.
 	if specDiags.HasErrors() || syntaxDiags.HasErrors() {
-		if err := p.renderer.Render(append(
-			specDiags,
-			syntaxDiags...,
-		)); err != nil {
-			return fmt.Errorf("rendering diagnostics: %w", err)
+		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
+			return err
 		}
 		return fmt.Errorf("syntax validation failed")
+	}
+
+	// The syntax phase only stops the load on errors, so its warnings are carried
+	// past this gate. Every error return below goes through fail, which renders
+	// them first — returning bare would drop them, which is the drop this two-phase
+	// render exists to fix. The success path folds them into the single render at
+	// the end instead.
+	fail := func(err error) error {
+		if renderErr := p.render(slices.Concat(specDiags, syntaxDiags)); renderErr != nil {
+			return renderErr
+		}
+		return err
 	}
 
 	for path, rawSpec := range parsedRawSpecs {
@@ -247,7 +257,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			path,
 			rawSpec.Parsed(),
 		); err != nil {
-			return fmt.Errorf("loading spec %s: %w", path, err)
+			return fail(fmt.Errorf("loading spec %s: %w", path, err))
 		}
 	}
 
@@ -264,7 +274,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			continue
 		}
 		if err := p.provider.LoadImportManifest(&ws); err != nil {
-			return fmt.Errorf("broadcasting import manifest: %w", err)
+			return fail(fmt.Errorf("broadcasting import manifest: %w", err))
 		}
 		break
 	}
@@ -272,31 +282,41 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
-		return fmt.Errorf("building resource graph: %w", err)
+		return fail(fmt.Errorf("building resource graph: %w", err))
 	}
 
 	// Cycles make the graph unusable,
 	// so detect them before semantic validation
 	if _, err := graph.DetectCycles(); err != nil {
-		return fmt.Errorf("cycle detected in resource graph: %w", err)
+		return fail(fmt.Errorf("cycle detected in resource graph: %w", err))
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
 	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
-		return fmt.Errorf("semantic validation: %w", err)
+		return fail(fmt.Errorf("semantic validation: %w", err))
 	}
 
-	// Syntax warnings don't stop validation, so they are rendered in the same
-	// pass as the semantic diagnostics rather than dropped.
-	if err := p.renderer.Render(append(syntaxDiags, semanticDiags...)); err != nil {
-		return fmt.Errorf("rendering diagnostics: %w", err)
+	// specDiags is error-only by construction today and is folded in only so
+	// every render path carries the same set.
+	if err := p.render(slices.Concat(specDiags, syntaxDiags, semanticDiags)); err != nil {
+		return err
 	}
 
 	if semanticDiags.HasErrors() {
 		return fmt.Errorf("semantic validation failed")
 	}
 
+	return nil
+}
+
+// render is the single exit for diagnostics, so both validation phases report
+// in the same file order whichever one reached the renderer.
+func (p *project) render(diagnostics validation.Diagnostics) error {
+	diagnostics.Sort()
+	if err := p.renderer.Render(diagnostics); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
 	return nil
 }
 

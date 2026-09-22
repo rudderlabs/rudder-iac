@@ -5,15 +5,47 @@ match_behavior:
   # schedule type owns together with the five-minute floor (V-R3), column names
   # (V-R6), cursor_column's upsert requirement (V-R7), the event name/name_column
   # exclusion (V-R8), the reserved constant key (V-R9a) and a declared object's
-  # shape (V-R10). A cron expression this CLI cannot parse at all is a warning
-  # from retl/connection/cron-expression-valid, not an error here.
+  # shape (V-R10). A malformed or too-frequent cron expression is an error here;
+  # only a dialect this CLI cannot analyse is left to the
+  # retl/connection/cron-expression-valid warning.
   - applies_to:
       - kind: "retl-connections"
         version: "rudder/v1"
     valid:
       - example_id: "retl-connection-spec-valid"
         title: "Valid rETL connection with a basic schedule and JSON mapping"
+        description: "sync_settings is omitted, so the connection keeps the backend defaults: sync logs enabled with 30 days of retention and 5 snapshots, and failed keys retried."
         files:
+          model.yaml: &users-model |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: users-model
+            spec:
+              id: users-model
+              display_name: Users
+              account_id: acc-123
+              primary_key: user_id
+              source_definition: postgres
+              sql: SELECT user_id, email, updated_at FROM users
+          destination.yaml: &http-destination |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  warehouse: cloud
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -36,10 +68,43 @@ match_behavior:
                     mappings:
                       - from: email
                         to: traits.email
+      - example_id: "retl-connection-spec-valid-partial-sync-settings"
+        title: "Sync settings that override only some of the defaults"
+        description: "Every field left out of sync_settings takes its backend default, so this keeps sync logs enabled with 5 snapshots while shortening retention and turning off failed-key retries. A block that spells out exactly the defaults is the same connection as no block. Deleting the block later resets the stored settings to the defaults on the next apply; it does not keep the remote values."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+                    sync_settings:
+                      sync_logs:
+                        retention_days: 7
+                      failed_keys:
+                        retry: false
     invalid:
       - example_id: "retl-connection-spec-every-minutes-too-small"
         title: "Basic schedule syncing more often than every five minutes"
         files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -66,9 +131,12 @@ match_behavior:
             reference: "/spec/connections/0/config/schedule/every_minutes"
             severity: "error"
             message_contains: "'every_minutes' must be greater than or equal to 5"
-      - example_id: "retl-connection-spec-wrong-source-family"
-        title: "Source reference pointing at an event stream source"
+      - example_id: "retl-connection-spec-cron-malformed"
+        title: "Cron expression that does not parse"
+        description: "Minute 70 does not exist. The backend would store the expression unparsed and the connection would never sync, so this is an error rather than a warning."
         files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -77,7 +145,69 @@ match_behavior:
             spec:
               connections:
                 - id: users-to-webhook
-                  source: "#event-stream-source:my-js-source"
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: cron
+                      cron_expression: "70 * * * *"
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/schedule/cron_expression"
+            severity: "error"
+            message_contains: "'cron_expression' is not valid: minute field \"70\": 70 is out of range 0-59"
+      - example_id: "retl-connection-spec-cron-too-frequent"
+        title: "Cron expression syncing more often than every five minutes"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: cron
+                      cron_expression: "*/2 * * * *"
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/schedule/cron_expression"
+            severity: "error"
+            message_contains: "'cron_expression' is not valid: consecutive syncs have a 2-minute gap; the minimum supported interval is 5 minutes"
+      - example_id: "retl-connection-spec-wrong-source-family"
+        title: "Source reference written with the event stream source kind"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#event-stream-source:users-model"
                   destination: "#destination:my-http-destination"
                   config:
                     sync_behaviour: upsert
@@ -93,4 +223,97 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/source"
             severity: "error"
-            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id> or #retl-source-table:<id>)"
+            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id> or #retl-source-table:<id>), got a 'event-stream-source' reference"
+      - example_id: "retl-connection-spec-empty-object"
+        title: "Object mapping connection naming an empty object"
+        description: "Leaving object out makes a JSON mapper connection; writing it names the destination object the backend matches verbatim, so it cannot be empty."
+        files:
+          model.yaml: &conversions-model |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: conversions-model
+            spec:
+              id: conversions-model
+              display_name: Offline Conversions
+              account_id: acc-123
+              primary_key: conversion_id
+              source_definition: postgres
+              sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
+          destination.yaml: &bing-destination |
+            # bingads_offline_conversions is the only destination supporting
+            # object mapping, and it is unverified: validate this project with
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-bing-destination
+            spec:
+              id: my-bing-destination
+              display_name: Bing Offline Conversions
+              type: bingads_offline_conversions
+              enabled: true
+              definition_version: 1
+              config:
+                rudder_account_id: my-bing-account
+                customer_account_id: "1234567"
+                customer_id: "7654321"
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: ""
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/object"
+            severity: "error"
+            message_contains: "'object' is not valid: must not be empty or have leading or trailing whitespace"
+      - example_id: "retl-connection-spec-untrimmed-object"
+        title: "Object name with surrounding whitespace"
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: " conversions "
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/object"
+            severity: "error"
+            message_contains: "'object' is not valid: must not be empty or have leading or trailing whitespace"
