@@ -1,10 +1,10 @@
 version: rudder/v1
 kind: account
 metadata:
-  name: prod-pg
+  name: retl-pg
 spec:
-  id: prod-pg
-  name: Production Postgres
+  id: retl-pg
+  name: RETL Postgres
   account_definition_name: SOURCE_POSTGRES
   config:
     host: db.acme-analytics.internal

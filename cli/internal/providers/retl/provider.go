@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/samber/lo"
+
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -39,6 +41,9 @@ type Provider struct {
 	kindToType     map[string]string
 	syntacticRules []rules.Rule
 	matchers       []importmatcher.Matcher
+	// connectionMatcher is held back and appended by New after every option,
+	// so it trails all source matchers whatever order the options come in.
+	connectionMatcher *importmatcher.Matcher
 	// destinationRegistry is nil unless WithConnectionSupport was applied; the
 	// connection semantic rules read it.
 	destinationRegistry *definitions.Registry
@@ -58,8 +63,9 @@ type Option func(*Provider)
 // A nil registry is replaced with an empty one: registry.Get indexes a map on
 // its receiver, so nil constructs fine and only panics later, mid remote load.
 //
-// The matcher is appended, so it trails the SQL model matcher New seeds and its
-// endpoint lookups can rely on source matches being recorded already.
+// Its matcher resolves endpoints through source matches, so New appends it
+// after every option rather than here — a source kind registered by a later
+// option would otherwise match after it and leave its connections unmatched.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
 		if registry == nil {
@@ -72,7 +78,8 @@ func WithConnectionSupport(registry *definitions.Registry) Option {
 			connectionRules.NewConnectionSpecSyntaxValidRule(),
 			connectionRules.NewConnectionCronExpressionValidRule(),
 		)
-		p.matchers = append(p.matchers, connection.Matcher())
+		m := connection.Matcher()
+		p.connectionMatcher = &m
 	}
 }
 
@@ -108,6 +115,12 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 
 	for _, opt := range opts {
 		opt(p)
+	}
+	if p.connectionMatcher != nil {
+		p.matchers = append(p.matchers, *p.connectionMatcher)
+	}
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.EnableSourceKinds(lo.Keys(p.handlers)...)
 	}
 	return p
 }

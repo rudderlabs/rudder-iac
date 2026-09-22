@@ -1,15 +1,15 @@
 version: rudder/v1
 kind: account
 metadata:
-  name: prod-pg
+  name: retl-pg
 spec:
-  id: prod-pg
-  name: Production Postgres
+  id: retl-pg
+  name: RETL Postgres
   account_definition_name: SOURCE_POSTGRES
   config:
     host: db.acme-analytics.internal
     dbname: analytics
     user: rudder
     port: 5432
-    sslMode: disable
+    sslMode: require
     password: "{{ .PG_PASSWORD }}"

@@ -49,20 +49,12 @@ func TestConnectionCronExpressionValid(t *testing.T) {
 			schedule: map[string]any{"type": "cron", "cron_expression": "*/2 * * * *"},
 		},
 		{
-			name:     "a Quartz extension the analysis cannot reason about",
+			name:     "a Quartz extension stays an error, not a warning",
 			schedule: map[string]any{"type": "cron", "cron_expression": "0 0 L * *"},
-			expected: []rules.ValidationResult{{
-				Reference: "/connections/0/config/schedule/cron_expression",
-				Message:   `'cron_expression' could not be checked locally: day-of-month field "L": the "L" (last day) extension is not supported; the backend stores cron expressions unparsed and accepts this one, so verify the schedule it produces yourself`,
-			}},
 		},
 		{
-			name:     "the six-field seconds dialect",
+			name:     "the six-field seconds dialect stays an error, not a warning",
 			schedule: map[string]any{"type": "cron", "cron_expression": "0 0 0 * * *"},
-			expected: []rules.ValidationResult{{
-				Reference: "/connections/0/config/schedule/cron_expression",
-				Message:   "'cron_expression' could not be checked locally: six-field expressions (leading seconds field) are not supported; use the five-field minute hour day-of-month month day-of-week form; the backend stores cron expressions unparsed and accepts this one, so verify the schedule it produces yourself",
-			}},
 		},
 		{
 			name:     "a timezone directive the analysis evaluates in UTC only",
@@ -93,11 +85,11 @@ func TestConnectionCronExpressionValidRule_Validate(t *testing.T) {
 	t.Parallel()
 
 	raw := validRawSpec()
-	rawConfig(raw)["schedule"] = map[string]any{"type": "cron", "cron_expression": "0 0 L * *"}
+	rawConfig(raw)["schedule"] = map[string]any{"type": "cron", "cron_expression": "CRON_TZ=Asia/Kolkata 0 * * * *"}
 
 	assert.Equal(t, []rules.ValidationResult{{
 		Reference: "/spec/connections/0/config/schedule/cron_expression",
-		Message:   `'cron_expression' could not be checked locally: day-of-month field "L": the "L" (last day) extension is not supported; the backend stores cron expressions unparsed and accepts this one, so verify the schedule it produces yourself`,
+		Message:   `'cron_expression' could not be checked locally: timezone directives such as "CRON_TZ=Asia/Kolkata" are not supported; expressions are evaluated in UTC; the backend stores cron expressions unparsed and accepts this one, so verify the schedule it produces yourself`,
 	}}, NewConnectionCronExpressionValidRule().Validate(specContext(raw)))
 }
 

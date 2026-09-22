@@ -223,7 +223,7 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/source"
             severity: "error"
-            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id>), got a 'event-stream-source' reference"
+            message_contains: "'source' must reference a rETL source (#retl-source-sql-model:<id> or #retl-source-table:<id>), got a 'event-stream-source' reference"
       - example_id: "retl-connection-spec-empty-object"
         title: "Object mapping connection naming an empty object"
         description: "Leaving object out makes a JSON mapper connection; writing it names the destination object the backend matches verbatim, so it cannot be empty."

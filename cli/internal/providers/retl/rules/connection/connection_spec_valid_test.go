@@ -114,7 +114,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 		{
 			name: "an unsupported cron dialect is the warning rule's",
 			mutate: func(c *retlConnection.ConnectionSpec) {
-				c.Config.Schedule = retlConnection.ScheduleSpec{Type: "cron", CronExpression: "0 0 L * *"}
+				c.Config.Schedule = retlConnection.ScheduleSpec{Type: "cron", CronExpression: "CRON_TZ=Asia/Kolkata 0 * * * *"}
 			},
 			expected: []rules.ValidationResult{},
 		},
@@ -156,7 +156,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			name:   "malformed source reference",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Source = "users-model" },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/source", Message: "'source' is invalid: must be of pattern #retl-source-sql-model:<id>"},
+				{Reference: "/connections/0/source", Message: "'source' is invalid: must be of pattern #retl-source-sql-model:<id> or #retl-source-table:<id>"},
 			},
 		},
 		{
@@ -165,7 +165,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			expected: []rules.ValidationResult{
 				{
 					Reference: "/connections/0/source",
-					Message:   "'source' must reference a rETL source (#retl-source-sql-model:<id>), got a 'event-stream-source' reference",
+					Message:   "'source' must reference a rETL source (#retl-source-sql-model:<id> or #retl-source-table:<id>), got a 'event-stream-source' reference",
 				},
 			},
 		},
