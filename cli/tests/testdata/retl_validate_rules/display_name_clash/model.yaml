@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: e2e-validate-model
+spec:
+  id: e2e-validate-model
+  display_name: E2E Validate Users
+  account: "#account:e2e-validate-pg"
+  primary_key: id
+  source_definition: postgres
+  enabled: true
+  sql: SELECT id, email FROM users

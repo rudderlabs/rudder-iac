@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: e2e-lifecycle-connection
+spec:
+  connections:
+    - id: e2e-lifecycle-connection
+      source: "#retl-source-table:e2e-lifecycle-table"
+      destination: "#destination:e2e-lifecycle-http"
+      enabled: true
+      config:
+        sync_behaviour: mirror
+        schedule:
+          type: basic
+          every_minutes: 30
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: traits.email
+        event:
+          type: identify
