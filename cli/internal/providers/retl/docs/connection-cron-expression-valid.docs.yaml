@@ -1,0 +1,70 @@
+rule_id: "retl/connection/cron-expression-valid"
+match_behavior:
+  # Warns only where local analysis could not reach a verdict: a cron dialect
+  # this CLI does not parse (a CRON_TZ= or TZ= prefix, which it cannot evaluate
+  # in UTC) or an analysis that stopped short. The backend stores cron
+  # expressions verbatim and never parses them, so it accepts these and the
+  # apply is not blocked. An expression that is definitely invalid or that
+  # breaks the five-minute floor is an error from
+  # retl/connection/spec-syntax-valid instead, never downgraded to a warning —
+  # Quartz day extensions and the six- and seven-field dialects among them,
+  # because cron.ParseStandard cannot read any of them.
+  - applies_to:
+      - kind: "retl-connections"
+        version: "rudder/v1"
+    valid:
+      - example_id: "retl-connection-cron-supported-expression"
+        title: "Cron expression the CLI can check locally"
+        files:
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: cron
+                      cron_expression: "0 */2 * * *"
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+    invalid:
+      - example_id: "retl-connection-cron-unsupported-dialect"
+        title: "Timezone directive the CLI cannot analyse"
+        description: "Expressions are evaluated in UTC, and the backend accepts the directive unparsed, so this is a warning: only the author can confirm the schedule it produces."
+        files:
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: cron
+                      cron_expression: "CRON_TZ=Asia/Kolkata 0 * * * *"
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/schedule/cron_expression"
+            severity: "warning"
+            message_contains: "'cron_expression' could not be checked locally"

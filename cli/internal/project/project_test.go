@@ -1,6 +1,7 @@
 package project_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"testing"
@@ -11,8 +12,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
@@ -169,6 +172,56 @@ func TestProject_Load_Success(t *testing.T) {
 	}
 	assert.True(t, foundSpec1, "Spec1 should have been loaded")
 	assert.True(t, foundSpec2, "Spec2 should have been loaded")
+}
+
+// syntaxWarningProvider registers a syntactic rule that only ever warns, so a
+// spec can pass syntax validation while still carrying a syntax diagnostic.
+type syntaxWarningProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *syntaxWarningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{prules.NewTypedRule(
+		"test/source/syntax-warning",
+		rules.Warning,
+		"source specs always warn",
+		rules.Examples{},
+		prules.NewPatternValidator(
+			fixtureMatchPatterns,
+			func(_ string, _ string, _ map[string]any, _ map[string]any) []rules.ValidationResult {
+				return []rules.ValidationResult{{Reference: "/k", Message: "k could not be checked"}}
+			},
+		),
+	)}
+}
+
+func TestProject_Load_RendersSyntaxWarningsWithoutSyntaxErrors(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(&syntaxWarningProvider{mockProvider},
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewTextRenderer(&out)),
+	)
+
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Equal(t, `
+warning[test/source/syntax-warning]: k could not be checked
+  --> spec.yaml:6:3
+     |
+   6 | k: v
+     | ^^^^
+
+Found 0 error(s), 1 warning(s)
+`, out.String())
 }
 
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {

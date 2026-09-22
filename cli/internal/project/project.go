@@ -287,7 +287,9 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		return fmt.Errorf("semantic validation: %w", err)
 	}
 
-	if err := p.renderer.Render(semanticDiags); err != nil {
+	// Syntax warnings don't stop validation, so they are rendered in the same
+	// pass as the semantic diagnostics rather than dropped.
+	if err := p.renderer.Render(append(syntaxDiags, semanticDiags...)); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
 	}
 

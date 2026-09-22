@@ -1,0 +1,178 @@
+rule_id: "retl/connection/semantic-valid"
+match_behavior:
+  # Cross-resource checks over the project graph: both endpoint refs must
+  # resolve to project resources (V-C1), a source-destination pair can only be
+  # connected once (V-C3), a destination cannot receive from both event stream
+  # and rETL sources (V-E1) nor from two different rETL sources (V-R1), the
+  # destination must accept warehouse sources (V-C4) and carry the config that
+  # source type needs to connect (V-C5) plus an entry for it in a settings block
+  # (V-C8), the mappings and sync behaviour must match the flow the destination
+  # runs (V-R2, V-R4, V-R5, V-R9b, V-R10), and the source's warehouse must support
+  # the connection whatever state the destination is in (V-R11, V-R13, V-R14).
+  # Known limitation: these checks see only project-managed connections;
+  # a connection that exists remotely but is not in the project is invisible at
+  # validate time.
+  - applies_to:
+      - kind: "retl-connections"
+        version: "rudder/v1"
+    valid:
+      - example_id: "retl-connection-semantic-valid-full-project"
+        title: "Connection whose source and destination exist and are compatible"
+        files:
+          model.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: users-model
+            spec:
+              id: users-model
+              display_name: Users
+              account_id: acc-123
+              primary_key: user_id
+              source_definition: postgres
+              sql: SELECT user_id, email FROM users
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: basic
+                      every_minutes: 30
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+    invalid:
+      - example_id: "retl-connection-semantic-source-not-found"
+        title: "Connection whose rETL source does not exist in the project"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: ghost-to-webhook
+                  source: "#retl-source-sql-model:ghost-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/source"
+            severity: "error"
+            message_contains: "rETL source 'ghost-model' not found in the project"
+      - example_id: "retl-connection-semantic-reserved-mapping-target"
+        title: "JSON mapping aimed at a target the backend reserves for identifiers"
+        description: "The backend folds a mapping to user_id into the identifiers, so it never comes back where it was written and the connection would diff on every apply."
+        files:
+          model.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: users-model
+            spec:
+              id: users-model
+              display_name: Users
+              account_id: acc-123
+              primary_key: user_id
+              source_definition: postgres
+              sql: SELECT user_id, email FROM users
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: legacy_user_id
+                        to: user_id
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/mappings/0/to"
+            severity: "error"
+            message_contains: "mapping to 'user_id' is reserved for identifiers"
