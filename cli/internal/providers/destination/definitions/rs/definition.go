@@ -91,13 +91,11 @@ type excludeWindow struct {
 // terraform's sync and s3 blocks are provider-specific artifacts and cannot
 // represent every persisted config key without erasing values on whole-config updates.
 type rsConfig struct {
-	// use_iam_for_auth is required even though schema.json does not list it: its
-	// branches are gated on the key being present (if.required), so an absent
-	// value satisfies upstream by requiring nothing. required_if cannot express
-	// "absent or false", so relaxing it would stop host/port/password being
-	// enforced at all and push those failures to the API. use_serverless needs no
-	// `required`: its default applies before validation, which keeps
-	// cluster_id/workgroup_name enforced.
+	// use_iam_for_auth is required because other keys depend on its value:
+	// host, port and password when false; iam_role_arn_for_auth, cluster_region
+	// and cluster_id or workgroup_name when true. use_serverless, which picks
+	// between those last two, needs no `required`: its default applies before
+	// validation and keeps them enforced.
 	UseIAMForAuth *bool  `mapstructure:"use_iam_for_auth" validate:"required"`
 	Host          string `mapstructure:"host" validate:"required_if=UseIAMForAuth false,omitempty,dynamic_or_pattern=rs_host"`
 	Port          string `mapstructure:"port" validate:"required_if=UseIAMForAuth false,omitempty,dynamic_or_pattern=single_line_100"`
