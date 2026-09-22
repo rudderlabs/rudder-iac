@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -206,6 +207,20 @@ func TestTableSupportEnabled(t *testing.T) {
 		require.Len(t, matchers, 2)
 		assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
 		assert.Equal(t, table.ResourceType, matchers[1].ResourceType)
+	})
+
+	// import --merge matches in this order, and a connection resolves its
+	// endpoints through source matches. retlOptions happens to pass the
+	// connection option first; the order must not depend on that.
+	t.Run("orders the connection matcher after every source matcher", func(t *testing.T) {
+		t.Parallel()
+		want := []string{sqlmodel.ResourceType, table.ResourceType, connection.ResourceType}
+
+		connectionFirst := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(nil), retl.WithTableSupport())
+		tableFirst := retl.New(newDefaultMockClient(), retl.WithTableSupport(), retl.WithConnectionSupport(nil))
+
+		assert.Equal(t, want, matcherTypes(connectionFirst.ResourceMatchers()))
+		assert.Equal(t, want, matcherTypes(tableFirst.ResourceMatchers()))
 	})
 
 	t.Run("loads table specs into the resource graph", func(t *testing.T) {
