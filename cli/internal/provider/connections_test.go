@@ -3,6 +3,7 @@ package provider_test
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,21 +16,30 @@ import (
 func TestExplainBlockingConnections(t *testing.T) {
 	t.Parallel()
 
+	// One case per service that raises this refusal, spelled as that service
+	// spells it. The three wordings are unrelated strings, so a table built on
+	// one of them leaves the other two paths silently unannotated.
 	t.Run("names both env vars and keeps the backend error", func(t *testing.T) {
 		t.Parallel()
 
-		for _, msg := range []string{
-			"The destination has active connections, please delete those first",
-			"The source has active connections, please delete those first",
+		for name, msg := range map[string]string{
+			"destination.service.ts": "The destination has active connections, please delete those first",
+			"source.service.ts":      "The source has active connections, please delete those first",
+			"retl/service.ts":        "The source is connected to some destinations.",
 		} {
-			backend := &client.APIError{HTTPStatusCode: 400, Message: msg}
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
 
-			err := provider.ExplainBlockingConnections(fmt.Errorf("deleting RETL source: %w", backend))
+				backend := &client.APIError{HTTPStatusCode: http.StatusBadRequest, Message: msg}
 
-			var apiErr *client.APIError
-			require.ErrorAs(t, err, &apiErr)
-			assert.Equal(t, backend, apiErr)
-			assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true")
+				err := provider.ExplainBlockingConnections(fmt.Errorf("deleting RETL source: %w", backend))
+
+				var apiErr *client.APIError
+				require.ErrorAs(t, err, &apiErr)
+				assert.Equal(t, backend, apiErr)
+				assert.Contains(t, err.Error(), msg, "the backend's own reason must survive")
+				assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true")
+			})
 		}
 	})
 
@@ -38,8 +48,8 @@ func TestExplainBlockingConnections(t *testing.T) {
 		t.Parallel()
 
 		for _, err := range []error{
-			&client.APIError{HTTPStatusCode: 400, Message: "destination is referenced by a running job"},
-			&client.APIError{HTTPStatusCode: 500, Message: "active connections"},
+			&client.APIError{HTTPStatusCode: http.StatusBadRequest, Message: "destination is referenced by a running job"},
+			&client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "active connections"},
 			errors.New("active connections"),
 		} {
 			assert.Same(t, err, provider.ExplainBlockingConnections(err))

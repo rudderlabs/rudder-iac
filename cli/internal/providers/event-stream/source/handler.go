@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -491,7 +492,7 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	}
 	err := h.client.Delete(ctx, remoteID)
 	if err != nil {
-		return fmt.Errorf("deleting event stream source: %w", err)
+		return fmt.Errorf("deleting event stream source: %w", provider.ExplainBlockingConnections(err))
 	}
 	return nil
 }
