@@ -22,6 +22,10 @@ const (
 //	destination.service.ts    deleting a destination
 //	source.service.ts         deleting an event-stream source
 //	retl/service.ts           deleting an rETL source
+//
+// Delete refusals only. retl/service.ts raises "connected to some destinations"
+// on an update too ("... Cannot update modelPath"), which this would match — no
+// update path calls it today, and one should not without widening this comment.
 var blockedByConnectionsMessages = []string{
 	"active connections",
 	"connected to some destinations",

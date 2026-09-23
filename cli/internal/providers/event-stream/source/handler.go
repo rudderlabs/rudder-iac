@@ -492,7 +492,7 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	}
 	err := h.client.Delete(ctx, remoteID)
 	if err != nil {
-		return fmt.Errorf("deleting event stream source: %w", provider.ExplainBlockingConnections(err))
+		return fmt.Errorf("deleting event stream source: %w", provider.ExplainBlockingEventStreamConnections(err))
 	}
 	return nil
 }

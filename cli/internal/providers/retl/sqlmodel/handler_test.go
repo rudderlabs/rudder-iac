@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,8 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"net/http"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -91,7 +90,6 @@ type mockRETLClient struct {
 	updateCalled               bool
 	deleteCalled               bool
 	sourceID                   string
-	deleteError                bool
 	deleteErr                  error
 	updateError                bool
 	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
@@ -158,13 +156,7 @@ func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, sourceID string, 
 
 func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) error {
 	m.deleteCalled = true
-	if m.deleteErr != nil {
-		return m.deleteErr
-	}
-	if m.deleteError {
-		return errors.New("deleting RETL source")
-	}
-	return nil
+	return m.deleteErr
 }
 
 func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
@@ -1120,7 +1112,7 @@ func TestSQLModelHandler(t *testing.T) {
 				expectedError: true,
 				errorMessage:  "deleting RETL source",
 				mockSetup: func() *mockRETLClient {
-					return &mockRETLClient{sourceID: "error", deleteError: true}
+					return &mockRETLClient{sourceID: "error", deleteErr: errors.New("deleting RETL source")}
 				},
 			},
 			// The rETL service has its own wording for this refusal, so a case

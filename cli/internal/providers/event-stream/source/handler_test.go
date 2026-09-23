@@ -1902,6 +1902,10 @@ func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
 // refusal is the one the CLI is most likely to meet: a source the CLI manages,
 // connected in the UI to a destination it does not. Without the annotation the
 // destroy fails naming nothing the plan contains.
+//
+// The remedy here must not name the rETL flags: no rETL connection can join an
+// event-stream source (retl/connection.SourceKinds is sqlModel plus table), so
+// turning them on cannot help and would only cost the reader a second attempt.
 func TestHandler_Delete_BlockedByConnections(t *testing.T) {
 	t.Parallel()
 
@@ -1920,7 +1924,9 @@ func TestHandler_Delete_BlockedByConnections(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "The source has active connections",
 			"the backend's own reason must survive")
-		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true")
+		assert.Contains(t, err.Error(), "Delete them in the workspace first")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT",
+			"no rETL connection can join an event-stream source, so the flags cannot help here")
 		var apiErr *client.APIError
 		require.ErrorAs(t, err, &apiErr)
 	})
