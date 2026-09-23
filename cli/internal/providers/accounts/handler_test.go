@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -18,6 +19,7 @@ type mockStore struct {
 	updatedID      string
 	externalIDSet  [2]string // {id, externalID}
 	createReturnID string
+	deleteErr      error
 }
 
 func (m *mockStore) Create(_ context.Context, req *client.CreateAccountRequest) (*client.Account, error) {
@@ -28,7 +30,7 @@ func (m *mockStore) Update(_ context.Context, id string, req *client.UpdateAccou
 	m.updated, m.updatedID = req, id
 	return &client.Account{ID: id}, nil
 }
-func (m *mockStore) Delete(context.Context, string) error { return nil }
+func (m *mockStore) Delete(context.Context, string) error { return m.deleteErr }
 func (m *mockStore) Get(context.Context, string) (*client.Account, error) {
 	return &client.Account{ID: "remote-1"}, nil
 }
@@ -297,4 +299,31 @@ func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
 				"definition %q: the accounts config split does not support nested secret keys yet", definition)
 		}
 	}
+}
+
+
+// The handler must route its delete failure through the explainer, so the
+// refusal names the flag that would let this run see the dependent (DEX-959).
+func TestDelete_ExplainsAnInUseRefusal(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{deleteErr: &client.APIError{
+		HTTPStatusCode: http.StatusConflict,
+		Message:        "This account can't be removed because it is being used by sources: src-1.",
+	}}}
+
+	err := h.Delete(context.Background(), "snf-test", nil, &AccountState{ID: "remote-1"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "src-1", "the backend's reason must survive")
+	assert.Contains(t, err.Error(), "RUDDERSTACK_X_RETL_TABLE_SUPPORT=true")
+}
+
+func TestDelete_LeavesOtherFailuresAlone(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{deleteErr: &client.APIError{
+		HTTPStatusCode: http.StatusInternalServerError, Message: "upstream unavailable",
+	}}}
+
+	err := h.Delete(context.Background(), "snf-test", nil, &AccountState{ID: "remote-1"})
+
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL")
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -167,9 +168,12 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldD
 	return &AccountState{ID: updated.ID}, nil
 }
 
+// Delete annotates the one refusal the CLI knows more about than the API: an
+// account still in use, where the resource using it is often one this run never
+// loaded (DEX-959). Every other failure passes through untouched.
 func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *AccountResource, oldState *AccountState) error {
 	if err := h.store.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting account %q: %w", oldState.ID, err)
+		return fmt.Errorf("deleting account %q: %w", oldState.ID, provider.ExplainBlockingAccountUsage(err))
 	}
 	return nil
 }
