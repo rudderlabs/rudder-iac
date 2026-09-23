@@ -128,7 +128,7 @@
 <!-- ticket:DEX-691 -->
 - Snowflake intentionally keeps its existing narrowed `SourceTypes`/connection-mode surface during focused config-tag/schema-parity fixes; do not broaden it to warehouse precedents such as Postgres, Redshift, or BigQuery unless the task explicitly requires source-type metadata changes.
 - Keep Snowflake `use_key_pair_auth` required because it is the top-level warehouse auth selector that drives deterministic `password` versus `private_key` validation.
-- Allow Snowflake storage selectors `role_based_auth` and `use_sas_tokens` to be omitted so imports and partially specified storage configs can rely on backend/UI defaults instead of being rejected by CLI validation.
+- Allow Snowflake storage selector `use_sas_tokens` to be omitted; validation applies its `false` default (DEX-926), so an omitted selector requires `account_key` just as the backend does. `s3.role_based_auth` is required for AWS storage, so it declares no default even though `schema.json` has `true`.
 - Keep Snowflake `bucket_name` on the shared `single_line_100` pattern; the field is shared across AWS and GCP storage, and provider-specific bucket-name regexes would over-restrict one side of that shared local config surface.
 ## DEX-509 — Kafka Destination Config Surface
 <!-- ticket:DEX-509 -->
@@ -280,3 +280,10 @@
 - Use `s3` rather than `aws` for the AWS-backed block because Postgres' selector value is `bucket_provider: S3`, task examples use `s3.role_based_auth`, and Snowflake already uses an `s3` local block for similar storage settings.
 - Preserve MinIO as its own nested local block (`minio.end_point`, `minio.secret_access_key`, `minio.use_ssl`) rather than leaving those keys flat.
 - Group only keys `schema.json` declares in exactly one `bucketProvider` branch. `bucket_name` (S3/GCS/MinIO) and `access_key_id` (S3/MinIO) are declared in several, so they stay top-level: the API carries one flat key for each, and routing it into a provider block would need a conditional that leaves a stale value from a third provider nowhere to land. Same rule as Snowflake.
+
+## DEX-926 — Destination Validation Applies Defaults
+<!-- ticket:DEX-926 -->
+- `RegisteredDefinition.ValidateConfig` applies the definition's declared defaults before validating, so it checks the config apply sends. A default can satisfy a conditional requirement (Redshift `use_serverless`, Snowflake `cloud_provider`) or trigger one (Redshift `role_based_auth` requires `iam_role_arn`, Snowflake `azure.use_sas_tokens` requires `azure.account_key`).
+- Do not make a key `required` so that validation sees a value; declare its schema default instead. Nested defaults still fill only a block the spec carries, so a key inside an omitted block stays absent during validation too.
+- A key that stays required declares no default, even when `schema.json` has one: a default would fill in before validation and switch the requirement off. Registration rejects this only for a bare `required` tag, not for custom required checks. Redshift `use_iam_for_auth`, Snowflake `use_key_pair_auth` and Snowflake `s3.role_based_auth` stay required on purpose.
+- Customer.io `api_version` defaults to `v2`, matching integrations-config #2705, so a spec that omits it requires `user_id_identifier_type`.

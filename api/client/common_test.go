@@ -169,3 +169,51 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 		})
 	}
 }
+
+// Each true case is the verbatim message of one control-plane service, because
+// the three wordings share no substring: destination.service.ts and
+// source.service.ts say "active connections", retl/service.ts does not.
+func TestAPIError_BlockedByConnections(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiError *client.APIError
+		want     bool
+	}{
+		{
+			name:     "destination.service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The destination has active connections, please delete those first"},
+			want:     true,
+		},
+		{
+			name:     "source.service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The source has active connections, please delete those first"},
+			want:     true,
+		},
+		{
+			name:     "retl/service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The source is connected to some destinations."},
+			want:     true,
+		},
+		{
+			name:     "checks ErrorMessage when Message is empty",
+			apiError: &client.APIError{HTTPStatusCode: 400, ErrorMessage: "The source is connected to some destinations."},
+			want:     true,
+		},
+		{
+			name:     "returns false for an unrelated 400",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "destination is referenced by a running job"},
+			want:     false,
+		},
+		{
+			name:     "returns false when the status is not 400",
+			apiError: &client.APIError{HTTPStatusCode: 500, Message: "The destination has active connections, please delete those first"},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.apiError.BlockedByConnections())
+		})
+	}
+}
