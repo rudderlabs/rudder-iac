@@ -33,7 +33,6 @@ func NewCmdTest() *cobra.Command {
 	var (
 		deps     app.Deps
 		p        project.Project
-		err      error
 		location string
 		all      bool
 		modified bool
@@ -81,6 +80,7 @@ func NewCmdTest() *cobra.Command {
 			}
 
 			// Initialize dependencies
+			var err error
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -97,6 +97,7 @@ func NewCmdTest() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
 			defer func() {
 				telemetry.TrackCommand("transformations test", err, []telemetry.KV{
 					{K: "location", V: location},
@@ -167,7 +168,8 @@ func NewCmdTest() *cobra.Command {
 			displayer.Display(results)
 
 			if results.HasFailures() {
-				return ErrTestsFailed
+				err = ErrTestsFailed
+				return err
 			}
 
 			return nil

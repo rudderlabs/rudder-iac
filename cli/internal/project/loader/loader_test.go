@@ -30,9 +30,9 @@ func TestLoader_Load(t *testing.T) {
 
 	t.Run("Loads YAML and YML files", func(t *testing.T) {
 		tmpDir := setupTestDir(t, map[string]string{
-			"source.yaml":           testContent,
-			"destination.yml":       testContent,
-			"subdir/nested.yaml":    testContent,
+			"source.yaml":          testContent,
+			"destination.yml":      testContent,
+			"subdir/nested.yaml":   testContent,
 			"subdir/deep/file.yml": testContent,
 		})
 		defer os.RemoveAll(tmpDir)
@@ -61,6 +61,21 @@ func TestLoader_Load(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, specs)
+	})
+
+	t.Run("Ignores var files", func(t *testing.T) {
+		tmpDir := setupTestDir(t, map[string]string{
+			"source.yaml":               testContent,
+			"secrets.vars.yaml":         `ACCESS_KEY: ""`,
+			"imported/secrets.vars.yml": `WRITE_KEY: ""`,
+		})
+		defer os.RemoveAll(tmpDir)
+
+		l := &loader.Loader{}
+		specs, err := l.Load(tmpDir)
+
+		require.NoError(t, err)
+		assert.Len(t, specs, 1)
 	})
 
 	t.Run("Ignores non-YAML files", func(t *testing.T) {

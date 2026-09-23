@@ -1,0 +1,37 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "firebase",
+  "name": "E2E Firebase Updated",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "consentManagement": {
+      "androidKotlin": [
+        {
+          "provider": "ketch"
+        }
+      ],
+      "iosSwift": [
+        {
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ],
+          "provider": "oneTrust",
+          "resolutionStrategy": "and"
+        }
+      ]
+    },
+    "eventFilteringOption": "blacklistedEvents"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

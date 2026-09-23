@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -15,6 +16,11 @@ var log = logger.New("loader")
 const (
 	ExtensionYAML = ".yaml"
 	ExtensionYML  = ".yml"
+
+	// VarFileInfix marks variable files (flat KEY: value YAML consumed via
+	// --var-file, including the one scaffolded by import). They live alongside
+	// specs but are not specs, so the loader skips them.
+	VarFileInfix = ".vars"
 )
 
 // Loader is responsible for finding and loading project specification files.
@@ -43,6 +49,10 @@ func (l *Loader) Load(location string) (map[string]*specs.RawSpec, error) {
 		// Check file extension
 		ext := filepath.Ext(path)
 		if ext != ExtensionYAML && ext != ExtensionYML {
+			return nil
+		}
+
+		if strings.HasSuffix(path, VarFileInfix+ext) {
 			return nil
 		}
 

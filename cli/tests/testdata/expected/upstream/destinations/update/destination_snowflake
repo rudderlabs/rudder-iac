@@ -1,0 +1,39 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "snowflake",
+  "name": "E2E Snowflake Updated",
+  "type": "SNOWFLAKE",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "account": "rudder-cli-e2e.us-east-1",
+    "allowUsersContextTraits": false,
+    "database": "RUDDER_E2E_UPD",
+    "excludeWindow": {
+      "excludeWindowEndTime": "05:00",
+      "excludeWindowStartTime": "04:00"
+    },
+    "manualSync": false,
+    "namespace": "rudder_cli_e2e",
+    "preferAppend": true,
+    "role": "RUDDER_ROLE",
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "syncFrequency": "360",
+    "syncStartAt": "01:00",
+    "underscoreDivideNumbers": false,
+    "useKeyPairAuth": false,
+    "useRudderStorage": true,
+    "user": "RUDDER_CLI_E2E_SNOWFLAKE_USER",
+    "warehouse": "RUDDER_WH",
+    "cloudProvider": "AWS",
+    "cleanupObjectStorageFiles": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

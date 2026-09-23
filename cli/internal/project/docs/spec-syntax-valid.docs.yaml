@@ -1,0 +1,93 @@
+rule_id: "project/spec-syntax-valid"
+match_behavior:
+  # Project-level (gatekeeper) rule that runs against every spec regardless of
+  # kind or version, so it is documented with a single wildcard applies_to
+  # entry. The {kind: "*", version: "*"} pattern is what the rule reports from
+  # AppliesTo(), keeping the generated catalog deterministic regardless of which
+  # providers or experimental kinds are active.
+  - applies_to:
+      - kind: "*"
+        version: "*"
+    valid:
+      - example_id: "spec-syntax-all-top-level-fields"
+        title: "Spec with all required top-level fields"
+        description: >
+          A well-formed spec declaring version, kind, metadata and spec. These
+          are the four top-level fields every spec must carry.
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: properties
+            metadata:
+              name: my-properties
+            spec:
+              properties:
+                - name: MyTestProperty
+                  type: string
+    invalid:
+      - example_id: "spec-syntax-missing-kind"
+        title: "Spec missing the required kind field"
+        description: "Every spec must declare a kind."
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind:
+            metadata:
+              name: my-properties
+            spec:
+              properties:
+                - name: MyTestProperty
+                  type: string
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/kind"
+            severity: "error"
+            message_contains: "'kind' is required"
+      - example_id: "spec-syntax-missing-version"
+        title: "Spec missing the required version field"
+        description: "Every spec must declare a version."
+        files:
+          spec.yaml: |
+            version:
+            kind: properties
+            metadata:
+              name: my-properties
+            spec:
+              properties:
+                - name: MyTestProperty
+                  type: string
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/version"
+            severity: "error"
+            message_contains: "'version' is required"
+      - example_id: "spec-syntax-missing-metadata"
+        title: "Spec missing the required metadata block"
+        description: "Every spec must declare a metadata block."
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: properties
+            spec:
+              properties:
+                - name: MyTestProperty
+                  type: string
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/metadata"
+            severity: "error"
+            message_contains: "'metadata' is required"
+      - example_id: "spec-syntax-missing-spec"
+        title: "Spec missing the required spec body"
+        description: "Every spec must declare a spec body."
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: properties
+            metadata:
+              name: my-properties
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/spec"
+            severity: "error"
+            message_contains: "'spec' is required"

@@ -5,14 +5,22 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type EmptyProvider struct{}
 
 var errNotImplemented = fmt.Errorf("not implemented")
+
+// ResourceMatchers returns nil: by default a provider does not support
+// import --merge smart linking. Providers opt in by overriding.
+func (p *EmptyProvider) ResourceMatchers() []importmatcher.Matcher {
+	return nil
+}
 
 // CRUD Operations
 func (p *EmptyProvider) Create(_ context.Context, _ string, _ string, _ resources.ResourceData) (*resources.ResourceData, error) {
@@ -61,6 +69,13 @@ func (p *EmptyProvider) ConsolidateSync(_ context.Context, _ *resources.Graph, _
 	return nil
 }
 
+// LoadImportManifest is a no-op default. Providers that consume import manifests
+// override it (e.g. via BaseProvider); this keeps providers with no import-manifest
+// state satisfying the mandatory ImportManifestLoader on the Provider interface.
+func (p *EmptyProvider) LoadImportManifest(_ *specs.WorkspaceImportMetadata) error {
+	return nil
+}
+
 func (p *EmptyProvider) SupportedMatchPatterns() []rules.MatchPattern {
 	return nil
 }
@@ -71,4 +86,8 @@ func (p *EmptyProvider) SyntacticRules() []rules.Rule {
 
 func (p *EmptyProvider) SemanticRules() []rules.Rule {
 	return []rules.Rule{}
+}
+
+func (p *EmptyProvider) RuleDocEntries() []docs.RuleDocEntry {
+	return nil
 }

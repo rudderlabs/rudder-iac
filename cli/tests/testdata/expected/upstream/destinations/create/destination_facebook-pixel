@@ -1,0 +1,60 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "facebook-pixel",
+  "name": "E2E Facebook Pixel",
+  "type": "FACEBOOK_PIXEL",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "pixelId": "1234567890123456",
+    "standardPageCall": true,
+    "valueFieldIdentifier": "properties.value",
+    "advancedMapping": false,
+    "limitedDataUSage": false,
+    "testDestination": false,
+    "testEventCode": "TEST12345",
+    "removeExternalId": false,
+    "useUpdatedMapping": false,
+    "eventsToEvents": [
+      {
+        "from": "Order Completed",
+        "to": "Purchase"
+      }
+    ],
+    "blacklistPiiProperties": [
+      {
+        "blacklistPiiProperties": "email",
+        "blacklistPiiHash": true
+      }
+    ],
+    "whitelistPiiProperties": [
+      {
+        "whitelistPiiProperties": "plan"
+      }
+    ],
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "autoConfig": {
+      "web": true
+    },
+    "legacyConversionPixelId": {
+      "web": [
+        {
+          "from": "Product Viewed",
+          "to": "rudderCliE2eLegacyPixelId"
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

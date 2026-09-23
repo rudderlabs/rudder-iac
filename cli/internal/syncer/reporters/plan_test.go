@@ -2,17 +2,18 @@ package reporters
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPlanReporter(t *testing.T) {
-	// Test default behavior (flat mode) with all resource types
+	// Test default behavior with all resource types
 	var buf bytes.Buffer
 
 	r := &planReporter{}
@@ -92,7 +93,7 @@ func TestPlanReporter(t *testing.T) {
 		"\n" +
 		"Updated resources:\n" +
 		"  - resource_type:resource4\n" +
-		"    - complex: map[a:1 b:2] => map[a:1 b:3]\n" +
+		"    - complex.b: 2 => 3\n" +
 		"    - name: old-name => new-name\n" +
 		"    - ref_ptr_changed: " + oldRefURN + " => " + newRefURN + "\n" +
 		"    - ref_ptr_nil_source: <nil> => " + newRefURN + "\n" +
@@ -100,7 +101,7 @@ func TestPlanReporter(t *testing.T) {
 		"    - ref_val_changed: " + oldRefURN + " => " + newRefURN + "\n" +
 		"    - size: 10 => 20\n" +
 		"  - resource_type:resource5\n" +
-		"    - items: [1 2 3] => [1 5 3]\n" +
+		"    - items[1]: 2 => 5\n" +
 		"\n" +
 		"Removed resources:\n" +
 		"  - resource_type:resource6\n" +
@@ -110,8 +111,6 @@ func TestPlanReporter(t *testing.T) {
 }
 
 func TestPlanReporter_NestedDiff(t *testing.T) {
-	enableNestedDiffs(t)
-
 	var buf bytes.Buffer
 
 	r := &planReporter{}
@@ -155,16 +154,20 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 					"config": {
 						Property: "config",
 						SourceValue: map[string]any{
+							"name": "old-config",
 							"servers": []any{
 								map[string]any{"host": "a.com", "port": 80},
 								map[string]any{"host": "b.com", "port": 443},
 							},
+							"settings": map[string]any{"retries": 2},
 						},
 						TargetValue: map[string]any{
+							"name": "new-config",
 							"servers": []any{
 								map[string]any{"host": "a.com", "port": 80},
 								map[string]any{"host": "b.com", "port": 8443},
 							},
+							"settings": map[string]any{"retries": 3},
 						},
 					},
 				},
@@ -215,7 +218,9 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
   - resource_type:with_arrays
     - items[1]: 2 => 5
   - resource_type:with_mixed_structures
+    - config.name: old-config => new-config
     - config.servers[1].port: 443 => 8443
+    - config.settings.retries: 2 => 3
   - resource_type:with_nested_maps
     - complex.b: 2 => 3
     - name: old-name => new-name
@@ -245,6 +250,38 @@ func TestPlanReporter_NestedDiff(t *testing.T) {
 	assert.Equal(t, expectedOutput, output)
 }
 
+func TestPlanReporter_NilPresenceDiff(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := &planReporter{}
+	r.SetWriter(&buf)
+
+	diff := &differ.Diff{
+		UpdatedResources: map[string]differ.ResourceDiff{
+			"resource_type:with_nil_presence_diff": {
+				URN: "resource_type:with_nil_presence_diff",
+				Diffs: map[string]differ.PropertyDiff{
+					"optional": {
+						Property:    "optional",
+						SourceValue: nil,
+						TargetValue: nil,
+					},
+				},
+			},
+		},
+	}
+
+	r.ReportPlan(&planner.Plan{Diff: diff})
+
+	expectedOutput := `Updated resources:
+  - resource_type:with_nil_presence_diff
+    - optional: <nil> => <nil>
+
+`
+
+	assert.Equal(t, expectedOutput, buf.String())
+}
+
 func TestPrintablePropertyRef(t *testing.T) {
 	urn := "data-graph:my-graph"
 
@@ -263,14 +300,90 @@ func TestPrintablePropertyRef(t *testing.T) {
 	})
 }
 
-func enableNestedDiffs(t *testing.T) {
-	t.Helper()
+func TestPrintableSecret(t *testing.T) {
+	const real = "sk_live_abcd1234"
+	const masked = "****1234"
 
-	viper.Set("experimental", true)
-	viper.Set("flags.nestedDiffs", true)
-
-	t.Cleanup(func() {
-		viper.Set("experimental", false)
-		viper.Set("flags.nestedDiffs", false)
+	t.Run("value secret is masked", func(t *testing.T) {
+		result := printable(secret.New(real))
+		assert.Contains(t, result, masked)
+		assert.NotContains(t, result, real)
 	})
+
+	t.Run("pointer secret is masked", func(t *testing.T) {
+		s := secret.New(real)
+		result := printable(&s)
+		assert.Contains(t, result, masked)
+		assert.NotContains(t, result, real)
+	})
+
+	t.Run("unknown secret renders placeholder", func(t *testing.T) {
+		assert.Contains(t, printable(secret.NewUnknown()), "(unknown)")
+	})
+
+	t.Run("nil pointer secret renders nil", func(t *testing.T) {
+		assert.Contains(t, printable((*secret.String)(nil)), "<nil>")
+	})
+}
+
+// TestRenderPropertyDiff_Secret proves a secret diff renders as "always re-applied"
+// (no meaningful old => new) and never leaks the real value.
+func TestRenderPropertyDiff_Secret(t *testing.T) {
+	const real = "sk_live_old_1111"
+
+	t.Run("flat secret diff renders the always-re-applied annotation", func(t *testing.T) {
+		lines := renderPropertyDiff(differ.PropertyDiff{
+			Property:    "token",
+			SourceValue: secret.New(real),
+			TargetValue: secret.NewUnknown(),
+			SecretOnly:  true,
+		})
+		out := strings.Join(lines, "")
+		assert.Contains(t, out, "token")
+		assert.Contains(t, out, "(secret, always re-applied)")
+		assert.NotContains(t, out, "=>")
+		assert.NotContains(t, out, real)
+	})
+
+	// When a sibling field changes, the property diff is not secret-only, so the
+	// nested renderer renders the real change normally and the secret leaf through
+	// the generic path, where printable masks it. The "(secret, always re-applied)"
+	// line is reserved for secret-only property diffs; a secret leaked here must
+	// still never show its real value.
+	t.Run("nested diff masks a secret leaf without leaking the value", func(t *testing.T) {
+		localSecret, unknown := secret.New(real), secret.NewUnknown()
+		lines := renderPropertyDiff(differ.PropertyDiff{
+			Property:    "config",
+			SourceValue: map[string]any{"token": &localSecret, "name": "a"},
+			TargetValue: map[string]any{"token": &unknown, "name": "b"},
+		})
+		out := strings.Join(lines, "")
+		assert.Contains(t, out, "config.name")
+		assert.Contains(t, out, "config.token")
+		assert.Contains(t, out, "(unknown)")
+		assert.NotContains(t, out, real)
+	})
+}
+
+// TestRenderDiff_SecretSections proves secret-only resources are listed in their own
+// "Always re-applied" section, separate from real updates, with no value leak.
+func TestRenderDiff_SecretSections(t *testing.T) {
+	diff := &differ.Diff{
+		UpdatedResources: map[string]differ.ResourceDiff{
+			"type:real": {URN: "type:real", Diffs: map[string]differ.PropertyDiff{
+				"name": {Property: "name", SourceValue: "a", TargetValue: "b"},
+			}},
+			"type:secret": {URN: "type:secret", SecretOnly: true, Diffs: map[string]differ.PropertyDiff{
+				"token": {Property: "token", SourceValue: secret.New("sk_live_x"), TargetValue: secret.NewUnknown(), SecretOnly: true},
+			}},
+		},
+	}
+
+	out := renderDiff(diff)
+	assert.Contains(t, out, "Updated resources")
+	assert.Contains(t, out, "type:real")
+	assert.Contains(t, out, "Always re-applied (secret values can't be read back)")
+	assert.Contains(t, out, "type:secret")
+	assert.Contains(t, out, "(secret, always re-applied)")
+	assert.NotContains(t, out, "sk_live_x")
 }

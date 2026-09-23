@@ -1,0 +1,51 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "adobe-analytics",
+  "name": "E2E Adobe Analytics",
+  "type": "ADOBE_ANALYTICS",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "device"
+    },
+    "contextDataMapping": [
+      {
+        "from": "campaign",
+        "to": "campaignName"
+      }
+    ],
+    "contextDataPrefix": "rudder.",
+    "dropVisitorId": false,
+    "eVarMapping": [
+      {
+        "from": "plan",
+        "to": "1"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "heartbeatTrackingServerUrl": "heartbeat.example.com",
+    "marketingCloudOrgId": "rudderCliE2eOrgId",
+    "noFallbackVisitorId": false,
+    "preferVisitorId": true,
+    "productIdentifier": "sku",
+    "reportSuiteIds": "rudderCliE2eRsid",
+    "sslHeartbeat": true,
+    "timestampOption": "hybrid",
+    "timestampOptionalReporting": true,
+    "trackPageName": true,
+    "trackingServerSecureUrl": "secure.example.com",
+    "trackingServerUrl": "metrics.example.com",
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      },
+      {
+        "eventName": "Product Viewed"
+      }
+    ]
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

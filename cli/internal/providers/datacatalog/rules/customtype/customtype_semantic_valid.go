@@ -46,7 +46,7 @@ func validateCustomTypeVariants(spec localcatalog.CustomTypeSpec, graph *resourc
 		for j, prop := range ct.Properties {
 			ownRefs[j] = prop.Ref
 		}
-		results = append(results, variant.ValidateVariantDiscriminatorsV0(
+		results = append(results, variant.ValidateVariantSemanticV0(
 			ct.Variants, ownRefs, fmt.Sprintf("/types/%d", i), graph,
 		)...)
 	}
@@ -63,7 +63,7 @@ func validateCustomTypeVariantsV1(spec localcatalog.CustomTypeSpecV1, graph *res
 			ownRefs[j] = prop.Property
 		}
 
-		results = append(results, variant.ValidateVariantDiscriminatorsV1(
+		results = append(results, variant.ValidateVariantSemanticV1(
 			ct.Variants,
 			ownRefs,
 			fmt.Sprintf("/types/%d", i),

@@ -1,0 +1,4 @@
+{{- if .Comment -}}
+/** {{ escapeComment .Comment }} */
+{{ end -}}
+export type {{ .Alias }} = {{ .Type }};

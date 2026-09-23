@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"gopkg.in/yaml.v3"
 )
 
@@ -16,10 +17,16 @@ var (
 type YAMLFormatter struct{}
 
 // Format converts data to YAML format with 2-space indentation and quoted string values.
+//
+// When data is already a *yaml.Node it is used as-is rather than re-encoded, so
+// node-level details such as HeadComment (e.g. the import-manifest header) are
+// preserved; re-encoding through node.Encode would drop them.
 func (f YAMLFormatter) Format(data any) ([]byte, error) {
 	var node yaml.Node
 
-	if err := node.Encode(data); err != nil {
+	if n, ok := data.(*yaml.Node); ok {
+		node = *n
+	} else if err := node.Encode(data); err != nil {
 		return nil, fmt.Errorf("encoding data to YAML node: %w", err)
 	}
 	forceStringQuotes(&node)
@@ -36,7 +43,9 @@ func (f YAMLFormatter) Format(data any) ([]byte, error) {
 		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	// Byte-level rewrite: the yaml encoder cannot emit a '{'-leading scalar
+	// unquoted, so quoted substitution tokens are unquoted after encoding.
+	return varsubst.UnquoteTokens(buf.Bytes()), nil
 }
 
 // Extension returns "yaml" as the file extension.

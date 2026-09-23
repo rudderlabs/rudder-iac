@@ -19,6 +19,11 @@ import (
 )
 
 func TestTransformationsTest(t *testing.T) {
+	// This test needs no experimental flag of its own; the umbrella switch is
+	// here only so the residue tolerance below actually takes effect.
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	allowManagedResidue(t)
+
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
@@ -119,6 +124,10 @@ func testResultsIgnoreFields(results map[string]any) []string {
 				prefix+".id",
 				prefix+".versionId",
 				prefix+".externalId",
+				// message is a verbatim upstream error string (e.g. the Python
+				// interpreter's SyntaxError text); its wording changes upstream and
+				// is not the CLI's contract — pass/status already assert failure.
+				prefix+".message",
 			)
 		}
 	}

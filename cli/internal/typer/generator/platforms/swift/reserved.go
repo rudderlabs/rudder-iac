@@ -1,0 +1,66 @@
+package swift
+
+// Source: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/lexicalstructure/
+
+// swiftReservedWords contains keywords that cannot be used as identifiers without backtick escaping.
+var swiftReservedWords = map[string]bool{
+	// Keywords used in declarations
+	"associatedtype": true,
+	"class":          true,
+	"deinit":         true,
+	"enum":           true,
+	"extension":      true,
+	"fileprivate":    true,
+	"func":           true,
+	"import":         true,
+	"init":           true,
+	"inout":          true,
+	"internal":       true,
+	"let":            true,
+	"open":           true,
+	"operator":       true,
+	"private":        true,
+	"protocol":       true,
+	"public":         true,
+	"rethrows":       true,
+	"static":         true,
+	"struct":         true,
+	"subscript":      true,
+	"typealias":      true,
+	"var":            true,
+
+	// Keywords used in statements
+	"break":       true,
+	"case":        true,
+	"continue":    true,
+	"default":     true,
+	"defer":       true,
+	"do":          true,
+	"else":        true,
+	"fallthrough": true,
+	"for":         true,
+	"guard":       true,
+	"if":          true,
+	"in":          true,
+	"repeat":      true,
+	"return":      true,
+	"switch":      true,
+	"where":       true,
+	"while":       true,
+
+	// Keywords used in expressions and types
+	"Any":   true,
+	"as":    true,
+	"catch": true,
+	"false": true,
+	"is":    true,
+	"nil":   true,
+	"self":  true,
+	"Self":  true,
+	"super": true,
+	"throw": true,
+	"throws": true,
+	"true":  true,
+	"try":   true,
+	"Type":  true,
+}

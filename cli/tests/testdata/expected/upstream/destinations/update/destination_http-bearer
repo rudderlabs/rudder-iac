@@ -1,0 +1,21 @@
+{
+  "config": {
+    "apiUrl": "https://webhooks.example.com/rudder/events",
+    "auth": "bearerTokenAuth",
+    "format": "XML",
+    "isBatchingEnabled": false,
+    "isDefaultMapping": true,
+    "method": "POST",
+    "xmlRootKey": "rudderEvent"
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-bearer",
+  "id": "<ignored>",
+  "name": "E2E HTTP Bearer Auth Updated",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
+

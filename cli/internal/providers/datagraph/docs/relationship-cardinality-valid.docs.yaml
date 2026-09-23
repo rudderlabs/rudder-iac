@@ -1,0 +1,167 @@
+rule_id: "datagraph/data-graph/relationship-cardinality-valid"
+match_behavior:
+  - applies_to:
+      - kind: "data-graph"
+        version: "rudder/v1"
+    valid:
+      - example_id: "dg-cardinality-entity-to-entity"
+        title: "Entity-to-entity relationship with any cardinality is valid"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                  relationships:
+                    - id: user-account
+                      display_name: User Account
+                      cardinality: one-to-one
+                      target: "#data-graph-model:account"
+                      source_join_key: account_id
+                      target_join_key: account_id
+                - id: account
+                  display_name: Account
+                  type: entity
+                  table: db.schema.accounts
+                  primary_id: account_id
+      - example_id: "dg-cardinality-event-to-entity-many-to-one"
+        title: "Event-to-entity relationship must use many-to-one cardinality"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+                  timestamp: purchased_at
+                  relationships:
+                    - id: purchase-user
+                      display_name: Purchase User
+                      cardinality: many-to-one
+                      target: "#data-graph-model:user"
+                      source_join_key: user_id
+                      target_join_key: user_id
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+    invalid:
+      - example_id: "dg-cardinality-event-to-event-rejected"
+        title: "Event models cannot be connected to other event models"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+                  timestamp: purchased_at
+                  relationships:
+                    - id: purchase-click
+                      display_name: Purchase Click
+                      cardinality: many-to-one
+                      target: "#data-graph-model:click"
+                      source_join_key: session_id
+                      target_join_key: session_id
+                - id: click
+                  display_name: Click
+                  type: event
+                  table: db.schema.clicks
+                  timestamp: clicked_at
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/relationships/0/cardinality"
+            severity: "error"
+            message_contains: "event models cannot be connected to other event models"
+      - example_id: "dg-cardinality-event-to-entity-wrong-cardinality"
+        title: "Event-to-entity relationship must have cardinality many-to-one"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+                  timestamp: purchased_at
+                  relationships:
+                    - id: purchase-user
+                      display_name: Purchase User
+                      cardinality: one-to-many
+                      target: "#data-graph-model:user"
+                      source_join_key: user_id
+                      target_join_key: user_id
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/relationships/0/cardinality"
+            severity: "error"
+            message_contains: "must have cardinality 'many-to-one'"
+      - example_id: "dg-cardinality-entity-to-event-wrong-cardinality"
+        title: "Entity-to-event relationship must have cardinality one-to-many"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                  relationships:
+                    - id: user-purchase
+                      display_name: User Purchase
+                      cardinality: many-to-one
+                      target: "#data-graph-model:purchase"
+                      source_join_key: user_id
+                      target_join_key: user_id
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+                  timestamp: purchased_at
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/relationships/0/cardinality"
+            severity: "error"
+            message_contains: "must have cardinality 'one-to-many'"

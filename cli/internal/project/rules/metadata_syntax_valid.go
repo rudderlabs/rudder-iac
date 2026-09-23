@@ -15,13 +15,17 @@ import (
 
 type MetadataSyntaxValidRule struct {
 	parseSpec ParseSpecFunc
-	appliesTo []rules.MatchPattern
+	patterns  []rules.MatchPattern
 }
 
+// NewMetadataSyntaxValidRule scopes the rule to the given resource match patterns so
+// it runs only on resource specs. Project-level kinds such as import-manifest are
+// excluded — their metadata carries no inline import block and their ParseSpec lives
+// on a different provider.
 func NewMetadataSyntaxValidRule(parseSpec ParseSpecFunc, patterns []rules.MatchPattern) rules.Rule {
 	return &MetadataSyntaxValidRule{
 		parseSpec: parseSpec,
-		appliesTo: patterns,
+		patterns:  patterns,
 	}
 }
 
@@ -38,7 +42,7 @@ func (r *MetadataSyntaxValidRule) Description() string {
 }
 
 func (r *MetadataSyntaxValidRule) AppliesTo() []rules.MatchPattern {
-	return r.appliesTo
+	return r.patterns
 }
 
 func (r *MetadataSyntaxValidRule) Examples() rules.Examples {

@@ -5,52 +5,137 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/samber/lo"
+
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	retldocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/connection"
 	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
+	tableRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/table"
 )
 
 // Provider implements the provider interface for RETL resources
 type Provider struct {
 	provider.EmptyProvider
-	client     retlClient.RETLStore
-	handlers   map[string]resourceHandler
-	kindToType map[string]string
+	client         retlClient.RETLStore
+	handlers       map[string]resourceHandler
+	kindToType     map[string]string
+	syntacticRules []rules.Rule
+	matchers       []importmatcher.Matcher
+	// connectionMatcher is held back and appended by New after every option,
+	// so it trails all source matchers whatever order the options come in.
+	connectionMatcher *importmatcher.Matcher
+	// destinationRegistry is nil unless WithConnectionSupport was applied; the
+	// connection semantic rules read it.
+	destinationRegistry *definitions.Registry
 }
 
 const importDir = "retl"
 
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithConnectionSupport registers the rETL connection kind: its spec kind,
+// resource type and handler, whose presence also enables its validation rules
+// and import --merge matcher. Without it the provider keeps exactly the
+// SQL-model surface it had, and the authored connection fragments stay out of
+// the generated catalog.
+//
+// A nil registry is replaced with an empty one: registry.Get indexes a map on
+// its receiver, so nil constructs fine and only panics later, mid remote load.
+//
+// Its matcher resolves endpoints through source matches, so New appends it
+// after every option rather than here — a source kind registered by a later
+// option would otherwise match after it and leave its connections unmatched.
+func WithConnectionSupport(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		if registry == nil {
+			registry = definitions.NewRegistry()
+		}
+		p.destinationRegistry = registry
+		p.kindToType[connection.ResourceKind] = connection.ResourceType
+		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
+		p.syntacticRules = append(p.syntacticRules,
+			connectionRules.NewConnectionSpecSyntaxValidRule(),
+			connectionRules.NewConnectionCronExpressionValidRule(),
+		)
+		m := connection.Matcher()
+		p.connectionMatcher = &m
+	}
+}
+
+// WithTableSupport registers the experimental retl-source-table kind: its spec
+// kind, resource type and handler, whose presence also enables its syntax rule
+// and import --merge matcher. Without it the provider behaves exactly as it did
+// before the kind existed, and never lists table sources.
+func WithTableSupport() Option {
+	return func(p *Provider) {
+		p.kindToType[table.ResourceKind] = table.ResourceType
+		p.handlers[table.ResourceType] = table.NewHandler(p.client, importDir)
+		p.syntacticRules = append(p.syntacticRules, tableRules.NewTableSpecSyntaxValidRule())
+		p.matchers = append(p.matchers, table.Matcher())
+	}
+}
+
 // New creates a new RETL provider instance
-func New(client retlClient.RETLStore) *Provider {
+func New(client retlClient.RETLStore, opts ...Option) *Provider {
 	p := &Provider{
 		client:   client,
 		handlers: make(map[string]resourceHandler),
 		kindToType: map[string]string{
 			"retl-source-sql-model": sqlmodel.ResourceType,
 		},
+		syntacticRules: []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()},
+		// Source matchers must precede any matcher for a resource that
+		// references a source, so options append rather than prepend.
+		matchers: []importmatcher.Matcher{sqlmodel.Matcher()},
 	}
 
 	// Register handlers
-	options := []sqlmodel.HandlerOption{}
-	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-		options = append(options, sqlmodel.WithV1SpecSupport())
-	}
-	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir, options...)
+	p.handlers[sqlmodel.ResourceType] = sqlmodel.NewHandler(client, importDir)
 
+	for _, opt := range opts {
+		opt(p)
+	}
+	if p.connectionMatcher != nil {
+		p.matchers = append(p.matchers, *p.connectionMatcher)
+	}
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.EnableSourceKinds(lo.Keys(p.handlers)...)
+	}
 	return p
+}
+
+// LoadImportManifest fans the active workspace's manifest out to every registered
+// handler so URN → remote-ID mappings from a central import-manifest file
+// populate the same import-metadata map that inline metadata.import does.
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	workspaces := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*m}}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(workspaces); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) SupportedKinds() []string {
@@ -64,7 +149,11 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		// Only the SQL model kind shipped on rudder/0.1; every kind added since
+		// legacy versions were retired is v1-only.
+		if kind == sqlmodel.ResourceKind {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -77,6 +166,13 @@ func (p *Provider) SupportedTypes() []string {
 		types = append(types, resourceType)
 	}
 	return types
+}
+
+// ResourceMatchers overrides the EmptyProvider default to opt into import
+// --merge smart linking for SQL models, and for connections and table sources
+// once registered.
+func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
+	return p.matchers
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -129,15 +225,33 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
-	return []rules.Rule{
-		sqlmodelRules.NewSQLModelSpecSyntaxValidRule(),
-	}
+	return p.syntacticRules
 }
 
+// SemanticRules registers the table and connection rules only with their kinds,
+// so with the flags off validation is exactly what it was before those kinds
+// existed — and their authored fragments stay out of the generated catalog.
 func (p *Provider) SemanticRules() []rules.Rule {
-	return []rules.Rule{
+	semantic := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),
 	}
+	if _, ok := p.handlers[table.ResourceType]; ok {
+		semantic = append(semantic, tableRules.NewTableSemanticValidRule())
+	}
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		semantic = append(semantic,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
+	}
+	return semantic
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the retl provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
+	entries, _ := docs.LoadRuleDocEntries(retldocs.FragmentsFS, ".")
+	return entries
 }
 
 // GetResourceGraph returns a graph of all resources
@@ -287,14 +401,16 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
-func (p *Provider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
+func (p *Provider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	allEntities := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(collection, idNamer, inputResolver)
+		entities, handlerEntries, err := handler.FormatForExport(collection, idNamer, inputResolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler %w", err)
 		}
 		allEntities = append(allEntities, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return allEntities, nil
+	return allEntities, entries, nil
 }

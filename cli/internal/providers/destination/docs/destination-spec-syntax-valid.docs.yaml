@@ -1,0 +1,84 @@
+rule_id: "destination/spec-syntax-valid"
+match_behavior:
+  - applies_to:
+      - kind: "destination"
+        version: "rudder/v1"
+    valid:
+      - example_id: "destination-spec-syntax-valid-basic"
+        title: "Valid destination with registered type, version and config"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-prod
+            spec:
+              id: webhook-prod
+              display_name: Production Webhook
+              type: WEBHOOK
+              enabled: true
+              definition_version: 1
+              config:
+                webhook_url: "https://example.com/hook"
+    invalid:
+      - example_id: "destination-spec-syntax-unknown-field"
+        title: "Unknown envelope field is rejected"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-prod
+            spec:
+              id: webhook-prod
+              display_name: Production Webhook
+              type: WEBHOOK
+              definition_version: 1
+              unexpected_field: true
+              config:
+                webhook_url: "https://example.com/hook"
+        expected_diagnostics:
+          - file: "destination.yaml"
+            reference: "/unexpected_field"
+            severity: "error"
+            message_contains: "unknown field"
+      - example_id: "destination-spec-syntax-unsupported-type"
+        title: "Destination type not present in the definition registry"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: mystery-dest
+            spec:
+              id: mystery-dest
+              display_name: Mystery Destination
+              type: NOT_A_REAL_TYPE
+              definition_version: 1
+              config: {}
+        expected_diagnostics:
+          - file: "destination.yaml"
+            reference: "/type"
+            severity: "error"
+            message_contains: "is not supported"
+      - example_id: "destination-spec-syntax-bad-transformation-ref"
+        title: "Transformation reference must match #transformation:<id>"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-prod
+            spec:
+              id: webhook-prod
+              display_name: Production Webhook
+              type: WEBHOOK
+              definition_version: 1
+              transformation: "transformation/my-transformation"
+              config:
+                webhook_url: "https://example.com/hook"
+        expected_diagnostics:
+          - file: "destination.yaml"
+            reference: "/transformation"
+            severity: "error"
+            message_contains: "must be of pattern #transformation:<id>"

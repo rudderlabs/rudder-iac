@@ -11,8 +11,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	dcdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	categoryRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/category"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
@@ -22,7 +23,9 @@ import (
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/samber/lo"
 )
 
 var log = logger.New("datacatalogprovider")
@@ -62,6 +65,13 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return p.dc.LoadLegacySpec(path, s)
+}
+
+// LoadImportManifest delegates the active workspace's manifest to the local
+// catalog so resources whose URNs match a manifest entry get ImportMetadata
+// attached at ResourceGraph() time, mirroring the inline metadata.import path.
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	return p.dc.LoadImportManifest(m)
 }
 
 func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
@@ -305,6 +315,11 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 				localcatalog.KindTrackingPlans,
 				tp.LocalID,
 			)),
+			resources.WithAdditionalMetadata(map[string]any{
+				"ruleIdToEventId": lo.SliceToMap(tp.Rules, func(rule *localcatalog.TPRuleV1) (string, string) {
+					return rule.LocalID, strings.TrimPrefix(rule.Event, "#event:")
+				}),
+			}),
 		)
 		graph.AddResource(resource)
 		graph.AddDependencies(resource.URN(), getDependencies(tp, propIDToURN, eventIDToURN))
@@ -345,6 +360,8 @@ func inflateRefs(catalog *localcatalog.DataCatalog) error {
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
+	eventRuleIncludesEnabled := config.GetConfig().ExperimentalFlags.EventRuleIncludes
+
 	syntactic := []rules.Rule{
 		propertyRules.NewPropertySpecSyntaxValidRule(),
 		propertyRules.NewPropertyConfigValidRule(),
@@ -352,18 +369,27 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 		customtypeRules.NewCustomTypeConfigValidRule(),
 		eventRules.NewEventSpecSyntaxValidRule(),
 		categoryRules.NewCategorySpecSyntaxValidRule(),
-		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(),
+		trackingplanRules.NewTrackingPlanSpecSyntaxValidRule(eventRuleIncludesEnabled),
 	}
 
 	return syntactic
 }
 
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the datacatalog provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
+	entries, _ := docs.LoadRuleDocEntries(dcdocs.FragmentsFS, ".")
+	return entries
+}
+
 func (p *Provider) SemanticRules() []rules.Rule {
+	eventRuleIncludesEnabled := config.GetConfig().ExperimentalFlags.EventRuleIncludes
+
 	return []rules.Rule{
 		propertyRules.NewPropertySemanticValidRule(),
 		eventRules.NewEventSemanticValidRule(),
 		categoryRules.NewCategorySemanticValidRule(),
 		customtypeRules.NewCustomTypeSemanticValidRule(),
-		trackingplanRules.NewTrackingPlanSemanticValidRule(),
+		trackingplanRules.NewTrackingPlanSemanticValidRule(eventRuleIncludesEnabled),
 	}
 }

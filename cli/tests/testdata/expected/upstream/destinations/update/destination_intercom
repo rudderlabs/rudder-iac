@@ -1,0 +1,46 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "intercom",
+  "name": "E2E Intercom Updated",
+  "type": "INTERCOM",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "appId": "rudderCliE2eAppIdUpdated",
+    "apiServer": "eu",
+    "apiVersion": "v1",
+    "sendAnonymousId": true,
+    "updateLastRequestAt": false,
+    "blacklistedEvents": [
+      {
+        "eventName": "Page Viewed"
+      }
+    ],
+    "eventFilteringOption": "blacklistedEvents",
+    "mobileApiKeyAndroid": {
+      "android": "rudderCliE2eAndroidKeyUpdated"
+    },
+    "mobileApiKeyIOS": {
+      "ios": "rudderCliE2eIosKeyUpdated"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

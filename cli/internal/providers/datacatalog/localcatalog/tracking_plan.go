@@ -13,7 +13,7 @@ var (
 	// Non-capturing groups (?:...) ensure the we only capture the localId from the reference string
 	PropRegex         = regexp.MustCompile(`^#(?:/properties/[^/]+/|property:)(.+)$`)
 	EventRegex        = regexp.MustCompile(`^#(?:/events/[^/]+/|event:)(.+)$`)
-	IncludeRegex      = regexp.MustCompile(`^#\/tp\/(.*)\/event_rule\/(.*)$`)
+	IncludeRegex      = regexp.MustCompile(`^#/tp/([a-zA-Z0-9_-]+)/event_rule/([a-zA-Z0-9_-]+|\*)$`)
 	CustomTypeRegex   = regexp.MustCompile(`^#(?:/custom-types/[^/]+/|custom-type:)(.+)$`)
 	CategoryRegex     = regexp.MustCompile(`^#(?:/categories/[^/]+/|category:)(.+)$`)
 	TrackingPlanRegex = regexp.MustCompile(`^#(?:/tp/[^/]+/|tracking-plan:)(.+)$`)
@@ -39,9 +39,9 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name            string
-	LocalID         string
-	Ref             string
+	Name    string
+	LocalID string
+	Ref     string
 	Description     string
 	CategoryRef     *string
 	Type            string
@@ -66,6 +66,9 @@ type TPEventProperty struct {
 	LocalID              string                 `json:"id"`
 	Description          string                 `json:"description"`
 	Type                 string                 `json:"type"`
+	Types                []string               `json:"types,omitempty"`
+	ItemType             string                 `json:"item_type,omitempty"`
+	ItemTypes            []string               `json:"item_types,omitempty"`
 	Config               map[string]interface{} `json:"config"`
 	Required             bool                   `json:"required"`
 	Properties           []*TPEventProperty     `json:"properties,omitempty"` // NEW: Nested properties
@@ -75,7 +78,7 @@ type TPEventProperty struct {
 type TPRule struct {
 	Type       string            `json:"type" validate:"required,eq=event_rule"`
 	LocalID    string            `json:"id" validate:"required"`
-	Event      *TPRuleEvent      `json:"event" validate:"required"`
+	Event      *TPRuleEvent      `json:"event,omitempty"`
 	Properties []*TPRuleProperty `json:"properties,omitempty" validate:"omitempty,dive"`
 	Includes   *TPRuleIncludes   `json:"includes,omitempty"`
 	Variants   Variants          `json:"variants,omitempty" validate:"omitempty,max=1,dive"`
@@ -240,6 +243,9 @@ func expandEventRefs(rule *TPRuleV1, fetcher CatalogResourceFetcher) (*TPEvent, 
 			Properties:           property.Properties,
 			Description:          property.Description,
 			Type:                 property.Type,
+			Types:                append([]string(nil), property.Types...),
+			ItemType:             property.ItemType,
+			ItemTypes:            append([]string(nil), property.ItemTypes...),
 			Required:             prop.Required,
 			Config:               shallowCopy(property.Config),
 			AdditionalProperties: property.AdditionalProperties,
@@ -279,6 +285,9 @@ func expandPropertyRefs(prop *TPRulePropertyV1, fetcher CatalogResourceFetcher) 
 		LocalID:              property.LocalID,
 		Description:          property.Description,
 		Type:                 property.Type,
+		Types:                append([]string(nil), property.Types...),
+		ItemType:             property.ItemType,
+		ItemTypes:            append([]string(nil), property.ItemTypes...),
 		Required:             prop.Required,
 		Config:               shallowCopy(property.Config),
 		AdditionalProperties: prop.AdditionalProperties,

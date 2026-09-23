@@ -90,6 +90,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
 	viper.BindEnv("experimental", "RUDDERSTACK_CLI_EXPERIMENTAL")
+	viper.BindEnv("concurrency.syncer", "RUDDERSTACK_CLI_CONCURRENCY_SYNCER")
 	viper.BindEnv("concurrency.catalogClient", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_CLIENT")
 	viper.BindEnv("concurrency.compositeProvider", "RUDDERSTACK_CLI_CONCURRENCY_COMPOSITE_PROVIDER")
 	viper.BindEnv("concurrency.catalogProvider", "RUDDERSTACK_CLI_CONCURRENCY_CATALOG_PROVIDER")
@@ -179,6 +180,16 @@ func GetConfig() Config {
 
 	if !viper.GetBool("experimental") {
 		config.ExperimentalFlags = ExperimentalConfig{}
+	}
+
+	// While concurrent syncs were gated, a sub-1 concurrency.syncer was inert
+	// for anyone who had not enabled the flag: WithConcurrency was never applied
+	// and the syncer fell back to 1. Reading the value unconditionally would
+	// fail their next apply, so clamp instead of erroring. Users who did enable
+	// the flag were already refused by WithConcurrency, and clamping is the
+	// quieter of the two — chosen so that no existing config breaks on upgrade.
+	if config.Concurrency.Syncer < 1 {
+		config.Concurrency.Syncer = 1
 	}
 
 	return config

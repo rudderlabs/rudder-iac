@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/samber/lo"
 )
 
@@ -33,15 +34,48 @@ func (d *Diff) HasDiff() bool {
 		len(d.RemovedResources) > 0
 }
 
+// HasNonSecretDiff reports whether the plan contains any change a user actually made,
+// ignoring resources that update only because they carry an unknown secret (which
+// re-applies every run by design). Used by the import "project not synced" guard so
+// the presence of secrets does not permanently block imports.
+func (d *Diff) HasNonSecretDiff() bool {
+	if len(d.NewResources) > 0 ||
+		len(d.ImportableResources) > 0 ||
+		len(d.RemovedResources) > 0 {
+		return true
+	}
+	for _, rd := range d.UpdatedResources {
+		if !rd.IsSecretOnly() {
+			return true
+		}
+	}
+	return false
+}
+
 type ResourceDiff struct {
 	URN   string
 	Diffs map[string]PropertyDiff
+	// SecretOnly is true when every property diff is secret-driven, so the
+	// resource is "always re-applied" rather than genuine drift. It is computed
+	// once while the diffs are built (see compareData) and cached here.
+	SecretOnly bool
+}
+
+// IsSecretOnly reports whether this resource updates only because of unknown
+// secrets. The verdict is precomputed in ComputeDiff, so this is O(1).
+func (rd ResourceDiff) IsSecretOnly() bool {
+	return rd.SecretOnly
 }
 
 type PropertyDiff struct {
 	Property    string
 	SourceValue any
 	TargetValue any
+	// SecretOnly is true when this diff exists only because of an unknown secret, so
+	// the reporter can render it distinctly and classify the resource as always
+	// re-applied. It propagates up: a containing map diff is SecretOnly only when every
+	// child diff is.
+	SecretOnly bool
 }
 
 type DiffOptions struct {
@@ -86,10 +120,11 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffO
 				tData = r.Data()
 			}
 
-			// Check if resource is updated or unmodified
-			propertyDiffs := CompareData(sData, tData)
+			// Check if resource is updated or unmodified. secretOnly is computed
+			// while the diffs are built and cached on the ResourceDiff.
+			propertyDiffs, secretOnly := CompareData(sData, tData)
 			if len(propertyDiffs) > 0 {
-				updatedResources[urn] = ResourceDiff{URN: urn, Diffs: propertyDiffs}
+				updatedResources[urn] = ResourceDiff{URN: urn, Diffs: propertyDiffs, SecretOnly: secretOnly}
 			} else {
 				unmodifiedResources = append(unmodifiedResources, urn)
 			}
@@ -113,9 +148,23 @@ func ComputeDiff(source *resources.Graph, target *resources.Graph, options DiffO
 	}
 }
 
-// compareData compares the data of two resources and returns the differences
-func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
+// CompareData compares the data of two resources and returns the differences and
+// whether the whole set is secret-only.
+// The secret-only verdict is computed as the diffs are built rather than by
+// re-looping afterwards; callers propagate it up a nested map and cache it on a
+// ResourceDiff (see ComputeDiff) so IsSecretOnly stays O(1).
+func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) {
 	diffs := make(map[string]PropertyDiff)
+
+	// record is the single, once-per-key write path into diffs, so the running
+	// count of secret diffs stays in lockstep with the map size.
+	secretDiffs := 0
+	record := func(key string, d PropertyDiff) {
+		diffs[key] = d
+		if d.SecretOnly {
+			secretDiffs++
+		}
+	}
 
 	// Helper function to compare values recursively
 	var compareValues func(key string, v1, v2 any)
@@ -125,20 +174,26 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 			return
 		}
 
-		newV1, ok := rewriteCompatibleType(v1)
-		if ok {
+		// Rewrite both sides so a []any-of-objects from one decode path (e.g.
+		// JSON remote state) and its equal counterpart from another (e.g. YAML
+		// spec) land on the same type before the type-equality gate below.
+		if newV1, ok := rewriteCompatibleType(v1); ok {
 			v1 = newV1
 		}
 
+		if newV2, ok := rewriteCompatibleType(v2); ok {
+			v2 = newV2
+		}
+
 		if reflect.TypeOf(v1) != reflect.TypeOf(v2) {
-			diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			return
 		}
 
 		// If v1 and v2 are pointers, compare the dereferenced values
 		if reflect.TypeOf(v1).Kind() == reflect.Pointer {
 			if isNil(v1) || isNil(v2) {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 				return
 			}
 			compareValues(key, reflect.ValueOf(v1).Elem().Interface(), reflect.ValueOf(v2).Elem().Interface())
@@ -150,34 +205,56 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 		case *resources.PropertyRef:
 			v2Typed := v2.(*resources.PropertyRef)
 			if !comparePropertyRefs(v1Typed, v2Typed) {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 		case resources.PropertyRef:
 			v2Typed := v2.(resources.PropertyRef)
 			if !comparePropertyRefs(&v1Typed, &v2Typed) {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 
+		// A secret owns the "how do we compare?" decision in its own type: an
+		// unknown secret always diffs (we can't read the remote, so we re-apply),
+		// otherwise known values are compared. The diff is flagged Secret so the
+		// reporter renders it distinctly and the resource is classified as always
+		// re-applied. SourceValue/TargetValue stay secret.String so they mask. A
+		// *secret.String (the form that survives RawData's struct→map decode, like
+		// *PropertyRef) is dereferenced to this case by the pointer branch above.
+		case secret.String:
+			v2Typed := v2.(secret.String)
+			if v1Typed.Diff(v2Typed) {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: true})
+			}
+
+		// Slices are compared member-wise (like nested maps) so a secret nested
+		// inside one still reaches the secret case above and keeps its SecretOnly
+		// classification — a whole-slice DeepEqual would lose it.
 		case []map[string]any:
 			v2Typed := v2.([]map[string]any)
-			if !reflect.DeepEqual(v1Typed, v2Typed) {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			if changed, sliceSecretOnly := compareSlices(toAnySlice(v1Typed), toAnySlice(v2Typed)); changed {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: sliceSecretOnly})
 			}
 
 		case map[string]any:
 			v2Typed := v2.(map[string]any)
-			subDiffs := CompareData(v1Typed, v2Typed)
+			subDiffs, subSecretOnly := CompareData(v1Typed, v2Typed)
 			if len(subDiffs) > 0 {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+				// A nested map is secret-only (always re-applied) only when every
+				// child diff is itself secret-driven; one real sibling change makes
+				// the whole map a real diff.
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: subSecretOnly})
 			}
 		case []any:
 			v2Typed := v2.([]any)
-			if !reflect.DeepEqual(v1Typed, v2Typed) {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			if changed, sliceSecretOnly := compareSlices(v1Typed, v2Typed); changed {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2, SecretOnly: sliceSecretOnly})
 			}
 		default:
-			if v1 != v2 {
-				diffs[key] = PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2}
+			// DeepEqual, not !=: member-wise slice comparison routes arbitrary
+			// values here, and == panics on uncomparable dynamic types (a typed
+			// slice, a map, a struct holding either) — even when they are equal.
+			if !reflect.DeepEqual(v1, v2) {
+				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 		}
 	}
@@ -185,7 +262,10 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	// Iterate over properties in r1 to find differences
 	for key, value1 := range r1 {
 		if value2, exists := r2[key]; !exists {
-			diffs[key] = PropertyDiff{Property: key, SourceValue: value1, TargetValue: nil}
+			// Presence-based secret wrapping omits keys the API strips. A secret
+			// present on only one side is still secret-driven drift (re-apply),
+			// not a real config change.
+			record(key, PropertyDiff{Property: key, SourceValue: value1, TargetValue: nil, SecretOnly: isSecretValue(value1)})
 		} else {
 			compareValues(key, value1, value2)
 		}
@@ -194,16 +274,71 @@ func CompareData(r1, r2 resources.ResourceData) map[string]PropertyDiff {
 	// Iterate over properties in r2 to find properties that are not in r1
 	for key, value2 := range r2 {
 		if _, exists := r1[key]; !exists {
-			diffs[key] = PropertyDiff{Property: key, SourceValue: nil, TargetValue: value2}
+			record(key, PropertyDiff{Property: key, SourceValue: nil, TargetValue: value2, SecretOnly: isSecretValue(value2)})
 		}
 	}
 
-	return diffs
+	// secretDiffs == len(diffs) means every recorded diff is secret-driven; the
+	// > 0 guard keeps an empty diff set from counting as secret-only.
+	return diffs, secretDiffs > 0 && secretDiffs == len(diffs)
 }
 
-// rewrite []any ->  map[string]any if possible
+// compareSlices compares two slices member-wise, pairing members by position.
+// Each pair goes through CompareData under a synthetic key, reusing the full
+// comparison semantics (pointers, secrets, nested containers). The slice is
+// secret-only when every differing member is; a length mismatch is genuine
+// drift, since adding or removing a member is a real change.
+func compareSlices(v1, v2 []any) (changed, secretOnly bool) {
+	if len(v1) != len(v2) {
+		return true, false
+	}
+	secretOnly = true
+	for i := range v1 {
+		subDiffs, subSecretOnly := CompareData(
+			resources.ResourceData{"member": v1[i]},
+			resources.ResourceData{"member": v2[i]},
+		)
+		if len(subDiffs) == 0 {
+			continue
+		}
+		changed = true
+		secretOnly = secretOnly && subSecretOnly
+	}
+	return changed, changed && secretOnly
+}
+
+func toAnySlice(entries []map[string]any) []any {
+	out := make([]any, len(entries))
+	for i, entry := range entries {
+		out[i] = entry
+	}
+	return out
+}
+
+// rewriteNumber widens any number to float64, the type json.Unmarshal produces
+// for remote state. The same value decoded from a YAML spec arrives as an int,
+// and without this the two fail the type gate below and re-diff on every apply.
+func rewriteNumber(input any) (float64, bool) {
+	value := reflect.ValueOf(input)
+
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(value.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(value.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return value.Float(), true
+	default:
+		return 0, false
+	}
+}
+
+// rewrite []any ->  map[string]any and int -> float64 if possible
 // and return back the response.
 func rewriteCompatibleType(input any) (any, bool) {
+	if number, ok := rewriteNumber(input); ok {
+		return number, true
+	}
 
 	if _, ok := input.([]any); !ok {
 		return nil, false
@@ -232,6 +367,21 @@ func isNil(val any) bool {
 	}
 
 	return false
+}
+
+// isSecretValue reports whether v is secret-driven: a secret.String (value or
+// pointer), or a block whose every leaf is one. The API strips secret values
+// rather than masking them, so a block whose keys are all secret vanishes from
+// remote state entirely; an empty block, or one non-secret leaf, is real drift.
+func isSecretValue(v any) bool {
+	switch typed := v.(type) {
+	case secret.String, *secret.String:
+		return true
+	case map[string]any:
+		return len(typed) > 0 && lo.EveryBy(lo.Values(typed), isSecretValue)
+	default:
+		return false
+	}
 }
 
 // comparePropertyRefs compares two PropertyRef objects by their comparable fields

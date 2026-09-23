@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,52 +18,115 @@ import (
 
 const concurrencyForTest = 1
 
+const (
+	upstreamConsistencyTimeout      = 30 * time.Second
+	upstreamConsistencyPollInterval = 2 * time.Second
+)
+
+// varFilePath supplies values for the {{ .VAR }} placeholders in the create/update
+// specs. It lives outside create/ and update/ (and uses the .vars.yaml suffix the
+// loader skips), so it is never parsed as a resource spec.
+var varFilePath = filepath.Join("testdata", "project", "substitution.vars.yaml")
+
 func TestProjectApply(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
+	// The api_tracking event keeps its name and description as {{ .VAR }}
+	// placeholders resolved at apply time.
+	//   - API_TRACKING_DESCRIPTION comes from the var file only (no env var set).
+	//   - API_TRACKING_NAME is in both the var file and the env var below; the env
+	//     var wins, resolving to "API Tracking" (the var file value is ignored).
+	// Both resolve to the values already in the snapshots, so a precedence
+	// regression — env losing to the file — would fail the snapshot comparison.
+	allowManagedResidue(t)
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
 	projectDir := filepath.Join("testdata", "project")
+	migratedDir := copyAndMigrateProject(t, executor, projectDir)
 
-	t.Run("rudder/v0.1 specs", func(t *testing.T) {
-		applyAndVerify(t, executor, projectDir)
-	})
-
-	t.Run("rudder/v1 specs after migration", func(t *testing.T) {
-		migratedDir := copyAndMigrateProject(t, executor, projectDir)
-		verifyNoDiffAfterMigration(t, executor, migratedDir)
-		applyAndVerify(t, executor, migratedDir)
+	t.Run("rudder specs", func(t *testing.T) {
+		applyAndVerify(t, executor, projectDir, migratedDir)
 	})
 }
 
-func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir string) {
+func applyAndVerify(t *testing.T, executor *CmdExecutor, projectDir, migratedDir string) {
 	t.Helper()
 
 	output, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "Failed to destroy resources: %v, output: %s", err, string(output))
 
+	var (
+		createDir = filepath.Join(projectDir, "create")
+		updateDir = filepath.Join(projectDir, "update")
+	)
+
 	t.Run("should create entities in catalog from project", func(t *testing.T) {
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "create"), "--confirm=false")
+		output, err := executor.Execute(cliBinPath, "apply", "-l", createDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Initial apply command failed with output: %s", string(output))
 		verifyState(t, "create")
 	})
 
+	t.Run("migrated create specs should produce the same state", func(t *testing.T) {
+		// Compare the migrated create tree while the live workspace still contains
+		// the state produced by the original create tree. This covers create-only
+		// resources without issuing the duplicate writes of a second apply cycle.
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "create"))
+	})
+
 	t.Run("should update entities in catalog from project", func(t *testing.T) {
 		time.Sleep(5 * time.Second)
-		output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(projectDir, "update"), "--confirm=false")
+
+		output, err := executor.Execute(cliBinPath, "apply", "-l", updateDir, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Update apply command failed with output: %s", string(output))
 		verifyState(t, "update")
 	})
+
+	t.Run("migrated update specs should produce the same state", func(t *testing.T) {
+		verifyNoChangesToApply(t, executor, filepath.Join(migratedDir, "update"))
+	})
+
+	t.Run("applying on already applied project should not create any diff", func(t *testing.T) {
+		// If we reapply the update directory, we should
+		// not see any changes meaning double apply without any changes
+		// should report no changes to apply.
+		verifyNoChangesToApply(t, executor, updateDir)
+	})
 }
 
-func verifyNoDiffAfterMigration(t *testing.T, executor *CmdExecutor, migratedDir string) {
+func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 	t.Helper()
 
-	// we only verify no diff after migration for the update directory, as the last apply was run on it
-	output, err := executor.Execute(cliBinPath, "apply", "-l", filepath.Join(migratedDir, "update"), "--dry-run", "--confirm=false")
-	require.NoError(t, err, "Dry run failed for update: %s", string(output))
-	assert.Contains(t, string(output), "No changes to apply", "Expected no diff after migration, but got: %s", string(output))
+	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
+	// applied; otherwise the file-only variable would be undefined and the dry run would error.
+	var (
+		output []byte
+		err    error
+	)
+	deadline := time.Now().Add(upstreamConsistencyTimeout)
+	for {
+		output, err = executor.Execute(
+			cliBinPath,
+			"apply",
+			"-l",
+			path,
+			"--var-file",
+			varFilePath,
+			"--dry-run",
+			"--confirm=false",
+		)
+		if err == nil && strings.Contains(string(output), "No changes to apply") {
+			return
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(upstreamConsistencyPollInterval)
+	}
+
+	require.NoError(t, err, "Dry run failed for %s: %s", path, string(output))
+	assert.Contains(t, string(output), "No changes to apply", "Expected no diff for %s, but got: %s", path, string(output))
 }
 
 func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir string) string {
@@ -76,7 +140,9 @@ func copyAndMigrateProject(t *testing.T, executor *CmdExecutor, projectDir strin
 		out, err := exec.Command("cp", "-r", src, dst).CombinedOutput()
 		require.NoError(t, err, "Failed to copy %s to %s: %s", src, dst, string(out))
 
-		output, err := executor.Execute(cliBinPath, "migrate", "-l", dst, "--confirm=false")
+		// migrate substitutes {{ .VAR }} placeholders too, so it needs the var file
+		// to resolve the file-only variable.
+		output, err := executor.Execute(cliBinPath, "migrate", "-l", dst, "--var-file", varFilePath, "--confirm=false")
 		require.NoError(t, err, "Migration failed for %s: %s", dir, string(output))
 	}
 
@@ -125,6 +191,7 @@ func verifyState(t *testing.T, dir string) {
 			"events[0].properties[1].id",
 			"events[0].properties[2].id",
 			"events[0].properties[3].id",
+			"events[0].properties[4].id",
 			"events[0].id",
 			"events[0].createdAt",
 			"events[0].updatedAt",
@@ -167,6 +234,7 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].properties[2].properties[0].properties[1].id",
 			"events[2].properties[2].properties[0].properties[0].properties[0].id",
 			"events[2].properties[2].properties[0].properties[0].properties[1].id",
+			"events[2].properties[3].id",
 			"events[1].properties[2].id",
 			"events[1].properties[3].id",
 			"events[1].variants[0].discriminator",
@@ -192,6 +260,17 @@ func verifyState(t *testing.T, dir string) {
 			"events[2].categoryId",
 		},
 	)
-	err = upstreamTester.SnapshotTest(context.Background())
+	deadline := time.Now().Add(upstreamConsistencyTimeout)
+	for {
+		err = upstreamTester.SnapshotTest(context.Background())
+		if err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(upstreamConsistencyPollInterval)
+	}
+
 	assert.NoError(t, err, "Upstream state verification failed")
 }

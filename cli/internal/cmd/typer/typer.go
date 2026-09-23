@@ -3,16 +3,22 @@ package typer
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/api/client/catalog"
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
 	"github.com/spf13/cobra"
+)
+
+const (
+	platformKotlin     = "kotlin"
+	platformSwift      = "swift"
+	platformTypeScript = "typescript"
 )
 
 func NewCmdTyper() *cobra.Command {
@@ -34,43 +40,48 @@ func newCmdGenerate() *cobra.Command {
 	var platform string
 	var outputDir string
 	var options []string
+	var local bool
+	var location string
 
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "Generate type-safe code from tracking plan",
 		Long:  "Generate type-safe code from a RudderStack tracking plan",
+		Example: heredoc.Doc(`
+			$ rudder-cli typer generate --tracking-plan-id <id> --platform kotlin
+			$ rudder-cli typer generate --local --location ./project --platform kotlin
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if trackingPlanID == "" {
-				return fmt.Errorf("tracking-plan-id is required")
-			}
-
-			if platform != "kotlin" {
-				return fmt.Errorf("unsupported platform: %s (supported platforms: kotlin)", platform)
+			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true, platformTypeScript: true}
+			if !validPlatforms[platform] {
+				supported := make([]string, 0, len(validPlatforms))
+				for p := range validPlatforms {
+					supported = append(supported, p)
+				}
+				sort.Strings(supported)
+				return fmt.Errorf("unsupported platform: %s (supported platforms: %s)", platform, strings.Join(supported, ", "))
 			}
 
 			defer func() {
 				telemetry.TrackCommand("typer", nil, []telemetry.KV{
 					{K: "platform", V: platform},
+					{K: "local", V: local},
 				}...)
 			}()
 
-			deps, err := app.NewDeps()
-			if err != nil {
-				return fmt.Errorf("failed to initialize dependencies: %w", err)
-			}
-
-			client := deps.Client()
-
-			cfg := config.GetConfig()
-			dataCatalogClient, err := catalog.NewRudderDataCatalog(
-				client,
-				catalog.WithConcurrency(cfg.Concurrency.CatalogClient),
+			var (
+				planProvider typer.PlanProvider
+				err          error
 			)
+			if local {
+				planProvider, err = providers.NewLocalCatalogPlanProviderForProject(location, trackingPlanID)
+			} else {
+				planProvider, err = providers.NewRemoteCatalogPlanProvider(trackingPlanID)
+			}
 			if err != nil {
-				return fmt.Errorf("failed to initialize data catalog client: %w", err)
+				return err
 			}
 
-			planProvider := providers.NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient)
 			rudderTyper := typer.NewRudderTyper(planProvider)
 
 			// Parse platform-specific options from key=value pairs
@@ -83,18 +94,19 @@ func newCmdGenerate() *cobra.Command {
 				PlatformOptions:  platformOptions,
 			}
 
-			ctx := context.Background()
-			return rudderTyper.Generate(ctx, genOptions)
+			return rudderTyper.Generate(context.Background(), genOptions)
 		},
 	}
 
-	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from")
-	cmd.MarkFlagRequired("tracking-plan-id")
+	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from (remote), or local id of the plan in the specs (with --local)")
 
-	cmd.Flags().StringVar(&platform, "platform", "kotlin", "Platform to generate code for (kotlin)")
+	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s, %s)", platformKotlin, platformSwift, platformTypeScript))
 	cmd.MarkFlagRequired("platform")
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
+
+	cmd.Flags().BoolVar(&local, "local", false, "Generate from local specs instead of the remote workspace (no workspace, apply, auth or network needed)")
+	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory or spec file (used with --local)")
 
 	cmd.Flags().StringArrayVar(&options, "option", []string{},
 		"Platform-specific options in key=value format (use 'rudder-cli typer options <platform>' to see available options)")

@@ -4,11 +4,14 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -147,18 +150,19 @@ type LifecycleManager interface {
 // This is used during import operations to create spec files, and other related files, from existing remote resources.
 type Exporter interface {
 	// FormatForExport converts a resource collection into formattable entities that can be
-	// written as configuration files.
+	// written as configuration files, plus the import-manifest entries each resource
+	// contributes. Implementations still embed inline metadata.import into the emitted
+	// specs; the returned ImportEntry slice carries the same URN → remote-ID mappings so
+	// the importer can aggregate them into a single import-manifest.
 	//
 	// The idNamer generates human-readable identifiers for resources in the generated files.
 	// The resolver handles reference resolution, converting remote IDs into local references
 	// where appropriate (e.g., referencing other imported or existing resources).
-	//
-	// Returns a slice of entities that can be formatted and written to disk.
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		resolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 // SpecMigrator handles migration of project specifications from one version to another.
@@ -175,6 +179,17 @@ type ConsolidateSyncer interface {
 	// For transformations: batch publishes all modified resources
 	// For other providers: no-op (return nil)
 	ConsolidateSync(ctx context.Context, graph *resources.Graph, state *state.State) error
+}
+
+// ImportManifestLoader receives a single workspace's import metadata after all
+// manifest specs have been loaded and scoped to the active workspace. It is
+// implemented by resource providers that populate their internal import-metadata
+// state from a central import-manifest file instead of, or in addition to, inline
+// metadata.import blocks on resource specs.
+//
+// LoadImportManifest delegates to the underlying handlers' LoadImportMetadata.
+type ImportManifestLoader interface {
+	LoadImportManifest(m *specs.WorkspaceImportMetadata) error
 }
 
 // RuleProvider is an optional interface that providers can implement
@@ -200,6 +215,22 @@ type RuleProvider interface {
 	// Rule IDs should follow convention: "<provider>/<kind>/<rule-name>"
 	// Example: "datacatalog/events/valid-property-ref"
 	SemanticRules() []rules.Rule
+
+	// RuleDocEntries returns authored YAML documentation fragments for this
+	// provider's rules. Returns nil until a provider populates real doc data.
+	RuleDocEntries() []docs.RuleDocEntry
+}
+
+// ResourceMatcherProvider exposes the uniqueness matchers used by
+// `import workspace --merge` to link unmanaged remote resources to existing
+// local project resources.
+//
+// Matchers are returned in resolution order — parents before children — so
+// matchers for child types can rely on parent matches being recorded already.
+// An empty or nil result means the provider does not support smart import:
+// its resources keep namer-generated identities.
+type ResourceMatcherProvider interface {
+	ResourceMatchers() []importmatcher.Matcher
 }
 
 // Provider is the complete interface that all providers must implement.
@@ -230,4 +261,6 @@ type Provider interface {
 	SpecMigrator
 	ConsolidateSyncer
 	RuleProvider
+	ImportManifestLoader
+	ResourceMatcherProvider
 }

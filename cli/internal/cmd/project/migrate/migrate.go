@@ -5,8 +5,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +19,7 @@ func NewCmdMigrate() *cobra.Command {
 		location string
 		confirm  bool
 		proj     project.Project
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -41,8 +44,16 @@ func NewCmdMigrate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
+			// Wire variable substitution so specs containing {{ .VAR }} placeholders
+			// resolve before they are validated and migrated; otherwise migration of a
+			// project that uses substitution would fail on the literal tokens.
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
 			// Validate project before migration
-			proj = deps.NewProject()
+			proj = deps.NewProject(projectOpts...)
 			if err := proj.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
 			}
@@ -50,14 +61,29 @@ func NewCmdMigrate() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Create migrator and run migration
+			defer func() {
+				telemetry.TrackCommand("migrate", err, migrateTelemetryExtras(location, confirm)...)
+			}()
+
 			m := migrator.New(proj, deps.CompositeProvider())
-			return m.Migrate(confirm)
+			err = m.Migrate(confirm)
+			return err
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
+}
+
+// migrateTelemetryExtras returns TrackCommand key-values for migrate (fixed from/to spec versions for this path).
+func migrateTelemetryExtras(location string, confirm bool) []telemetry.KV {
+	return []telemetry.KV{
+		{K: "location", V: location},
+		{K: "confirm", V: confirm},
+		{K: "from_version", V: specs.SpecVersionV0_1},
+		{K: "to_version", V: specs.SpecVersionV1},
+	}
 }

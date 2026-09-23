@@ -1,0 +1,120 @@
+rule_id: "project/duplicate-urn"
+match_behavior:
+  - applies_to:
+      - kind: "categories"
+        version: "rudder/0.1"
+      - kind: "categories"
+        version: "rudder/v0.1"
+      - kind: "categories"
+        version: "rudder/v1"
+      - kind: "custom-types"
+        version: "rudder/0.1"
+      - kind: "custom-types"
+        version: "rudder/v0.1"
+      - kind: "custom-types"
+        version: "rudder/v1"
+      - kind: "data-graph"
+        version: "rudder/v1"
+      - kind: "event-stream-connections"
+        version: "rudder/v1"
+      - kind: "event-stream-source"
+        version: "rudder/0.1"
+      - kind: "event-stream-source"
+        version: "rudder/v0.1"
+      - kind: "event-stream-source"
+        version: "rudder/v1"
+      - kind: "events"
+        version: "rudder/0.1"
+      - kind: "events"
+        version: "rudder/v0.1"
+      - kind: "events"
+        version: "rudder/v1"
+      - kind: "properties"
+        version: "rudder/0.1"
+      - kind: "properties"
+        version: "rudder/v0.1"
+      - kind: "properties"
+        version: "rudder/v1"
+      - kind: "retl-connections"
+        version: "rudder/v1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/0.1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/v0.1"
+      - kind: "retl-source-sql-model"
+        version: "rudder/v1"
+      - kind: "retl-source-table"
+        version: "rudder/v1"
+      - kind: "tp"
+        version: "rudder/0.1"
+      - kind: "tp"
+        version: "rudder/v0.1"
+      - kind: "tracking-plan"
+        version: "rudder/v1"
+      - kind: "transformation"
+        version: "rudder/v1"
+      - kind: "transformation-library"
+        version: "rudder/v1"
+      - kind: "destination"
+        version: "rudder/v1"
+      - kind: "account"
+        version: "rudder/v1"
+    valid:
+      - example_id: "duplicate-urn-distinct-urns"
+        title: "Distinct URNs across files"
+        description: >
+          Two specs that each declare a different resource. The URNs do not
+          collide, so the project is valid.
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events-a
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+          b.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events-b
+            spec:
+              events:
+                - id: cart_viewed
+                  name: Cart Viewed
+    invalid:
+      - example_id: "duplicate-urn-across-files"
+        title: "Same URN declared in two files"
+        description: >
+          Both files declare an event with id "order_completed", which resolves
+          to the same URN. The rule flags every occurrence.
+        files:
+          a.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events-a
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed
+          b.yaml: |
+            version: rudder/v1
+            kind: events
+            metadata:
+              name: events-b
+            spec:
+              events:
+                - id: order_completed
+                  name: Order Completed (duplicate)
+        expected_diagnostics:
+          - file: "a.yaml"
+            reference: "/spec/events/0/id"
+            severity: "error"
+            message_contains: "duplicate URN 'event:order_completed'"
+          - file: "b.yaml"
+            reference: "/spec/events/0/id"
+            severity: "error"
+            message_contains: "duplicate URN 'event:order_completed'"

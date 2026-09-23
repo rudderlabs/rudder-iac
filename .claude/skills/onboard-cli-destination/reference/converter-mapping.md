@@ -1,0 +1,119 @@
+# Converter Mapping Cookbook
+
+Porting terraform `configs.ConfigProperty` lists to the CLI
+`definitions/converter` package. The CLI package was modeled on the terraform
+one, so most calls port 1:1 — only the second argument's meaning changes from
+"terraform key" to "local YAML key" (both snake_case, usually identical).
+
+Package: `cli/internal/providers/destination/definitions/converter`
+
+## Helper translation table
+
+| Terraform (`rudderstack/configs`) | CLI (`definitions/converter`) | Notes |
+| --- | --- | --- |
+| `c.Simple(apiKey, tfKey, filters...)` | `converter.Simple(apiKey, localKey)` | Port **without** filters — see "Do not skip zero values" below. Terraform's `filters...` (`SkipZeroValue` etc.) are intentionally dropped for destination config |
+| `c.SkipZeroValue` | **do not port** | Would omit zero values / empty slices from the API config and cause phantom, non-converging diffs. See "Do not skip zero values" below |
+| `c.Conditional(apiKey, tfKey, cond)` | `converter.Conditional(apiKey, localKey, cond)` | Identical |
+| `c.Equals(key, value)` | `converter.Equals(key, value)` | Identical |
+| `c.Discriminator(apiKey, values)` | `converter.Discriminator(apiKey, values)` | Identical; `DiscriminatorValues` = `map[string]any` keyed by local key |
+| `c.ArrayWithStrings(rootAPIKey, nestedField, tfKey)` | `converter.ArrayWithStrings(rootAPIKey, nestedField, localKey)` | Identical: `["a"]` ↔ `[{nestedField: "a"}]` |
+| `c.ArrayWithObjects(rootAPIKey, tfKey, fields)` | `converter.ArrayWithObjects(rootAPIKey, localKey, fields)` | Identical; `fields` maps API field → local field name (string) or `converter.APINestedObject{LocalKey, NestedKey}` |
+| `c.Negated(apiKey, tfKey)` | **no equivalent** | Rare. If needed, add `Negated` to the converter package (mirror the terraform implementation) rather than inlining a custom `ConfigProperty` in the definition |
+| `GetCommonConfigMeta(sourceTypes)` | `common.Properties(sourceTypes)` | Consent management; CLI takes **local** source types |
+| — (no terraform equivalent) | `converter.Gated(prop, sourceTypes...)` | Wrapper, not a mapping: restricts the property's local key to the given **local** source types. Use when db-config `destConfig` lists the API key only under specific source types (see source-extraction.md). Wraps any constructor except `Discriminator` (no local key — registry rejects it) |
+
+## Do not skip zero values
+
+**Port every `converter.Simple` bare — no `SkipZeroValue` or other value
+filters**, even where terraform uses `c.SkipZeroValue`. Skipping empty values
+from the API config produces phantom diffs that never converge. Enforce presence
+through validation instead: `required` / `required_if` struct tags for fields
+that must not be empty, `omitempty` / `*bool` for genuinely optional ones. The
+merged S3 definition passes no filters to any `Simple`; match it.
+
+## Dot-path API keys
+
+gjson/sjson paths work the same in both: dotted API keys such as
+`"connectionMode.web"` write/read nested API objects. Terraform's local side may
+use TF list indexing for nested blocks; the CLI local side is plain YAML nesting,
+so use dotted local paths such as `"connection_mode.web"`.
+
+## Common patterns
+
+Simple field:
+
+```go
+converter.Simple("prefix", "prefix")
+```
+
+Whitelist/blacklist with discriminator (GA4-style). The local keys are the
+nested `event_filtering.{whitelist,blacklist}` block — the fleet convention —
+backed by a config struct whose two fields carry `excluded_with` on each other
+so both lists can never be set at once (the Discriminator ranges over a map, so
+with both set the derived `eventFilteringOption` would be non-deterministic):
+
+```go
+converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
+}),
+```
+
+When upstream scopes the same keys per source type (iterable declares
+`whitelistedEvents.web` / `eventFilteringOption.web`), keep the identical local
+`event_filtering` block and express the scoping in the converters instead:
+dotted API keys plus `Gated` on the two arrays. The Discriminator stays ungated
+— it has no local key, and the lists it derives from carry the gate:
+
+```go
+converter.Gated(
+    converter.ArrayWithStrings("whitelistedEvents.web", "eventName", "event_filtering.whitelist"),
+    common.SourceTypeWeb,
+),
+converter.Gated(
+    converter.ArrayWithStrings("blacklistedEvents.web", "eventName", "event_filtering.blacklist"),
+    common.SourceTypeWeb,
+),
+converter.Discriminator("eventFilteringOption.web", converter.DiscriminatorValues{
+    "event_filtering.whitelist": "whitelistedEvents",
+    "event_filtering.blacklist": "blacklistedEvents",
+}),
+```
+
+Never model `eventFilteringOption` (scoped or not) as a user-set field — it is
+always derived, so the backend default applies and inconsistent states (option
+set with no list, or contradicting the list) stay unrepresentable.
+
+List of objects with field rename:
+
+```go
+converter.ArrayWithObjects("piiPropertiesToIgnore", "pii_property", map[string]any{
+    "piiProperty": "pii_property_name",
+})
+```
+
+Same-shape list (no rename needed, e.g. webhook headers `{from, to}`):
+
+```go
+converter.Simple("headers", "headers")
+```
+
+## Config struct fields for each property shape
+
+The converter maps values; the config struct validates them. Shapes must
+agree with what the YAML holds locally:
+
+| Local YAML shape | Struct field type |
+| --- | --- |
+| scalar string | `string` |
+| optional bool | `*bool` |
+| required bool (gates conditionals) | `*bool` + `validate:"required"` |
+| string list (`ArrayWithStrings` local side) | `[]string` |
+| object list | `[]struct{...}` with `mapstructure` tags per field, `validate:"omitempty,dive"` on the slice |
+| consent block | `common.ConsentManagement` tagged `mapstructure:"consent_management"` (mandatory type) |
+| connection mode block (see source-extraction.md) | `common.ConnectionMode` tagged `mapstructure:"connection_mode"` (mandatory type, same as consent; convention, not registry-enforced) |
+
+Unknown local keys are rejected by the validator automatically — the struct
+is the closed allowlist, so every mapped property needs a struct field.

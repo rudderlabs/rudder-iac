@@ -1,7 +1,6 @@
 package testorchestrator
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,14 +18,14 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		local.AddResource(newTransResource("t1", "Trans 1", "code-v1"))
 		local.AddResource(newTransResource("t2", "Trans 2", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Len(t, plan.TestUnits, 2)
 	})
 
 	t.Run("empty graph produces empty plan", func(t *testing.T) {
-		plan, err := NewPlanner(resources.NewGraph()).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(resources.NewGraph()).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -41,7 +40,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		local.AddResource(trans)
 		local.AddDependency(trans.URN(), lib.URN())
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Len(t, plan.TestUnits, 1)
@@ -52,7 +51,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		local := resources.NewGraph()
 		local.AddResource(newLibResource("lib-1", "Lib", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -71,7 +70,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		local.AddDependency(trans.URN(), lib1.URN())
 		local.AddDependency(trans.URN(), lib2.URN())
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -82,7 +81,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		local := resources.NewGraph()
 		local.AddResource(newTransResource("t1", "Trans", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -94,7 +93,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newTransResource("t1", "Trans", "same-code"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -106,7 +105,7 @@ func TestBuildPlan_ModeAll(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newTransResource("t1", "Trans", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeAll, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeAll, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -124,7 +123,7 @@ func TestBuildPlan_ModeModified(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newTransResource("t1", "Trans 1", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeModified, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeModified, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -137,7 +136,7 @@ func TestBuildPlan_ModeModified(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newTransResource("t1", "Trans", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeModified, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeModified, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -158,7 +157,7 @@ func TestBuildPlan_ModeModified(t *testing.T) {
 		remote.AddResource(remoteTrans)
 		remote.AddDependency(remoteTrans.URN(), remoteLib.URN())
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeModified, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeModified, "", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -171,7 +170,7 @@ func TestBuildPlan_ModeModified(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newLibResource("lib-1", "Lib", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeModified, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeModified, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -185,7 +184,7 @@ func TestBuildPlan_ModeModified(t *testing.T) {
 		remote := resources.NewGraph()
 		remote.AddResource(newTransResource("t1", "Trans", "same-code"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), remote, ModeModified, "", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(remote, ModeModified, "", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -201,7 +200,7 @@ func TestBuildPlan_ModeSingle(t *testing.T) {
 		local.AddResource(newTransResource("t1", "Trans 1", "code-v1"))
 		local.AddResource(newTransResource("t2", "Trans 2", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeSingle, "t1", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeSingle, "t1", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -219,7 +218,7 @@ func TestBuildPlan_ModeSingle(t *testing.T) {
 		local.AddDependency(t1.URN(), lib.URN())
 		// t2 does NOT depend on lib
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeSingle, "lib-1", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeSingle, "lib-1", "ws-1")
 
 		require.NoError(t, err)
 		require.Len(t, plan.TestUnits, 1)
@@ -230,7 +229,7 @@ func TestBuildPlan_ModeSingle(t *testing.T) {
 		local := resources.NewGraph()
 		local.AddResource(newLibResource("lib-1", "Lib", "code-v1"))
 
-		plan, err := NewPlanner(local).BuildPlan(context.Background(), resources.NewGraph(), ModeSingle, "lib-1", "ws-1")
+		plan, err := NewPlanner(local).BuildPlan(resources.NewGraph(), ModeSingle, "lib-1", "ws-1")
 
 		require.NoError(t, err)
 		assert.Empty(t, plan.TestUnits)
@@ -239,7 +238,7 @@ func TestBuildPlan_ModeSingle(t *testing.T) {
 	})
 
 	t.Run("unknown ID returns error", func(t *testing.T) {
-		plan, err := NewPlanner(resources.NewGraph()).BuildPlan(context.Background(), resources.NewGraph(), ModeSingle, "no-such-id", "ws-1")
+		plan, err := NewPlanner(resources.NewGraph()).BuildPlan(resources.NewGraph(), ModeSingle, "no-such-id", "ws-1")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no-such-id")

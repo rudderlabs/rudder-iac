@@ -1,0 +1,29 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "statsig",
+  "name": "E2E Statsig Updated",
+  "type": "STATSIG",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "consentManagement": {
+      "web": [
+        {
+          "provider": "oneTrust",
+          "consents": [
+            {
+              "consent": "analytics"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

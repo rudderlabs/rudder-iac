@@ -1,0 +1,52 @@
+{{- if .Comment }}
+/// {{ escapeComment .Comment }}
+{{- end }}
+{{- /*
+    Variant enums represent discriminated unions — each case has a different payload struct.
+    Payload structs are nested inside the enum (unlike Kotlin where they are top-level).
+    `case other(Default)` is always generated as a required fallback so switch statements
+    remain exhaustive even when new variants are added to the Tracking Plan.
+    `discriminator` exposes the tag value for consumer code.
+    `toProperties()` delegates to the matched payload struct.
+*/}}
+public enum {{ .Name }} {
+{{- range .Cases }}
+{{- if .Comment }}
+    /// {{ escapeComment .Comment }}
+{{- end }}
+{{- if .IsDefault }}
+    case other(Default)
+{{- else }}
+    case {{ .Name }}({{ .PayloadType }})
+{{- end }}
+{{- end }}
+
+{{- range .PayloadStructs }}
+{{ include "structwithindent" (mkSlice 1 .) | indent 1 }}
+{{- end }}
+
+    public var discriminator: String {
+        switch self {
+{{- range .Cases }}
+{{- if .IsDefault }}
+        case .other: return ""
+{{- else }}
+        case .{{ .Name }}: return {{ formatLiteral .DiscriminatorValue }}
+{{- end }}
+{{- end }}
+        }
+    }
+
+    public func toProperties() -> [String: Any] {
+        switch self {
+{{- range .Cases }}
+{{- if .IsDefault }}
+        case .other(let data): return data.toProperties()
+{{- else }}
+        case .{{ .Name }}(let data): return data.toProperties()
+{{- end }}
+{{- end }}
+        }
+    }
+}
+{{- "" -}}

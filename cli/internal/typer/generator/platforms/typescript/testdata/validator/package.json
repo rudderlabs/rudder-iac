@@ -1,0 +1,28 @@
+{
+  "name": "rudder-typer-typescript-validator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Validator project for the TypeScript Rudder Typer generator. Imports the generated RudderTyper.ts, instantiates @rudderstack/analytics-js, and asserts on dispatched events via network-level interception (MSW).",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rudderstack/analytics-js": "3.31.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.39",
+    "happy-dom": "20.9.0",
+    "msw": "2.13.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  }
+}

@@ -8,8 +8,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
-	libraryhandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 )
@@ -78,7 +78,7 @@ func NewLibrarySpecSyntaxValidRule() rules.Rule {
 		"transformation library spec syntax must be valid",
 		rules.Examples{},
 		prules.NewPathAwarePatternValidator(
-			prules.V1VersionPatterns(libraryhandler.HandlerMetadata.SpecKind),
+			prules.V1VersionPatterns(ttypes.LibrarySpecKind),
 			validateLibrarySpec,
 		),
 	)

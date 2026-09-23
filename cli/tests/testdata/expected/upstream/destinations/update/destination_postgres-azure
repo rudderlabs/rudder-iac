@@ -1,0 +1,32 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "postgres-azure",
+  "name": "E2E Postgres Azure Updated",
+  "type": "POSTGRES",
+  "enabled": true,
+  "config": {
+    "accountName": "ruddercliE2e",
+    "bucketProvider": "AZURE_BLOB",
+    "containerName": "rudder-cli-e2e-updated",
+    "database": "analytics",
+    "host": "postgres-azure.rudder-cli-e2e.internal",
+    "namespace": "rudder_e2e_azure_updated",
+    "port": "5432",
+    "sslMode": "disable",
+    "syncFrequency": "360",
+    "useRudderStorage": false,
+    "useSASTokens": true,
+    "user": "rudderCliE2ePostgresAzureUser",
+    "useSSH": false,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "preferAppend": true,
+    "allowUsersContextTraits": false,
+    "underscoreDivideNumbers": false,
+    "cleanupObjectStorageFiles": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

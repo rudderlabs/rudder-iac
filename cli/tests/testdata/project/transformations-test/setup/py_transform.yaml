@@ -13,3 +13,7 @@ spec:
         props["source"] = "rudder"
         event["properties"] = props
         return event
+  tests:
+    - name: py_transform_setup
+      input: ./input/py_transform
+      output: ./output/py_transform

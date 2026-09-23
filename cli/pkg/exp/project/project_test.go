@@ -10,7 +10,12 @@ import (
 )
 
 func TestProjectLoad(t *testing.T) {
-	t.Setenv("RUDDERSTACK_X_TRANSFORMATIONS", "true")
+	// The create fixtures keep the two api_tracking fields as {{ .VAR }}
+	// placeholders. project.Load() resolves them from RUDDER_* env vars, so
+	// supply the values here; the e2e suite passes the same ones via the
+	// --var-file at tests/testdata/project/substitution.vars.yaml.
+	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
+	t.Setenv("RUDDER_API_TRACKING_DESCRIPTION", "This event is triggered every time a user views a product.")
 
 	t.Run("Load project and verify resource graph", func(t *testing.T) {
 		graph, err := project.Load(context.Background(), "../../../tests/testdata/project/create")

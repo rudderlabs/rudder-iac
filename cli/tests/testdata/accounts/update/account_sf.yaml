@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: prod-sf
+spec:
+  id: prod-sf
+  name: Production Snowflake
+  account_definition_name: SOURCE_SNOWFLAKE
+  config:
+    account: xy12345.eu-west-1
+    dbname: ANALYTICS
+    warehouse: TRANSFORMING_WH
+    user: RUDDER
+    role: RUDDER_ROLE
+    authenticationType: keyPair
+    privateKey: "{{ .SF_KEYPAIR }}"
+    privateKeyPassphrase: "{{ .SF_KEYPAIR_PHRASE }}"

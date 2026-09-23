@@ -1,0 +1,21 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "externalId": "prod-sf",
+  "name": "Production Snowflake",
+  "definition": {
+    "name": "SOURCE_SNOWFLAKE",
+    "type": "snowflake",
+    "category": "source"
+  },
+  "options": {
+    "account": "xy12345.eu-west-1",
+    "dbname": "ANALYTICS",
+    "warehouse": "TRANSFORMING_WH",
+    "user": "RUDDER",
+    "role": "RUDDER_ROLE",
+    "authenticationType": "keyPair"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

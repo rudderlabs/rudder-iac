@@ -9,6 +9,7 @@ const (
 	NameKey             = "name"
 	EnabledKey          = "enabled"
 	SourceDefinitionKey = "type"
+	ExternalIDKey       = "externalId"
 
 	TrackKey              = "track"
 	IdentifyKey           = "identify"
@@ -61,6 +62,8 @@ var sourceDefinitions = []string{
 	"node",
 	"ruby",
 	"unity",
+	"ios_swift",
+	"android_kotlin",
 }
 
 // SourceSpec mirrors the YAML spec structure. JSON tags enable the typed rule engine's
@@ -69,7 +72,7 @@ var sourceDefinitions = []string{
 type SourceSpec struct {
 	LocalID          string                `json:"id"         mapstructure:"id"         validate:"required"`
 	Name             string                `json:"name"       mapstructure:"name"       validate:"required"`
-	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity"`
+	SourceDefinition string                `json:"type"       mapstructure:"type"       validate:"required,oneof=java dotnet php flutter cordova rust react_native python ios android javascript go node ruby unity ios_swift android_kotlin"`
 	Enabled          *bool                 `json:"enabled"    mapstructure:"enabled"`
 	Governance       *SourceGovernanceSpec `json:"governance" mapstructure:"governance"`
 }
@@ -98,7 +101,7 @@ type EventConfigSpec struct {
 }
 
 type TrackConfigSpec struct {
-	EventConfigSpec         `mapstructure:",squash"`
+	EventConfigSpec     `mapstructure:",squash"`
 	DropUnplannedEvents *bool `json:"drop_unplanned_events" mapstructure:"drop_unplanned_events"`
 }
 

@@ -1,0 +1,201 @@
+package facebookpixel
+
+import (
+	"reflect"
+
+	"github.com/go-playground/validator/v10"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+)
+
+// Source types from integrations-config destinations/facebook_pixel/db-config.json.
+var sourceTypes = []string{
+	common.SourceTypeAndroid,
+	common.SourceTypeAndroidKotlin,
+	common.SourceTypeIOS,
+	common.SourceTypeIOSSwift,
+	common.SourceTypeWeb,
+	common.SourceTypeUnity,
+	common.SourceTypeCloud,
+	common.SourceTypeReactNative,
+	common.SourceTypeFlutter,
+	common.SourceTypeCordova,
+}
+
+var connectionModes = map[string][]string{
+	common.SourceTypeAndroid:       {"cloud"},
+	common.SourceTypeAndroidKotlin: {"cloud"},
+	common.SourceTypeIOS:           {"cloud"},
+	common.SourceTypeIOSSwift:      {"cloud"},
+	common.SourceTypeWeb:           {"cloud", "device"},
+	common.SourceTypeUnity:         {"cloud"},
+	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeReactNative:   {"cloud"},
+	common.SourceTypeFlutter:       {"cloud"},
+	common.SourceTypeCordova:       {"cloud"},
+}
+
+type eventMapping struct {
+	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
+}
+
+type piiDenylistEntry struct {
+	Property string `mapstructure:"property" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	Hash     *bool  `mapstructure:"hash"`
+}
+
+type piiAllowlistEntry struct {
+	Property string `mapstructure:"property" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+}
+
+type eventFiltering struct {
+	Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist,dive,dynamic_or_pattern=single_line_100"`
+	Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist,dive,dynamic_or_pattern=single_line_100"`
+}
+
+type webBool struct {
+	Web *bool `mapstructure:"web"`
+}
+
+type legacyConversionPixelMapping struct {
+	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+}
+
+// facebookPixelConfig is the local YAML config model. Field set mirrors
+// integrations-config destinations/facebook_pixel schema/defaultConfig;
+// validation constraints mirror schema.json where present.
+type facebookPixelConfig struct {
+	PixelID                 string                         `mapstructure:"pixel_id" validate:"required,dynamic_or_pattern=single_line_100"`
+	AccessToken             string                         `mapstructure:"access_token" validate:"facebook_pixel_access_token_required,omitempty,dynamic_or_pattern=single_line_300"`
+	StandardPageCall        *bool                          `mapstructure:"standard_page_call" default:"false"`
+	ValueFieldIdentifier    string                         `mapstructure:"value_field_identifier" validate:"omitempty,oneof=properties.value properties.price" default:"properties.price"`
+	AdvancedMapping         *bool                          `mapstructure:"advanced_mapping" default:"false"`
+	LimitedDataUsage        *bool                          `mapstructure:"limited_data_usage" default:"false"`
+	TestDestination         *bool                          `mapstructure:"test_destination" default:"false"`
+	TestEventCode           string                         `mapstructure:"test_event_code" validate:"omitempty,dynamic_or_pattern=single_line_100"`
+	RemoveExternalID        *bool                          `mapstructure:"remove_external_id" default:"false"`
+	UseUpdatedMapping       *bool                          `mapstructure:"use_updated_mapping" default:"false"`
+	EventsToEvents          []eventMapping                 `mapstructure:"events_to_events" validate:"omitempty,dive"`
+	BlacklistPIIProperties  []piiDenylistEntry             `mapstructure:"blacklist_pii_properties" validate:"omitempty,dive"`
+	WhitelistPIIProperties  []piiAllowlistEntry            `mapstructure:"whitelist_pii_properties" validate:"omitempty,dive"`
+	EventFiltering          *eventFiltering                `mapstructure:"event_filtering"`
+	AutoConfig              webBool                        `mapstructure:"auto_config"`
+	LegacyConversionPixelID []legacyConversionPixelMapping `mapstructure:"legacy_conversion_pixel_id" validate:"omitempty,dive"`
+	ConnectionMode          common.ConnectionMode          `mapstructure:"connection_mode"`
+	ConsentManagement       common.ConsentManagement       `mapstructure:"consent_management"`
+}
+
+// schema.json requires accessToken unless connection_mode.web is device: the
+// server-side conversions API needs a token, the pure device-mode pixel does
+// not. The condition is keyed on a map entry, which required_if cannot resolve,
+// so it reads the sibling off FieldLevel.Parent(). The tag precedes omitempty,
+// which would otherwise short-circuit it on the empty value being rejected.
+func accessTokenConditional(fl validator.FieldLevel) bool {
+	parent := fl.Parent()
+	if parent.Kind() == reflect.Pointer {
+		parent = parent.Elem()
+	}
+
+	field := parent.FieldByName("ConnectionMode")
+	if !field.IsValid() {
+		return true
+	}
+	connectionMode, _ := field.Interface().(common.ConnectionMode)
+
+	// The schema branch is not-wrapped over "connectionMode present AND, if web
+	// is set, web is device". JSON Schema `properties` constrains only keys that
+	// are present, so an absent web key satisfies it vacuously: a config with
+	// connection_mode {android: cloud} needs no token, while an absent
+	// connection_mode does.
+	if connectionMode != nil {
+		web, ok := connectionMode["web"]
+		if !ok || web == "device" {
+			return true
+		}
+	}
+	return fl.Field().String() != ""
+}
+
+// Connect-time required keys, derived from schema.json's single
+// connectionMode-gated branch: accessToken is required unless web runs in
+// device mode, so every supported pair carries it except (web, device).
+var connectionRequiredKeys = map[string]map[string][]string{
+	common.SourceTypeAndroid:       {"cloud": {"access_token"}},
+	common.SourceTypeAndroidKotlin: {"cloud": {"access_token"}},
+	common.SourceTypeIOS:           {"cloud": {"access_token"}},
+	common.SourceTypeIOSSwift:      {"cloud": {"access_token"}},
+	common.SourceTypeWeb:           {"cloud": {"access_token"}},
+	common.SourceTypeUnity:         {"cloud": {"access_token"}},
+	common.SourceTypeReactNative:   {"cloud": {"access_token"}},
+	common.SourceTypeFlutter:       {"cloud": {"access_token"}},
+	common.SourceTypeCordova:       {"cloud": {"access_token"}},
+	common.SourceTypeCloud:         {"cloud": {"access_token"}},
+}
+
+// NewDefinition returns the Facebook Pixel destination definition.
+func NewDefinition() *definitions.DestinationDefinition {
+	properties := []converter.ConfigProperty{
+		converter.Simple("pixelId", "pixel_id"),
+		converter.Simple("accessToken", "access_token"),
+		converter.Simple("standardPageCall", "standard_page_call"),
+		converter.Simple("valueFieldIdentifier", "value_field_identifier"),
+		converter.Simple("advancedMapping", "advanced_mapping"),
+		converter.Simple("limitedDataUSage", "limited_data_usage"),
+		converter.Simple("testDestination", "test_destination"),
+		converter.Simple("testEventCode", "test_event_code"),
+		converter.Simple("removeExternalId", "remove_external_id"),
+		converter.Simple("useUpdatedMapping", "use_updated_mapping"),
+		converter.ArrayWithObjects("eventsToEvents", "events_to_events", map[string]any{
+			"from": "from",
+			"to":   "to",
+		}),
+		converter.ArrayWithObjects("blacklistPiiProperties", "blacklist_pii_properties", map[string]any{
+			"blacklistPiiProperties": "property",
+			"blacklistPiiHash":       "hash",
+		}),
+		converter.ArrayWithObjects("whitelistPiiProperties", "whitelist_pii_properties", map[string]any{
+			"whitelistPiiProperties": "property",
+		}),
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
+		}),
+		converter.Gated(
+			converter.Simple("autoConfig.web", "auto_config.web"),
+			common.SourceTypeWeb,
+		),
+		converter.Gated(
+			converter.ArrayWithObjects("legacyConversionPixelId.web", "legacy_conversion_pixel_id", map[string]any{
+				"from": "from",
+				"to":   "to",
+			}),
+			common.SourceTypeWeb,
+		),
+	}
+	properties = append(properties, common.ConnectionModeProperties(sourceTypes)...)
+	properties = append(properties, common.Properties(sourceTypes)...)
+
+	return &definitions.DestinationDefinition{
+		Type:       "facebook_pixel",
+		APIType:    "FACEBOOK_PIXEL",
+		Version:    1,
+		Properties: properties,
+		ConfigValidateFuncs: []rules.CustomValidateFunc{
+			{Tag: "facebook_pixel_access_token_required", Func: accessTokenConditional},
+		},
+		SecretKeys: []string{"access_token", "legacy_conversion_pixel_id.to", "pixel_id"},
+		NewConfig: func() any {
+			return &facebookPixelConfig{}
+		},
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
+	}
+}

@@ -1,11 +1,15 @@
 package differ_test
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompareData(t *testing.T) {
@@ -21,7 +25,7 @@ func TestCompareData(t *testing.T) {
 		"key4": "value4",
 	}
 
-	diffs := differ.CompareData(data1, data2)
+	diffs, _ := differ.CompareData(data1, data2)
 
 	assert.Len(t, diffs, 3)
 
@@ -37,6 +41,52 @@ func TestCompareData(t *testing.T) {
 
 	assert.Nil(t, diffs["key4"].SourceValue)
 	assert.Equal(t, diffs["key4"].TargetValue, "value4")
+}
+
+// TestCompareData_ArrayOfObjects guards against the phantom diff where
+// rewriteCompatibleType rewrote only the source side ([]any of objects →
+// []map[string]any), so two equal arrays always failed the type-equality gate.
+// Seen in the wild with destination consent_management blocks (remote state
+// decoded from JSON vs local spec decoded from YAML).
+func TestCompareData_ArrayOfObjects(t *testing.T) {
+	block := func(strategy string) map[string]any {
+		return map[string]any{
+			"web": []any{
+				map[string]any{
+					"provider":            "custom",
+					"resolution_strategy": strategy,
+					"consents":            []any{"test"},
+				},
+			},
+		}
+	}
+
+	t.Run("equal []any-of-objects on both sides do not diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"consent_management": block("and")},
+			resources.ResourceData{"consent_management": block("and")},
+		)
+		assert.Empty(t, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("equal mixed shapes ([]map vs []any of maps) do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []map[string]any{{"k": "v"}}},
+			resources.ResourceData{"items": []any{map[string]any{"k": "v"}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("genuinely different arrays still diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"consent_management": block("and")},
+			resources.ResourceData{"consent_management": block("or")},
+		)
+		assert.Len(t, diffs, 1)
+		assert.Contains(t, diffs, "consent_management")
+		assert.False(t, secretOnly)
+	})
 }
 
 func TestComputeDiff(t *testing.T) {
@@ -65,4 +115,529 @@ func TestComputeDiff(t *testing.T) {
 	assert.Equal(t, diff.UpdatedResources["some-type:r1"], differ.ResourceDiff{URN: "some-type:r1", Diffs: map[string]differ.PropertyDiff{"key2": {Property: "key2", SourceValue: "value2", TargetValue: "value3"}}})
 	assert.Contains(t, diff.RemovedResources, "some-type:r2")
 	assert.Contains(t, diff.UnmodifiedResources, "some-type:r0")
+}
+
+// TestCompareData_Secret covers the secret-aware rules on the Data() path, where
+// the concrete secret.String value lives directly in the resource map. It also
+// asserts the secret-only verdict CompareData returns alongside the diffs.
+// A whole number decodes to int from a YAML spec but to float64 from a JSON API
+// response. Both sides render identically, so an unnormalized comparison reports
+// a diff that reads as "1 => 1" and never settles.
+func TestCompareData_NumberDecodeTypes(t *testing.T) {
+	t.Run("equal numbers from different decode paths do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": float64(1)},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("equal numbers nested in a map do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"sdk_version": map[string]any{"web": 1}},
+			resources.ResourceData{"sdk_version": map[string]any{"web": float64(1)}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("equal numbers inside a slice of objects do not diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []any{map[string]any{"n": 1}}},
+			resources.ResourceData{"items": []any{map[string]any{"n": float64(1)}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("every integer width normalizes", func(t *testing.T) {
+		for _, value := range []any{int8(1), int16(1), int32(1), int64(1), uint(1), uint64(1), float32(1)} {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"n": value},
+				resources.ResourceData{"n": float64(1)},
+			)
+			assert.Emptyf(t, diffs, "%T must compare equal to float64", value)
+		}
+	})
+
+	t.Run("a changed number is still genuine drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": float64(2)},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"web": {Property: "web", SourceValue: float64(1), TargetValue: float64(2)},
+		}, diffs)
+	})
+
+	t.Run("a number replaced by a string is still genuine drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"web": 1},
+			resources.ResourceData{"web": "1"},
+		)
+		require.Contains(t, diffs, "web")
+	})
+}
+
+func TestCompareData_Secret(t *testing.T) {
+	t.Run("equal known secrets do not diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{"token": secret.New("hunter2")},
+		)
+		assert.Empty(t, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("different known secrets diff, flagged Secret, keep both values for masking", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{"token": secret.New("hunter3")},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: secret.New("hunter3"), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("unknown remote always diffs and is flagged Secret", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{"token": secret.NewUnknown()},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: secret.NewUnknown(), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret nested in a map alone makes the map diff secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"config": map[string]any{"token": secret.New("hunter2")}},
+			resources.ResourceData{"config": map[string]any{"token": secret.NewUnknown()}},
+		)
+		require.Contains(t, diffs, "config")
+		assert.True(t, diffs["config"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret nested in a map with a real sibling is a real diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"config": map[string]any{"token": secret.New("hunter2"), "name": "a"}},
+			resources.ResourceData{"config": map[string]any{"token": secret.NewUnknown(), "name": "b"}},
+		)
+		require.Contains(t, diffs, "config")
+		assert.False(t, diffs["config"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("secret inside a slice re-applies every run, classified secret-only, never leaks", func(t *testing.T) {
+		// Slices are compared member-wise, so a nested secret reaches the secret
+		// case like a map-nested one: an unknown remote always diffs (re-applies
+		// every run) but the diff is flagged SecretOnly, keeping non-merge imports
+		// unblocked. Format still masks, so the real value never leaks through the
+		// render path.
+		slices := map[string]struct{ local, remote any }{
+			"[]map[string]any": {
+				local:  []map[string]any{{"token": secret.New("hunter2")}},
+				remote: []map[string]any{{"token": secret.NewUnknown()}},
+			},
+			"[]any": {
+				local:  []any{map[string]any{"token": secret.New("hunter2")}},
+				remote: []any{map[string]any{"token": secret.NewUnknown()}},
+			},
+		}
+		for name, tc := range slices {
+			t.Run(name, func(t *testing.T) {
+				// Two independent compares against the always-unknown remote both
+				// diff: the resource re-applies on every run.
+				for run := 1; run <= 2; run++ {
+					diffs, secretOnly := differ.CompareData(
+						resources.ResourceData{"creds": tc.remote},
+						resources.ResourceData{"creds": tc.local},
+					)
+					require.Contains(t, diffs, "creds", "unknown remote must diff on run %d (re-applied every run)", run)
+					assert.True(t, diffs["creds"].SecretOnly, "slice-nested secret must classify secret-only")
+					assert.True(t, secretOnly)
+
+					rendered := fmt.Sprintf("%v -> %v", diffs["creds"].SourceValue, diffs["creds"].TargetValue)
+					assert.NotContains(t, rendered, "hunter2", "real secret value leaked through render path: %s", rendered)
+				}
+			})
+		}
+	})
+
+	t.Run("slice-nested secret with a real change in the same member is a real diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Trace", "to": secret.NewUnknown()}}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("slice-nested secret with a real change in a sibling member is a real diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{
+				map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")},
+				map[string]any{"from": "content-type", "to": "application/json"},
+			}},
+			resources.ResourceData{"headers": []any{
+				map[string]any{"from": "X-Api-Key", "to": secret.NewUnknown()},
+				map[string]any{"from": "content-type", "to": "text/plain"},
+			}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly, "a real change in one member makes the whole slice a real diff")
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("slice length mismatch is a real diff even with secrets", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{
+				map[string]any{"to": secret.New("hunter2")},
+				map[string]any{"to": secret.New("hunter3")},
+			}},
+			resources.ResourceData{"headers": []any{
+				map[string]any{"to": secret.NewUnknown()},
+			}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.False(t, diffs["headers"].SecretOnly, "adding or removing a member is genuine drift")
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("equal slices with equal known secrets do not diff", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+		)
+		assert.Empty(t, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("mixed slice with non-object members classifies the secret member", func(t *testing.T) {
+		// A scalar member blocks the []any → []map[string]any rewrite, so this
+		// pins the []any path: equal scalar members contribute no diff, and the
+		// secret-bearing member alone keeps the slice secret-only.
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"items": []any{"static", map[string]any{"to": secret.New("hunter2")}}},
+			resources.ResourceData{"items": []any{"static", map[string]any{"to": secret.NewUnknown()}}},
+		)
+		require.Contains(t, diffs, "items")
+		assert.True(t, diffs["items"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret present in only one side's member is secret-only", func(t *testing.T) {
+		// Presence-based wrapping omits keys the API strips: the remote member has
+		// no "to" at all. The member diff is still secret-driven, not drift.
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key", "to": secret.New("hunter2")}}},
+			resources.ResourceData{"headers": []any{map[string]any{"from": "X-Api-Key"}}},
+		)
+		require.Contains(t, diffs, "headers")
+		assert.True(t, diffs["headers"].SecretOnly)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("pointer flavor mirrors value flavor", func(t *testing.T) {
+		local, remote := secret.New("hunter2"), secret.New("hunter3")
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": &local},
+			resources.ResourceData{"token": &remote},
+		)
+		// The pointer branch dereferences to the secret.String case, which records
+		// the dereferenced values and the Secret flag.
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: secret.New("hunter3"), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+
+		same := secret.New("hunter2")
+		equal, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": &local},
+			resources.ResourceData{"token": &same},
+		)
+		assert.Empty(t, equal)
+		assert.False(t, secretOnly)
+	})
+
+	// Presence-based secret wrapping omits remote keys the API strips; a local
+	// secret with no remote counterpart must stay SecretOnly so it re-applies
+	// without looking like genuine drift.
+	t.Run("known secret vs missing key is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2")},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: secret.New("hunter2"), TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs known secret is secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"token": secret.New("hunter2")},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: nil, TargetValue: secret.New("hunter2"), SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("pointer secret vs missing key is secret-only", func(t *testing.T) {
+		tok := secret.New("hunter2")
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": &tok},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"token": {Property: "token", SourceValue: &tok, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("secret vs missing key with real sibling is not secret-only", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"token": secret.New("hunter2"), "name": "a"},
+			resources.ResourceData{"name": "b"},
+		)
+		require.Contains(t, diffs, "token")
+		require.Contains(t, diffs, "name")
+		assert.True(t, diffs["token"].SecretOnly)
+		assert.False(t, diffs["name"].SecretOnly)
+		assert.False(t, secretOnly)
+	})
+
+	t.Run("non-secret missing key stays real drift", func(t *testing.T) {
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"name": "a"},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"name": {Property: "name", SourceValue: "a", TargetValue: nil, SecretOnly: false},
+		}, diffs)
+		assert.False(t, secretOnly)
+	})
+
+	// Snowflake's gcp block holds only credentials, so the API's secret stripping
+	// leaves nothing behind and the whole block goes missing from remote state.
+	t.Run("all-secret block vs missing key is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{"gcp": block},
+			resources.ResourceData{},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: block, TargetValue: nil, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	t.Run("missing key vs all-secret block is secret-only", func(t *testing.T) {
+		block := map[string]any{"credentials": secret.New("service-account-json")}
+		diffs, secretOnly := differ.CompareData(
+			resources.ResourceData{},
+			resources.ResourceData{"gcp": block},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"gcp": {Property: "gcp", SourceValue: nil, TargetValue: block, SecretOnly: true},
+		}, diffs)
+		assert.True(t, secretOnly)
+	})
+
+	blocks := []struct {
+		name       string
+		block      map[string]any
+		wantSecret bool
+	}{
+		{"nested all-secret block", map[string]any{"inner": map[string]any{"credentials": secret.New("json")}}, true},
+		{"non-secret leaf makes the whole block a real change", map[string]any{"credentials": secret.New("json"), "region": "us-east1"}, false},
+		{"purely non-secret block", map[string]any{"start_time": "02:00", "end_time": "03:00"}, false},
+		// Vacuously "all secret": nothing inside justifies re-applying, so the
+		// len guard in isSecretValue has to keep it out.
+		{"empty block", map[string]any{}, false},
+	}
+
+	for _, b := range blocks {
+		t.Run(b.name+" vs missing key", func(t *testing.T) {
+			diffs, secretOnly := differ.CompareData(
+				resources.ResourceData{"block": b.block},
+				resources.ResourceData{},
+			)
+			require.Contains(t, diffs, "block")
+			assert.Equal(t, b.wantSecret, diffs["block"].SecretOnly)
+			assert.Equal(t, b.wantSecret, secretOnly)
+		})
+	}
+}
+
+// TestDiff_HasNonsecretDiff locks the import guard's discriminator. ResourceDiff.SecretOnly
+// is precomputed by ComputeDiff; here we set it directly to exercise the guard logic.
+// (That ComputeDiff sets it correctly is covered by TestComputeDiff_Secret.)
+func TestDiff_HasNonsecretDiff(t *testing.T) {
+	secretOnly := &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{
+		"some-type:r0": {URN: "some-type:r0", SecretOnly: true,
+			Diffs: map[string]differ.PropertyDiff{"token": {SecretOnly: true}}},
+	}}
+	assert.True(t, secretOnly.HasDiff(), "a secret-only resource is still a diff (it re-applies)")
+	assert.False(t, secretOnly.HasNonSecretDiff(), "but it is not real drift")
+
+	mixed := &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{
+		"some-type:r0": {URN: "some-type:r0", SecretOnly: false,
+			Diffs: map[string]differ.PropertyDiff{"token": {SecretOnly: true}, "name": {}}},
+	}}
+	assert.True(t, mixed.HasNonSecretDiff())
+
+	assert.True(t, (&differ.Diff{NewResources: []string{"x"}}).HasNonSecretDiff())
+	assert.True(t, (&differ.Diff{RemovedResources: []string{"x"}}).HasNonSecretDiff())
+}
+
+// secretRawData is a typed RawData struct that adopts a secret. The field is a
+// *secret.String, mirroring *PropertyRef: a pointer is the form that survives the
+// struct→map decode the differ relies on (see TestSecret_SurvivesStructToMap).
+type secretRawData struct {
+	Name  string
+	Token *secret.String
+}
+
+// TestSecret_SurvivesStructToMap locks down the decode-preservation contract: the
+// struct→map step the differ performs on RawData must not flatten the concrete
+// secret type, otherwise the secret-aware rules can never fire.
+func TestSecret_SurvivesStructToMap(t *testing.T) {
+	t.Run("pointer secret is preserved as concrete type", func(t *testing.T) {
+		tok := secret.New("hunter2")
+		var out map[string]any
+		require.NoError(t, mapstructure.Decode(secretRawData{Name: "main", Token: &tok}, &out))
+
+		got, ok := out["Token"].(*secret.String)
+		require.True(t, ok, "expected *secret.String, got %T", out["Token"])
+		assert.Equal(t, "hunter2", got.Reveal())
+	})
+
+	// A value secret.String has no exported fields, so mapstructure decomposes it
+	// into an empty map rather than preserving it. This is why adopters use a
+	// *secret.String on the RawData path, exactly as PropertyRef uses a pointer.
+	t.Run("value secret does not survive, justifying the pointer contract", func(t *testing.T) {
+		type valueRawData struct {
+			Token secret.String
+		}
+		var out map[string]any
+		require.NoError(t, mapstructure.Decode(valueRawData{Token: secret.New("hunter2")}, &out))
+
+		_, ok := out["Token"].(secret.String)
+		assert.False(t, ok, "value secret.String unexpectedly survived as a concrete type")
+	})
+}
+
+// TestComputeDiff_Secret exercises the full RawData path end to end: typed structs
+// carrying a *secret.String are decoded to maps and compared by the differ.
+func TestComputeDiff_Secret(t *testing.T) {
+	rawWith := func(s secret.String) *secretRawData {
+		return &secretRawData{Name: "main", Token: &s}
+	}
+	resWith := func(id string, s secret.String) *resources.Resource {
+		return resources.NewResource(id, "some-type", resources.ResourceData{}, []string{}, resources.WithRawData(rawWith(s)))
+	}
+
+	t.Run("unknown remote forces an always-re-applied, secret-only update", func(t *testing.T) {
+		local := resources.NewGraph()
+		remote := resources.NewGraph()
+		local.AddResource(resWith("r0", secret.New("hunter2")))
+		remote.AddResource(resWith("r0", secret.NewUnknown()))
+
+		diff := differ.ComputeDiff(local, remote, differ.DiffOptions{})
+		require.Contains(t, diff.UpdatedResources, "some-type:r0")
+		assert.True(t, diff.UpdatedResources["some-type:r0"].IsSecretOnly())
+		assert.False(t, diff.HasNonSecretDiff(), "a secret-only update is not real drift")
+		assert.NotContains(t, diff.UnmodifiedResources, "some-type:r0")
+	})
+
+	t.Run("real field change alongside a secret is a real diff", func(t *testing.T) {
+		local := resources.NewGraph()
+		remote := resources.NewGraph()
+		local.AddResource(resources.NewResource("r0", "some-type", resources.ResourceData{}, []string{},
+			resources.WithRawData(&secretRawData{Name: "local", Token: ptr(secret.New("hunter2"))})))
+		remote.AddResource(resources.NewResource("r0", "some-type", resources.ResourceData{}, []string{},
+			resources.WithRawData(&secretRawData{Name: "remote", Token: ptr(secret.NewUnknown())})))
+
+		diff := differ.ComputeDiff(local, remote, differ.DiffOptions{})
+		require.Contains(t, diff.UpdatedResources, "some-type:r0")
+		assert.False(t, diff.UpdatedResources["some-type:r0"].IsSecretOnly())
+		assert.True(t, diff.HasNonSecretDiff())
+	})
+}
+
+func ptr(s secret.String) *secret.String { return &s }
+
+// Member-wise slice comparison routes arbitrary values through CompareData's
+// default branch, so that branch must tolerate every shape a resource can hold
+// — including types Go's == refuses to compare. The whole-slice reflect.DeepEqual
+// this replaced was shape-agnostic; these pin that the replacement still is.
+func TestCompareData_UncomparableValues(t *testing.T) {
+	shapes := map[string]struct{ equal, differing any }{
+		"typed slice":     {[]string{"a"}, []string{"b"}},
+		"typed map":       {map[string]string{"a": "1"}, map[string]string{"a": "2"}},
+		"struct w/ slice": {struct{ Tags []string }{[]string{"a"}}, struct{ Tags []string }{[]string{"b"}}},
+	}
+
+	for name, shape := range shapes {
+		t.Run(name+" — equal members do not diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"items": []any{shape.equal}},
+				resources.ResourceData{"items": []any{shape.equal}},
+			)
+			assert.Empty(t, diffs)
+		})
+
+		t.Run(name+" — differing members diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"items": []any{shape.equal}},
+				resources.ResourceData{"items": []any{shape.differing}},
+			)
+			assert.Contains(t, diffs, "items")
+		})
+
+		t.Run(name+" — equal at top level does not diff", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"item": shape.equal},
+				resources.ResourceData{"item": shape.equal},
+			)
+			assert.Empty(t, diffs)
+		})
+	}
+}
+
+// Member-wise comparison normalises each member the way the top level always
+// has, which settles two shapes the old whole-slice DeepEqual called drift.
+// Neither is a real config change, so neither should diff.
+func TestCompareData_SliceNormalisation(t *testing.T) {
+	t.Run("nil and empty []map[string]any are the same slice", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"items": []map[string]any(nil)},
+			resources.ResourceData{"items": []map[string]any{}},
+		)
+		assert.Empty(t, diffs, "an absent list and an empty list are not drift")
+	})
+
+	t.Run("member container type alone is not a difference", func(t *testing.T) {
+		// The two decode paths flagged at datacatalog/state/trackingplan.go:672:
+		// state load yields []any-of-maps where catalog registration yields
+		// []map[string]any. Equal content, different container type.
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"events": []any{[]map[string]any{{"a": 1}}}},
+			resources.ResourceData{"events": []any{[]any{map[string]any{"a": 1}}}},
+		)
+		assert.Empty(t, diffs)
+	})
+
+	t.Run("member content differences still diff", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"events": []any{[]map[string]any{{"a": 1}}}},
+			resources.ResourceData{"events": []any{[]any{map[string]any{"a": 2}}}},
+		)
+		assert.Contains(t, diffs, "events")
+	})
 }

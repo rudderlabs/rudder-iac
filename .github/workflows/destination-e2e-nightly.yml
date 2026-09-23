@@ -1,0 +1,64 @@
+name: destination e2e nightly
+# TestDestinationsApply creates, updates and deletes every destination fixture
+# (~225 writes), and each write posts to the production control plane's outbox.
+# Run on every commit it delayed customers' workspace config propagation, so it
+# runs once a day against main instead. workflow_dispatch allows an on-demand run,
+# e.g. before merging a destination definition change.
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: "destination e2e tests (live control plane)"
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 30
+    # Shares the mutex with test-with-coverage.yml's e2e job: both destroy and
+    # snapshot the same workspace, so they must never overlap. Concurrency groups
+    # are repository-wide, so the matching name serializes across workflows.
+    concurrency:
+      group: test-and-upload-code-coverage
+      cancel-in-progress: false
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: setup go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          check-latest: true
+          cache: true
+          go-version: "~1.25"
+
+      - name: running destination e2e tests
+        run: go test --race -timeout 20m ./cli/tests/... -run '^TestDestinationsApply$' -v
+        env:
+          RUDDERSTACK_API_URL: ${{ vars.RUDDERSTACK_API_URL }}
+          RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
+          RUDDERSTACK_CLI_DEBUG: ${{ vars.RUDDERSTACK_CLI_DEBUG }}
+          RUDDERSTACK_CLI_TELEMETRY_DISABLED: ${{ vars.RUDDERSTACK_CLI_TELEMETRY_DISABLED }}
+          RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL }}
+          RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: ${{ vars.RUDDERSTACK_X_UNVERIFIED_DESTINATIONS }}
+          # The test opens by destroying every resource in the workspace
+          # RUDDERSTACK_ACCESS_TOKEN points at. Set the repository variable to 1
+          # only while that workspace is disposable.
+          RUN_DESTINATION_E2E: ${{ vars.RUN_DESTINATION_E2E }}
+
+      - name: upload cli logs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: cli.log
+          path: ~/.rudder/cli.log
+          if-no-files-found: ignore

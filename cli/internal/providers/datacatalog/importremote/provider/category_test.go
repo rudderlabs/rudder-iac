@@ -13,9 +13,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 type mockCategoryCatalog struct {
@@ -60,7 +61,7 @@ func TestCategoryLoadImportable(t *testing.T) {
 		assert.False(t, lo.Contains(resourceIDs, "cat2"))
 	})
 
-	t.Run("correctly assigns externalId and old path based reference after namer is loaded", func(t *testing.T) {
+	t.Run("correctly assigns externalId and compact reference after namer is loaded", func(t *testing.T) {
 		mockClient := &mockCategoryCatalog{
 			categories: []*catalog.Category{
 				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
@@ -72,39 +73,6 @@ func TestCategoryLoadImportable(t *testing.T) {
 			client:   mockClient,
 			log:      *logger.New("test"),
 			filepath: "data-catalog",
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.Nil(t, err)
-
-		categories := collection.GetAll(types.CategoryResourceType)
-		require.Equal(t, 2, len(categories))
-
-		cat1, ok := categories["cat1"]
-		require.True(t, ok)
-		assert.NotEmpty(t, cat1.ExternalID)
-		assert.Equal(t, cat1.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, cat1.ExternalID))
-
-		cat2, ok := categories["cat2"]
-		require.True(t, ok)
-		assert.NotEmpty(t, cat2.ExternalID)
-		assert.Equal(t, cat2.Reference, fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, cat2.ExternalID))
-	})
-
-	t.Run("correctly assigns externalId and new URN based reference after namer is loaded", func(t *testing.T) {
-		mockClient := &mockCategoryCatalog{
-			categories: []*catalog.Category{
-				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
-				{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1"},
-			},
-		}
-
-		provider := &CategoryImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: true,
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
@@ -149,7 +117,7 @@ func TestCategoryFormatForExport(t *testing.T) {
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.Nil(t, err)
 
-		result, err := provider.FormatForExport(
+		result, _, err := provider.FormatForExport(
 			collection,
 			externalIdNamer,
 			mockResolver,
@@ -163,6 +131,7 @@ func TestCategoryFormatForExport(t *testing.T) {
 		spec, ok := entity.Content.(*specs.Spec)
 		require.True(t, ok)
 
+		assert.Equal(t, specs.SpecVersionV1, spec.Version)
 		assert.Equal(t, "categories", spec.Kind)
 		assert.Equal(t, "categories", spec.Metadata["name"])
 		assert.NotNil(t, spec.Metadata["import"])
@@ -172,7 +141,7 @@ func TestCategoryFormatForExport(t *testing.T) {
 		assert.Equal(t, 2, len(categories))
 	})
 
-	t.Run("creates v0 spec when v1 support disabled", func(t *testing.T) {
+	t.Run("export uses rudder/v1 spec version", func(t *testing.T) {
 		mockResolver := &mockResolver{
 			references: map[string]map[string]string{},
 		}
@@ -184,54 +153,16 @@ func TestCategoryFormatForExport(t *testing.T) {
 		}
 
 		provider := &CategoryImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: false,
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
 		}
 
 		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
 		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
 		require.NoError(t, err)
 
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
-		require.NoError(t, err)
-		require.Len(t, result, 1)
-
-		spec, ok := result[0].Content.(*specs.Spec)
-		require.True(t, ok)
-		assert.Equal(t, specs.SpecVersionV0_1, spec.Version)
-
-		categories, ok := spec.Spec["categories"].([]map[string]any)
-		require.True(t, ok)
-		require.Len(t, categories, 1)
-		assert.Contains(t, categories[0], "id")
-		assert.Contains(t, categories[0], "name")
-	})
-
-	t.Run("creates v1 spec when v1 support enabled", func(t *testing.T) {
-		mockResolver := &mockResolver{
-			references: map[string]map[string]string{},
-		}
-
-		mockClient := &mockCategoryCatalog{
-			categories: []*catalog.Category{
-				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
-			},
-		}
-
-		provider := &CategoryImportProvider{
-			client:        mockClient,
-			log:           *logger.New("test"),
-			filepath:      "data-catalog",
-			v1SpecSupport: true,
-		}
-
-		externalIdNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
-		collection, err := provider.LoadImportable(context.Background(), externalIdNamer)
-		require.NoError(t, err)
-
-		result, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
+		result, _, err := provider.FormatForExport(collection, externalIdNamer, mockResolver)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 
@@ -244,5 +175,71 @@ func TestCategoryFormatForExport(t *testing.T) {
 		require.Len(t, categories, 1)
 		assert.Contains(t, categories[0], "id")
 		assert.Contains(t, categories[0], "name")
+	})
+}
+
+func TestCategoryFormatForExportSkipsMatched(t *testing.T) {
+	t.Parallel()
+
+	newCollection := func(t *testing.T) *resources.RemoteResources {
+		t.Helper()
+		mockClient := &mockCategoryCatalog{
+			categories: []*catalog.Category{
+				{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
+				{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1"},
+			},
+		}
+		provider := &CategoryImportProvider{
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
+		}
+		collection, err := provider.LoadImportable(context.Background(), namer.NewExternalIdNamer(namer.NewKebabCase()))
+		require.Nil(t, err)
+		return collection
+	}
+
+	provider := &CategoryImportProvider{log: *logger.New("test"), filepath: "data-catalog"}
+	mockResolver := &mockResolver{references: map[string]map[string]string{}}
+	local := resources.NewResource("user-actions", types.CategoryResourceType, resources.ResourceData{}, []string{})
+
+	t.Run("matched category gets manifest entry only", func(t *testing.T) {
+		t.Parallel()
+
+		collection := newCollection(t)
+		matched := collection.GetAll(types.CategoryResourceType)["cat1"]
+		matched.MatchedWith = local
+		matched.ExternalID = "user-actions" // adopted local identity
+
+		entities, entries, err := provider.FormatForExport(collection, nil, mockResolver)
+		require.Nil(t, err)
+
+		// Spec content and embedded import metadata only for the unmatched category.
+		require.Equal(t, 1, len(entities))
+		spec := entities[0].Content.(*specs.Spec)
+		categories := spec.Spec["categories"].([]map[string]any)
+		require.Equal(t, 1, len(categories))
+		assert.Equal(t, "e-commerce", categories[0]["id"])
+
+		// Manifest entries for both, the matched one under its adopted local URN.
+		assert.ElementsMatch(t, []importmanifest.ImportEntry{
+			{WorkspaceID: "ws1", URN: "category:user-actions", RemoteID: "cat1"},
+			{WorkspaceID: "ws1", URN: "category:e-commerce", RemoteID: "cat2"},
+		}, entries)
+	})
+
+	t.Run("all matched emits entries only", func(t *testing.T) {
+		t.Parallel()
+
+		collection := newCollection(t)
+		for _, category := range collection.GetAll(types.CategoryResourceType) {
+			category.MatchedWith = local
+		}
+
+		entities, entries, err := provider.FormatForExport(collection, nil, mockResolver)
+		require.Nil(t, err)
+
+		assert.Empty(t, entities)
+		assert.Equal(t, 2, len(entries))
 	})
 }

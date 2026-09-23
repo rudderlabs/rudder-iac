@@ -22,19 +22,24 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "concurrentSyncs",
-			flagName: "concurrentSyncs",
-			want:     "RUDDERSTACK_X_CONCURRENT_SYNCS",
+			name:     "eventRuleIncludes",
+			flagName: "eventRuleIncludes",
+			want:     "RUDDERSTACK_X_EVENT_RULE_INCLUDES",
 		},
 		{
-			name:     "v1SpecSupport",
-			flagName: "v1SpecSupport",
-			want:     "RUDDERSTACK_X_V1_SPEC_SUPPORT",
+			name:     "unverifiedDestinations",
+			flagName: "unverifiedDestinations",
+			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
 		},
 		{
-			name:     "transformations",
-			flagName: "transformations",
-			want:     "RUDDERSTACK_X_TRANSFORMATIONS",
+			name:     "retlTableSupport",
+			flagName: "retlTableSupport",
+			want:     "RUDDERSTACK_X_RETL_TABLE_SUPPORT",
+		},
+		{
+			name:     "lowercase",
+			flagName: "lowercase",
+			want:     "RUDDERSTACK_X_LOWERCASE",
 		},
 	}
 
@@ -71,6 +76,92 @@ func TestExperimentalConfigStructInvariants(t *testing.T) {
 				"experimental flag %s with tag %q must be recognized as valid", field.Name, tag)
 		})
 	}
+}
+
+func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
+}
+
+func TestIsValidExperimentalFlag_ImportMerge(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("importMerge"))
+}
+
+func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("unverifiedDestinations"))
+}
+
+func TestIsValidExperimentalFlag_RetlConnectionSupport(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("retlConnectionSupport"))
+}
+
+func TestIsValidExperimentalFlag_RETLTableSupport(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("retlTableSupport"))
+}
+
+func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "data" + "Graph"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_ConcurrentSyncsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "concurrent" + "Syncs"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_RemovedDestinationFlag(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "destination" + "Support"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_ConnectionSupportRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "connection" + "Support"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_LocalTyperRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "local" + "Typer"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_TransformationsRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "trans" + "formations"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_EnableVarSubstitutionRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "enableVar" + "Substitution"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
+}
+
+func TestIsValidExperimentalFlag_AccountSupportRemoved(t *testing.T) {
+	t.Parallel()
+
+	removedFlag := "account" + "Support"
+	assert.False(t, IsValidExperimentalFlag(removedFlag))
 }
 
 func TestGetAvailableExperimentalFlags(t *testing.T) {

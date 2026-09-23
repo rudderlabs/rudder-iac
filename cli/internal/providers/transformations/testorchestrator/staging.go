@@ -20,11 +20,11 @@ func StageTransformation(
 	if remoteID == "" {
 		// Transformation doesn't exist remotely - create new
 		req := &transformations.CreateTransformationRequest{
-			Name:       transformation.Name,
-			Code:       transformation.Code,
-			Language:   transformation.Language,
+			Name:        transformation.Name,
+			Code:        transformation.Code,
+			Language:    transformation.Language,
 			Description: transformation.Description,
-			ExternalID: transformation.ID,
+			ExternalID:  transformation.ID,
 		}
 		result, err := store.CreateTransformation(ctx, req, false)
 		if err != nil {
@@ -35,9 +35,9 @@ func StageTransformation(
 
 	// Transformation exists remotely - update it
 	updateReq := &transformations.UpdateTransformationRequest{
-		Name:     transformation.Name,
-		Code:     transformation.Code,
-		Language: transformation.Language,
+		Name:        transformation.Name,
+		Code:        transformation.Code,
+		Language:    transformation.Language,
 		Description: transformation.Description,
 	}
 
@@ -76,9 +76,9 @@ func StageLibrary(
 
 	// Library exists remotely - update it
 	updateReq := &transformations.UpdateLibraryRequest{
-		Name:     library.Name,
-		Code:     library.Code,
-		Language: library.Language,
+		Name:        library.Name,
+		Code:        library.Code,
+		Language:    library.Language,
 		Description: library.Description,
 	}
 

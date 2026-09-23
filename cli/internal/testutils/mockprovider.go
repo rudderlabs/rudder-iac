@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -11,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
 
 // MockProvider is a mock implementation of the provider.Provider interface for testing.
@@ -37,6 +39,7 @@ type MockProvider struct {
 	ImportErr                  error
 	ParseSpecVal               *specs.ParsedSpec
 	ParseSpecErr               error
+	RuleDocEntriesVal          []docs.RuleDocEntry
 
 	// Tracking calls
 	LoadSpecCalledWithArgs             []LoadSpecArgs
@@ -177,12 +180,16 @@ func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resour
 	return nil, nil
 }
 
-func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, error) {
-	return nil, nil
+func (m *MockProvider) FormatForExport(collection *resources.RemoteResources, idNamer namer.Namer, inputResolver resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	return nil, nil, nil
 }
 
 func (m *MockProvider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
+}
+
+func (m *MockProvider) RuleDocEntries() []docs.RuleDocEntry {
+	return m.RuleDocEntriesVal
 }
 
 // ResetCallCounters resets all call counters and argument trackers.

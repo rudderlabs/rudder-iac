@@ -1,0 +1,44 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "customerio",
+  "name": "E2E Customer.io",
+  "type": "CUSTOMERIO",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "siteID": "rudderCliE2eSiteId",
+    "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
+    "apiVersion": "v1",
+    "datacenter": "US",
+    "deviceTokenEventName": "Device Token Registered",
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "sendPageNameInSDK": {
+      "web": false
+    },
+    "dataUseInApp": {
+      "web": false
+    },
+    "autoTrackDeviceAttributes": {
+      "android": false,
+      "ios": false
+    },
+    "backgroundQueueMinNumberOfTasks": {
+      "android": "10"
+    },
+    "backgroundQueueSecondsDelay": {
+      "android": "30"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

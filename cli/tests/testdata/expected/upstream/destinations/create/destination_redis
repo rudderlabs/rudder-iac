@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "redis",
+  "name": "E2E Redis",
+  "type": "REDIS",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "address": "redis.example.com:6379",
+    "prefix": "rudder-cli-e2e",
+    "database": "0",
+    "clusterMode": false,
+    "secure": false,
+    "skipVerify": false,
+    "useJSONModule": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

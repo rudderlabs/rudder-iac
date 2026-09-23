@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -29,18 +29,16 @@ var (
 )
 
 type CategoryImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *CategoryImportProvider {
 	return &CategoryImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, CategoriesRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, CategoriesRelativePath),
+		client:   client,
 	}
 }
 
@@ -102,10 +100,7 @@ func (p *CategoryImportProvider) idResources(
 		}
 
 		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCategories, MetadataNameCategories, externalID)
-		if p.v1SpecSupport {
-			category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
-		}
+		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
 	}
 	return nil
 }
@@ -115,51 +110,59 @@ func (p *CategoryImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting categories for export to file")
 
 	categories := collection.GetAll(types.CategoryResourceType)
 	if len(categories) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedCategories := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, category := range categories {
 		p.log.Debug("formatting category", "remoteID", category.ID, "externalID", category.ExternalID)
 
 		data, ok := category.Data.(*catalog.Category)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog category")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog category")
+		}
+
+		urn := resources.URN(category.ExternalID, types.CategoryResourceType)
+
+		// Matched categories (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if category.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceID,
+				URN:         urn,
+				RemoteID:    category.ID,
+			})
+			continue
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceID // Similar for all the categories
-		urn := resources.URN(category.ExternalID, types.CategoryResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: category.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableCategory := &model.ImportableCategoryV1{}
-			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
-		} else {
-			importableCategory := &model.ImportableCategory{}
-			formatted, err = importableCategory.ForExport(category.ExternalID, data, resolver)
-		}
+		importableCategory := &model.ImportableCategoryV1{}
+		formatted, err := importableCategory.ForExport(category.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting category: %w", err)
+			return nil, nil, fmt.Errorf("formatting category: %w", err)
 		}
 		formattedCategories = append(formattedCategories, formatted)
+	}
+
+	if len(formattedCategories) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -171,7 +174,7 @@ func (p *CategoryImportProvider) FormatForExport(
 			"categories": formattedCategories,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -179,5 +182,5 @@ func (p *CategoryImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

@@ -33,13 +33,27 @@ build:
 clean:
 	rm -rf bin
 
+RULE_DOCS_OUTPUT_DIR ?= docs/generated
+
+.PHONY: gen-rule-docs
+# The catalog documents the complete rule set, so generation turns on the
+# experimental features whose rules ship with authored fragments; without them
+# those fragments read as stale. That is also how a plain local run generates
+# the same catalog CI does. Defaulted rather than pinned so CI, which sets them
+# explicitly, still wins.
+gen-rule-docs: ## Generate the validation rule documentation artifact
+	RUDDERSTACK_CLI_EXPERIMENTAL=$${RUDDERSTACK_CLI_EXPERIMENTAL:-true} \
+	RUDDERSTACK_X_RETL_TABLE_SUPPORT=$${RUDDERSTACK_X_RETL_TABLE_SUPPORT:-true} \
+	RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=$${RUDDERSTACK_X_RETL_CONNECTION_SUPPORT:-true} \
+	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
+
 .PHONY: test
 test: ## Run all unit tests (excluding e2e)
 	@go test --race --covermode=atomic --coverprofile=coverage-unit.out $(shell go list ./... | grep -v /cli/tests)
 
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
-	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out ./cli/tests/...  -v
+	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out -timeout 20m ./cli/tests/...  -v
 
 .PHONY: test-it
 test-it: ## Run all test, including integration tests
@@ -63,5 +77,36 @@ typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 
 .PHONY: typer-kotlin-update-testdata
 typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
-	mkdir -p cli/internal/typer/generator/platforms/kotlin/testdata/main/kotlin/com/rudderstack/ruddertyper
-	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go > cli/internal/typer/generator/platforms/kotlin/testdata/validator/src/main/kotlin/com/rudderstack/ruddertyper/Main.kt
+	go run cli/internal/typer/generator/platforms/kotlin/testutils/generate_reference_plan.go
+
+.PHONY: typer-swift-update-testdata
+typer-swift-update-testdata: ## Update test data for Swift code generation
+	go run cli/internal/typer/generator/platforms/swift/testutils/generate_reference_plan.go \
+	  > cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift
+
+.PHONY: typer-typescript-update-testdata
+typer-typescript-update-testdata: ## Update test data for TypeScript code generation
+	go run cli/internal/typer/generator/platforms/typescript/testutils/generate_reference_plan.go \
+	  > cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts
+	go run ./cli/internal/typer/generator/platforms/typescript/testutils/identity_sections \
+	  > cli/internal/typer/generator/platforms/typescript/testdata/IdentitySections.ts
+	go run ./cli/internal/typer/generator/platforms/typescript/testutils/empty_identity \
+	  > cli/internal/typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
+
+.PHONY: typer-swift-validate
+typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
+	mkdir -p cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper
+	cp cli/internal/typer/generator/platforms/swift/testdata/RudderTyper.swift \
+	   cli/internal/typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper/RudderTyper.swift
+	cd cli/internal/typer/generator/platforms/swift/testdata/validator && swift test --disable-swift-testing
+
+.PHONY: typer-typescript-validate
+typer-typescript-validate: ## Validate generated TypeScript code against the RudderStack JS SDK
+	mkdir -p cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper
+	cp cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts \
+	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/RudderTyper.ts
+	cp cli/internal/typer/generator/platforms/typescript/testdata/IdentitySections.ts \
+	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/IdentitySections.ts
+	cp cli/internal/typer/generator/platforms/typescript/testdata/EmptyIdentity.ts \
+	   cli/internal/typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/EmptyIdentity.ts
+	cd cli/internal/typer/generator/platforms/typescript/testdata/validator && docker compose run --rm -T validator

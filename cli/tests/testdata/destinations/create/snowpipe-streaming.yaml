@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: snowpipe-streaming
+spec:
+  id: snowpipe-streaming
+  display_name: E2E Snowpipe Streaming
+  type: snowpipe_streaming
+  enabled: true
+  definition_version: 1
+  config:
+    account: rudder-cli-e2e.us-east-1
+    database: RUDDER_E2E
+    warehouse: RUDDER_WH
+    user: RUDDER_CLI_E2E
+    role: RUDDER_ROLE
+    namespace: rudder_cli_e2e
+    private_key: "{{ .SNOWPIPE_STREAMING_PRIVATE_KEY }}"
+    private_key_passphrase: "{{ .SNOWPIPE_STREAMING_PRIVATE_KEY_PASSPHRASE }}"
+    json_paths: context.traits
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

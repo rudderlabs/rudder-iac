@@ -211,6 +211,23 @@ func TestListDataGraphs(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestListDataGraphsReturnsEmptyResponseWhenFeatureNotEnabled(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/data-graphs", "")
+		},
+		ResponseStatus: 403,
+		ResponseBody:   `{"error":"Feature is not enabled for your account: DATA_GRAPH"}`,
+	})
+
+	store := newTestStore(t, httpClient)
+
+	result, err := store.ListDataGraphs(context.Background(), &datagraph.ListDataGraphsRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, &datagraph.ListDataGraphsResponse{}, result)
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestListDataGraphsWithPagination(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
 		Validate: func(req *http.Request) bool {

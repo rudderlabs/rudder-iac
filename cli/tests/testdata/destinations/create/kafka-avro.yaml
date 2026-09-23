@@ -1,0 +1,29 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: kafka-avro
+spec:
+  id: kafka-avro
+  display_name: E2E Kafka Avro
+  type: kafka
+  enabled: true
+  definition_version: 1
+  config:
+    host_name: kafka-avro.rudder-cli-e2e.internal
+    port: "9092"
+    topic: rudder-cli-e2e-avro
+    ssl_enabled: false
+    use_sasl: false
+    use_ssh: false
+    convert_to_avro: true
+    embed_avro_schema_id: true
+    avro_schemas:
+      - schema_id: track-value
+        schema: '{"type":"record","name":"Track","fields":[{"name":"event","type":"string"}]}'
+    enable_multi_topic: true
+    event_type_to_topic_map:
+      - from: identify
+        to: rudder-identifies
+    event_to_topic_map:
+      - from: Order Completed
+        to: rudder-orders

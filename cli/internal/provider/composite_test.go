@@ -4,16 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -337,6 +341,33 @@ func TestCompositeProvider_ResourceGraph(t *testing.T) {
 	}
 }
 
+func TestCompositeProvider_RuleDocEntries(t *testing.T) {
+	t.Run("aggregates entries from all child providers", func(t *testing.T) {
+		p1 := testutils.NewMockProvider([]string{"kindA"}, nil)
+		p1.RuleDocEntriesVal = []docs.RuleDocEntry{{RuleID: "rule-1"}}
+
+		p2 := testutils.NewMockProvider([]string{"kindB"}, nil)
+		p2.RuleDocEntriesVal = []docs.RuleDocEntry{{RuleID: "rule-2"}, {RuleID: "rule-3"}}
+
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"p1": p1,
+			"p2": p2,
+		})
+		assert.NoError(t, err)
+
+		entries := cp.RuleDocEntries()
+		assert.Len(t, entries, 3)
+
+		ids := make([]string, len(entries))
+		for i, e := range entries {
+			ids[i] = e.RuleID
+		}
+		assert.Contains(t, ids, "rule-1")
+		assert.Contains(t, ids, "rule-2")
+		assert.Contains(t, ids, "rule-3")
+	})
+}
+
 func TestCompositeProvider_ResourceOperations(t *testing.T) {
 	ctx := context.Background()
 	resDataA := resources.ResourceData{"key": "valA"}
@@ -449,4 +480,88 @@ func TestCompositeProvider_ResourceOperations(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mockConsumerProvider embeds MockProvider and implements ImportManifestLoader,
+// recording the workspace manifest it receives.
+type mockConsumerProvider struct {
+	*testutils.MockProvider
+	got *specs.WorkspaceImportMetadata
+}
+
+func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImportMetadata) error {
+	m.got = manifest
+	return nil
+}
+
+func TestCompositeProvider_LoadImportManifest(t *testing.T) {
+	t.Parallel()
+
+	manifest := &specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-a",
+		Resources:   []specs.ImportIds{{URN: "a:1", RemoteID: "r1"}},
+	}
+
+	t.Run("broadcasts to every sub-provider", func(t *testing.T) {
+		t.Parallel()
+
+		consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil)}
+		// plain uses EmptyProvider's no-op LoadImportManifest; the broadcast
+		// reaches it too but stores nothing.
+		plain := testutils.NewMockProvider([]string{"kindB"}, nil)
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": consumer, "b": plain})
+		assert.NoError(t, err)
+		assert.NoError(t, cp.(*provider.CompositeProvider).LoadImportManifest(manifest))
+		assert.Equal(t, manifest, consumer.got)
+	})
+}
+
+// matcherMockProvider overrides the MockProvider's nil-default ResourceMatchers.
+type matcherMockProvider struct {
+	*testutils.MockProvider
+	matchers []importmatcher.Matcher
+}
+
+func (m *matcherMockProvider) ResourceMatchers() []importmatcher.Matcher {
+	return m.matchers
+}
+
+func TestCompositeProviderResourceMatchers(t *testing.T) {
+	t.Parallel()
+
+	noopMatcher := func(resourceType string) importmatcher.Matcher {
+		return importmatcher.Matcher{
+			ResourceType: resourceType,
+			Match: func(importmatcher.Scope, *resources.RemoteResource) *resources.Resource {
+				return nil
+			},
+		}
+	}
+
+	alpha := &matcherMockProvider{
+		MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+		matchers:     []importmatcher.Matcher{noopMatcher("a1"), noopMatcher("a2")},
+	}
+	// gamma keeps the nil default: it does not support smart import and
+	// contributes nothing to the aggregate.
+	gamma := testutils.NewMockProvider([]string{"kindC"}, []string{"typeC"})
+
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"alpha": alpha,
+		"gamma": gamma,
+	})
+	require.NoError(t, err)
+
+	matchers := cp.ResourceMatchers()
+	types := make([]string, 0, len(matchers))
+	for _, m := range matchers {
+		types = append(types, m.ResourceType)
+	}
+
+	// Cross-provider order is unspecified; a provider's own matcher order is
+	// preserved (parent-before-child).
+	assert.ElementsMatch(t, []string{"a1", "a2"}, types)
+	assert.Less(t,
+		slices.Index(types, "a1"), slices.Index(types, "a2"),
+		"per-provider matcher order must be preserved")
 }

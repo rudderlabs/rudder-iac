@@ -1,0 +1,28 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "snowpipe-streaming",
+  "name": "E2E Snowpipe Streaming Updated",
+  "type": "SNOWPIPE_STREAMING",
+  "enabled": true,
+  "config": {
+    "account": "rudder-cli-e2e.us-east-1",
+    "database": "RUDDER_E2E_UPD",
+    "warehouse": "RUDDER_WH",
+    "user": "RUDDER_CLI_E2E",
+    "role": "RUDDER_ROLE_UPD",
+    "namespace": "rudder_cli_e2e",
+    "jsonPaths": "context.traits,properties.metadata",
+    "skipTracksTable": false,
+    "enableIceberg": false,
+    "underscoreDivideNumbers": false,
+    "allowUsersContextTraits": false,
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

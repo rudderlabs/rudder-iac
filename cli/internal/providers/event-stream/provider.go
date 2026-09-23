@@ -5,28 +5,37 @@ import (
 	"fmt"
 
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	connectionHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
+	esdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/docs"
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/connection"
 	sourceRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/rules/source"
 	sourceHandler "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 type handler interface {
 	LoadSpec(path string, s *specs.Spec) error
+	LoadImportMetadata(m *specs.WorkspacesImportMetadata) error
 	MigrateSpec(s *specs.Spec) (*specs.Spec, error)
 	ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error)
 	GetResources() ([]*resources.Resource, error)
 	Create(ctx context.Context, ID string, data resources.ResourceData) (*resources.ResourceData, error)
 	Update(ctx context.Context, ID string, data resources.ResourceData, state resources.ResourceData) (*resources.ResourceData, error)
 	Delete(ctx context.Context, ID string, state resources.ResourceData) error
+	List(ctx context.Context, filters lister.Filters) ([]resources.ResourceData, error)
 	Import(ctx context.Context, ID string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error)
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
@@ -35,7 +44,7 @@ type handler interface {
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 var _ provider.Provider = &Provider{}
@@ -44,23 +53,63 @@ const importDir = "event-stream"
 
 type Provider struct {
 	provider.EmptyProvider
+	client     esClient.EventStreamStore
 	kindToType map[string]string
 	handlers   map[string]handler
+	// destinationRegistry backs the connection semantic rules' source-type
+	// compatibility checks against destination definitions.
+	destinationRegistry *definitions.Registry
 }
 
-func New(client esClient.EventStreamStore) *Provider {
+// Option configures the provider at construction.
+type Option func(*Provider)
+
+// WithDestinationRegistry supplies the destination definitions that back the
+// connection semantic rules' source-type compatibility checks. A nil registry
+// is ignored so this option cannot clear the empty default New installs:
+// connection rules are registered unconditionally now, and registry.Get
+// indexes a map on its receiver, so a nil registry constructs fine and only
+// panics later, mid-validate. This narrows the option, not the whole type —
+// a zero Provider built inside the package still has the hazard.
+func WithDestinationRegistry(registry *definitions.Registry) Option {
+	return func(p *Provider) {
+		if registry == nil {
+			return
+		}
+		p.destinationRegistry = registry
+	}
+}
+
+func New(client esClient.EventStreamStore, opts ...Option) *Provider {
 	p := &Provider{
+		client: client,
 		kindToType: map[string]string{
-			"event-stream-source": sourceHandler.ResourceType,
+			"event-stream-source":                               sourceHandler.ResourceType,
+			connectionHandler.EventStreamConnectionResourceKind: connectionHandler.EventStreamConnectionResourceType,
 		},
-		handlers: make(map[string]handler),
+		handlers:            make(map[string]handler),
+		destinationRegistry: definitions.NewRegistry(),
 	}
-	options := []sourceHandler.HandlerOption{}
-	if config.GetConfig().ExperimentalFlags.V1SpecSupport {
-		options = append(options, sourceHandler.WithV1SpecSupport())
+	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir)
+	p.handlers[connectionHandler.EventStreamConnectionResourceType] = connectionHandler.NewHandler(client, importDir)
+	for _, opt := range opts {
+		opt(p)
 	}
-	p.handlers[sourceHandler.ResourceType] = sourceHandler.NewHandler(client, importDir, options...)
 	return p
+}
+
+// LoadImportManifest fans the active workspace's manifest out to every registered
+// handler so URN → remote-ID mappings from a central import-manifest file
+// populate the same per-source import-metadata maps that inline
+// metadata.import does.
+func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	workspaces := &specs.WorkspacesImportMetadata{Workspaces: []specs.WorkspaceImportMetadata{*m}}
+	for resourceType, h := range p.handlers {
+		if err := h.LoadImportMetadata(workspaces); err != nil {
+			return fmt.Errorf("loading import manifest into handler %s: %w", resourceType, err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) SupportedKinds() []string {
@@ -71,10 +120,18 @@ func (p *Provider) SupportedKinds() []string {
 	return kinds
 }
 
+// kindsWithoutLegacyVersions are kinds introduced after legacy spec versions
+// were retired, so they only ever match v1 patterns.
+var kindsWithoutLegacyVersions = map[string]struct{}{
+	connectionHandler.EventStreamConnectionResourceKind: {},
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	for kind := range p.kindToType {
-		patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		if _, v1Only := kindsWithoutLegacyVersions[kind]; !v1Only {
+			patterns = append(patterns, prules.LegacyVersionPatterns(kind)...)
+		}
 		patterns = append(patterns, prules.V1VersionPatterns(kind)...)
 	}
 	return patterns
@@ -86,6 +143,14 @@ func (p *Provider) SupportedTypes() []string {
 		types = append(types, t)
 	}
 	return types
+}
+
+// ResourceMatchers overrides the EmptyProvider default to opt into import
+// --merge smart linking for event stream sources and connections. The
+// connection matcher is listed after the source matcher so its endpoint
+// lookups can rely on source matches being recorded already.
+func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
+	return []importmatcher.Matcher{sourceHandler.Matcher(), connectionHandler.Matcher()}
 }
 
 func (p *Provider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -197,6 +262,18 @@ func (p *Provider) Delete(ctx context.Context, ID string, resourceType string, s
 	return handler.Delete(ctx, ID, state)
 }
 
+func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
+	handler, ok := p.handlers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("no handler for resource type: %s", resourceType)
+	}
+	result, err := handler.List(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("listing %s: %w", resourceType, err)
+	}
+	return result, nil
+}
+
 func (p *Provider) Import(ctx context.Context, ID string, resourceType string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	handler, ok := p.handlers[resourceType]
 	if !ok {
@@ -224,30 +301,42 @@ func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	result := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, handler := range p.handlers {
-		entities, err := handler.FormatForExport(
+		entities, handlerEntries, err := handler.FormatForExport(
 			collection,
 			idNamer,
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for handler %w", err)
+			return nil, nil, fmt.Errorf("formatting for export for handler %w", err)
 		}
 		result = append(result, entities...)
+		entries = append(entries, handlerEntries...)
 	}
-	return result, nil
+	return result, entries, nil
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the event-stream provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []docs.RuleDocEntry {
+	entries, _ := docs.LoadRuleDocEntries(esdocs.FragmentsFS, ".")
+	return entries
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
 	return []rules.Rule{
 		sourceRules.NewSourceSpecSyntaxValidRule(),
+		connectionRules.NewConnectionSpecSyntaxValidRule(),
 	}
 }
 
 func (p *Provider) SemanticRules() []rules.Rule {
 	return []rules.Rule{
 		sourceRules.NewSourceSemanticValidRule(),
+		connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+		connectionRules.NewConnectionEnabledEndpointsRule(),
 	}
 }

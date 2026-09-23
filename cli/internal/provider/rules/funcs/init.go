@@ -11,4 +11,13 @@ func init() {
 	// Register the default patterns for the pattern validator
 	// These patterns can be used by callers downstream to validate fields in struct
 	NewPattern("letter_start", "^[a-zA-Z]", "must start with a letter [a-zA-Z]")
+
+	// Upstream integrations-config spells the common "short text" constraint as
+	// `^(.{0,100})$`, which bounds length *and* forbids line breaks — a plain
+	// max=100 would let newlines through.
+	NewPattern("single_line_100", `^(.{0,100})$`, "must be at most 100 characters and must not contain line breaks")
+	NewPattern("single_line_200", `^(.{0,200})$`, "must be at most 200 characters and must not contain line breaks")
+	NewPattern("single_line_300", `^(.{0,300})$`, "must be at most 300 characters and must not contain line breaks")
+	NewPattern("single_line_500", `^(.{0,500})$`, "must be at most 500 characters and must not contain line breaks")
+	NewPattern("single_line_1000", `^(.{0,1000})$`, "must be at most 1000 characters and must not contain line breaks")
 }

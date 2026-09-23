@@ -1,18 +1,57 @@
 package project_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	provrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
+
+func enableImportMerge(t *testing.T) {
+	t.Helper()
+	prevExp, prevFlag := viper.Get("experimental"), viper.Get("flags.importMerge")
+	viper.Set("experimental", true)
+	viper.Set("flags.importMerge", true)
+	t.Cleanup(func() {
+		viper.Set("experimental", prevExp)
+		viper.Set("flags.importMerge", prevFlag)
+	})
+}
+
+// fixtureMatchPatterns declares the test fixture kinds (Source/Destination) so a
+// MockProvider reports them as supported. Without this the gatekeeper rule
+// SpecSyntaxValidRule rejects them as unknown kinds — these tests exercise
+// loading/routing/substitution, not kind validation, so they need a provider
+// that treats their fixture kinds as known (as a real provider would).
+var fixtureMatchPatterns = []rules.MatchPattern{
+	{Kind: "Source", Version: "rudder/0.1"},
+	{Kind: "Source", Version: "rudder/v1"},
+	{Kind: "Source", Version: "rudder/v2.0"},
+	{Kind: "Destination", Version: "rudder/0.1"},
+}
+
+// mapResolver is a tiny in-memory varsubst.Resolver used to drive substitution
+// from test cases without depending on env vars or files.
+type mapResolver map[string]string
+
+func (m mapResolver) Resolve(name string) (string, bool) {
+	v, ok := m[name]
+	return v, ok
+}
 
 // MockLoader is a mock implementation of the project.Loader interface for testing.
 type MockLoader struct {
@@ -25,6 +64,61 @@ func (m *MockLoader) Load(location string) (map[string]*specs.RawSpec, error) {
 		return m.LoadFunc(location)
 	}
 	return nil, errors.New("MockLoader.LoadFunc is not set")
+}
+
+// mockConsumerProvider embeds MockProvider and implements
+// provider.ImportManifestLoader, recording the workspace manifest it receives via
+// the read-path broadcast.
+type mockConsumerProvider struct {
+	*testutils.MockProvider
+	gotManifest *specs.WorkspaceImportMetadata
+}
+
+func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImportMetadata) error {
+	m.gotManifest = manifest
+	return nil
+}
+
+func TestProject_BroadcastsImportManifest(t *testing.T) {
+	enableImportMerge(t)
+
+	consumer := &mockConsumerProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+	// Declare the resource kind so the gatekeeper SpecSyntaxValidRule treats
+	// "Source" as known (the manifest pattern alone would reject it otherwise).
+	consumer.MatchPatterns = []rules.MatchPattern{
+		rules.MatchKindVersion("Source", specs.SpecVersionV1),
+	}
+	manifestYAML := "version: rudder/v1\n" +
+		"kind: import-manifest\n" +
+		"metadata:\n  name: import-manifest\n" +
+		"spec:\n" +
+		"  workspaces:\n" +
+		"    - workspace_id: ws-a\n" +
+		"      resources:\n" +
+		"        - urn: event:login\n" +
+		"          remote_id: rem-1\n" +
+		"    - workspace_id: ws-b\n" +
+		"      resources:\n" +
+		"        - urn: event:logout\n" +
+		"          remote_id: rem-2\n"
+	resourceYAML := "kind: Source\nversion: rudder/v1\nmetadata:\n  name: my_source\nspec:\n  k: v"
+
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"import-manifest.yaml": {Data: []byte(manifestYAML)},
+			"source.yaml":          {Data: []byte(resourceYAML)},
+		}, nil
+	}}
+
+	proj := project.New(consumer, project.WithLoader(mockLoader), project.WithWorkspaceID("ws-a"))
+	require.NoError(t, proj.Load("test_dir"))
+
+	require.NotNil(t, consumer.gotManifest, "consumer should have received the broadcast manifest")
+	// Scoped to the active workspace ws-a only.
+	assert.Equal(t, &specs.WorkspaceImportMetadata{
+		WorkspaceID: "ws-a",
+		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
+	}, consumer.gotManifest)
 }
 
 func TestNewProject_Load_Error(t *testing.T) {
@@ -48,6 +142,7 @@ func TestProject_Load_Success(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
 	mockLoader := &MockLoader{}
 
 	proj := project.New(mockProvider, project.WithLoader(mockLoader))
@@ -80,10 +175,61 @@ func TestProject_Load_Success(t *testing.T) {
 	assert.True(t, foundSpec2, "Spec2 should have been loaded")
 }
 
+// syntaxWarningProvider registers a syntactic rule that only ever warns, so a
+// spec can pass syntax validation while still carrying a syntax diagnostic.
+type syntaxWarningProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *syntaxWarningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/source/syntax-warning",
+		rules.Warning,
+		"source specs always warn",
+		rules.Examples{},
+		provrules.NewPatternValidator(
+			fixtureMatchPatterns,
+			func(_ string, _ string, _ map[string]any, _ map[string]any) []rules.ValidationResult {
+				return []rules.ValidationResult{{Reference: "/k", Message: "k could not be checked"}}
+			},
+		),
+	)}
+}
+
+func TestProject_Load_RendersSyntaxWarningsWithoutSyntaxErrors(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(&syntaxWarningProvider{mockProvider},
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewTextRenderer(&out)),
+	)
+
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Equal(t, `
+warning[test/source/syntax-warning]: k could not be checked
+  --> spec.yaml:6:3
+     |
+   6 | k: v
+     | ^^^^
+
+Found 0 error(s), 1 warning(s)
+`, out.String())
+}
+
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	t.Parallel()
 
 	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
 	mockLoader := &MockLoader{}
 
 	proj := project.New(mockProvider, project.WithLoader(mockLoader))
@@ -104,7 +250,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading spec path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
 }
-
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
@@ -139,63 +284,34 @@ func TestProject_GetResourceGraph_Error(t *testing.T) {
 	assert.Equal(t, 1, mockProvider.GetResourceGraphCalledCount)
 }
 
-func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
+func TestProject_LoadSpec_VersionRouting(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name                       string
 		specVersion                string
-		useV1SpecSupport           bool
 		expectError                bool
 		expectLoadSpecCalled       bool
 		expectLoadLegacySpecCalled bool
 		errorContains              string
 	}{
 		{
-			name:                       "rudder/v1 spec without v1 support - calls LoadSpec",
+			name:                       "rudder/v1 spec calls LoadSpec",
 			specVersion:                "rudder/v1",
-			useV1SpecSupport:           false,
 			expectError:                false,
 			expectLoadSpecCalled:       true,
 			expectLoadLegacySpecCalled: false,
 		},
 		{
-			name:                       "rudder/v1 spec with v1 support - calls LoadSpec",
-			specVersion:                "rudder/v1",
-			useV1SpecSupport:           true,
-			expectError:                false,
-			expectLoadSpecCalled:       true,
-			expectLoadLegacySpecCalled: false,
-		},
-		{
-			name:                       "rudder/0.1 spec without v1 support - calls LoadLegacySpec (backward compatible)",
+			name:                       "rudder/0.1 spec calls LoadLegacySpec",
 			specVersion:                "rudder/0.1",
-			useV1SpecSupport:           false,
 			expectError:                false,
 			expectLoadSpecCalled:       false,
 			expectLoadLegacySpecCalled: true,
 		},
 		{
-			name:                       "rudder/0.1 spec with v1 support - calls LoadLegacySpec (backward compatible)",
-			specVersion:                "rudder/0.1",
-			useV1SpecSupport:           true,
-			expectError:                false,
-			expectLoadSpecCalled:       false,
-			expectLoadLegacySpecCalled: true,
-		},
-		{
-			name:                       "unsupported version without v1 support - returns error",
+			name:                       "unsupported version returns error",
 			specVersion:                "rudder/v2.0",
-			useV1SpecSupport:           false,
-			expectError:                true,
-			expectLoadSpecCalled:       false,
-			expectLoadLegacySpecCalled: false,
-			errorContains:              "unsupported spec version: rudder/v2.0",
-		},
-		{
-			name:                       "unsupported version with v1 support - returns error",
-			specVersion:                "rudder/v2.0",
-			useV1SpecSupport:           true,
 			expectError:                true,
 			expectLoadSpecCalled:       false,
 			expectLoadLegacySpecCalled: false,
@@ -209,13 +325,10 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 			t.Parallel()
 
 			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.MatchPatterns = fixtureMatchPatterns
 			mockLoader := &MockLoader{}
 
-			var opts []project.ProjectOption
-			opts = append(opts, project.WithLoader(mockLoader))
-			if tc.useV1SpecSupport {
-				opts = append(opts, project.WithV1SpecSupport())
-			}
+			opts := []project.ProjectOption{project.WithLoader(mockLoader)}
 
 			proj := project.New(mockProvider, opts...)
 
@@ -258,6 +371,231 @@ func TestProject_LoadSpec_WithV1SpecSupport(t *testing.T) {
 				tc.expectLoadLegacySpecCalled,
 				loadLegacySpecCalled,
 				"LoadLegacySpec called mismatch: expected %v, got %v", tc.expectLoadLegacySpecCalled, loadLegacySpecCalled)
+		})
+	}
+}
+
+func TestProject_Load_WithSubstitutor(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		substitutor varsubst.Substitutor
+		rawSpecs    map[string][]byte
+		wantErr     string // empty when Load should succeed
+		wantSpecs   map[string]*specs.Spec
+	}{
+		{
+			name:        "resolves variables in metadata",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "resolved_name"},
+					Spec:     map[string]any{"k": "v"},
+				},
+			},
+		},
+		{
+			// Bare 5432 (no surrounding quotes in the spec) parses as int after substitution.
+			name:        "preserves non-string scalar type",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"PORT": "5432"}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: db\nspec:\n  port: {{ .PORT }}"),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "db"},
+					Spec:     map[string]any{"port": 5432},
+				},
+			},
+		},
+		{
+			name:        "undefined variable aborts load before parsing",
+			substitutor: varsubst.NewSubstitutor(mapResolver{}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
+			},
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+		{
+			// A var file cannot fix a malformed token, so no --var-file hint.
+			name:        "invalid variable syntax aborts load without var-file hint",
+			substitutor: varsubst.NewSubstitutor(mapResolver{}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: \"{{ .1A }}\"\nspec:\n  k: v"),
+			},
+			wantErr:   "variable substitution failed",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+		{
+			name:        "nil substitutor leaves spec untouched",
+			substitutor: nil,
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: literal\nspec:\n  k: \"{{ .v }}\""),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "literal"},
+					Spec:     map[string]any{"k": "{{ .v }}"},
+				},
+			},
+		},
+		{
+			// Substitution is all-or-nothing: a single failed spec aborts the
+			// pass before any spec is parsed, so no specs reach Specs().
+			name:        "mixed clean and errored specs short-circuits before parsing",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"NAME": "clean_name"}),
+			rawSpecs: map[string][]byte{
+				"path/to/clean.yaml":   []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .NAME }}\nspec:\n  k: v"),
+				"path/to/errored.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: {{ .MISSING }}\nspec:\n  k: v"),
+			},
+			wantErr:   "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			wantSpecs: map[string]*specs.Spec{},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := testutils.NewMockProvider(nil, nil)
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
+				for path, data := range tc.rawSpecs {
+					raw[path] = &specs.RawSpec{Data: data}
+				}
+				return raw, nil
+			}}
+
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithSubstitutor(tc.substitutor),
+			)
+
+			err := proj.Load("test_dir")
+			if tc.wantErr != "" {
+				require.EqualError(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tc.wantSpecs, proj.Specs())
+		})
+	}
+}
+
+// warningProvider adds a syntactic and a semantic rule, each warning on the
+// fixture spec named after it, so a test can place the two phases' diagnostics
+// in different files.
+type warningProvider struct {
+	*testutils.MockProvider
+}
+
+func warnOnSpecNamed(name string) func(string, string, map[string]any, map[string]any) []rules.ValidationResult {
+	return func(_ string, _ string, metadata map[string]any, _ map[string]any) []rules.ValidationResult {
+		if metadata["name"] != name {
+			return nil
+		}
+		return []rules.ValidationResult{{Message: "check this spec"}}
+	}
+}
+
+func (p *warningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/syntactic-warning",
+		rules.Warning,
+		"the syntactic fixture spec always warns",
+		rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, warnOnSpecNamed("syntactic_source")),
+	)}
+}
+
+func (p *warningProvider) SemanticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/semantic-warning",
+		rules.Warning,
+		"the semantic fixture spec always warns",
+		rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, warnOnSpecNamed("semantic_source")),
+	)}
+}
+
+func fixtureSpec(name string) *specs.RawSpec {
+	return &specs.RawSpec{Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: " + name + "\nspec:\n  k: v")}
+}
+
+// TestProject_Load_RendersSyntacticWarnings covers what handleValidation does
+// with syntactic diagnostics that do not stop the load: they used to be dropped
+// on the way to the semantic phase, and on the error paths in between. The
+// two-file case also pins the ordering, since the merged set is sorted by file
+// rather than by phase.
+func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]*specs.RawSpec
+		graphErr  error
+		wantLines []string
+	}{
+		{
+			name:      "syntactic warning alone",
+			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
+		},
+		{
+			name:      "load fails after the syntax gate",
+			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			graphErr:  errors.New("graph is broken"),
+			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
+		},
+		{
+			name: "semantic file sorts ahead of the syntactic one",
+			rawSpecs: map[string]*specs.RawSpec{
+				"b.yaml": fixtureSpec("syntactic_source"),
+				"a.yaml": fixtureSpec("semantic_source"),
+			},
+			wantLines: []string{
+				"warning[test/semantic-warning]: check this spec",
+				"warning[test/syntactic-warning]: check this spec",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := &warningProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockProvider.GetResourceGraphErr = tc.graphErr
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				return tc.rawSpecs, nil
+			}}
+
+			var buf bytes.Buffer
+			proj := project.New(mockProvider, project.WithLoader(mockLoader), project.WithRenderer(renderer.NewTextRenderer(&buf)))
+
+			err := proj.Load("test_dir")
+			assert.Equal(t, tc.graphErr != nil, err != nil, "load error: %v", err)
+
+			var rendered []string
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if strings.Contains(line, "check this spec") {
+					rendered = append(rendered, strings.TrimSpace(line))
+				}
+			}
+			assert.Equal(t, tc.wantLines, rendered)
 		})
 	}
 }

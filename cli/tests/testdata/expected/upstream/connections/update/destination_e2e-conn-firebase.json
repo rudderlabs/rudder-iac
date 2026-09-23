@@ -1,0 +1,16 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "e2e-conn-firebase",
+  "name": "E2E Connection Firebase",
+  "type": "FIREBASE",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "android": "device"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

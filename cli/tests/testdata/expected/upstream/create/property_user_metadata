@@ -1,0 +1,15 @@
+{
+    "propConfig": {},
+    "id": "prop_IGNORED",
+    "externalId": "user_metadata",
+    "name": "User Metadata",
+    "description": "Optional user metadata object or null",
+    "type": "null,object",
+    "workspaceId": "IGNORED",
+    "createdBy": "IGNORED",
+    "updatedBy": null,
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "itemDefinitionId": "",
+    "definitionId": ""
+}

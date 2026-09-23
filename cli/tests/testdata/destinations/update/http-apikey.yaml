@@ -1,0 +1,23 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: http-apikey
+spec:
+  id: http-apikey
+  display_name: E2E HTTP API Key Auth Updated
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/events
+    auth: apiKeyAuth
+    api_key_name: "{{ .HTTP_APIKEY_API_KEY_NAME }}"
+    api_key_value: "{{ .HTTP_API_KEY_VALUE }}"
+    method: POST
+    format: JSON
+    headers:
+      - to: X-Rudder-Source
+        from: "{{ .HTTP_APIKEY_HEADERS_FROM }}"
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

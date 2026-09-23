@@ -1,0 +1,27 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "s3-datalake-role",
+  "name": "E2E S3 Datalake Role",
+  "type": "S3_DATALAKE",
+  "enabled": true,
+  "config": {
+    "allowUsersContextTraits": false,
+    "bucketName": "rudder-cli-e2e-datalake-role",
+    "cleanupObjectStorageFiles": false,
+    "enableSSE": true,
+    "iamRoleARN": "arn:aws:iam::123456789012:role/rudder-cli-e2e-datalake",
+    "namespace": "rudder_e2e_datalake_role",
+    "prefix": "rudder/datalake-role/",
+    "region": "us-east-1",
+    "roleBasedAuth": true,
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "syncFrequency": "180",
+    "underscoreDivideNumbers": false,
+    "useGlue": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

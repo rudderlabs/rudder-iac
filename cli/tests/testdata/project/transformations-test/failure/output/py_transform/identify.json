@@ -1,0 +1,18 @@
+[
+  {
+    "userId": "failure_user_123",
+    "type": "identify",
+    "context": {
+      "traits": {
+        "name": "Failure User"
+      }
+    },
+    "properties": {
+      "name": "Failure User",
+      "source": "rudder"
+    },
+    "channel": "web",
+    "messageId": "failure-py-transform-identify",
+    "anonymousId": "failure_anonymous_id"
+  }
+]

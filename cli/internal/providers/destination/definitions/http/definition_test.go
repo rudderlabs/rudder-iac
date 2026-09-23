@@ -1,0 +1,1075 @@
+package http_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
+)
+
+func TestNewDefinitionMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+
+	registered, err := registry.Get("http", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, "http", registered.Type)
+	assert.Equal(t, "HTTP", registered.APIType)
+	assert.Equal(t, int64(1), registered.Version)
+	assert.Equal(t, []string{"password", "bearer_token", "api_key_value", "api_key_name", "username", "headers.from"}, registered.SecretKeys())
+
+	expectedSourceTypes := []string{
+		"android", "android_kotlin", "ios", "ios_swift", "web",
+		"unity", "react_native", "flutter", "cordova", "cloud", "warehouse",
+	}
+	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	for _, sourceType := range expectedSourceTypes {
+		modes, err := registered.ConnectionModes(sourceType)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cloud"}, modes)
+	}
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.Empty(t, registered.GatedKeyPaths())
+
+	// HTTP declares neither field upstream, so it takes the backend fallback.
+	assert.Nil(t, httpdest.NewDefinition().SyncBehaviours, "HTTP must declare no override")
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
+
+	// auth/method/format are defaulted upstream too, but are required here, so
+	// a spec always carries them.
+	assert.Equal(t, map[string]any{
+		"is_batching_enabled": false,
+		"is_default_mapping":  true,
+	}, registered.ConfigDefaults())
+
+	byAPI, err := registry.GetByAPIType("HTTP", 1)
+	require.NoError(t, err)
+	assert.Equal(t, registered, byAPI)
+}
+
+func TestHTTPApplyDefaults(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredHTTPDefinition(t)
+
+	t.Run("fills defaults omitted by the spec", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": false,
+			"is_default_mapping":  true,
+		}, registered.ApplyDefaults(validMinimalConfig()))
+	})
+
+	t.Run("keeps values the spec sets", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = "50"
+		config["is_default_mapping"] = false
+
+		assert.Equal(t, map[string]any{
+			"api_url":             "https://example.com/webhook",
+			"auth":                "noAuth",
+			"method":              "POST",
+			"format":              "JSON",
+			"is_batching_enabled": true,
+			"max_batch_size":      "50",
+			"is_default_mapping":  false,
+		}, registered.ApplyDefaults(config))
+	})
+
+	t.Run("enriched config stays valid", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, registered.ValidateConfig(registered.ApplyDefaults(validMinimalConfig())))
+	})
+}
+
+// Regression guard for the phantom diff: a spec omitting the defaulted keys
+// must yield the same local config as the destination the backend stored for
+// it, so a second apply reports no change.
+func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+	h := destination.NewHandler(nil, registry)
+
+	// The spec omits is_batching_enabled / is_default_mapping entirely.
+	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/http.yaml", &destination.DestinationSpec{
+		ID:                "http-noauth",
+		DisplayName:       "HTTP No Auth",
+		Type:              "http",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config:            validMinimalConfig(),
+	})
+	require.NoError(t, err)
+
+	// What the backend stores for that spec: the same values plus the defaults
+	// it applied. eventFilteringOption has no local key and is dropped on the
+	// way back.
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-http",
+		ExternalID: "http-noauth",
+		Name:       "HTTP No Auth",
+		Type:       "HTTP",
+		Version:    1,
+		IsEnabled:  true,
+		Config: []byte(`{
+			"apiUrl": "https://example.com/webhook",
+			"auth": "noAuth",
+			"method": "POST",
+			"format": "JSON",
+			"isBatchingEnabled": false,
+			"isDefaultMapping": true,
+			"eventFilteringOption": "disable"
+		}`),
+	}}
+
+	remoteResource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	assert.Equal(t, remoteResource.Config, extracted["http-noauth"].Config,
+		"enriched spec config must equal the remote-derived config, otherwise apply reports a phantom diff")
+}
+
+func TestHTTPConfigValidation(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredHTTPDefinition(t)
+
+	for _, tc := range []struct {
+		name string
+		key  string
+		path string
+	}{
+		{name: "missing api_url", key: "api_url", path: "/api_url"},
+		{name: "missing auth", key: "auth", path: "/auth"},
+		{name: "missing method", key: "method", path: "/method"},
+		{name: "missing format", key: "format", path: "/format"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := validMinimalConfig()
+			delete(config, tc.key)
+
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors)
+			assert.Equal(t, tc.path, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "required")
+		})
+	}
+
+	t.Run("valid noAuth minimal config", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(validMinimalConfig())
+		assert.Empty(t, errors)
+	})
+
+	t.Run("validated example config", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(exampleConfig())
+		assert.Empty(t, errors)
+	})
+
+	t.Run("invalid api_url rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["api_url"] = "http://localhost:8080/webhook"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/api_url", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "public http(s) domain URL")
+	})
+
+	t.Run("ngrok api_url rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["api_url"] = "https://demo.ngrok.io/webhook"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/api_url", errors[0].Path)
+	})
+
+	t.Run("invalid auth rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "oauth"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/auth", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("invalid method rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["method"] = "OPTIONS"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/method", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	t.Run("invalid format rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["format"] = "CSV"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/format", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
+	})
+
+	// schema.json declares all three as plain enums with no {{ … || … }} branch,
+	// so a templated value would be stored verbatim and rejected by the backend.
+	t.Run("auth method and format reject dynamic values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{"auth", "method", "format"} {
+			for _, value := range []string{`{{ .VALUE || noAuth }}`, "env.VALUE"} {
+				config := validMinimalConfig()
+				config[field] = value
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors, "%s=%s", field, value)
+				assert.Equal(t, "/"+field, errors[0].Path)
+			}
+		}
+	})
+
+	t.Run("valid basicAuth", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "basicAuth"
+		config["username"] = "rudder"
+		config["password"] = "secret"
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("basicAuth requires username and password", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "basicAuth"
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 2)
+		assertValidationPaths(t, errors, "/username", "/password")
+	})
+
+	t.Run("valid bearerTokenAuth", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "bearerTokenAuth"
+		config["bearer_token"] = "bearer-token"
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("bearerTokenAuth requires bearer_token", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "bearerTokenAuth"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/bearer_token", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	t.Run("valid apiKeyAuth", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "apiKeyAuth"
+		config["api_key_name"] = "X-Api-Key"
+		config["api_key_value"] = "api-key-value"
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("apiKeyAuth requires api key name and value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "apiKeyAuth"
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 2)
+		assertValidationPaths(t, errors, "/api_key_name", "/api_key_value")
+	})
+
+	t.Run("api_key_name rejects whitespace", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["auth"] = "apiKeyAuth"
+		config["api_key_name"] = "X Api Key"
+		config["api_key_value"] = "api-key-value"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/api_key_name", errors[0].Path)
+	})
+
+	t.Run("batching enabled requires string max_batch_size", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = "100"
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("batching enabled requires max_batch_size", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/max_batch_size", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	t.Run("numeric max_batch_size rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = 100
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/max_batch_size", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "expected type 'string'")
+	})
+
+	t.Run("max_batch_size range rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_batching_enabled"] = true
+		config["max_batch_size"] = "101"
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/max_batch_size", errors[0].Path)
+	})
+
+	t.Run("valid XML with xml_root_key", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["format"] = "XML"
+		config["xml_root_key"] = "rudderEvent"
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	// schema.json states these as patterns, not length keywords, so the bound
+	// forbids line breaks as well as overlong values.
+	t.Run("credential fields reject line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			auth  string
+			field string
+		}{
+			{auth: "basicAuth", field: "username"},
+			{auth: "basicAuth", field: "password"},
+			{auth: "bearerTokenAuth", field: "bearer_token"},
+			{auth: "apiKeyAuth", field: "api_key_value"},
+		} {
+			config := validMinimalConfig()
+			config["auth"] = tc.auth
+			switch tc.auth {
+			case "basicAuth":
+				config["username"] = "rudder"
+				config["password"] = "s3cret"
+			case "bearerTokenAuth":
+				config["bearer_token"] = "token"
+			case "apiKeyAuth":
+				config["api_key_name"] = "X-Api-Key"
+				config["api_key_value"] = "value"
+			}
+			config[tc.field] = "bad\nvalue"
+
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors, tc.field)
+			assert.Equal(t, "/"+tc.field, errors[0].Path)
+		}
+
+		config := validMinimalConfig()
+		config["format"] = "XML"
+		config["xml_root_key"] = "bad\nvalue"
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/xml_root_key", errors[0].Path)
+	})
+
+	// schema.json allows up to 2048 for bearerToken; the CLI previously capped
+	// it at 255, which rejects an ordinary JWT.
+	t.Run("bearer_token length follows schema bounds", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			length int
+			valid  bool
+		}{
+			{length: 256, valid: true},
+			{length: 2048, valid: true},
+			{length: 2049, valid: false},
+		} {
+			config := validMinimalConfig()
+			config["auth"] = "bearerTokenAuth"
+			config["bearer_token"] = stringOfLength(tc.length)
+
+			errors := registered.ValidateConfig(config)
+			if tc.valid {
+				assert.Empty(t, errors, "length %d", tc.length)
+				continue
+			}
+			require.NotEmpty(t, errors, "length %d", tc.length)
+			assert.Equal(t, "/bearer_token", errors[0].Path)
+		}
+	})
+
+	t.Run("xml_root_key length rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["format"] = "XML"
+		config["xml_root_key"] = stringOfLength(101)
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/xml_root_key", errors[0].Path)
+	})
+
+	t.Run("valid mapping arrays", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["is_default_mapping"] = false
+		config["properties_mapping"] = []any{map[string]any{"to": "$.traits.email", "from": "$.context.traits.email"}}
+		config["query_params"] = []any{map[string]any{"to": "plan", "from": "$.context.plan"}}
+		config["headers"] = []any{map[string]any{"to": "X-Source", "from": "rudder/web"}}
+		config["path_params"] = []any{map[string]any{"path": "$.userId"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("invalid properties_mapping nested field rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["properties_mapping"] = []any{map[string]any{"to": "not-json-path", "from": "$.userId"}}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/properties_mapping/0/to", errors[0].Path)
+	})
+
+	t.Run("invalid query_params nested field rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["query_params"] = []any{map[string]any{"to": "$.bad", "from": "value"}}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/query_params/0/to", errors[0].Path)
+	})
+
+	t.Run("invalid headers nested field rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["headers"] = []any{map[string]any{"to": "X Header", "from": "value"}}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/headers/0/to", errors[0].Path)
+	})
+
+	t.Run("invalid path_params nested field rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["path_params"] = []any{map[string]any{"path": "bad path"}}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/path_params/0/path", errors[0].Path)
+	})
+
+	t.Run("valid event filtering whitelist", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"whitelist": []any{"Order Completed", "Product Viewed"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering whitelist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"whitelist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering blacklist accepts template value", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{"blacklist": []any{"{{ event || fallback }}"}}
+
+		errors := registered.ValidateConfig(config)
+		assert.Empty(t, errors)
+	})
+
+	t.Run("event filtering rejects invalid literal values", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name  string
+			key   string
+			value string
+			path  string
+		}{
+			{name: "whitelist newline", key: "whitelist", value: "Order\nCompleted", path: "/event_filtering/whitelist/0"},
+			{name: "blacklist too long", key: "blacklist", value: stringOfLength(101), path: "/event_filtering/blacklist/0"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				config := validMinimalConfig()
+				config["event_filtering"] = map[string]any{tc.key: []any{tc.value}}
+
+				errors := registered.ValidateConfig(config)
+				require.NotEmpty(t, errors)
+				assert.Equal(t, tc.path, errors[0].Path)
+			})
+		}
+	})
+
+	t.Run("event filtering rejects whitelist and blacklist together", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["event_filtering"] = map[string]any{
+			"whitelist": []any{"Order Completed"},
+			"blacklist": []any{"Product Viewed"},
+		}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/event_filtering/whitelist", "/event_filtering/blacklist")
+	})
+
+	t.Run("unknown key rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["not_a_field"] = true
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/not_a_field", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
+	})
+
+	t.Run("unsupported consent source rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["consent_management"] = map[string]any{"amp": []any{}}
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/amp", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'amp' is not supported")
+	})
+
+	t.Run("invalid consent provider rejected", func(t *testing.T) {
+		t.Parallel()
+
+		config := validMinimalConfig()
+		config["consent_management"] = map[string]any{
+			"web": []any{map[string]any{"provider": "unknown"}},
+		}
+
+		errors := registered.ValidateConfig(config)
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/web/0/provider", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "'provider' must be one of")
+	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
+	t.Run("warehouse settings accepted", func(t *testing.T) {
+		t.Parallel()
+		config := validMinimalConfig()
+		config["connection_mode"] = map[string]any{"warehouse": "cloud"}
+		config["consent_management"] = map[string]any{"warehouse": []any{
+			map[string]any{
+				"provider":            "custom",
+				"resolution_strategy": "and",
+				"consents":            []any{"marketing"},
+			},
+		}}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("connection_mode rejects device for warehouse", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"warehouse": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/warehouse" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/warehouse to be rejected")
+	})
+}
+
+func TestHTTPConversionRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	def := httpdest.NewDefinition()
+	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
+		{
+			// Warehouse support adds connectionMode/consentManagement warehouse
+			// properties; a spec that omits them still converts unchanged.
+			Name: "minimal",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON"
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON"
+			}`,
+		},
+		{
+			Name: "basic auth",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "basicAuth",
+				"username": "rudder",
+				"password": "secret",
+				"method": "POST",
+				"format": "JSON"
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "basicAuth",
+				"username": "rudder",
+				"password": "secret",
+				"method": "POST",
+				"format": "JSON"
+			}`,
+		},
+		{
+			Name: "bearer auth",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "bearerTokenAuth",
+				"bearer_token": "bearer-token",
+				"method": "PUT",
+				"format": "JSON"
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "bearerTokenAuth",
+				"bearerToken": "bearer-token",
+				"method": "PUT",
+				"format": "JSON"
+			}`,
+		},
+		{
+			Name: "api key auth",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "apiKeyAuth",
+				"api_key_name": "X-Api-Key",
+				"api_key_value": "api-key-value",
+				"method": "PATCH",
+				"format": "JSON"
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "apiKeyAuth",
+				"apiKeyName": "X-Api-Key",
+				"apiKeyValue": "api-key-value",
+				"method": "PATCH",
+				"format": "JSON"
+			}`,
+		},
+		{
+			Name: "mapping arrays and batching",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"xml_root_key": "rudderEvent",
+				"method": "POST",
+				"format": "XML",
+				"properties_mapping": [{"to": "$.traits.email", "from": "$.context.traits.email"}],
+				"query_params": [{"to": "plan", "from": "$.context.plan"}],
+				"headers": [{"to": "X-Source", "from": "rudder/web"}],
+				"path_params": [{"path": "$.userId"}],
+				"is_batching_enabled": true,
+				"max_batch_size": "25",
+				"is_default_mapping": false
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"xmlRootKey": "rudderEvent",
+				"method": "POST",
+				"format": "XML",
+				"propertiesMapping": [{"to": "$.traits.email", "from": "$.context.traits.email"}],
+				"queryParams": [{"to": "plan", "from": "$.context.plan"}],
+				"headers": [{"to": "X-Source", "from": "rudder/web"}],
+				"pathParams": [{"path": "$.userId"}],
+				"isBatchingEnabled": true,
+				"maxBatchSize": "25",
+				"isDefaultMapping": false
+			}`,
+		},
+		{
+			Name: "event filtering whitelist",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"event_filtering": {"whitelist": ["Order Completed", "Product Viewed"]}
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"whitelistedEvents": [{"eventName": "Order Completed"}, {"eventName": "Product Viewed"}],
+				"eventFilteringOption": "whitelistedEvents"
+			}`,
+		},
+		{
+			Name: "event filtering blacklist",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"event_filtering": {"blacklist": ["Order Cancelled"]}
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"blacklistedEvents": [{"eventName": "Order Cancelled"}],
+				"eventFilteringOption": "blacklistedEvents"
+			}`,
+		},
+		{
+			Name: "consent source boundary mappings",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"consent_management": {
+					"android_kotlin": [{"provider": "oneTrust"}],
+					"ios_swift": [{"provider": "ketch"}],
+					"react_native": [{"provider": "iubenda"}]
+				}
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"consentManagement": {
+					"androidKotlin": [{"provider": "oneTrust"}],
+					"iosSwift": [{"provider": "ketch"}],
+					"reactnative": [{"provider": "iubenda"}]
+				}
+			}`,
+		},
+		{
+			Name: "warehouse settings",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"connection_mode": {"warehouse": "cloud"},
+				"consent_management": {"warehouse": [{"provider": "custom", "resolution_strategy": "and", "consents": ["marketing"]}]}
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"connectionMode": {"warehouse": "cloud"},
+				"consentManagement": {"warehouse": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent": "marketing"}]}]}
+			}`,
+		},
+	})
+}
+
+func TestHTTPSecretKeysUseLocalConfigKeys(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+
+	h := destination.NewHandler(nil, registry)
+	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/http.yaml", &destination.DestinationSpec{
+		ID:                "http-production",
+		DisplayName:       "HTTP Production",
+		Type:              "http",
+		Enabled:           true,
+		DefinitionVersion: 1,
+		Config: map[string]any{
+			"api_url":       "https://example.com/webhook",
+			"auth":          "apiKeyAuth",
+			"method":        "POST",
+			"format":        "JSON",
+			"password":      "password-value",
+			"bearer_token":  "bearer-token-value",
+			"api_key_name":  "X-Api-Key",
+			"api_key_value": "api-key-secret-value",
+		},
+	})
+	require.NoError(t, err)
+
+	config := extracted["http-production"].Config
+	assertWrappedSecret(t, config, "password", "password-value")
+	assertWrappedSecret(t, config, "bearer_token", "bearer-token-value")
+	assertWrappedSecret(t, config, "api_key_value", "api-key-secret-value")
+	assertWrappedSecret(t, config, "api_key_name", "X-Api-Key")
+}
+
+func TestHTTPRemoteSecretsAreUnknownAndRedacted(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+
+	h := destination.NewHandler(nil, registry)
+	remote := &destination.RemoteDestination{Destination: &client.Destination{
+		ID:         "dst-http",
+		ExternalID: "http-production",
+		Name:       "HTTP Production",
+		Type:       "HTTP",
+		Version:    1,
+		IsEnabled:  true,
+		Config: []byte(`{
+			"apiUrl": "https://example.com/webhook",
+			"auth": "apiKeyAuth",
+			"method": "POST",
+			"format": "JSON",
+			"bearerToken": "",
+			"apiKeyName": "X-Api-Key",
+			"apiKeyValue": ""
+		}`),
+	}}
+
+	resource, _, err := h.Impl.MapRemoteToState(remote, urnResolver{})
+	require.NoError(t, err)
+
+	bearerToken := requireSecret(t, resource.Config, "bearer_token")
+	apiKeyValue := requireSecret(t, resource.Config, "api_key_value")
+	assert.True(t, bearerToken.IsUnknown())
+	assert.True(t, apiKeyValue.IsUnknown())
+	assert.NotContains(t, fmt.Sprintf("%v %v", bearerToken, apiKeyValue), "api-key")
+	assert.NotContains(t, mustJSON(t, resource.Config), "api-key")
+}
+
+func registeredHTTPDefinition(t *testing.T) *definitions.RegisteredDefinition {
+	t.Helper()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+	registered, err := registry.Get("http", 1)
+	require.NoError(t, err)
+	return registered
+}
+
+func validMinimalConfig() map[string]any {
+	return map[string]any{
+		"api_url": "https://example.com/webhook",
+		"auth":    "noAuth",
+		"method":  "POST",
+		"format":  "JSON",
+	}
+}
+
+func exampleConfig() map[string]any {
+	return map[string]any{
+		"api_url":             "https://webhooks.example.com/rudder/events",
+		"auth":                "apiKeyAuth",
+		"api_key_name":        "X-Api-Key",
+		"api_key_value":       "{{ .HTTP_API_KEY_VALUE }}",
+		"method":              "POST",
+		"format":              "JSON",
+		"is_default_mapping":  false,
+		"properties_mapping":  []any{map[string]any{"to": "$.email", "from": "$.context.traits.email"}},
+		"query_params":        []any{map[string]any{"to": "source", "from": "rudder"}},
+		"headers":             []any{map[string]any{"to": "X-Rudder-Source", "from": "rudder-cli"}},
+		"path_params":         []any{map[string]any{"path": "$.userId"}},
+		"is_batching_enabled": true,
+		"max_batch_size":      "25",
+		"event_filtering":     map[string]any{"whitelist": []any{"Order Completed", "Product Viewed"}},
+		"consent_management":  map[string]any{"web": []any{map[string]any{"provider": "oneTrust", "consents": []any{"analytics"}}}},
+	}
+}
+
+func assertValidationPaths(t *testing.T, errors []definitions.ConfigError, paths ...string) {
+	t.Helper()
+
+	byPath := map[string]struct{}{}
+	for _, err := range errors {
+		byPath[err.Path] = struct{}{}
+	}
+	for _, path := range paths {
+		assert.Contains(t, byPath, path)
+	}
+}
+
+func assertWrappedSecret(t *testing.T, config map[string]any, key string, want string) {
+	t.Helper()
+
+	s := requireSecret(t, config, key)
+	assert.False(t, s.IsUnknown())
+	assert.Equal(t, want, s.Reveal())
+	assert.NotContains(t, fmt.Sprintf("%v", s), want)
+}
+
+func requireSecret(t *testing.T, config map[string]any, key string) *secret.String {
+	t.Helper()
+
+	v, ok := config[key]
+	require.True(t, ok, "missing secret key %q", key)
+	s, ok := v.(*secret.String)
+	require.True(t, ok, "key %q: expected *secret.String, got %T", key, v)
+	require.NotNil(t, s)
+	return s
+}
+
+func mustJSON(t *testing.T, value any) string {
+	t.Helper()
+
+	b, err := json.Marshal(value)
+	require.NoError(t, err)
+	return string(b)
+}
+
+func stringOfLength(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = 'x'
+	}
+	return string(b)
+}
+
+type urnResolver struct{}
+
+func (urnResolver) GetURNByID(string, string) (string, error) {
+	return "", resources.ErrRemoteResourceExternalIdNotFound
+}

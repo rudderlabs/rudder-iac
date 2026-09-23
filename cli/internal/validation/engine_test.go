@@ -366,7 +366,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), map[string]*specs.RawSpec{}, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), map[string]*specs.RawSpec{}, graph, "")
 
 			require.NoError(t, err)
 			assert.Empty(t, diagnostics)
@@ -399,7 +399,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			assert.Empty(t, diagnostics)
@@ -430,7 +430,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			require.Len(t, diagnostics, 1)
@@ -468,7 +468,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			testGraph := resources.NewGraph()
-			_, err = engine.ValidateSemantic(context.Background(), rawSpecs, testGraph)
+			_, err = engine.ValidateSemantic(context.Background(), rawSpecs, testGraph, "")
 
 			require.NoError(t, err)
 			assert.NotNil(t, receivedGraph)
@@ -513,7 +513,7 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 			require.NoError(t, err)
 
 			graph := resources.NewGraph()
-			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph)
+			diagnostics, err := engine.ValidateSemantic(context.Background(), rawSpecs, graph, "")
 
 			require.NoError(t, err)
 			require.Len(t, diagnostics, 2)
@@ -529,13 +529,13 @@ func TestValidationEngine_ValidateSemantic(t *testing.T) {
 	})
 }
 
-// mockProjectRule implements both Rule and ProjectRule
-type mockProjectRule struct {
+// mockMultiSpecRule implements both Rule and ProjectRule
+type mockMultiSpecRule struct {
 	mockRule
 	validateProjectFn func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult
 }
 
-func (m *mockProjectRule) ValidateProject(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+func (m *mockMultiSpecRule) ValidateSpecs(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 	if m.validateProjectFn != nil {
 		return m.validateProjectFn(specs)
 	}
@@ -552,7 +552,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
 		}
 
-		pr := &mockProjectRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
@@ -602,7 +602,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			},
 		}
 
-		pr := &mockProjectRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "project-rule",
 				severity:  rules.Error,
@@ -640,7 +640,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 			"/path/to/test.yaml": newRawSpec(t, validPropertiesYAML),
 		}
 
-		pr := &mockProjectRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:       "exact-pattern-project-rule",
 				severity: rules.Error,
@@ -679,7 +679,7 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 
 		var receivedPaths []string
 
-		pr := &mockProjectRule{
+		pr := &mockMultiSpecRule{
 			mockRule: mockRule{
 				id:        "capture-rule",
 				severity:  rules.Error,
@@ -705,6 +705,43 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		assert.Len(t, receivedPaths, 2)
 		assert.Contains(t, receivedPaths, "/path/to/props.yaml")
 		assert.Contains(t, receivedPaths, "/path/to/events.yaml")
+	})
+
+	t.Run("multiple-resource rule receives only specs matching its AppliesTo patterns", func(t *testing.T) {
+		t.Parallel()
+
+		rawSpecs := map[string]*specs.RawSpec{
+			"/path/to/props.yaml":  newRawSpec(t, validPropertiesYAML),
+			"/path/to/events.yaml": newRawSpec(t, validEventsYAML),
+		}
+
+		var receivedPaths []string
+
+		// Scoped to "properties" only — must NOT receive the events spec.
+		pr := &mockMultiSpecRule{
+			mockRule: mockRule{
+				id:        "properties-only-rule",
+				severity:  rules.Error,
+				appliesTo: []rules.MatchPattern{rules.MatchKind("properties")},
+			},
+			validateProjectFn: func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				for path := range specs {
+					receivedPaths = append(receivedPaths, path)
+				}
+				return nil
+			},
+		}
+
+		registry := rules.NewRegistry(engineTestSupportedPatterns)
+		require.NoError(t, registry.RegisterSyntactic(pr))
+
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		_, err = engine.ValidateSyntax(context.Background(), rawSpecs)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"/path/to/props.yaml"}, receivedPaths)
 	})
 
 }

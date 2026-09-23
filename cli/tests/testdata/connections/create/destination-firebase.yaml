@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: e2e-conn-firebase
+spec:
+  id: e2e-conn-firebase
+  display_name: E2E Connection Firebase
+  type: firebase
+  enabled: true
+  definition_version: 1
+  config:
+    connection_mode:
+      android: device

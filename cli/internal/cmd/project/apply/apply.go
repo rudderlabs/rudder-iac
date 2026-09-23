@@ -5,12 +5,14 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -23,12 +25,14 @@ var (
 
 func NewCmdApply() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		dryRun   bool
-		confirm  bool
+		deps      app.Deps
+		p         project.Project
+		workspace *client.Workspace
+		err       error
+		location  string
+		dryRun    bool
+		confirm   bool
+		varFiles  []string
 	)
 
 	cmd := &cobra.Command{
@@ -50,11 +54,26 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = deps.NewProject()
+			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
+
+			p = deps.NewProject(projectOpts...)
 
 			// Load and validate the project configuration
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
+			}
+
+			if project.HasLegacySpecs(p.Specs()) {
+				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
 			}
 
 			return nil
@@ -71,11 +90,6 @@ func NewCmdApply() *cobra.Command {
 				}...)
 			}()
 
-			workspace, err := deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
-			}
-
 			// Get resource graph to understand dependencies
 			graph, err := p.ResourceGraph()
 			if err != nil {
@@ -86,10 +100,7 @@ func NewCmdApply() *cobra.Command {
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
-			}
-
-			if config.GetConfig().ExperimentalFlags.ConcurrentSyncs {
-				options = append(options, syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer))
+				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
 			}
 
 			// Create syncer to handle the changes
@@ -117,6 +128,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
 }

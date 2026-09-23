@@ -12,16 +12,29 @@ import (
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
-	// ConcurrentSyncs enables concurrent sync operations when applying changes
-	ConcurrentSyncs bool `mapstructure:"concurrentSyncs"`
-	// NestedDiffs enables detailed diff reports for nested structures
-	NestedDiffs bool `mapstructure:"nestedDiffs"`
-	// V1SpecSupport enables support for v1 specs (rudder/v1)
-	V1SpecSupport bool `mapstructure:"v1SpecSupport"`
-	// Transformations enables transformations provider and related features
-	Transformations bool `mapstructure:"transformations"`
-	// DataGraph enables data graph operations (sync, validate, import)
-	DataGraph bool `mapstructure:"dataGraph"`
+	// EventRuleIncludes enables including event rules from other tracking plans
+	EventRuleIncludes bool `mapstructure:"eventRuleIncludes"`
+	// ImportMerge enables import-manifest.yaml generation during `import workspace`
+	// and treats the import-manifest kind as a recognized spec kind during
+	// validation. This feature `import workspace --merge` links matching
+	// remote resources to existing local project resources instead of
+	// generating duplicate specs
+	ImportMerge bool `mapstructure:"importMerge"`
+	// UnverifiedDestinations enables registration of destination definitions
+	// that still need the unverified gate.
+	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
+	// RetlConnectionSupport enables the rETL connection kind in the rETL
+	// provider: its spec kind, resource type, lifecycle and import matcher.
+	//
+	// Turning it on also puts retl-connections@rudder/v1 in scope for rule-doc
+	// generation, where no authored fragment covers it yet, so `make
+	// gen-rule-docs` and TestGenerateRuleCatalog_CompleteAndDriftFree fail until
+	// DEX-829 lands the fragments. CLI validation is unaffected either way.
+	RetlConnectionSupport bool `mapstructure:"retlConnectionSupport"`
+
+	// RETLTableSupport registers the retl-source-table spec kind with the RETL
+	// provider.
+	RETLTableSupport bool `mapstructure:"retlTableSupport"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

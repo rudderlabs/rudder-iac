@@ -3,6 +3,7 @@ package export_test
 import (
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler/export"
@@ -58,9 +59,13 @@ func TestSingleSpecExportStrategy_FormatForExport_WritesURN(t *testing.T) {
 		"local-id-1": {id: "remote-id-1", workspaceID: "ws-123"},
 	}
 
-	entities, err := strategy.FormatForExport(remotes, nil, nil)
+	entities, importEntries, err := strategy.FormatForExport(remotes, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, entities, 1)
+
+	assert.ElementsMatch(t, []importmanifest.ImportEntry{
+		{WorkspaceID: "ws-123", URN: "my-resource-type:local-id-1", RemoteID: "remote-id-1"},
+	}, importEntries)
 
 	spec, ok := entities[0].Content.(*specs.Spec)
 	require.True(t, ok)

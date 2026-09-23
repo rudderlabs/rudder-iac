@@ -15,7 +15,60 @@ var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, 
 	results = append(results, validateTrackingPlanVariantsV1(spec, graph)...)
 	results = append(results, validatePropertyNestingV1(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV1(spec, graph)...)
+	results = append(results, validateDuplicateEventsV1(spec)...)
+	results = append(results, validateDuplicatePropertiesV1(spec)...)
 
+	return results
+}
+
+func validateDuplicateEventsV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, rule := range spec.Rules {
+		counts[rule.Event]++
+	}
+
+	var results []rules.ValidationResult
+	for i, rule := range spec.Rules {
+		if counts[rule.Event] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/rules/%d/event", i),
+				Message:   "duplicate event reference in tracking plan rules",
+			})
+		}
+	}
+	return results
+}
+
+func validateDuplicatePropertiesV1(spec localcatalog.TrackingPlanV1) []rules.ValidationResult {
+	var results []rules.ValidationResult
+
+	for i, rule := range spec.Rules {
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+		results = append(results, checkDuplicateSiblingPropsV1(rule.Properties, ruleRef+"/properties")...)
+	}
+
+	return results
+}
+
+func checkDuplicateSiblingPropsV1(props []*localcatalog.TPRulePropertyV1, parentRef string) []rules.ValidationResult {
+	counts := make(map[string]int)
+	for _, prop := range props {
+		counts[prop.Property]++
+	}
+
+	var results []rules.ValidationResult
+	for i, prop := range props {
+		if counts[prop.Property] > 1 {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("%s/%d/property", parentRef, i),
+				Message:   "duplicate property reference in tracking plan event rule",
+			})
+		}
+		if len(prop.Properties) > 0 {
+			nestedRef := fmt.Sprintf("%s/%d/properties", parentRef, i)
+			results = append(results, checkDuplicateSiblingPropsV1(prop.Properties, nestedRef)...)
+		}
+	}
 	return results
 }
 
@@ -25,12 +78,15 @@ func validateTrackingPlanVariantsV1(spec localcatalog.TrackingPlanV1, graph *res
 		if len(rule.Variants) == 0 {
 			continue
 		}
+
+		ruleRef := fmt.Sprintf("/rules/%d", i)
+
 		ownRefs := make([]string, 0, len(rule.Properties))
 		for _, prop := range rule.Properties {
 			ownRefs = append(ownRefs, prop.Property)
 		}
-		results = append(results, variant.ValidateVariantDiscriminatorsV1(
-			rule.Variants, ownRefs, fmt.Sprintf("/rules/%d", i), graph,
+		results = append(results, variant.ValidateVariantSemanticV1(
+			rule.Variants, ownRefs, ruleRef, graph,
 		)...)
 	}
 	return results

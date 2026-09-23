@@ -1,0 +1,90 @@
+rule_id: "destination/semantic-valid"
+match_behavior:
+  - applies_to:
+      - kind: "destination"
+        version: "rudder/v1"
+    valid:
+      - example_id: "destination-semantic-valid-transformation-exists"
+        title: "Destination whose transformation exists in the project"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-prod
+            spec:
+              id: webhook-prod
+              display_name: Production Webhook
+              type: WEBHOOK
+              definition_version: 1
+              transformation: "#transformation:my-transformation"
+              config:
+                webhook_url: "https://example.com/hook"
+          transformation.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformation
+            spec:
+              id: my-transformation
+              name: My Transformation
+              language: javascript
+              code: "export function transformEvent(event) { return event; }"
+    invalid:
+      - example_id: "destination-semantic-transformation-not-found"
+        title: "Destination references a transformation that does not exist in the project"
+        files:
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-prod
+            spec:
+              id: webhook-prod
+              display_name: Production Webhook
+              type: WEBHOOK
+              definition_version: 1
+              transformation: "#transformation:ghost"
+              config:
+                webhook_url: "https://example.com/hook"
+        expected_diagnostics:
+          - file: "destination.yaml"
+            reference: "/transformation"
+            severity: "error"
+            message_contains: "not found in the project"
+      - example_id: "destination-semantic-duplicate-display-name"
+        title: "Two destinations share the same display_name"
+        files:
+          destination-a.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-a
+            spec:
+              id: webhook-a
+              display_name: Shared Name
+              type: WEBHOOK
+              definition_version: 1
+              config:
+                webhook_url: "https://example.com/hook-a"
+          destination-b.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: webhook-b
+            spec:
+              id: webhook-b
+              display_name: Shared Name
+              type: WEBHOOK
+              definition_version: 1
+              config:
+                webhook_url: "https://example.com/hook-b"
+        expected_diagnostics:
+          - file: "destination-a.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name"
+          - file: "destination-b.yaml"
+            reference: "/display_name"
+            severity: "error"
+            message_contains: "duplicate display_name"

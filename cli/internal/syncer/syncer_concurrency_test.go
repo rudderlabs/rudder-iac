@@ -12,26 +12,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/testutils"
 	internalTestutils "github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/samber/lo"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func enableConcurrentSyncs(t *testing.T) {
-	t.Helper()
-
-	viper.Set("experimental", true)
-	viper.Set("flags.concurrentSyncs", true)
-
-	t.Cleanup(func() {
-		viper.Set("experimental", false)
-		viper.Set("flags.concurrentSyncs", false)
-	})
-}
-
 func TestSyncerConcurrencyCreate(t *testing.T) {
-	enableConcurrentSyncs(t)
-
 	events, properties := createBasicResources()
 	trackingPlans := createTrackingPlans(events, properties)
 	targetGraph := createGraphWithResources(events, properties, trackingPlans)
@@ -169,8 +154,6 @@ func TestSyncerConcurrencyCreate(t *testing.T) {
 }
 
 func TestSyncerConcurrencyDelete(t *testing.T) {
-	enableConcurrentSyncs(t)
-
 	events, properties := createBasicResources()
 	trackingPlans := createTrackingPlans(events, properties)
 
@@ -307,8 +290,6 @@ func TestSyncerConcurrencyDelete(t *testing.T) {
 func TestSyncerContinueOnFailBehavior(t *testing.T) {
 
 	t.Run("sync operations stop on first failure", func(t *testing.T) {
-		enableConcurrentSyncs(t)
-
 		events, properties := createBasicResources()
 		trackingPlans := createTrackingPlans(events, properties)
 
@@ -359,8 +340,6 @@ func TestSyncerContinueOnFailBehavior(t *testing.T) {
 	})
 
 	t.Run("destroy operations continue despite failures", func(t *testing.T) {
-		enableConcurrentSyncs(t)
-
 		events, properties := createBasicResources()
 		trackingPlans := createTrackingPlans(events, properties)
 

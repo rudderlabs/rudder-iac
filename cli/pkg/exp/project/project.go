@@ -33,7 +33,13 @@ func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 		return nil, err
 	}
 
-	p := deps.NewProject()
+	// Wire the same capabilities (e.g. variable substitution) that apply/validate use.
+	projectOpts, err := app.NewProjectOptions(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	p := deps.NewProject(projectOpts...)
 	if err := p.Load(location); err != nil {
 		return nil, err
 	}

@@ -1,0 +1,108 @@
+rule_id: "transformations/transformation/spec-syntax-valid"
+match_behavior:
+  - applies_to:
+      - kind: "transformation"
+        version: "rudder/v1"
+    valid:
+      - example_id: "transformation-spec-syntax-valid-inline-js"
+        title: "Valid transformation spec with inline JavaScript code"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  description: Enriches events with additional metadata
+                  language: javascript
+                  code: |
+                    export function transformEvent(event, metadata) {
+                      event.properties.enriched = true;
+                      return event;
+                    }
+    invalid:
+      - example_id: "transformation-spec-syntax-valid-missing-id"
+        title: "Transformation spec missing required id field"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - name: My Transformation
+                  language: javascript
+                  code: |
+                    export function transformEvent(event, metadata) {
+                      return event;
+                    }
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/id"
+            severity: "error"
+            message_contains: "'id' is required"
+      - example_id: "transformation-spec-syntax-valid-missing-language"
+        title: "Transformation spec missing required language field"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  code: |
+                    export function transformEvent(event, metadata) {
+                      return event;
+                    }
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/language"
+            severity: "error"
+            message_contains: "'language' is required"
+      - example_id: "transformation-spec-syntax-valid-invalid-language"
+        title: "Transformation spec with unsupported language"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  language: ruby
+                  code: |
+                    def transform_event(event, metadata)
+                      event
+                    end
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/language"
+            severity: "error"
+            message_contains: "'language' must be one of [javascript python]"
+      - example_id: "transformation-spec-syntax-valid-missing-code-and-file"
+        title: "Transformation spec with neither code nor file specified"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  language: javascript
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/code"
+            severity: "error"
+            message_contains: "'code' is required when 'file' is not specified"

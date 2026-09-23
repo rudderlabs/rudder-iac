@@ -1,0 +1,57 @@
+{
+  "config": {
+    "apiKey": "rudderCliE2eAmFullKeyUpdated",
+    "blacklistedEvents": [
+      {
+        "eventName": "Application Opened"
+      }
+    ],
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "enableEnhancedUserOperations": false,
+    "enableFormInteractionsAutoCapture": {
+      "web": true
+    },
+    "enablePageViewsAutoCapture": {
+      "web": false
+    },
+    "eventFilteringOption": "blacklistedEvents",
+    "groupTypeTrait": "org",
+    "groupValueTrait": "orgId",
+    "mapDeviceBrand": false,
+    "residencyServer": "standard",
+    "sdkVersion": {
+      "web": 1
+    },
+    "trackAllPages": false,
+    "trackCategorizedPages": true,
+    "trackNamedPages": true,
+    "trackProductsOnce": false,
+    "trackRevenuePerProduct": false,
+    "trackSessionEvents": {
+      "android": true,
+      "web": false
+    },
+    "traitsToIncrement": [
+      {
+        "traits": "logins"
+      },
+      {
+        "traits": "sessions"
+      }
+    ],
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false,
+    "versionName": "2.0.0"
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "am",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Amplitude Updated",
+  "type": "AM",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

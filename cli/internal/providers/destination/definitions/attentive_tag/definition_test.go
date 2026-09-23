@@ -1,0 +1,336 @@
+package attentivetag_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
+)
+
+func TestNewDefinitionMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(attentivetag.NewDefinition()))
+
+	registered, err := registry.Get("attentive_tag", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, "attentive_tag", registered.Type)
+	assert.Equal(t, "ATTENTIVE_TAG", registered.APIType)
+	assert.Equal(t, int64(1), registered.Version)
+	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
+
+	expectedSourceTypes := []string{
+		"android", "android_kotlin", "ios", "ios_swift", "web",
+		"unity", "react_native", "flutter", "cordova", "cloud",
+	}
+	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	for _, sourceType := range expectedSourceTypes {
+		modes, err := registered.ConnectionModes(sourceType)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cloud"}, modes)
+	}
+
+	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	byAPI, err := registry.GetByAPIType("ATTENTIVE_TAG", 1)
+	require.NoError(t, err)
+	assert.Equal(t, registered, byAPI)
+}
+
+func TestAttentiveTagConfigValidation(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(attentivetag.NewDefinition()))
+	registered, err := registry.Get("attentive_tag", 1)
+	require.NoError(t, err)
+
+	t.Run("missing api_key", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/api_key", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "required")
+	})
+
+	t.Run("valid minimal config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "test-api-key",
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("valid full config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":                  "test-api-key",
+			"sign_up_source_id":        "12345",
+			"enable_new_identify_flow": true,
+			"consent_management": map[string]any{
+				"web": []any{
+					map[string]any{
+						"provider": "oneTrust",
+						"consents": []any{"analytics"},
+					},
+				},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("example yaml config", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":                  "your-attentive-api-key",
+			"sign_up_source_id":        "123456",
+			"enable_new_identify_flow": true,
+		})
+		assert.Empty(t, errors)
+	})
+
+	// schema.json states api_key as ^(.{1,100})$, a pattern rather than a length
+	// keyword, so the bound forbids line breaks as well as overlong values.
+	t.Run("api_key rejects overlong values and line breaks", func(t *testing.T) {
+		t.Parallel()
+		for _, value := range []string{strings.Repeat("a", 101), "bad\nvalue"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"api_key": value,
+			})
+			require.Len(t, errors, 1, value)
+			assert.Equal(t, "/api_key", errors[0].Path)
+		}
+	})
+
+	// Unlike sign_up_source_id, schema.json declares the {{ … || … }} branch for
+	// api_key, so a template is accepted and not measured against the bound.
+	t.Run("api_key accepts a ui template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_key": "{{ config.apiKey || " + strings.Repeat("a", 150) + " }}",
+		}))
+	})
+
+	t.Run("sign_up_source_id accepts a ui template", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"api_key":           "test-api-key",
+			"sign_up_source_id": "{{ config.signUpSourceId || 123 }}",
+		}))
+	})
+
+	t.Run("sign_up_source_id rejects non-digits", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":           "test-api-key",
+			"sign_up_source_id": "abc123",
+		})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/sign_up_source_id", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must contain only digits")
+	})
+
+	t.Run("sign_up_source_id rejects dynamic values", func(t *testing.T) {
+		t.Parallel()
+
+		// The UI template form moved to its own accepting case: schema.json
+		// declares that branch. env.VAR stays rejected because the CLI never
+		// honours the deprecated form, and {{ .VAR }} because var substitution
+		// resolves it before validation — one still present is a mistake.
+		cases := []struct {
+			name  string
+			value string
+		}{
+			{name: "env reference", value: "env.SIGN_UP_SOURCE_ID"},
+			{name: "iac variable", value: "{{ .SIGN_UP_SOURCE_ID }}"},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				errors := registered.ValidateConfig(map[string]any{
+					"api_key":           "test-api-key",
+					"sign_up_source_id": tc.value,
+				})
+				require.Len(t, errors, 1)
+				assert.Equal(t, "/sign_up_source_id", errors[0].Path)
+				assert.Contains(t, errors[0].Message, "must contain only digits")
+			})
+		}
+	})
+
+	t.Run("unknown key rejected", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":     "test-api-key",
+			"not_a_field": true,
+		})
+		require.NotEmpty(t, errors)
+		assert.Equal(t, "/not_a_field", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "unknown config field")
+	})
+
+	t.Run("unsupported consent source rejected", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "test-api-key",
+			"consent_management": map[string]any{
+				"warehouse": []any{},
+			},
+		})
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
+	})
+
+	t.Run("invalid consent provider rejected", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key": "test-api-key",
+			"consent_management": map[string]any{
+				"ios_swift": []any{
+					map[string]any{"provider": "unknown"},
+				},
+			},
+		})
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/consent_management/ios_swift/0/provider", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "'provider' must be one of")
+	})
+	// connection_mode legality is per source type, taken from this definition's
+	// own ConnectionModes map rather than a shared enum.
+	t.Run("connection_mode accepts a supported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "cloud"},
+		})
+
+		for _, err := range errors {
+			assert.NotEqual(t, "/connection_mode/web", err.Path)
+		}
+	})
+
+	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"connection_mode": map[string]any{"web": "device"},
+		})
+
+		var found bool
+		for _, err := range errors {
+			if err.Path == "/connection_mode/web" {
+				found = true
+				assert.Contains(t, err.Message, "must be one of")
+			}
+		}
+		assert.True(t, found, "expected /connection_mode/web to be rejected")
+	})
+
+}
+
+func TestAttentiveTagConversionRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	def := attentivetag.NewDefinition()
+	testutil.AssertConversion(t, def.Properties, []testutil.ConversionCase{
+		{
+			Name: "minimal api key only",
+			LocalJSON: `{
+				"api_key": "test-api-key"
+			}`,
+			APIJSON: `{
+				"apiKey": "test-api-key"
+			}`,
+		},
+		{
+			Name: "full config",
+			LocalJSON: `{
+				"api_key": "test-api-key",
+				"sign_up_source_id": "12345",
+				"enable_new_identify_flow": true
+			}`,
+			APIJSON: `{
+				"apiKey": "test-api-key",
+				"signUpSourceId": "12345",
+				"enableNewIdentifyFlow": true
+			}`,
+		},
+		{
+			// Zero values must survive conversion: filtering them out would drop
+			// the key upstream and re-introduce it on every plan as a phantom diff.
+			Name: "explicit zero values preserved",
+			LocalJSON: `{
+				"api_key": "test-api-key",
+				"sign_up_source_id": "",
+				"enable_new_identify_flow": false
+			}`,
+			APIJSON: `{
+				"apiKey": "test-api-key",
+				"signUpSourceId": "",
+				"enableNewIdentifyFlow": false
+			}`,
+		},
+		{
+			Name: "consent for web",
+			LocalJSON: `{
+				"api_key": "test-api-key",
+				"consent_management": {
+					"web": [
+						{
+							"provider": "oneTrust",
+							"resolution_strategy": "and",
+							"consents": ["analytics", "marketing"]
+						}
+					]
+				}
+			}`,
+			APIJSON: `{
+				"apiKey": "test-api-key",
+				"consentManagement": {
+					"web": [
+						{
+							"provider": "oneTrust",
+							"resolutionStrategy": "and",
+							"consents": [
+								{"consent": "analytics"},
+								{"consent": "marketing"}
+							]
+						}
+					]
+				}
+			}`,
+		},
+		{
+			Name: "consent source boundary mappings",
+			LocalJSON: `{
+				"api_key": "test-api-key",
+				"consent_management": {
+					"android_kotlin": [{"provider": "oneTrust"}],
+					"ios_swift": [{"provider": "ketch"}],
+					"react_native": [{"provider": "iubenda"}]
+				}
+			}`,
+			APIJSON: `{
+				"apiKey": "test-api-key",
+				"consentManagement": {
+					"androidKotlin": [{"provider": "oneTrust"}],
+					"iosSwift": [{"provider": "ketch"}],
+					"reactnative": [{"provider": "iubenda"}]
+				}
+			}`,
+		},
+	})
+}

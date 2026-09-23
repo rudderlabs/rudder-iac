@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: http-bearer
+spec:
+  id: http-bearer
+  display_name: E2E HTTP Bearer Auth Updated
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/events
+    auth: bearerTokenAuth
+    bearer_token: "{{ .HTTP_BEARER_TOKEN }}"
+    method: POST
+    format: XML
+    xml_root_key: rudderEvent

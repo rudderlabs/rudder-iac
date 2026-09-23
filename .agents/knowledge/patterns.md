@@ -1,0 +1,258 @@
+# Patterns
+
+> Recurring idioms specific to this repo (error handling, state management,
+> retries, logging, DI, request lifecycle).
+> Append-only. Agent-authored sections may optionally carry an HTML-comment tag
+> (e.g., `<!-- pr:<id> -->`) identifying the writer/PR/run; human-authored
+> sections are conventionally left untouched by automated runs.
+> Every observed idiom includes a `file:line` reference.
+
+## RUD-2739 Observed Runtime Idioms
+<!-- ticket:RUD-2739 -->
+- Error context is layered at each boundary with `%w`, so failures preserve causal chains while adding operation intent (for example dependency init, project load, workspace fetch, sync). Ref: `cli/internal/cmd/project/apply/apply.go:49` (`NewCmdApply` PreRunE), `cli/internal/cmd/project/apply/apply.go:80` (`NewCmdApply` RunE), `cli/internal/providers/retl/provider.go:145` (`Provider.ResourceGraph`).
+- Domain-specific wrapper errors encode orchestration semantics (`failed` vs `cancelled`) and still participate in `errors.Is/As` via `Unwrap()`. Ref: `cli/pkg/tasker/errors.go:5` (`ErrTaskFailed`), `cli/pkg/tasker/errors.go:18` (`ErrTaskCancelled`), `cli/pkg/tasker/task.go:94` (`job.runTask`).
+- Concurrent task execution is dependency-aware: tasks block on dependency completion channels, then short-circuit when upstream failures occur and `continueOnFail` is false. Ref: `cli/pkg/tasker/task.go:36` (`RunTasks`), `cli/pkg/tasker/task.go:94` (`job.runTask`).
+- Sync execution follows a stable lifecycle: load remote resources -> map to state -> derive graph -> plan diff -> execute operations -> optional consolidation. Ref: `cli/internal/syncer/syncer.go:121` (`ProjectSyncer.apply`), `cli/internal/syncer/syncer.go:180` (`StateToGraph`), `cli/internal/syncer/syncer.go:484` (`ProjectSyncer.providerOperation`).
+- Shared mutable sync state is guarded with `RWMutex` during dereference/mutation so concurrent operations can read references while serializing writes to state updates. Ref: `cli/internal/syncer/syncer.go:22` (`ProjectSyncer.stateMutex`), `cli/internal/syncer/syncer.go:280` (`ProjectSyncer.createOperation`), `cli/internal/syncer/syncer.go:477` (`ProjectSyncer.deleteOperation`).
+- Resource state has dual representations: generic map data for serialization plus typed `InputRaw`/`OutputRaw` for provider-specific logic and reflection dereferencing. Ref: `cli/internal/resources/state/state.go:19` (`ResourceState`), `cli/internal/resources/state/state.go:24` (`InputRaw`), `cli/internal/resources/state/state.go:25` (`OutputRaw`).
+- Request lifecycle in the API client is centralized (`Do` + `service` helpers): build request with auth headers, execute, decode success payload, and normalize non-2xx into structured `APIError`. Ref: `api/client/client.go:72` (`Client.Do`), `api/client/client.go:94` (`APIError` construction), `api/client/service.go:13` (`service.next`).
+- Pagination follows a repeated “first page + `Paging.Next` loop” idiom in service clients, avoiding duplicated transport code by reusing `service.next`. Ref: `api/client/accounts.go:40` (`accounts.List`), `api/client/accounts.go:49` (`accounts.ListAll`), `api/client/service.go:13` (`service.next`).
+- Dependency injection uses functional options to swap infrastructure (HTTP client/base URL/user agent, sync reporter/concurrency) without changing constructors. Ref: `api/client/options.go:3` (`Option`), `api/client/options.go:15` (`WithHTTPClient`), `cli/internal/syncer/syncer.go:60` (`WithReporter`), `cli/internal/syncer/syncer.go:69` (`WithConcurrency`).
+- Polling-style async workflows use timeout + ticker loops with explicit pending/failed/completed states rather than sleep-based retries. Ref: `cli/internal/providers/retl/sqlmodel/preview.go:13` (`DefaultTimeout`), `cli/internal/providers/retl/sqlmodel/preview.go:25` (`Handler.Preview`), `cli/internal/providers/retl/sqlmodel/preview.go:55` (`time.NewTicker`).
+- Logging is package-scoped and structured (`slog` wrapper with fixed attrs), allowing runners/providers to stamp component identity into every record. Ref: `cli/internal/logger/log.go:49` (`logger.New`), `cli/internal/providers/datagraph/validator/runner.go:16` (`validationLog`), `cli/internal/providers/transformations/testorchestrator/runner.go:22` (`testLogger`).
+
+## RUD-2752 — Workspace List Command Construction Pattern
+<!-- ticket:RUD-2752 -->
+- Workspace list commands follow a consistent orchestration shape: parse flags, defer telemetry tracking, build dependencies via app bootstrap, select a `lister.ListProvider`, choose table/JSON format from `--json`, then execute `List` with resource type and filters.
+- Provider-side list behavior is centralized behind provider `List(ctx, resourceType, filters)` methods, creating a stable extension seam for adding new listable workspace resources.
+- List result rows are expected to map into common resource keys (`id`, `name`, `type`, `enabled`) with optional domain-specific keys such as `externalId`, aligning with shared lister table/JSON output expectations.
+
+## INT-6489 — Destination CRUD Struct Passthrough
+<!-- ticket:INT-6489 -->
+- Destination Create and Update copy the input `Destination`, clear only `ID`, and marshal the full struct through the shared service helper.
+- Destination Get unmarshals `response.destination` into the same `Destination` type used by write paths.
+- Because CRUD uses whole-struct passthrough, new optional public contract fields with `json:",omitempty"` can often be added to the DTO without changing individual service methods.
+
+## DEX-456 — Account Client Thin-Service Placement
+<!-- ticket:DEX-456 -->
+- `api/client/accounts.go` follows the repo's thin-service pattern: the concrete `accounts` wrapper delegates list/get/create/update/delete behavior to shared `service` helpers. Additive account contract work should stay in that account-specific client surface and its co-located tests, not in `client.go` or the shared transport layer.
+
+## RUD-2860 — Shared Destination DTO Write Scrubbing
+<!-- ticket:RUD-2860 -->
+- Destination support is centralized in `api/client/destinations.go`; the same `Destination` struct is used as the request and response contract for create, update, get, and list.
+- Because destination create/update marshal copied whole structs, adding response-oriented or ownership-metadata fields to `Destination` can affect write payloads unless each write method explicitly clears fields that do not belong on that endpoint.
+- `Destinations.Update` is expected to copy the input destination and clear `ExternalID` before marshaling, while `Destinations.SetExternalID` owns the dedicated external-ID write endpoint.
+
+## RUD-2963 — Optional Feature API Fallback
+<!-- ticket:RUD-2963 -->
+- `api/client.APIError.FeatureFlagNotEnabled` classifies an unavailable optional capability only when the response is HTTP 403 and its normalized `APIError.Msg()` contains either the `Flag is not enabled for your account` prefix or the `Feature is not enabled for your account` prefix. Ref: `api/client/common.go` (`APIError.FeatureFlagNotEnabled`).
+- Optional-feature list clients degrade this typed condition to a non-nil empty response rather than failing the wider multi-provider operation; DataGraph listing and catalog first-page loading share this behavior, while unrelated errors retain operation-specific wrapping. Ref: `api/client/datagraph/datagraph.go` (`ListDataGraphs`), `api/client/catalog/catalog.go` (`getFirstPage`).
+
+## DEX-545 — Named Pattern Allow/Reject Registry
+<!-- ticket:DEX-545 -->
+- Named pattern validation is centralized in `cli/internal/provider/rules/funcs/regex.go`; `validate:"pattern=<name>"` consumers should rely on the registry match path rather than calling stored allow regexes directly.
+- Pattern registration now supports an optional reject regex: `NewPattern`/`Register` remain allow-only wrappers, while `NewPatternWithReject`/`RegisterWithReject` store the allow regex plus optional reject and make matching fail when the reject regex matches.
+- Re-registering a pattern without a reject intentionally clears any stale reject entry for that name, preserving allow-only behavior for existing callers.
+- `RegisterWithReject` defensively initializes nil registry maps before writes, so package-local fixtures or future literal registries do not panic when they omit optional maps such as `rejects`.
+
+## DEX-510 — HTTP Destination Definition Conversion
+<!-- ticket:DEX-510 -->
+- Destination definitions declare `SecretKeys` in local YAML config shape, not upstream API config shape, because `HandlerImpl.ExtractResourcesFromSpec` wraps secrets before API conversion and `MapRemoteToState` wraps after API-to-local conversion; HTTP secrets are `password`, `bearer_token`, and `api_key_value`.
+- HTTP event filtering keeps a nested local YAML object (`event_filtering.whitelist` / `event_filtering.blacklist`) and maps it to API `whitelistedEvents` / `blacklistedEvents` plus the `eventFilteringOption` discriminator via `converter.ArrayWithStrings` and `converter.Discriminator`.
+
+## DEX-591 — Destination Apply E2E Catalog Fixtures
+<!-- ticket:DEX-591 -->
+- Destination apply E2E fixtures use a catalog-style layout: specs live under `cli/tests/testdata/destinations/create/<variation>.yaml` and `cli/tests/testdata/destinations/update/<variation>.yaml`, while shared variables live in `cli/tests/testdata/destinations/destinations.vars.yaml`.
+- `TestDestinationsApply` applies the destination create/update directories directly, relying on recursive spec loading so future destination variations can be added without changing test code.
+- Expected upstream destination snapshots remain under `cli/tests/testdata/expected/upstream/destinations/{create,update}/destination_<spec.id>` for whole-managed-set comparison.
+
+## DEX-608 — Destination E2E Unverified Fixture Gate
+<!-- ticket:DEX-608 -->
+- `TestDestinationsApply` still needs `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true` while its create/update fixture directories include unverified destination variations such as `rs` and `salesforce`; S3, HTTP, and Attentive Tag are verified/native and do not need that gate.
+- Destination apply E2E comments and skip messaging should describe the unverified gate in terms of the current unverified fixture set, not S3 or HTTP alone.
+
+## DEX-661 — Destination Export Empty-Value Pruning
+<!-- ticket:DEX-661 -->
+- Destination export pruning treats nil, empty strings, and containers holding only empty values as empty, but treats scalar zero values as populated; do not generalize emptiness to scalar zero semantics because `false` and numeric `0` can be meaningful destination config values.
+- The destination empty-value helper switches on the concrete types `json.Unmarshal` produces (`nil`, `string`, `[]any`, `map[string]any`) rather than reflecting over arbitrary kinds: local config is always decoded from the API response, so typed slices, maps, and pointers cannot reach it and handling them would be dead code.
+- Destination export must prune empty local config values before calling `secret.MaskSecrets`, so API-returned null or empty-string secret keys are dropped before they can become generated variable placeholders in imported YAML.
+## DEX-498 — Facebook Conversions E2E Fixture Scope
+<!-- ticket:DEX-498 -->
+- `facebook_conversions` destination E2E fixtures may document live snapshot capture deferral when live credentials or a disposable destination-enabled workspace are unavailable, but committed fixtures should still make the intended coverage shape visible.
+- The initial `facebook_conversions` fixture shape covers a standard cloud-mode variation with dataset/access token, event mappings, PII allow/deny lists, and update mutations for display name, `action_source`, booleans, `test_event_code`, and mappings.
+
+## DEX-505 — Google Pub/Sub E2E Snapshot Deferral
+<!-- ticket:DEX-505 -->
+- Google Pub/Sub destination E2E coverage may add create/update fixture YAML and dummy credentials without expected upstream snapshot files when no explicitly disposable live destination-enabled stack is available.
+- Do not invent hand-written GOOGLEPUBSUB upstream snapshots; defer live `RUN_DESTINATION_E2E=1 TestDestinationsApply` snapshot capture until a safe backend is available, while keeping ungated compile/skip validation as the safe autonomous check.
+
+## DEX-516 — Kinesis E2E Coverage
+<!-- ticket:DEX-516 -->
+- Never add destination apply fixture YAML under `cli/tests/testdata/destinations/{create,update}` without matching upstream snapshots: `DestinationSnapshotTester` count-checks fetched destinations against the expected file set, so a fixture with no snapshot fails the whole suite before any payload is compared — taking every other destination's coverage down with it.
+- Kinesis ships both meaningful auth variations, mirroring the S3 pair: `kinesis` (key-based, `role_based_auth: false`, access keys via `{{ .VAR }}`) and `kinesis-role` (role-based, `role_based_auth: true`, `iam_role_arn`). Both are live-confirmed.
+- Snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly on the first gated run, including `useMessageId: false` where the fixture omits it.
+## DEX-521 — Marketo E2E Coverage
+<!-- ticket:DEX-521 -->
+- Never add create/update fixture YAML without matching upstream snapshots. `DestinationSnapshotTester` count-checks fetched destinations against the expected file set before comparing any payload, so a fixture with no snapshot fails the whole suite and takes every other destination's coverage down with it.
+- Marketo snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly, covering all three `ArrayWithObjects` reshapes and the three-key `rudderEventsMapping` row shape.
+- A gated run can fail for reasons unrelated to the change: a backend 500 on the datacatalog endpoints aborts the opening `destroy` before any destination work happens. Retry before investigating the destination under test.
+## DEX-523 — Salesforce E2E Coverage
+<!-- ticket:DEX-523 -->
+- Never add create/update fixture YAML without matching upstream snapshots, with or without a comment explaining the gap. `DestinationSnapshotTester` count-checks fetched destinations against the expected file set before comparing payloads, so a fixture with no snapshot fails the entire suite and takes every other destination's coverage down with it.
+- Salesforce snapshots derived as "converter output − `secretKeys` + `schema.json` defaults" matched the live backend exactly. Both `password` and `initialAccessToken` are write-only and correctly absent.
+
+## DEX-525 — Model Every schema.json Key, Even Without A Terraform Mapping
+<!-- ticket:DEX-525 -->
+- Destination update replaces the whole config object, so any key the definition does not model is absent from the payload and **erased upstream on the first apply** — including values a user set in the UI. Omitting a key does not make it "unsupported"; it makes it destroyable.
+- `schema.json` is the source of truth for which keys exist. Terraform supplies the mapping shape (reshapes, nested key names, local spelling) but does not bound the surface. Derive local keys mechanically (camelCase → snake_case) for anything terraform misses.
+- Slack is the worked example: `incomingWebhooksType`, `denyListOfEvents`, and the nested `eventChannelWebhook` have no terraform mapping. With them omitted, the gated e2e showed `incomingWebhooksType` present in the create snapshot (backend applies its `schema.json` default) and gone from the update snapshot. Modelling all three fixed it.
+- A create/update snapshot mismatch on a key the definition does not model is the signature of this bug — check for it before assuming the snapshot is simply wrong.
+
+## DEX-677 — Confluent Cloud Snapshot Coverage
+<!-- ticket:DEX-677 -->
+- Confluent Cloud destination apply E2E fixtures should include matching expected upstream snapshots when fixture YAML is added, keeping the destination snapshot count guard safe.
+- For Confluent Cloud snapshots, write-only `api_key` and `api_secret` are expected to be absent from upstream payloads, while non-secret `bootstrapServer` and `topic` remain.
+- If a gated live destination run shows extra backend defaults for API type `CONFLUENT_CLOUD`, adjust the expected upstream destination snapshots rather than removing the count-guard-safe fixture coverage.
+
+## DEX-515 — Warehouse Object-Storage Validation Stays Declarative
+<!-- ticket:DEX-515 -->
+- Warehouse destinations keep every object-storage provider's keys in one flat upstream object, so per-provider keys stay `omitempty` and are never gated on the provider selector (`cloudProvider` for snowflake, `bucketProvider` for postgres). Only the selector itself is conditional: `required_if=UseRudderStorage false`.
+- Enforcing the per-provider matrix locally makes the CLI stricter than the backend and rejects configs it accepts, which breaks importing an existing destination that omits an optional key.
+- Two-way boolean conditionals are expressible with struct tags and should use them (`required_if=UseSSH true`, `required_if=SSLMode verify-ca`, `required_if=UseKeyPairAuth false`); a custom validation hook is not needed and was removed rather than introduced.
+- Only register named patterns that `schema.json` actually declares. Postgres declares patterns for `host`, `database`, `user`, `port`, `namespace` and enums for `sslMode`/`syncFrequency`/`bucketProvider` — bucket, container, endpoint and TLS-material patterns do not exist upstream and inventing them rejects valid values (an invented `BEGIN RSA PRIVATE KEY` regex rejects PKCS#8 keys).
+
+## DEX-493 — BigQuery E2E Snapshot Deferral
+<!-- ticket:DEX-493 -->
+- BigQuery destination E2E fixture YAML should be paired with expected upstream snapshots because destination E2E snapshot checks are count-guarded; adding YAML without snapshots breaks the whole destination suite.
+- The initial BigQuery upstream snapshots are derived from CLI converter output plus explicit schema/default values and omit write-only credentials, rather than being live-captured.
+- Live `RUN_DESTINATION_E2E` capture remains deferred until an explicitly disposable destination-enabled BigQuery workspace and credentials are available, because destination E2E destroy/apply mutates the configured workspace.
+## DEX-520 — S3 Datalake Definition And E2E Patterns
+<!-- ticket:DEX-520 -->
+- S3 Datalake bucket names use destination-local named pattern `s3_datalake_bucket_name` with allow `^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$` and reject `(^xn--)|(^.*\.\..*$)|(^(\d+(\.|$)){4}$)` to approximate upstream negative lookaheads within RE2.
+- S3 Datalake namespace validation uses destination-local named pattern `s3_datalake_namespace` with allow `^(.{0,64})$` and reject `^(pg_|PG_|pG_|Pg_)`.
+- For S3 Datalake E2E coverage, do not add destination create/update fixture YAML without matching live-verified upstream snapshots; `TestDestinationsApply` count-checks expected snapshots, and hand-derived snapshots are unsafe for this backend because of warehouse/datalake defaults plus write-only fields.
+
+## DEX-690 — Redshift Config Preservation Guard
+<!-- ticket:DEX-690 -->
+- Destination handler API/local conversion for Redshift is definition-driven: `HandlerImpl.apiConfigToLocal` converts only registered definition properties, and `localConfigToAPI` sends only converted local keys.
+- Guard Redshift's modeled API key set in definition tests so future schema/defaultConfig keys are not accidentally omitted and erased on update/import.
+- Prefer full Redshift definition modeling over generic destination-handler unknown-key preservation, because generic preservation would broaden behavior for all destinations and conflict with closed schema validation.
+## DEX-504 — Google Sheets E2E Snapshot Deferral
+<!-- ticket:DEX-504 -->
+- Google Sheets destination E2E fixture YAML was intentionally not added without matching live-confirmed upstream snapshots; `TestDestinationsApply` count-checks destination fixtures against expected snapshots, so fixture-only coverage would break unrelated destination E2E runs.
+- Defer Google Sheets destination apply fixture and snapshot coverage until an explicitly disposable live destination-enabled workspace is available; prefer unit/registry coverage and compile-only E2E validation in autonomous environments.
+
+## DEX-509 — Kafka E2E Snapshot Deferral
+<!-- ticket:DEX-509 -->
+- Kafka destination E2E fixture YAML should not be added without matching live-confirmed upstream snapshots; destination apply E2E is count-guarded, so fixture-only Kafka coverage would break `TestDestinationsApply` for all destinations.
+- Defer Kafka create/update destination fixture and snapshot coverage until an explicitly disposable live destination-enabled RudderStack workspace is available; rely on unit coverage for validation/conversion and handler extraction in autonomous environments.
+
+## DEX-487 — ActiveCampaign E2E Snapshot Deferral
+<!-- ticket:DEX-487 -->
+- ActiveCampaign destination E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available, avoiding `TestDestinationsApply` fixture/snapshot count-guard failures.
+- The intended deferred ActiveCampaign E2E variation is a standard `active_campaign` destination with `api_url`/`api_key` plus optional `actid`/`event_key`, updating `display_name` and mutable optional values while keeping secrets variable-backed.
+
+## DEX-492 — Braze E2E Snapshot Deferral
+<!-- ticket:DEX-492 -->
+- Braze destination apply E2E fixture YAML and upstream snapshots should be deferred until an explicitly disposable destination-enabled RudderStack workspace is available to live-capture matching snapshots.
+- Do not add fixture-only Braze YAML or hand-derived Braze upstream snapshots: `TestDestinationsApply` count-checks fixture/snapshot parity, so unmatched Braze fixtures or snapshots can break the entire destination E2E suite.
+- Until live snapshots are available, rely on Braze definition validation/conversion tests plus compile/skip E2E validation for autonomous coverage.
+
+## DEX-508 — Intercom E2E Snapshot Deferral
+<!-- ticket:DEX-508 -->
+- Intercom destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable destination-enabled RudderStack workspace and credentials are available.
+- Do not add fixture-only Intercom YAML or unmatched upstream snapshots: `TestDestinationsApply` count-checks destination fixture/snapshot parity, so unmatched Intercom coverage can break the entire destination E2E suite.
+## DEX-497 — Facebook Pixel E2E Snapshot Deferral
+<!-- ticket:DEX-497 -->
+- Facebook Pixel destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled RudderStack workspace is available for capture.
+- Do not add fixture-only Facebook Pixel YAML without matching live-verified upstream snapshots because `TestDestinationsApply` count-checks destination fixture/snapshot parity and can fail the entire destination suite before payload comparison.
+- Until live snapshots are available, rely on Facebook Pixel definition/unit coverage plus ungated compile/skip validation of `TestDestinationsApply` in autonomous environments.
+
+## DEX-518 — Qualtrics E2E Snapshot Deferral
+<!-- ticket:DEX-518 -->
+- Qualtrics destination apply E2E fixture YAML and expected upstream snapshots should be deferred until an explicitly disposable live destination-enabled workspace is available.
+- Do not add fixture-only Qualtrics YAML under `cli/tests/testdata/destinations/{create,update}` without matching live snapshots because `TestDestinationsApply` count-checks fixture/snapshot parity and unmatched fixtures can break the entire destination E2E suite.
+- Until live snapshots are available, rely on Qualtrics definition/unit coverage plus ungated compile/skip E2E validation in autonomous environments.
+
+## DEX-719 — GCS Connection Mode E2E Fixture Updates
+<!-- ticket:DEX-719 -->
+- For GCS connection-mode re-onboarding, update existing GCS destination fixture and expected upstream snapshot pairs in lockstep instead of adding new fixture files.
+- GCS destination E2E fixtures that include `connection_mode` should use literal `cloud` values, not templates, because connection mode is enum-like and template values are rejected by validation.
+- Preserve `TestDestinationsApply` fixture/snapshot parity: no fixture-only additions, because the snapshot tester count-checks expected upstream destinations before payload comparison.
+## DEX-512 — LinkedIn Ads Cannot Have Destination E2E Fixtures
+<!-- ticket:DEX-512 -->
+- `rudderAccountId` is a foreign key to an account that must already exist in the target workspace, not a free-form string. A fixture with a dummy value fails at create with `400 ... 'Account not found with given id in the workspace'`, so LinkedIn Ads cannot participate in `TestDestinationsApply` as it stands — this is a missing prerequisite, not a missing stack, and no amount of snapshot capture fixes it.
+- Do not add create/update fixtures for account-framework destinations until the destination e2e can provision (or reference) a real account. Fixtures without runnable configs break the whole suite for every other destination, because a failed apply aborts before snapshot verification.
+- The same shape applies to any destination whose config references another resource by ID; check for such keys in `destConfig.defaultConfig` before writing e2e fixtures.
+## DEX-527 — Snowpipe Streaming E2E Is Workspace-Gated; `namespace` Is Immutable
+<!-- ticket:DEX-527 -->
+- Snowpipe Streaming is gated by the `SNOWFLAKE_STREAMING` flag (`options.hidden.gate.flags` in its db-config), and the gate **is enforced by the destinations API**, not just a UI hint. A workspace without the entitlement rejects create with `403 destination "SNOWPIPE_STREAMING" is not available for your account`; the dedicated destination-e2e workspace has it and creates cleanly. Gate behaviour is therefore per workspace — establish which workspace a gated run targets before concluding a destination is or is not runnable.
+- Because the failure lands at apply, before any snapshot comparison, running these fixtures against a non-entitled workspace fails the whole `TestDestinationsApply` suite and takes every other destination's coverage with it. `RUN_DESTINATION_E2E` is wired from a repo variable in `test-with-coverage.yml`, so enabling it against a non-entitled workspace is the failure mode to guard against.
+- `namespace` is **immutable upstream**: changing it between the create and update fixtures fails with `400 Field "namespace" is immutable and cannot be modified`. Update fixtures must hold it constant and vary other fields (`display_name`, `database`, `role`, `json_paths` all update cleanly).
+- The backend injects `skipTracksTable`, `enableIceberg`, `underscoreDivideNumbers` and `allowUsersContextTraits` as `false` on create even when the spec omits them, so all four need `default:"false"` struct tags or every apply reports a phantom diff. Confirmed by inspecting the stored config after a live create.
+- `privateKey` and `privateKeyPassphrase` are write-only and correctly absent from upstream snapshots. `privateKey` must be PEM-shaped: schema declares no template branch, so it is validated with a local `pattern` rather than wrapped by a custom converter (terraform wraps raw bodies; the CLI validates, matching `snowflake`).
+
+## DEX-725 — Connection Mode Snapshot Updates
+<!-- ticket:DEX-725 -->
+- For `bqstream`, `confluent_cloud`, and `googlesheets` connection-mode additions, E2E upstream snapshots may be updated mechanically from the existing converter mapping and snapshot conventions when no explicitly disposable live destination-enabled workspace is available.
+- Avoid live `RUN_DESTINATION_E2E` execution for these destination snapshot updates in autonomous environments unless disposable credentials are explicitly provided, because destination E2E mutates the configured workspace.
+- Renaming event-filter local keys to the nested block (adj, tiktok_ads, iterable) leaves expected upstream snapshots byte-identical: the API keys don't change, and the derived `eventFilteringOption` equals what the old fixtures set by hand — a built-in equivalence check when converting a definition.
+
+## DEX-730 — Event-Filter Dynamic Values
+<!-- ticket:DEX-730 -->
+- An upstream `^(.{0,100})$` constraint is a pattern (it forbids newlines), not a length limit: model it as a `single_line_100` pattern tag, never `max=100`.
+- Pick `dynamic_or_pattern` vs plain `pattern` from the property itself: only when schema.json declares the `(^\{\{.*\|\|(.*)\}\}$)` branch does the field accept templates. Whole destinations often declare none (bq, postgres, slack, adobe_analytics), and the split can differ per key inside one destination (attentive_tag has it, adobe has it on three URL fields only). The tag — never the regex — carries template support.
+- Dropping `dynamic_or_pattern` rarely makes a field reject templates outright: a permissive `.{0,N}` accepts template text as an ordinary literal, exactly as upstream does. What changes is that the text is now measured against the bound instead of bypassing it — so assert length, not rejection, unless the pattern's shape excludes `{{`.
+- Dropping an unreachable source type can break test fixtures that used it incidentally (Amplitude's consent round-trip used `shopify` for its `custom` provider case); move that coverage to a kept source type rather than deleting the case.
+
+## DEX-736 — Legacy GA Destination E2E Account-Link Deferral
+<!-- ticket:DEX-736 -->
+- Legacy Google Analytics (`type: ga`) E2E fixtures stay in place; only `rudder_delete_account_id` is dropped from them, because the upstream config API rejects an account id that is not a real account link in the workspace.
+- `RudderDeleteAccountID` is `omitempty` in the GA definition, so omitting it from a fixture keeps the spec valid and simply leaves `rudderDeleteAccountId` out of the upstream payload and its expected snapshot.
+- Prefer trimming the account-linked key over deleting whole fixture/snapshot pairs: it keeps `TestDestinationsApply` coverage for the rest of the legacy GA config surface while removing the only field that needs a cross-linked account.
+
+## DEX-531 — Webhook Dotted Secret Paths
+<!-- ticket:DEX-531 -->
+- Shared destination/account secret map helpers support dotted secret paths such as `headers.to`, applying the final path segment to each object in an array so nested webhook header values remain secret while sibling non-secret fields such as `headers.from` stay visible.
+- Webhook declares `headers.to` in local YAML config shape, preserving the secret boundary across spec wrapping, API reveal, remote-state unknown wrapping, and export masking.
+- Export masking emits indexed variable placeholders for nested collection secret values, such as `{{ .MY_WEBHOOK_HEADERS_0_TO }}`, so each webhook header secret remains distinct while preserving the dotted local secret path (`headers.to`).
+
+## DEX-735 — Plan Nested Diff Rendering GA
+<!-- ticket:DEX-735 -->
+- Plan output now renders per-field nested diffs unconditionally via the nested diff renderer rather than behind `ExperimentalConfig.NestedDiffs`.
+- The legacy single-line fallback path for ordinary multi-field changes has been removed, but secret-only changes and root-level scalar/nil/non-decomposable changes still keep their single-line behavior.
+
+## DEX-745 — Bing Ads Offline Conversions E2E Deferral
+<!-- ticket:DEX-745 -->
+- Bing Ads Offline Conversions destination E2E fixtures and snapshots should be deferred until an explicitly disposable workspace with a real Bing Ads OAuth account link is available.
+- Do not use dummy `rudder_account_id` values for live destination fixtures: it is an OAuth account-management foreign key and placeholder values fail live apply, matching the account-linked destination precedent from LinkedIn Ads and GA delete-account fixtures.
+- Until live account-linked fixtures are runnable, rely on definition/unit coverage for example config and conversion behavior plus compile-only `TestDestinationsApply` validation in autonomous environments.
+
+## DEX-747 — Account-Linked Destination E2E Deferral
+<!-- ticket:DEX-747 -->
+- Do not add `google_adwords_offline_conversions` destination apply E2E fixture/snapshot files without provisioning or referencing a real compatible account in the target workspace; the destination is OAuth/account-linked through `rudderAccountId` with supported account definition `DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH`.
+- Dummy `rudderAccountId` fixtures fail live `TestDestinationsApply` before snapshot comparison — verified against the dev stack, which rejects the create with `http status code: 400 … 'Account not found with given id in the workspace'`, the same failure the legacy GA `rudderDeleteAccountId` fixture hit (DEX-736). Autonomous coverage therefore relies on unit validation/conversion tests plus ungated compile/skip E2E checks until the account prerequisite is available.
+
+## DEX-771 — Destination E2E Unverified Fixture Gate After HTTP Promotion
+<!-- ticket:DEX-771 -->
+- `TestDestinationsApply` still sets `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true`, but HTTP is no longer the reason; the fixture set still includes unverified destination types such as `attentive_tag`, `rs`, and `salesforce`.
+- HTTP fixture coverage remains in the shared destination E2E suite as a verified destination, so compile-only validation can exercise its test code without live workspace mutation.
+
+## DEX-812 — Kafka SSH Grouping And Validation
+<!-- ticket:DEX-812 -->
+- Kafka maps nested local YAML `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` to the unchanged flat API keys `sshHost`, `sshPort`, `sshUser`, and `sshPublicKey` with dotted `converter.Simple` paths; `use_ssh` remains top-level as the branch selector.
+- Use a value nested SSH struct instead of a pointer struct so validators still descend into SSH fields when the local `ssh` block is absent, allowing per-field `/ssh/...` errors when `use_ssh` is true.
+- Nested Kafka SSH requiredness uses a destination-scoped `kafka_ssh_required` validator that reads top-level `UseSSH` via `validator.FieldLevel.Top()`; ordinary `required_if=UseSSH true` on nested fields would silently become a no-op because go-playground resolves field names within the current struct.
+
+## DEX-846 — Slack Empty Array Defaults E2E Pinning
+<!-- ticket:DEX-846 -->
+- Slack create E2E fixtures should explicitly carry empty local arrays for `event_channel_settings`, `event_template_settings`, `whitelisted_trait_settings`, and `deny_list_of_events`, with matching upstream `[]` snapshot entries for `eventChannelSettings`, `eventTemplateSettings`, `whitelistedTraitsSettings`, and `denyListOfEvents`.
+- Pinning those arrays in the fixture prevents the backend from applying its schema `default: []` values invisibly and keeps the create snapshot stable without changing the destination defaults engine.
+
+## DEX-852 — Destination Connection Mode Fixture Pinning
+<!-- ticket:DEX-852 -->
+- When adding `connection_mode` to existing destination definitions, update the destination fixture and expected upstream snapshot pairs in lockstep rather than adding unmatched fixture-only coverage.
+- Do not add `connection_mode` to every fixture. E2E fixtures exist to prove the wire conversion, so a mixed-mode destination carrying both enum values and the snake-to-camel source keys (`adj`, `posthog`) covers it; repeating a device-only `web: device` block across the other fixtures adds no assertion. Per-destination mode validation belongs in the definition unit tests, where the valid set actually differs.
+- Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
+- The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must name its source type under `connection_mode`. DEX-848 removed `use_native_sdk`, so `connection_mode` is the only block `validateSourceTypeSettings` can accept — an empty config there fails the connect-time check for the android source.
+- Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.

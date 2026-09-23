@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 )
@@ -90,13 +91,19 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 		collection map[string]*Remote,
 		idNamer namer.Namer,
 		inputResolver resolver.ReferenceResolver,
-	) ([]writer.FormattableEntity, error)
+	) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error)
 }
 
 type HandlerMetadata struct {
 	SpecKind         string
 	ResourceType     string
 	SpecMetadataName string
+	// ReferencedByKind stamps "#<SpecKind>:<id>" on the graph resources the
+	// handler builds, so import names a resource the project already manages
+	// with the same reference LoadImportable gives one it imports. Opt-in
+	// because the reference is only right for a kind whose resources each own
+	// their spec: data-graph models and relationships share the data-graph kind.
+	ReferencedByKind bool
 }
 
 // URNResolver provides URN (Uniform Resource Name) resolution from remote resource IDs.

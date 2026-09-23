@@ -1,9 +1,11 @@
 package validate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -21,10 +23,12 @@ var (
 
 func NewCmdValidate() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
+		deps      app.Deps
+		p         project.Project
+		workspace *client.Workspace
+		err       error
+		location  string
+		varFiles  []string
 	)
 
 	cmd := &cobra.Command{
@@ -44,7 +48,21 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = deps.NewProject()
+			// Resolve the active workspace so validation scopes workspace-aware
+			// rules (e.g. import-manifest orphaned-urn) to the same workspace apply
+			// targets.
+			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
+
+			p = deps.NewProject(projectOpts...)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,6 +79,10 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("validating project: %w", err)
 			}
 
+			if project.HasLegacySpecs(p.Specs()) {
+				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
+			}
+
 			validateLog.Info("Project configuration is valid")
 			ui.PrintSuccess("Project configuration is valid")
 			return nil
@@ -68,5 +90,6 @@ func NewCmdValidate() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	return cmd
 }

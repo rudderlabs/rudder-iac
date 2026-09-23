@@ -621,6 +621,28 @@ The Kotlin generator supports options to customize code generation behavior. Opt
 - Cannot start or end with a dot
 - Cannot have consecutive dots
 
+#### `outputFileName`
+
+**Type:** `string`
+**Default:** `Main.kt`
+**Description:** Name of the generated Kotlin file (e.g., `MyEvents.kt`).
+
+#### `composeImmutable`
+
+**Type:** `bool`
+**Default:** `false`
+**Description:** When `true`, annotates every generated `data class` (top-level, nested, and concrete sealed subclasses) with `@androidx.compose.runtime.Immutable` and adds the corresponding import.
+
+##### Why `@Immutable` and not `@Stable`
+
+Generated event classes are `data class`es over `val` properties of immutable types (primitives, `String`, `JsonElement`, nested data classes, enums). They cannot mutate after construction, which matches `@Immutable`'s contract precisely. `@Stable` is a weaker guarantee meant for types whose public state *can* change but does so observably — using it here would understate what the generator already proves and forces Compose into extra equality work it doesn't need.
+
+Sealed parent classes are skipped (they're abstract, never instantiated). Enums are skipped — the Compose compiler already treats them as stable.
+
+##### Runtime requirement
+
+The generated file emits `import androidx.compose.runtime.Immutable`. The consuming module **must** have `androidx.compose.runtime` on its classpath, otherwise the file will not compile. Any module that already uses Jetpack Compose will have it; if you flip this flag in a non-Compose module, the build will fail with an unresolved reference.
+
 ## References
 
 - [Main Architecture Doc](../../docs/ARCHITECTURE.md)

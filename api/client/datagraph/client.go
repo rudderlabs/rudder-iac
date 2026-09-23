@@ -11,6 +11,7 @@ type DataGraphClient interface {
 	DataGraphStore
 	ModelStore
 	RelationshipStore
+	ColumnMetadataStore
 }
 
 // rudderDataGraphClient implements the DataGraphStore interface

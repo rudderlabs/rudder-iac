@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: s3-datalake-role
+spec:
+  id: s3-datalake-role
+  display_name: E2E S3 Datalake Role
+  type: s3_datalake
+  enabled: true
+  definition_version: 1
+  config:
+    bucket_name: rudder-cli-e2e-datalake-role
+    prefix: rudder/datalake-role/
+    namespace: rudder_e2e_datalake_role
+    use_glue: true
+    region: us-east-1
+    role_based_auth: true
+    iam_role_arn: arn:aws:iam::123456789012:role/rudder-cli-e2e-datalake
+    sync_frequency: "180"
+    enable_sse: true

@@ -5,6 +5,9 @@
 {{- if .Comment }}
 /** {{ escapeComment .Comment }} */
 {{- end }}
+{{- range .Annotations }}
+@{{ . }}
+{{- end }}
 data class {{ .Name }}(
 {{- range $index, $prop := .Properties }}{{- if $index }},
 {{ end }}

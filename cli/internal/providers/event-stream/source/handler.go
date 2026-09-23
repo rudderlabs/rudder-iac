@@ -10,7 +10,9 @@ import (
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -22,34 +24,19 @@ import (
 )
 
 type Handler struct {
-	resources     map[string]*sourceResource
-	seenIDs       []string
-	client        esClient.EventStreamStore
-	importDir     string
-	v1SpecSupport bool
+	resources map[string]*sourceResource
+	seenIDs   []string
+	client    esClient.EventStreamStore
+	importDir string
 }
 
-// HandlerOption configures a Handler (e.g. for tests).
-type HandlerOption func(*Handler)
-
-// WithV1SpecSupport sets the v1 spec support flag (used in tests to override config).
-func WithV1SpecSupport() HandlerOption {
-	return func(h *Handler) {
-		h.v1SpecSupport = true
-	}
-}
-
-func NewHandler(client esClient.EventStreamStore, importDir string, opts ...HandlerOption) *Handler {
-	h := &Handler{
+func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
+	return &Handler{
 		resources: make(map[string]*sourceResource),
 		seenIDs:   make([]string, 0),
 		client:    client,
 		importDir: filepath.Join(importDir, ImportPath),
 	}
-	for _, opt := range opts {
-		opt(h)
-	}
-	return h
 }
 
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
@@ -221,10 +208,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			data[TrackingPlanKey] = s.Governance.Validations.TrackingPlanRef
 			data[TrackingPlanConfigKey] = buildTrackingPlanConfigState(s.Governance.Validations.Config)
 		}
-		ref := getFileMetadata(s.LocalID)
-		if h.v1SpecSupport {
-			ref = fmt.Sprintf("#%s:%s", ResourceType, s.LocalID)
-		}
+		ref := fmt.Sprintf("#%s:%s", ResourceType, s.LocalID)
 		opts := []resources.ResourceOpts{
 			resources.WithResourceFileMetadata(ref),
 		}
@@ -512,6 +496,29 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	return nil
 }
 
+func (h *Handler) List(ctx context.Context, _ lister.Filters) ([]resources.ResourceData, error) {
+	sources, err := h.client.GetSources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting event stream sources: %w", err)
+	}
+
+	result := make([]resources.ResourceData, 0, len(sources))
+	for _, source := range sources {
+		resourceData := resources.ResourceData{
+			IDKey:               source.ID,
+			NameKey:             source.Name,
+			SourceDefinitionKey: source.Type,
+			EnabledKey:          source.Enabled,
+		}
+		if source.ExternalID != "" {
+			resourceData[ExternalIDKey] = source.ExternalID
+		}
+		result = append(result, resourceData)
+	}
+
+	return result, nil
+}
+
 func (h *Handler) Import(ctx context.Context, id string, data resources.ResourceData, remoteId string) (*resources.ResourceData, error) {
 	// FIXME: Instead of fetching all sources, fetch the source with the matching remoteId
 	sources, err := h.client.GetSources(ctx)
@@ -577,10 +584,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
 		}
-		ref := getFileMetadata(externalID)
-		if h.v1SpecSupport {
-			ref = fmt.Sprintf("#%s:%s", ResourceType, externalID)
-		}
+		ref := fmt.Sprintf("#%s:%s", ResourceType, externalID)
 		remoteResource := &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
@@ -597,22 +601,35 @@ func (h *Handler) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	sources := collection.GetAll(ResourceType)
 	if len(sources) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
 	var result []writer.FormattableEntity
+	var entries []importmanifest.ImportEntry
 	for _, source := range sources {
 		data, ok := source.Data.(*sourceClient.EventStreamSource)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to event stream source")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to event stream source")
 		}
-		workspaceMetadata.WorkspaceID = data.WorkspaceID
 		urn := resources.URN(source.ExternalID, ResourceType)
+		entries = append(entries, importmanifest.ImportEntry{
+			WorkspaceID: data.WorkspaceID,
+			URN:         urn,
+			RemoteID:    source.ID,
+		})
+
+		// Matched sources (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec file is written for them.
+		if source.MatchedWith != nil {
+			continue
+		}
+
+		workspaceMetadata.WorkspaceID = data.WorkspaceID
 		workspaceMetadata.Resources = []specs.ImportIds{
 			{
 				URN:      urn,
@@ -626,14 +643,14 @@ func (h *Handler) FormatForExport(
 			inputResolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec: %w", err)
+			return nil, nil, fmt.Errorf("creating spec: %w", err)
 		}
 		result = append(result, writer.FormattableEntity{
 			Content:      spec,
 			RelativePath: filepath.Join(h.importDir, fmt.Sprintf("%s.yaml", source.ExternalID)),
 		})
 	}
-	return result, nil
+	return result, entries, nil
 }
 
 func (p *Handler) toImportSpec(
@@ -680,12 +697,8 @@ func (p *Handler) toImportSpec(
 		}
 	}
 
-	version := specs.SpecVersionV0_1Variant
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
 	return &specs.Spec{
-		Version:  version,
+		Version:  specs.SpecVersionV1,
 		Kind:     ResourceKind,
 		Metadata: metadataMap,
 		Spec:     specMap,
@@ -697,23 +710,46 @@ func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
 	if err != nil {
 		return err
 	}
+	if metadata.Import == nil {
+		return nil
+	}
+	return srcResource.applyImportManifest(metadata.Import)
+}
 
-	if metadata.Import != nil {
-		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
-			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
-				// Support both URN field (new) and LocalID field (legacy)
-				var urn string
-				if resource.URN != "" {
-					urn = resource.URN
-				} else {
-					urn = resources.URN(resource.LocalID, ResourceType)
-				}
-				srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
-					WorkspaceId: workspace.WorkspaceID,
-					RemoteId:    resource.RemoteID,
-				}
-			})
+// applyImportManifest writes manifest entries into this source's ImportMetadata
+// map. Shared by the inline metadata.import path (addImportMetadata) and the
+// central import-manifest broadcast (Handler.LoadImportMetadata).
+func (srcResource *sourceResource) applyImportManifest(m *specs.WorkspacesImportMetadata) error {
+	lo.ForEach(m.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+		lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
+			// Support both URN field (new) and LocalID field (legacy)
+			var urn string
+			if resource.URN != "" {
+				urn = resource.URN
+			} else {
+				urn = resources.URN(resource.LocalID, ResourceType)
+			}
+			srcResource.ImportMetadata[urn] = &WorkspaceRemoteIDMapping{
+				WorkspaceId: workspace.WorkspaceID,
+				RemoteId:    resource.RemoteID,
+			}
 		})
+	})
+	return nil
+}
+
+// LoadImportMetadata replicates the aggregated manifest into every loaded
+// source. Each source reads only its own URN from ImportMetadata at graph time
+// (see GetResources), so replicating the full manifest into every source is
+// safe. Nil-safe.
+func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
+	if m == nil {
+		return nil
+	}
+	for _, srcResource := range h.resources {
+		if err := srcResource.applyImportManifest(m); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -984,12 +1020,4 @@ func dropToAction(drop bool) trackingplanClient.Action {
 		return trackingplanClient.Drop
 	}
 	return trackingplanClient.Forward
-}
-
-func getFileMetadata(externalID string) string {
-	return fmt.Sprintf("#/%s/%s/%s",
-		ResourceKind,
-		MetadataName,
-		externalID,
-	)
 }

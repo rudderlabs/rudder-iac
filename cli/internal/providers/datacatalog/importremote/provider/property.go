@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -29,18 +29,16 @@ var (
 )
 
 type PropertyImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *PropertyImportProvider {
 	return &PropertyImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, PropertiesRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, PropertiesRelativePath),
+		client:   client,
 	}
 }
 
@@ -97,10 +95,7 @@ func (p *PropertyImportProvider) idResources(
 		}
 
 		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindProperties, MetadataNameProperties, externalID)
-		if p.v1SpecSupport {
-			property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
-		}
+		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
 	}
 	return nil
 }
@@ -110,51 +105,59 @@ func (p *PropertyImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting properties for export to file")
 
 	properties := collection.GetAll(types.PropertyResourceType)
 	if len(properties) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedProps := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, property := range properties {
 		p.log.Debug("formatting property", "remoteID", property.ID, "externalID", property.ExternalID)
 
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog property")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog property")
+		}
+
+		urn := resources.URN(property.ExternalID, types.PropertyResourceType)
+
+		// Matched properties (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if property.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceId,
+				URN:         urn,
+				RemoteID:    property.ID,
+			})
+			continue
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the properties
-		urn := resources.URN(property.ExternalID, types.PropertyResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: property.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableProp := &model.ImportablePropertyV1{}
-			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
-		} else {
-			importableProp := &model.ImportableProperty{}
-			formatted, err = importableProp.ForExport(property.ExternalID, data, resolver)
-		}
+		importableProp := &model.ImportablePropertyV1{}
+		formatted, err := importableProp.ForExport(property.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting property: %w", err)
+			return nil, nil, fmt.Errorf("formatting property: %w", err)
 		}
 		formattedProps = append(formattedProps, formatted)
+	}
+
+	if len(formattedProps) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -166,7 +169,7 @@ func (p *PropertyImportProvider) FormatForExport(
 			"properties": formattedProps,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -174,5 +177,5 @@ func (p *PropertyImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

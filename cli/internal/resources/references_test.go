@@ -209,3 +209,29 @@ type ExampleStruct struct {
 	}
 	ArrayField []any
 }
+
+// opaqueValue mimics secret.String: a struct whose entire state is unexported.
+// Reflecting into its fields via Interface() panics, so collectReferencesByReflection
+// must skip unexported fields rather than descend into them.
+type opaqueValue struct {
+	hidden string
+}
+
+func TestCollectReferencesByReflection_SkipsUnexportedFields(t *testing.T) {
+	type host struct {
+		Ref    *PropertyRef
+		Secret opaqueValue // exported field, but its inner state is unexported
+		hidden opaqueValue // unexported field
+	}
+
+	in := host{
+		Ref:    &PropertyRef{URN: "test:urn", Property: "id"},
+		Secret: opaqueValue{hidden: "x"},
+		hidden: opaqueValue{hidden: "y"},
+	}
+
+	assert.NotPanics(t, func() {
+		refs := collectReferencesByReflection(in)
+		assert.Equal(t, []*PropertyRef{{URN: "test:urn", Property: "id"}}, refs)
+	})
+}

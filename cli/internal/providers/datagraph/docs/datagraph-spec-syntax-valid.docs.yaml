@@ -1,0 +1,116 @@
+rule_id: "datagraph/data-graph/spec-syntax-valid"
+match_behavior:
+  - applies_to:
+      - kind: "data-graph"
+        version: "rudder/v1"
+    valid:
+      - example_id: "dg-spec-syntax-valid-entity-event"
+        title: "Valid data-graph spec with entity and event models"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+                  primary_id: user_id
+                  root: true
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+                  timestamp: purchased_at
+                  relationships:
+                    - id: purchase-user
+                      display_name: Purchase User
+                      cardinality: many-to-one
+                      target: "#data-graph-model:user"
+                      source_join_key: user_id
+                      target_join_key: user_id
+    invalid:
+      - example_id: "dg-spec-syntax-missing-account-id"
+        title: "Data-graph missing required account_id"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account_id"
+            severity: "error"
+            message_contains: "'account_id' is required"
+      - example_id: "dg-spec-syntax-entity-missing-primary-id"
+        title: "Entity model missing required primary_id field"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: db.schema.users
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/primary_id"
+            severity: "error"
+            message_contains: "'primary_id' is required for entity models"
+      - example_id: "dg-spec-syntax-event-missing-timestamp"
+        title: "Event model missing required timestamp field"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: purchase
+                  display_name: Purchase
+                  type: event
+                  table: db.schema.purchases
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/timestamp"
+            severity: "error"
+            message_contains: "'timestamp' is required for event models"
+      - example_id: "dg-spec-syntax-invalid-table-format"
+        title: "Model table must be a 3-part catalog.schema.table reference"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: data-graph
+            metadata:
+              name: my-data-graph
+            spec:
+              id: my-data-graph
+              account_id: wh-account-123
+              models:
+                - id: user
+                  display_name: User
+                  type: entity
+                  table: schema.users
+                  primary_id: user_id
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/models/0/table"
+            severity: "error"
+            message_contains: "'table' must be a 3-part reference in the format catalog.schema.table"

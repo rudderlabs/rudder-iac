@@ -182,6 +182,44 @@ func TestClientSourcesCreate(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func boolPtr(b bool) *bool { return &b }
+
+func TestClientSourcesGetWithGeoEnrichmentAndTransient(t *testing.T) {
+	ctx := context.Background()
+
+	calls := []testutils.Call{
+		{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/sources/some-id", "")
+			},
+			ResponseStatus: 200,
+			ResponseBody: `{
+				"source": {
+					"id": "some-id",
+					"name": "some-name",
+					"type": "some-type",
+					"config": { "key1": "val1" },
+					"enabled": true,
+					"geoEnrichmentEnabled": true,
+					"transient": true
+				}
+			}`,
+		},
+	}
+
+	httpClient := testutils.NewMockHTTPClient(t, calls...)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	source, err := c.Sources.Get(ctx, "some-id")
+	require.NoError(t, err)
+	assert.Equal(t, boolPtr(true), source.GeoEnrichmentEnabled)
+	assert.Equal(t, boolPtr(true), source.Transient)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestClientSourcesUpdate(t *testing.T) {
 	ctx := context.Background()
 

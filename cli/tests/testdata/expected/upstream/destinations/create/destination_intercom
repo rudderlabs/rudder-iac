@@ -1,0 +1,34 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "intercom",
+  "name": "E2E Intercom",
+  "type": "INTERCOM",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "appId": "rudderCliE2eAppId",
+    "apiServer": "standard",
+    "apiVersion": "v2",
+    "sendAnonymousId": false,
+    "updateLastRequestAt": true,
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "mobileApiKeyAndroid": {
+      "android": "rudderCliE2eAndroidKey"
+    },
+    "mobileApiKeyIOS": {
+      "ios": "rudderCliE2eIosKey"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

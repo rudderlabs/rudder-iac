@@ -1,0 +1,29 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: hs
+spec:
+  id: hs
+  display_name: E2E HubSpot Updated
+  type: hs
+  enabled: true
+  definition_version: 1
+  config:
+    api_version: legacyApi
+    access_token: "{{ .HS_ACCESS_TOKEN }}"
+    hub_id: "{{ .HS_HUB_ID_UPDATED }}"
+    do_association: false
+    event_filtering:
+      blacklist:
+        - Application Opened
+    consent_management:
+      web:
+        - provider: oneTrust
+          resolution_strategy: and
+          consents:
+            - analytics
+      android_kotlin:
+        - provider: ketch
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

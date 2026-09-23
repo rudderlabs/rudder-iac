@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -85,21 +86,25 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Conte
 			Scope: h.metadata.ResourceType,
 		})
 
-		reference := fmt.Sprintf("#/%s/%s/%s", h.metadata.SpecKind, h.metadata.SpecMetadataName, externalID)
-
 		if err != nil {
 			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
 		}
 		resourceMap[metadata.ID] = &resources.RemoteResource{
 			ID:         metadata.ID,
 			ExternalID: externalID,
-			Reference:  reference,
+			Reference:  h.reference(externalID),
 			Data:       remoteData,
 		}
 	}
 
 	collection.Set(h.metadata.ResourceType, resourceMap)
 	return collection, nil
+}
+
+// reference is the "#<kind>:<id>" form other specs name a resource of this
+// handler by.
+func (h *BaseHandler[Spec, Res, State, Remote]) reference(id string) string {
+	return fmt.Sprintf("#%s:%s", h.metadata.SpecKind, id)
 }
 
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
@@ -166,7 +171,8 @@ func (h *BaseHandler[Spec, Res, State, Remote]) ParseSpec(_ string, s *specs.Spe
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadSpec(path string, s *specs.Spec) error {
 	spec := h.Impl.NewSpec()
 
-	// Convert spec map to struct using mapstructure
+	// Convert spec map to struct using mapstructure. Secret fields decode from
+	// bare strings via secret.String's UnmarshalMapstructure.
 	if err := mapstructure.Decode(s.Spec, spec); err != nil {
 		return fmt.Errorf("converting spec: %w", err)
 	}
@@ -206,6 +212,9 @@ func (h *BaseHandler[Spec, Res, State, Remote]) Resources() ([]*resources.Resour
 		urn := resources.URN(resourceId, h.metadata.ResourceType)
 		if importMetadata, ok := h.importMetadata[urn]; ok {
 			opts = append(opts, resources.WithResourceImportMetadata(importMetadata.RemoteId, importMetadata.WorkspaceId))
+		}
+		if h.metadata.ReferencedByKind {
+			opts = append(opts, resources.WithResourceFileMetadata(h.reference(resourceId)))
 		}
 		r := resources.NewResource(
 			resourceId,
@@ -327,23 +336,47 @@ func (h *BaseHandler[Spec, Res, State, Remote]) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	inputResolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	all := collection.GetAll(h.metadata.ResourceType)
 	if len(all) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
+	// Matched resources (import --merge) adopt an existing local spec: they
+	// contribute a manifest entry only, emitted here because the MatchedWith
+	// reference lives on the RemoteResource wrapper the Impl never sees. The
+	// Impl stays the entry source for the resources it exports — disjoint
+	// sets, one emitter each, so entries are never duplicated.
 	remotes := make(map[string]*Remote, len(all))
+	var matchedEntries []importmanifest.ImportEntry
 	for _, res := range all {
 		remote, ok := res.Data.(*Remote)
 		if !ok {
-			return nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
+			return nil, nil, &ErrInvalidDataType{Expected: (*Remote)(nil), Actual: res.Data}
+		}
+
+		if res.MatchedWith != nil {
+			metadata := (*remote).Metadata()
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: metadata.WorkspaceID,
+				URN:         resources.URN(res.ExternalID, h.metadata.ResourceType),
+				RemoteID:    res.ID,
+			})
+			continue
 		}
 
 		remotes[res.ExternalID] = remote
 	}
 
-	return h.Impl.FormatForExport(remotes, idNamer, inputResolver)
+	if len(remotes) == 0 {
+		return nil, matchedEntries, nil
+	}
+
+	entities, entries, err := h.Impl.FormatForExport(remotes, idNamer, inputResolver)
+	if err != nil {
+		return nil, nil, err
+	}
+	return entities, append(entries, matchedEntries...), nil
 }
 
 func CreatePropertyRef[State any](

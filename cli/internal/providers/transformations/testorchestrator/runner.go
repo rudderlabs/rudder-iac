@@ -64,7 +64,7 @@ func (r *Runner) Run(ctx context.Context, mode Mode, targetID string) (*TestResu
 	remoteGraph := syncer.StateToGraph(remoteState)
 
 	testLogger.Debug("Building test plan")
-	testPlan, err := r.planner.BuildPlan(ctx, remoteGraph, mode, targetID, r.workspaceID)
+	testPlan, err := r.planner.BuildPlan(remoteGraph, mode, targetID, r.workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("building test plan: %w", err)
 	}
@@ -306,7 +306,7 @@ func (r *Runner) runTestUnitTask(ctx context.Context, results *tasker.Results[*t
 			return fmt.Errorf("task is not a test unit task")
 		}
 
-		testLogger.Info("Testing transformation", "id", unitTask.ID, "name", unitTask.Name)
+		testLogger.Debug("Testing transformation", "id", unitTask.ID, "name", unitTask.Name)
 
 		testReq := buildTestRequest(unitTask.transformationVersion, unitTask.testDefs, unitTask.libraryVersionIDs)
 

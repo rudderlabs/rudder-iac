@@ -1051,7 +1051,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(map[string]*model.RemoteTransformation{}, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(map[string]*model.RemoteTransformation{}, namer, resolver)
 
 		require.NoError(t, err)
 		assert.Nil(t, result)
@@ -1080,7 +1080,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -1091,6 +1091,37 @@ func TestFormatForExport(t *testing.T) {
 		// Check code file
 		assert.Equal(t, "transformations/javascript/test-trans.js", result[1].RelativePath)
 		assert.Equal(t, "export function transformEvent(event, metadata) { return event; }", result[1].Content)
+	})
+
+	t.Run("code file follows the deduplicated spec file name", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"shared": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					Name:        "Shared",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		// A library named "shared" already claimed the name in the transformations dir.
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		require.NoError(t, idNamer.Load([]namer.ScopeName{{Name: "shared", Scope: "transformations"}}))
+
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, &mockResolver{})
+
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		assert.Equal(t, "transformations/shared-1.yaml", result[0].RelativePath)
+		assert.Equal(t, "javascript/shared-1.js", result[0].Content.(*specs.Spec).Spec["file"])
+		assert.Equal(t, "transformations/javascript/shared-1.js", result[1].RelativePath)
 	})
 
 	t.Run("python transformation exports to python folder", func(t *testing.T) {
@@ -1116,7 +1147,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 2)
@@ -1148,7 +1179,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported language 'golang'")
@@ -1181,7 +1212,7 @@ func TestFormatForExport(t *testing.T) {
 		}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "generating file name for transformation")
@@ -1220,7 +1251,7 @@ func TestFormatForExport(t *testing.T) {
 		namer := &mockNamer{}
 		resolver := &mockResolver{}
 
-		result, err := handler.Impl.FormatForExport(remotes, namer, resolver)
+		result, _, err := handler.Impl.FormatForExport(remotes, namer, resolver)
 
 		require.NoError(t, err)
 		require.Len(t, result, 4) // 2 specs + 2 code files

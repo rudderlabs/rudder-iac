@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: http-noauth
+spec:
+  id: http-noauth
+  display_name: E2E HTTP No Auth Updated
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/events
+    auth: noAuth
+    method: PUT
+    format: JSON
+    is_batching_enabled: true
+    max_batch_size: "50"

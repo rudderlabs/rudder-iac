@@ -9,6 +9,7 @@ import (
 
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -17,6 +18,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -37,9 +39,9 @@ type TransformationHandler = handler.BaseHandler[
 ]
 
 var HandlerMetadata = handler.HandlerMetadata{
-	ResourceType:     "transformation",
-	SpecKind:         "transformation",
-	SpecMetadataName: "transformations",
+	ResourceType:     ttypes.TransformationResourceType,
+	SpecKind:         ttypes.TransformationSpecKind,
+	SpecMetadataName: ttypes.TransformationMetadataName,
 }
 
 // HandlerImpl implements the HandlerImpl interface for transformation resources
@@ -273,17 +275,18 @@ func (h *HandlerImpl) FormatForExport(
 	remotes map[string]*model.RemoteTransformation,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	if len(remotes) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	formattables := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 
 	for externalID, remote := range remotes {
 		// Validate language
 		if remote.Language != handlers.JavaScript && remote.Language != handlers.Python {
-			return nil, fmt.Errorf("unsupported language '%s' for transformation %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
+			return nil, nil, fmt.Errorf("unsupported language '%s' for transformation %s: only %s and %s are supported", remote.Language, remote.ID, handlers.JavaScript, handlers.Python)
 		}
 
 		// Determine file extension and folder based on language
@@ -298,8 +301,17 @@ func (h *HandlerImpl) FormatForExport(
 			langFolder = handlers.Python
 		}
 
-		// Code file path: <language-folder>/<external-id>.<ext>
-		codeFilePath := filepath.Join(langFolder, externalID+ext)
+		// External IDs are unique per resource type only, so a library can share
+		// this ID; the spec and code file take the name deduplicated across the dir.
+		fileName, err := idNamer.Name(namer.ScopeName{
+			Name:  externalID,
+			Scope: handlers.TransformationsDir,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("generating file name for transformation %s: %w", remote.ID, err)
+		}
+
+		codeFilePath := filepath.Join(langFolder, fileName+ext)
 
 		// Build import metadata
 		urn := resources.URN(externalID, HandlerMetadata.ResourceType)
@@ -312,9 +324,10 @@ func (h *HandlerImpl) FormatForExport(
 				},
 			},
 		}
+		entries = append(entries, handlers.ImportEntriesFromWorkspace(workspaceMetadata)...)
 
 		// Create spec with file reference
-		spec, err := handlers.ToImportSpec(
+		spec, err := specs.ToImportSpec(
 			HandlerMetadata.SpecKind,
 			HandlerMetadata.SpecMetadataName,
 			workspaceMetadata,
@@ -327,16 +340,7 @@ func (h *HandlerImpl) FormatForExport(
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec for transformation %s: %w", remote.ID, err)
-		}
-
-		// Generate unique filename for YAML spec
-		fileName, err := idNamer.Name(namer.ScopeName{
-			Name:  externalID,
-			Scope: handlers.TransformationsDir,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating file name for transformation %s: %w", remote.ID, err)
+			return nil, nil, fmt.Errorf("creating spec for transformation %s: %w", remote.ID, err)
 		}
 
 		// Add YAML spec entity
@@ -352,5 +356,5 @@ func (h *HandlerImpl) FormatForExport(
 		})
 	}
 
-	return formattables, nil
+	return formattables, entries, nil
 }

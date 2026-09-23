@@ -1,0 +1,49 @@
+rule_id: "transformations/transformation/semantic-valid"
+match_behavior:
+  - applies_to:
+      - kind: "transformation"
+        version: "rudder/v1"
+    valid:
+      - example_id: "transformation-semantic-valid-no-imports"
+        title: "Transformation with no library imports is valid"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  language: javascript
+                  code: |
+                    export function transformEvent(event, metadata) {
+                      event.properties.processed = true;
+                      return event;
+                    }
+    invalid:
+      - example_id: "transformation-semantic-valid-missing-library"
+        title: "Transformation importing a library that does not exist in the graph"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: transformation
+            metadata:
+              name: my-transformations
+            spec:
+              transformations:
+                - id: my-transformation
+                  name: My Transformation
+                  language: javascript
+                  code: |
+                    import mathUtils from 'mathUtils';
+                    export function transformEvent(event, metadata) {
+                      event.properties.value = mathUtils.round(event.properties.value);
+                      return event;
+                    }
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/code"
+            severity: "error"
+            message_contains: "'mathUtils' imported library not found"

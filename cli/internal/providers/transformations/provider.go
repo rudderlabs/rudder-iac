@@ -10,19 +10,23 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/display"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/library"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/parser"
-	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	lrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/library"
 	trules "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/rules/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
+
+	tfdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/docs"
 )
 
 var log = logger.New("transformationsprovider")
@@ -75,8 +79,8 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 // Transformations only support the V1 version; legacy versions are explicitly rejected.
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	var patterns []vrules.MatchPattern
-	patterns = append(patterns, prules.V1VersionPatterns("transformation")...)
-	patterns = append(patterns, prules.V1VersionPatterns("transformation-library")...)
+	patterns = append(patterns, prules.V1VersionPatterns(ttypes.TransformationResourceType)...)
+	patterns = append(patterns, prules.V1VersionPatterns(ttypes.LibraryResourceType)...)
 	return patterns
 }
 
@@ -92,6 +96,13 @@ func (p *Provider) SemanticRules() []vrules.Rule {
 		trules.NewTransformationSemanticValidRule(),
 		lrules.NewLibrarySemanticValidRule(),
 	}
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the transformations provider, joined to registered rules by the docs generator.
+func (p *Provider) RuleDocEntries() []vdocs.RuleDocEntry {
+	entries, _ := vdocs.LoadRuleDocEntries(tfdocs.FragmentsFS, ".")
+	return entries
 }
 
 // MapRemoteToState overrides BaseProvider.MapRemoteToState to populate dependencies for transformations

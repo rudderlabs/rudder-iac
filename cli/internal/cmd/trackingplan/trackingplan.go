@@ -1,7 +1,6 @@
 package trackingplan
 
 import (
-	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
 	tpApplyCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan/apply"
@@ -12,13 +11,10 @@ import (
 func NewCmdTrackingPlan() *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:   "tp <command>",
-		Short: "Manage datacatalog resources",
-		Long:  "Manage the lifecycle of datacatalog resources using user defined state",
-		Example: heredoc.Doc(`
-			$ rudder-cli tp validate
-			$ rudder-cli tp apply
-		`),
+		Use:        "tp <command>",
+		Short:      "[Deprecated] Manage datacatalog resources",
+		Long:       "[Deprecated] Manage the lifecycle of datacatalog resources using user defined state",
+		Deprecated: "all tp subcommands have been replaced by top-level commands (apply, validate, destroy)",
 	}
 
 	cmd.AddCommand(tpValidateCmd.NewCmdTPValidate())

@@ -83,9 +83,17 @@ func collectReferencesByReflection(v any) []*PropertyRef {
 			return refs
 		}
 
-		// Recursively collect references from the fields of the struct
+		// Recursively collect references from the exported fields of the struct.
+		// Unexported fields can't be read via Interface() (it panics), so we skip
+		// them — this is what lets opaque value types like secret.String, whose
+		// state is unexported, sit in a RawData struct without crashing graph
+		// construction. PropertyRefs are always declared on exported fields, so in
+		// practice nothing reachable is lost. Mirrors DereferenceByReflection.
 		for i := 0; i < val.NumField(); i++ {
 			field := val.Field(i)
+			if !field.CanInterface() {
+				continue
+			}
 			refs = append(refs, collectReferencesByReflection(field.Interface())...)
 		}
 		return refs

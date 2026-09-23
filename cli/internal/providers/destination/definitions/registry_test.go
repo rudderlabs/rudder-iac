@@ -1,0 +1,454 @@
+package definitions_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+)
+
+func TestRegistryRegisterAndGet(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+
+	require.NoError(t, registry.Register(def))
+
+	registered, err := registry.Get("WEBHOOK", 1)
+	require.NoError(t, err)
+	assert.Equal(t, def, registered.DestinationDefinition)
+}
+
+func TestRegistryDuplicateRegistration(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+
+	require.NoError(t, registry.Register(def))
+	err := registry.Register(def)
+	require.Error(t, err)
+}
+
+func TestRegistryRejectsUnmappedSourceType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.SourceTypes = []string{"unsupported_source"}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `local source type "unsupported_source" has no API mapping`)
+}
+
+func TestRegistryRejectsConnectionModeWithoutSourceType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.SourceTypes = []string{"web"}
+	def.ConnectionModes = map[string][]string{"ios": {"cloud"}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection modes configured for unsupported source type "ios"`)
+}
+
+func TestRegistryRejectsSourceTypeWithoutConnectionModes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.SourceTypes = append(def.SourceTypes, "ios")
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `source type "ios" has no connection modes`)
+}
+
+func TestRegistryRejectsMissingConnectionModes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionModes = nil
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `source type "web" has no connection modes`)
+}
+
+func TestRegistryRejectsConnectionRequiredKeysWithoutSourceType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"ios": {"cloud": {"webhook_url"}}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection required keys configured for unsupported source type "ios"`)
+}
+
+func TestRegistryRejectsConnectionRequiredKeysWithoutKeys(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"cloud": {}}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" in mode "cloud" are empty`)
+}
+
+func TestRegistryRejectsConnectionRequiredKeysUnsupportedMode(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"device": {"webhook_url"}}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" reference unsupported connection mode "device"`)
+}
+
+func TestRegistryRejectsConnectionRequiredKeysWithoutModes(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" list no connection modes`)
+}
+
+func TestRegistryRejectsConnectionRequiredKeysUnknownKey(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConnectionRequiredKeys = map[string]map[string][]string{"web": {"cloud": {"webhook_url", "no_such_key"}}}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `connection required keys for source type "web" in mode "cloud" reference unknown config key "no_such_key"`)
+}
+
+// warehouseTestDefinition is a webhook definition retargeted at warehouse, the
+// only source type rETL metadata is legal on.
+func warehouseTestDefinition() *definitions.DestinationDefinition {
+	def := definitions.WebhookTestDefinition("WH", 1)
+	def.SourceTypes = []string{common.SourceTypeWarehouse}
+	def.ConnectionModes = map[string][]string{common.SourceTypeWarehouse: {"cloud"}}
+	return def
+}
+
+// An explicitly empty list is not absence: the backend falls back only when the
+// definition omits syncBehaviours entirely.
+func TestRegistryRETLMetadataExplicitlyEmptySyncBehaviours(t *testing.T) {
+	t.Parallel()
+
+	def := warehouseTestDefinition()
+	def.SyncBehaviours = []string{}
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	registered, err := registry.Get("WH", 1)
+	require.NoError(t, err)
+
+	behaviours := registered.SyncBehaviours()
+	require.NotNil(t, behaviours, "a declared-empty list must not read back as absence")
+	assert.Empty(t, behaviours)
+}
+
+// The fallback slice is package-level, so a caller mutating what the accessor
+// hands back would otherwise corrupt it for every other definition.
+func TestRegistrySyncBehavioursAreNotMutableByCallers(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(warehouseTestDefinition()))
+	registered, err := registry.Get("WH", 1)
+	require.NoError(t, err)
+
+	registered.SyncBehaviours()[0] = "mutated"
+
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+
+	declared := warehouseTestDefinition()
+	declared.SyncBehaviours = []string{"mirror"}
+	declaredRegistry := definitions.NewRegistry()
+	require.NoError(t, declaredRegistry.Register(declared))
+	registeredDeclared, err := declaredRegistry.Get("WH", 1)
+	require.NoError(t, err)
+
+	registeredDeclared.SyncBehaviours()[0] = "mutated"
+
+	assert.Equal(t, []string{"mirror"}, registeredDeclared.SyncBehaviours())
+}
+
+func TestRegistryRejectsUnknownSyncBehaviour(t *testing.T) {
+	t.Parallel()
+
+	def := warehouseTestDefinition()
+	def.SyncBehaviours = []string{"upsert", "append"}
+
+	err := definitions.NewRegistry().Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `sync behaviour "append" is not one of [upsert mirror full]`)
+}
+
+func TestRegistryRejectsRETLMetadataWithoutWarehouse(t *testing.T) {
+	t.Parallel()
+
+	for name, mutate := range map[string]func(*definitions.DestinationDefinition){
+		"empty sync behaviours": func(def *definitions.DestinationDefinition) { def.SyncBehaviours = []string{} },
+		"visual mapper":         func(def *definitions.DestinationDefinition) { def.SupportsVisualMapper = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+			mutate(def)
+
+			err := definitions.NewRegistry().Register(def)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "rETL metadata requires the warehouse source type")
+		})
+	}
+}
+
+func TestRegistryRejectsConsentOverrideWithoutSourceType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConsentValidationOverrides = map[string]common.ConsentValidator{
+		"ios": common.ValidateConsentEntries,
+	}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `consent validation override configured for unsupported source type "ios"`)
+}
+
+func TestRegistryRejectsNilConsentOverride(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConsentValidationOverrides = map[string]common.ConsentValidator{"web": nil}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `consent validation override for source type "web" is nil`)
+}
+
+func TestRegistryRejectsConsentOverrideWithoutSharedConsentModel(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := definitions.WebhookTestDefinition("WEBHOOK", 1)
+	def.ConsentValidationOverrides = map[string]common.ConsentValidator{
+		"web": common.ValidateConsentEntries,
+	}
+
+	err := registry.Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "consent validation overrides require a common.ConsentManagement config field")
+}
+
+func TestRegistryRejectsNonSharedConsentModel(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				ConsentManagement map[string]any `mapstructure:"consent_management"`
+			}{}
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "consent_management config field must use common.ConsentManagement")
+}
+
+func TestRegistryRejectsNonSharedConnectionModeModel(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	err := registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				ConnectionMode map[string]string `mapstructure:"connection_mode"`
+			}{}
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection_mode config field must use common.ConnectionMode")
+}
+
+func TestRegistrySupportedTypesAndVersions(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(definitions.WebhookTestDefinition("WEBHOOK", 1)))
+	require.NoError(t, registry.Register(definitions.WebhookTestDefinition("WEBHOOK", 2)))
+	require.NoError(t, registry.Register(definitions.GA4TestDefinition()))
+
+	assert.ElementsMatch(t, []string{"GA4", "WEBHOOK"}, registry.SupportedTypes())
+	assert.True(t, registry.IsSupported("WEBHOOK"))
+	assert.False(t, registry.IsSupported("S3"))
+
+	versions, err := registry.Versions("WEBHOOK")
+	require.NoError(t, err)
+	assert.Equal(t, []int64{1, 2}, versions)
+
+	_, err = registry.Versions("S3")
+	require.Error(t, err)
+}
+
+func TestRegistryGetUnknown(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	_, err := registry.Get("WEBHOOK", 1)
+	require.Error(t, err)
+}
+
+func TestRegistryGetByAPIType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	def := &definitions.DestinationDefinition{
+		Type:    "s3",
+		APIType: "S3",
+		Version: 1,
+		NewConfig: func() any {
+			return &struct {
+				BucketName string `mapstructure:"bucket_name" validate:"required"`
+			}{}
+		},
+	}
+	require.NoError(t, registry.Register(def))
+
+	registered, err := registry.GetByAPIType("S3", 1)
+	require.NoError(t, err)
+	assert.Equal(t, "s3", registered.Type)
+	assert.Equal(t, "S3", registered.APIType)
+
+	_, err = registry.GetByAPIType("S3", 2)
+	require.Error(t, err)
+	_, err = registry.GetByAPIType("s3", 1)
+	require.Error(t, err)
+}
+
+func TestRegistryAPITypeDefaultsToType(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(definitions.WebhookTestDefinition("WEBHOOK", 1)))
+
+	registered, err := registry.Get("WEBHOOK", 1)
+	require.NoError(t, err)
+	assert.Equal(t, "WEBHOOK", registered.APIType)
+
+	byAPI, err := registry.GetByAPIType("WEBHOOK", 1)
+	require.NoError(t, err)
+	assert.Equal(t, registered, byAPI)
+}
+
+func TestRegistryDuplicateAPITypeVersion(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:    "s3",
+		APIType: "S3",
+		Version: 1,
+		NewConfig: func() any {
+			return &struct {
+				BucketName string `mapstructure:"bucket_name" validate:"required"`
+			}{}
+		},
+	}))
+
+	err := registry.Register(&definitions.DestinationDefinition{
+		Type:    "amazon_s3",
+		APIType: "S3",
+		Version: 1,
+		NewConfig: func() any {
+			return &struct {
+				BucketName string `mapstructure:"bucket_name" validate:"required"`
+			}{}
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `apiType "S3" version 1 is already registered as "s3"`)
+}
+
+func TestRegisteredDefinitionMetadataAndConversion(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(definitions.GA4TestDefinition()))
+
+	registered, err := registry.Get("GA4", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"api_secret"}, registered.SecretKeys())
+	assert.ElementsMatch(t, []string{"web", "android"}, registered.SupportedSourceTypes())
+	assert.Contains(t, registered.SupportedSourceTypes(), "web")
+	assert.NotContains(t, registered.SupportedSourceTypes(), "ios")
+
+	modes, err := registered.ConnectionModes("web")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"cloud", "device", "hybrid"}, modes)
+
+	requiredKeys := registered.ConnectionRequiredKeys("web", "cloud")
+	assert.Equal(t, []string{"api_secret"}, requiredKeys)
+	requiredKeys[0] = "mutated"
+	assert.Equal(t, []string{"api_secret"}, registered.ConnectionRequiredKeys("web", "cloud"))
+	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"), "a supported mode without an entry has no required keys")
+	assert.Nil(t, registered.ConnectionRequiredKeys("android", "cloud"))
+
+	assert.Equal(t, []string{"connection_mode"}, registered.SourceTypeConfigKeys())
+
+	local := map[string]any{
+		"api_secret":     "secret",
+		"measurement_id": "G-123",
+	}
+	api, err := registered.LocalToAPI(local)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"apiSecret":     "secret",
+		"measurementId": "G-123",
+	}, api)
+
+	back, err := registered.APIToLocal(api)
+	require.NoError(t, err)
+	assert.Equal(t, local, back)
+}

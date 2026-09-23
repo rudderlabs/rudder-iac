@@ -1,0 +1,24 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "zendesk",
+  "name": "E2E Zendesk",
+  "type": "ZENDESK",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud",
+      "androidKotlin": "cloud"
+    },
+    "email": "rudder-cli-e2e@example.com",
+    "domain": "rudder-cli-e2e",
+    "sourceName": "rudder",
+    "createUsersAsVerified": false,
+    "sendGroupCallsWithoutUserId": false,
+    "removeUsersFromOrganization": false,
+    "searchByExternalId": false
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

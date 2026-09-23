@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"gopkg.in/yaml.v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,6 +145,30 @@ level1:
 	}
 }
 
+// Variable substitution tokens must come out unquoted: substitution rewrites
+// the raw bytes before YAML parsing, and the unquoted form marks the value as
+// a reference rather than a string literal. Tokens embedded in larger strings
+// stay quoted — only a whole-scalar token is a reference.
+func TestYAMLFormatter_UnquotesVariableTokens(t *testing.T) {
+	t.Parallel()
+
+	input := map[string]interface{}{
+		"accessKey": "{{ .BOOKS_ACCESS_KEY }}",
+		"items":     []string{"{{ .ITEM_TOKEN }}"},
+		"partial":   "prefix {{ .EMBEDDED }} suffix",
+	}
+
+	output, err := YAMLFormatter{}.Format(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, heredoc.Doc(`
+		accessKey: {{ .BOOKS_ACCESS_KEY }}
+		items:
+		  - {{ .ITEM_TOKEN }}
+		partial: "prefix {{ .EMBEDDED }} suffix"
+	`), string(output))
+}
+
 func TestYAMLFormatter_Extension(t *testing.T) {
 	t.Parallel()
 	formatter := YAMLFormatter{}
@@ -222,4 +247,18 @@ enabled: true
 			}
 		})
 	}
+}
+
+func TestYAMLFormatter_Format_PreservesNodeHeadComment(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	require.NoError(t, node.Encode(map[string]any{"kind": "import-manifest"}))
+	node.HeadComment = " generated — do not edit"
+
+	out, err := YAMLFormatter{}.Format(&node)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(out), "#"), "got:\n%s", out)
+	assert.Contains(t, string(out), "generated — do not edit")
+	assert.Contains(t, string(out), `kind: "import-manifest"`)
 }

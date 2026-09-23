@@ -7,11 +7,14 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"golang.org/x/exp/maps"
@@ -53,6 +56,19 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
 	}, nil
+}
+
+// ResourceMatchers aggregates import --merge matchers from all providers.
+// Cross-provider order is immaterial — resource types are disjoint across
+// providers (enforced at construction) and no matcher reads another
+// provider's marks — so plain map iteration is fine; only the order within a
+// provider's own slice (parent-before-child) is meaningful and is preserved.
+func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
+	var all []importmatcher.Matcher
+	for _, provider := range p.Providers {
+		all = append(all, provider.ResourceMatchers()...)
+	}
+	return all
 }
 
 // SupportedMatchPatterns aggregates match patterns from all providers.
@@ -242,22 +258,36 @@ func (p *CompositeProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	formattable := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 
 	for name, provider := range p.Providers {
-		entities, err := provider.FormatForExport(
+		entities, providerEntries, err := provider.FormatForExport(
 			collection,
 			idNamer,
 			resolver,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("formatting for export for provider %s: %w", name, err)
+			return nil, nil, fmt.Errorf("formatting for export for provider %s: %w", name, err)
 		}
 		formattable = append(formattable, entities...)
+		entries = append(entries, providerEntries...)
 	}
 
-	return formattable, nil
+	return formattable, entries, nil
+}
+
+// LoadImportManifest fans the active workspace's manifest out to every
+// sub-provider. Providers with no matching URNs simply store nothing, so the
+// broadcast is a no-op for them.
+func (p *CompositeProvider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
+	for name, sub := range p.Providers {
+		if err := sub.LoadImportManifest(m); err != nil {
+			return fmt.Errorf("loading import manifest into provider %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // Helper methods
@@ -394,5 +424,14 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
-// Compile-time verification that CompositeProvider implements RuleProvider and SpecFactoryProvider
+// RuleDocEntries aggregates authored doc fragments from all child providers.
+func (p *CompositeProvider) RuleDocEntries() []docs.RuleDocEntry {
+	var entries []docs.RuleDocEntry
+	for _, provider := range p.Providers {
+		entries = append(entries, provider.RuleDocEntries()...)
+	}
+	return entries
+}
+
+// Compile-time verification that CompositeProvider implements RuleProvider (including RuleDocEntries)
 var _ RuleProvider = (*CompositeProvider)(nil)

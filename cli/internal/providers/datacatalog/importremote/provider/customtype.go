@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/model"
@@ -28,18 +28,16 @@ var (
 )
 
 type CustomTypeImportProvider struct {
-	client        catalog.DataCatalog
-	log           logger.Logger
-	filepath      string
-	v1SpecSupport bool
+	client   catalog.DataCatalog
+	log      logger.Logger
+	filepath string
 }
 
 func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, importDir string) *CustomTypeImportProvider {
 	return &CustomTypeImportProvider{
-		log:           log,
-		filepath:      filepath.Join(importDir, CustomTypesRelativePath),
-		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
+		log:      log,
+		filepath: filepath.Join(importDir, CustomTypesRelativePath),
+		client:   client,
 	}
 }
 
@@ -96,10 +94,7 @@ func (p *CustomTypeImportProvider) idResources(
 		}
 
 		customType.ExternalID = externalID
-		customType.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindCustomTypes, MetadataNameCustomTypes, externalID)
-		if p.v1SpecSupport {
-			customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
-		}
+		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
 	}
 	return nil
 }
@@ -109,51 +104,59 @@ func (p *CustomTypeImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting custom types for export to file")
 
 	customTypes := collection.GetAll(types.CustomTypeResourceType)
 	if len(customTypes) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workspaceMetadata := specs.WorkspaceImportMetadata{
 		Resources: make([]specs.ImportIds, 0),
 	}
-	version := specs.SpecVersionV0_1
-	if p.v1SpecSupport {
-		version = specs.SpecVersionV1
-	}
+	version := specs.SpecVersionV1
 
 	formattedTypes := make([]map[string]any, 0)
+	var matchedEntries []importmanifest.ImportEntry
 	for _, customType := range customTypes {
 		p.log.Debug("formatting custom type", "remoteID", customType.ID, "externalID", customType.ExternalID)
 
 		data, ok := customType.Data.(*catalog.CustomType)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource to catalog custom type")
+			return nil, nil, fmt.Errorf("unable to cast remote resource to catalog custom type")
+		}
+
+		urn := resources.URN(customType.ExternalID, types.CustomTypeResourceType)
+
+		// Matched custom types (import --merge) adopt an existing local spec:
+		// manifest entry only — no spec content and no spec-embedded import
+		// metadata, since the written file does not contain them.
+		if customType.MatchedWith != nil {
+			matchedEntries = append(matchedEntries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceId,
+				URN:         urn,
+				RemoteID:    customType.ID,
+			})
+			continue
 		}
 
 		workspaceMetadata.WorkspaceID = data.WorkspaceId // Similar for all the custom types
-		urn := resources.URN(customType.ExternalID, types.CustomTypeResourceType)
 		workspaceMetadata.Resources = append(workspaceMetadata.Resources, specs.ImportIds{
 			URN:      urn,
 			RemoteID: customType.ID,
 		})
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableCustomType := &model.ImportableCustomTypeV1{}
-			formatted, err = importableCustomType.ForExport(customType.ExternalID, data, resolver)
-		} else {
-			importableCustomType := &model.ImportableCustomType{}
-			formatted, err = importableCustomType.ForExport(customType.ExternalID, data, resolver)
-		}
+		importableCustomType := &model.ImportableCustomTypeV1{}
+		formatted, err := importableCustomType.ForExport(customType.ExternalID, data, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("formatting custom type: %w", err)
+			return nil, nil, fmt.Errorf("formatting custom type: %w", err)
 		}
 		formattedTypes = append(formattedTypes, formatted)
+	}
+
+	if len(formattedTypes) == 0 {
+		return nil, matchedEntries, nil
 	}
 
 	spec, err := toImportSpec(
@@ -165,7 +168,7 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			"types": formattedTypes,
 		})
 	if err != nil {
-		return nil, fmt.Errorf("creating spec: %w", err)
+		return nil, nil, fmt.Errorf("creating spec: %w", err)
 	}
 
 	return []writer.FormattableEntity{
@@ -173,5 +176,5 @@ func (p *CustomTypeImportProvider) FormatForExport(
 			Content:      spec,
 			RelativePath: p.filepath,
 		},
-	}, nil
+	}, append(importEntriesFromWorkspace(workspaceMetadata), matchedEntries...), nil
 }

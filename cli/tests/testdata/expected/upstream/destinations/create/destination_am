@@ -1,0 +1,54 @@
+{
+  "config": {
+    "apiKey": "rudderCliE2eAmFullKey",
+    "connectionMode": {
+      "web": "device"
+    },
+    "enableEnhancedUserOperations": false,
+    "enablePageViewsAutoCapture": {
+      "web": true
+    },
+    "enableWebVitalsAutoCapture": {
+      "web": false
+    },
+    "eventFilteringOption": "whitelistedEvents",
+    "groupTypeTrait": "company",
+    "groupValueTrait": "companyId",
+    "mapDeviceBrand": false,
+    "residencyServer": "standard",
+    "sdkVersion": {
+      "web": 2
+    },
+    "trackAllPages": true,
+    "trackCategorizedPages": false,
+    "trackNamedPages": true,
+    "trackProductsOnce": false,
+    "trackRevenuePerProduct": false,
+    "trackSessionEvents": {
+      "android": false,
+      "web": false
+    },
+    "traitsToIncrement": [
+      {
+        "traits": "logins"
+      }
+    ],
+    "useUserDefinedPageEventName": false,
+    "useUserDefinedScreenEventName": false,
+    "versionName": "1.0.0",
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ]
+  },
+  "createdAt": "\u003cignored\u003e",
+  "enabled": true,
+  "externalId": "am",
+  "id": "\u003cignored\u003e",
+  "name": "E2E Amplitude",
+  "type": "AM",
+  "updatedAt": "\u003cignored\u003e",
+  "version": "\u003cignored\u003e",
+  "workspaceId": "\u003cignored\u003e"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "kinesis-role",
+  "name": "E2E Kinesis Role Auth Updated",
+  "type": "KINESIS",
+  "enabled": true,
+  "config": {
+    "region": "us-west-2",
+    "stream": "rudder-cli-e2e-role-updated",
+    "roleBasedAuth": true,
+    "iamRoleARN": "arn:aws:iam::123456789012:role/KinesisAccessUpdated",
+    "useMessageId": true
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

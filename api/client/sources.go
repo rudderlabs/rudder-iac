@@ -7,14 +7,16 @@ import (
 )
 
 type Source struct {
-	ID        string          `json:"id,omitempty"`
-	Name      string          `json:"name"`
-	Type      string          `json:"type"`
-	WriteKey  string          `json:"writeKey,omitempty"`
-	IsEnabled bool            `json:"enabled"`
-	Config    json.RawMessage `json:"config"`
-	CreatedAt *time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time      `json:"updatedAt,omitempty"`
+	ID                   string          `json:"id,omitempty"`
+	Name                 string          `json:"name"`
+	Type                 string          `json:"type"`
+	WriteKey             string          `json:"writeKey,omitempty"`
+	IsEnabled            bool            `json:"enabled"`
+	Config               json.RawMessage `json:"config"`
+	CreatedAt            *time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt            *time.Time      `json:"updatedAt,omitempty"`
+	GeoEnrichmentEnabled *bool           `json:"geoEnrichmentEnabled,omitempty"`
+	Transient            *bool           `json:"transient,omitempty"`
 }
 
 type sources struct {

@@ -33,6 +33,12 @@ type ValidationContext struct {
 	// This is nil for syntactic validation (pre-graph construction)
 	// and populated for semantic validation (post-graph construction).
 	Graph *resources.Graph
+
+	// WorkspaceID is the workspace this run targets. Workspace-scoped semantic
+	// rules (e.g. orphaned-URN) read it to validate only the active workspace's
+	// entries. Empty when no specific workspace is targeted (e.g. validate with
+	// no target) — such rules then apply to all workspaces.
+	WorkspaceID string
 }
 
 // HasGraph returns true if the context includes a resource graph for semantic validation.

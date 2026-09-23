@@ -1,55 +1,20 @@
 package validate
 
 import (
-	"fmt"
+	"errors"
 
-	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/cli/internal/app"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/spf13/cobra"
 )
 
-var (
-	log = logger.New("trackingplan", logger.Attr{
-		Key:   "cmd",
-		Value: "validate",
-	})
-)
-
 func NewCmdTPValidate() *cobra.Command {
-	var (
-		location string
-		err      error
-	)
-
 	cmd := &cobra.Command{
-		Use:   "validate",
-		Short: "Validate locally defined catalog",
-		Long:  "Validate locally defined catalog",
-		Example: heredoc.Doc(`
-			$ rudder-cli tp validate --location <path-to-catalog-dir or file>
-		`),
+		Use:        "validate",
+		Short:      "Validate locally defined catalog",
+		Deprecated: "use `rudder-cli validate` instead",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			defer func() {
-				telemetry.TrackCommand("tp validate", err)
-			}()
-
-			deps, err := app.NewDeps()
-			if err != nil {
-				return fmt.Errorf("initialising dependencies: %w", err)
-			}
-
-			p := deps.NewDataCatalogProject()
-
-			if err := p.Load(location); err != nil {
-				return fmt.Errorf("loading project: %w", err)
-			}
-
-			return nil
+			return errors.New("tp validate is deprecated: use `rudder-cli validate` instead")
 		},
 	}
 
-	cmd.Flags().StringVarP(&location, "location", "l", "", "Path to the directory containing the catalog files or catalog file itself")
 	return cmd
 }

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/loader"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
@@ -33,7 +33,6 @@ type TrackingPlanImportProvider struct {
 	client        catalog.DataCatalog
 	log           logger.Logger
 	baseImportDir string
-	v1SpecSupport bool
 }
 
 func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger, baseImportDir string) *TrackingPlanImportProvider {
@@ -41,7 +40,6 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 		log:           log,
 		baseImportDir: baseImportDir,
 		client:        client,
-		v1SpecSupport: config.GetConfig().ExperimentalFlags.V1SpecSupport,
 	}
 }
 
@@ -98,10 +96,7 @@ func (p *TrackingPlanImportProvider) idResources(
 		}
 
 		tp.ExternalID = externalID
-		tp.Reference = fmt.Sprintf("#/%s/%s/%s", localcatalog.KindTrackingPlans, externalID, externalID)
-		if p.v1SpecSupport {
-			tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, externalID)
-		}
+		tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, externalID)
 	}
 	return nil
 }
@@ -111,24 +106,37 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
 	resolver resolver.ReferenceResolver,
-) ([]writer.FormattableEntity, error) {
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
 	p.log.Debug("formatting tracking plans for export to file")
 
 	trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
 	if len(trackingPlans) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	formattables := make([]writer.FormattableEntity, 0)
+	var entries []importmanifest.ImportEntry
 	for _, trackingPlan := range trackingPlans {
 		p.log.Debug("formatting tracking plan", "remoteID", trackingPlan.ID, "externalID", trackingPlan.ExternalID)
 
 		data, ok := trackingPlan.Data.(*catalog.TrackingPlanWithIdentifiers)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
+			return nil, nil, fmt.Errorf("unable to cast remote resource: %s to catalog tracking plan", trackingPlan.ID)
 		}
 
 		urn := resources.URN(trackingPlan.ExternalID, types.TrackingPlanResourceType)
+
+		// Matched tracking plans (import --merge) adopt an existing local
+		// spec: manifest entry only — no spec file is written for them.
+		if trackingPlan.MatchedWith != nil {
+			entries = append(entries, importmanifest.ImportEntry{
+				WorkspaceID: data.WorkspaceID,
+				URN:         urn,
+				RemoteID:    trackingPlan.ID,
+			})
+			continue
+		}
+
 		workspaceMetadata := specs.WorkspaceImportMetadata{
 			WorkspaceID: data.WorkspaceID,
 			Resources: []specs.ImportIds{
@@ -138,26 +146,16 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 				},
 			},
 		}
+		entries = append(entries, importEntriesFromWorkspace(workspaceMetadata)...)
 
-		var formatted map[string]any
-		var err error
-		if p.v1SpecSupport {
-			importableTrackingPlan := &model.ImportableTrackingPlanV1{}
-			formatted, err = importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
-		} else {
-			importableTrackingPlan := &model.ImportableTrackingPlan{}
-			formatted, err = importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
-		}
+		importableTrackingPlan := &model.ImportableTrackingPlanV1{}
+		formatted, err := importableTrackingPlan.ForExport(trackingPlan.ExternalID, data, resolver, idNamer)
 		if err != nil {
-			return nil, fmt.Errorf("formatting tracking plan %s for export: %w", trackingPlan.ID, err)
+			return nil, nil, fmt.Errorf("formatting tracking plan %s for export: %w", trackingPlan.ID, err)
 		}
 
-		kind := localcatalog.KindTrackingPlans
-		version := specs.SpecVersionV0_1
-		if p.v1SpecSupport {
-			kind = localcatalog.KindTrackingPlansV1
-			version = specs.SpecVersionV1
-		}
+		kind := localcatalog.KindTrackingPlansV1
+		version := specs.SpecVersionV1
 
 		spec, err := toImportSpec(
 			version,
@@ -167,7 +165,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			formatted,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating spec for tracking plan %s: %w", trackingPlan.ID, err)
+			return nil, nil, fmt.Errorf("creating spec for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
 		fName, err := idNamer.Name(namer.ScopeName{
@@ -175,7 +173,7 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 			Scope: trackingPlanFileNameScope,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("generating file path for tracking plan %s: %w", trackingPlan.ID, err)
+			return nil, nil, fmt.Errorf("generating file path for tracking plan %s: %w", trackingPlan.ID, err)
 		}
 
 		formattables = append(formattables, writer.FormattableEntity{
@@ -189,5 +187,5 @@ func (p *TrackingPlanImportProvider) FormatForExport(
 
 	}
 
-	return formattables, nil
+	return formattables, entries, nil
 }

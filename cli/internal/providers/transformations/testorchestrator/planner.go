@@ -1,12 +1,12 @@
 package testorchestrator
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/samber/lo"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
@@ -46,25 +46,19 @@ func (tp *TestPlan) IsTransformationModified(urn string) bool {
 
 // Planner determines what resources to test based on mode and diff
 type Planner struct {
-	graph              *resources.Graph
-	transformationType string
-	libraryType        string
+	graph *resources.Graph
 }
 
 // NewPlanner creates a new test planner
 func NewPlanner(graph *resources.Graph) *Planner {
-	return &Planner{
-		graph:              graph,
-		transformationType: "transformation",
-		libraryType:        "transformation-library",
-	}
+	return &Planner{graph: graph}
 }
 
 // BuildPlan determines which transformations to test based on mode and remote graph
-func (p *Planner) BuildPlan(ctx context.Context, remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
+func (p *Planner) BuildPlan(remoteGraph *resources.Graph, mode Mode, targetID string, workspaceID string) (*TestPlan, error) {
 	var (
-		transformations = p.graph.ResourcesByType(p.transformationType)
-		libraries       = p.graph.ResourcesByType(p.libraryType)
+		transformations = p.graph.ResourcesByType(ttypes.TransformationResourceType)
+		libraries       = p.graph.ResourcesByType(ttypes.LibraryResourceType)
 	)
 
 	// Compute diff to identify new/updated/unmodified resources
@@ -153,7 +147,7 @@ func (p *Planner) planSingle(targetID string, transformations []*resources.Resou
 	}
 
 	transformationsToTest = []*resources.Resource{resource}
-	if resource.Type() == p.libraryType {
+	if resource.Type() == ttypes.LibraryResourceType {
 		dependents := p.findDependentTransformations(resource, transformations)
 		transformationsToTest = dependents
 		// Add library with no dependents to standalone list
@@ -194,10 +188,10 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 		r, _ := p.graph.GetResource(urn)
 
 		switch r.Type() {
-		case p.transformationType:
+		case ttypes.TransformationResourceType:
 			transformationURNs[urn] = true
 
-		case p.libraryType:
+		case ttypes.LibraryResourceType:
 			libraryURNs[urn] = true
 		}
 	}
@@ -210,10 +204,10 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 
 		if remote == nil || p.modified(resource, remote) {
 			switch resource.Type() {
-			case p.transformationType:
+			case ttypes.TransformationResourceType:
 				transformationURNs[urn] = true
 
-			case p.libraryType:
+			case ttypes.LibraryResourceType:
 				libraryURNs[urn] = true
 			}
 		}
@@ -226,10 +220,10 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 
 		if p.modified(resource, remote) {
 			switch resource.Type() {
-			case p.transformationType:
+			case ttypes.TransformationResourceType:
 				transformationURNs[urn] = true
 
-			case p.libraryType:
+			case ttypes.LibraryResourceType:
 				libraryURNs[urn] = true
 			}
 		}
@@ -240,13 +234,13 @@ func (p *Planner) buildModifiedResourceSets(diff *differ.Diff, remoteGraph *reso
 
 func (p *Planner) modified(resource, remote *resources.Resource) bool {
 	switch resource.Type() {
-	case p.transformationType:
+	case ttypes.TransformationResourceType:
 		resourceData, _ := resource.RawData().(*model.TransformationResource)
 		remoteData, _ := remote.RawData().(*model.TransformationResource)
 
 		return resourceData.Name != remoteData.Name || resourceData.Code != remoteData.Code
 
-	case p.libraryType:
+	case ttypes.LibraryResourceType:
 		resourceData, _ := resource.RawData().(*model.LibraryResource)
 		remoteData, _ := remote.RawData().(*model.LibraryResource)
 
