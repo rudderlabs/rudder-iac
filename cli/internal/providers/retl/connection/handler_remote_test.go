@@ -257,6 +257,7 @@ func TestList(t *testing.T) {
 	assert.Equal(t, []resources.ResourceData{
 		{
 			IDKey:              "conn-1",
+			"name":             "users-to-webhook",
 			SourceIDKey:        "src-1",
 			SourceNameKey:      "Users",
 			DestinationIDKey:   "dst-1",
@@ -266,6 +267,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			IDKey:              "conn-2",
+			"name":             "",
 			SourceIDKey:        "src-1",
 			SourceNameKey:      "Users",
 			DestinationIDKey:   "dst-object",
@@ -294,6 +296,7 @@ func TestListNamesAreBestEffort(t *testing.T) {
 		assert.Equal(t, []resources.ResourceData{
 			{
 				IDKey:              "conn-1",
+				"name":             "users-to-webhook",
 				SourceIDKey:        "src-1",
 				SourceNameKey:      "",
 				DestinationIDKey:   "dst-1",

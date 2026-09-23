@@ -869,7 +869,12 @@ func (h *Handler) List(ctx context.Context, hasExternalID *bool) ([]resources.Re
 	result := make([]resources.ResourceData, 0, len(conns))
 	for _, conn := range conns {
 		result = append(result, resources.ResourceData{
-			IDKey:              conn.ID,
+			IDKey: conn.ID,
+			// A connection has no name of its own; the external id is what an
+			// author calls it, and the table renderer keys on "name". Without
+			// this the list prints an opaque id and "- not set -" for every
+			// row, which is worse than not listing at all.
+			"name":             conn.ExternalID,
 			SourceIDKey:        conn.SourceID,
 			SourceNameKey:      sources[conn.SourceID].Name,
 			DestinationIDKey:   conn.DestinationID,
