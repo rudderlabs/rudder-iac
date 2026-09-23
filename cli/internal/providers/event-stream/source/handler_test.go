@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -1893,5 +1895,56 @@ func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
 		assert.Equal(t, "rem-1", byID["src-1"].ImportMetadata().RemoteId)
 		// src-2 has no matching manifest URN, so it stays unimported.
 		assert.Nil(t, byID["src-2"].ImportMetadata())
+	})
+}
+
+// An event-stream source cannot carry an rETL connection, but SourceService's
+// refusal is the one the CLI is most likely to meet: a source the CLI manages,
+// connected in the UI to a destination it does not. Without the annotation the
+// destroy fails naming nothing the plan contains.
+//
+// The remedy here must not name the rETL flags: no rETL connection can join an
+// event-stream source (retl/connection.SourceKinds is sqlModel plus table), so
+// turning them on cannot help and would only cost the reader a second attempt.
+func TestHandler_Delete_BlockedByConnections(t *testing.T) {
+	t.Parallel()
+
+	t.Run("explains the refusal", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		mockClient.FailDeleteWith(&client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "The source has active connections, please delete those first",
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		err := handler.Delete(context.Background(), "web", resources.ResourceData{source.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The source has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "Delete them in the workspace first")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT",
+			"no rETL connection can join an event-stream source, so the flags cannot help here")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	t.Run("leaves an unrelated failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		mockClient.FailDeleteWith(&client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "source is referenced by a running job",
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		err := handler.Delete(context.Background(), "web", resources.ResourceData{source.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
 	})
 }
