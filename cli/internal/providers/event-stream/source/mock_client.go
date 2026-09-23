@@ -17,6 +17,7 @@ type MockSourceClient struct {
 	updateTPConnectionCalled bool
 	getSourcesCalled         bool
 	setExternalIDCalled      bool
+	getSourcesCalls          []sourceClient.ListSourcesOptions
 	getSourcesFunc           func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 	deleteErr                error
 }
@@ -53,8 +54,13 @@ func (m *MockSourceClient) Delete(ctx context.Context, sourceID string) error {
 	return m.deleteErr
 }
 
-func (m *MockSourceClient) GetSources(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+func (m *MockSourceClient) GetSources(ctx context.Context, opts ...sourceClient.ListSourcesOption) ([]sourceClient.EventStreamSource, error) {
 	m.getSourcesCalled = true
+	options := sourceClient.ListSourcesOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	m.getSourcesCalls = append(m.getSourcesCalls, options)
 	if m.getSourcesFunc != nil {
 		return m.getSourcesFunc(ctx)
 	}
@@ -103,6 +109,12 @@ func (m *MockSourceClient) DeleteCalled() bool {
 
 func (m *MockSourceClient) GetSourcesCalled() bool {
 	return m.getSourcesCalled
+}
+
+// GetSourcesCalls returns the resolved list options of every GetSources call,
+// in order, so callers can assert which hasExternalId filter was asked for.
+func (m *MockSourceClient) GetSourcesCalls() []sourceClient.ListSourcesOptions {
+	return m.getSourcesCalls
 }
 
 func (m *MockSourceClient) LinkTPCalled() bool {

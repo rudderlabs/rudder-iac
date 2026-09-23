@@ -422,17 +422,12 @@ func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, 
 
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	sources, err := h.client.GetSources(ctx)
+	sources, err := h.client.GetSources(ctx, sourceClient.WithSourcesHasExternalID(true))
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources {
-		if source.ExternalID == "" {
-			// loop over the sources which have externalID not set
-			// as they are not anyway part of the state
-			continue
-		}
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: source.ExternalID,
@@ -569,15 +564,12 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	sources, err := h.client.GetSources(ctx)
+	sources, err := h.client.GetSources(ctx, sourceClient.WithSourcesHasExternalID(false))
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources {
-		if source.ExternalID != "" {
-			continue
-		}
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  source.Name,
 			Scope: ResourceType,

@@ -446,6 +446,27 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		assert.Equal(t, "web-to-s3", second.ExternalID)
 	})
 
+	// sourcesByID is the membership set that tells event stream connections
+	// apart from rETL rows, so it must stay unfiltered: a hasExternalId filter
+	// would hide UI-created sources and misclassify their connections as rETL.
+	t.Run("lists sources unfiltered so UI-created sources still match", func(t *testing.T) {
+		mock := &MockConnectionClient{
+			ListFunc: func(_ client.ListConnectionsOptions) (*client.ConnectionsPage, error) {
+				return &client.ConnectionsPage{Connections: []client.Connection{
+					{ID: "conn-remote-1", ExternalID: "android-to-s3", SourceID: "src-ui", DestinationID: "dst-remote-1"},
+				}}, nil
+			},
+		}
+		eventStreamSources(mock, "src-ui")
+		h := NewHandler(mock, "event-stream")
+
+		collection, err := h.LoadResourcesFromRemote(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{}}, mock.GetSourcesCalls())
+		assert.Len(t, collection.GetAll(EventStreamConnectionResourceType), 1)
+	})
+
 	t.Run("skips rETL connections", func(t *testing.T) {
 		// rETL rows appear in the same generic list; only connections whose
 		// source is an event stream source are kept.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1273,13 +1274,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:       "python",
 					Enabled:    false,
 				},
-				{
-					ID:         "remote789",
-					ExternalID: "", // This should be skipped
-					Name:       "Test Source 3",
-					Type:       "Go",
-					Enabled:    true,
-				},
 			}, nil
 		})
 		handler := source.NewHandler(mockClient, importDir)
@@ -1287,7 +1281,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadResourcesFromRemote(context.Background())
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: lo.ToPtr(true)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
 		assert.Len(t, esResources, 2)
@@ -1501,22 +1495,15 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
 				{
-					ID:         "remote123",
-					ExternalID: "external-123", // Has ExternalID - should be filtered out
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
-				},
-				{
 					ID:         "remote456",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 2",
 					Type:       "python",
 					Enabled:    false,
 				},
 				{
 					ID:         "remote789",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 3",
 					Type:       "javascript",
 					Enabled:    true,
@@ -1528,10 +1515,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: lo.ToPtr(false)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
-		require.Len(t, esResources, 2, "Should only include sources without ExternalID")
+		require.Len(t, esResources, 2)
 
 		// Verify the returned resources
 		resource456, exists := esResources["remote456"]
