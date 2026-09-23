@@ -1,15 +1,12 @@
 package retlsource
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +15,15 @@ func newCmdValidate() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <external-id>",
-		Short: "Validate a RETL source (SQL model or table)",
-		Long:  "Validate a RETL source (SQL model or warehouse table) by executing its query without returning data. s3 table sources have no query to validate.",
+		Short: "Validate a RETL source's spec (SQL model or table)",
+		Long: heredoc.Doc(`
+			Validate a RETL source's spec.
+
+			This checks the project's specs and that the source is defined in it. It
+			does not run the source's query: reading from the warehouse is what
+			` + "`rudder-cli retl-sources preview`" + ` is for, and it is opt-in because it
+			executes a query against live data.
+		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
@@ -39,6 +43,8 @@ func newCmdValidate() *cobra.Command {
 				return err
 			}
 
+			// Load runs the project's syntactic and semantic rules over every spec,
+			// so reaching the graph at all means the project validated.
 			p := d.NewProject()
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
@@ -52,19 +58,9 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			resourceData, err := resolveAccountRef(cmd.Context(), d.Client().Accounts, resource.Data())
-			if err != nil {
-				return err
-			}
 
-			// Get the RETL provider
-			retlProvider := d.Providers().RETL
-
-			// Validate by attempting to preview with limit=0
-			ui.StartSpinner("Validating SQL query ...")
-			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
-			ui.StopSpinner()
-			return reportValidation(cmd.OutOrStdout(), err)
+			reportValidation(cmd.OutOrStdout(), externalID, resource.Type())
+			return nil
 		},
 	}
 
@@ -73,18 +69,11 @@ func newCmdValidate() *cobra.Command {
 	return cmd
 }
 
-// reportValidation treats ErrPreviewUnsupported (an s3 table source) as a pass,
-// so validating every source in a project in CI does not fail on one.
-func reportValidation(w io.Writer, err error) error {
-	switch {
-	case err == nil:
-		fmt.Fprintln(w, "✅ SQL query executed successfully")
-		return nil
-	case errors.Is(err, table.ErrPreviewUnsupported):
-		fmt.Fprintf(w, "✅ Nothing to validate: %s\n", err)
-		return nil
-	default:
-		fmt.Fprintf(w, "❌ SQL query failed to execute: %s\n", err)
-		return err
-	}
+// reportValidation names the source that validated and where the warehouse check
+// went. Saying so matters more than it looks: this command used to run the query,
+// so a bare success line would read as "your warehouse is reachable" to anyone
+// who used the old behaviour.
+func reportValidation(w io.Writer, externalID, resourceType string) {
+	fmt.Fprintf(w, "✅ %s '%s' is valid\n", resourceType, externalID)
+	fmt.Fprintf(w, "   To check that its query runs against the warehouse: rudder-cli retl-sources preview %s\n", externalID)
 }
