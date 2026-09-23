@@ -83,13 +83,13 @@ func newCmdValidate() *cobra.Command {
 func reportValidation(w io.Writer, err error) error {
 	switch {
 	case err == nil:
-		fmt.Fprintln(w, "✅ Query executed successfully")
+		fmt.Fprintln(w, "✅ SQL query executed successfully")
 		return nil
 	case errors.Is(err, table.ErrPreviewUnsupported):
 		fmt.Fprintf(w, "✅ Nothing to validate: %s\n", err)
 		return nil
 	default:
-		fmt.Fprintf(w, "❌ Query failed to execute: %s\n", err)
+		fmt.Fprintf(w, "❌ SQL query failed to execute: %s\n", err)
 		return err
 	}
 }

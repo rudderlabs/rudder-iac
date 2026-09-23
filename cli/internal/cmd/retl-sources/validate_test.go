@@ -28,7 +28,7 @@ func TestReportValidation(t *testing.T) {
 		{
 			name: "a query that ran is a pass",
 			err:  nil,
-			want: "✅ Query executed successfully\n",
+			want: "✅ SQL query executed successfully\n",
 		},
 		{
 			name:     "a source with no query to run is a pass, not a failure",
@@ -39,7 +39,7 @@ func TestReportValidation(t *testing.T) {
 		{
 			name:     "a query that failed is a failure",
 			err:      queryFailed,
-			want:     "❌ Query failed to execute: preview request failed: relation does not exist\n",
+			want:     "❌ SQL query failed to execute: preview request failed: relation does not exist\n",
 			wantExit: queryFailed,
 		},
 	}

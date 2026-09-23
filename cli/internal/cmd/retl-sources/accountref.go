@@ -32,14 +32,39 @@ type accountLister interface {
 // Data that already carries a plain account_id is returned untouched, and so is
 // data for any other kind.
 func resolveAccountRef(ctx context.Context, lister accountLister, data resources.ResourceData) (resources.ResourceData, error) {
-	localID, ok := referencedAccountLocalID(data[sqlmodel.AccountIDKey])
+	// Both shapes are read: retl and event-stream store *resources.PropertyRef
+	// while datacatalog stores it by value.
+	var urn string
+	switch ref := data[sqlmodel.AccountIDKey].(type) {
+	case *resources.PropertyRef:
+		urn = ref.URN
+	case resources.PropertyRef:
+		urn = ref.URN
+	default:
+		return data, nil
+	}
+	localID, ok := strings.CutPrefix(urn, accounts.AccountResourceType+":")
 	if !ok {
 		return data, nil
 	}
 
-	remoteID, err := managedAccountID(ctx, lister, localID)
+	all, err := lister.ListAll(ctx, client.WithHasExternalID(true))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing managed accounts: %w", err)
+	}
+
+	// config-backend enforces UNIQUE (workspaceId, externalId) on managed
+	// accounts (UK__accounts__workspace_id__external_id), so the first match is
+	// the only one.
+	remoteID := ""
+	for _, account := range all {
+		if account.ExternalID == localID {
+			remoteID = account.ID
+			break
+		}
+	}
+	if remoteID == "" {
+		return nil, fmt.Errorf("account %q is referenced but does not exist in the workspace yet; run `rudder-cli apply` first, or set account_id to preview against an existing account", localID)
 	}
 
 	// Copied rather than mutated: the caller's data is the graph's, and the
@@ -47,49 +72,4 @@ func resolveAccountRef(ctx context.Context, lister accountLister, data resources
 	resolved := maps.Clone(data)
 	resolved[sqlmodel.AccountIDKey] = remoteID
 	return resolved, nil
-}
-
-// referencedAccountLocalID returns the account local id a graph value refers to.
-// Both the pointer and the value form are matched: retl and event-stream store
-// *resources.PropertyRef while datacatalog stores it by value, and a source
-// built by either would otherwise fall through as "no account".
-func referencedAccountLocalID(value any) (string, bool) {
-	var urn string
-	switch ref := value.(type) {
-	case *resources.PropertyRef:
-		urn = ref.URN
-	case resources.PropertyRef:
-		urn = ref.URN
-	default:
-		return "", false
-	}
-
-	return strings.CutPrefix(urn, accounts.AccountResourceType+":")
-}
-
-// managedAccountID looks up the one managed account claiming localID as its
-// externalId. Nothing is reported as a missing account rather than as an
-// obscure failure downstream: the account exists in the project but not yet in
-// the workspace, which apply is what fixes.
-func managedAccountID(ctx context.Context, lister accountLister, localID string) (string, error) {
-	all, err := lister.ListAll(ctx, client.WithHasExternalID(true))
-	if err != nil {
-		return "", fmt.Errorf("listing managed accounts: %w", err)
-	}
-
-	var ids []string
-	for _, account := range all {
-		if account.ExternalID == localID {
-			ids = append(ids, account.ID)
-		}
-	}
-
-	switch len(ids) {
-	case 1:
-		return ids[0], nil
-	case 0:
-		return "", fmt.Errorf("account %q is referenced but does not exist in the workspace yet; run `rudder-cli apply` first, or set account_id to preview against an existing account", localID)
-	default:
-		return "", fmt.Errorf("account %q matches %d accounts in the workspace; the duplicate has to be resolved before it can be previewed", localID, len(ids))
-	}
 }

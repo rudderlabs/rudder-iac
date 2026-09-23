@@ -1,7 +1,6 @@
 package sqlmodel_test
 
 import (
-	"context"
 	"maps"
 	"testing"
 
@@ -282,31 +281,6 @@ func TestExportAccountRoundTrip(t *testing.T) {
 
 			diffs, _ := differ.CompareData(rs.Input, local[0].Data())
 			assert.Empty(t, diffs)
-		})
-	}
-}
-
-// The commands resolve an account reference before Preview is reached, so an
-// unresolved one here is a caller that skipped that step: the handler refuses
-// rather than calling the API with an empty account id.
-func TestPreviewReferencedAccount(t *testing.T) {
-	t.Parallel()
-
-	for name, ref := range map[string]any{
-		"pointer": sqlmodel.AccountRef("prod-pg"),
-		"value":   *sqlmodel.AccountRef("prod-pg"),
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
-
-			_, err := h.Preview(context.Background(), "orders", resources.ResourceData{
-				sqlmodel.SQLKey:       "SELECT 1",
-				sqlmodel.AccountIDKey: ref,
-			}, 5)
-
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "account reference on orders was not resolved before preview")
 		})
 	}
 }

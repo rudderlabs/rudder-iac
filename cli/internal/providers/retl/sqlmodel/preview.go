@@ -29,13 +29,6 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		return nil, fmt.Errorf("SQL not found in resource data")
 	}
 
-	// The commands resolve an account reference before calling Preview (see
-	// cmd/retl-sources/accountref.go), so reaching here means a caller that did
-	// not. Both shapes are matched for the same reason as in table/preview.go.
-	switch data[AccountIDKey].(type) {
-	case *resources.PropertyRef, resources.PropertyRef:
-		return nil, fmt.Errorf("account reference on %s was not resolved before preview", ID)
-	}
 	accountID, ok := data[AccountIDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("account ID not found in resource data")
@@ -53,9 +46,8 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 // query derived from the table. A request with Limit 0 is validated without
 // returning data.
 //
-// It takes the request rather than its fields: the two adjacent strings it used
-// to take were an ordering hazard on an exported signature that then rebuilt
-// this very struct.
+// It takes the request rather than its fields so the caller cannot transpose
+// two adjacent strings.
 func PreviewQuery(ctx context.Context, client retlClient.RETLStore, request *retlClient.PreviewSubmitRequest) ([]map[string]any, error) {
 	submitResp, err := client.SubmitSourcePreview(ctx, request)
 	if err != nil {

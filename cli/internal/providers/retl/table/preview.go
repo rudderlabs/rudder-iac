@@ -30,15 +30,6 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 	if err != nil {
 		return nil, err
 	}
-	// The commands resolve an account reference before calling Preview (see
-	// cmd/retl-sources/accountref.go), so reaching here means a caller that did
-	// not. Both shapes are matched: retl and event-stream store
-	// *resources.PropertyRef while datacatalog stores it by value, and matching
-	// one would fall through to "account ID not found in resource data".
-	switch data[sqlmodel.AccountIDKey].(type) {
-	case *resources.PropertyRef, resources.PropertyRef:
-		return nil, fmt.Errorf("account reference on %s was not resolved before preview", id)
-	}
 	if t.AccountID == "" {
 		return nil, fmt.Errorf("account ID not found in resource data")
 	}

@@ -101,21 +101,6 @@ func TestResolveAccountRef(t *testing.T) {
 		assert.Contains(t, err.Error(), "rudder-cli apply")
 	})
 
-	t.Run("refuses an ambiguous match rather than picking one", func(t *testing.T) {
-		t.Parallel()
-
-		lister := &stubAccounts{accounts: []client.Account{
-			{ID: "acc-1", ExternalID: "prod-pg"},
-			{ID: "acc-2", ExternalID: "prod-pg"},
-		}}
-		data := resources.ResourceData{sqlmodel.AccountIDKey: sqlmodel.AccountRef("prod-pg")}
-
-		_, err := resolveAccountRef(context.Background(), lister, data)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "matches 2 accounts")
-	})
-
 	t.Run("wraps a listing failure", func(t *testing.T) {
 		t.Parallel()
 

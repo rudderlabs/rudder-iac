@@ -47,8 +47,8 @@ func newCmdPreview() *cobra.Command {
 			// the warehouse for 1. validate's limit of 0 is the one deliberate
 			// mismatch (no rows returned, one row read to prove the table reads).
 			//
-			// Below the defer on purpose: every other preview failure records a
-			// TrackCommand event, and this one used to be the exception.
+			// Below the defer so this failure records a TrackCommand event like
+			// every other one.
 			if limit < 0 {
 				err = fmt.Errorf("--limit cannot be negative, got %d", limit)
 				return err
