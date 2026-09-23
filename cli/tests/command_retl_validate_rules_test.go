@@ -8,10 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRETLValidationRules drives the RETL semantic rules through the binary.
-// Each fixture is a project the control plane would refuse partway through an
-// apply, after some of it had already been written; the rules exist to refuse
-// it up front, and this checks they do, from both `validate` and `apply`.
+// TestRETLValidationRules checks that a project the control plane would refuse
+// partway through an apply is refused up front instead, and that nothing
+// reaches the workspace when it is.
+//
+// The refusal messages themselves are pinned in the rule modules and in the
+// runnable docs fragments, so they are not what this suite is for. What only an
+// apply can show is the consequence: the rules run before the syncer writes
+// anything, so a project carrying one bad source does not leave the account and
+// the good source behind it. Every case is therefore driven through `apply`
+// only — a `validate` invocation here would re-assert the module's own strings
+// against a live lane and prove nothing further.
 func TestRETLValidationRules(t *testing.T) {
 	allowManagedResidue(t)
 
@@ -45,17 +52,17 @@ func TestRETLValidationRules(t *testing.T) {
 				"error[retl/table/semantic-valid]: account 'e2e-validate-pg' is a 'postgres' account (SOURCE_POSTGRES) and cannot back source_definition 'snowflake'",
 			},
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name+": validate", func(t *testing.T) {
-			out, err := executor.Execute(cliBinPath, "validate",
-				"-l", filepath.Join(projectDir, tc.fixture), "--var-file", credentials)
-			require.Error(t, err, "validate should fail, got: %s", out)
-			for _, message := range tc.messages {
-				assert.Contains(t, string(out), message)
-			}
-		})
+		{
+			// The connection rules were the one family with no apply-cycle
+			// coverage: a topology the backend would reject, and a sync
+			// behaviour the JSON mapper flow does not offer.
+			name:    "connection topology the destination cannot serve",
+			fixture: "connection_topology",
+			messages: []string{
+				"error[retl/connection/semantic-valid]: destination 'e2e-validate-http' config has no 'connection_mode' entry for source type 'warehouse'",
+				"error[retl/connection/semantic-valid]: 'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'e2e-validate-http' on the json_mapper flow",
+			},
+		},
 	}
 
 	// apply is workspace-wide, so the refusal is checked from an empty
@@ -65,7 +72,7 @@ func TestRETLValidationRules(t *testing.T) {
 	require.NoError(t, err, "destroy failed: %s", out)
 
 	for _, tc := range cases {
-		t.Run(tc.name+": apply writes nothing", func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			out, err := executor.Execute(cliBinPath, "apply",
 				"-l", filepath.Join(projectDir, tc.fixture), "--var-file", credentials, "--confirm=false")
 			require.Error(t, err, "apply should refuse the project, got: %s", out)
@@ -73,9 +80,15 @@ func TestRETLValidationRules(t *testing.T) {
 				assert.Contains(t, string(out), message)
 			}
 
+			// The account is the load-bearing one: it has no dependency of its
+			// own, so it is what a syncer that started before validating would
+			// have created first.
 			assert.NotContains(t, managedAccountExternalIDs(t), "e2e-validate-pg")
-			assert.NotContains(t, managedRETLSourceExternalIDs(t), "e2e-validate-model")
-			assert.NotContains(t, managedRETLSourceExternalIDs(t), "e2e-validate-table")
+			sources := managedRETLSourceExternalIDs(t)
+			assert.NotContains(t, sources, "e2e-validate-model")
+			assert.NotContains(t, sources, "e2e-validate-table")
+			assert.NotContains(t, managedDestinationExternalIDs(t), "e2e-validate-http")
+			assert.NotContains(t, managedRETLConnectionExternalIDs(t), "e2e-validate-connection")
 		})
 	}
 }
