@@ -66,4 +66,14 @@ func TestRETLConnectionRefusedAtCreate(t *testing.T) {
 	// in the shared workspace cannot fail it and a leaked row cannot hide.
 	assert.NotContains(t, lo.Map(managedRETLConnections(t), func(c retlClient.RETLConnection, _ int) string { return c.ExternalID }),
 		"orders-to-archive", "a refused connection must leave nothing upstream")
+
+	// The endpoints the project also carries must be absent too. The rules run
+	// before the syncer writes anything (apply.go calls p.Load first), so a
+	// refusal anywhere in the project leaves none of it behind — not just the
+	// resource at fault. Asserting the account in particular is what would catch
+	// a regression: it has no dependency of its own, so it is what a syncer that
+	// started before validating would create first.
+	assert.NotContains(t, managedAccountExternalIDs(t), "retl-pg")
+	assert.NotContains(t, managedRETLSourceExternalIDs(t), "orders-model")
+	assert.NotContains(t, managedDestinationExternalIDs(t), "e2e-retl-archive")
 }

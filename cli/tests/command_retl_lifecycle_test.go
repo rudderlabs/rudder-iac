@@ -62,13 +62,17 @@ func TestRETLLifecycle(t *testing.T) {
 
 	var modelID, tableID, connectionID string
 
-	t.Run("apply create", func(t *testing.T) {
+	// Every later step compares against these ids, so a failed create would turn
+	// one failure into a cascade of misleading ones.
+	if !t.Run("apply create", func(t *testing.T) {
 		applyRETLProject(t, executor, step("create"), credentials)
 
 		modelID = managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID).ID
 		tableID = assertLifecycleTable(t)
 		connectionID = assertLifecycleConnection(t, modelID)
-	})
+	}) {
+		t.FailNow()
+	}
 
 	t.Run("moving the connection to another source replaces it", func(t *testing.T) {
 		applyRETLProject(t, executor, step("replace"), credentials)
