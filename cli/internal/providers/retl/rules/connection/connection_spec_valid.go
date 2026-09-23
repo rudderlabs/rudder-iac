@@ -1,0 +1,250 @@
+package connection
+
+import (
+	"fmt"
+	"math"
+	"reflect"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/go-viper/mapstructure/v2"
+
+	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+)
+
+// validateRawConnectionsSpec reads the spec map strictly before checking it.
+// The handler's mapstructure decode rejects unknown keys too, but only once
+// loading starts — after validation has already passed the spec — so a misspelt
+// field would surface as a generic load failure instead of a diagnostic
+// pointing at the key.
+func validateRawConnectionsSpec(
+	_ string,
+	_ string,
+	_ map[string]any,
+	raw map[string]any,
+) []rules.ValidationResult {
+	var (
+		spec retlConnection.ConnectionsSpec
+		md   mapstructure.Metadata
+	)
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &spec,
+		Metadata:   &md,
+		DecodeHook: mapstructure.DecodeHookFuncKind(rejectFractionalInts),
+	})
+	if err != nil {
+		return []rules.ValidationResult{{Message: fmt.Sprintf("creating spec decoder: %v", err)}}
+	}
+
+	// A field that failed to decode keeps its zero value, so the checks below
+	// would report the decoder's spec rather than the author's: return the
+	// decode verdicts alone.
+	if err := decoder.Decode(raw); err != nil {
+		return decodeErrorResults(err)
+	}
+
+	return append(unknownFieldResults(md.Unused), validateConnectionsSpec(spec)...)
+}
+
+// rejectFractionalInts refuses a fractional number for an int field, which
+// mapstructure would otherwise truncate without a word.
+func rejectFractionalInts(from, to reflect.Kind, data any) (any, error) {
+	if from != reflect.Float64 || to != reflect.Int {
+		return data, nil
+	}
+	if f := data.(float64); f != math.Trunc(f) {
+		return nil, fmt.Errorf("expected an integer, got %v", f)
+	}
+	return data, nil
+}
+
+// mapstructurePathIndex matches the "[0]" element suffixes mapstructure writes
+// into the field paths it reports.
+var mapstructurePathIndex = regexp.MustCompile(`\[(\d+)\]`)
+
+// unknownFieldResults reports every key the spec type does not carry. The
+// decoder collects them in map iteration order, so they are sorted to keep the
+// diagnostics stable between runs.
+func unknownFieldResults(unused []string) []rules.ValidationResult {
+	slices.Sort(unused)
+
+	results := make([]rules.ValidationResult, 0, len(unused))
+	for _, path := range unused {
+		results = append(results, result(
+			jsonPointer(path),
+			fmt.Sprintf("unknown field %q", fieldName(path)),
+		))
+	}
+	return results
+}
+
+// decodeErrorResults turns a decode failure into one result per field that
+// could not be read. mapstructure joins the field errors into a tree and wraps
+// each one in a DecodeError carrying the field's path, so flattening the tree
+// is what turns a single root error into per-field references.
+func decodeErrorResults(err error) []rules.ValidationResult {
+	decodeErrors := flattenDecodeErrors(err)
+	if len(decodeErrors) == 0 {
+		return []rules.ValidationResult{{Message: fmt.Sprintf("decoding spec: %v", err)}}
+	}
+
+	results := make([]rules.ValidationResult, 0, len(decodeErrors))
+	for _, decodeErr := range decodeErrors {
+		results = append(results, result(
+			jsonPointer(decodeErr.Name()),
+			fmt.Sprintf("'%s' is not valid: %v", fieldName(decodeErr.Name()), decodeErr.Unwrap()),
+		))
+	}
+	return results
+}
+
+// flattenDecodeErrors walks the joined error tree and collects the outermost
+// DecodeError on every branch: that is the node that knows the field path,
+// while what it wraps is the bare reason.
+func flattenDecodeErrors(err error) []*mapstructure.DecodeError {
+	if decodeErr, ok := err.(*mapstructure.DecodeError); ok {
+		return []*mapstructure.DecodeError{decodeErr}
+	}
+
+	switch wrapper := err.(type) {
+	case interface{ Unwrap() []error }:
+		var collected []*mapstructure.DecodeError
+		for _, wrapped := range wrapper.Unwrap() {
+			collected = append(collected, flattenDecodeErrors(wrapped)...)
+		}
+		return collected
+	case interface{ Unwrap() error }:
+		return flattenDecodeErrors(wrapper.Unwrap())
+	}
+
+	return nil
+}
+
+// jsonPointer converts a mapstructure field path ("connections[0].config.typo")
+// into the JSON pointer the rule engine reports against
+// ("/connections/0/config/typo").
+func jsonPointer(path string) string {
+	return "/" + strings.ReplaceAll(mapstructurePathIndex.ReplaceAllString(path, "/$1"), ".", "/")
+}
+
+// fieldName is the field a mapstructure path is about: its last named segment,
+// so an element path ("connections[0]") names the field holding the element
+// rather than the index.
+func fieldName(path string) string {
+	named := mapstructurePathIndex.ReplaceAllString(path, "")
+	if index := strings.LastIndex(named, "."); index != -1 {
+		return named[index+1:]
+	}
+	return named
+}
+
+func validateConnectionsSpec(spec retlConnection.ConnectionsSpec) []rules.ValidationResult {
+	validationErrors, err := rules.ValidateStruct(spec, "")
+	if err != nil {
+		return []rules.ValidationResult{{
+			Message: err.Error(),
+		}}
+	}
+
+	// The root type resolves cross-field tag params to their json display names.
+	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
+
+	for index, c := range spec.Connections {
+		results = append(results, validateEndpointRef(
+			sourceRef(index), "source", c.Source,
+			retlConnection.SourceKindRefForms(), "a rETL source",
+			func(kind string) bool { _, ok := retlConnection.SourceKindByKind(kind); return ok },
+		)...)
+		results = append(results, validateEndpointRef(
+			destinationRef(index), "destination", c.Destination,
+			fmt.Sprintf("#%s:<id>", destination.DestinationSpecKind), "a destination",
+			func(kind string) bool { return kind == destination.DestinationSpecKind },
+		)...)
+		results = append(results, validateCron(index, c.Config.Schedule)...)
+	}
+
+	return results
+}
+
+// validateEndpointRef checks one endpoint reference (V-C2, and on the source
+// side V-C6). An empty ref is skipped — the struct validator's required tag
+// already reports it. A malformed ref and one pointing at a kind the endpoint
+// does not accept fail differently: only the second can name the kind the
+// author actually wrote.
+func validateEndpointRef(reference, field, ref, forms, label string, accepts func(string) bool) []rules.ValidationResult {
+	if ref == "" {
+		return nil
+	}
+
+	kind, _, ok := retlConnection.RefID(ref)
+	if !ok {
+		return []rules.ValidationResult{result(reference, fmt.Sprintf(
+			"'%s' is invalid: must be of pattern %s", field, forms,
+		))}
+	}
+
+	if !accepts(kind) {
+		return []rules.ValidationResult{result(reference, fmt.Sprintf(
+			"'%s' must reference %s (%s), got a '%s' reference", field, label, forms, kind,
+		))}
+	}
+
+	return nil
+}
+
+// validateCron (V-R3) is the part of the schedule contract struct tags cannot
+// express: a cron expression has to parse against the supported grammar and
+// stay above the frequency floor. Only verdicts this severity owns are reported
+// — an unsupported dialect is the cron-expression warning rule's.
+func validateCron(index int, schedule retlConnection.ScheduleSpec) []rules.ValidationResult {
+	return cronResults(
+		index, schedule.Type, schedule.CronExpression,
+		[]CronStatus{CronInvalid, CronTooFrequent},
+		"'cron_expression' is not valid: %s",
+	)
+}
+
+func result(reference, message string) rules.ValidationResult {
+	return rules.ValidationResult{Reference: reference, Message: message}
+}
+
+// connectionRef and the refs below build the JSON-pointer references for the
+// connection entry at index and its fields; the rule engine prefixes "/spec".
+func connectionRef(index int) string {
+	return fmt.Sprintf("/connections/%d", index)
+}
+
+func sourceRef(index int) string {
+	return connectionRef(index) + "/source"
+}
+
+func destinationRef(index int) string {
+	return connectionRef(index) + "/destination"
+}
+
+func configRef(index int) string {
+	return connectionRef(index) + "/config"
+}
+
+func scheduleRef(index int) string {
+	return configRef(index) + "/schedule"
+}
+
+func NewConnectionSpecSyntaxValidRule() rules.Rule {
+	return prules.NewTypedRule(
+		"retl/connection/spec-syntax-valid",
+		rules.Error,
+		"retl connection spec syntax must be valid",
+		rules.Examples{},
+		prules.NewPatternValidator(
+			prules.V1VersionPatterns(retlConnection.ResourceKind),
+			validateRawConnectionsSpec,
+		),
+	)
+}

@@ -18,19 +18,26 @@ import (
 const (
 	retlModelConnectionExternalID = "orders-to-http"
 	retlTableConnectionExternalID = "customers-to-http"
-	retlDestinationExternalID     = "e2e-retl-http"
+	// One destination per connection: a JSON-mapper destination (anything outside
+	// DESTINATION_SPECIFIC_REGISTRY) accepts a single rETL connection, and
+	// config-backend refuses a second with "Destination does not support multiple
+	// connections". Sharing one only passed when concurrent creates raced past
+	// that check.
+	retlModelDestinationExternalID = "e2e-retl-http"
+	retlTableDestinationExternalID = "e2e-retl-http-customers"
 )
 
 type retlConnectionWant struct {
 	externalID       string
 	sourceType       retlClient.SourceType
 	sourceExternalID string
+	destExternalID   string
 	everyMinutes     int
 	emailTarget      string
 }
 
 // TestRETLConnectionsApply drives a retl-connections entry end to end: the
-// project carries the account, both source kinds and the destination the
+// project carries the account, both source kinds and the destinations the
 // connections join, so one apply has to order them all and substitute
 // server-assigned ids into each connection.
 //
@@ -60,8 +67,8 @@ func TestRETLConnectionsApply(t *testing.T) {
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 	})
 
-	model := retlConnectionWant{retlModelConnectionExternalID, retlClient.ModelSourceType, retlModelExternalID, 30, "traits.email"}
-	table := retlConnectionWant{retlTableConnectionExternalID, retlClient.TableSourceType, retlTableExternalID, 45, "traits.email"}
+	model := retlConnectionWant{retlModelConnectionExternalID, retlClient.ModelSourceType, retlModelExternalID, retlModelDestinationExternalID, 30, "traits.email"}
+	table := retlConnectionWant{retlTableConnectionExternalID, retlClient.TableSourceType, retlTableExternalID, retlTableDestinationExternalID, 45, "traits.email"}
 
 	t.Run("apply create", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "create"), credentials)
@@ -107,7 +114,7 @@ func assertRETLConnection(t *testing.T, want retlConnectionWant) string {
 
 	assert.True(t, actual.Enabled, "connection should be enabled")
 	assert.Equal(t, managedRETLSource(t, want.sourceType, want.sourceExternalID).ID, actual.SourceID, "connection is not on the managed source")
-	assert.Equal(t, managedDestinationID(t, retlDestinationExternalID), actual.DestinationID, "connection is not on the managed destination")
+	assert.Equal(t, managedDestinationID(t, want.destExternalID), actual.DestinationID, "connection is not on the managed destination")
 	assert.Equal(t, retlClient.SyncBehaviourUpsert, actual.SyncBehaviour)
 	assert.Equal(t, &retlClient.Event{Type: retlClient.EventTypeIdentify}, actual.Event)
 	require.NotNil(t, actual.Schedule.EveryMinutes, "basic schedule came back without everyMinutes")
