@@ -29,31 +29,35 @@ func (h *Handler) Preview(ctx context.Context, ID string, data resources.Resourc
 		return nil, fmt.Errorf("SQL not found in resource data")
 	}
 
-	// Preview reads the project graph without remote state, so the remote id a
-	// referenced account resolves to is not known here.
-	if _, ok := data[AccountIDKey].(*resources.PropertyRef); ok {
-		return nil, fmt.Errorf("preview does not support sql models that reference their account yet: set account_id on %s to preview it", ID)
+	// The commands resolve an account reference before calling Preview (see
+	// cmd/retl-sources/accountref.go), so reaching here means a caller that did
+	// not. Both shapes are matched for the same reason as in table/preview.go.
+	switch data[AccountIDKey].(type) {
+	case *resources.PropertyRef, resources.PropertyRef:
+		return nil, fmt.Errorf("account reference on %s was not resolved before preview", ID)
 	}
 	accountID, ok := data[AccountIDKey].(string)
 	if !ok {
 		return nil, fmt.Errorf("account ID not found in resource data")
 	}
 
-	return PreviewQuery(ctx, h.client, accountID, sql, limit)
-}
-
-// PreviewQuery runs sql against the account's warehouse through the preview API
-// and polls for the resulting rows. It is shared with table sources, whose
-// preview is a query derived from the table. If limit is 0, the query is
-// validated without returning data.
-func PreviewQuery(ctx context.Context, client retlClient.RETLStore, accountID, sql string, limit int) ([]map[string]any, error) {
-	previewReq := &retlClient.PreviewSubmitRequest{
+	return PreviewQuery(ctx, h.client, &retlClient.PreviewSubmitRequest{
 		SQL:       sql,
 		AccountID: accountID,
 		Limit:     limit,
-	}
+	})
+}
 
-	submitResp, err := client.SubmitSourcePreview(ctx, previewReq)
+// PreviewQuery runs a preview request against the account's warehouse and polls
+// for the resulting rows. It is shared with table sources, whose preview is a
+// query derived from the table. A request with Limit 0 is validated without
+// returning data.
+//
+// It takes the request rather than its fields: the two adjacent strings it used
+// to take were an ordering hazard on an exported signature that then rebuilt
+// this very struct.
+func PreviewQuery(ctx context.Context, client retlClient.RETLStore, request *retlClient.PreviewSubmitRequest) ([]map[string]any, error) {
+	submitResp, err := client.SubmitSourcePreview(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("submitting preview request: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
@@ -29,24 +30,23 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 	if err != nil {
 		return nil, err
 	}
-	// Preview reads the project graph without remote state, so the remote id a
-	// referenced account resolves to is not known here. fromData reads the key
-	// through a checked assert, so a reference reads back as an empty id and
-	// would otherwise surface as "account ID not found".
-	//
-	// Both shapes are matched deliberately. Account references arrive with #851,
-	// where sqlmodel.AccountRef returns the pointer form — but the repo is split:
-	// retl and event-stream store *resources.PropertyRef while datacatalog stores
-	// it by value. Matching only one shape would turn a later change of mind into
-	// a silent fallthrough to the obscure message this branch exists to replace.
+	// The commands resolve an account reference before calling Preview (see
+	// cmd/retl-sources/accountref.go), so reaching here means a caller that did
+	// not. Both shapes are matched: retl and event-stream store
+	// *resources.PropertyRef while datacatalog stores it by value, and matching
+	// one would fall through to "account ID not found in resource data".
 	switch data[sqlmodel.AccountIDKey].(type) {
 	case *resources.PropertyRef, resources.PropertyRef:
-		return nil, fmt.Errorf("preview does not support table sources that reference their account yet: set account_id on %s to preview it", id)
+		return nil, fmt.Errorf("account reference on %s was not resolved before preview", id)
 	}
 	if t.AccountID == "" {
 		return nil, fmt.Errorf("account ID not found in resource data")
 	}
-	return sqlmodel.PreviewQuery(ctx, h.client, t.AccountID, sql, limit)
+	return sqlmodel.PreviewQuery(ctx, h.client, &retlClient.PreviewSubmitRequest{
+		SQL:       sql,
+		AccountID: t.AccountID,
+		Limit:     limit,
+	})
 }
 
 // previewSQL quotes the schema and table as sqlconnect-go does when

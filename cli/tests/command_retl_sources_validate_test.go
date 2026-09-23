@@ -28,9 +28,10 @@ func TestRETLSourceValidateNoQuery(t *testing.T) {
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
 
-	// No var file: `retl-sources validate` and `preview` take only --location,
-	// so a fixture that uses variables cannot be validated by them at all. The
-	// password here is a literal for that reason; the account is never applied.
+	// No var file: `retl-sources validate` and `preview` take only --location
+	// (DEX-914), so a fixture that uses variables cannot be opened by them at
+	// all. This one carries no account spec and names its account_id inline,
+	// which is why it needs none.
 	projectDir := filepath.Join("testdata", "retl_source_validate")
 
 	t.Run("validate passes and says there was nothing to run", func(t *testing.T) {

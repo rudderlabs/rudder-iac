@@ -383,9 +383,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       warehouseSpec,
 			wantConfig: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Users",
-				Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+				ID:     "src-1",
+				Name:   "Users",
+				Config: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,
@@ -404,9 +404,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       s3Spec,
 			wantConfig: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Events",
-				Config:               retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
+				ID:     "src-1",
+				Name:   "Events",
+				Config: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,

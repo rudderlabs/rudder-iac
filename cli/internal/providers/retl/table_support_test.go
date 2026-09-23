@@ -340,9 +340,12 @@ func TestTableSupportEnabled(t *testing.T) {
 		r, ok := graph.GetResource("retl-source-table:users-table")
 		require.True(t, ok)
 
-		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 0)
+		// Non-zero on purpose: with 0 the expected request carries Limit at its
+		// zero value, which is exactly what a Provider.Preview that dropped the
+		// limit would also produce.
+		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 5)
 
 		require.NoError(t, err)
-		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 1`}, got)
+		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 5`, Limit: 5}, got)
 	})
 }

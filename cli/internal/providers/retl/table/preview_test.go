@@ -115,7 +115,7 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 			table.TableKey:               "users",
 		}, 10)
 
-		require.EqualError(t, err, "preview does not support table sources that reference their account yet: set account_id on users-table to preview it")
+		require.EqualError(t, err, "account reference on users-table was not resolved before preview")
 		assert.Empty(t, store.requests)
 	})
 
@@ -133,7 +133,7 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 			table.TableKey:               "users",
 		}, 10)
 
-		require.EqualError(t, err, "preview does not support table sources that reference their account yet: set account_id on users-table to preview it")
+		require.EqualError(t, err, "account reference on users-table was not resolved before preview")
 		assert.Empty(t, store.requests)
 	})
 

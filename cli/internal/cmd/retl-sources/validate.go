@@ -51,7 +51,10 @@ func newCmdValidate() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			resourceData := resource.Data()
+			resourceData, err := resolveAccountRef(cmd.Context(), d.Client().Accounts, resource.Data())
+			if err != nil {
+				return err
+			}
 
 			// Get the RETL provider
 			retlProvider := d.Providers().RETL
