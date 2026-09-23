@@ -2,6 +2,8 @@ package tests
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +15,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 )
 
 const (
@@ -62,8 +65,9 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	applyRETLProject(t, executor, baseDir, credentials)
 
 	var (
-		model         = managedRETLSourceWithWorkspace(t, store, connectionImportModelExternalID)
+		model         = managedRETLSource(t, retlClient.ModelSourceType, connectionImportModelExternalID)
 		destinationID = managedDestinationID(t, connectionImportDestinationExternalID)
+		workspaceID   = projectWorkspaceID(t)
 	)
 	seeded, err := store.CreateConnection(context.Background(), &retlClient.CreateRETLConnectionRequest{
 		SourceID:      model.ID,
@@ -78,10 +82,16 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	require.NoError(t, err, "seeding an unmanaged RETL connection")
 	require.NotEmpty(t, seeded.ID, "seeded RETL connection has no id")
 	require.Empty(t, seeded.ExternalID, "a seed must be unmanaged")
+	// Anchors both the claim assertion below and removeSeededConnections, which
+	// reads the same listing: were the HasExternalID filter to regress to an
+	// empty result, the NotContains would pass vacuously and cleanup would
+	// silently no-op, leaving unmanaged seeds that break every other suite.
+	require.Contains(t, unmanagedConnectionIDs(t, store, destinationID), seeded.ID,
+		"the seed must start in the importable set")
 
 	projectDir := t.TempDir()
 	copyFixtureDir(t, baseDir, projectDir)
-	writeConnectionClaimSpec(t, filepath.Join(projectDir, "connection.yaml"), model.WorkspaceID, seeded.ID)
+	writeConnectionClaimSpec(t, filepath.Join(projectDir, "connection.yaml"), workspaceID, seeded.ID)
 
 	t.Run("apply claims the existing connection instead of creating one", func(t *testing.T) {
 		applyRETLProject(t, executor, projectDir, credentials)
@@ -110,80 +120,73 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	})
 }
 
-// managedRETLSourceWithWorkspace is managedRETLSource without the workspace
-// cleared: import metadata is filed under the workspace, and an entry for the
-// wrong one would turn the claim into a silent create.
-func managedRETLSourceWithWorkspace(t *testing.T, store retlClient.RETLStore, externalID string) retlClient.RETLSource {
+// projectWorkspaceID is the workspace the project resolves against, which is
+// the one the import metadata has to be filed under: an entry for the wrong
+// workspace turns the claim into a silent create.
+func projectWorkspaceID(t *testing.T) string {
 	t.Helper()
 
-	sources, err := store.ListRetlSources(context.Background(),
-		retlClient.WithSourceType(string(retlClient.ModelSourceType)), retlClient.WithHasExternalId(lo.ToPtr(true)))
-	require.NoError(t, err, "listing managed RETL sources")
-
-	matches := lo.Filter(sources.Data, func(s retlClient.RETLSource, _ int) bool { return s.ExternalID == externalID })
-	require.Len(t, matches, 1, "managed RETL sources claiming %q", externalID)
-	require.NotEmpty(t, matches[0].WorkspaceID, "managed RETL source %q has no workspace id", externalID)
-	return matches[0]
+	workspace, err := newAccountsAPIClient(t).Workspaces.GetByAuthToken(context.Background())
+	require.NoError(t, err, "reading the workspace")
+	require.NotEmpty(t, workspace.ID, "workspace has no id")
+	return workspace.ID
 }
 
 // removeSeededConnections deletes the unmanaged connections on the fixture
 // destination, whichever run seeded them. A claimed connection is managed and
-// left to destroy. Deletion errors are logged rather than failed, so cleanup
-// always gets as far as it can.
+// left to destroy. Every deletion is attempted before any failure is reported,
+// so cleanup gets as far as it can, but a failure is asserted rather than
+// logged: this also runs as a precondition, and a seed left behind on a
+// managed destination breaks the opening destroy of every other suite, far
+// from the cause.
 func removeSeededConnections(t *testing.T, store retlClient.RETLStore) {
 	t.Helper()
 
 	destinations, err := store.GetDestinations(context.Background())
 	require.NoError(t, err, "listing destinations")
+
+	var failures []error
 	for _, destination := range destinations {
 		if destination.ExternalID != connectionImportDestinationExternalID {
 			continue
 		}
 		for _, id := range unmanagedConnectionIDs(t, store, destination.ID) {
 			if err := store.DeleteConnection(context.Background(), id); err != nil {
-				t.Logf("deleting seeded RETL connection %s: %v", id, err)
+				failures = append(failures, fmt.Errorf("deleting seeded RETL connection %s: %w", id, err))
 			}
 		}
 	}
+	assert.NoError(t, errors.Join(failures...), "seeded RETL connections left behind")
 }
 
 func unmanagedConnectionIDs(t *testing.T, store retlClient.RETLStore, destinationID string) []string {
 	t.Helper()
 
-	var ids []string
-	for page := 1; ; page++ {
-		result, err := store.ListConnections(context.Background(), &retlClient.ListRETLConnectionsRequest{
-			DestinationID: destinationID, HasExternalID: lo.ToPtr(false), Page: page, PageSize: 100,
-		})
-		require.NoError(t, err, "listing unmanaged RETL connections")
-		ids = append(ids, lo.Map(result.Data, func(c retlClient.RETLConnection, _ int) string { return c.ID })...)
-		if result.Paging.Next == "" {
-			return ids
-		}
-	}
+	connections := listRETLConnections(t, store, &retlClient.ListRETLConnectionsRequest{
+		DestinationID: destinationID, HasExternalID: lo.ToPtr(false),
+	})
+	return lo.Map(connections, func(c retlClient.RETLConnection, _ int) string { return c.ID })
 }
 
 // writeConnectionClaimSpec writes the connection spec export would emit for the
-// seeded row: the import metadata ties the local id to the remote one.
+// seeded row: the import metadata ties the local id to the remote one. It goes
+// through specs.ToImportSpec rather than hand-rolling the metadata map, so a
+// yaml-tag change or a field rename cannot leave this green while real exports
+// stop claiming.
 func writeConnectionClaimSpec(t *testing.T, path, workspaceID, remoteID string) {
 	t.Helper()
 
-	spec := &specs.Spec{
-		Version: specs.SpecVersionV1,
-		Kind:    "retl-connections",
-		Metadata: map[string]any{
-			"name": "retl-connections",
-			"import": map[string]any{
-				"workspaces": []any{map[string]any{
-					"workspace_id": workspaceID,
-					"resources": []any{map[string]any{
-						"urn":       "retl-connection:" + connectionImportLocalID,
-						"remote_id": remoteID,
-					}},
-				}},
-			},
+	spec, err := specs.ToImportSpec(
+		"retl-connections",
+		"retl-connections",
+		specs.WorkspaceImportMetadata{
+			WorkspaceID: workspaceID,
+			Resources: []specs.ImportIds{{
+				URN:      connection.ResourceType + ":" + connectionImportLocalID,
+				RemoteID: remoteID,
+			}},
 		},
-		Spec: map[string]any{
+		map[string]any{
 			"connections": []any{map[string]any{
 				"id":          connectionImportLocalID,
 				"source":      "#retl-source-sql-model:" + connectionImportModelExternalID,
@@ -198,7 +201,8 @@ func writeConnectionClaimSpec(t *testing.T, path, workspaceID, remoteID string) 
 				},
 			}},
 		},
-	}
+	)
+	require.NoError(t, err, "building the claim spec")
 
 	raw, err := yaml.Marshal(spec)
 	require.NoError(t, err)
@@ -208,11 +212,5 @@ func writeConnectionClaimSpec(t *testing.T, path, workspaceID, remoteID string) 
 func copyFixtureDir(t *testing.T, from, to string) {
 	t.Helper()
 
-	entries, err := os.ReadDir(from)
-	require.NoError(t, err, "reading %s", from)
-	for _, entry := range entries {
-		raw, err := os.ReadFile(filepath.Join(from, entry.Name()))
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(filepath.Join(to, entry.Name()), raw, 0o644))
-	}
+	require.NoError(t, os.CopyFS(to, os.DirFS(from)), "copying %s", from)
 }
