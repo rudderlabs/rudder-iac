@@ -3,12 +3,14 @@ package table_test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -24,10 +26,11 @@ import (
 // filters. Calls are recorded so tests can assert what reached the API.
 type fakeStore struct {
 	retlClient.RETLStore
-	sources map[string]*retlClient.RETLSource
-	nextID  int
-	calls   []string
-	failOn  string
+	sources  map[string]*retlClient.RETLSource
+	nextID   int
+	calls    []string
+	failOn   string
+	failWith error
 }
 
 func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
@@ -41,6 +44,9 @@ func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
 func (f *fakeStore) record(call string) error {
 	f.calls = append(f.calls, call)
 	if f.failOn == call {
+		if f.failWith != nil {
+			return f.failWith
+		}
 		return fmt.Errorf("api error on %s", call)
 	}
 	return nil
@@ -383,9 +389,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       warehouseSpec,
 			wantConfig: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Users",
-				Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+				ID:     "src-1",
+				Name:   "Users",
+				Config: retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,
@@ -404,9 +410,9 @@ func TestLifecycle(t *testing.T) {
 			spec:       s3Spec,
 			wantConfig: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 			wantCreated: retlClient.RETLSource{
-				ID:                   "src-1",
-				Name:                 "Events",
-				Config:               retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
+				ID:     "src-1",
+				Name:   "Events",
+				Config: retlClient.RETLS3TableConfig{BucketName: "events", ObjectPrefix: "daily/"},
 				// A spec with no `enabled` key creates an enabled source.
 				IsEnabled:            true,
 				SourceType:           retlClient.TableSourceType,
@@ -526,6 +532,48 @@ func TestDelete(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "deleting RETL source")
+	})
+
+	// The rETL service refuses this delete with its own wording, which is
+	// neither of the two "active connections" messages the other services use.
+	// Without a case for it the annotation never fires on this path, so the
+	// message is asserted verbatim rather than through a shared constant.
+	t.Run("explains a delete blocked by connections", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore()
+		store.failOn = "delete:src-1"
+		store.failWith = &client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "The source is connected to some destinations.",
+		}
+		h := table.NewHandler(store, "retl")
+
+		err := h.Delete(context.Background(), "users-table", resources.ResourceData{sqlmodel.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The source is connected to some destinations.",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+			"the remedy must name the flags that let the CLI remove them")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	t.Run("leaves an unrelated delete failure alone", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore()
+		store.failOn = "delete:src-1"
+		store.failWith = &client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "source is referenced by a running job",
+		}
+		h := table.NewHandler(store, "retl")
+
+		err := h.Delete(context.Background(), "users-table", resources.ResourceData{sqlmodel.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
 	})
 }
 

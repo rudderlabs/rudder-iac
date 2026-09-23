@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.27.0](https://github.com/rudderlabs/rudder-iac/compare/v0.26.0...v0.27.0) (2026-09-22)
+
+
+### Features
+
+* **retl:** add connection validation rules and shared topology checks ([#871](https://github.com/rudderlabs/rudder-iac/issues/871)) ([83ab5cc](https://github.com/rudderlabs/rudder-iac/commit/83ab5cc3376e44c4fbd385ef4ba4e78467af3307))
+* **retl:** add retl-source-table spec kind behind an experimental flag ([#849](https://github.com/rudderlabs/rudder-iac/issues/849)) ([50f3424](https://github.com/rudderlabs/rudder-iac/commit/50f34248ecd8fcfb9d59e3e59de57ad1bdebe407))
+* **retl:** classify cron expressions and enforce the five-minute sync floor ([#869](https://github.com/rudderlabs/rudder-iac/issues/869)) ([c2cec76](https://github.com/rudderlabs/rudder-iac/commit/c2cec767cafdd62f521241552be7591a1172d54c))
+* **retl:** complete connection remote state, lossless import/export and matcher ([#866](https://github.com/rudderlabs/rudder-iac/issues/866)) ([e83c1a6](https://github.com/rudderlabs/rudder-iac/commit/e83c1a6eb8905b6e71f999c51c3ce6a92343ca36))
+* **retl:** reference accounts by URN from RETL source specs ([#851](https://github.com/rudderlabs/rudder-iac/issues/851)) ([acee859](https://github.com/rudderlabs/rudder-iac/commit/acee859675c9c38e97a86c600cb64797db490096))
+* **retl:** register retl-source-table in connection SourceKinds ([#886](https://github.com/rudderlabs/rudder-iac/issues/886)) ([a8c2f1f](https://github.com/rudderlabs/rudder-iac/commit/a8c2f1f85c5d7873cf546f548552c3be9dd45d85))
+* **retl:** register the connection handler behind retlConnectionSupport ([#868](https://github.com/rudderlabs/rudder-iac/issues/868)) ([214e975](https://github.com/rudderlabs/rudder-iac/commit/214e975f4e0af30999d554d2142123a4e24c9c0b))
+* **validation:** compare source names case-insensitively ([#856](https://github.com/rudderlabs/rudder-iac/issues/856)) ([d28d047](https://github.com/rudderlabs/rudder-iac/commit/d28d047f52b87b8053c50e4efa240b8d43d93c2f))
+
+
+### Bug Fixes
+
+* **destination:** apply config defaults before validation and default customerio api_version to v2 ([#901](https://github.com/rudderlabs/rudder-iac/issues/901)) ([dd39382](https://github.com/rudderlabs/rudder-iac/commit/dd39382c239d43811d0512608ce2297912b9be71))
+* **retl:** refuse a connection create the read path cannot map back ([#893](https://github.com/rudderlabs/rudder-iac/issues/893)) ([1e4e582](https://github.com/rudderlabs/rudder-iac/commit/1e4e5820ef009321d06462fe400411b8a664bff0))
+* **retl:** skip unknown RETL source types when decoding lists ([#847](https://github.com/rudderlabs/rudder-iac/issues/847)) ([32598d7](https://github.com/rudderlabs/rudder-iac/commit/32598d78707886793cc7e0e6aec4c6f6a8306226))
+* **tests:** send the Postgres account port as a number, not a string ([#827](https://github.com/rudderlabs/rudder-iac/issues/827)) ([ce79745](https://github.com/rudderlabs/rudder-iac/commit/ce79745b2fdcb2a3167c3fda4f80e8e86488918a))
+
+
+### Miscellaneous
+
+* ignore .DS_Store ([#890](https://github.com/rudderlabs/rudder-iac/issues/890)) ([7a1be5a](https://github.com/rudderlabs/rudder-iac/commit/7a1be5ab7a63d6e0afafb26e3b4bd35ef2e014ac))
+* **retl:** cover RETL sources and connections end to end ([#883](https://github.com/rudderlabs/rudder-iac/issues/883)) ([a09edf4](https://github.com/rudderlabs/rudder-iac/commit/a09edf499f11ab829fbad6621897d2195cd2cbb1))
+* **retl:** give each rETL connection in the e2e fixture its own destination ([#900](https://github.com/rudderlabs/rudder-iac/issues/900)) ([0aed30f](https://github.com/rudderlabs/rudder-iac/commit/0aed30f39a3f4e8047c08a84b56917303801482d))
+* **retl:** runnable connection rule documentation and validation examples ([#872](https://github.com/rudderlabs/rudder-iac/issues/872)) ([4f86be1](https://github.com/rudderlabs/rudder-iac/commit/4f86be123d528b1453f7ec8c99b368aae53ee850))
+
 ## [0.26.0](https://github.com/rudderlabs/rudder-iac/compare/v0.25.1...v0.26.0) (2026-09-17)
 
 

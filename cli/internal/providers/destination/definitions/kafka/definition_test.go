@@ -181,7 +181,7 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assertError(t, errors, "/sasl_type", "must be one of")
 	})
 
-	t.Run("sasl fields required when ssl and sasl are enabled", func(t *testing.T) {
+	t.Run("sasl type defaults to plain when ssl and sasl are enabled", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
 		config["ssl_enabled"] = true
@@ -189,9 +189,11 @@ func TestKafkaConfigValidation(t *testing.T) {
 
 		errors := registered.ValidateConfig(config)
 
-		require.Len(t, errors, 2)
-		assertError(t, errors, "/sasl_type", "required")
+		require.Len(t, errors, 1)
 		assertError(t, errors, "/username", "required")
+
+		config["sasl_type"] = ""
+		assertError(t, registered.ValidateConfig(config), "/sasl_type", "required")
 	})
 
 	t.Run("sasl fields not required when ssl is disabled", func(t *testing.T) {
