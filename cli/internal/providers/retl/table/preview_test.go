@@ -73,8 +73,8 @@ func TestPreviewQueriesTheTable(t *testing.T) {
 	}
 }
 
-// validate previews with limit 0, which the request omits just as it does for
-// SQL models; the query itself still stays bounded.
+// A limit of 0 is omitted from the request just as it is for SQL models, and the
+// query itself still stays bounded.
 func TestPreviewWithoutLimitReadsOneRow(t *testing.T) {
 	t.Parallel()
 	store := &previewStore{}
@@ -97,7 +97,6 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		_, err := h.Preview(context.Background(), r.ID(), r.Data(), 10)
 
 		require.EqualError(t, err, "preview is not supported for s3 table sources")
-		assert.ErrorIs(t, err, table.ErrPreviewUnsupported)
 		assert.Empty(t, store.requests)
 	})
 
@@ -114,11 +113,8 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		}, 10)
 
 		require.EqualError(t, err, `preview cannot quote identifiers for source_definition "oracle": add its quoting to previewSQL`)
-		// Deliberately NOT ErrPreviewUnsupported. That sentinel means "this source
-		// has no query to run", which `validate` now treats as a pass; an unknown
-		// definition is a gap in previewSQL and must keep failing. Wrapping both in
-		// one sentinel would let a missing quoting rule exit 0.
-		assert.NotErrorIs(t, err, table.ErrPreviewUnsupported)
+		// An unknown definition is a gap in previewSQL, not a source with nothing
+		// to run; the two messages must stay distinguishable.
 		assert.Empty(t, store.requests)
 	})
 
@@ -133,7 +129,6 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		_, err := h.Preview(context.Background(), r.ID(), r.Data(), 10)
 
 		require.EqualError(t, err, "bigquery schema and table names cannot contain a backslash: \"public.users\\\\` union select 1 --\"")
-		assert.NotErrorIs(t, err, table.ErrPreviewUnsupported)
 		assert.Empty(t, store.requests)
 	})
 

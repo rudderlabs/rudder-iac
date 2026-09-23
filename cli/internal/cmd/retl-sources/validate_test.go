@@ -10,43 +10,46 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-// validate no longer runs the source's query, so its output must not imply that
-// the warehouse was reached. The old command printed "Query executed
-// successfully"; anyone reading the new line has to be told where that check
-// went, or a green validate reads as a green warehouse.
+// validate reports the spec check and points at the command that does reach the
+// warehouse. The whole two-line output is compared, so the wording cannot drift
+// unnoticed — and an s3 source must not be pointed at preview, which exits 1 on
+// it.
 func TestReportValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("points a warehouse source at preview", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range []struct {
+		name             string
+		externalID       string
+		resourceType     string
+		sourceDefinition string
+		want             string
+	}{
+		{
+			name:             "a warehouse source is pointed at preview",
+			externalID:       "orders-model",
+			resourceType:     "retl-source-sql-model",
+			sourceDefinition: "postgres",
+			want: "✅ retl-source-sql-model 'orders-model' is valid\n" +
+				"   To check that its query runs against the warehouse: rudder-cli retl-sources preview orders-model\n",
+		},
+		{
+			name:             "an s3 source is not",
+			externalID:       "archive-bucket",
+			resourceType:     "retl-source-table",
+			sourceDefinition: "s3",
+			want: "✅ retl-source-table 'archive-bucket' is valid\n" +
+				"   It has no query to run, so there is nothing to preview.\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		var out bytes.Buffer
-		reportValidation(&out, "orders-model", "retl-source-sql-model", resources.ResourceData{
-			sqlmodel.SourceDefinitionKey: "postgres",
+			var out bytes.Buffer
+			reportValidation(&out, tc.externalID, tc.resourceType, resources.ResourceData{
+				sqlmodel.SourceDefinitionKey: tc.sourceDefinition,
+			})
+
+			assert.Equal(t, tc.want, out.String())
 		})
-
-		got := out.String()
-		assert.Contains(t, got, "retl-source-sql-model 'orders-model' is valid")
-		assert.Contains(t, got, "rudder-cli retl-sources preview orders-model",
-			"a user who relied on validate running the query has to be told where it went")
-		assert.NotContains(t, got, "Query executed",
-			"validate must not claim to have run a query it no longer runs")
-	})
-
-	// An s3 table source has no query, so preview exits 1 on it. Sending the
-	// reader there would be worse than saying nothing.
-	t.Run("does not send an s3 source to a command that refuses it", func(t *testing.T) {
-		t.Parallel()
-
-		var out bytes.Buffer
-		reportValidation(&out, "archive-bucket", "retl-source-table", resources.ResourceData{
-			sqlmodel.SourceDefinitionKey: "s3",
-		})
-
-		got := out.String()
-		assert.Contains(t, got, "retl-source-table 'archive-bucket' is valid")
-		assert.Contains(t, got, "nothing to preview")
-		assert.NotContains(t, got, "retl-sources preview",
-			"preview exits 1 for s3, so the success line must not point at it")
-	})
+	}
 }

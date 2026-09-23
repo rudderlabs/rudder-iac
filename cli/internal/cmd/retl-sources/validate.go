@@ -73,13 +73,8 @@ func newCmdValidate() *cobra.Command {
 }
 
 // reportValidation names the source that validated and where the warehouse check
-// went. Saying so matters more than it looks: this command used to run the query,
-// so a bare success line would read as "your warehouse is reachable" to anyone
-// who used the old behaviour.
-//
-// An s3 table source has no query to run, so pointing at preview would send the
-// reader to a command that exits 1. The source definition is on the spec, so
-// telling the two apart costs nothing — no API call, no account needed.
+// lives, so a green validate is not read as a reachable warehouse. An s3 table
+// source has no query, and preview exits 1 on one, so it is pointed elsewhere.
 func reportValidation(w io.Writer, externalID, resourceType string, data resources.ResourceData) {
 	fmt.Fprintf(w, "✅ %s '%s' is valid\n", resourceType, externalID)
 

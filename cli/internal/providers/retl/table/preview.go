@@ -12,9 +12,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-// ErrPreviewUnsupported marks a table source that has no warehouse query to
-// preview, so callers can tell it apart from a query that failed to run.
-var ErrPreviewUnsupported = errors.New("preview is not supported")
+// errNoQueryToPreview is the refusal for a table source that has no warehouse
+// query. It was a sentinel while `validate` previewed and had to tell "nothing
+// to run" apart from "the query failed"; validate no longer previews, so no
+// caller matches on it and a plain error carries the same text.
+var errNoQueryToPreview = errors.New("preview is not supported")
 
 // bigQueryEscaper escapes quote characters the way BigQuery string literals
 // do, which is also how its quoted identifiers are escaped.
@@ -48,7 +50,7 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 // gets an answer without pulling data back.
 func previewSQL(t TableSpec, limit int) (string, error) {
 	if t.isS3() {
-		return "", fmt.Errorf("%w for s3 table sources", ErrPreviewUnsupported)
+		return "", fmt.Errorf("%w for s3 table sources", errNoQueryToPreview)
 	}
 
 	var relation string

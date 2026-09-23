@@ -325,7 +325,7 @@ func TestTableSupportEnabled(t *testing.T) {
 	// calls the handler directly, so a Provider.Preview that passed a literal
 	// would still pass there. The handler-map dispatch itself is covered by the
 	// create subtest above, which reads the same p.handlers map.
-	t.Run("validates table sources through the preview API", func(t *testing.T) {
+	t.Run("previews table sources through the preview API", func(t *testing.T) {
 		t.Parallel()
 		client := newDefaultMockClient()
 		var got *retlClient.PreviewSubmitRequest
