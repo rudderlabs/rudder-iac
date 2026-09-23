@@ -7,34 +7,23 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// mockDestinationLister implements DestinationLister over a preset list, applying
-// the hasExternalId filter the way the API does. A tester that forgot to pass the
-// filter therefore sees unmanaged destinations too, and the count guard fails.
+// mockDestinationLister implements DestinationLister, returning a preset list and
+// capturing the options the tester asked for.
 type mockDestinationLister struct {
 	destinations []client.Destination
+	opts         client.ListDestinationsOptions
 }
 
 func (m *mockDestinationLister) GetAll(_ context.Context, opts ...client.ListDestinationsOption) ([]client.Destination, error) {
-	options := &client.ListDestinationsOptions{}
 	for _, opt := range opts {
-		opt(options)
+		opt(&m.opts)
 	}
-
-	if options.HasExternalID == nil {
-		return m.destinations, nil
-	}
-
-	var filtered []client.Destination
-	for _, dest := range m.destinations {
-		if (dest.ExternalID != "") == *options.HasExternalID {
-			filtered = append(filtered, dest)
-		}
-	}
-	return filtered, nil
+	return m.destinations, nil
 }
 
 // s3Destination mirrors the destination_s3 snapshot fixture, including the
@@ -68,11 +57,13 @@ func s3Destination() client.Destination {
 
 var destinationTestIgnore = []string{"id", "workspaceId", "version", "createdAt", "updatedAt"}
 
-func newDestinationTester(t *testing.T, dests []client.Destination) *DestinationSnapshotTester {
+func newDestinationTester(t *testing.T, dests []client.Destination) (*DestinationSnapshotTester, *mockDestinationLister) {
 	t.Helper()
 	fileManager, err := NewSnapshotFileManager("testdata/snapshot/destinations")
 	require.NoError(t, err)
-	return NewDestinationSnapshotTester(&mockDestinationLister{destinations: dests}, fileManager, destinationTestIgnore)
+
+	lister := &mockDestinationLister{destinations: dests}
+	return NewDestinationSnapshotTester(lister, fileManager, destinationTestIgnore), lister
 }
 
 func TestDestinationSnapshotTester(t *testing.T) {
@@ -80,18 +71,15 @@ func TestDestinationSnapshotTester(t *testing.T) {
 
 	t.Run("managed destination matches snapshot", func(t *testing.T) {
 		t.Parallel()
-		tester := newDestinationTester(t, []client.Destination{s3Destination()})
+		tester, _ := newDestinationTester(t, []client.Destination{s3Destination()})
 		assert.NoError(t, tester.SnapshotTest(context.Background()))
 	})
 
-	t.Run("unmanaged destinations are excluded by the hasExternalId filter", func(t *testing.T) {
+	t.Run("unmanaged destinations are left to the API's hasExternalId filter", func(t *testing.T) {
 		t.Parallel()
-		// An extra destination without an ExternalID (e.g. UI-created) is dropped
-		// by the API filter, so the count still matches the one fixture. This only
-		// holds if the tester asks for hasExternalId=true.
-		unmanaged := client.Destination{Name: "UI Destination", Type: "S3"}
-		tester := newDestinationTester(t, []client.Destination{s3Destination(), unmanaged})
-		assert.NoError(t, tester.SnapshotTest(context.Background()))
+		tester, lister := newDestinationTester(t, []client.Destination{s3Destination()})
+		require.NoError(t, tester.SnapshotTest(context.Background()))
+		assert.Equal(t, client.ListDestinationsOptions{HasExternalID: lo.ToPtr(true)}, lister.opts)
 	})
 
 	t.Run("count mismatch fails", func(t *testing.T) {
@@ -99,7 +87,7 @@ func TestDestinationSnapshotTester(t *testing.T) {
 		// Two managed destinations but only one expected snapshot file.
 		extra := s3Destination()
 		extra.ExternalID = "s3-extra"
-		tester := newDestinationTester(t, []client.Destination{s3Destination(), extra})
+		tester, _ := newDestinationTester(t, []client.Destination{s3Destination(), extra})
 		err := tester.SnapshotTest(context.Background())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resource count mismatch")
@@ -109,7 +97,7 @@ func TestDestinationSnapshotTester(t *testing.T) {
 		t.Parallel()
 		diverged := s3Destination()
 		diverged.Name = "Renamed S3"
-		tester := newDestinationTester(t, []client.Destination{diverged})
+		tester, _ := newDestinationTester(t, []client.Destination{diverged})
 		err := tester.SnapshotTest(context.Background())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "destination:s3")

@@ -947,7 +947,6 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/v2/destinations", r.URL.Path)
-		// Unmanaged destinations are dropped by the API, not by the handler.
 		require.Equal(t, "true", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
@@ -1006,7 +1005,6 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	registry := testRegistry(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Managed destinations are dropped by the API, not by the handler.
 		require.Equal(t, "false", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{

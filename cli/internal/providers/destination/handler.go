@@ -287,9 +287,8 @@ func errUnregisteredManagedType(id, apiType string, version int64) error {
 	)
 }
 
-// LoadRemoteResources returns only managed destinations (ExternalID set),
-// selected by the API's hasExternalId filter. An unregistered type on a managed
-// resource indicates corrupted state and errors.
+// LoadRemoteResources returns only managed destinations (ExternalID set). An
+// unregistered type on a managed resource indicates corrupted state and errors.
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestination, error) {
 	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(true))
 	if err != nil {
@@ -307,10 +306,9 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	return result, nil
 }
 
-// LoadImportableResources returns unmanaged destinations (no ExternalID),
-// selected by the API's hasExternalId filter, and silently skips destinations
-// whose (Type, Version) pair isn't registered — import can only target
-// definitions the CLI knows how to convert.
+// LoadImportableResources returns unmanaged destinations (no ExternalID) and
+// silently skips destinations whose (Type, Version) pair isn't registered —
+// import can only target definitions the CLI knows how to convert.
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
 	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(false))
 	if err != nil {
