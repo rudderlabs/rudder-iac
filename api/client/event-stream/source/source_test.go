@@ -283,9 +283,7 @@ func TestGetSources(t *testing.T) {
 			},
 		},
 		{
-			// Only the first URL is built here; the filter survives paging
-			// because the server echoes it into the next link, which the
-			// client follows verbatim.
+			// The filter survives paging because the server echoes it into the next link, which the client follows verbatim.
 			name: "hasExternalId filter across pages",
 			opts: []esSource.ListSourcesOption{esSource.WithSourcesHasExternalID(true)},
 			calls: []testutils.Call{

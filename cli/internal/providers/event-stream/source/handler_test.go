@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1281,7 +1280,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadResourcesFromRemote(context.Background())
 
 		assert.NoError(t, err)
-		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: lo.ToPtr(true)}}, mockClient.GetSourcesCalls())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(true)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
 		assert.Len(t, esResources, 2)
@@ -1515,7 +1514,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
 
 		assert.NoError(t, err)
-		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: lo.ToPtr(false)}}, mockClient.GetSourcesCalls())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(false)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
 		require.Len(t, esResources, 2)
