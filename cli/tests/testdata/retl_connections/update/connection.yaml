@@ -23,7 +23,7 @@ spec:
           type: identify
     - id: customers-to-http
       source: "#retl-source-table:customers-table"
-      destination: "#destination:e2e-retl-http"
+      destination: "#destination:e2e-retl-http-customers"
       enabled: true
       config:
         sync_behaviour: upsert

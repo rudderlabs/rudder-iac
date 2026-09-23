@@ -83,13 +83,13 @@ func SourceKindBySourceType(sourceType retlClient.SourceType) (SourceKind, bool)
 // A reference of the wrong family and a malformed one fail differently: only
 // the first can name the kind the author actually wrote.
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
-	kind, id, ok := refID(ref)
+	kind, id, ok := RefID(ref)
 	if !ok {
-		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, SourceKindRefForms())
 	}
 	sourceKind, ok := SourceKindByKind(kind)
 	if !ok {
-		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, SourceKindRefForms())
 	}
 	return &resources.PropertyRef{
 		URN:      resources.URN(id, sourceKind.ResourceType),
@@ -103,9 +103,10 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 // multiple lines.
 var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
 
-// refID splits a scalar "#<kind>:<id>" reference into its parts, reporting
-// whether it is well formed at all.
-func refID(ref string) (kind string, id string, ok bool) {
+// RefID splits a scalar "#<kind>:<id>" reference into its parts, reporting
+// whether it is well formed at all. Exported so the connection rules parse
+// references with this same function and cannot drift from the handler.
+func RefID(ref string) (kind string, id string, ok bool) {
 	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return "", "", false
@@ -113,8 +114,10 @@ func refID(ref string) (kind string, id string, ok bool) {
 	return matches[1], matches[2], true
 }
 
-// sourceKindRefForms lists the reference forms a source may take, for errors.
-func sourceKindRefForms() string {
+// SourceKindRefForms lists the reference forms a source may take, for errors.
+// Exported so the connection spec rules describe the accepted forms from the
+// same table reference parsing uses.
+func SourceKindRefForms() string {
 	forms := make([]string, len(SourceKinds))
 	for i, sk := range SourceKinds {
 		forms[i] = fmt.Sprintf("#%s:<id>", sk.Kind)
