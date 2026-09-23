@@ -11,13 +11,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockDestinationLister implements DestinationLister, returning a preset list.
+// mockDestinationLister implements DestinationLister over a preset list, applying
+// the hasExternalId filter the way the API does. A tester that forgot to pass the
+// filter therefore sees unmanaged destinations too, and the count guard fails.
 type mockDestinationLister struct {
 	destinations []client.Destination
 }
 
-func (m *mockDestinationLister) GetAll(context.Context) ([]client.Destination, error) {
-	return m.destinations, nil
+func (m *mockDestinationLister) GetAll(_ context.Context, opts ...client.ListDestinationsOption) ([]client.Destination, error) {
+	options := &client.ListDestinationsOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if options.HasExternalID == nil {
+		return m.destinations, nil
+	}
+
+	var filtered []client.Destination
+	for _, dest := range m.destinations {
+		if (dest.ExternalID != "") == *options.HasExternalID {
+			filtered = append(filtered, dest)
+		}
+	}
+	return filtered, nil
 }
 
 // s3Destination mirrors the destination_s3 snapshot fixture, including the
@@ -67,10 +84,11 @@ func TestDestinationSnapshotTester(t *testing.T) {
 		assert.NoError(t, tester.SnapshotTest(context.Background()))
 	})
 
-	t.Run("unmanaged destinations are filtered out by external ID", func(t *testing.T) {
+	t.Run("unmanaged destinations are excluded by the hasExternalId filter", func(t *testing.T) {
 		t.Parallel()
-		// An extra destination without an ExternalID (e.g. UI-created) must not
-		// count toward the managed set, so the count still matches the one fixture.
+		// An extra destination without an ExternalID (e.g. UI-created) is dropped
+		// by the API filter, so the count still matches the one fixture. This only
+		// holds if the tester asks for hasExternalId=true.
 		unmanaged := client.Destination{Name: "UI Destination", Type: "S3"}
 		tester := newDestinationTester(t, []client.Destination{s3Destination(), unmanaged})
 		assert.NoError(t, tester.SnapshotTest(context.Background()))

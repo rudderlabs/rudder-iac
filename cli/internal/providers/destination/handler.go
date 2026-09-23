@@ -287,10 +287,11 @@ func errUnregisteredManagedType(id, apiType string, version int64) error {
 	)
 }
 
-// LoadRemoteResources returns only managed destinations (ExternalID set). An
-// unregistered type on a managed resource indicates corrupted state and errors.
+// LoadRemoteResources returns only managed destinations (ExternalID set),
+// selected by the API's hasExternalId filter. An unregistered type on a managed
+// resource indicates corrupted state and errors.
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(true))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -298,12 +299,6 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
-		if d.ExternalID == "" {
-			continue
-		}
-
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			return nil, errUnregisteredManagedType(d.ID, d.Type, d.Version)
 		}
@@ -312,11 +307,12 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	return result, nil
 }
 
-// LoadImportableResources returns unmanaged destinations (no ExternalID) and
-// silently skips destinations whose (Type, Version) pair isn't registered —
-// import can only target definitions the CLI knows how to convert.
+// LoadImportableResources returns unmanaged destinations (no ExternalID),
+// selected by the API's hasExternalId filter, and silently skips destinations
+// whose (Type, Version) pair isn't registered — import can only target
+// definitions the CLI knows how to convert.
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(false))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -324,11 +320,6 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
-		if d.ExternalID != "" {
-			continue
-		}
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			// Only destinations whose exact (apiType, version) is registered
 			// in the CLI are considered importable.

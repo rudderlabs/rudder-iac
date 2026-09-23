@@ -947,13 +947,14 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/v2/destinations", r.URL.Path)
+		// Unmanaged destinations are dropped by the API, not by the handler.
+		require.Equal(t, "true", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
-				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","name":"Unmanaged","type":"GA4","version":1,"config":{}}
+				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}}
 			],
-			"paging": {"total": 2}
+			"paging": {"total": 1}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -1004,16 +1005,17 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	ctx := context.Background()
 	registry := testRegistry(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Managed destinations are dropped by the API, not by the handler.
+		require.Equal(t, "false", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","name":"GA4-unmanaged","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","externalId":"ga4-managed","name":"GA4-managed","type":"GA4","version":1,"config":{}},
 				{"id":"dst-3","name":"S3-unmanaged","type":"S3","config":{}},
 				{"id":"dst-4","name":"GA4-unregistered-version","type":"GA4","version":2,"config":{}}
 			],
-			"paging": {"total": 4}
+			"paging": {"total": 3}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -1023,7 +1025,7 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 
 	remotes, err := h.Impl.LoadImportableResources(ctx)
 	require.NoError(t, err)
-	require.Len(t, remotes, 1, "only unmanaged + registered (type, version) pairs pass")
+	require.Len(t, remotes, 1, "only registered (type, version) pairs pass")
 	assert.Equal(t, "dst-1", remotes[0].ID)
 	assert.Equal(t, "", remotes[0].ExternalID)
 }
