@@ -63,8 +63,10 @@ func TestRETLConnectionScenarios(t *testing.T) {
 	var trackID, columnID string
 
 	t.Run("apply create", func(t *testing.T) {
-		assertRETLConnectionChangesPlanned(t, executor, step("create"), credentials,
-			scenarioTrackConnectionExternalID, scenarioColumnConnectionExternalID)
+		plan := planRETLProject(t, executor, step("create"), credentials)
+		for _, localID := range []string{scenarioTrackConnectionExternalID, scenarioColumnConnectionExternalID} {
+			assert.Contains(t, plan, connectionURNPrefix+localID, "the plan must name the connection it will create")
+		}
 		applyRETLProject(t, executor, step("create"), credentials)
 
 		var track, column retlClient.RETLConnection
@@ -86,56 +88,8 @@ func TestRETLConnectionScenarios(t *testing.T) {
 			CursorColumn:  "updated_at",
 		}, track)
 
-		// No sync_settings in the spec: the backend stores its defaults.
-		assert.Equal(t, retlClient.RETLConnection{
-			SourceID:      managedRETLSource(t, retlClient.TableSourceType, scenarioTableExternalID).ID,
-			DestinationID: managedDestinationID(t, scenarioColumnDestinationExternalID),
-			Enabled:       true,
-			ExternalID:    scenarioColumnConnectionExternalID,
-			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("0 */6 * * *")},
-			SyncSettings:  syncSettings(true, 30, 5, true),
-			SyncBehaviour: retlClient.SyncBehaviourFull,
-			Identifiers:   []retlClient.Mapping{{From: "id", To: "anonymous_id"}},
-			Mappings:      []retlClient.Mapping{{From: "email", To: "properties.email"}},
-			Event:         &retlClient.Event{Type: retlClient.EventTypeTrack, NameColumn: "event_name"},
-		}, column)
-	})
-
-	t.Run("created connections converge", func(t *testing.T) {
-		assertNoRETLConnectionChanges(t, executor, step("create"), credentials)
-	})
-
-	t.Run("apply update", func(t *testing.T) {
-		applyRETLProject(t, executor, step("update"), credentials)
-
-		id, track := managedRETLConnectionByExternalID(t, scenarioTrackConnectionExternalID)
-		assert.Equal(t, trackID, id, "a schedule, enabled, constants and sync settings change must update the connection in place")
-		// A partial sync_settings block: the CLI fills every field it leaves out
-		// with the backend default before sending, so the stored non-default
-		// values (false/0/0) are replaced rather than merged into. everyMinutes
-		// must be gone with the basic schedule that carried it.
-		assert.Equal(t, retlClient.RETLConnection{
-			SourceID:      managedRETLSource(t, retlClient.ModelSourceType, scenarioModelExternalID).ID,
-			DestinationID: managedDestinationID(t, scenarioTrackDestinationExternalID),
-			Enabled:       false,
-			ExternalID:    scenarioTrackConnectionExternalID,
-			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("30 2 * * *")},
-			SyncSettings:  syncSettings(true, 30, 5, true),
-			SyncBehaviour: retlClient.SyncBehaviourUpsert,
-			Identifiers:   []retlClient.Mapping{{From: "id", To: "user_id"}},
-			Mappings:      []retlClient.Mapping{{From: "email", To: "properties.email"}, {From: "plan", To: "properties.plan"}},
-			Event:         &retlClient.Event{Type: retlClient.EventTypeTrack, Name: "Order Synced"},
-			Constants: []retlClient.Constant{
-				{Key: "properties.origin", Value: "rudder-cli-e2e-v2"},
-				{Key: "properties.team", Value: "dex"},
-			},
-			CursorColumn: "updated_at",
-		}, track)
-
-		id, column := managedRETLConnectionByExternalID(t, scenarioColumnConnectionExternalID)
-		assert.Equal(t, columnID, id, "a schedule and sync settings change must update the connection in place")
-		// A full non-default block replaces the defaults create stored, and the
-		// cronExpression must be gone with the cron schedule that carried it.
+		// A manual schedule carries no interval, and the non-default block is
+		// what the update step drops.
 		assert.Equal(t, retlClient.RETLConnection{
 			SourceID:      managedRETLSource(t, retlClient.TableSourceType, scenarioTableExternalID).ID,
 			DestinationID: managedDestinationID(t, scenarioColumnDestinationExternalID),
@@ -150,8 +104,61 @@ func TestRETLConnectionScenarios(t *testing.T) {
 		}, column)
 	})
 
+	t.Run("created connections converge", func(t *testing.T) {
+		assert.NotContains(t, planRETLProject(t, executor, step("create"), credentials),
+			connectionURNPrefix, "a re-apply must not plan any connection change")
+	})
+
+	t.Run("apply update", func(t *testing.T) {
+		applyRETLProject(t, executor, step("update"), credentials)
+
+		id, track := managedRETLConnectionByExternalID(t, scenarioTrackConnectionExternalID)
+		assert.Equal(t, trackID, id, "a schedule, enabled, constants and sync settings change must update the connection in place")
+		// A partial sync_settings block names retention_days only: the CLI fills
+		// every field it leaves out with the backend default before sending, so
+		// the stored false/0/0/false are replaced rather than merged into.
+		// everyMinutes must be gone with the basic schedule that carried it.
+		assert.Equal(t, retlClient.RETLConnection{
+			SourceID:      managedRETLSource(t, retlClient.ModelSourceType, scenarioModelExternalID).ID,
+			DestinationID: managedDestinationID(t, scenarioTrackDestinationExternalID),
+			Enabled:       false,
+			ExternalID:    scenarioTrackConnectionExternalID,
+			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("30 2 * * *")},
+			SyncSettings:  syncSettings(true, 7, 5, true),
+			SyncBehaviour: retlClient.SyncBehaviourUpsert,
+			Identifiers:   []retlClient.Mapping{{From: "id", To: "user_id"}},
+			Mappings:      []retlClient.Mapping{{From: "email", To: "properties.email"}, {From: "plan", To: "properties.plan"}},
+			Event:         &retlClient.Event{Type: retlClient.EventTypeTrack, Name: "Order Synced"},
+			Constants: []retlClient.Constant{
+				{Key: "properties.origin", Value: "rudder-cli-e2e-v2"},
+				{Key: "properties.team", Value: "dex"},
+			},
+			CursorColumn: "updated_at",
+		}, track)
+
+		id, column := managedRETLConnectionByExternalID(t, scenarioColumnConnectionExternalID)
+		assert.Equal(t, columnID, id, "a schedule and sync settings change must update the connection in place")
+		// Omitting sync_settings drops the non-default block create stored: the
+		// CLI has to send the defaults a fresh create would have filled in, so
+		// anything but true/30/5/true means the drop was sent as an omission
+		// and the backend kept the old values.
+		assert.Equal(t, retlClient.RETLConnection{
+			SourceID:      managedRETLSource(t, retlClient.TableSourceType, scenarioTableExternalID).ID,
+			DestinationID: managedDestinationID(t, scenarioColumnDestinationExternalID),
+			Enabled:       true,
+			ExternalID:    scenarioColumnConnectionExternalID,
+			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("0 */6 * * *")},
+			SyncSettings:  syncSettings(true, 30, 5, true),
+			SyncBehaviour: retlClient.SyncBehaviourFull,
+			Identifiers:   []retlClient.Mapping{{From: "id", To: "anonymous_id"}},
+			Mappings:      []retlClient.Mapping{{From: "email", To: "properties.email"}},
+			Event:         &retlClient.Event{Type: retlClient.EventTypeTrack, NameColumn: "event_name"},
+		}, column)
+	})
+
 	t.Run("updated connections converge", func(t *testing.T) {
-		assertNoRETLConnectionChanges(t, executor, step("update"), credentials)
+		assert.NotContains(t, planRETLProject(t, executor, step("update"), credentials),
+			connectionURNPrefix, "a re-apply must not plan any connection change")
 	})
 
 	// destroy removes connections and the endpoints they still join in one run.
@@ -166,7 +173,7 @@ func TestRETLConnectionScenarios(t *testing.T) {
 		assert.NotContains(t, connections, scenarioTrackConnectionExternalID)
 		assert.NotContains(t, connections, scenarioColumnConnectionExternalID)
 
-		destinations := managedDestinationExternalIDs(t)
+		destinations := retlVisibleDestinationExternalIDs(t)
 		assert.NotContains(t, destinations, scenarioTrackDestinationExternalID)
 		assert.NotContains(t, destinations, scenarioColumnDestinationExternalID)
 
@@ -202,29 +209,17 @@ func managedRETLConnectionByExternalID(t *testing.T, externalID string) (string,
 // convergence assertion below passing unconditionally.
 const connectionURNPrefix = connection.ResourceType + ":"
 
-// assertRETLConnectionChangesPlanned is the positive half of the convergence
-// checks: it proves the plan really does print this prefix, so the
-// NotContains below is a statement about the plan rather than about a string
-// nothing emits.
-func assertRETLConnectionChangesPlanned(t *testing.T, executor *CmdExecutor, dir, credentials string, localIDs ...string) {
-	t.Helper()
-
-	out, err := executor.Execute(cliBinPath, "apply", "-l", dir, "--var-file", credentials, "--dry-run", "--confirm=false")
-	require.NoError(t, err, "dry run failed: %s", out)
-	for _, localID := range localIDs {
-		assert.Contains(t, string(out), connectionURNPrefix+localID, "the plan must name the connection it will create")
-	}
-}
-
-// assertNoRETLConnectionChanges dry-runs the project and checks that no
-// connection is planned. The whole plan cannot be required empty: the account
+// planRETLProject dry-runs the project and returns the plan. Callers assert on
+// connectionURNPrefix: once positively, so the absence checks are statements
+// about the plan rather than about a string nothing emits, and then negatively
+// after each apply. The whole plan cannot be required empty — the account
 // secret cannot be read back, so the account re-plans on every apply.
-func assertNoRETLConnectionChanges(t *testing.T, executor *CmdExecutor, dir, credentials string) {
+func planRETLProject(t *testing.T, executor *CmdExecutor, dir, credentials string) string {
 	t.Helper()
 
 	out, err := executor.Execute(cliBinPath, "apply", "-l", dir, "--var-file", credentials, "--dry-run", "--confirm=false")
 	require.NoError(t, err, "dry run failed: %s", out)
-	assert.NotContains(t, string(out), connectionURNPrefix, "a re-apply must not plan any connection change")
+	return string(out)
 }
 
 func syncSettings(logsEnabled bool, retentionDays, snapshots int, retryFailedKeys bool) *retlClient.SyncSettings {

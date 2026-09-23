@@ -58,11 +58,11 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 
-	// Registered after the destroy so it runs before it.
 	t.Cleanup(func() {
 		out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 	})
+	// Registered after the destroy cleanup so it runs before it.
 	t.Cleanup(func() { removeSeededConnections(t, store) })
 
 	applyRETLProject(t, executor, baseDir, credentials)
@@ -119,7 +119,8 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	})
 
 	t.Run("claimed connection converges", func(t *testing.T) {
-		assertNoRETLConnectionChanges(t, executor, projectDir, credentials)
+		assert.NotContains(t, planRETLProject(t, executor, projectDir, credentials),
+			connectionURNPrefix, "a re-apply must not plan any connection change")
 	})
 }
 

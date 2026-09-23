@@ -218,9 +218,11 @@ func managedAccountExternalIDs(t *testing.T) []string {
 	return lo.Map(accounts, func(a client.Account, _ int) string { return a.ExternalID })
 }
 
-// managedDestinationExternalIDs lists the externalIds of every destination the
-// rETL store can see.
-func managedDestinationExternalIDs(t *testing.T) []string {
+// retlVisibleDestinationExternalIDs lists the externalIds of every destination
+// the rETL store can see. GetDestinations has no managed filter, so unmanaged
+// destinations come back with an empty externalId — enough for the NotContains
+// checks, not a list of managed destinations.
+func retlVisibleDestinationExternalIDs(t *testing.T) []string {
 	t.Helper()
 
 	destinations, err := retlClient.NewRudderRETLStore(newAccountsAPIClient(t)).GetDestinations(context.Background())
