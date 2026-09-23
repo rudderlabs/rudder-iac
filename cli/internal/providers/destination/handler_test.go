@@ -723,6 +723,58 @@ func TestHandlerImpl_Delete(t *testing.T) {
 		assert.True(t, deleteCalled)
 	})
 
+	// The backend refuses to delete a destination that still has connections, and
+	// says only that. When the blocking connection is a kind this run is not
+	// managing — rETL connections are behind an experimental flag — nothing in
+	// the plan mentions it, so the workspace becomes un-destroyable with no hint
+	// as to why. The wrapper adds the missing half.
+	t.Run("explains a delete blocked by connections", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"The destination has active connections, please delete those first"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The destination has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+			"the remedy must name the flags that let the CLI remove them")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	// Only the connections refusal earns the extra guidance; every other failure
+	// is passed through, so an unrelated 400 does not acquire advice about a flag
+	// that has nothing to do with it.
+	t.Run("leaves an unrelated delete failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"destination is referenced by a running job"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
+	})
+
 	t.Run("deletes destination when no transformation", func(t *testing.T) {
 		t.Parallel()
 
