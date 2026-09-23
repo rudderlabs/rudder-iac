@@ -39,6 +39,9 @@ const (
 // destroy from deleting them, so seeds on the fixture destination are removed
 // before every destroy.
 func TestRETLConnectionImportClaim(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")

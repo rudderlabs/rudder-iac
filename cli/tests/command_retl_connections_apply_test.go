@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -48,10 +49,23 @@ type retlConnectionWant struct {
 // connection read path skips any row whose destination is not one of them,
 // which would leave this suite creating a connection it could never read back.
 //
-// Ungated for the reason given on TestRETLSourcesApply. Against production it
-// fails until the config-backend release carrying DEX-892 (externalId on
-// connection create) ships; the PR that adds it is held until then.
+// Gated behind RUN_RETL_E2E so that a plain `go test ./cli/...` does not write
+// to whatever workspace the developer's ~/.rudder/config.json points at — which
+// defaults to production, and which cost a real apply before this gate existed.
+//
+// The gate is passed as a literal "1" by the e2e workflow rather than through a
+// repository variable. DEX-901 found RUN_CONNECTION_E2E wired as
+// ${{ vars.RUN_CONNECTION_E2E }} with no such variable ever defined, so that
+// suite has never executed; the variable is still undefined today. A gate read
+// from an undefined variable is silent disablement, so this one does not depend
+// on repository settings to stay on.
+//
+// Against production it fails until the config-backend release carrying DEX-892
+// (externalId on connection create) ships; the PR that adds it is held until then.
 func TestRETLConnectionsApply(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")

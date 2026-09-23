@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -37,6 +38,9 @@ const (
 // offer are upsert and full (the backend refuses mirror there), and the
 // postgres source definition accepts sync settings.
 func TestRETLConnectionScenarios(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")

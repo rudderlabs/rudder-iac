@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,12 +33,18 @@ const (
 // apply the account alone, read its id back and feed it to the sources through
 // a generated var file.
 //
-// Deliberately ungated. DEX-901 found that RUN_CONNECTION_E2E was added to the
-// e2e workflow but never defined as a repository variable, so that suite has
-// never executed — a gate is only coverage if someone remembers to turn it on.
-// This suite needs nothing TestAccountsApply does not already need (a live
-// stack carrying SOURCE_POSTGRES), so it runs in the same lane instead.
+// Gated behind RUN_RETL_E2E, with the workflow passing a literal "1" rather than
+// a repository variable. The original note here argued for staying ungated,
+// because DEX-901 found RUN_CONNECTION_E2E wired to an undefined variable and
+// that suite has never run — a gate is only coverage if someone turns it on.
+// That argument was against gates that depend on repository settings, and it
+// still holds: this one does not. What ungating cost instead was a plain
+// `go test ./cli/...` applying to whatever workspace ~/.rudder/config.json
+// names, which defaults to production.
 func TestRETLSourcesApply(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 	// Accounts are behind the experimental umbrella and the table kind behind
 	// its own flag; the SQL model kind is behind neither.
