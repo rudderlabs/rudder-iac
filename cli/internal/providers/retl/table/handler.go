@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -170,7 +171,62 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	if desired.SourceDefinition != current {
 		return nil, fmt.Errorf("updating table source %s: source_definition cannot be changed from %q to %q", ID, current, desired.SourceDefinition)
 	}
+	if err := h.checkTableMoveAllowed(ctx, ID, sourceID, desired, state); err != nil {
+		return nil, err
+	}
 	return h.update(ctx, sourceID, desired)
+}
+
+// checkTableMoveAllowed refuses a schema or table change on a source a
+// destination is already syncing from, which the webapp blocks outright: the
+// destination has started against the old table's shape, and repointing the
+// source underneath it silently changes what every later sync reads. primary_key
+// stays editable, as it does in the webapp (DEX-960).
+//
+// The connections are read from the API rather than the project, because a
+// connection made in the webapp blocks the edit just as much as one the project
+// manages — and is invisible locally. The call only happens on the rare apply
+// that actually moves a source.
+func (h *Handler) checkTableMoveAllowed(
+	ctx context.Context,
+	ID, sourceID string,
+	desired TableSpec,
+	state resources.ResourceData,
+) error {
+	var (
+		currentSchema, _ = state[SchemaKey].(string)
+		currentTable, _  = state[TableKey].(string)
+		moved            []string
+	)
+	// An empty current value means the state never recorded one — an s3 source,
+	// which has neither — so there is no move to refuse. Both are required on
+	// every other source definition, so a real move always has a value to name.
+	if currentSchema != "" && desired.Schema != currentSchema {
+		moved = append(moved, fmt.Sprintf("schema %q -> %q", currentSchema, desired.Schema))
+	}
+	if currentTable != "" && desired.Table != currentTable {
+		moved = append(moved, fmt.Sprintf("table %q -> %q", currentTable, desired.Table))
+	}
+	if len(moved) == 0 {
+		return nil
+	}
+
+	page, err := h.client.ListConnections(ctx, &retlClient.ListRETLConnectionsRequest{SourceID: sourceID})
+	if err != nil {
+		return fmt.Errorf("updating table source %s: checking whether it is connected: %w", ID, err)
+	}
+	if page == nil || len(page.Data) == 0 {
+		return nil
+	}
+
+	connected := make([]string, 0, len(page.Data))
+	for _, c := range page.Data {
+		connected = append(connected, c.ID)
+	}
+	return fmt.Errorf(
+		"updating table source %s: %s cannot be changed while the source is connected to a destination (connections: %s); delete the connection first, or create a new source for the new table",
+		ID, strings.Join(moved, " and "), strings.Join(connected, ", "),
+	)
 }
 
 func (h *Handler) update(ctx context.Context, sourceID string, t TableSpec) (*resources.ResourceData, error) {

@@ -31,6 +31,9 @@ type fakeStore struct {
 	calls    []string
 	failOn   string
 	failWith error
+	// connections a source is wired to, keyed by source id. Empty means the
+	// source is unconnected, which is what most lifecycle cases assume.
+	connections map[string][]retlClient.RETLConnection
 }
 
 func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
@@ -39,6 +42,13 @@ func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
 		f.sources[s.ID] = &s
 	}
 	return f
+}
+
+func (f *fakeStore) ListConnections(_ context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if err := f.record("list-connections:" + req.SourceID); err != nil {
+		return nil, err
+	}
+	return &retlClient.RETLConnectionsPage{Data: f.connections[req.SourceID]}, nil
 }
 
 func (f *fakeStore) record(call string) error {
@@ -481,6 +491,72 @@ func TestUpdate(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `source_definition cannot be changed from "postgres" to "snowflake"`)
 		assert.Empty(t, store.calls)
+	})
+
+	// The webapp blocks schema/table edits once a destination is syncing from the
+	// source, because the destination started against the old table's shape.
+	// apply used to let both through (DEX-960).
+	t.Run("refuses a schema or table change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
+		store.connections = map[string][]retlClient.RETLConnection{
+			"src-1": {{ID: "conn-1"}},
+		}
+		h, r := loadResource(t, store, withField(withField(warehouseSpec(), "schema", "PUBLIC"), "table", "OTHER"))
+		state := resources.ResourceData{
+			sqlmodel.IDKey:               "src-1",
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+		}
+
+		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `schema "public" -> "PUBLIC"`)
+		assert.Contains(t, err.Error(), `table "users" -> "OTHER"`)
+		assert.Contains(t, err.Error(), "conn-1", "the message must name the blocking connection")
+		assert.NotContains(t, store.calls, "update:src-1", "the update must not reach the API")
+	})
+
+	// primary_key stays editable on a connected source, as it does in the webapp.
+	t.Run("allows a primary_key change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
+		store.connections = map[string][]retlClient.RETLConnection{
+			"src-1": {{ID: "conn-1"}},
+		}
+		h, r := loadResource(t, store, withField(warehouseSpec(), "primary_key", "email"))
+		state := resources.ResourceData{
+			sqlmodel.IDKey:               "src-1",
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+		}
+
+		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
+
+		require.NoError(t, err)
+		assert.NotContains(t, store.calls, "list-connections:src-1", "an unchanged table needs no connection lookup")
+	})
+
+	// The same edit on an unconnected source is the user's to make.
+	t.Run("allows a schema change on an unconnected source", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
+		h, r := loadResource(t, store, withField(warehouseSpec(), "schema", "PUBLIC"))
+		state := resources.ResourceData{
+			sqlmodel.IDKey:               "src-1",
+			sqlmodel.SourceDefinitionKey: "postgres",
+			table.SchemaKey:              "public",
+			table.TableKey:               "users",
+		}
+
+		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
+
+		require.NoError(t, err)
+		assert.Contains(t, store.calls, "list-connections:src-1")
+		assert.Contains(t, store.calls, "update:src-1")
 	})
 
 	t.Run("errors when state has no remote id", func(t *testing.T) {
