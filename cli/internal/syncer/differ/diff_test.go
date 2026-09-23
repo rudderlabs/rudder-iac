@@ -642,10 +642,9 @@ func TestCompareData_SliceNormalisation(t *testing.T) {
 	})
 }
 
-// URN is the only PropertyRef field the user configures. The source graph is
-// built from specs (unresolved) and the target graph from the API (resolved),
-// so Property, IsResolved and Value routinely differ for an identical
-// configuration — comparing them reported drift where nothing changed.
+// URN is the only PropertyRef field the user configures. Property, IsResolved
+// and Value are internal runtime state, so a difference in them is never a
+// change the user made and must not be reported as drift.
 func TestCompareData_PropertyRef(t *testing.T) {
 	source := resources.PropertyRef{URN: "urn:resource:src", Property: "id"}
 

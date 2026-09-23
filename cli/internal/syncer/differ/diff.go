@@ -385,10 +385,12 @@ func isSecretValue(v any) bool {
 }
 
 // comparePropertyRefs compares two PropertyRef objects by URN alone. URN is the
-// only field the user configures; Property, IsResolved and Value are runtime
-// state that legitimately differs between the source graph (built from specs,
-// unresolved) and the target graph (built from the API, resolved), so comparing
-// them reports drift where the user changed nothing.
+// only field the user configures; Property, IsResolved and Value are internal
+// runtime state. A Property that disagrees between the two graphs is an
+// implementation error rather than a user-visible change, so it must not drive
+// an update operation. IsResolved and Value are written during plan execution,
+// which runs after the diff, so both sides are always unresolved here —
+// comparing them would report drift the moment that ordering changed.
 func comparePropertyRefs(r1, r2 *resources.PropertyRef) bool {
 	if r1 == nil && r2 == nil {
 		return true
