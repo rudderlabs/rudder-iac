@@ -6,8 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
 // TestRETLValidationRules drives the RETL semantic rules through the binary.
@@ -76,8 +74,8 @@ func TestRETLValidationRules(t *testing.T) {
 			}
 
 			assert.NotContains(t, managedAccountExternalIDs(t), "e2e-validate-pg")
-			assert.NotContains(t, managedRETLSourceExternalIDs(t, retlClient.ModelSourceType), "e2e-validate-model")
-			assert.NotContains(t, managedRETLSourceExternalIDs(t, retlClient.TableSourceType), "e2e-validate-table")
+			assert.NotContains(t, managedRETLSourceExternalIDs(t), "e2e-validate-model")
+			assert.NotContains(t, managedRETLSourceExternalIDs(t), "e2e-validate-table")
 		})
 	}
 }

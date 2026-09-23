@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -90,6 +91,13 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 		"config":               map[string]any{"primaryKey": "id", "schema": "analytics", "table": "users"},
 	})
 
+	// Anchors the NotContains after the claim: were the HasExternalID filter to
+	// regress to an empty result, that assertion would pass vacuously.
+	require.Contains(t, unmanagedRETLSourceIDs(t, store, retlClient.ModelSourceType), model.ID,
+		"the seeded model must start in the importable set")
+	require.Contains(t, unmanagedRETLSourceIDs(t, store, retlClient.TableSourceType), table.ID,
+		"the seeded table must start in the importable set")
+
 	projectDir := t.TempDir()
 
 	t.Run("import retl-sources writes a spec that names the remote source", func(t *testing.T) {
@@ -98,28 +106,20 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 		require.NoError(t, err, "import retl-sources failed: %s", out)
 
 		spec := readSpec(t, filepath.Join(projectDir, importModelLocalID+".yaml"))
-		assert.Equal(t, &specs.Spec{
-			Version:  specs.SpecVersionV1,
-			Kind:     "retl-source-sql-model",
-			Metadata: importMetadata(importModelLocalID, "retl-source-sql-model", model),
-			Spec: map[string]any{
-				"id":                importModelLocalID,
-				"display_name":      importSeedModelName,
-				"description":       "",
-				"account_id":        accountID,
-				"primary_key":       "id",
-				"source_definition": "postgres",
-				"enabled":           true,
-				"sql":               "SELECT id, email FROM users",
-			},
-		}, spec)
+		assert.Equal(t, importSpec(t, importModelLocalID, "retl-source-sql-model", model, map[string]any{
+			"id":                importModelLocalID,
+			"display_name":      importSeedModelName,
+			"description":       "",
+			"account_id":        accountID,
+			"primary_key":       "id",
+			"source_definition": "postgres",
+			"enabled":           true,
+			"sql":               "SELECT id, email FROM users",
+		}), spec)
 	})
 
-	writeSpec(t, filepath.Join(projectDir, importTableLocalID+".yaml"), &specs.Spec{
-		Version:  specs.SpecVersionV1,
-		Kind:     "retl-source-table",
-		Metadata: importMetadata(importTableLocalID, "retl-source-table", table),
-		Spec: map[string]any{
+	writeSpec(t, filepath.Join(projectDir, importTableLocalID+".yaml"),
+		importSpec(t, importTableLocalID, "retl-source-table", table, map[string]any{
 			"id":                importTableLocalID,
 			"display_name":      importSeedTableName,
 			"account_id":        accountID,
@@ -128,8 +128,7 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 			"schema":            "analytics",
 			"table":             "users_claimed",
 			"enabled":           true,
-		},
-	})
+		}))
 
 	wantModel := retlClient.RETLSource{
 		ID:                   model.ID,
@@ -222,12 +221,18 @@ func seedUnmanagedRETLSource(t *testing.T, apiClient *client.Client, body map[st
 // removeImportSeeds deletes whatever a previous or the current run seeded:
 // unmanaged sources and accounts matched by name, sources first because an
 // account in use cannot be deleted. A claimed source is managed and left to
-// destroy. Deletion errors are logged rather than failed, so cleanup always
-// gets as far as it can.
+// destroy.
+//
+// Every deletion is attempted before any failure is reported, so cleanup gets
+// as far as it can — but the failures are asserted rather than logged. This
+// also runs as a precondition, and a seed left behind means the next run's
+// seeding trips the case-insensitive display-name rule this suite itself pins,
+// reported far from the cause.
 func removeImportSeeds(t *testing.T, apiClient *client.Client, store retlClient.RETLStore) {
 	t.Helper()
 
 	ctx := context.Background()
+	var failures []error
 	sources, err := store.ListRetlSources(ctx, retlClient.WithHasExternalId(lo.ToPtr(false)))
 	require.NoError(t, err, "listing unmanaged RETL sources")
 	for _, source := range sources.Data {
@@ -235,7 +240,7 @@ func removeImportSeeds(t *testing.T, apiClient *client.Client, store retlClient.
 			continue
 		}
 		if err := store.DeleteRetlSource(ctx, source.ID); err != nil {
-			t.Logf("deleting seeded RETL source %s: %v", source.ID, err)
+			failures = append(failures, fmt.Errorf("deleting seeded RETL source %s: %w", source.ID, err))
 		}
 	}
 
@@ -246,9 +251,11 @@ func removeImportSeeds(t *testing.T, apiClient *client.Client, store retlClient.
 			continue
 		}
 		if err := apiClient.Accounts.Delete(ctx, account.ID); err != nil {
-			t.Logf("deleting seeded account %s: %v", account.ID, err)
+			failures = append(failures, fmt.Errorf("deleting seeded account %s: %w", account.ID, err))
 		}
 	}
+
+	assert.NoError(t, errors.Join(failures...), "import seeds left behind")
 }
 
 func unmanagedRETLSourceIDs(t *testing.T, store retlClient.RETLStore, sourceType retlClient.SourceType) []string {
@@ -260,21 +267,20 @@ func unmanagedRETLSourceIDs(t *testing.T, store retlClient.RETLStore, sourceType
 	return lo.Map(sources.Data, func(s retlClient.RETLSource, _ int) string { return s.ID })
 }
 
-// importMetadata is the metadata block that ties a local spec to the remote
-// source, in the map shape a spec file decodes to.
-func importMetadata(localID, resourceType string, remote *retlClient.RETLSource) map[string]any {
-	return map[string]any{
-		"name": localID,
-		"import": map[string]any{
-			"workspaces": []any{map[string]any{
-				"workspace_id": remote.WorkspaceID,
-				"resources": []any{map[string]any{
-					"urn":       fmt.Sprintf("%s:%s", resourceType, localID),
-					"remote_id": remote.ID,
-				}},
-			}},
-		},
-	}
+// importSpec is the spec the exporter would write for a remote source: the
+// import metadata ties the local id to the remote one. It goes through
+// specs.ToImportSpec rather than a hand-rolled map, so a yaml-tag change or a
+// urn/local_id swap cannot leave this test green while real exports stop
+// claiming.
+func importSpec(t *testing.T, localID, kind string, remote *retlClient.RETLSource, specData map[string]any) *specs.Spec {
+	t.Helper()
+
+	spec, err := specs.ToImportSpec(kind, localID, specs.WorkspaceImportMetadata{
+		WorkspaceID: remote.WorkspaceID,
+		Resources:   []specs.ImportIds{{URN: fmt.Sprintf("%s:%s", kind, localID), RemoteID: remote.ID}},
+	}, specData)
+	require.NoError(t, err, "building the %s import spec", kind)
+	return spec
 }
 
 func readSpec(t *testing.T, path string) *specs.Spec {

@@ -13,3 +13,5 @@ spec:
     auth: noAuth
     method: POST
     format: JSON
+    connection_mode:
+      warehouse: cloud

@@ -9,7 +9,7 @@ spec:
       destination: "#destination:e2e-lifecycle-http"
       enabled: true
       config:
-        sync_behaviour: mirror
+        sync_behaviour: full
         schedule:
           type: basic
           every_minutes: 30
