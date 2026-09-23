@@ -44,8 +44,8 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 // rudder-sources queries a table source, so the preview reads the same relation:
 // quoted names keep their case and may contain any character.
 //
-// validate previews with limit 0; the query still reads one row so that it
-// proves the table can be read, not just that it resolves.
+// A limit of 0 still reads one row, so a caller asking only "can this be read?"
+// gets an answer without pulling data back.
 func previewSQL(t TableSpec, limit int) (string, error) {
 	if t.isS3() {
 		return "", fmt.Errorf("%w for s3 table sources", ErrPreviewUnsupported)

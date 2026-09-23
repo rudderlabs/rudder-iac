@@ -7,6 +7,9 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +62,7 @@ func newCmdValidate() *cobra.Command {
 				return err
 			}
 
-			reportValidation(cmd.OutOrStdout(), externalID, resource.Type())
+			reportValidation(cmd.OutOrStdout(), externalID, resource.Type(), resource.Data())
 			return nil
 		},
 	}
@@ -73,7 +76,16 @@ func newCmdValidate() *cobra.Command {
 // went. Saying so matters more than it looks: this command used to run the query,
 // so a bare success line would read as "your warehouse is reachable" to anyone
 // who used the old behaviour.
-func reportValidation(w io.Writer, externalID, resourceType string) {
+//
+// An s3 table source has no query to run, so pointing at preview would send the
+// reader to a command that exits 1. The source definition is on the spec, so
+// telling the two apart costs nothing — no API call, no account needed.
+func reportValidation(w io.Writer, externalID, resourceType string, data resources.ResourceData) {
 	fmt.Fprintf(w, "✅ %s '%s' is valid\n", resourceType, externalID)
+
+	if definition, _ := data[sqlmodel.SourceDefinitionKey].(string); definition == table.SourceDefinitionS3 {
+		fmt.Fprintln(w, "   It has no query to run, so there is nothing to preview.")
+		return
+	}
 	fmt.Fprintf(w, "   To check that its query runs against the warehouse: rudder-cli retl-sources preview %s\n", externalID)
 }
