@@ -138,6 +138,12 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	spinner.Stop()
 
+	// Before the plan is shown, so a refusal is not mistaken for something that
+	// happened partway through applying it.
+	if err := guardInUseDeletes(plan, state, target); err != nil {
+		return []error{err}
+	}
+
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
