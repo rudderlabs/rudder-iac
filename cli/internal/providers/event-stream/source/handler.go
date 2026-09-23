@@ -446,6 +446,12 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream source")
 		}
+		// Unmanaged sources hold no state, and resolving their tracking plan
+		// first would be fatal: the tracking plan collection is loaded managed
+		// only, so a UI-linked plan is missing from it entirely.
+		if source.ExternalID == "" {
+			continue
+		}
 		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
 			tpURN, err := collection.GetURNByID(types.TrackingPlanResourceType, source.TrackingPlan.ID)
@@ -459,12 +465,8 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 				trackingPlanURN = &tpURN
 			}
 		}
-		resourceState, skip := mapRemoteToState(&source, trackingPlanURN)
-		if skip {
-			continue
-		}
 		urn := resources.URN(esResource.ExternalID, ResourceType)
-		s.Resources[urn] = resourceState
+		s.Resources[urn] = mapRemoteToState(&source, trackingPlanURN)
 	}
 	return s, nil
 }
@@ -795,10 +797,7 @@ func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]an
 	return result
 }
 
-func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*state.ResourceState, bool) {
-	if source.ExternalID == "" {
-		return nil, true
-	}
+func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) *state.ResourceState {
 	input := resources.ResourceData{
 		NameKey:             source.Name,
 		EnabledKey:          source.Enabled,
@@ -820,7 +819,7 @@ func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *s
 		ID:     source.ExternalID,
 		Input:  input,
 		Output: *output,
-	}, false
+	}
 }
 
 func toResourceData(sourceID string, trackingPlanID string) *resources.ResourceData {

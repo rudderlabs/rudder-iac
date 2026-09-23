@@ -1486,6 +1486,34 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, resource123)
 		})
+
+		// Until the hasExternalId filter is live server side, unmanaged sources
+		// still reach the collection. Their UI-created tracking plan is absent
+		// from the managed-only tracking plan collection, so resolving it would
+		// abort the whole state load.
+		t.Run("skips an unmanaged source whose tracking plan is not managed", func(t *testing.T) {
+			t.Parallel()
+			handler := source.NewHandler(nil, importDir)
+
+			collection := resources.NewRemoteResources()
+			collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+				"remote456": {
+					ID: "remote456",
+					Data: sourceClient.EventStreamSource{
+						ID:           "remote456",
+						Name:         "UI Source",
+						Type:         "python",
+						TrackingPlan: &sourceClient.TrackingPlan{ID: "remote-tp-456"},
+					},
+				},
+			})
+			collection.Set(types.TrackingPlanResourceType, map[string]*resources.RemoteResource{})
+
+			st, err := handler.MapRemoteToState(collection)
+
+			require.NoError(t, err)
+			assert.Empty(t, st.Resources)
+		})
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
