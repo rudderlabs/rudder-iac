@@ -19,9 +19,6 @@ const (
 	tableHeaderHeight = 2
 	// Help footer, plus one line so the first row is not scrolled out of view.
 	reservedHeight = 2
-	// Assumed height for the first paint; the real one arrives with the first
-	// WindowSizeMsg, which bubbletea emits right after the initial render.
-	defaultTerminalHeight = 24
 )
 
 type model struct {
@@ -30,6 +27,9 @@ type model struct {
 	keys      keyMap
 	resources []resources.ResourceData
 	width     int
+	// Rows the table and the details pane may each occupy. Zero means the
+	// terminal height is unknown and neither pane is constrained.
+	maxHeight int
 }
 
 type keyMap struct {
@@ -72,7 +72,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.help.Width = msg.Width
-		m.table.SetHeight(fitTableHeight(len(m.resources), msg.Height))
+		m.maxHeight = availableHeight(msg.Height)
+		m.table.SetHeight(tableHeight(len(m.resources), m.maxHeight))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
@@ -99,16 +100,16 @@ func (m model) View() string {
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
-	// Main Layout. Capping the details pane to the rendered table keeps the
-	// joined view within the height the table was sized to.
-	tableView := m.table.View()
-	detailsStyle := lipgloss.NewStyle().
-		Padding(0, 2).
-		MaxHeight(lipgloss.Height(tableView))
+	// Main Layout. The details pane is held to the same budget as the table, so
+	// that neither side of the join can outgrow the terminal.
+	detailsStyle := lipgloss.NewStyle().Padding(0, 2)
+	if m.maxHeight > 0 {
+		detailsStyle = detailsStyle.MaxHeight(m.maxHeight)
+	}
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		tableView,
+		m.table.View(),
 		detailsStyle.Render(fullDetailsView),
 	)
 
@@ -118,11 +119,22 @@ func (m model) View() string {
 	)
 }
 
-// fitTableHeight sizes the table to its content without letting it outgrow the
-// terminal, so that large result sets scroll inside the table viewport instead
-// of pushing the details pane and help footer off screen.
-func fitTableHeight(rowCount, terminalHeight int) int {
-	return min(rowCount+tableHeaderHeight, max(terminalHeight-reservedHeight, tableHeaderHeight+1))
+// availableHeight is the room the panes have on a terminal of the given height,
+// once the help footer and one spare line are reserved.
+func availableHeight(terminalHeight int) int {
+	return max(terminalHeight-reservedHeight, tableHeaderHeight+1)
+}
+
+// tableHeight sizes the table to its content without letting it outgrow the
+// rows available to it, so that large result sets scroll inside the table
+// viewport instead of pushing the details pane and help footer off screen. A
+// budget of zero leaves every row in place, for output that is not going to a
+// terminal and will never receive a WindowSizeMsg.
+func tableHeight(rowCount, available int) int {
+	if available <= 0 {
+		return rowCount + tableHeaderHeight
+	}
+	return min(rowCount+tableHeaderHeight, available)
 }
 
 func newModel(rs []resources.ResourceData, columnWidths map[string]int) model {
@@ -179,14 +191,24 @@ func newModel(rs []resources.ResourceData, columnWidths map[string]int) model {
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
-	// Sized after the styles, because the header border changes its height.
-	t.SetHeight(fitTableHeight(len(rows), defaultTerminalHeight))
+
+	// Piped output never receives a WindowSizeMsg to correct an initial guess,
+	// so it keeps every row rather than silently losing some of them.
+	maxHeight := 0
+	if h := ui.GetTerminalHeight(); h > 0 {
+		maxHeight = availableHeight(h)
+	}
+
+	// Set after the styles, because the header border changes how a height maps
+	// onto rendered lines.
+	t.SetHeight(tableHeight(len(rows), maxHeight))
 
 	return model{
 		table:     t,
 		help:      help.New(),
 		keys:      keys,
 		resources: rs,
+		maxHeight: maxHeight,
 	}
 }
 
