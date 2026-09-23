@@ -11,8 +11,18 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
- 
-const noResourcesFoundMsg = "No resources found"
+
+const (
+	noResourcesFoundMsg = "No resources found"
+
+	// Header row plus the border rendered underneath it.
+	tableHeaderHeight = 2
+	// Help footer, plus one line so the first row is not scrolled out of view.
+	reservedHeight = 2
+	// Assumed height for the first paint; the real one arrives with the first
+	// WindowSizeMsg, which bubbletea emits right after the initial render.
+	defaultTerminalHeight = 24
+)
 
 type model struct {
 	table     table.Model
@@ -20,7 +30,6 @@ type model struct {
 	keys      keyMap
 	resources []resources.ResourceData
 	width     int
-	height    int
 }
 
 type keyMap struct {
@@ -62,8 +71,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.height = msg.Height
 		m.help.Width = msg.Width
+		m.table.SetHeight(fitTableHeight(len(m.resources), msg.Height))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
@@ -90,13 +99,16 @@ func (m model) View() string {
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
-	// Main Layout
+	// Main Layout. Capping the details pane to the rendered table keeps the
+	// joined view within the height the table was sized to.
+	tableView := m.table.View()
 	detailsStyle := lipgloss.NewStyle().
-		Padding(0, 2)
+		Padding(0, 2).
+		MaxHeight(lipgloss.Height(tableView))
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		m.table.View(),
+		tableView,
 		detailsStyle.Render(fullDetailsView),
 	)
 
@@ -106,12 +118,14 @@ func (m model) View() string {
 	)
 }
 
-func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
-	if len(rs) == 0 {
-		ui.Println(noResourcesFoundMsg)
-		return nil
-	}
+// fitTableHeight sizes the table to its content without letting it outgrow the
+// terminal, so that large result sets scroll inside the table viewport instead
+// of pushing the details pane and help footer off screen.
+func fitTableHeight(rowCount, terminalHeight int) int {
+	return min(rowCount+tableHeaderHeight, max(terminalHeight-reservedHeight, tableHeaderHeight+1))
+}
 
+func newModel(rs []resources.ResourceData, columnWidths map[string]int) model {
 	// Default column widths
 	idWidth := 27
 	nameWidth := 30
@@ -153,7 +167,6 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(len(rows)+1), // +1 for the header
 	)
 
 	s := table.DefaultStyles()
@@ -166,15 +179,24 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
+	// Sized after the styles, because the header border changes its height.
+	t.SetHeight(fitTableHeight(len(rows), defaultTerminalHeight))
 
-	m := model{
+	return model{
 		table:     t,
 		help:      help.New(),
 		keys:      keys,
 		resources: rs,
 	}
+}
 
-	p := tea.NewProgram(m)
+func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
+	if len(rs) == 0 {
+		ui.Println(noResourcesFoundMsg)
+		return nil
+	}
+
+	p := tea.NewProgram(newModel(rs, columnWidths))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
