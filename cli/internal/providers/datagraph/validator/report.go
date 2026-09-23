@@ -11,7 +11,7 @@ import (
 type RunStatus int
 
 const (
-	RunStatusExecuted    RunStatus = iota
+	RunStatusExecuted RunStatus = iota
 	RunStatusNoResources
 )
 

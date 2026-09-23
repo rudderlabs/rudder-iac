@@ -22,7 +22,7 @@ func TestAccountNameResolver_GetAccountName(t *testing.T) {
 	t.Run("returns account name when present", func(t *testing.T) {
 		resolver := NewAccountNameResolver(&mockAccountGetter{
 			account: &client.Account{
-				Name:       "My Warehouse",
+				Name: "My Warehouse",
 				Definition: struct {
 					Name     string `json:"name"`
 					Type     string `json:"type"`

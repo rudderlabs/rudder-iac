@@ -49,7 +49,53 @@ func NewCmdRetlSource() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdListRetlSources())
+	cmd.AddCommand(newCmdViewRetlSource())
 
+	return cmd
+}
+
+func newCmdViewRetlSource() *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "view <external-id>",
+		Short: "Show one RETL source in full",
+		Long:  "Shows what a source actually reads — its query or table, its primary key and the account it reads through — which is the part a list cannot show.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			defer func() {
+				telemetry.TrackCommand("workspace retl-sources view", err, []telemetry.KV{
+					{K: "json", V: jsonOutput},
+				}...)
+			}()
+
+			d, err := app.NewDeps()
+			if err != nil {
+				return err
+			}
+
+			retlProvider := d.Providers().RETL
+			registered := retlProvider.SupportedTypes()
+			kinds := make([]string, 0, len(sourceKinds))
+			for _, kind := range sourceKinds {
+				if slices.Contains(registered, kind) {
+					kinds = append(kinds, kind)
+				}
+			}
+
+			row, err := findByExternalID(cmd.Context(), allKinds{provider: retlProvider, kinds: kinds}, "retl-sources", args[0], "rETL source")
+			if err != nil {
+				return err
+			}
+
+			err = lister.New(oneResource(row), lister.WithFormat(viewFormat(jsonOutput))).
+				List(cmd.Context(), "retl-source", nil)
+			return err
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
 }
 

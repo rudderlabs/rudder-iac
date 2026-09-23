@@ -294,6 +294,7 @@ func (h *Handler) List(ctx context.Context, hasExternalId *bool) ([]resources.Re
 		sql := re.ReplaceAllString(cfg.Sql, " ")
 		resourceData = append(resourceData, resources.ResourceData{
 			IDKey:               source.ID,
+			ExternalIDKey:       source.ExternalID,
 			"name":              source.Name,
 			AccountIDKey:        source.AccountID,
 			SourceDefinitionKey: source.SourceDefinitionName,

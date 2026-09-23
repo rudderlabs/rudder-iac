@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -16,7 +17,50 @@ func NewCmdAccounts() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdListAccounts())
+	cmd.AddCommand(newCmdViewAccount())
 
+	return cmd
+}
+
+func newCmdViewAccount() *cobra.Command {
+	var jsonOutput bool
+
+	cmd := &cobra.Command{
+		Use:   "view <external-id>",
+		Short: "Show one account in full",
+		Long: heredoc.Doc(`
+			Shows an account's definition and its non-secret options.
+
+			Secret values are never shown. The API does not return them, and
+			printing a placeholder where a password would be only suggests the
+			CLI could read it.
+		`),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			defer func() {
+				telemetry.TrackCommand("workspace accounts view", err, []telemetry.KV{
+					{K: "json", V: jsonOutput},
+				}...)
+			}()
+
+			d, err := app.NewDeps()
+			if err != nil {
+				return err
+			}
+
+			row, err := findByExternalID(cmd.Context(), d.Providers().Workspace, workspace.AccountResourceType, args[0], "account")
+			if err != nil {
+				return err
+			}
+
+			err = lister.New(oneResource(row), lister.WithFormat(viewFormat(jsonOutput))).
+				List(cmd.Context(), workspace.AccountResourceType, nil)
+			return err
+		},
+	}
+
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	return cmd
 }
 
