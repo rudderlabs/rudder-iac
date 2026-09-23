@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -297,4 +298,53 @@ func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
 				"definition %q: the accounts config split does not support nested secret keys yet", definition)
 		}
 	}
+}
+
+func sfRemote(externalID, authType string) *RemoteAccount {
+	acc := &client.Account{
+		ID:         "remote-" + externalID,
+		ExternalID: externalID,
+		Name:       "name-" + externalID,
+		Options: json.RawMessage(fmt.Sprintf(
+			`{"account":"xy12345","dbname":"ANALYTICS","warehouse":"WH","user":"RUDDER","authenticationType":%q}`, authType)),
+	}
+	acc.Definition.Name = "SOURCE_SNOWFLAKE"
+	return &RemoteAccount{Account: acc}
+}
+
+// A Snowflake account declares one auth mode and the control-plane schema
+// accepts only that mode's secrets, so exporting a var for the other mode asks
+// the user to fill in config that can never be sent (DEX-958).
+func TestToExportSpecMap_NarrowsSecretsToAuthMode(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+
+	t.Run("keyPair", func(t *testing.T) {
+		specMap, err := h.toExportSpecMap("snf", sfRemote("snf", "keyPair"))
+		require.NoError(t, err)
+
+		config := specMap["config"].(map[string]any)
+		assert.Equal(t, "{{ .SNF_PRIVATEKEY }}", config["privateKey"])
+		assert.Equal(t, "{{ .SNF_PRIVATEKEYPASSPHRASE }}", config["privateKeyPassphrase"])
+		assert.NotContains(t, config, "password", "password auth is not in play, so its var is dead config")
+	})
+
+	t.Run("password", func(t *testing.T) {
+		specMap, err := h.toExportSpecMap("snf", sfRemote("snf", "password"))
+		require.NoError(t, err)
+
+		config := specMap["config"].(map[string]any)
+		assert.Equal(t, "{{ .SNF_PASSWORD }}", config["password"])
+		assert.NotContains(t, config, "privateKey")
+		assert.NotContains(t, config, "privateKeyPassphrase")
+	})
+
+	// An unrecognised mode must not silently drop a secret the account needs.
+	t.Run("unknown mode keeps the full set", func(t *testing.T) {
+		specMap, err := h.toExportSpecMap("snf", sfRemote("snf", "oauth-someday"))
+		require.NoError(t, err)
+
+		config := specMap["config"].(map[string]any)
+		assert.Contains(t, config, "password")
+		assert.Contains(t, config, "privateKey")
+	})
 }

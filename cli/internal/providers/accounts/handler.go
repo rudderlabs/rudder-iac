@@ -60,6 +60,46 @@ var registeredAccounts = map[string]accountDefinition{
 	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
 }
 
+// authModeSecrets narrows a definition's secret set by the auth mode its own
+// config declares. A definition absent here has a single mode and keeps its
+// full set.
+//
+// ponytail: hardcoded alongside registeredAccounts and goes away with the same
+// DEX-467 move to the control-plane account-definitions API, whose db-config
+// already carries the discriminator ("authenticationType": "key_pair_or_password").
+var authModeSecrets = map[string]map[string][]string{
+	"SOURCE_SNOWFLAKE": {
+		"keyPair":  {"privateKey", "privateKeyPassphrase"},
+		"password": {"password"},
+	},
+}
+
+// exportSecretKeys is the subset of a definition's secret keys the account's own
+// config can actually use. A keyPair Snowflake account has no use for a password,
+// and the control-plane schema rejects one outright, so exporting a var token for
+// it only asks the user to fill in config that can never be sent (DEX-958).
+//
+// An unrecognised or absent mode keeps the full set: over-exporting is noise,
+// under-exporting would drop a secret the account needs.
+func exportSecretKeys(definitionName string, config map[string]any) ([]string, bool) {
+	keys, ok := secretKeys(definitionName)
+	if !ok {
+		return nil, false
+	}
+
+	modes, discriminated := authModeSecrets[definitionName]
+	if !discriminated {
+		return keys, true
+	}
+
+	mode, _ := config["authenticationType"].(string)
+	modeKeys, known := modes[mode]
+	if !known {
+		return keys, true
+	}
+	return modeKeys, true
+}
+
 // DefinitionType returns the type of a registered account definition, e.g.
 // "postgres" for SOURCE_POSTGRES. ok is false for an unregistered definition.
 func DefinitionType(accountDefinitionName string) (string, bool) {
@@ -304,14 +344,16 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) (map[string]any, error) {
-	keys, ok := secretKeys(remote.Definition.Name)
-	if !ok {
-		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
-	}
-
 	config, err := unmarshalOptions(remote.Options)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
+	}
+
+	// Narrowed by the config above, so this reads the options rather than the
+	// definition alone.
+	keys, ok := exportSecretKeys(remote.Definition.Name, config)
+	if !ok {
+		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
 	// The API omits secrets, so surface each secret key as present-but-empty so
 	// MaskSecrets emits a "{{ .VAR }}" token the user fills via a var file.
