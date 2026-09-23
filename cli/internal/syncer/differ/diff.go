@@ -384,8 +384,11 @@ func isSecretValue(v any) bool {
 	}
 }
 
-// comparePropertyRefs compares two PropertyRef objects by their comparable fields
-// (excludes the Resolve function field which cannot be compared)
+// comparePropertyRefs compares two PropertyRef objects by URN alone. URN is the
+// only field the user configures; Property, IsResolved and Value are runtime
+// state that legitimately differs between the source graph (built from specs,
+// unresolved) and the target graph (built from the API, resolved), so comparing
+// them reports drift where the user changed nothing.
 func comparePropertyRefs(r1, r2 *resources.PropertyRef) bool {
 	if r1 == nil && r2 == nil {
 		return true
@@ -393,8 +396,5 @@ func comparePropertyRefs(r1, r2 *resources.PropertyRef) bool {
 	if r1 == nil || r2 == nil {
 		return false
 	}
-	return r1.URN == r2.URN &&
-		r1.Property == r2.Property &&
-		r1.IsResolved == r2.IsResolved &&
-		r1.Value == r2.Value
+	return r1.URN == r2.URN
 }
