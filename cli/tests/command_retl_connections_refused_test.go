@@ -75,5 +75,5 @@ func TestRETLConnectionRefusedAtCreate(t *testing.T) {
 	// started before validating would create first.
 	assert.NotContains(t, managedAccountExternalIDs(t), "retl-pg")
 	assert.NotContains(t, managedRETLSourceExternalIDs(t), "orders-model")
-	assert.NotContains(t, managedDestinationExternalIDs(t), "e2e-retl-archive")
+	assert.NotContains(t, retlVisibleDestinationExternalIDs(t), "e2e-retl-archive")
 }

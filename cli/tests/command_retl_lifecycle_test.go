@@ -91,7 +91,8 @@ func TestRETLLifecycle(t *testing.T) {
 	// delete-and-create on every apply, churning a production connection
 	// forever. Nothing else in the suite would notice.
 	t.Run("the replaced connection converges", func(t *testing.T) {
-		assertNoRETLConnectionChanges(t, executor, step("replace"), credentials)
+		assert.NotContains(t, planRETLProject(t, executor, step("replace"), credentials),
+			connectionURNPrefix, "a re-apply must not plan any connection change")
 	})
 
 	t.Run("a sync_behaviour change is refused and changes nothing", func(t *testing.T) {
@@ -134,7 +135,7 @@ func TestRETLLifecycle(t *testing.T) {
 
 		assert.Equal(t, modelID, managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID).ID,
 			"a source still in the project must survive the prune")
-		assert.Contains(t, managedDestinationExternalIDs(t), lifecycleDestinationExternalID,
+		assert.Contains(t, retlVisibleDestinationExternalIDs(t), lifecycleDestinationExternalID,
 			"a destination still in the project must survive the prune")
 	})
 
@@ -147,7 +148,7 @@ func TestRETLLifecycle(t *testing.T) {
 		assert.NotContains(t, sources, lifecycleTableExternalID)
 		assert.NotContains(t, managedRETLConnectionExternalIDs(t), lifecycleConnectionExternalID)
 		assert.NotContains(t, managedAccountExternalIDs(t), lifecyclePGAccountExternalID)
-		assert.NotContains(t, managedDestinationExternalIDs(t), lifecycleDestinationExternalID)
+		assert.NotContains(t, retlVisibleDestinationExternalIDs(t), lifecycleDestinationExternalID)
 	})
 }
 
