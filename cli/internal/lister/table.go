@@ -197,11 +197,21 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 	return nil
 }
 
-// interactiveStdout reports whether stdout is a terminal a person is watching.
-// bubbletea opens /dev/tty directly rather than using stdout, so this is a
-// proxy rather than a guarantee — but every non-interactive case we care about
-// (a pipe, a redirect, CI) fails it, and that is what matters.
+// interactiveStdout reports whether stdout is a terminal a person is watching
+// AND that they have not asked for plain output.
+//
+// The terminal check catches pipes, redirects and CI. It cannot catch every
+// case: a pty is a terminal whether or not a human is at the other end, so a
+// session recorder or an automation harness driving a pty passes it and the TUI
+// still blocks waiting for esc. Nothing can distinguish those from a real
+// terminal, so RUDDERSTACK_CLI_NONINTERACTIVE exists to say so explicitly.
+//
+// bubbletea also opens /dev/tty rather than stdout, so even the terminal check
+// is a proxy for what it will do rather than a guarantee.
 func interactiveStdout() bool {
+	if os.Getenv("RUDDERSTACK_CLI_NONINTERACTIVE") == "1" {
+		return false
+	}
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 

@@ -55,3 +55,17 @@ func TestPrintStaticTable(t *testing.T) {
 		}
 	})
 }
+
+// A pty is a terminal whether or not a person is at the far end, so a session
+// recorder or an automation harness passes the terminal check and the TUI
+// blocks on esc. The env override is the only way to say "not interactive" in
+// that case, and it is what the demo recordings rely on.
+func TestNonInteractiveOverride(t *testing.T) {
+	t.Setenv("RUDDERSTACK_CLI_NONINTERACTIVE", "1")
+	assert.False(t, interactiveStdout(), "an explicit opt-out wins over the terminal check")
+
+	t.Setenv("RUDDERSTACK_CLI_NONINTERACTIVE", "")
+	// Not asserting the true case: under `go test` stdout is not a terminal, so
+	// it is false for the other reason, and asserting it would prove nothing.
+	assert.False(t, interactiveStdout())
+}
