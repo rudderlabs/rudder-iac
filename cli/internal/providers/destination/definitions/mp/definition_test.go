@@ -237,22 +237,28 @@ func TestMPConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("page template required when custom page event name is enabled", func(t *testing.T) {
+	t.Run("page template defaults when custom page event name is enabled", func(t *testing.T) {
 		t.Parallel()
 
 		config := validMinimalConfig()
 		config["use_user_defined_page_event_name"] = true
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		config["user_defined_page_event_template"] = ""
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/user_defined_page_event_template", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("screen template required when custom screen event name is enabled", func(t *testing.T) {
+	t.Run("screen template defaults when custom screen event name is enabled", func(t *testing.T) {
 		t.Parallel()
 
 		config := validMinimalConfig()
 		config["use_user_defined_screen_event_name"] = true
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		config["user_defined_screen_event_template"] = ""
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/user_defined_screen_event_template", errors[0].Path)
