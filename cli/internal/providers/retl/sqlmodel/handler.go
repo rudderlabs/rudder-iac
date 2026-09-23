@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -277,7 +278,7 @@ func (h *Handler) Delete(ctx context.Context, ID string, state resources.Resourc
 
 	// Call API to delete RETL source
 	if err := h.client.DeleteRetlSource(ctx, sourceID); err != nil {
-		return fmt.Errorf("deleting RETL source: %w", err)
+		return fmt.Errorf("deleting RETL source: %w", provider.ExplainBlockingConnections(err))
 	}
 
 	return nil
