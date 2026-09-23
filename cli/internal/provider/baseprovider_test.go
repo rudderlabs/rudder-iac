@@ -21,8 +21,8 @@ type captureHandler struct {
 	got          *specs.WorkspacesImportMetadata
 }
 
-func (h *captureHandler) ResourceType() string              { return h.resourceType }
-func (h *captureHandler) SpecKind() string                  { return h.resourceType }
+func (h *captureHandler) ResourceType() string               { return h.resourceType }
+func (h *captureHandler) SpecKind() string                   { return h.resourceType }
 func (h *captureHandler) LoadSpec(string, *specs.Spec) error { return nil }
 func (h *captureHandler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 	h.got = m
@@ -31,11 +31,11 @@ func (h *captureHandler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) e
 func (h *captureHandler) ParseSpec(string, *specs.Spec) (*specs.ParsedSpec, error) {
 	return &specs.ParsedSpec{}, nil
 }
-func (h *captureHandler) Resources() ([]*resources.Resource, error)              { return nil, nil }
-func (h *captureHandler) Create(context.Context, any) (any, error)               { return nil, nil }
-func (h *captureHandler) Update(context.Context, any, any, any) (any, error)     { return nil, nil }
-func (h *captureHandler) Delete(context.Context, string, any, any) error         { return nil }
-func (h *captureHandler) Import(context.Context, any, string) (any, error)       { return nil, nil }
+func (h *captureHandler) Resources() ([]*resources.Resource, error)          { return nil, nil }
+func (h *captureHandler) Create(context.Context, any) (any, error)           { return nil, nil }
+func (h *captureHandler) Update(context.Context, any, any, any) (any, error) { return nil, nil }
+func (h *captureHandler) Delete(context.Context, string, any, any) error     { return nil }
+func (h *captureHandler) Import(context.Context, any, string) (any, error)   { return nil, nil }
 func (h *captureHandler) LoadResourcesFromRemote(context.Context) (*resources.RemoteResources, error) {
 	return nil, nil
 }

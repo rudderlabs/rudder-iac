@@ -462,9 +462,9 @@ func TestParseValidationErrors(t *testing.T) {
 }
 
 type testMapstructureConfig struct {
-	APISecret     string                  `json:"api_secret" mapstructure:"api_secret" validate:"required"`
-	TypesOfClient string                  `json:"types_of_client" mapstructure:"types_of_client" validate:"required"`
-	MeasurementID string                  `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
+	APISecret      string                   `json:"api_secret" mapstructure:"api_secret" validate:"required"`
+	TypesOfClient  string                   `json:"types_of_client" mapstructure:"types_of_client" validate:"required"`
+	MeasurementID  string                   `json:"measurement_id" mapstructure:"measurement_id" validate:"required_if=TypesOfClient gtag"`
 	ConnectionMode testMapstructureConnMode `json:"connection_mode" mapstructure:"connection_mode"`
 }
 

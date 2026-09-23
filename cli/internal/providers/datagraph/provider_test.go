@@ -239,7 +239,6 @@ func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	}, dgData)
 }
 
-
 func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	provider := datagraph.NewProvider(mockClient, nil)

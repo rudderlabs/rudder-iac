@@ -11,7 +11,7 @@ type typedRule struct {
 	severity    rules.Severity
 	description string
 	examples    rules.Examples
-	validators []PatternValidator
+	validators  []PatternValidator
 }
 
 // NewTypedRule creates a validation rule composed of one or more PatternValidators.

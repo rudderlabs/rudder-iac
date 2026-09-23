@@ -39,9 +39,9 @@ type TrackingPlan struct {
 }
 
 type TPEvent struct {
-	Name    string
-	LocalID string
-	Ref     string
+	Name            string
+	LocalID         string
+	Ref             string
 	Description     string
 	CategoryRef     *string
 	Type            string

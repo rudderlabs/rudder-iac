@@ -222,5 +222,5 @@ type mockReporter struct {
 	completed []string
 }
 
-func (m *mockReporter) TaskStarted(id, _ string)       { m.started = append(m.started, id) }
+func (m *mockReporter) TaskStarted(id, _ string)            { m.started = append(m.started, id) }
 func (m *mockReporter) TaskCompleted(id, _ string, _ error) { m.completed = append(m.completed, id) }

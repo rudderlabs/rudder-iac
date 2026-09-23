@@ -1304,4 +1304,3 @@ func buildScreenMethod(rule *plan.EventRule, nr *core.NameRegistry) (*SwiftAnaly
 
 	return method, nil
 }
-

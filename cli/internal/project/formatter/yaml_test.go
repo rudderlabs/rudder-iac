@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"gopkg.in/yaml.v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestYAMLFormatter_Format(t *testing.T) {

@@ -33,26 +33,26 @@ func TestValidateFlags(t *testing.T) {
 	}{
 		// Valid cases
 		{
-			name:          "valid single ID",
-			args:          []string{"my-transformation"},
-			all:           false,
-			modified:      false,
+			name:     "valid single ID",
+			args:     []string{"my-transformation"},
+			all:      false,
+			modified: false,
 
 			expectedError: false,
 		},
 		{
-			name:          "valid --all flag",
-			args:          []string{},
-			all:           true,
-			modified:      false,
+			name:     "valid --all flag",
+			args:     []string{},
+			all:      true,
+			modified: false,
 
 			expectedError: false,
 		},
 		{
-			name:          "valid --modified flag",
-			args:          []string{},
-			all:           false,
-			modified:      true,
+			name:     "valid --modified flag",
+			args:     []string{},
+			all:      false,
+			modified: true,
 
 			expectedError: false,
 		},

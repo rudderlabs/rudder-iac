@@ -31,9 +31,9 @@ type ConnectionConfig struct {
 }
 
 type EventTypeConfig struct {
-	PropagateValidationErrors *StringBool   `json:"propagateValidationErrors,omitempty"`
-	UnplannedProperties       *Action `json:"unplannedProperties,omitempty"`
-	AnyOtherViolation         *Action `json:"anyOtherViolation,omitempty"`
+	PropagateValidationErrors *StringBool `json:"propagateValidationErrors,omitempty"`
+	UnplannedProperties       *Action     `json:"unplannedProperties,omitempty"`
+	AnyOtherViolation         *Action     `json:"anyOtherViolation,omitempty"`
 }
 
 type TrackConfig struct {

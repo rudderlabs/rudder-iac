@@ -74,7 +74,7 @@ func EscapeKotlinComment(s string) string {
 //   - `42` (int) → `42`
 //   - `3.14` (float) → `3.14`
 //   - `true` (bool) → `true`
-//   - `nil` → ``
+//   - `nil` → “
 func FormatKotlinLiteral(value any) string {
 	if value == nil {
 		return ""

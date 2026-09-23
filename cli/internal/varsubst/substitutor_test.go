@@ -291,4 +291,3 @@ func TestSubstituteBytes_ErrorPositions(t *testing.T) {
 		})
 	}
 }
-

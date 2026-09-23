@@ -2,6 +2,8 @@ package connection
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/samber/lo"
 
 	apiClient "github.com/rudderlabs/rudder-iac/api/client"
@@ -33,6 +35,15 @@ type MockConnectionClient struct {
 	EndpointsErr      error
 	SourceListCalls   int
 	DestinationsCalls int
+
+	// Sync surface. Syncs is the run history GetSync and ListSyncs serve, and
+	// the call slices record what a command asked for.
+	Syncs          []retlClient.Sync
+	SyncErr        error
+	StartSyncCalls []string
+	StopSyncCalls  []string
+	ListSyncsCalls []retlClient.ListSyncsRequest
+	GetSyncCalls   []string
 
 	CreateFunc        func(req *retlClient.CreateRETLConnectionRequest) (*retlClient.RETLConnection, error)
 	UpdateFunc        func(id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error)
@@ -129,4 +140,44 @@ func (m *MockConnectionClient) GetDestinations(_ context.Context) ([]apiClient.D
 		return nil, m.EndpointsErr
 	}
 	return m.Destinations, nil
+}
+
+func (m *MockConnectionClient) StartSync(_ context.Context, connectionID string, syncType retlClient.SyncType) (*retlClient.StartSyncResponse, error) {
+	m.StartSyncCalls = append(m.StartSyncCalls, connectionID)
+	if m.SyncErr != nil {
+		return nil, m.SyncErr
+	}
+	if len(m.Syncs) > 0 {
+		return &retlClient.StartSyncResponse{SyncID: m.Syncs[0].ID}, nil
+	}
+	return &retlClient.StartSyncResponse{SyncID: "run-1"}, nil
+}
+
+func (m *MockConnectionClient) StopSync(_ context.Context, connectionID string) error {
+	m.StopSyncCalls = append(m.StopSyncCalls, connectionID)
+	return m.SyncErr
+}
+
+func (m *MockConnectionClient) ListSyncs(_ context.Context, _ string, req retlClient.ListSyncsRequest) (*retlClient.SyncsPage, error) {
+	m.ListSyncsCalls = append(m.ListSyncsCalls, req)
+	if m.SyncErr != nil {
+		return nil, m.SyncErr
+	}
+	return &retlClient.SyncsPage{
+		Syncs:  m.Syncs,
+		Paging: apiClient.Paging{Total: len(m.Syncs)},
+	}, nil
+}
+
+func (m *MockConnectionClient) GetSync(_ context.Context, _, syncID string) (*retlClient.Sync, error) {
+	m.GetSyncCalls = append(m.GetSyncCalls, syncID)
+	if m.SyncErr != nil {
+		return nil, m.SyncErr
+	}
+	for _, s := range m.Syncs {
+		if s.ID == syncID {
+			return &s, nil
+		}
+	}
+	return nil, fmt.Errorf("sync %q not found", syncID)
 }

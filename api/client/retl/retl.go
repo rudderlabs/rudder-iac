@@ -33,6 +33,18 @@ type RETLConnectionStore interface {
 	// SetConnectionExternalId sets the external ID for a RETL connection.
 	SetConnectionExternalId(ctx context.Context, req *SetRETLConnectionExternalIDRequest) error
 
+	// StartSync queues a run on the connection and returns its id.
+	StartSync(ctx context.Context, connectionID string, syncType SyncType) (*StartSyncResponse, error)
+
+	// StopSync cancels the run in progress on the connection.
+	StopSync(ctx context.Context, connectionID string) error
+
+	// ListSyncs returns one page of the connection's run history.
+	ListSyncs(ctx context.Context, connectionID string, req ListSyncsRequest) (*SyncsPage, error)
+
+	// GetSync returns a single run of the connection.
+	GetSync(ctx context.Context, connectionID, syncID string) (*Sync, error)
+
 	// GetDestinations lists the workspace's destinations.
 	GetDestinations(ctx context.Context) ([]client.Destination, error)
 }

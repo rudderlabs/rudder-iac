@@ -54,14 +54,13 @@ type TrackConfig struct {
 }
 
 type EventTypeConfig struct {
-	PropagateViolations *bool   `json:"propagateViolations,omitempty"`
-	DropUnplannedProperties       *bool `json:"dropUnplannedProperties,omitempty"`
-	DropOtherViolations         *bool `json:"dropOtherViolations,omitempty"`
+	PropagateViolations     *bool `json:"propagateViolations,omitempty"`
+	DropUnplannedProperties *bool `json:"dropUnplannedProperties,omitempty"`
+	DropOtherViolations     *bool `json:"dropOtherViolations,omitempty"`
 }
 
-
 type TrackingPlan struct {
-	ID     string                               `json:"id"`
+	ID     string              `json:"id"`
 	Config *TrackingPlanConfig `json:"config"`
 }
 

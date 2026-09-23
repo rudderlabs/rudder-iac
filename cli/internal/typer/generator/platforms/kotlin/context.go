@@ -86,13 +86,13 @@ type SDKCall struct {
 
 // RudderAnalyticsMethod represents a method in the generated RudderAnalytics object
 type RudderAnalyticsMethod struct {
-	Name            string                 // The public method name, e.g., "productClicked"
-	EventName       string                 // The underlying event name, e.g., "Product Clicked"
-	IdentitySection string                 // The identity section, e.g., "properties" or "traits"
-	MethodArguments []KotlinMethodArgument // Arguments for the public method's signature
-	SDKCall         SDKCall                // The structured, internal SDK call
-	Comment         string                 // KDoc comment
-	AddDataToContext bool                  // Whether to add the data parameter to context instead of SDK call
+	Name             string                 // The public method name, e.g., "productClicked"
+	EventName        string                 // The underlying event name, e.g., "Product Clicked"
+	IdentitySection  string                 // The identity section, e.g., "properties" or "traits"
+	MethodArguments  []KotlinMethodArgument // Arguments for the public method's signature
+	SDKCall          SDKCall                // The structured, internal SDK call
+	Comment          string                 // KDoc comment
+	AddDataToContext bool                   // Whether to add the data parameter to context instead of SDK call
 }
 
 // KotlinContext holds all the information needed to generate Kotlin code

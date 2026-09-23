@@ -66,7 +66,6 @@ func namespaceToJSONPointer(namespace string) string {
 	return fmt.Sprintf("/%s", namespace)
 }
 
-
 func jsonFieldTag(field reflect.StructField) (string, bool) {
 	jsonTag := field.Tag.Get("json")
 	if jsonTag == "" {
