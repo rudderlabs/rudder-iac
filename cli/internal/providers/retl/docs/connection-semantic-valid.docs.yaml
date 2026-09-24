@@ -315,22 +315,22 @@ match_behavior:
             message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination cannot receive from both event stream and rETL sources"
       - example_id: "retl-connection-semantic-destination-rejects-warehouse-sources"
         title: "Destination whose definition does not accept warehouse sources"
-        description: "Attentive Tag supports only event stream sources upstream, and rETL sources connect as warehouse sources."
+        description: "Google Ads supports only event stream sources upstream, and rETL sources connect as warehouse sources."
         files:
           model.yaml: *users-model
           destination.yaml: |
             version: rudder/v1
             kind: destination
             metadata:
-              name: my-attentive-destination
+              name: my-googleads-destination
             spec:
-              id: my-attentive-destination
-              display_name: Attentive Tag
-              type: attentive_tag
+              id: my-googleads-destination
+              display_name: Google Ads
+              type: googleads
               enabled: true
               definition_version: 1
               config:
-                api_key: example-api-key
+                conversion_id: AW-123456789
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -338,9 +338,9 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: users-to-attentive
+                - id: users-to-googleads
                   source: "#retl-source-sql-model:users-model"
-                  destination: "#destination:my-attentive-destination"
+                  destination: "#destination:my-googleads-destination"
                   config:
                     sync_behaviour: upsert
                     schedule:
@@ -355,7 +355,7 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/destination"
             severity: "error"
-            message_contains: "destination 'my-attentive-destination' (type 'attentive_tag') does not accept rETL sources: source type 'warehouse' is not among supported source types"
+            message_contains: "destination 'my-googleads-destination' (type 'googleads') does not accept rETL sources: source type 'warehouse' is not among supported source types"
       - example_id: "retl-connection-semantic-missing-warehouse-settings"
         title: "Destination with no connection_mode entry for warehouse sources"
         files:
