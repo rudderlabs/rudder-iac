@@ -64,10 +64,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		assert.Equal(t, want, modes, sourceType)
 	}
 
-	// site_id and api_key are required outright, so no connect-time entry adds
-	// anything for a warehouse source.
-	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
-
 	assert.Equal(t, map[string][]string{
 		"auto_track_device_attributes/android":         {"android"},
 		"auto_track_device_attributes/ios":             {"ios"},

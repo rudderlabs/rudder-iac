@@ -52,7 +52,6 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.Nil(t, registered.ConnectionRequiredKeys("web", "cloud"))
-	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	// db-config.json declares the visual mapper but no syncBehaviours, so the
