@@ -3,9 +3,7 @@
 Which registered destination definitions declare `warehouse`, and with what rETL
 metadata. The derivation is the one in
 [source-type-mapping.md](source-type-mapping.md) "rETL metadata" and
-"Per-source-type connect-time required keys". It is applied to a whole
-definition at once: `warehouse` source type, its connection modes,
-`SyncBehaviours`, `SupportsVisualMapper` and `ConnectionRequiredKeys`.
+"Per-source-type connect-time required keys".
 
 - **Upstream revision**: `rudderlabs/rudder-integrations-config` `develop` at
   `5f11c22c4bcad9ecca4ec37ad31bb7605b72b079` (2026-09-24). DEX-821 read
@@ -14,14 +12,8 @@ definition at once: `warehouse` source type, its connection modes,
   `supportsVisualMapper`. Only `customerio` changed a connectionMode-gated
   schema branch (see below).
 - **CLI definition version**: `1` for every definition below.
-- **Flow selection**: rudder-config-backend
-  `src/modules/retl/api-gateway/connection-config/assembler.ts`
-  `determineFlowTypeFromRequest`. A destination in `DESTINATION_SPECIFIC_REGISTRY`
-  (`constants.ts`: `CUSTOMERIO`, `CUSTOMERIO_AUDIENCE`) runs its own flow, which
-  the CLI refuses. Otherwise a destination with `supportsVisualMapper` and an
-  `object` runs object mapping, and everything else runs the JSON mapper, which
-  drops `mirror`. The CLI mirrors this in `retl/connection/flow.go`
-  `ClassifyFlow`.
+- **Flow**: `retl/connection/flow.go` `ClassifyFlow` (mirrors config-backend
+  `determineFlowTypeFromRequest`).
 - **`supportedSourcesValidation`**: none. A recursive key walk over all 50
   registered destinations' db-config.json found no occurrence at this revision,
   and a repo-wide code search found only a historical CHANGELOG entry.
@@ -50,46 +42,23 @@ directory is `linkedIn_ads`.
 
 ## Verified definitions that declare `warehouse`
 
+`active_campaign`, `am`, `attentive_tag`, `bqstream`, `braze`, `customerio`,
+`facebook_conversions`, `facebook_pixel`, `ga4`, `gcs`, `hs`, `http` (DEX-821),
+`iterable`, `mp`, `posthog`, `s3`, `tiktok_ads`, `webhook`.
+
 Each declares `warehouse` with mode `cloud`, as every upstream
-`supportedConnectionModes.warehouse` does. Sync behaviours read `default` where
-upstream omits `syncBehaviours`, which leaves the field unset and takes the
-backend's `upsert`/`mirror`/`full` fallback.
+`supportedConnectionModes.warehouse` does. Unless noted below, upstream omits
+`syncBehaviours`, so the field stays unset and takes the backend's
+`upsert`/`mirror`/`full` fallback, and the definition declares no visual mapper
+and no `ConnectionRequiredKeys[warehouse][cloud]`.
 
-| Type | Sync behaviours | Visual mapper | `ConnectionRequiredKeys[warehouse][cloud]` | Added in |
-| --- | --- | --- | --- | --- |
-| `active_campaign` | default | no | — | DEX-834 |
-| `am` | default | yes | — | DEX-834 |
-| `attentive_tag` | default | no | — | DEX-834 |
-| `bqstream` | default | no | — | DEX-834 |
-| `braze` | default | yes | `rest_api_key` (allOf branch naming `warehouse: cloud`) | DEX-834 |
-| `customerio` | `upsert`, `mirror` | no | — (see below) | DEX-834 |
-| `facebook_conversions` | default | no | — | DEX-834 |
-| `facebook_pixel` | default | no | `access_token` (negated `web: device` branch) | DEX-834 |
-| `ga4` | default | no | — | DEX-834 |
-| `gcs` | default | no | — | DEX-834 |
-| `hs` | default | yes | — | DEX-834 |
-| `http` | default | no | — | DEX-821 |
-| `iterable` | default | yes | — | DEX-834 |
-| `mp` | default | no | — | DEX-834 |
-| `posthog` | default | no | — | DEX-834 |
-| `s3` | default | no | — | DEX-834 |
-| `tiktok_ads` | default | no | — | DEX-834 |
-| `webhook` | default | no | — | DEX-834 |
-
-- `customerio` runs the destination-specific flow, so rETL refuses it whatever
-  its metadata says. Since `9fa7b26`, upstream no longer requires `siteID` and
-  `apiKey` outright. It requires them for every connection mode except
-  web-only device mode, and `siteID` also depends on `sdkVersion`. The CLI
-  still tags both keys `required` outright, so a connect-time entry would add
-  nothing, as on every other source type of this definition. The same upstream
-  change added `sdkVersion`, `writeKey` and `anonymousInApp` (all web-only),
-  which the definition does not model yet. That is config-surface drift, and
-  it is outside this inventory.
+- Visual mapper: `am`, `braze`, `hs`, `iterable`.
+- `braze` requires `rest_api_key` (allOf branch naming `warehouse: cloud`).
+- `facebook_pixel` requires `access_token` (negated `web: device` branch).
+- `customerio`: `upsert`, `mirror`. It runs its own flow, which rETL refuses,
+  and its upstream `siteID`/`apiKey` requiredness changed since `9fa7b26`.
 - `iterable`'s only connectionMode branch (top-level `anyOf`, `packageName`)
   applies to `web: device` and does not reach `warehouse`.
-- `posthog`'s schema.json declares no `connectionMode` property; the definition
-  models `connection_mode` from before this inventory, and `warehouse` joins it
-  like any other source type.
 
 ## Verified definitions without `warehouse`
 
