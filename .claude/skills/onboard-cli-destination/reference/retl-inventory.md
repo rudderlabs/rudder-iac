@@ -53,7 +53,8 @@ and no `ConnectionRequiredKeys[warehouse][cloud]`.
 
 - Visual mapper: `am`, `braze`, `hs`, `iterable`.
 - `braze` requires `rest_api_key` (allOf branch naming `warehouse: cloud`).
-- `facebook_pixel` requires `access_token` (negated `web: device` branch).
+- `facebook_pixel` requires nothing: its only branch (negated `web: device`)
+  does not name `connectionMode.warehouse`.
 - `customerio`: `upsert`, `mirror`. It runs its own flow, which rETL refuses,
   and its upstream `siteID`/`apiKey` requiredness changed since `9fa7b26`.
 - `iterable`'s only connectionMode branch (top-level `anyOf`, `packageName`)

@@ -641,7 +641,7 @@ func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 		{typ: "braze", requiredKey: "rest_api_key"},
 		{typ: "customerio", jsonMapper: specificFlow, objectMapping: specificFlow},
 		{typ: "facebook_conversions", objectMapping: objectRefused("FACEBOOK_CONVERSIONS")},
-		{typ: "facebook_pixel", requiredKey: "access_token", objectMapping: objectRefused("FACEBOOK_PIXEL")},
+		{typ: "facebook_pixel", objectMapping: objectRefused("FACEBOOK_PIXEL")},
 		{typ: "ga4", objectMapping: objectRefused("GA4")},
 		{typ: "gcs", objectMapping: objectRefused("GCS")},
 		{typ: "hs"},
