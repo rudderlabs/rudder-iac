@@ -334,6 +334,7 @@
 
 ## DEX-834 — Verified Warehouse Metadata Backfill
 <!-- ticket:DEX-834 -->
-- Supersedes DEX-730's never-declared rule for `warehouse`, which DEX-821 began retiring with `http`. A definition declares `warehouse` whenever integrations-config db-config lists it, because rETL connections reach destinations through that token. `amp`, `shopify` and `cloud_source` stay never-declared.
+- A definition declares `warehouse` whenever integrations-config db-config lists it, because rETL connections reach destinations through that token; DEX-821 began this with `http`. `amp`, `shopify` and `cloud_source` stay never-declared.
+- This supersedes the `warehouse` exclusion, and nothing else, in: architecture.md "DEX-730 — Never-Declared Source Types", "DEX-510 — HTTP Destination Registration Boundary", "DEX-490 — Amplitude Destination Onboarding" and "DEX-531 — Webhook Destination Onboarding"; conventions.md "DEX-499 — GCS Destination Source-Type Ownership", "DEX-719 — GCS Connection Mode Config Surface" (keeping GCS on the DEX-499 set; its cloud-only modes still hold) and "DEX-730 — Amplitude Source Scope"; patterns.md "DEX-852 — Destination Connection Mode Fixture Pinning".
 - Every verified definition whose db-config lists `warehouse` now declares it with its full rETL metadata. Unverified eligible definitions are deferred, and the backfill promotes nothing to verified. `.claude/skills/onboard-cli-destination/reference/retl-inventory.md` holds the inventory, the exclusions, the pinned upstream revision and the derivation.
 - Declaring `warehouse` also maps `connectionMode.warehouse` and `consentManagement.warehouse` in both conversion directions. A remote destination that already carries those keys now shows them on import and plan; before, they were dropped.
