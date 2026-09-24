@@ -108,7 +108,7 @@ source and `app_key` from a device-mode one, so source type alone cannot decide.
 config-backend destination-definition entity (`connection.service.ts` reads
 `destDefConfig.supportedSourcesValidation`) and no upstream definition
 populates it (zero occurrences across rudder-integrations-config, verified
-2026-08-25 and again at `5f11c22` for DEX-834). Never search db-config for it. `config.destConfig.<sourceType>`
+2026-08-25). Never search db-config for it. `config.destConfig.<sourceType>`
 lists which keys are *scoped* to a source type; it does not say which are
 *required*, so it is not the source either — it feeds gated-key detection only
 (source-extraction.md "Detecting gated keys in destConfig").

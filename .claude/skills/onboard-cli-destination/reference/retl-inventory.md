@@ -15,8 +15,7 @@ metadata. The derivation is the one in
 - **Flow**: `retl/connection/flow.go` `ClassifyFlow` (mirrors config-backend
   `determineFlowTypeFromRequest`).
 - **`supportedSourcesValidation`**: none. A recursive key walk over all 50
-  registered destinations' db-config.json found no occurrence at this revision,
-  and a repo-wide code search found only a historical CHANGELOG entry.
+  registered destinations' db-config.json found no occurrence at this revision.
 
 ## Reproduce
 
