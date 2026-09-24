@@ -43,10 +43,10 @@ Current mapping (local → API):
   `common.SourceTypeToken` call site
   (`event-stream/rules/connection/connection_semantic_valid.go`) passes an empty
   category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` branch
-  dead. What remains is the ten types S3 declares: `android`, `android_kotlin`,
-  `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`,
-  `cordova`. When unsure about another mapped-but-unusual type, include what S3
-  includes and flag the rest.
+  dead. What remains is the eleven types S3 declares: `android`,
+  `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`,
+  `react_native`, `flutter`, `cordova`, `warehouse`. When unsure about another
+  mapped-but-unusual type, include what S3 includes and flag the rest.
 - **Declare `warehouse` whenever db-config lists it.** rETL connections reach
   destinations through that token, so it is no longer an exception —
   warehouse-only destinations (`bingads_offline_conversions`,
