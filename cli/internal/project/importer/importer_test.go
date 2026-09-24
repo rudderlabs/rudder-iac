@@ -258,33 +258,76 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 }
 
 func TestWorkspaceImport_PrintsSummary(t *testing.T) {
-	var out bytes.Buffer
-	ui.SetWriter(&out)
-	t.Cleanup(ui.RestoreWriter)
+	const applyHint = "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n"
 
-	importable := importableCollection()
-	importable.Set("event-stream-source", map[string]*resources.RemoteResource{
-		"rid-2": {ID: "rid-2", ExternalID: "web"},
-		"rid-3": {ID: "rid-3", ExternalID: "ios"},
-		"rid-4": {ID: "rid-4", ExternalID: "android", MatchedWith: resources.NewResource("android", "event-stream-source", nil, nil)},
-	})
-	importable.Set("tracking-plan", map[string]*resources.RemoteResource{
-		"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)},
-	})
-
-	err := WorkspaceImport(context.Background(), &stubProject{
-		location: t.TempDir(),
-		graph:    resources.NewGraph(),
-	}, &stubImportProvider{importable: importable}, ImportOptions{Merge: true})
-	require.NoError(t, err)
-
-	assert.Equal(t, `Imported 3 resources into imported/:
+	tests := []struct {
+		name       string
+		importable map[string]map[string]*resources.RemoteResource
+		merge      bool
+		expected   string
+	}{
+		{
+			name: "plain import omits the merged section",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source":              {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-source": {"rid-2": {ID: "rid-2", ExternalID: "web"}},
+			},
+			expected: `Imported 2 resources into imported/:
+  event-stream-source  1
+  source               1
+` + applyHint,
+		},
+		{
+			name:  "merge lists merged resources by local URN",
+			merge: true,
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-source": {
+					"rid-2": {ID: "rid-2", ExternalID: "web"},
+					"rid-3": {ID: "rid-3", ExternalID: "ios"},
+					"rid-4": {ID: "rid-4", ExternalID: "android", MatchedWith: resources.NewResource("android", "event-stream-source", nil, nil)},
+				},
+				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
+			},
+			expected: `Imported 3 resources into imported/:
   event-stream-source  2
   source               1
 Merged 2 remote resources into existing local resources:
   event-stream-source:android  <- remote rid-4
   tracking-plan:checkout       <- remote tp-1
+` + applyHint,
+		},
+		{
+			name:  "everything merged still prints the imported total",
+			merge: true,
+			importable: map[string]map[string]*resources.RemoteResource{
+				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
+			},
+			expected: `Imported 0 resources into imported/:
+Merged 1 remote resources into existing local resources:
+  tracking-plan:checkout  <- remote tp-1
+` + applyHint,
+		},
+	}
 
-The imported resources are not managed by the CLI yet. Run `+"`rudder-cli apply`"+` to start managing them.
-`, out.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			ui.SetWriter(&out)
+			t.Cleanup(ui.RestoreWriter)
+
+			importable := resources.NewRemoteResources()
+			for resourceType, rs := range tt.importable {
+				importable.Set(resourceType, rs)
+			}
+
+			err := WorkspaceImport(context.Background(), &stubProject{
+				location: t.TempDir(),
+				graph:    resources.NewGraph(),
+			}, &stubImportProvider{importable: importable}, ImportOptions{Merge: tt.merge})
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expected, out.String())
+		})
+	}
 }
