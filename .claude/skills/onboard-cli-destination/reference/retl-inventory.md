@@ -5,13 +5,17 @@ metadata. The derivation is the one in
 [source-type-mapping.md](source-type-mapping.md) "rETL metadata" and
 "Per-source-type connect-time required keys".
 
-- **Upstream revision**: `rudderlabs/rudder-integrations-config` `develop` at
-  `5f11c22c4bcad9ecca4ec37ad31bb7605b72b079` (2026-09-24). DEX-821 read
+- **Provenance**: every definition this backfill changed was derived from
+  `rudderlabs/rudder-integrations-config` `develop` at
+  `5f11c22c4bcad9ecca4ec37ad31bb7605b72b079` (2026-09-24) and is CLI definition
+  version `1`; everything else listed was read at the same revision. DEX-821 read
   `9fa7b26`, 37 commits earlier. Between the two, no registered destination
   changed `supportedSourceTypes`, `supportedConnectionModes`, `syncBehaviours` or
   `supportsVisualMapper`. Only `customerio` changed a connectionMode-gated
   schema branch (see below).
-- **CLI definition version**: `1` for every definition below.
+- **Verified or not**: the registration block in
+  `cli/internal/app/dependencies.go` `newDestinationRegistry` decides it; the
+  last Reproduce command lists both sets.
 - **Flow**: `retl/connection/flow.go` `ClassifyFlow` (mirrors config-backend
   `determineFlowTypeFromRequest`).
 - **`supportedSourcesValidation`**: none. A recursive key walk over all 50
@@ -34,6 +38,12 @@ raw "$TYPE/db-config.json" | jq -c '{
 raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?
   | select((.if | tostring | test("connectionMode")) and .then.required != null)
   | {if, required: .then.required}'
+
+# Verified vs unverified, from the repo root: the types listed before the
+# UnverifiedDestinations marker are verified, the rest unverified.
+sed -n '/^func newDestinationRegistry/,/^}/p' cli/internal/app/dependencies.go |
+  grep -oE 'UnverifiedDestinations|registering [a-z0-9_]+ destination' |
+  sed -E 's/^registering ([a-z0-9_]+) destination$/\1/'
 ```
 
 `$TYPE` is the definition's local type, except `linkedin_ads`, whose upstream
