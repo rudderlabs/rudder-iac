@@ -331,3 +331,10 @@
 - The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
 - Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
 - GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.
+
+## DEX-834 — Verified Warehouse Metadata Backfill
+<!-- ticket:DEX-834 -->
+- Supersedes DEX-730's never-declared rule for `warehouse`, which DEX-821 began retiring with `http`. A definition declares `warehouse` whenever integrations-config db-config lists it, because rETL connections reach destinations through that token. `amp`, `shopify` and `cloud_source` stay never-declared.
+- Every verified definition whose db-config lists `warehouse` now declares it with its full rETL metadata. Unverified eligible definitions are deferred, and the backfill promotes nothing to verified. `.claude/skills/onboard-cli-destination/reference/retl-inventory.md` holds the inventory, the exclusions, the pinned upstream revision and the derivation.
+- Declaring `warehouse` also maps `connectionMode.warehouse` and `consentManagement.warehouse` in both conversion directions. A remote destination that already carries those keys now shows them on import and plan; before, they were dropped.
+- Use a destination with no upstream `warehouse` (`googleads`, `bq`, `postgres`, `rs`, `s3_datalake`, `snowflake`) as the negative example for rETL compatibility, never a backfilled one such as `s3` or `webhook`.

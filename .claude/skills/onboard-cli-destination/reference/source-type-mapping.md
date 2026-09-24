@@ -86,10 +86,14 @@ destination rETL can reach without saying how it may sync.
   `connectionMode.warehouse`, plus the negated branches whose exclusion does not
   cover it — an `if.not` applies to every supported pair it does not exclude, so
   declaring `warehouse` pulls `(warehouse, cloud)` into those branches too. The
-  known cases among already-registered destinations are Braze (`rest_api_key`,
-  named branch) and Facebook Pixel (`access_token`, via
-  `not(connectionMode.web == "device")`); both are backfills, so they belong to
-  DEX-834.
+  known cases are Braze (`rest_api_key`, named branch) and Facebook Pixel
+  (`access_token`, via `not(connectionMode.web == "device")`), both backfilled
+  in DEX-834.
+
+[retl-inventory.md](retl-inventory.md) records which registered definitions
+declare `warehouse`, the values each carries, the pinned upstream revision and
+the commands that reproduce them. Update it whenever a definition gains or
+changes rETL metadata.
 
 ## Per-source-type connect-time required keys
 
@@ -104,7 +108,7 @@ source and `app_key` from a device-mode one, so source type alone cannot decide.
 config-backend destination-definition entity (`connection.service.ts` reads
 `destDefConfig.supportedSourcesValidation`) and no upstream definition
 populates it (zero occurrences across rudder-integrations-config, verified
-2026-08-25). Never search db-config for it. `config.destConfig.<sourceType>`
+2026-08-25 and again at `5f11c22` for DEX-834). Never search db-config for it. `config.destConfig.<sourceType>`
 lists which keys are *scoped* to a source type; it does not say which are
 *required*, so it is not the source either — it feeds gated-key detection only
 (source-extraction.md "Detecting gated keys in destConfig").
@@ -160,7 +164,9 @@ requiredness" for the full writeup and the pointer-field caveat.
    `ConnectionModes` (db-config `supportedConnectionModes`).
 4. Translate each `then.required` API key to its snake_case local key. Every key
    must be a `mapstructure` tag on the config struct — one that is not means the
-   property was dropped or renamed; re-check before excluding it.
+   property was dropped or renamed; re-check before excluding it. Drop a key the
+   struct already tags `validate:"required"` outright: every config carries it,
+   so the entry could never fire (Customer.io's `site_id` and `api_key`).
 5. Union the key lists when several branches hit the same `(source type, mode)`;
    dedupe and keep each list sorted.
 6. Omit a mode with no keys, a source type with no modes, and the whole field
