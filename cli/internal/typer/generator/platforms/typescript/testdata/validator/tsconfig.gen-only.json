@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "//": "Type-checks the generated RudderTyper.ts alone against the SDK, without the reference-plan __tests__. Used to validate --local output from an arbitrary project (e.g. rudder-data-gov), whose plan differs from the reference the vitest suite is written against.",
+  "include": ["src/RudderTyper/**/*.ts"]
+}
