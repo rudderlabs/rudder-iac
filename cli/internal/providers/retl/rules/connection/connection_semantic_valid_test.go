@@ -597,8 +597,9 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 
 // TestConnectionSemanticValid_WarehouseDestinationFlows drives verified
 // destinations that accept warehouse sources through their real definitions:
-// every one runs a JSON mapper connection on upsert, and an object picks object
-// mapping, on mirror, only where upstream declares the visual mapper.
+// every one runs a JSON mapper connection on upsert or full but not mirror, and
+// an object picks object mapping, on mirror, only where upstream declares the
+// visual mapper.
 // Customer.io accepts warehouse sources yet keeps its destination-specific
 // flow refused.
 func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
@@ -624,6 +625,10 @@ func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 	specificFlow := []rules.ValidationResult{{
 		Reference: "/connections/0/destination",
 		Message:   `destination api type "CUSTOMERIO" uses a destination-specific rETL flow, which is not supported`,
+	}}
+	jsonMirrorRefused := []rules.ValidationResult{{
+		Reference: "/connections/0/config/sync_behaviour",
+		Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on the json_mapper flow",
 	}}
 
 	tests := []struct {
@@ -670,6 +675,19 @@ func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 			objectEntry := connectionTo(dest.id)
 			objectMappingEntry(&objectEntry)
 			assert.Equal(t, tt.objectMapping, validateConnectionsSemantic(registry, specOf(objectEntry), graph), "object mapping")
+
+			// A refused flow refuses every sync behaviour alike (customerio).
+			if tt.jsonMapper != nil {
+				return
+			}
+
+			fullEntry := connectionTo(dest.id)
+			fullEntry.Config.SyncBehaviour = "full"
+			assert.Empty(t, validateConnectionsSemantic(registry, specOf(fullEntry), graph), "json mapper on full")
+
+			mirrorEntry := connectionTo(dest.id)
+			mirrorEntry.Config.SyncBehaviour = "mirror"
+			assert.Equal(t, jsonMirrorRefused, validateConnectionsSemantic(registry, specOf(mirrorEntry), graph), "json mapper on mirror")
 		})
 	}
 }
