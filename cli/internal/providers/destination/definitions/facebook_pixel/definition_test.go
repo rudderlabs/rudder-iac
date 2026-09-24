@@ -65,14 +65,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}, registered.GatedKeyPaths())
 
 	for _, sourceType := range expectedSourceTypes {
-		if sourceType == "warehouse" {
-			continue
-		}
 		assert.Equal(t, []string{"access_token"}, registered.ConnectionRequiredKeys(sourceType, "cloud"), sourceType)
 	}
 	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"))
-	// The accessToken branch never names connectionMode.warehouse.
-	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
 
 	byAPI, err := registry.GetByAPIType("FACEBOOK_PIXEL", 1)
 	require.NoError(t, err)
