@@ -118,6 +118,7 @@ func TestDeleteSource(t *testing.T) {
 func TestGetSources(t *testing.T) {
 	tests := []struct {
 		name            string
+		opts            []esSource.ListSourcesOption
 		calls           []testutils.Call
 		expectedSources []esSource.EventStreamSource
 	}{
@@ -282,6 +283,40 @@ func TestGetSources(t *testing.T) {
 			},
 		},
 		{
+			// The filter survives paging because the server echoes it into the next link, which the client follows verbatim.
+			name: "hasExternalId filter across pages",
+			opts: []esSource.ListSourcesOption{esSource.WithSourcesHasExternalID(true)},
+			calls: []testutils.Call{
+				{
+					Validate: func(req *http.Request) bool {
+						return assert.Equal(t, "https://api.rudderstack.com/v2/event-stream-sources?hasExternalId=true", req.URL.String())
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [{"id": "src-123", "externalId": "ext-123", "name": "Source 1", "type": "webhook", "enabled": true}],
+						"paging": {
+							"total": 2,
+							"next": "/v2/event-stream-sources?hasExternalId=true&page=2"
+						}
+					}`,
+				},
+				{
+					Validate: func(req *http.Request) bool {
+						return assert.Equal(t, "https://api.rudderstack.com/v2/event-stream-sources?hasExternalId=true&page=2", req.URL.String())
+					},
+					ResponseStatus: 200,
+					ResponseBody: `{
+						"data": [{"id": "src-456", "externalId": "ext-456", "name": "Source 2", "type": "api", "enabled": false}],
+						"paging": {"total": 2, "next": ""}
+					}`,
+				},
+			},
+			expectedSources: []esSource.EventStreamSource{
+				{ID: "src-123", ExternalID: "ext-123", Name: "Source 1", Type: "webhook", Enabled: true},
+				{ID: "src-456", ExternalID: "ext-456", Name: "Source 2", Type: "api", Enabled: false},
+			},
+		},
+		{
 			name: "empty response",
 			calls: []testutils.Call{
 				{
@@ -310,7 +345,7 @@ func TestGetSources(t *testing.T) {
 
 			eventStreamClient := esSource.NewRudderSourceStore(c)
 
-			sources, err := eventStreamClient.GetSources(context.Background())
+			sources, err := eventStreamClient.GetSources(context.Background(), tt.opts...)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectedSources, sources)
