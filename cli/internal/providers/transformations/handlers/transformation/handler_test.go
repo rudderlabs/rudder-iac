@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -507,7 +509,7 @@ func TestLoadImportableResources(t *testing.T) {
 
 		handler := transformation.NewHandler(mockStore)
 
-		importables, err := handler.Impl.LoadImportableResources(context.Background())
+		importables, err := handler.Impl.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 
 		require.NoError(t, err)
 		require.Len(t, importables, 1)
@@ -525,7 +527,7 @@ func TestLoadImportableResources(t *testing.T) {
 
 		handler := transformation.NewHandler(mockStore)
 
-		importables, err := handler.Impl.LoadImportableResources(context.Background())
+		importables, err := handler.Impl.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 
 		require.NoError(t, err)
 		require.Len(t, importables, 0)
@@ -551,7 +553,7 @@ func TestLoadImportableResources(t *testing.T) {
 
 		handler := transformation.NewHandler(mockStore)
 
-		importables, err := handler.Impl.LoadImportableResources(context.Background())
+		importables, err := handler.Impl.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 
 		require.NoError(t, err)
 		require.Len(t, importables, 0)
@@ -567,7 +569,7 @@ func TestLoadImportableResources(t *testing.T) {
 
 		handler := transformation.NewHandler(mockStore)
 
-		importables, err := handler.Impl.LoadImportableResources(context.Background())
+		importables, err := handler.Impl.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "listing transformations")

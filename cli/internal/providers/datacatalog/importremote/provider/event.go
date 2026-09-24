@@ -16,7 +16,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 const (
@@ -42,23 +41,27 @@ func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, impor
 	}
 }
 
-func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable events from remote catalog")
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: f.UnmanagedOnly()})
 	if err != nil {
 		return nil, fmt.Errorf("getting events from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, event := range events {
-		if event.ExternalID != "" {
+		if event.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
 		resourceMap[event.ID] = &resources.RemoteResource{
-			ID:   event.ID,
-			Data: event,
+			ID: event.ID,
+			// Carried through so idResources keeps an already-managed
+			// resource's upstream identifier instead of renaming it.
+			ExternalID: f.KeepID(event.ExternalID),
+			Data:       event,
 		}
 	}
 
@@ -81,7 +84,8 @@ func (p *EventImportProvider) idResources(
 	p.log.Debug("assigning identifiers to events")
 	events := collection.GetAll(types.EventResourceType)
 
-	for _, event := range events {
+	candidates := make([]namer.IDCandidate, 0, len(events))
+	for id, event := range events {
 		data, ok := event.Data.(*catalog.Event)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog event")
@@ -94,15 +98,21 @@ func (p *EventImportProvider) idResources(
 			name = data.EventType
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  name,
-			Scope: types.EventResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for event %s: %w", data.Name, err)
-		}
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        id,
+			Name:       name,
+			ExternalID: event.ExternalID,
+		})
+	}
 
-		event.ExternalID = externalID
-		event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, externalID)
+	externalIDs, err := namer.ResolveIDs(idNamer, types.EventResourceType, candidates)
+	if err != nil {
+		return err
+	}
+
+	for id, event := range events {
+		event.ExternalID = externalIDs[id]
+		event.Reference = fmt.Sprintf("#%s:%s", types.EventResourceType, event.ExternalID)
 	}
 	return nil
 }

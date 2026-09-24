@@ -16,7 +16,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 const (
@@ -42,18 +41,19 @@ func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable categories from remote catalog")
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: f.UnmanagedOnly()})
 	if err != nil {
 		return nil, fmt.Errorf("getting categories from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, category := range categories {
-		if category.ExternalID != "" {
+		if category.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
 
@@ -62,8 +62,11 @@ func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer nam
 		}
 
 		resourceMap[category.ID] = &resources.RemoteResource{
-			ID:   category.ID,
-			Data: category,
+			ID: category.ID,
+			// Carried through so idResources keeps an already-managed
+			// resource's upstream identifier instead of renaming it.
+			ExternalID: f.KeepID(category.ExternalID),
+			Data:       category,
 		}
 	}
 
@@ -86,21 +89,27 @@ func (p *CategoryImportProvider) idResources(
 	p.log.Debug("assigning identifiers to categories")
 	categories := collection.GetAll(types.CategoryResourceType)
 
-	for _, category := range categories {
+	candidates := make([]namer.IDCandidate, 0, len(categories))
+	for id, category := range categories {
 		data, ok := category.Data.(*catalog.Category)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog category")
 		}
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        id,
+			Name:       data.Name,
+			ExternalID: category.ExternalID,
+		})
+	}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.CategoryResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for category %s: %w", data.Name, err)
-		}
+	externalIDs, err := namer.ResolveIDs(idNamer, types.CategoryResourceType, candidates)
+	if err != nil {
+		return err
+	}
 
-		category.ExternalID = externalID
-		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, externalID)
+	for id, category := range categories {
+		category.ExternalID = externalIDs[id]
+		category.Reference = fmt.Sprintf("#%s:%s", types.CategoryResourceType, category.ExternalID)
 	}
 	return nil
 }

@@ -64,7 +64,7 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteW
 	return result, nil
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteWriter, error) {
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*model.RemoteWriter, error) {
 	remoteWriters := h.backend.AllWriters()
 
 	fmt.Println("Loading importable resources for writers")

@@ -565,3 +565,40 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 		slices.Index(types, "a1"), slices.Index(types, "a2"),
 		"per-provider matcher order must be preserved")
 }
+
+func TestCompositeProviderSubset(t *testing.T) {
+	t.Parallel()
+
+	newComposite := func(t *testing.T) *provider.CompositeProvider {
+		t.Helper()
+
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+			"alpha": testutils.NewMockProvider([]string{"alpha-kind"}, []string{"alpha-type"}),
+			"beta":  testutils.NewMockProvider([]string{"beta-kind"}, []string{"beta-type"}),
+		})
+		require.NoError(t, err)
+		return cp.(*provider.CompositeProvider)
+	}
+
+	t.Run("names the providers it aggregates, sorted", func(t *testing.T) {
+		assert.Equal(t, []string{"alpha", "beta"}, newComposite(t).ProviderNames())
+	})
+
+	t.Run("narrows to the named providers", func(t *testing.T) {
+		subset, err := newComposite(t).Subset([]string{"beta"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"beta-kind"}, subset.SupportedKinds())
+	})
+
+	t.Run("rejects an unknown provider with the valid names", func(t *testing.T) {
+		_, err := newComposite(t).Subset([]string{"beta", "gamma"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "gamma")
+		assert.Contains(t, err.Error(), "alpha, beta")
+	})
+
+	t.Run("an empty subset is rejected rather than silently doing nothing", func(t *testing.T) {
+		_, err := newComposite(t).Subset(nil)
+		require.Error(t, err)
+	})
+}

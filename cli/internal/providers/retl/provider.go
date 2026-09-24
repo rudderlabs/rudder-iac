@@ -386,10 +386,10 @@ func (p *Provider) Preview(ctx context.Context, ID string, resourceType string, 
 	return handler.Preview(ctx, ID, data, limit)
 }
 
-func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	for _, handler := range p.handlers {
-		resources, err := handler.LoadImportable(ctx, idNamer)
+		resources, err := handler.LoadImportable(ctx, idNamer, filter...)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable resources from handler %w", err)
 		}

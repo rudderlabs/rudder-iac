@@ -1257,3 +1257,80 @@ func TestProviderWithConnectionSupport(t *testing.T) {
 	assert.Equal(t, "conn-remote-9", r.ImportMetadata().RemoteId)
 	assert.Equal(t, "ws-1", r.ImportMetadata().WorkspaceId)
 }
+
+// TestLoadImportable_IncludeManaged pins the API-level filter: a plain import
+// asks the RETL API for unmanaged sources only, while a clone asks for every
+// source and keeps the externalIds they already carry.
+func TestLoadImportable_IncludeManaged(t *testing.T) {
+	t.Parallel()
+
+	sources := []retlClient.RETLSource{
+		{
+			ID: "src-managed", ExternalID: "prod-users", Name: "Prod Users",
+			SourceType: retlClient.ModelSourceType, SourceDefinitionName: "postgres", AccountID: "account-1",
+			Config: retlClient.RETLSQLModelConfig{PrimaryKey: "id", Sql: "SELECT 1"},
+		},
+		{
+			ID: "src-unmanaged", Name: "Staging Users",
+			SourceType: retlClient.ModelSourceType, SourceDefinitionName: "postgres", AccountID: "account-1",
+			Config: retlClient.RETLSQLModelConfig{PrimaryKey: "id", Sql: "SELECT 2"},
+		},
+	}
+
+	newProvider := func(seen *[]*bool) *retl.Provider {
+		mockClient := newDefaultMockClient()
+		mockClient.listRetlSourcesFunc = func(_ context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
+			resolved := retlClient.ListRetlSourcesOptions{}
+			for _, opt := range opts {
+				opt(&resolved)
+			}
+			*seen = append(*seen, resolved.HasExternalId)
+
+			var matching []retlClient.RETLSource
+			for _, s := range sources {
+				if resolved.SourceType != "" && string(s.SourceType) != resolved.SourceType {
+					continue
+				}
+				if resolved.HasExternalId != nil && (s.ExternalID != "") != *resolved.HasExternalId {
+					continue
+				}
+				matching = append(matching, s)
+			}
+			return &retlClient.RETLSources{Data: matching}, nil
+		}
+		return retl.New(mockClient)
+	}
+
+	t.Run("without the filter the API is asked for unmanaged sources only", func(t *testing.T) {
+		var seen []*bool
+		got, err := newProvider(&seen).LoadImportable(context.Background(), namer.NewExternalIdNamer(namer.NewKebabCase()))
+		require.NoError(t, err)
+
+		require.NotEmpty(t, seen)
+		for _, hasExternalID := range seen {
+			require.NotNil(t, hasExternalID)
+			assert.False(t, *hasExternalID)
+		}
+
+		all := got.GetAll(sqlmodel.ResourceType)
+		require.Len(t, all, 1)
+		assert.Equal(t, "staging-users", all["src-unmanaged"].ExternalID)
+	})
+
+	t.Run("with IncludeManaged the filter is dropped and externalIds are kept", func(t *testing.T) {
+		var seen []*bool
+		got, err := newProvider(&seen).LoadImportable(context.Background(), namer.NewExternalIdNamer(namer.NewKebabCase()),
+			resources.ImportableFilter{IncludeManaged: true})
+		require.NoError(t, err)
+
+		require.NotEmpty(t, seen)
+		for _, hasExternalID := range seen {
+			assert.Nil(t, hasExternalID, "a clone must not filter managed sources out at the API")
+		}
+
+		all := got.GetAll(sqlmodel.ResourceType)
+		require.Len(t, all, 2)
+		assert.Equal(t, "prod-users", all["src-managed"].ExternalID)
+		assert.Equal(t, "staging-users", all["src-unmanaged"].ExternalID)
+	})
+}

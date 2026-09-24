@@ -323,22 +323,30 @@ func (h *Handler) FetchImportData(_ context.Context, _ specs.ImportIds) (writer.
 	return writer.FormattableEntity{}, fmt.Errorf("single-source import is not supported for %s resources", ResourceType)
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
-	hasExternalID := false
-	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(tableSourceTypeFilter), retlClient.WithHasExternalId(&hasExternalID))
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
+	f := resources.ImportableFilterOf(filter)
+	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(tableSourceTypeFilter), retlClient.WithHasExternalId(f.UnmanagedOnly()))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
 
+	candidates := make([]namer.IDCandidate, 0, len(sources.Data))
+	for _, source := range sources.Data {
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        source.ID,
+			Name:       source.Name,
+			ExternalID: f.KeepID(source.ExternalID),
+		})
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, ResourceType, candidates)
+	if err != nil {
+		return nil, err
+	}
+
 	resourceMap := make(map[string]*resources.RemoteResource, len(sources.Data))
 	for _, source := range sources.Data {
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  source.Name,
-			Scope: ResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating external ID for source %s: %w", source.Name, err)
-		}
+		externalID := externalIDs[source.ID]
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,

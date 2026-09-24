@@ -1021,11 +1021,43 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	c := newTestClient(t, srv.URL)
 	h := destination.NewHandler(c, registry)
 
-	remotes, err := h.Impl.LoadImportableResources(ctx)
+	remotes, err := h.Impl.LoadImportableResources(ctx, resources.ImportableFilter{})
 	require.NoError(t, err)
 	require.Len(t, remotes, 1, "only unmanaged + registered (type, version) pairs pass")
 	assert.Equal(t, "dst-1", remotes[0].ID)
 	assert.Equal(t, "", remotes[0].ExternalID)
+}
+
+func TestHandlerImpl_LoadImportableResourcesIncludeManaged(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	registry := testRegistry(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"destinations": [
+				{"id":"dst-1","name":"GA4-unmanaged","type":"GA4","version":1,"config":{}},
+				{"id":"dst-2","externalId":"ga4-managed","name":"GA4-managed","type":"GA4","version":1,"config":{}},
+				{"id":"dst-4","name":"GA4-unregistered-version","type":"GA4","version":2,"config":{}}
+			],
+			"paging": {"total": 3}
+		}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	h := destination.NewHandler(newTestClient(t, srv.URL), registry)
+
+	remotes, err := h.Impl.LoadImportableResources(ctx, resources.ImportableFilter{IncludeManaged: true})
+	require.NoError(t, err)
+
+	ids := make(map[string]string, len(remotes))
+	for _, r := range remotes {
+		ids[r.ID] = r.ExternalID
+	}
+	assert.Equal(t, map[string]string{"dst-1": "", "dst-2": "ga4-managed"}, ids,
+		"managed destinations join the clone; an unregistered (type, version) is still skipped")
 }
 
 // --- Import ---

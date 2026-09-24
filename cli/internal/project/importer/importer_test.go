@@ -175,7 +175,7 @@ func (p *stubImportProvider) MapRemoteToState(*resources.RemoteResources) (*stat
 	return state.EmptyState(), nil
 }
 
-func (p *stubImportProvider) LoadImportable(context.Context, namer.Namer) (*resources.RemoteResources, error) {
+func (p *stubImportProvider) LoadImportable(context.Context, namer.Namer, ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	return p.importable, nil
 }
 

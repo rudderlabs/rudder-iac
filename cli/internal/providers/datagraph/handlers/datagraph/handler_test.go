@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
@@ -76,7 +78,7 @@ func TestLoadImportableResources(t *testing.T) {
 	}
 
 	h := &HandlerImpl{client: mockClient}
-	remotes, err := h.LoadImportableResources(context.Background())
+	remotes, err := h.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
 }
@@ -112,7 +114,7 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 		}
 
 		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
-		remotes, err := h.LoadImportableResources(context.Background())
+		remotes, err := h.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 		require.NoError(t, err)
 		require.Len(t, remotes, 2)
 		assert.Equal(t, "My Warehouse", remotes[0].AccountName)
@@ -142,7 +144,7 @@ func TestLoadImportableResources_WithAccountNameResolution(t *testing.T) {
 		}
 
 		h := &HandlerImpl{client: mockClient, accountResolver: mockResolver}
-		_, err := h.LoadImportableResources(context.Background())
+		_, err := h.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "resolving account name")
 	})

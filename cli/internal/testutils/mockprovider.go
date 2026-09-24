@@ -176,7 +176,7 @@ func (m *MockProvider) Import(_ context.Context, ID string, resourceType string,
 	return m.ImportVal, m.ImportErr
 }
 
-func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer) (*resources.RemoteResources, error) {
+func (m *MockProvider) LoadImportable(_ context.Context, _ namer.Namer, _ ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 

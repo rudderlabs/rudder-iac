@@ -107,19 +107,19 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 	return allRelationships, nil
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.RemoteRelationship, error) {
-	hasExternalID := false
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*dgModel.RemoteRelationship, error) {
+	// Only unmanaged data graphs by default — relationships under a managed DG
+	// are not importable. A clone (IncludeManaged) wants both.
+	hasExternalID := filter.UnmanagedOnly()
 
-	// Only fetch unmanaged data graphs — relationships under managed DGs are not importable
-	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+	dataGraphs, err := h.listAllDataGraphs(ctx, hasExternalID)
 	if err != nil {
 		return nil, err
 	}
 
-	// For each data graph, fetch all relationships without external IDs
 	var allRelationships []*dgModel.RemoteRelationship
 	for _, dg := range dataGraphs {
-		relationships, err := h.listAllRelationshipsForDataGraph(ctx, dg.ID, &hasExternalID)
+		relationships, err := h.listAllRelationshipsForDataGraph(ctx, dg.ID, hasExternalID)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable relationships for data graph %s: %w", dg.ID, err)
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -208,7 +210,7 @@ var _ tasker.Task = &compositeProviderTask{}
 
 // LoadImportableResources loads the resources from upstream which are
 // present in the workspace and ready to be imported.
-func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	var (
 		collection = resources.NewRemoteResources()
 		err        error
@@ -228,7 +230,7 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 		if !ok {
 			return fmt.Errorf("expected compositeProviderTask, got %T", task)
 		}
-		importable, err := t.provider.LoadImportable(ctx, idNamer)
+		importable, err := t.provider.LoadImportable(ctx, idNamer, filter...)
 		if err != nil {
 			return fmt.Errorf("loading importable resources for composite provider %s: %w", t.name, err)
 		}
@@ -252,6 +254,38 @@ func (p *CompositeProvider) LoadImportable(ctx context.Context, idNamer namer.Na
 	}
 
 	return collection, nil
+}
+
+// ProviderNames lists the providers this composite aggregates, sorted, for
+// commands that let the user name a subset.
+func (p *CompositeProvider) ProviderNames() []string {
+	names := maps.Keys(p.Providers)
+	slices.Sort(names)
+	return names
+}
+
+// Subset returns a composite provider limited to the named providers. It is for
+// commands that scope work to specific providers — `init <provider>...` — and
+// not for anything that loads a project: dropping a provider drops the spec
+// kinds it registers, so a project containing those kinds would fail to parse.
+func (p *CompositeProvider) Subset(names []string) (Provider, error) {
+	subset := make(map[string]Provider, len(names))
+	var unknown []string
+	for _, name := range names {
+		prov, ok := p.Providers[name]
+		if !ok {
+			unknown = append(unknown, name)
+			continue
+		}
+		subset[name] = prov
+	}
+
+	if len(unknown) > 0 {
+		return nil, fmt.Errorf("unknown provider(s) %s: must be one of %s",
+			strings.Join(unknown, ", "), strings.Join(p.ProviderNames(), ", "))
+	}
+
+	return NewCompositeProvider(subset)
 }
 
 func (p *CompositeProvider) FormatForExport(

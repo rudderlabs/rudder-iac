@@ -16,7 +16,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 const (
@@ -42,23 +41,27 @@ func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, im
 	}
 }
 
-func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: f.UnmanagedOnly()})
 	if err != nil {
 		return nil, fmt.Errorf("getting properties from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
-		if property.ExternalID != "" {
+		if property.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
 		resourceMap[property.ID] = &resources.RemoteResource{
-			ID:   property.ID,
-			Data: property,
+			ID: property.ID,
+			// Carried through so idResources keeps an already-managed
+			// resource's upstream identifier instead of renaming it.
+			ExternalID: f.KeepID(property.ExternalID),
+			Data:       property,
 		}
 	}
 
@@ -81,21 +84,27 @@ func (p *PropertyImportProvider) idResources(
 	p.log.Debug("assigning identifiers to properties")
 	properties := collection.GetAll(types.PropertyResourceType)
 
-	for _, property := range properties {
+	candidates := make([]namer.IDCandidate, 0, len(properties))
+	for id, property := range properties {
 		data, ok := property.Data.(*catalog.Property)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog property")
 		}
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        id,
+			Name:       data.Name,
+			ExternalID: property.ExternalID,
+		})
+	}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.PropertyResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
-		}
+	externalIDs, err := namer.ResolveIDs(idNamer, types.PropertyResourceType, candidates)
+	if err != nil {
+		return err
+	}
 
-		property.ExternalID = externalID
-		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, externalID)
+	for id, property := range properties {
+		property.ExternalID = externalIDs[id]
+		property.Reference = fmt.Sprintf("#%s:%s", types.PropertyResourceType, property.ExternalID)
 	}
 	return nil
 }

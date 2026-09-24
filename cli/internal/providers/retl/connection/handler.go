@@ -698,22 +698,34 @@ func resolveSourceURN(collection *resources.RemoteResources, sourceID string) (s
 
 // LoadImportable lists the connections not yet managed by the CLI and names
 // each after its endpoints, e.g. "users-to-webhook". Both endpoints are known
-// to exist: a row missing either is not importable in the first place.
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
-	remotes, err := h.eligible(ctx, lo.ToPtr(false))
+// to exist: a row missing either is not importable in the first place. With
+// IncludeManaged the managed connections come too, keeping their upstream
+// externalId.
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
+	f := resources.ImportableFilterOf(filter)
+
+	remotes, err := h.eligible(ctx, f.UnmanagedOnly())
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make([]namer.IDCandidate, 0, len(remotes))
+	for _, remote := range remotes {
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        remote.ID,
+			Name:       fmt.Sprintf("%s-to-%s", remote.SourceName, remote.DestinationName),
+			ExternalID: f.KeepID(remote.ExternalID),
+		})
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, ResourceType, candidates)
 	if err != nil {
 		return nil, err
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource, len(remotes))
 	for _, remote := range remotes {
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  fmt.Sprintf("%s-to-%s", remote.SourceName, remote.DestinationName),
-			Scope: ResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for connection %s: %w", remote.ID, err)
-		}
+		externalID := externalIDs[remote.ID]
 		resourceMap[remote.ID] = &resources.RemoteResource{
 			ID:         remote.ID,
 			ExternalID: externalID,

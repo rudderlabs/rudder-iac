@@ -12,6 +12,7 @@ import (
 	examplewriter "github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
@@ -76,7 +77,7 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteB
 	return result, nil
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteBook, error) {
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*model.RemoteBook, error) {
 	remoteBooks := h.backend.AllBooks()
 
 	// Return all resources for import

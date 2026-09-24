@@ -21,12 +21,56 @@ import (
 
 type mockCategoryCatalog struct {
 	catalog.DataCatalog
-	categories []*catalog.Category
-	err        error
+	categories  []*catalog.Category
+	err         error
+	seenOptions catalog.ListOptions
 }
 
 func (m *mockCategoryCatalog) GetCategories(ctx context.Context, options catalog.ListOptions) ([]*catalog.Category, error) {
+	m.seenOptions = options
 	return m.categories, m.err
+}
+
+func TestCategoryLoadImportableIncludeManaged(t *testing.T) {
+	categories := []*catalog.Category{
+		{ID: "cat1", Name: "User Actions", WorkspaceID: "ws1"},
+		{ID: "cat2", Name: "E-commerce", WorkspaceID: "ws1", ExternalID: "ecommerce"},
+	}
+
+	newProvider := func() (*CategoryImportProvider, *mockCategoryCatalog) {
+		mockClient := &mockCategoryCatalog{categories: categories}
+		return &CategoryImportProvider{
+			client:   mockClient,
+			log:      *logger.New("test"),
+			filepath: "data-catalog",
+		}, mockClient
+	}
+
+	t.Run("without the filter the catalog is asked for unmanaged categories only", func(t *testing.T) {
+		provider, mockClient := newProvider()
+
+		_, err := provider.LoadImportable(context.Background(), namer.NewExternalIdNamer(namer.NewKebabCase()))
+		require.NoError(t, err)
+
+		require.NotNil(t, mockClient.seenOptions.HasExternalID)
+		assert.False(t, *mockClient.seenOptions.HasExternalID)
+	})
+
+	t.Run("with IncludeManaged the filter is dropped and externalIds are kept", func(t *testing.T) {
+		provider, mockClient := newProvider()
+
+		collection, err := provider.LoadImportable(context.Background(), namer.NewExternalIdNamer(namer.NewKebabCase()),
+			resources.ImportableFilter{IncludeManaged: true})
+		require.NoError(t, err)
+
+		assert.Nil(t, mockClient.seenOptions.HasExternalID, "a clone must not filter managed categories out at the API")
+
+		all := collection.GetAll(types.CategoryResourceType)
+		require.Len(t, all, 2)
+		assert.Equal(t, "ecommerce", all["cat2"].ExternalID)
+		assert.Equal(t, "#category:ecommerce", all["cat2"].Reference)
+		assert.Equal(t, "user-actions", all["cat1"].ExternalID)
+	})
 }
 
 func TestCategoryLoadImportable(t *testing.T) {

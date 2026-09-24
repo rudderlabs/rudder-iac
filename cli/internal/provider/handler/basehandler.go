@@ -70,25 +70,34 @@ func (h *BaseHandler[Spec, Res, State, Remote]) AddResource(id string, resource 
 	return nil
 }
 
-func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	remoteResources, err := h.Impl.LoadImportableResources(ctx)
+	remoteResources, err := h.Impl.LoadImportableResources(ctx, f)
 	if err != nil {
 		return nil, fmt.Errorf("loading importable resources: %w", err)
+	}
+
+	candidates := make([]namer.IDCandidate, 0, len(remoteResources))
+	for _, remoteData := range remoteResources {
+		metadata := (*remoteData).Metadata()
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        metadata.ID,
+			Name:       metadata.Name,
+			ExternalID: f.KeepID(metadata.ExternalID),
+		})
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, h.metadata.ResourceType, candidates)
+	if err != nil {
+		return nil, err
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, remoteData := range remoteResources {
 		metadata := (*remoteData).Metadata()
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  metadata.Name,
-			Scope: h.metadata.ResourceType,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for source '%s': %w", metadata.Name, err)
-		}
+		externalID := externalIDs[metadata.ID]
 		resourceMap[metadata.ID] = &resources.RemoteResource{
 			ID:         metadata.ID,
 			ExternalID: externalID,

@@ -28,6 +28,7 @@ const (
 var (
 	ErrProjectNotSynced = errors.New("import not allowed as project has changes to be synced")
 	ErrAmbiguousMatch   = errors.New("merge import matched multiple remote resources to one local resource")
+	ErrProjectNotEmpty  = errors.New("target directory is not empty")
 )
 
 type ImportProvider interface {
