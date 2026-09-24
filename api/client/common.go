@@ -49,11 +49,21 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	msg := fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, e.Msg())
+	reason := fmt.Sprintf("'%s'", e.Msg())
 	if suffix := formatDetails(e.Details); suffix != "" {
-		msg += " " + suffix
+		reason += " " + suffix
 	}
-	return msg
+
+	// Both 403 causes need the user to act, with a token that has the permission
+	// or an account that has the feature, so name that rather than the status line.
+	if e.FeatureFlagNotEnabled() {
+		return fmt.Sprintf("feature not enabled: %s: contact RudderStack support to enable it", reason)
+	}
+	if e.HTTPStatusCode == http.StatusForbidden {
+		return fmt.Sprintf("permission denied: %s: use an access token with the required permissions, or ask a workspace admin to grant them", reason)
+	}
+
+	return fmt.Sprintf("http status code: %d, error code: '%s', error: %s", e.HTTPStatusCode, e.ErrorCode, reason)
 }
 
 // formatDetails renders APIError.Details as a parenthesised suffix.
