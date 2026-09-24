@@ -22,10 +22,12 @@ func StartSpinner(message string) {
 	defer spinnerMu.Unlock()
 	stopLocked()
 	current = spinner.New(spinner.CharSets[14], 100*time.Millisecond,
-		spinner.WithSuffix(" "+message), spinner.WithWriterFile(os.Stderr))
+		spinner.WithSuffix(" "+message), spinner.WithWriterFile(os.Stderr),
+		spinner.WithHiddenCursor(false))
 	current.Start()
 }
 
+// StopSpinner clears the running spinner, if any.
 func StopSpinner() {
 	spinnerMu.Lock()
 	defer spinnerMu.Unlock()
