@@ -160,7 +160,8 @@ Mechanical rules:
   source-extraction.md "Conditional requiredness"). See source-type-mapping.md
   "Per-source-type connect-time required keys" for the recognised `if` shapes
   and the full derivation; omit the field when no kept source type
-  contributes a key.
+  contributes a key. `warehouse` takes keys only from branches that name
+  `connectionMode.warehouse` (source-type-mapping.md "rETL metadata").
 - Source-type-gated keys: if a terraform-mapped property's API key is absent
   from `db-config.json` `destConfig.defaultConfig` but present under specific
   `destConfig.<sourceType>` lists, wrap the ported property in
