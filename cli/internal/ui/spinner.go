@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -9,18 +10,29 @@ import (
 
 // One spinner per process, like gh's progress indicator. Stderr keeps stdout
 // clean for --json and piping; the library no-ops when stderr is not a TTY.
-// ponytail: not goroutine-safe, every Start/Stop runs on the command goroutine.
-var current *spinner.Spinner
+// The mutex is for parallel tests that load projects concurrently.
+var (
+	spinnerMu sync.Mutex
+	current   *spinner.Spinner
+)
 
 // StartSpinner replaces any running spinner with a new message.
 func StartSpinner(message string) {
-	StopSpinner()
+	spinnerMu.Lock()
+	defer spinnerMu.Unlock()
+	stopLocked()
 	current = spinner.New(spinner.CharSets[14], 100*time.Millisecond,
 		spinner.WithSuffix(" "+message), spinner.WithWriterFile(os.Stderr))
 	current.Start()
 }
 
 func StopSpinner() {
+	spinnerMu.Lock()
+	defer spinnerMu.Unlock()
+	stopLocked()
+}
+
+func stopLocked() {
 	if current != nil {
 		current.Stop()
 		current = nil
