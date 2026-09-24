@@ -99,20 +99,12 @@ func TestAPIError_Error(t *testing.T) {
 			want: `http status code: 400, error code: '', error: 'request validation failed' (details: ["a","b"])`,
 		},
 		{
-			name: "403 names the permission fix",
+			name: "403 names the fix",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Insufficient permissions",
 			},
-			want: "permission denied: 'Insufficient permissions': use an access token with the required permissions, or ask a workspace admin to grant them",
-		},
-		{
-			name: "403 for a disabled feature names the support fix",
-			apiError: &client.APIError{
-				HTTPStatusCode: 403,
-				Message:        "Feature is not enabled for your account: DATA_GRAPH",
-			},
-			want: "feature not enabled: 'Feature is not enabled for your account: DATA_GRAPH': contact RudderStack support to enable it",
+			want: "access denied: 'Insufficient permissions': check the access token's permissions, or ask RudderStack support to enable the feature",
 		},
 	}
 
@@ -150,14 +142,6 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,
 				Message:        "Feature is not enabled for your account: DATA_GRAPH",
-			},
-			want: true,
-		},
-		{
-			name: "returns true for 403 on a flag-gated resource",
-			apiError: &client.APIError{
-				HTTPStatusCode: 403,
-				Message:        `destination "SNOWPIPE_STREAMING" is not available for your account`,
 			},
 			want: true,
 		},

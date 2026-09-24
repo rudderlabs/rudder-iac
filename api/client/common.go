@@ -11,9 +11,6 @@ import (
 const (
 	FeatureFlagNotEnabledMessagePrefix = "Flag is not enabled for your account"
 	FeatureNotEnabledMessagePrefix     = "Feature is not enabled for your account"
-	// Raised on create when the resource's definition is gated behind flags the
-	// account lacks, e.g. `destination "SNOWPIPE_STREAMING" is not available for your account`.
-	ResourceNotAvailableMessageSuffix = "is not available for your account"
 )
 
 // blockedByConnectionsMessages are the refusals the control plane raises when a
@@ -57,13 +54,10 @@ func (e *APIError) Error() string {
 		reason += " " + suffix
 	}
 
-	// Both 403 causes need the user to act, with a token that has the permission
-	// or an account that has the feature, so name that rather than the status line.
-	if e.FeatureFlagNotEnabled() {
-		return fmt.Sprintf("feature not enabled: %s: contact RudderStack support to enable it", reason)
-	}
+	// A 403 is a missing token permission or a feature not enabled for the account;
+	// the server message names which, so add the fix instead of guessing the cause.
 	if e.HTTPStatusCode == http.StatusForbidden {
-		return fmt.Sprintf("permission denied: %s: use an access token with the required permissions, or ask a workspace admin to grant them", reason)
+		return fmt.Sprintf("access denied: %s: check the access token's permissions, or ask RudderStack support to enable the feature", reason)
 	}
 
 	return fmt.Sprintf("http status code: %d, error code: '%s', error: %s", e.HTTPStatusCode, e.ErrorCode, reason)
@@ -100,8 +94,7 @@ func formatDetails(details json.RawMessage) string {
 func (e *APIError) FeatureFlagNotEnabled() bool {
 	return e.HTTPStatusCode == 403 &&
 		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
-			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix) ||
-			strings.Contains(e.Msg(), ResourceNotAvailableMessageSuffix))
+			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))
 }
 
 // BlockedByConnections reports whether this is the control plane refusing to
