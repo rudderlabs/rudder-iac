@@ -81,17 +81,40 @@ destination rETL can reach without saying how it may sync.
   falls back on absence only. Omit the field instead.
 - Both fields require `warehouse` in `SourceTypes`; registration rejects them
   otherwise.
-- `ConnectionRequiredKeys["warehouse"]["cloud"]` follows the warehouse rule:
-  only `schema.json` `allOf` branches whose `if` names
-  `connectionMode.warehouse` count. A negated branch that excludes another
-  source type does not extend to `warehouse`, so Facebook Pixel's
-  `not(connectionMode.web == "device")` gives it no entry. The known case is
-  Braze (`rest_api_key`), backfilled in DEX-834.
+- `ConnectionRequiredKeys["warehouse"]["cloud"]` is derived exactly like every
+  other mode: from the `schema.json` `allOf` branches that name
+  `connectionMode.warehouse`, plus the negated branches whose exclusion does not
+  cover it — an `if.not` applies to every supported pair it does not exclude, so
+  declaring `warehouse` pulls `(warehouse, cloud)` into those branches too. The
+  known cases among already-registered destinations are Braze (`rest_api_key`,
+  named branch) and Facebook Pixel (`access_token`, via
+  `not(connectionMode.web == "device")`).
 
-[retl-inventory.md](retl-inventory.md) records which registered definitions
-declare `warehouse`, the values each carries, the pinned upstream revision and
-the commands that reproduce them. Update it whenever a definition gains or
-changes rETL metadata.
+To reproduce the values from upstream (`$TYPE` is the local type, except
+`linkedin_ads`, whose upstream directory is `linkedIn_ads`):
+
+```sh
+REF=develop
+raw() { gh api "repos/rudderlabs/rudder-integrations-config/contents/src/configurations/destinations/$1?ref=$REF" -H 'Accept: application/vnd.github.raw'; }
+
+# db-config: warehouse support, its modes and the two rETL fields.
+raw "$TYPE/db-config.json" | jq -c '{
+  warehouse: (.config.supportedSourceTypes | index("warehouse") != null),
+  modes: .config.supportedConnectionModes.warehouse,
+  syncBehaviours: (.config | if has("syncBehaviours") then .syncBehaviours else "absent" end),
+  supportsVisualMapper: .config.supportsVisualMapper}'
+
+# schema.json: the connectionMode-conditioned branches with required keys.
+raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?
+  | select((.if | tostring | test("connectionMode")) and .then.required != null)
+  | {if, required: .then.required}'
+
+# Verified vs unverified, from the repo root: the types listed before the
+# UnverifiedDestinations marker are verified, the rest unverified.
+sed -n '/^func newDestinationRegistry/,/^}/p' cli/internal/app/dependencies.go |
+  grep -oE 'UnverifiedDestinations|registering [a-z0-9_]+ destination' |
+  sed -E 's/^registering ([a-z0-9_]+) destination$/\1/'
+```
 
 ## Per-source-type connect-time required keys
 
@@ -132,7 +155,7 @@ key list; `if` says when it applies. Only branches conditioned on
 | --- | --- | --- |
 | `if.properties.connectionMode.anyOf[]`, each branch `{properties: {<apiSourceType>: {const: <mode>}}, required: [<apiSourceType>]}` | Braze | the union of the listed `(source type, mode)` pairs |
 | `if.properties.connectionMode.properties`, mapping `<apiSourceType>` → `{const: <mode>}` (usually with `additionalProperties: false`) | Intercom | each `(source type, mode)` pair in the object |
-| `if.not { … connectionMode … }` | Facebook Pixel: `not(connectionMode.web == "device")` → `accessToken` | every supported `(source type, mode)` pair **except** the ones the negated clause matches, and never `warehouse` (see "rETL metadata") |
+| `if.not { … connectionMode … }` | Facebook Pixel: `not(connectionMode.web == "device")` → `accessToken` | every supported `(source type, mode)` pair **except** the ones the negated clause matches |
 | `if.properties` carries `connectionMode` **and** another config key (Braze `usePlatformSpecificApiKeys: {const: true}`, `if.required: ["usePlatformSpecificApiKeys", "connectionMode"]`) | Braze `appKey` / `androidApiKey` / `iOSApiKey` / `webApiKey` | **not expressible as a `ConnectionRequiredKeys` entry** — the map has no room for a value-dependent condition. Express the whole branch as a custom validator instead (see "Expressing it as a custom validator instead" below) and drop it from this map |
 
 ### Expressing it as a custom validator instead
