@@ -314,7 +314,7 @@ match_behavior:
             message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination cannot receive from both event stream and rETL sources"
       - example_id: "retl-connection-semantic-destination-rejects-warehouse-sources"
         title: "Destination whose definition does not accept warehouse sources"
-        description: "Google Ads supports only event stream sources upstream, and rETL sources connect as warehouse sources. The verified destinations that accept them are active_campaign, am, attentive_tag, bqstream, braze, facebook_conversions, facebook_pixel, ga4, gcs, hs, http, iterable, mp, posthog, s3, tiktok_ads and webhook; customerio accepts them too, but its destination-specific flow is refused."
+        description: "Google Ads supports only event stream sources upstream, and rETL sources connect as warehouse sources."
         files:
           model.yaml: *users-model
           destination.yaml: |
