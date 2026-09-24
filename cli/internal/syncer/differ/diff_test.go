@@ -641,3 +641,61 @@ func TestCompareData_SliceNormalisation(t *testing.T) {
 		assert.Contains(t, diffs, "events")
 	})
 }
+
+// URN is the only PropertyRef field the user configures. Property, IsResolved
+// and Value are internal runtime state, so a difference in them is never a
+// change the user made and must not be reported as drift.
+func TestCompareData_PropertyRef(t *testing.T) {
+	source := resources.PropertyRef{URN: "urn:resource:src", Property: "id"}
+
+	targets := map[string]resources.PropertyRef{
+		"differing Property":   {URN: "urn:resource:src", Property: "externalId"},
+		"differing IsResolved": {URN: "urn:resource:src", Property: "id", IsResolved: true},
+		"differing Value":      {URN: "urn:resource:src", Property: "id", IsResolved: true, Value: "resolved-id"},
+	}
+
+	for name, target := range targets {
+		t.Run(name+" is not drift", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"ref": source},
+				resources.ResourceData{"ref": target},
+			)
+			assert.Empty(t, diffs)
+		})
+
+		t.Run(name+" is not drift through a pointer", func(t *testing.T) {
+			diffs, _ := differ.CompareData(
+				resources.ResourceData{"ref": &source},
+				resources.ResourceData{"ref": &target},
+			)
+			assert.Empty(t, diffs)
+		})
+	}
+
+	t.Run("a differing URN is drift", func(t *testing.T) {
+		target := resources.PropertyRef{URN: "urn:resource:other", Property: "id"}
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"ref": source},
+			resources.ResourceData{"ref": target},
+		)
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"ref": {Property: "ref", SourceValue: source, TargetValue: target},
+		}, diffs)
+	})
+
+	t.Run("an absent ref on one side is drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"ref": (*resources.PropertyRef)(nil)},
+			resources.ResourceData{"ref": &source},
+		)
+		assert.Contains(t, diffs, "ref")
+	})
+
+	t.Run("an absent ref on both sides is not drift", func(t *testing.T) {
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"ref": (*resources.PropertyRef)(nil)},
+			resources.ResourceData{"ref": (*resources.PropertyRef)(nil)},
+		)
+		assert.Empty(t, diffs)
+	})
+}
