@@ -153,24 +153,24 @@ func WorkspaceImport(
 // imported specs are not managed by the CLI until they are applied.
 func printImportSummary(importable *resources.RemoteResources) {
 	var (
-		counts []string
-		merged []string
-		total  int
+		importedRows []string
+		merged       []string
+		total        int
 	)
 	for _, t := range importable.Types() {
-		n := 0
+		imported := 0
 		for _, r := range importable.GetAll(t) {
 			if r.MatchedWith != nil {
 				merged = append(merged, fmt.Sprintf("  %s\t<- remote %s\n", r.MatchedWith.URN(), r.ID))
 				continue
 			}
-			n++
+			imported++
 		}
-		if n == 0 {
+		if imported == 0 {
 			continue
 		}
-		counts = append(counts, fmt.Sprintf("  %s\t%d\n", t, n))
-		total += n
+		importedRows = append(importedRows, fmt.Sprintf("  %s\t%d\n", t, imported))
+		total += imported
 	}
 	// Merged lines start with the local URN, so sorting the lines sorts by URN.
 	slices.Sort(merged)
@@ -179,7 +179,7 @@ func printImportSummary(importable *resources.RemoteResources) {
 		b strings.Builder
 		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	)
-	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(counts, ""))
+	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(importedRows, ""))
 	if len(merged) > 0 {
 		fmt.Fprintf(w, "Merged %d remote resources into existing local resources:\n%s", len(merged), strings.Join(merged, ""))
 	}
