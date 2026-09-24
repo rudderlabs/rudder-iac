@@ -9,7 +9,7 @@ import (
 
 // Warn reports non-fatal generation issues. It is a hook so callers such as the CLI can
 // render warnings their own way without generators depending on a UI package.
-var Warn = func(msg string) { fmt.Fprintln(os.Stderr, msg) }
+var Warn = func(msg string) { fmt.Fprintln(os.Stderr, "Warning:", msg) }
 
 // File represents a generated file
 type File struct {
