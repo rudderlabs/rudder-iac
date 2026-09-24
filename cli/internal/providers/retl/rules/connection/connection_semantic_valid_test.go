@@ -1,16 +1,34 @@
 package connection
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
+	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
+	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
+	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
+	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
@@ -22,13 +40,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// requiredKeysTestConfig backs a definition that demands a config field before
-// a warehouse source may connect — no registered definition does today.
-type requiredKeysTestConfig struct {
-	APIKey         string                `mapstructure:"api_key"`
-	ConnectionMode common.ConnectionMode `mapstructure:"connection_mode"`
-}
-
 // endpointOnlyTestConfig models neither settings block, so the settings check
 // has nowhere to ask for an entry and stays out of these cases' results.
 type endpointOnlyTestConfig struct {
@@ -37,11 +48,12 @@ type endpointOnlyTestConfig struct {
 
 // newTestRegistry holds the real definitions the fixtures name — http reaches
 // warehouse sources through the JSON mapper, bingads also supports the visual
-// mapper, customerio_audience drives its own destination-specific flow — plus
-// four minimal fakes for the cases no shipped definition can produce:
+// mapper, customerio_audience drives its own destination-specific flow,
+// facebook_pixel demands access_token before a warehouse source connects
+// (V-C5) — plus three minimal fakes for the cases no shipped definition can
+// produce:
 //
 //   - "eventstreamonly" declares no warehouse source type at all (V-C4).
-//   - "requiredkeys" demands api_key before a warehouse source connects (V-C5).
 //   - "mirroronly" accepts mirror alone without the visual mapper, so the JSON
 //     mapper flow leaves the two endpoints with no behaviour in common (V-R2).
 //   - "hyphen-mapper" is an object-mapping destination whose names carry a
@@ -53,6 +65,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	require.NoError(t, registry.Register(httpdest.NewDefinition()))
 	require.NoError(t, registry.Register(bingads.NewDefinition()))
 	require.NoError(t, registry.Register(customerioaudience.NewDefinition()))
+	require.NoError(t, registry.Register(facebookpixel.NewDefinition()))
 
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "eventstreamonly",
@@ -60,16 +73,6 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		NewConfig:       func() any { return &endpointOnlyTestConfig{} },
 		SourceTypes:     []string{common.SourceTypeWeb},
 		ConnectionModes: map[string][]string{common.SourceTypeWeb: {"cloud"}},
-	}))
-	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
-		Type:            "requiredkeys",
-		Version:         1,
-		NewConfig:       func() any { return &requiredKeysTestConfig{} },
-		SourceTypes:     []string{common.SourceTypeWarehouse},
-		ConnectionModes: map[string][]string{common.SourceTypeWarehouse: {"cloud"}},
-		ConnectionRequiredKeys: map[string]map[string][]string{
-			common.SourceTypeWarehouse: {"cloud": {"api_key"}},
-		},
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "mirroronly",
@@ -539,12 +542,12 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 		{
 			name: "a destination config missing what a warehouse source needs to connect",
 			destination: destinationFixture{
-				id: "my-required-destination", typ: "requiredkeys", enabled: true,
+				id: "my-pixel-destination", typ: "facebook_pixel", enabled: true,
 				config: map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/destination",
-				Message:   "destination 'my-required-destination' config is missing fields required to connect a 'warehouse' source: api_key",
+				Message:   "destination 'my-pixel-destination' config is missing fields required to connect a 'warehouse' source: access_token",
 			}},
 		},
 		{
@@ -589,6 +592,85 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 
 			graph := connectedGraph(postgresModel(), tt.destination)
 			assert.Equal(t, tt.expected, validateConnectionsSemantic(registry, specOf(c), graph))
+		})
+	}
+}
+
+// TestConnectionSemanticValid_WarehouseBackfill drives the verified
+// destinations DEX-834 admitted to rETL through their real definitions: every
+// one runs a JSON mapper connection on upsert, and an object picks object
+// mapping, on mirror, only where upstream declares the visual mapper.
+// Customer.io is admitted as a warehouse target yet keeps its
+// destination-specific flow refused.
+func TestConnectionSemanticValid_WarehouseBackfill(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	for _, def := range []*definitions.DestinationDefinition{
+		activecampaign.NewDefinition(), am.NewDefinition(), attentivetag.NewDefinition(),
+		bqstream.NewDefinition(), braze.NewDefinition(), customerio.NewDefinition(),
+		facebookconversions.NewDefinition(), facebookpixel.NewDefinition(), ga4.NewDefinition(),
+		gcs.NewDefinition(), hs.NewDefinition(), iterable.NewDefinition(), mp.NewDefinition(),
+		posthog.NewDefinition(), s3.NewDefinition(), tiktokads.NewDefinition(), webhook.NewDefinition(),
+	} {
+		require.NoError(t, registry.Register(def))
+	}
+
+	objectRefused := func(apiType string) []rules.ValidationResult {
+		return []rules.ValidationResult{{
+			Reference: "/connections/0/config/object",
+			Message:   fmt.Sprintf("'object' is not allowed: destination api type %q does not support object mapping", apiType),
+		}}
+	}
+	specificFlow := []rules.ValidationResult{{
+		Reference: "/connections/0/destination",
+		Message:   `destination api type "CUSTOMERIO" uses a destination-specific rETL flow, which is not supported`,
+	}}
+
+	tests := []struct {
+		typ string
+		// requiredKey is what the destination needs before a warehouse source
+		// connects (V-C5), set so the flow checks are all that is left.
+		requiredKey   string
+		jsonMapper    []rules.ValidationResult
+		objectMapping []rules.ValidationResult
+	}{
+		{typ: "active_campaign", objectMapping: objectRefused("ACTIVE_CAMPAIGN")},
+		{typ: "am"},
+		{typ: "attentive_tag", objectMapping: objectRefused("ATTENTIVE_TAG")},
+		{typ: "bqstream", objectMapping: objectRefused("BQSTREAM")},
+		{typ: "braze", requiredKey: "rest_api_key"},
+		{typ: "customerio", jsonMapper: specificFlow, objectMapping: specificFlow},
+		{typ: "facebook_conversions", objectMapping: objectRefused("FACEBOOK_CONVERSIONS")},
+		{typ: "facebook_pixel", requiredKey: "access_token", objectMapping: objectRefused("FACEBOOK_PIXEL")},
+		{typ: "ga4", objectMapping: objectRefused("GA4")},
+		{typ: "gcs", objectMapping: objectRefused("GCS")},
+		{typ: "hs"},
+		{typ: "iterable"},
+		{typ: "mp", objectMapping: objectRefused("MP")},
+		{typ: "posthog", objectMapping: objectRefused("POSTHOG")},
+		{typ: "s3", objectMapping: objectRefused("S3")},
+		{typ: "tiktok_ads", objectMapping: objectRefused("TIKTOK_ADS")},
+		{typ: "webhook", objectMapping: objectRefused("WEBHOOK")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.typ, func(t *testing.T) {
+			t.Parallel()
+
+			config := map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}}
+			if tt.requiredKey != "" {
+				config[tt.requiredKey] = "example-key"
+			}
+			dest := destinationFixture{id: "my-destination", typ: tt.typ, enabled: true, config: config}
+			graph := connectedGraph(postgresModel(), dest)
+
+			jsonEntry := connectionTo(dest.id)
+			assert.Equal(t, tt.jsonMapper, validateConnectionsSemantic(registry, specOf(jsonEntry), graph), "json mapper")
+
+			objectEntry := connectionTo(dest.id)
+			objectMappingEntry(&objectEntry)
+			assert.Equal(t, tt.objectMapping, validateConnectionsSemantic(registry, specOf(objectEntry), graph), "object mapping")
 		})
 	}
 }
