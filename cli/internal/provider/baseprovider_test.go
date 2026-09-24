@@ -42,7 +42,7 @@ func (h *captureHandler) LoadResourcesFromRemote(context.Context) (*resources.Re
 func (h *captureHandler) MapRemoteToState(*resources.RemoteResources) (*state.State, error) {
 	return nil, nil
 }
-func (h *captureHandler) LoadImportable(context.Context, namer.Namer) (*resources.RemoteResources, error) {
+func (h *captureHandler) LoadImportable(context.Context, namer.Namer, ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	return nil, nil
 }
 func (h *captureHandler) FormatForExport(*resources.RemoteResources, namer.Namer, resolver.ReferenceResolver) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {

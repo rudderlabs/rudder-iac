@@ -222,9 +222,15 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteAccount
 }
 
 // LoadImportableResources returns unmanaged accounts (no ExternalID) of a
-// supported definition.
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteAccount, error) {
-	all, err := h.store.ListAll(ctx, client.WithHasExternalID(false))
+// supported definition, or every supported account when the filter asks for
+// managed ones too.
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*RemoteAccount, error) {
+	opts := []client.ListAccountsOption{}
+	if hasExternalID := filter.UnmanagedOnly(); hasExternalID != nil {
+		opts = append(opts, client.WithHasExternalID(*hasExternalID))
+	}
+
+	all, err := h.store.ListAll(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("listing importable accounts: %w", err)
 	}

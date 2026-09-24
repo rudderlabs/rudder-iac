@@ -16,7 +16,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 const (
@@ -41,23 +40,27 @@ func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, 
 	}
 }
 
-func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable custom types from remote catalog")
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: f.UnmanagedOnly()})
 	if err != nil {
 		return nil, fmt.Errorf("getting custom types from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, customType := range customTypes {
-		if customType.ExternalID != "" {
+		if customType.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
 		resourceMap[customType.ID] = &resources.RemoteResource{
-			ID:   customType.ID,
-			Data: customType,
+			ID: customType.ID,
+			// Carried through so idResources keeps an already-managed
+			// resource's upstream identifier instead of renaming it.
+			ExternalID: f.KeepID(customType.ExternalID),
+			Data:       customType,
 		}
 	}
 
@@ -80,21 +83,27 @@ func (p *CustomTypeImportProvider) idResources(
 	p.log.Debug("assigning identifiers to custom types")
 	customTypes := collection.GetAll(types.CustomTypeResourceType)
 
-	for _, customType := range customTypes {
+	candidates := make([]namer.IDCandidate, 0, len(customTypes))
+	for id, customType := range customTypes {
 		data, ok := customType.Data.(*catalog.CustomType)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog custom type")
 		}
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        id,
+			Name:       data.Name,
+			ExternalID: customType.ExternalID,
+		})
+	}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.CustomTypeResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for custom type %s: %w", data.Name, err)
-		}
+	externalIDs, err := namer.ResolveIDs(idNamer, types.CustomTypeResourceType, candidates)
+	if err != nil {
+		return err
+	}
 
-		customType.ExternalID = externalID
-		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, externalID)
+	for id, customType := range customTypes {
+		customType.ExternalID = externalIDs[id]
+		customType.Reference = fmt.Sprintf("#%s:%s", types.CustomTypeResourceType, customType.ExternalID)
 	}
 	return nil
 }

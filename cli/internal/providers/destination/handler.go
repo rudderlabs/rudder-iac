@@ -312,10 +312,11 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	return result, nil
 }
 
-// LoadImportableResources returns unmanaged destinations (no ExternalID) and
-// silently skips destinations whose (Type, Version) pair isn't registered —
+// LoadImportableResources returns unmanaged destinations (no ExternalID), or
+// every destination when the filter asks for managed ones too. Destinations
+// whose (Type, Version) pair isn't registered are silently skipped either way —
 // import can only target definitions the CLI knows how to convert.
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*RemoteDestination, error) {
 	all, err := h.client.Destinations.GetAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
@@ -326,7 +327,7 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 		d := &all[i]
 		// TODO: Move the filtering logic to the API client. Remove
 		// this check and comment once we have API filtering support.
-		if d.ExternalID != "" {
+		if d.ExternalID != "" && !filter.IncludeManaged {
 			continue
 		}
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {

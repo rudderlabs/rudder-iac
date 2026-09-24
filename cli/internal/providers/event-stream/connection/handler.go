@@ -407,11 +407,19 @@ func mapRemoteToState(conn *client.Connection, sourceURN, destinationURN string)
 
 // LoadImportable lists the remote event stream connections not yet managed by
 // the CLI (no externalId) and assigns each an identity derived from its
-// endpoints' names, e.g. "android-source-to-s3".
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+// endpoints' names, e.g. "android-source-to-s3". With IncludeManaged the
+// managed connections come too, keeping their upstream externalId.
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 
-	conns, sourcesByID, err := h.eventStreamConnections(ctx, client.WithConnectionsHasExternalID(false))
+	f := resources.ImportableFilterOf(filter)
+
+	var opts []client.ListConnectionsOption
+	if hasExternalID := f.UnmanagedOnly(); hasExternalID != nil {
+		opts = append(opts, client.WithConnectionsHasExternalID(*hasExternalID))
+	}
+
+	conns, sourcesByID, err := h.eventStreamConnections(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -431,6 +439,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 		destinationsByID[d.ID] = d
 	}
 
+	candidates := make([]namer.IDCandidate, 0, len(conns))
 	for _, conn := range conns {
 		// The source is always present: eventStreamConnections only returns
 		// connections whose source is in the map.
@@ -442,13 +451,22 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 			// the list falls back to its remote id.
 			destinationName = conn.DestinationID
 		}
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
-			Scope: EventStreamConnectionResourceType,
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        conn.ID,
+			Name:       fmt.Sprintf("%s-to-%s", src.Name, destinationName),
+			ExternalID: f.KeepID(conn.ExternalID),
 		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
-		}
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, EventStreamConnectionResourceType, candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, conn := range conns {
+		src := sourcesByID[conn.SourceID]
+		dst := destinationsByID[conn.DestinationID]
+		externalID := externalIDs[conn.ID]
 		resourceMap[conn.ID] = &resources.RemoteResource{
 			ID:         conn.ID,
 			ExternalID: externalID,

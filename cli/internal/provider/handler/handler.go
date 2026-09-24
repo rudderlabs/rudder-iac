@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
 // HandlerImpl defines the resource-specific operations that each handler implementation must
@@ -50,7 +51,7 @@ type HandlerImpl[Spec any, Res any, State any, Remote RemoteResource] interface 
 	// including those without external IDs. This is used during import operations
 	// to discover resources that can be brought under IaC management. The returned
 	// resources will be presented to users as candidates for import.
-	LoadImportableResources(ctx context.Context) ([]*Remote, error)
+	LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*Remote, error)
 
 	// MapRemoteToState converts a remote API resource into the corresponding Res
 	// (input/configuration) and State (output) representations used internally.

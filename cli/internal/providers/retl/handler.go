@@ -84,7 +84,7 @@ type resourceHandler interface {
 	// LoadImportable loads all importable resources from remote
 	// The idNamer is used to generate unique IDs for the resources.
 	// Returns a collection of resources or an error if loading fails.
-	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error)
 
 	// FormatForExport formats the resources for export
 	// The idNamer is used to generate unique IDs for the resources.

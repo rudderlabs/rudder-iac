@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKebabCase_Name(t *testing.T) {
@@ -176,4 +177,57 @@ func TestCamelCase_Name(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestResolveIDs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("keeps upstream externalIDs and generates the rest", func(t *testing.T) {
+		n := NewExternalIdNamer(NewKebabCase())
+
+		ids, err := ResolveIDs(n, "source", []IDCandidate{
+			{Key: "r1", Name: "Prod HTTP", ExternalID: "prod-http"},
+			{Key: "r2", Name: "Staging HTTP"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"r1": "prod-http", "r2": "staging-http"}, ids)
+	})
+
+	t.Run("a generated name never lands on a kept one", func(t *testing.T) {
+		n := NewExternalIdNamer(NewKebabCase())
+
+		// Both resolve to "prod-http": one keeps it, the other must not get it.
+		ids, err := ResolveIDs(n, "source", []IDCandidate{
+			{Key: "managed", Name: "Prod HTTP", ExternalID: "prod-http"},
+			{Key: "unmanaged", Name: "Prod HTTP"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "prod-http", ids["managed"])
+		assert.NotEqual(t, "prod-http", ids["unmanaged"])
+	})
+
+	t.Run("an externalID already loaded by the caller is not an error", func(t *testing.T) {
+		n := NewExternalIdNamer(NewKebabCase())
+		// Import preloads the local project's IDs, which for a managed resource
+		// are the same identifiers ResolveIDs then reserves.
+		require.NoError(t, n.Load([]ScopeName{{Name: "prod-http", Scope: "source"}}))
+
+		ids, err := ResolveIDs(n, "source", []IDCandidate{
+			{Key: "r1", Name: "Prod HTTP", ExternalID: "prod-http"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"r1": "prod-http"}, ids)
+	})
+
+	t.Run("scopes are independent", func(t *testing.T) {
+		n := NewExternalIdNamer(NewKebabCase())
+
+		sources, err := ResolveIDs(n, "source", []IDCandidate{{Key: "s", Name: "Checkout"}})
+		require.NoError(t, err)
+		destinations, err := ResolveIDs(n, "destination", []IDCandidate{{Key: "d", Name: "Checkout"}})
+		require.NoError(t, err)
+
+		assert.Equal(t, "checkout", sources["s"])
+		assert.Equal(t, "checkout", destinations["d"])
+	})
 }

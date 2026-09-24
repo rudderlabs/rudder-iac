@@ -87,9 +87,8 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteD
 	return h.listAllDataGraphs(ctx, &hasExternalID)
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteDataGraph, error) {
-	hasExternalID := false
-	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*model.RemoteDataGraph, error) {
+	dataGraphs, err := h.listAllDataGraphs(ctx, filter.UnmanagedOnly())
 	if err != nil {
 		return nil, err
 	}

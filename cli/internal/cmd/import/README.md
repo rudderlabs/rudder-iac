@@ -13,6 +13,13 @@ so on), the next `apply` fails on the collision.
 
 `--merge` (Smart Import) solves that.
 
+> **Starting from nothing?** If you have no project at all — a fresh checkout, a
+> new sandbox, a machine with credentials and no specs — you want
+> [`rudder-cli init`](../initcmd/README.md) instead. It writes the whole
+> workspace, managed resources included, into an empty directory, and applying
+> what comes out reports no changes. `import workspace` is for adding to a project
+> that already exists.
+
 > **Status: experimental.** `--merge` is behind an experimental flag and is **off
 > by default**. Without the flag, `import workspace` behaves exactly as before and
 > `--merge` is rejected. See [Enabling `--merge`](#enabling---merge).

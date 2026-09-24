@@ -107,19 +107,19 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 	return allModels, nil
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.RemoteModel, error) {
-	hasExternalID := false
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*dgModel.RemoteModel, error) {
+	// Only unmanaged data graphs by default — models under a managed DG are not
+	// importable. A clone (IncludeManaged) wants both.
+	hasExternalID := filter.UnmanagedOnly()
 
-	// Only fetch unmanaged data graphs — models under managed DGs are not importable
-	dataGraphs, err := h.listAllDataGraphs(ctx, &hasExternalID)
+	dataGraphs, err := h.listAllDataGraphs(ctx, hasExternalID)
 	if err != nil {
 		return nil, err
 	}
 
-	// For each data graph, fetch all models without external IDs
 	var allModels []*dgModel.RemoteModel
 	for _, dg := range dataGraphs {
-		models, err := h.listAllModelsForDataGraph(ctx, dg.ID, &hasExternalID)
+		models, err := h.listAllModelsForDataGraph(ctx, dg.ID, hasExternalID)
 		if err != nil {
 			return nil, fmt.Errorf("loading importable models for data graph %s: %w", dg.ID, err)
 		}

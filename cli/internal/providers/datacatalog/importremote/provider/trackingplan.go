@@ -17,7 +17,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
-	"github.com/samber/lo"
 )
 
 const (
@@ -43,23 +42,27 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 	}
 }
 
-func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable tracking plans from remote catalog")
 	collection := resources.NewRemoteResources()
+	f := resources.ImportableFilterOf(filter)
 
-	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: f.UnmanagedOnly()})
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plans from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, trackingPlan := range trackingPlans {
-		if trackingPlan.ExternalID != "" {
+		if trackingPlan.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
 		resourceMap[trackingPlan.ID] = &resources.RemoteResource{
-			ID:   trackingPlan.ID,
-			Data: trackingPlan,
+			ID: trackingPlan.ID,
+			// Carried through so idResources keeps an already-managed
+			// resource's upstream identifier instead of renaming it.
+			ExternalID: f.KeepID(trackingPlan.ExternalID),
+			Data:       trackingPlan,
 		}
 	}
 
@@ -82,21 +85,27 @@ func (p *TrackingPlanImportProvider) idResources(
 	p.log.Debug("assigning identifiers to tracking plans")
 	trackingPlans := collection.GetAll(types.TrackingPlanResourceType)
 
-	for _, tp := range trackingPlans {
+	candidates := make([]namer.IDCandidate, 0, len(trackingPlans))
+	for id, tp := range trackingPlans {
 		data, ok := tp.Data.(*catalog.TrackingPlanWithIdentifiers)
 		if !ok {
 			return fmt.Errorf("unable to cast remote resource to catalog tracking plan")
 		}
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        id,
+			Name:       data.Name,
+			ExternalID: tp.ExternalID,
+		})
+	}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.TrackingPlanResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for tracking plan %s: %w", data.Name, err)
-		}
+	externalIDs, err := namer.ResolveIDs(idNamer, types.TrackingPlanResourceType, candidates)
+	if err != nil {
+		return err
+	}
 
-		tp.ExternalID = externalID
-		tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, externalID)
+	for id, tp := range trackingPlans {
+		tp.ExternalID = externalIDs[id]
+		tp.Reference = fmt.Sprintf("#%s:%s", localcatalog.KindTrackingPlansV1, tp.ExternalID)
 	}
 	return nil
 }

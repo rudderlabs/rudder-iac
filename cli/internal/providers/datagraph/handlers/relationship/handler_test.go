@@ -640,7 +640,7 @@ func TestLoadImportableResources(t *testing.T) {
 	}
 
 	h := &HandlerImpl{client: mockClient}
-	remotes, err := h.LoadImportableResources(context.Background())
+	remotes, err := h.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
 
@@ -740,7 +740,7 @@ func TestLoadRemoteOperations_Errors(t *testing.T) {
 			if tt.loadRemote {
 				remotes, err = h.LoadRemoteResources(context.Background())
 			} else {
-				remotes, err = h.LoadImportableResources(context.Background())
+				remotes, err = h.LoadImportableResources(context.Background(), resources.ImportableFilter{})
 			}
 
 			require.Error(t, err)

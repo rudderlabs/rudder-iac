@@ -567,32 +567,41 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 	return result, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 	sources, err := h.client.GetSources(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
-	resourceMap := make(map[string]*resources.RemoteResource)
+	f := resources.ImportableFilterOf(filter)
+	importable := make([]sourceClient.EventStreamSource, 0, len(sources))
+	candidates := make([]namer.IDCandidate, 0, len(sources))
 	for _, source := range sources {
-		if source.ExternalID != "" {
+		if source.ExternalID != "" && !f.IncludeManaged {
 			continue
 		}
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  source.Name,
-			Scope: ResourceType,
+		importable = append(importable, source)
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        source.ID,
+			Name:       source.Name,
+			ExternalID: f.KeepID(source.ExternalID),
 		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
-		}
-		ref := fmt.Sprintf("#%s:%s", ResourceType, externalID)
-		remoteResource := &resources.RemoteResource{
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, ResourceType, candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMap := make(map[string]*resources.RemoteResource, len(importable))
+	for _, source := range importable {
+		externalID := externalIDs[source.ID]
+		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
-			Reference:  ref,
+			Reference:  fmt.Sprintf("#%s:%s", ResourceType, externalID),
 			Data:       &source,
 		}
-		resourceMap[source.ID] = remoteResource
 	}
 	collection.Set(ResourceType, resourceMap)
 	return collection, nil

@@ -111,18 +111,20 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteL
 	return result, nil
 }
 
-func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteLibrary, error) {
+func (h *HandlerImpl) LoadImportableResources(ctx context.Context, filter resources.ImportableFilter) ([]*model.RemoteLibrary, error) {
 	libraries, err := h.store.ListLibraries(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing libraries: %w", err)
 	}
 
-	// Fetch resources WITHOUT external IDs (unmanaged resources)
+	// Unmanaged resources only (no external ID), unless the caller asked for
+	// the managed ones too — see resources.ImportableFilter.
 	result := make([]*model.RemoteLibrary, 0)
 	for _, l := range libraries {
-		if l.ExternalID == "" {
-			result = append(result, &model.RemoteLibrary{TransformationLibrary: l})
+		if l.ExternalID != "" && !filter.IncludeManaged {
+			continue
 		}
+		result = append(result, &model.RemoteLibrary{TransformationLibrary: l})
 	}
 	return result, nil
 }

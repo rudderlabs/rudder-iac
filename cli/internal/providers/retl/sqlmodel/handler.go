@@ -472,22 +472,30 @@ func (h *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 	return s, nil
 }
 
-func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer, filter ...resources.ImportableFilter) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	hasExternalID := false
-	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(modelSourceTypeFilter), retlClient.WithHasExternalId(&hasExternalID))
+	f := resources.ImportableFilterOf(filter)
+	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(modelSourceTypeFilter), retlClient.WithHasExternalId(f.UnmanagedOnly()))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
 	}
+
+	candidates := make([]namer.IDCandidate, 0, len(sources.Data))
+	for _, source := range sources.Data {
+		candidates = append(candidates, namer.IDCandidate{
+			Key:        source.ID,
+			Name:       source.Name,
+			ExternalID: f.KeepID(source.ExternalID),
+		})
+	}
+
+	externalIDs, err := namer.ResolveIDs(idNamer, ResourceType, candidates)
+	if err != nil {
+		return nil, err
+	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources.Data {
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  source.Name,
-			Scope: ResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for source %s: %w", source.Name, err)
-		}
+		externalID := externalIDs[source.ID]
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: externalID,
