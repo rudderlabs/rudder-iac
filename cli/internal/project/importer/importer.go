@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -143,7 +145,49 @@ func WorkspaceImport(
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
+	printImportSummary(importable)
 	return nil
+}
+
+// printImportSummary shows what landed on disk and that apply is still needed:
+// imported specs are not managed by the CLI until they are applied.
+func printImportSummary(importable *resources.RemoteResources) {
+	var (
+		counts []string
+		merged []string
+		total  int
+	)
+	for _, t := range importable.Types() {
+		n := 0
+		for _, r := range importable.GetAll(t) {
+			if r.MatchedWith != nil {
+				merged = append(merged, fmt.Sprintf("  %s\t<- remote %s\n", r.MatchedWith.URN(), r.ID))
+				continue
+			}
+			n++
+		}
+		if n == 0 {
+			continue
+		}
+		counts = append(counts, fmt.Sprintf("  %s\t%d\n", t, n))
+		total += n
+	}
+	// Merged lines start with the local URN, so sorting the lines sorts by URN.
+	slices.Sort(merged)
+
+	var (
+		b strings.Builder
+		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	)
+	if total > 0 {
+		fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(counts, ""))
+	}
+	if len(merged) > 0 {
+		fmt.Fprintf(w, "Merged %d remote resources into existing local resources:\n%s", len(merged), strings.Join(merged, ""))
+	}
+	fmt.Fprint(w, "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n")
+	_ = w.Flush()
+	ui.Print(b.String())
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,

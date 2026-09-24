@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -253,4 +255,36 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))
 	assert.NoError(t, err, "import-manifest.yaml must be written when importMerge is on")
+}
+
+func TestWorkspaceImport_PrintsSummary(t *testing.T) {
+	var out bytes.Buffer
+	ui.SetWriter(&out)
+	t.Cleanup(ui.RestoreWriter)
+
+	importable := importableCollection()
+	importable.Set("event-stream-source", map[string]*resources.RemoteResource{
+		"rid-2": {ID: "rid-2", ExternalID: "web"},
+		"rid-3": {ID: "rid-3", ExternalID: "ios"},
+		"rid-4": {ID: "rid-4", ExternalID: "android", MatchedWith: resources.NewResource("android", "event-stream-source", nil, nil)},
+	})
+	importable.Set("tracking-plan", map[string]*resources.RemoteResource{
+		"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)},
+	})
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: t.TempDir(),
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{importable: importable}, ImportOptions{Merge: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, `Imported 3 resources into imported/:
+  event-stream-source  2
+  source               1
+Merged 2 remote resources into existing local resources:
+  event-stream-source:android  <- remote rid-4
+  tracking-plan:checkout       <- remote tp-1
+
+The imported resources are not managed by the CLI yet. Run `+"`rudder-cli apply`"+` to start managing them.
+`, out.String())
 }
