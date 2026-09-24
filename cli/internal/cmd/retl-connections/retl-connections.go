@@ -22,6 +22,7 @@ func NewCmdRetlConnections() *cobra.Command {
 
 	cmd.AddCommand(newCmdSync())
 	cmd.AddCommand(newCmdStop())
+	cmd.AddCommand(newCmdSyncs())
 
 	return cmd
 }
