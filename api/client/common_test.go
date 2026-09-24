@@ -154,6 +154,14 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "returns true for 403 on a flag-gated resource",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        `destination "SNOWPIPE_STREAMING" is not available for your account`,
+			},
+			want: true,
+		},
+		{
 			name: "returns false for 403 with different message",
 			apiError: &client.APIError{
 				HTTPStatusCode: 403,

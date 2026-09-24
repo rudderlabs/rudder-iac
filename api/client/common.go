@@ -11,6 +11,9 @@ import (
 const (
 	FeatureFlagNotEnabledMessagePrefix = "Flag is not enabled for your account"
 	FeatureNotEnabledMessagePrefix     = "Feature is not enabled for your account"
+	// Raised on create when the resource's definition is gated behind flags the
+	// account lacks, e.g. `destination "SNOWPIPE_STREAMING" is not available for your account`.
+	ResourceNotAvailableMessageSuffix = "is not available for your account"
 )
 
 // blockedByConnectionsMessages are the refusals the control plane raises when a
@@ -97,7 +100,8 @@ func formatDetails(details json.RawMessage) string {
 func (e *APIError) FeatureFlagNotEnabled() bool {
 	return e.HTTPStatusCode == 403 &&
 		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
-			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))
+			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix) ||
+			strings.Contains(e.Msg(), ResourceNotAvailableMessageSuffix))
 }
 
 // BlockedByConnections reports whether this is the control plane refusing to
