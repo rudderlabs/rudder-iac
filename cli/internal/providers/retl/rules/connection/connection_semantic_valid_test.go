@@ -48,10 +48,9 @@ type endpointOnlyTestConfig struct {
 
 // newTestRegistry holds the real definitions the fixtures name — http reaches
 // warehouse sources through the JSON mapper, bingads also supports the visual
-// mapper, customerio_audience drives its own destination-specific flow,
-// facebook_pixel demands access_token before a warehouse source connects
-// (V-C5) — plus three minimal fakes for the cases no shipped definition can
-// produce:
+// mapper, customerio_audience drives its own destination-specific flow, braze
+// demands rest_api_key before a warehouse source connects (V-C5) — plus three
+// minimal fakes for the cases no shipped definition can produce:
 //
 //   - "eventstreamonly" declares no warehouse source type at all (V-C4).
 //   - "mirroronly" accepts mirror alone without the visual mapper, so the JSON
@@ -65,7 +64,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	require.NoError(t, registry.Register(httpdest.NewDefinition()))
 	require.NoError(t, registry.Register(bingads.NewDefinition()))
 	require.NoError(t, registry.Register(customerioaudience.NewDefinition()))
-	require.NoError(t, registry.Register(facebookpixel.NewDefinition()))
+	require.NoError(t, registry.Register(braze.NewDefinition()))
 
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "eventstreamonly",
@@ -542,12 +541,12 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 		{
 			name: "a destination config missing what a warehouse source needs to connect",
 			destination: destinationFixture{
-				id: "my-pixel-destination", typ: "facebook_pixel", enabled: true,
+				id: "my-braze-destination", typ: "braze", enabled: true,
 				config: map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/destination",
-				Message:   "destination 'my-pixel-destination' config is missing fields required to connect a 'warehouse' source: access_token",
+				Message:   "destination 'my-braze-destination' config is missing fields required to connect a 'warehouse' source: rest_api_key",
 			}},
 		},
 		{
