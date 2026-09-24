@@ -596,13 +596,13 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 	}
 }
 
-// TestConnectionSemanticValid_WarehouseBackfill drives the verified
-// destinations DEX-834 admitted to rETL through their real definitions: every
-// one runs a JSON mapper connection on upsert, and an object picks object
+// TestConnectionSemanticValid_WarehouseDestinationFlows drives verified
+// destinations that accept warehouse sources through their real definitions:
+// every one runs a JSON mapper connection on upsert, and an object picks object
 // mapping, on mirror, only where upstream declares the visual mapper.
-// Customer.io is admitted as a warehouse target yet keeps its
-// destination-specific flow refused.
-func TestConnectionSemanticValid_WarehouseBackfill(t *testing.T) {
+// Customer.io accepts warehouse sources yet keeps its destination-specific
+// flow refused.
+func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
