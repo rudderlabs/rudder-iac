@@ -7,13 +7,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/typescript"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 func main() {
-	// Keep generator warnings off stdout so the file redirect stays clean.
-	ui.SetWriter(os.Stderr)
-
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 	gen := &typescript.Generator{}
 

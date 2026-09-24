@@ -7,7 +7,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 const Platform = "typescript"
@@ -636,12 +635,12 @@ func processEventRules(p *plan.TrackingPlan, ctx *TSContext, nr *core.NameRegist
 		rule := ruleMap[key]
 
 		if !isSupportedEventType(rule.Event.EventType) {
-			ui.PrintWarning(fmt.Sprintf("unsupported event type %q, skipping", rule.Event.EventType))
+			core.Warn(fmt.Sprintf("unsupported event type %q, skipping", rule.Event.EventType))
 			continue
 		}
 
 		if !validateEventSection(rule) {
-			ui.PrintWarning(fmt.Sprintf("invalid section %q for event type %q, skipping", rule.Section, rule.Event.EventType))
+			core.Warn(fmt.Sprintf("invalid section %q for event type %q, skipping", rule.Section, rule.Event.EventType))
 			continue
 		}
 

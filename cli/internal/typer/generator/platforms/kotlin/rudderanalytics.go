@@ -6,7 +6,6 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 // sectionToParamName converts an EventRuleSection to the appropriate parameter name
@@ -68,7 +67,7 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 		if rule.Event.Name != "" {
 			builder.WriteString(fmt.Sprintf(" and event name %q", rule.Event.Name))
 		}
-		ui.PrintWarning(builder.String())
+		core.Warn(builder.String())
 
 		return nil, nil // Skip invalid event rules
 	}
@@ -84,7 +83,7 @@ func createRudderAnalyticsMethod(rule *plan.EventRule, nameRegistry *core.NameRe
 	case plan.EventTypeScreen:
 		err = buildScreenMethod(rule, method, nameRegistry)
 	default:
-		ui.PrintWarning(fmt.Sprintf("unsupported event type: %q", rule.Event.EventType))
+		core.Warn(fmt.Sprintf("unsupported event type: %q", rule.Event.EventType))
 		return nil, nil // Skip page events
 	}
 

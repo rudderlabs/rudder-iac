@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -82,6 +83,7 @@ func newCmdGenerate() *cobra.Command {
 				return err
 			}
 
+			core.Warn = ui.PrintWarning
 			rudderTyper := typer.NewRudderTyper(planProvider)
 
 			// Parse platform-specific options from key=value pairs

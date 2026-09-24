@@ -1,6 +1,15 @@
 package core
 
-import "github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+import (
+	"fmt"
+	"os"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+)
+
+// Warn reports non-fatal generation issues. It is a hook so callers such as the CLI can
+// render warnings their own way without generators depending on a UI package.
+var Warn = func(msg string) { fmt.Fprintln(os.Stderr, msg) }
 
 // File represents a generated file
 type File struct {

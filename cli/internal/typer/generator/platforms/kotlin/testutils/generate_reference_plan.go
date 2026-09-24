@@ -8,7 +8,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/testutils"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 // Writes the reference Kotlin output (and a composeImmutable variant) into the
@@ -16,10 +15,7 @@ import (
 // suitable for the in-repo Makefile target; override the destination root via
 // the first arg if needed.
 func main() {
-  // Keep generator warnings off stdout so the file redirect stays clean.
-	ui.SetWriter(os.Stderr)
-	
-  root := "cli/internal/typer/generator/platforms/kotlin/testdata/validator/src/main/kotlin"
+  root :="cli/internal/typer/generator/platforms/kotlin/testdata/validator/src/main/kotlin"
 	if len(os.Args) > 1 {
 		root = os.Args[1]
 	}
