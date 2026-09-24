@@ -11,8 +11,15 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
- 
-const noResourcesFoundMsg = "No resources found"
+
+const (
+	noResourcesFoundMsg = "No resources found"
+
+	// Header row plus the border rendered underneath it.
+	tableHeaderHeight = 2
+	// Help footer, plus one line so the first row is not scrolled out of view.
+	reservedHeight = 2
+)
 
 type model struct {
 	table     table.Model
@@ -20,7 +27,9 @@ type model struct {
 	keys      keyMap
 	resources []resources.ResourceData
 	width     int
-	height    int
+	// Rows the table and the details pane may each occupy. Zero means the
+	// terminal height is unknown and neither pane is constrained.
+	maxHeight int
 }
 
 type keyMap struct {
@@ -62,8 +71,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.height = msg.Height
 		m.help.Width = msg.Width
+		m.maxHeight = availableHeight(msg.Height)
+		m.table.SetHeight(tableHeight(len(m.resources), m.maxHeight))
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
@@ -90,9 +100,12 @@ func (m model) View() string {
 	detailsContent := lipgloss.NewStyle().Padding(0, 2).Render(detailsView)
 	fullDetailsView := lipgloss.JoinVertical(lipgloss.Top, detailsHeader, ruler, detailsContent)
 
-	// Main Layout
-	detailsStyle := lipgloss.NewStyle().
-		Padding(0, 2)
+	// Main Layout. The details pane is held to the same budget as the table, so
+	// that neither side of the join can outgrow the terminal.
+	detailsStyle := lipgloss.NewStyle().Padding(0, 2)
+	if m.maxHeight > 0 {
+		detailsStyle = detailsStyle.MaxHeight(m.maxHeight)
+	}
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -106,12 +119,25 @@ func (m model) View() string {
 	)
 }
 
-func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
-	if len(rs) == 0 {
-		ui.Println(noResourcesFoundMsg)
-		return nil
-	}
+// availableHeight is the room the panes have on a terminal of the given height,
+// once the help footer and one spare line are reserved.
+func availableHeight(terminalHeight int) int {
+	return max(terminalHeight-reservedHeight, tableHeaderHeight+1)
+}
 
+// tableHeight sizes the table to its content without letting it outgrow the
+// rows available to it, so that large result sets scroll inside the table
+// viewport instead of pushing the details pane and help footer off screen. A
+// budget of zero leaves every row in place, for output that is not going to a
+// terminal and will never receive a WindowSizeMsg.
+func tableHeight(rowCount, available int) int {
+	if available <= 0 {
+		return rowCount + tableHeaderHeight
+	}
+	return min(rowCount+tableHeaderHeight, available)
+}
+
+func newModel(rs []resources.ResourceData, columnWidths map[string]int) model {
 	// Default column widths
 	idWidth := 27
 	nameWidth := 30
@@ -153,7 +179,6 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(len(rows)+1), // +1 for the header
 	)
 
 	s := table.DefaultStyles()
@@ -167,14 +192,33 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		Bold(false)
 	t.SetStyles(s)
 
-	m := model{
+	// Piped output never receives a WindowSizeMsg to correct an initial guess,
+	// so it keeps every row rather than silently losing some of them.
+	maxHeight := 0
+	if h := ui.GetTerminalHeight(); h > 0 {
+		maxHeight = availableHeight(h)
+	}
+
+	// Set after the styles, because the header border changes how a height maps
+	// onto rendered lines.
+	t.SetHeight(tableHeight(len(rows), maxHeight))
+
+	return model{
 		table:     t,
 		help:      help.New(),
 		keys:      keys,
 		resources: rs,
+		maxHeight: maxHeight,
+	}
+}
+
+func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]int) error {
+	if len(rs) == 0 {
+		ui.Println(noResourcesFoundMsg)
+		return nil
 	}
 
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(newModel(rs, columnWidths))
 	if _, err := p.Run(); err != nil {
 		return err
 	}
