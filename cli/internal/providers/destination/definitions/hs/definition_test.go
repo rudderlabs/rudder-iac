@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -43,6 +43,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -51,7 +52,14 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.Nil(t, registered.ConnectionRequiredKeys("web", "cloud"))
+	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
 	assert.Empty(t, registered.GatedKeyPaths())
+
+	// db-config.json declares the visual mapper but no syncBehaviours, so the
+	// backend fallback applies.
+	assert.Nil(t, hs.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.True(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("HS", 1)
 	require.NoError(t, err)
@@ -529,6 +537,7 @@ func TestHSConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

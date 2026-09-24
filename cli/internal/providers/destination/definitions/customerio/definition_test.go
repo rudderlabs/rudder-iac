@@ -33,13 +33,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json narrows syncBehaviours to upsert and mirror and declares no
+	// visual mapper.
+	assert.Equal(t, []string{"upsert", "mirror"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -52,12 +56,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, sourceType)
 	}
+
+	// site_id and api_key are required outright, so no connect-time entry adds
+	// anything for a warehouse source.
+	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
 
 	assert.Equal(t, map[string][]string{
 		"auto_track_device_attributes/android":         {"android"},
@@ -404,6 +413,7 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
