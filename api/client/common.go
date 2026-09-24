@@ -54,10 +54,14 @@ func (e *APIError) Error() string {
 		reason += " " + suffix
 	}
 
-	// A 403 is a missing token permission or a feature not enabled for the account;
-	// the server message names which, so add the fix instead of guessing the cause.
-	if e.HTTPStatusCode == http.StatusForbidden {
-		return fmt.Sprintf("access denied: %s: check the access token's permissions, or ask RudderStack support to enable the feature", reason)
+	// Name a fix only for 403s whose message says what they are: the control plane
+	// also uses 403 for business-rule refusals (e.g. a tracking plan still connected
+	// to sources) that no token or feature change resolves.
+	if e.FeatureFlagNotEnabled() {
+		return fmt.Sprintf("feature not enabled: %s: ask RudderStack support to enable it for your account", reason)
+	}
+	if e.HTTPStatusCode == http.StatusForbidden && strings.Contains(strings.ToLower(e.Msg()), "permission") {
+		return fmt.Sprintf("permission denied: %s: use an access token with the required permissions, or ask a workspace admin to grant them", reason)
 	}
 
 	return fmt.Sprintf("http status code: %d, error code: '%s', error: %s", e.HTTPStatusCode, e.ErrorCode, reason)
