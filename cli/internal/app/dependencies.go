@@ -164,6 +164,18 @@ func NewDeps() (Deps, error) {
 	}, nil
 }
 
+// NewOfflineProject creates a project for local-only validation/generation flows.
+// It uses the same provider composition as authenticated commands so rule coverage
+// stays identical, but skips credential checks because callers do not load remote state.
+func NewOfflineProject(opts ...project.ProjectOption) (project.Project, error) {
+	cp, err := newCompositeProvider()
+	if err != nil {
+		return nil, fmt.Errorf("building offline provider: %w", err)
+	}
+
+	return project.New(cp, opts...), nil
+}
+
 // GenerateRuleCatalog composes the same providers project validation uses and
 // hands them to ruledoc.Build, which joins the live rules with the authored
 // *.docs.yaml fragments and returns the validated catalog.
@@ -186,18 +198,17 @@ func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, err
 }
 
 // newCompositeProvider builds the composite provider without requiring
-// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
-// enumerates rules and reads authored fragments but makes no network calls, so
-// it skips the auth check NewDeps enforces and feeds client.New a placeholder
-// token (an empty token is rejected outright, which would otherwise break
-// generation in CI where no credentials are configured). It shares
-// composeProviders with NewDeps so the documented rule set stays identical to
-// the one project validation observes — they can't drift.
+// credentials. It is used by local-only flows that enumerate rules or validate
+// specs but do not load remote state, so it skips the auth check NewDeps enforces
+// and feeds client.New a placeholder token (an empty token is rejected outright,
+// which would otherwise break CI where no credentials are configured). It shares
+// composeProviders with NewDeps so every local and authenticated validation path
+// observes the same providers and rules.
 func newCompositeProvider() (provider.Provider, error) {
 	cfg := config.GetConfig()
 
 	c, err := client.New(
-		"rule-doc-generation", // unused: generation makes no API calls
+		"offline-local-only", // unused: local-only flows make no API calls
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+v),
 	)
