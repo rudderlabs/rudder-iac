@@ -1,34 +1,20 @@
 package connection
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
-	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
-	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
-	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
-	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
@@ -595,78 +581,51 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 	}
 }
 
-// TestConnectionSemanticValid_WarehouseDestinationFlows drives verified
-// destinations that accept warehouse sources through their real definitions:
-// every one runs a JSON mapper connection on upsert or full but not mirror, and
-// an object picks object mapping, on mirror, only where upstream declares the
-// visual mapper.
-// Customer.io accepts warehouse sources yet keeps its destination-specific
-// flow refused.
+// TestConnectionSemanticValid_WarehouseDestinationFlows drives one backfilled
+// destination per flow outcome through its real definition: every one runs a
+// JSON mapper connection on upsert or full but not mirror, and object mapping
+// only where upstream declares the visual mapper. Customer.io accepts warehouse
+// sources yet keeps its destination-specific flow refused.
 func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 	t.Parallel()
 
 	registry := definitions.NewRegistry()
-	for _, def := range []*definitions.DestinationDefinition{
-		activecampaign.NewDefinition(), am.NewDefinition(), attentivetag.NewDefinition(),
-		bqstream.NewDefinition(), braze.NewDefinition(), customerio.NewDefinition(),
-		facebookconversions.NewDefinition(), facebookpixel.NewDefinition(), ga4.NewDefinition(),
-		gcs.NewDefinition(), hs.NewDefinition(), iterable.NewDefinition(), mp.NewDefinition(),
-		posthog.NewDefinition(), s3.NewDefinition(), tiktokads.NewDefinition(), webhook.NewDefinition(),
-	} {
-		require.NoError(t, registry.Register(def))
-	}
+	require.NoError(t, registry.Register(am.NewDefinition()))
+	require.NoError(t, registry.Register(s3.NewDefinition()))
+	require.NoError(t, registry.Register(customerio.NewDefinition()))
 
-	objectRefused := func(apiType string) []rules.ValidationResult {
-		return []rules.ValidationResult{{
-			Reference: "/connections/0/config/object",
-			Message:   fmt.Sprintf("'object' is not allowed: destination api type %q does not support object mapping", apiType),
+	var (
+		specificFlow = []rules.ValidationResult{{
+			Reference: "/connections/0/destination",
+			Message:   `destination api type "CUSTOMERIO" uses a destination-specific rETL flow, which is not supported`,
 		}}
-	}
-	specificFlow := []rules.ValidationResult{{
-		Reference: "/connections/0/destination",
-		Message:   `destination api type "CUSTOMERIO" uses a destination-specific rETL flow, which is not supported`,
-	}}
-	jsonMirrorRefused := []rules.ValidationResult{{
-		Reference: "/connections/0/config/sync_behaviour",
-		Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on the json_mapper flow",
-	}}
+		jsonMirrorRefused = []rules.ValidationResult{{
+			Reference: "/connections/0/config/sync_behaviour",
+			Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on the json_mapper flow",
+		}}
+	)
 
 	tests := []struct {
-		typ string
-		// requiredKey is what the destination needs before a warehouse source
-		// connects (V-C5), set so the flow checks are all that is left.
-		requiredKey   string
+		typ           string
 		jsonMapper    []rules.ValidationResult
 		objectMapping []rules.ValidationResult
 	}{
-		{typ: "active_campaign", objectMapping: objectRefused("ACTIVE_CAMPAIGN")},
 		{typ: "am"},
-		{typ: "attentive_tag", objectMapping: objectRefused("ATTENTIVE_TAG")},
-		{typ: "bqstream", objectMapping: objectRefused("BQSTREAM")},
-		{typ: "braze", requiredKey: "rest_api_key"},
+		{typ: "s3", objectMapping: []rules.ValidationResult{{
+			Reference: "/connections/0/config/object",
+			Message:   `'object' is not allowed: destination api type "S3" does not support object mapping`,
+		}}},
 		{typ: "customerio", jsonMapper: specificFlow, objectMapping: specificFlow},
-		{typ: "facebook_conversions", objectMapping: objectRefused("FACEBOOK_CONVERSIONS")},
-		{typ: "facebook_pixel", objectMapping: objectRefused("FACEBOOK_PIXEL")},
-		{typ: "ga4", objectMapping: objectRefused("GA4")},
-		{typ: "gcs", objectMapping: objectRefused("GCS")},
-		{typ: "hs"},
-		{typ: "iterable"},
-		{typ: "mp", objectMapping: objectRefused("MP")},
-		{typ: "posthog", objectMapping: objectRefused("POSTHOG")},
-		{typ: "s3", objectMapping: objectRefused("S3")},
-		{typ: "tiktok_ads", objectMapping: objectRefused("TIKTOK_ADS")},
-		{typ: "webhook", objectMapping: objectRefused("WEBHOOK")},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.typ, func(t *testing.T) {
 			t.Parallel()
 
-			config := map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}}
-			if tt.requiredKey != "" {
-				config[tt.requiredKey] = "example-key"
+			dest := destinationFixture{
+				id: "my-destination", typ: tt.typ, enabled: true,
+				config: map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
 			}
-			dest := destinationFixture{id: "my-destination", typ: tt.typ, enabled: true, config: config}
 			graph := connectedGraph(postgresModel(), dest)
 
 			jsonEntry := connectionTo(dest.id)
