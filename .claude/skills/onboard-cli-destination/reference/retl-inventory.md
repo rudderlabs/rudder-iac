@@ -20,6 +20,10 @@ metadata. The derivation is the one in
   `determineFlowTypeFromRequest`).
 - **`supportedSourcesValidation`**: none. A recursive key walk over all 50
   registered destinations' db-config.json found no occurrence at this revision.
+- **Docs handoff**: DEX-832's
+  [handoff page](https://app.notion.com/p/3e2f2b415dd081daa5d3ca3009cce98d)
+  predates this backfill and must be updated to advertise the expanded set
+  below.
 
 ## Reproduce
 
