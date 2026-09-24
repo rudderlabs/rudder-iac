@@ -298,6 +298,11 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
+		// Server-side hasExternalId is authoritative; this only stops an older
+		// control plane that ignores the param from failing every apply below.
+		if d.ExternalID == "" {
+			continue
+		}
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			return nil, errUnregisteredManagedType(d.ID, d.Type, d.Version)
 		}

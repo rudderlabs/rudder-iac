@@ -951,9 +951,10 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
-				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}}
+				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
+				{"id":"dst-2","name":"UI S3","type":"S3","version":1,"config":{}}
 			],
-			"paging": {"total": 1}
+			"paging": {"total": 2}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -961,6 +962,8 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	h := destination.NewHandler(c, registry)
 
+	// dst-2 simulates a control plane that ignores hasExternalId: it must be
+	// skipped rather than fail on its unregistered type.
 	remotes, err := h.Impl.LoadRemoteResources(ctx)
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)

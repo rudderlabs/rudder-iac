@@ -75,7 +75,7 @@ func TestDestinationSnapshotTester(t *testing.T) {
 		assert.NoError(t, tester.SnapshotTest(context.Background()))
 	})
 
-	t.Run("unmanaged destinations are left to the API's hasExternalId filter", func(t *testing.T) {
+	t.Run("requests only managed destinations", func(t *testing.T) {
 		t.Parallel()
 		tester, lister := newDestinationTester(t, []client.Destination{s3Destination()})
 		require.NoError(t, tester.SnapshotTest(context.Background()))
