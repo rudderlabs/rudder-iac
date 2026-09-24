@@ -10,9 +10,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/spf13/cobra"
 )
 
