@@ -179,9 +179,7 @@ func printImportSummary(importable *resources.RemoteResources) {
 		b strings.Builder
 		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	)
-	if total > 0 {
-		fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(counts, ""))
-	}
+	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(counts, ""))
 	if len(merged) > 0 {
 		fmt.Fprintf(w, "Merged %d remote resources into existing local resources:\n%s", len(merged), strings.Join(merged, ""))
 	}
