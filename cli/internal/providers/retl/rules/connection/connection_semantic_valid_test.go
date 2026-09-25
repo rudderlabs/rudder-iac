@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
+	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
@@ -35,7 +36,8 @@ type endpointOnlyTestConfig struct {
 // newTestRegistry holds the real definitions the fixtures name — http reaches
 // warehouse sources through the JSON mapper, bingads also supports the visual
 // mapper, customerio_audience drives its own destination-specific flow, braze
-// demands rest_api_key before a warehouse source connects (V-C5) — plus three
+// and facebook_pixel demand config before a warehouse source connects (V-C5) —
+// plus three
 // minimal fakes for the cases no shipped definition can produce:
 //
 //   - "eventstreamonly" declares no warehouse source type at all (V-C4).
@@ -51,6 +53,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	require.NoError(t, registry.Register(bingads.NewDefinition()))
 	require.NoError(t, registry.Register(customerioaudience.NewDefinition()))
 	require.NoError(t, registry.Register(braze.NewDefinition()))
+	require.NoError(t, registry.Register(facebookpixel.NewDefinition()))
 
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "eventstreamonly",
@@ -525,7 +528,7 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			}},
 		},
 		{
-			name: "a destination config missing what a warehouse source needs to connect",
+			name: "a braze config missing what a warehouse source needs to connect",
 			destination: destinationFixture{
 				id: "my-braze-destination", typ: "braze", enabled: true,
 				config: map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
@@ -533,6 +536,20 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/destination",
 				Message:   "destination 'my-braze-destination' config is missing fields required to connect a 'warehouse' source: rest_api_key",
+			}},
+		},
+		{
+			// facebook_pixel's own config check asks for access_token only when
+			// connection_mode.web is outside device mode, so this passes
+			// destination validation and only the connection catches it.
+			name: "a facebook_pixel config missing what a warehouse source needs to connect",
+			destination: destinationFixture{
+				id: "my-pixel-destination", typ: "facebook_pixel", enabled: true,
+				config: map[string]any{"pixel_id": "123456789012345", "connection_mode": map[string]any{"warehouse": "cloud"}},
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/destination",
+				Message:   "destination 'my-pixel-destination' config is missing fields required to connect a 'warehouse' source: access_token",
 			}},
 		},
 		{
