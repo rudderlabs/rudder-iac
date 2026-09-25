@@ -3,15 +3,19 @@ package experimental
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func NewCmdExperimental() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    "experimental",
-		Short:  "Manage experimental features",
-		Long:   "Enable, disable, and manage experimental features in rudder-cli",
+		Use:   "experimental",
+		Short: "Manage experimental features",
+		Long:  "List and manage opt-in experimental feature flags. Experimental commands require experimental mode during normal CLI execution.",
+		Example: heredoc.Doc(`
+			RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental list
+		`),
 		Hidden: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !viper.GetBool("experimental") {

@@ -26,8 +26,11 @@ func NewCmdTyper() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "typer",
 		Short: "Generate type-safe tracking code",
-		Long:  "Generate type-safe tracking code from RudderStack tracking plans",
-		Args:  cobra.NoArgs,
+		Long:  "Generate type-safe tracking APIs from remote tracking plans or local declarative project specifications.",
+		Example: heredoc.Doc(`
+			rudder-cli typer generate --local --location ./project --platform kotlin
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdGenerate())
@@ -49,7 +52,7 @@ func newCmdGenerate() *cobra.Command {
 		Short: "Generate type-safe code from tracking plan",
 		Long:  "Generate type-safe code from a RudderStack tracking plan",
 		Example: heredoc.Doc(`
-			$ rudder-cli typer generate --tracking-plan-id <id> --platform kotlin
+			$ rudder-cli typer generate --tracking-plan-id tracking-plan-id --platform kotlin
 			$ rudder-cli typer generate --local --location ./project --platform kotlin
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,7 +114,7 @@ func newCmdGenerate() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory or spec file (used with --local)")
 
 	cmd.Flags().StringArrayVar(&options, "option", []string{},
-		"Platform-specific options in key=value format (use 'rudder-cli typer options <platform>' to see available options)")
+		"Platform-specific options in key=value format (use 'rudder-cli typer options --platform <platform>' to see available options)")
 
 	return cmd
 }

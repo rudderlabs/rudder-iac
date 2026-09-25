@@ -1,6 +1,7 @@
 package experimental
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -10,7 +11,10 @@ func NewCmdEnable() *cobra.Command {
 		Use:   "enable <flag-name>",
 		Short: "Enable an experimental flag",
 		Long:  "Enable a specific experimental flag by name",
-		Args:  cobra.ExactArgs(1),
+		Example: heredoc.Doc(`
+			RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental enable importMerge
+		`),
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			flagName := args[0]
 			config.SetExperimentalFlag(flagName, true)

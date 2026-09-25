@@ -14,11 +14,13 @@ import (
 
 func TestTaskReporter_Model(t *testing.T) {
 	trm := initialModel(3)
+	initialView := trm.View()
+	assert.Contains(t, initialView, "0/3", "expected initial progress")
+	assert.NotContains(t, initialView, "Processing task", "expected no tasks initially")
+
 	tm := teatest.NewTestModel(t, trm)
 
 	ch := trm.tasksMsgChan
-	bts, _ := io.ReadAll(tm.Output())
-	assert.Empty(t, bts, "expected no output initially")
 
 	ch <- taskStartMsg{id: "task1", message: "Processing task 1"}
 	ch <- taskStartMsg{id: "task2", message: "Processing task 2"}
