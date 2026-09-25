@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: import-manifest
+metadata:
+  name: import-manifest
+spec:
+  workspaces:
+    - workspace_id: "ws-1"
+      resources:
+        - urn: "property:email_address"
+          remote_id: "remote-ws-1"
+    - workspace_id: "ws-2"
+      resources:
+        - urn: "property:email_address"
+          remote_id: "remote-ws-2"
