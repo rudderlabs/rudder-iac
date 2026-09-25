@@ -30,10 +30,8 @@ sudo mv rudder-cli /usr/local/bin/
 ### Docker
 
 ```sh
-docker run --rm rudderlabs/rudder-cli
+docker run --rm -e RUDDERSTACK_ACCESS_TOKEN -v "$HOME/.rudder:/.rudder" -v "$PWD:/project" rudderlabs/rudder-cli validate -l /project
 ```
-
-Mount `~/.rudder` and your project directory when the container needs access to local authentication or specifications.
 
 ### Build from source
 
@@ -59,6 +57,6 @@ rudder-cli apply --dry-run
 ## Documentation
 
 - [rudder-cli documentation](https://www.rudderstack.com/docs/dev-tools/rudder-cli/)
-- [Validation rules](https://www.rudderstack.com/docs/dev-tools/rudder-cli/validation-rules/)
+- [Validation rules](https://www.rudderstack.com/docs/dev-tools/rudder-cli/validations/)
 - [Breaking changes](BREAKING_CHANGES.md)
 - [Contributing](CONTRIBUTING.md)
