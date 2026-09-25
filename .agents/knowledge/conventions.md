@@ -39,7 +39,8 @@
 ## DEX-623 — Accounts E2E CI Enforcement
 <!-- ticket:DEX-623 -->
 - `TestAccountsApply` is expected to run under the normal live-backend `make test-e2e` / `make test-all` CI flow; it should not be guarded by `RUN_ACCOUNT_E2E`.
-- `TestAccountsImportWorkspace` remains behind `RUN_ACCOUNT_E2E` until the missing `imported/import-manifest.yaml` failure is fixed by a CI-proven follow-up; do not treat accounts apply gating and import-workspace gating as the same policy.
+- `TestAccountsImportWorkspace` also runs ungated in the normal e2e CI flow. It must set `RUDDERSTACK_X_IMPORT_MERGE=true` because `import workspace` only writes `imported/import-manifest.yaml` under the `importMerge` experimental flag, and the test rewrites that manifest.
+- Never gate an e2e test on an env var that CI doesn't set as a literal; a gate wired to an undefined repo variable silently skips forever.
 - The accounts E2E tests set their required account feature flags inside the tests via `t.Setenv`, so local CLI subprocesses inherit account support without workflow-level environment gates.
 - Outside the intended disposable CI workspace, prefer compile-only E2E validation such as `go test ./cli/tests -run '^$'` for accounts test changes because the live tests call `destroy` against the configured RudderStack workspace.
 

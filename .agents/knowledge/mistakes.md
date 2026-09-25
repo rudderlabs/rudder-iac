@@ -14,7 +14,8 @@
 ## DEX-623 — Accounts Import E2E First CI Failure
 <!-- ticket:DEX-623 -->
 - CI proved `TestAccountsApply` can run ungated, but `TestAccountsImportWorkspace` failed on its first completion attempt at `cli/tests/command_accounts_import_test.go:230` because `/tmp/.../imported/import-manifest.yaml` was missing.
-- Durable mitigation for account E2E enforcement is to keep `TestAccountsApply` in the normal CI path while leaving `TestAccountsImportWorkspace` gated by `RUN_ACCOUNT_E2E` until a follow-up fixes the missing manifest path with CI proof.
+- Root cause: `cli/internal/project/importer/importer.go` writes `import-manifest.yaml` only when the `importMerge` experimental flag is on (`RUDDERSTACK_X_IMPORT_MERGE`). The test now sets it via `t.Setenv` and runs ungated in the e2e lane; the `RUN_ACCOUNT_E2E` gate is gone.
+- Durable mitigation: any e2e that reads or rewrites the import manifest must set `RUDDERSTACK_X_IMPORT_MERGE=true`.
 
 ## DEX-498 — Transformation Fixture Default-Events CI Failure
 <!-- ticket:DEX-498 -->
