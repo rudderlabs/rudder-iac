@@ -22,15 +22,15 @@ func newCmdValidate() *cobra.Command {
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer func() {
+				telemetry.TrackCommand("retl-sources validate", err)
+			}()
+
 			if len(args) == 0 {
 				return fmt.Errorf("retl-source external id is required")
 			}
 			externalID := args[0]
-			var err error
-			defer func() {
-				telemetry.TrackCommand("retl-sources validate", err)
-			}()
 
 			d, err := app.NewDeps()
 			if err != nil {
