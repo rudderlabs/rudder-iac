@@ -21,6 +21,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv("RUN_RETL_E2E") == "1" {
 		sweepSeededConnections()
 	}
+	sweepLeftoverUnmanagedWebhooks()
 
 	exec, err := NewCmdExecutor("")
 	if err != nil {
