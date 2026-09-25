@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schemas/root.json
+version: rudder/v1
+kind: data-graph
+metadata:
+  name: customer-360
+spec:
+  id: customer-360
+  account_id: warehouse-account
+  models:
+    - id: user
+      display_name: User
+      type: entity
+      table: warehouse.public.users
+      primary_id: user_id

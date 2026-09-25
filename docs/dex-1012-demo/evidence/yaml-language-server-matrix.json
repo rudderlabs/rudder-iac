@@ -1,0 +1,79 @@
+{
+  "runtime": {
+    "yamlLanguageServer": "1.24.0",
+    "vscodeLanguageserverTextdocument": "1.0.12",
+    "node": "v20.20.2"
+  },
+  "matrix": [
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "modeline",
+      "case": "blank top level",
+      "expected": "version, kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "per-kind-source.yaml",
+      "association": "modeline",
+      "case": "blank top level",
+      "expected": "version, kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "root modeline",
+      "case": "source spec completion",
+      "expected": "includes source fields; excludes data-graph fields",
+      "result": "pass"
+    },
+    {
+      "sample": "customer-360.yaml",
+      "association": "root modeline",
+      "case": "data-graph spec completion",
+      "expected": "includes data-graph fields; excludes source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "per-kind-source.yaml",
+      "association": "per-kind modeline",
+      "case": "source spec completion",
+      "expected": "source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "settings-associated.yaml",
+      "association": "yaml.schemas equivalent",
+      "case": "source spec completion",
+      "expected": "source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "root modeline",
+      "case": "kind changed with source fields",
+      "expected": "wrong-kind and missing-field diagnostics",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "root modeline",
+      "case": "kind missing",
+      "expected": "no kind-specific suggestions; missing-kind diagnostic",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "root modeline",
+      "case": "hover on spec.enabled",
+      "expected": "field description",
+      "result": "pass"
+    },
+    {
+      "sample": "per-kind-source.yaml",
+      "association": "per-kind modeline",
+      "case": "hover on spec.enabled",
+      "expected": "field description",
+      "result": "pass"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "yaml.schemas": {
+    "./schemas/event-stream-source.json": [
+      "samples/settings-associated.yaml"
+    ]
+  },
+  "yaml.schemaStore.enable": true
+}

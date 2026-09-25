@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">VS Code YAML completion and hover proof for a Rudder event stream source</title>
+  <desc id="desc">Two reconstructed VS Code editor frames show kind-aware completion under spec and hover documentation for enabled.</desc>
+  <rect width="1200" height="700" fill="#181818"/>
+  <rect x="0" y="0" width="1200" height="42" fill="#323233"/>
+  <text x="22" y="27" fill="#cccccc" font-family="sans-serif" font-size="15">DEX-1012 reconstructed demo — yaml-language-server 1.24.0</text>
+  <line x1="600" y1="42" x2="600" y2="700" stroke="#444"/>
+
+  <g font-family="monospace" font-size="18">
+    <text x="28" y="82" fill="#9cdcfe">mobile.yaml — completion</text>
+    <text x="28" y="118" fill="#6a9955"># yaml-language-server: $schema=../../schemas/root.json</text>
+    <text x="28" y="151" fill="#9cdcfe">version:<tspan fill="#ce9178"> rudder/v1</tspan></text>
+    <text x="28" y="184" fill="#9cdcfe">kind:<tspan fill="#ce9178"> event-stream-source</tspan></text>
+    <text x="28" y="217" fill="#9cdcfe">metadata:</text>
+    <text x="54" y="250" fill="#9cdcfe">name:<tspan fill="#ce9178"> mobile-events</tspan></text>
+    <text x="28" y="283" fill="#9cdcfe">spec:</text>
+    <rect x="50" y="300" width="400" height="198" rx="4" fill="#252526" stroke="#007acc"/>
+    <rect x="51" y="302" width="398" height="38" fill="#094771"/>
+    <text x="70" y="328" fill="#ffffff">id</text>
+    <text x="70" y="368" fill="#ffffff">name</text>
+    <text x="70" y="408" fill="#ffffff">type</text>
+    <text x="70" y="448" fill="#ffffff">enabled</text>
+    <text x="250" y="328" fill="#bbbbbb">string</text>
+    <text x="250" y="368" fill="#bbbbbb">string</text>
+    <text x="250" y="408" fill="#bbbbbb">android | ios | web</text>
+    <text x="250" y="448" fill="#bbbbbb">boolean</text>
+    <text x="28" y="545" fill="#cccccc" font-size="15">Expected source fields are included; graph fields are excluded.</text>
+
+    <text x="628" y="82" fill="#9cdcfe">mobile.yaml — hover</text>
+    <text x="628" y="126" fill="#9cdcfe">spec:</text>
+    <text x="654" y="159" fill="#9cdcfe">id:<tspan fill="#ce9178"> mobile-events</tspan></text>
+    <text x="654" y="192" fill="#9cdcfe">name:<tspan fill="#ce9178"> Mobile events</tspan></text>
+    <text x="654" y="225" fill="#9cdcfe">type:<tspan fill="#ce9178"> android</tspan></text>
+    <rect x="648" y="239" width="160" height="34" fill="#264f78"/>
+    <text x="654" y="263" fill="#9cdcfe">enabled:<tspan fill="#569cd6"> true</tspan></text>
+    <rect x="650" y="292" width="500" height="130" rx="4" fill="#252526" stroke="#555"/>
+    <text x="670" y="327" fill="#dcdcaa">enabled</text>
+    <text x="670" y="362" fill="#cccccc" font-size="16">Whether this source accepts events.</text>
+    <text x="670" y="398" fill="#858585" font-size="15">boolean</text>
+    <text x="628" y="470" fill="#cccccc" font-size="15">Hover text comes from the selected kind's property schema.</text>
+  </g>
+
+  <rect x="0" y="650" width="1200" height="50" fill="#007acc"/>
+  <text x="22" y="681" fill="#ffffff" font-family="sans-serif" font-size="15">Reconstructed UI capture from the committed fixture and automated yaml-language-server matrix; not a pixel screenshot.</text>
+</svg>

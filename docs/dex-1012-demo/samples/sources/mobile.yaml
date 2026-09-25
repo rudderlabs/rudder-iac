@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../../schemas/root.json
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: mobile-events
+spec:
+  id: mobile-events
+  name: Mobile events
+  type: android
+  enabled: true

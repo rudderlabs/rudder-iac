@@ -28,6 +28,11 @@ go.work.sum
 # IDEs
 .vscode
 
+# Keep the DEX-1012 editor-association demo workspace reproducible.
+!docs/dex-1012-demo/.vscode/
+!docs/dex-1012-demo/.vscode/settings.json
+!docs/dex-1012-demo/.vscode/extensions.json
+
 # macOS
 .DS_Store
 

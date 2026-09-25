@@ -1,0 +1,88 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.invalid/rudder-cli/v1/data-graph.json",
+  "title": "Rudder data graph (DEX-1012 spike fixture)",
+  "description": "Illustrative schema used only to test editor association and language features.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "kind", "metadata", "spec"],
+  "properties": {
+    "version": {
+      "const": "rudder/v1",
+      "description": "Rudder specification format version."
+    },
+    "kind": {
+      "const": "data-graph",
+      "description": "Declares a Profiles data graph."
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "spec": {
+      "type": "object",
+      "description": "Data graph and model configuration.",
+      "additionalProperties": false,
+      "required": ["id", "account_id", "models"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable local identifier for the data graph."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Warehouse account used to resolve model tables."
+        },
+        "models": {
+          "type": "array",
+          "description": "Entity and event models in this graph.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "display_name", "type", "table"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable local model identifier."
+              },
+              "display_name": {
+                "type": "string",
+                "description": "Human-readable model name."
+              },
+              "type": {
+                "type": "string",
+                "enum": ["entity", "event"],
+                "description": "Whether rows represent entities or events."
+              },
+              "table": {
+                "type": "string",
+                "description": "Three-part catalog.schema.table reference."
+              },
+              "primary_id": {
+                "type": "string",
+                "description": "Column that uniquely identifies an entity."
+              },
+              "timestamp": {
+                "type": "string",
+                "description": "Column containing an event occurrence time."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "description": "File-level Rudder metadata.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for this specification file."
+        }
+      }
+    }
+  }
+}
