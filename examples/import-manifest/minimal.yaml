@@ -4,7 +4,7 @@ metadata:
   name: minimal-import-manifest
 spec:
   workspaces:
-    - workspace_id: workspace-development
+    - workspace_id: workspace-development # Replace with the target RudderStack workspace ID.
       resources:
         - urn: property:imported_user_id
-          remote_id: prop_remote_user_id
+          remote_id: prop_remote_user_id # Replace with the resource's remote ID in that workspace.

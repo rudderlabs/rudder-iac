@@ -341,5 +341,5 @@
 
 ## DEX-1002 — Canonical Example Coverage Boundary
 
-- Canonical example coverage is defined by the composite resource provider's `SupportedKinds()` set. Project-level `import-manifest` metadata is handled by the separate `ImportManifestProvider`, so it is not an example-covered resource kind unless that provider boundary changes.
+- Canonical example coverage combines the composite resource provider's `SupportedKinds()` set with the separate `ImportManifestProvider.SupportedKinds()` set when the `ImportMerge` flag is enabled. This keeps project-level `import-manifest` metadata covered by `examples/import-manifest/` alongside the resource kinds.
 - Coverage-provider construction enables every field currently declared by `config.ExperimentalConfig` via reflection rather than maintaining a hard-coded flag list. This ensures newly flag-gated supported kinds fail coverage until a matching `examples/<kind>` directory is added.

@@ -24,7 +24,8 @@ for it.
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
-5. A valid example YAML spec committed as `examples/destination/<type>.yaml`
+5. Once the destination is verified, a valid example YAML spec committed as
+   `examples/destination/<type>.yaml`
 
 Out of scope: rule-doc updates.
 
@@ -263,9 +264,10 @@ spec:
 ```
 
 Verify it mechanically, not by eye: the repository's examples test loads
-`examples/destination/` through the offline project validation path. Because
-new destinations start unverified, ensure `examples/destination/.flags` exists
-and contains `unverifiedDestinations` while preserving any other flags, then run
+`examples/destination/` through the offline project validation path. Unverified
+destinations stay out of `examples/` until they are verified; do not gate the
+shared destination catalog with `examples/destination/.flags`. Once verified,
+commit the example and run
 `go test ./cli/internal/app -run TestExamples -count=1`. The committed example
 must pass before it ships.
 
