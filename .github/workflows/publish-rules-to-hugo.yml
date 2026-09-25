@@ -1,0 +1,314 @@
+name: publish rules to rudder-hugo
+
+# Release Please uses GITHUB_TOKEN, so its release does not emit a release event.
+# Follow the existing release workflows and consume the explicit dispatch instead.
+on:
+  repository_dispatch:
+    types: [release-created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "rudder-iac release tag to publish (for example, v0.25.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-release:
+    name: "resolve release tag"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Resolve and validate release
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          case "$EVENT_NAME" in
+            repository_dispatch) TAG="$DISPATCH_TAG" ;;
+            workflow_dispatch) TAG="$INPUT_TAG" ;;
+            *) echo "::error::Unsupported event: $EVENT_NAME"; exit 1 ;;
+          esac
+
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release tag '$TAG' (expected v<major>.<minor>.<patch>)"
+            exit 1
+          fi
+
+          git ls-remote --exit-code --tags \
+            "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/${TAG}" >/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/dev/null
+
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  generate-rules:
+    name: "generate validation rule catalog"
+    needs: resolve-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout rudder-iac at the released tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/tags/${{ needs.resolve-release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Generate rule catalog
+        env:
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+          RUDDERSTACK_CLI_EXPERIMENTAL: 'true'
+          RUDDERSTACK_X_IMPORT_MERGE: 'true'
+          RUDDERSTACK_X_RETL_TABLE_SUPPORT: 'true'
+          RUDDERSTACK_X_RETL_CONNECTION_SUPPORT: 'true'
+        run: |
+          go run -ldflags "-X main.version=${VERSION}" \
+            ./cli/cmd/gen-rule-docs --output-dir docs/generated
+
+      - name: Verify generated rule catalog
+        env:
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s docs/generated/rules.yaml
+          ruby -ryaml -rdate <<'RUBY'
+          def fail_with(message)
+            warn "::error::#{message}"
+            exit 1
+          end
+
+          doc = YAML.safe_load_file(
+            "docs/generated/rules.yaml",
+            permitted_classes: [Date, Time],
+            aliases: false,
+          )
+          version = doc.dig("tool_metadata", "cli_version")
+          expected_version = ENV.fetch("VERSION")
+          fail_with("expected cli_version #{expected_version}, got #{version.inspect}") unless version == expected_version
+
+          rules = doc.fetch("rules")
+          # Guard the accepted 38-rule baseline without blocking releases that
+          # legitimately add rules after this workflow lands.
+          fail_with("expected at least 38 rules, got #{rules.length}") unless rules.length >= 38
+
+          ids = rules.map { |rule| rule.fetch("rule_id") }
+          required_ids = %w[
+            destination/semantic-valid
+            destination/spec-syntax-valid
+            event-stream/connection/enabled-endpoints-valid
+            event-stream/connection/semantic-valid
+            event-stream/connection/spec-syntax-valid
+            import-manifest/duplicate-urn
+            import-manifest/orphaned-urn
+            import-manifest/spec-syntax-valid
+            project/manifest-inline-conflict
+          ]
+          missing = required_ids - ids
+          fail_with("missing required rules: #{missing.join(", ")}") unless missing.empty?
+          RUBY
+
+      - name: Upload generated rule catalog
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rules-yaml
+          path: docs/generated/rules.yaml
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-rules:
+    name: "publish validation rule catalog to rudder-hugo"
+    needs: [resolve-release, generate-rules]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Download generated rule catalog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p docs/generated
+          gh run download "$GITHUB_RUN_ID" --name rules-yaml --dir docs/generated
+
+      - name: Verify catalog artifact
+        env:
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s docs/generated/rules.yaml
+          ruby -ryaml -rdate <<'RUBY'
+          def fail_with(message)
+            warn "::error::#{message}"
+            exit 1
+          end
+
+          doc = YAML.safe_load_file(
+            "docs/generated/rules.yaml",
+            permitted_classes: [Date, Time],
+            aliases: false,
+          )
+          version = doc.dig("tool_metadata", "cli_version")
+          expected_version = ENV.fetch("VERSION")
+          fail_with("expected cli_version #{expected_version}, got #{version.inspect}") unless version == expected_version
+
+          rules = doc.fetch("rules")
+          fail_with("expected at least 38 rules, got #{rules.length}") unless rules.length >= 38
+
+          ids = rules.map { |rule| rule.fetch("rule_id") }
+          required_ids = %w[
+            destination/semantic-valid
+            destination/spec-syntax-valid
+            event-stream/connection/enabled-endpoints-valid
+            event-stream/connection/semantic-valid
+            event-stream/connection/spec-syntax-valid
+            import-manifest/duplicate-urn
+            import-manifest/orphaned-urn
+            import-manifest/spec-syntax-valid
+            project/manifest-inline-conflict
+          ]
+          missing = required_ids - ids
+          fail_with("missing required rules: #{missing.join(", ")}") unless missing.empty?
+          RUBY
+
+      - name: Attach rule catalog to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: gh release upload "$TAG" docs/generated/rules.yaml#rules.yaml --clobber
+
+      # GITHUB_TOKEN cannot write to another repository. Mint a short-lived org
+      # GitHub App token scoped to rudder-hugo instead of storing a broad PAT.
+      - name: Generate rudder-hugo token
+        id: hugo-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+          owner: rudderlabs
+          repositories: rudder-hugo
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout rudderlabs/rudder-hugo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: rudderlabs/rudder-hugo
+          token: ${{ steps.hugo-token.outputs.token }}
+          path: rudder-hugo
+          persist-credentials: false
+
+      - name: Publish catalog pull request
+        working-directory: rudder-hugo
+        env:
+          GH_TOKEN: ${{ steps.hugo-token.outputs.token }}
+          TAG: ${{ needs.resolve-release.outputs.tag }}
+          VERSION: ${{ needs.resolve-release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="auto/rudder-cli-rules-${VERSION}"
+          BASE_BRANCH="$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')"
+          TITLE="chore: update rudder-cli validation rules (${VERSION})"
+          BODY="$(cat <<EOF
+          Auto-generated from rudder-iac release ${TAG}.
+
+          Updates \`data/rudder-cli-rules.raw.yaml\` with the released validation-rule catalog. The rudder-hugo merge script regenerates \`data/rudder-cli-rules.yaml\`.
+
+          Source: https://github.com/rudderlabs/rudder-iac/releases/tag/${TAG}
+          EOF
+          )"
+
+          git config user.name "rudderstack-cli-bot[bot]"
+          git config user.email "rudderstack-cli-bot[bot]@users.noreply.github.com"
+          gh auth setup-git
+
+          REMOTE_BRANCH_EXISTS=false
+          if git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" >/dev/null 2>&1; then
+            REMOTE_BRANCH_EXISTS=true
+            git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+          fi
+          git switch -C "$BRANCH" "origin/$BASE_BRANCH"
+          cp ../docs/generated/rules.yaml data/rudder-cli-rules.raw.yaml
+          git add data/rudder-cli-rules.raw.yaml
+
+          PR_NUMBER="$(gh pr list \
+            --repo rudderlabs/rudder-hugo \
+            --base "$BASE_BRANCH" \
+            --head "rudderlabs:${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if git diff --cached --quiet; then
+            echo "Catalog matches the base branch; no downstream PR required."
+            if [ -n "$PR_NUMBER" ]; then
+              gh pr close "$PR_NUMBER" \
+                --repo rudderlabs/rudder-hugo \
+                --comment "Closing because the generated catalog for ${TAG} matches ${BASE_BRANCH}; no update is needed."
+            fi
+            if [ "$REMOTE_BRANCH_EXISTS" = true ]; then
+              if ! git push origin --delete "$BRANCH"; then
+                echo "::warning::Could not delete stale branch ${BRANCH}; it may have already been removed."
+              fi
+            fi
+            exit 0
+          fi
+
+          CHANGED_FILES="$(git diff --cached --name-only)"
+          if [ "$CHANGED_FILES" != "data/rudder-cli-rules.raw.yaml" ]; then
+            echo "::error::Unexpected staged files: ${CHANGED_FILES}"
+            exit 1
+          fi
+
+          git commit -m "$TITLE"
+          git push --force-with-lease origin "HEAD:refs/heads/${BRANCH}"
+
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr edit "$PR_NUMBER" \
+              --repo rudderlabs/rudder-hugo \
+              --title "$TITLE" \
+              --body "$BODY"
+          else
+            gh pr create \
+              --repo rudderlabs/rudder-hugo \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body "$BODY"
+          fi

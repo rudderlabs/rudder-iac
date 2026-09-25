@@ -20,21 +20,26 @@ import (
 // — verrs is non-empty and this fails locally, with no CI round-trip needed.
 func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	Initialise("test")
-	// The gen-rule-docs make target defaults the rETL flags on and CI runs it,
-	// so the kinds they register are documented while still experimental. Match
-	// that here.
+	// The gen-rule-docs make target defaults the import-manifest and rETL
+	// flags on, so the kinds they register are documented while still
+	// experimental. Match that here.
+	t.Setenv("RUDDERSTACK_X_IMPORT_MERGE", "true")
 	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	// rETL connection support is on so the provider registers the connection
-	// rules its embedded fragments document; the gen-rule-docs workflow sets the
-	// same flag for the generation step.
-	prevExp, prevRetlConnections := viper.Get("experimental"), viper.Get("flags.retlConnectionSupport")
+	// Import-manifest and rETL connection support are on so the providers
+	// register the rules their embedded fragments document; the gen-rule-docs
+	// workflows set the same flags for generation.
+	prevExp := viper.Get("experimental")
+	prevImportMerge := viper.Get("flags.importMerge")
+	prevRetlConnections := viper.Get("flags.retlConnectionSupport")
 	viper.Set("experimental", true)
+	viper.Set("flags.importMerge", true)
 	viper.Set("flags.retlConnectionSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
+		viper.Set("flags.importMerge", prevImportMerge)
 		viper.Set("flags.retlConnectionSupport", prevRetlConnections)
 	})
 
@@ -42,4 +47,22 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, verrs, "every registered rule must have an authored fragment and vice versa")
 	assert.NotEmpty(t, doc.Rules, "catalog should document at least one rule")
+
+	ruleIDs := make(map[string]struct{}, len(doc.Rules))
+	for _, rule := range doc.Rules {
+		ruleIDs[rule.RuleID] = struct{}{}
+	}
+	for _, ruleID := range []string{
+		"destination/semantic-valid",
+		"destination/spec-syntax-valid",
+		"event-stream/connection/enabled-endpoints-valid",
+		"event-stream/connection/semantic-valid",
+		"event-stream/connection/spec-syntax-valid",
+		"import-manifest/duplicate-urn",
+		"import-manifest/orphaned-urn",
+		"import-manifest/spec-syntax-valid",
+		"project/manifest-inline-conflict",
+	} {
+		assert.Contains(t, ruleIDs, ruleID)
+	}
 }
