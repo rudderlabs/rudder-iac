@@ -62,7 +62,7 @@ func newCmdValidate() *cobra.Command {
 				return err
 			}
 
-			reportValidation(cmd.OutOrStdout(), externalID, resource.Type(), resource.Data())
+			reportValidation(cmd.OutOrStdout(), externalID, location, resource.Type(), resource.Data())
 			return nil
 		},
 	}
@@ -74,13 +74,19 @@ func newCmdValidate() *cobra.Command {
 
 // reportValidation names the source that validated and where the warehouse check
 // lives, so a green validate is not read as a reachable warehouse. An s3 table
-// source has no query, and preview exits 1 on one, so it is pointed elsewhere.
-func reportValidation(w io.Writer, externalID, resourceType string, data resources.ResourceData) {
+// source has no query, and preview exits 1 on one, so it is told there is
+// nothing to preview. The hint carries --location so it works when pasted.
+func reportValidation(w io.Writer, externalID, location, resourceType string, data resources.ResourceData) {
 	fmt.Fprintf(w, "✅ %s '%s' is valid\n", resourceType, externalID)
 
 	if definition, _ := data[sqlmodel.SourceDefinitionKey].(string); definition == table.SourceDefinitionS3 {
 		fmt.Fprintln(w, "   It has no query to run, so there is nothing to preview.")
 		return
 	}
-	fmt.Fprintf(w, "   To check that its query runs against the warehouse: rudder-cli retl-sources preview %s\n", externalID)
+
+	previewCmd := "rudder-cli retl-sources preview " + externalID
+	if location != "." {
+		previewCmd += " --location " + location
+	}
+	fmt.Fprintf(w, "   To check that its query runs against the warehouse: %s\n", previewCmd)
 }

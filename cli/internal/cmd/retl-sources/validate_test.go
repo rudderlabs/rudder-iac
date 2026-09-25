@@ -20,6 +20,7 @@ func TestReportValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		externalID       string
+		location         string
 		resourceType     string
 		sourceDefinition string
 		want             string
@@ -27,14 +28,25 @@ func TestReportValidation(t *testing.T) {
 		{
 			name:             "a warehouse source is pointed at preview",
 			externalID:       "orders-model",
+			location:         ".",
 			resourceType:     "retl-source-sql-model",
 			sourceDefinition: "postgres",
 			want: "✅ retl-source-sql-model 'orders-model' is valid\n" +
 				"   To check that its query runs against the warehouse: rudder-cli retl-sources preview orders-model\n",
 		},
 		{
-			name:             "an s3 source is not",
+			name:             "a warehouse source outside the working directory keeps its location in the hint",
+			externalID:       "orders-model",
+			location:         "./project",
+			resourceType:     "retl-source-sql-model",
+			sourceDefinition: "postgres",
+			want: "✅ retl-source-sql-model 'orders-model' is valid\n" +
+				"   To check that its query runs against the warehouse: rudder-cli retl-sources preview orders-model --location ./project\n",
+		},
+		{
+			name:             "an s3 source is told there is nothing to preview",
 			externalID:       "archive-bucket",
+			location:         "./project",
 			resourceType:     "retl-source-table",
 			sourceDefinition: "s3",
 			want: "✅ retl-source-table 'archive-bucket' is valid\n" +
@@ -45,7 +57,7 @@ func TestReportValidation(t *testing.T) {
 			t.Parallel()
 
 			var out bytes.Buffer
-			reportValidation(&out, tc.externalID, tc.resourceType, resources.ResourceData{
+			reportValidation(&out, tc.externalID, tc.location, tc.resourceType, resources.ResourceData{
 				sqlmodel.SourceDefinitionKey: tc.sourceDefinition,
 			})
 
