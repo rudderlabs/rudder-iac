@@ -85,9 +85,7 @@ func TestResolveAccountRef(t *testing.T) {
 
 		_, err := resolveAccountRef(context.Background(), lister, data)
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), `account "prod-pg"`)
-		assert.Contains(t, err.Error(), "rudder-cli apply")
+		require.EqualError(t, err, "account \"prod-pg\" is referenced but does not exist in the workspace yet; run `rudder-cli apply` first, or set account_id to preview against an existing account")
 	})
 
 	t.Run("wraps a listing failure", func(t *testing.T) {
@@ -100,6 +98,6 @@ func TestResolveAccountRef(t *testing.T) {
 		_, err := resolveAccountRef(context.Background(), lister, data)
 
 		require.ErrorIs(t, err, sentinel)
-		assert.Contains(t, err.Error(), "listing managed accounts")
+		require.EqualError(t, err, "listing managed accounts: boom")
 	})
 }
