@@ -290,8 +290,8 @@
 
 ## DEX-1000 — Published JSON Schema Contract
 <!-- ticket:DEX-1000 -->
-- `rudder-cli schema --out` publishes one `<kind>.schema.json` file per active kind plus `rudder-cli.schema.json`; existing files are protected unless `--overwrite` is explicit. Preflight every target before writing so one collision cannot leave a partially regenerated directory.
-- YAML schema modelines remain opt-in on import and migration. Their default URLs target versioned release assets, while `--schema-url-base` supplies a custom root and implies modeline emission. Append the running CLI version exactly once; only the default GitHub release base normalizes an unprefixed version to the repository's `v`-prefixed tag convention.
+- `rudder-cli schema --out` publishes one `<kind>.schema.json` file per active kind plus `rudder-spec.schema.json`; existing files are protected unless `--overwrite` is explicit. Preflight every target before writing so one collision cannot leave a partially regenerated directory.
+- YAML schema modelines remain opt-in on import and migration. Their default URLs target the stable, spec-versioned `https://www.rudderstack.com/docs/schemas/rudder-cli/v1` namespace approved by DEX-1012; `--schema-url-base` or `RUDDERSTACK_CLI_SCHEMA_BASE_URL` supplies a custom root and implies modeline emission without appending the CLI binary version.
 - Release schema generation must enable all distributable option-gated kinds so every URL the CLI can emit has a corresponding release asset; this includes `retl-connections` and `retl-source-table`. Generate and upload them in a dedicated post-GoReleaser workflow step against the checked-out release tag.
 - Reflected struct schemas stay closed with `additionalProperties: false` to match strict spec decoding; intentional `map[string]any` config blocks remain open.
 - Validation-tag enrichment must preserve runtime structural constraints, including `required`, `oneof` enums, `gte`/`lte` bounds, `eq` constants, `required_without`, `required_if`, `required_unless`, and element rules after `dive`; `$ref`/`$defs` traversal must remain cycle-safe.

@@ -342,6 +342,7 @@
 ## DEX-1000 — Provider-Owned JSON Schema Enumeration
 <!-- ticket:DEX-1000 -->
 - `cli/internal/provider/provider.go::SchemaProvider` is intentionally optional, and `cli/internal/provider/composite.go::CompositeProvider.SpecSchemas` aggregates schemas from the same provider instances used for kind routing; do not introduce a separate hardcoded public-kind registry.
+- `cli/internal/project/importmanifest.Provider.SpecSchemas` owns the `import-manifest` schema separately because this project-level kind is loaded before resource-provider dispatch; `app.GenerateSchemas` merges it with the composite schemas and rejects duplicate kind ownership.
 - Every active provider kind must have a schema. Keep provider-level and app-level equality tests aligned with `SupportedKinds()`, including default `data-graph` and the option-gated `retl-connections` and `retl-source-table` kinds.
 - Schema version constraints derive from each provider's `SupportedMatchPatterns`, avoiding a second kind/version registry. A kind may use version-specific reflected body branches when runtime DTOs differ: `custom-types`, data-catalog properties, and data-catalog events split legacy from `rudder/v1`, while categories share one body because both versions are structurally identical.
 - The schema reflector uses canonical `json` tags. User-authored account and destination spec DTOs therefore carry explicit JSON tags matching their existing YAML/mapstructure names; do not switch reflection globally to mapstructure because other active specs and metadata already rely on JSON naming.
