@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,10 +54,12 @@ func TestAccountsApply(t *testing.T) {
 	projectDir := filepath.Join("testdata", "accounts")
 	varFile := filepath.Join(projectDir, "credentials.vars.yaml")
 
+	demo.Say(t, "Start from a clean workspace: destroy removes anything a previous run left behind, so the create below always starts from nothing.")
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
 
 	t.Run("apply create", func(t *testing.T) {
+		demo.Say(t, "Accounts are created from spec with no ids anywhere — everything upstream is resolved by external ID reference, not by a value the user had to look up first.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "create"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "create apply failed: %s", out)
@@ -65,6 +68,7 @@ func TestAccountsApply(t *testing.T) {
 	})
 
 	t.Run("apply update", func(t *testing.T) {
+		demo.Say(t, "Re-applying the same accounts with changed values updates them in place upstream, rather than deleting and recreating.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "update"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "update apply failed: %s", out)
@@ -73,6 +77,7 @@ func TestAccountsApply(t *testing.T) {
 	})
 
 	t.Run("re-apply leaves non-secret upstream state unchanged", func(t *testing.T) {
+		demo.Say(t, "Applying this same spec again with nothing changed should be a no-op — except the API never returns write-only secrets, so the CLI cannot diff them and must re-send the secret on every apply. Watch the non-secret fields stay identical even though the request goes out again.")
 		out, err := executor.Execute(cliBinPath, "apply", "-l",
 			filepath.Join(projectDir, "update"), "--var-file", varFile, "--confirm=false")
 		require.NoError(t, err, "re-apply failed: %s", out)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 	"github.com/rudderlabs/rudder-iac/cli/tests/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,6 +187,11 @@ func TestDestinationsApply(t *testing.T) {
 
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+
+	// These literals are fixture credentials that must never surface in CLI
+	// output — the suite asserts that below. Registering them here masks them
+	// in the demo journal too, before the value can reach disk.
+	demo.RedactLiterals(destinationRawSecrets...)
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
