@@ -98,3 +98,9 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## DEX-999 — Semantic Pull Request Title And Commit Alignment
+
+- The Semantic pull requests workflow does not accept `ci` as a Conventional Commit type; workflow-only maintenance PRs should use an allowed type such as `chore` unless the workflow configuration changes.
+- With `validateSingleCommit` and `validateSingleCommitMatchesPrTitle` enabled, a single-commit PR must use an allowed semantic type in both the commit subject and PR title, and the two must match.
+- Choose the final semantic title before creating a single-commit PR. If rewriting history is prohibited, adding a second semantic commit avoids the single-commit title-match path without force-pushing.
