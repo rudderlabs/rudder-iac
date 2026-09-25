@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.28.0](https://github.com/rudderlabs/rudder-iac/compare/v0.27.0...v0.28.0) (2026-09-25)
+
+
+### Features
+
+* **cli:** loading feedback for long-running operations ([#918](https://github.com/rudderlabs/rudder-iac/issues/918)) ([07faf77](https://github.com/rudderlabs/rudder-iac/commit/07faf772f50f8134560ef94823dd286a8244c2a0))
+* **cli:** print the target workspace before apply output ([#908](https://github.com/rudderlabs/rudder-iac/issues/908)) ([addf3b6](https://github.com/rudderlabs/rudder-iac/commit/addf3b66b92471c973b906f3479c8f871d7556e5))
+* **destination:** backfill warehouse rETL metadata on verified destinations ([#922](https://github.com/rudderlabs/rudder-iac/issues/922)) ([dbd80ad](https://github.com/rudderlabs/rudder-iac/commit/dbd80ad08499eb27a4f04420be4d663be47c45f3))
+* **retl:** preview and validate table sources ([#850](https://github.com/rudderlabs/rudder-iac/issues/850)) ([25ed039](https://github.com/rudderlabs/rudder-iac/commit/25ed039dc00db23d3006c1adc65bb9f7ecf42d6d))
+* **retl:** stop running a preview as part of validate ([#906](https://github.com/rudderlabs/rudder-iac/issues/906)) ([5fd279f](https://github.com/rudderlabs/rudder-iac/commit/5fd279fefdaaa06538b164741a11ed06925d4169))
+
+
+### Bug Fixes
+
+* **accounts:** export only the secrets the account's auth mode uses ([#910](https://github.com/rudderlabs/rudder-iac/issues/910)) ([4492ab7](https://github.com/rudderlabs/rudder-iac/commit/4492ab7f6989b5a49a2e092a914ae239bc96ae76))
+* **api:** name the fix for permission and feature-flag 403s ([#920](https://github.com/rudderlabs/rudder-iac/issues/920)) ([7187e16](https://github.com/rudderlabs/rudder-iac/commit/7187e1676639ec1ca7898c8209aa79c046157da2))
+* **destination:** say why a delete is blocked by connections ([#894](https://github.com/rudderlabs/rudder-iac/issues/894)) ([672e86d](https://github.com/rudderlabs/rudder-iac/commit/672e86d4c0ac6aa821b26b0ca5c07de5376c3af1))
+* **transformations:** reference already-managed transformations on import ([#857](https://github.com/rudderlabs/rudder-iac/issues/857)) ([4c82fd9](https://github.com/rudderlabs/rudder-iac/commit/4c82fd9c255b0f68b33063e74f1b12ac0b2a8a88))
+
+
+### Miscellaneous
+
+* **event-stream:** use the hasExternalId API filter instead of filtering in Go ([#917](https://github.com/rudderlabs/rudder-iac/issues/917)) ([98df55f](https://github.com/rudderlabs/rudder-iac/commit/98df55fbdfd5478218ef9fe13aa4c32f1738d4b6))
+* **retl:** cover replacement, refusals, pruning, import claim and validation end to end ([#903](https://github.com/rudderlabs/rudder-iac/issues/903)) ([f3d860f](https://github.com/rudderlabs/rudder-iac/commit/f3d860f35b45716bacd466e8e05ac4456838200f))
+* **retl:** cover schedules, track events, constants, cursor, sync settings, full sync and connection import end to end ([#904](https://github.com/rudderlabs/rudder-iac/issues/904)) ([4672f72](https://github.com/rudderlabs/rudder-iac/commit/4672f72255b713348e32690a1b31ec2e9b9c0474))
+* **typer:** move typer to a top-level package decoupled from cli/internal ([#921](https://github.com/rudderlabs/rudder-iac/issues/921)) ([51f20e4](https://github.com/rudderlabs/rudder-iac/commit/51f20e4d1b6c6b7574bd1aa3b4c60e72dc1f0434))
+
 ## [0.27.0](https://github.com/rudderlabs/rudder-iac/compare/v0.26.0...v0.27.0) (2026-09-22)
 
 
