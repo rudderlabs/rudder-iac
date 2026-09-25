@@ -95,7 +95,9 @@ jobs:
           files: coverage-unit.out
 
   e2e:
-    name: "e2e tests (live control plane)"
+    # Internal name. The check people read is the `e2e-result` job below, which
+    # reports this one's outcome and distinguishes "failed" from "never got a turn".
+    name: "e2e tests (run)"
     runs-on: "ubuntu-24.04"
     timeout-minutes: 30
     # Keep the push run as the final verification of the tree that actually landed.
@@ -109,6 +111,14 @@ jobs:
     # cancel-in-progress stays false — supersession belongs to the workflow-level group
     # above, not here. Do not add `queue: max`: the default single-pending-slot
     # behaviour drops redundant queued runs, which is itself a saving.
+    #
+    # That single-pending-slot behaviour is also this group's one sharp edge, and the
+    # reason the `e2e-result` job exists. A concurrency group holds at most one running
+    # and one pending job: when a third arrives, the *pending* one is cancelled outright.
+    # With several PRs pushing at once that is routine — on 16 Sep, #847's queued job was
+    # evicted by runs from #849 and #851 ninety seconds later, and surfaced on #847 as a
+    # red check on a tree whose e2e had passed twice. Eviction is a scheduling outcome,
+    # not a test result, so it must not be reported as one.
     #
     # The group name is deliberately the one the pre-split workflow used. Renaming it
     # would open a window where a run on the old definition and a run on the new one
@@ -186,3 +196,53 @@ jobs:
           flags: e2e
           disable_search: true
           files: coverage-e2e.out
+
+  # The check the PR surface shows for e2e. It exists to tell two things apart that
+  # GitHub renders identically on the `e2e` job:
+  #
+  #   failure   — the suite ran and something broke. Red, and it should be.
+  #   cancelled — the job never started (0 steps): evicted from the shared-workspace
+  #               queue by a later run, so this tree got no e2e signal at all.
+  #
+  # The second is not a result about the code, so it does not fail the PR — but it is
+  # not silently green either: the job writes to the step summary and annotates the run,
+  # so "e2e did not run" is visible rather than inferred from a green tick.
+  #
+  # A cancellation of the whole workflow run (someone hits cancel, or the workflow-level
+  # per-PR group supersedes it) cancels this job too, so it cannot mask that case.
+  # `main`'s post-merge run remains the authority either way.
+  e2e-result:
+    name: "e2e tests (live control plane)"
+    runs-on: "ubuntu-24.04"
+    needs: [e2e]
+    if: always()
+    steps:
+      - name: report the e2e outcome
+        env:
+          RESULT: ${{ needs.e2e.result }}
+        run: |
+          case "$RESULT" in
+            success)
+              echo "e2e suite passed." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            skipped)
+              echo "e2e suite skipped for this run." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            cancelled)
+              echo "::warning title=e2e did not run::Evicted from the shared-workspace queue by a later run, so this tree has no e2e signal. Re-run the job to get one; main's post-merge run is the authority."
+              {
+                echo "### e2e did not run"
+                echo
+                echo "The suite holds a mutex over a single shared workspace. A concurrency group"
+                echo "keeps at most one running and one pending job, so a later run evicted this"
+                echo "one before it started — **this is a scheduling outcome, not a test result**."
+                echo
+                echo "Re-run the \`e2e tests (run)\` job to get a signal for this tree."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "::error title=e2e failed::The e2e suite ran and failed. See the 'e2e tests (run)' job."
+              echo "### e2e suite failed" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac
