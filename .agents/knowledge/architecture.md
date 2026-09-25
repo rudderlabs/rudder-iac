@@ -331,3 +331,9 @@
 - The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
 - Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
 - GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.
+
+## DEX-1001 — Canonical Agent Guidance
+
+- `CLAUDE.md` is the repository's canonical agent-instruction source; `AGENTS.md` is a tracked symlink to it so the two instruction entry points cannot drift.
+- Legacy Cursor rule trees at the repository root and under `cli/`, plus `.clinerules/`, were superseded by `CLAUDE.md` and `.agents/knowledge/`; do not restore those obsolete rule systems without a deliberate migration.
+- Before removing legacy guidance, repository-wide reference checks should distinguish active references from self-links and generated ignore patterns.
