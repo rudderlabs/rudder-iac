@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: settings-associated
+spec:
+  id: settings-associated
+  name: Settings-associated source
+  type: ios
+  enabled: true
