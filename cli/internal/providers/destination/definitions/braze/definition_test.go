@@ -28,13 +28,18 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json declares the visual mapper but no syncBehaviours, so the
+	// backend fallback applies.
+	assert.Nil(t, braze.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.True(t, registered.SupportsVisualMapper())
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device", "hybrid"},
@@ -47,6 +52,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud", "device"},
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -458,6 +464,7 @@ func TestBrazeConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
@@ -501,6 +508,13 @@ func TestBrazeAPIKeyConditionals(t *testing.T) {
 			name:  "cloud satisfied by rest_api_key",
 			extra: map[string]any{"connection_mode": map[string]any{"web": "cloud"}, "rest_api_key": "rest-key"},
 			want:  []string{},
+		},
+		{
+			// schema.json names warehouse in the restApiKey branch like any other
+			// cloud-mode source.
+			name:  "warehouse cloud requires rest_api_key",
+			extra: map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
+			want:  []string{"/rest_api_key"},
 		},
 		{
 			name: "device without platform-specific keys requires app_key",

@@ -24,11 +24,10 @@ func init() {
 }
 
 // Source types from integrations-config destinations/am/db-config.json, minus
-// amp, warehouse and shopify: the CLI maps those tokens but cannot produce
-// them, since an event stream source's type is constrained to the SDK
-// definitions and SourceTypeToken only reaches warehouse through a source
-// category the sole call site never sets. Declaring them would advertise
-// support no connection could ever match.
+// amp and shopify: the CLI maps those tokens but cannot produce them, since an
+// event stream source's type is constrained to the SDK definitions. Declaring
+// them would advertise support no connection could ever match. warehouse stays:
+// rETL connections reach the destination through it.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -40,6 +39,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -53,6 +53,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventFiltering struct {
@@ -396,7 +397,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &amplitudeConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:          append([]string(nil), sourceTypes...),
+		ConnectionModes:      connectionModes,
+		SupportsVisualMapper: true,
 	}
 }
