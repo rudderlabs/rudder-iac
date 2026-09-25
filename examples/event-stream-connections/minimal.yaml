@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-connections
+metadata:
+  name: website-connections
+spec:
+  connections:
+    - id: website-to-webhook
+      source: "#event-stream-source:website"
+      destination: "#destination:event-webhook"

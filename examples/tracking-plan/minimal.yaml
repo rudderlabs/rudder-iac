@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: signup-tracking-plan
+spec:
+  id: signup-tracking-plan
+  display_name: Signup Tracking Plan
+  rules:
+    - type: event_rule
+      id: signed_up_rule
+      event: "#event:signed_up"
+      additional_properties: false

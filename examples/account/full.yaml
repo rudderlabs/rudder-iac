@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: analytics-snowflake
+spec:
+  id: analytics-snowflake
+  name: Analytics Snowflake
+  account_definition_name: SOURCE_SNOWFLAKE
+  config:
+    account: example-account
+    warehouse: analytics
+    database: events
+    user: rudder
+    password: replace-with-your-password

@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: commerce-events
+spec:
+  events:
+    - id: product_viewed
+      name: Product Viewed
+      event_type: track
+      description: Emitted when a customer views a product.
+      category: "#category:commerce"
+    - id: checkout_completed
+      name: Checkout Completed
+      event_type: track
+      description: Emitted after a successful checkout.

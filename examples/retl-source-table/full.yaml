@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: orders-table
+spec:
+  id: orders-table
+  display_name: Orders Table
+  account: "#account:retl-postgres"
+  primary_key: order_id
+  source_definition: postgres
+  schema: analytics
+  table: orders
+  enabled: true

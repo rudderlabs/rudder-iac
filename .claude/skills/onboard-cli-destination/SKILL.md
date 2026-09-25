@@ -24,7 +24,8 @@ for it.
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
-5. A valid example YAML spec, printed in the final response (not committed as a file)
+5. Once the destination is verified, a valid example YAML spec committed as
+   `examples/destination/<type>.yaml`
 
 Out of scope: rule-doc updates.
 
@@ -243,9 +244,9 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 
 Testify only. `t.Parallel()` on tests and subtests, matching S3.
 
-### Step 7: Generate and verify the example YAML
+### Step 7: Commit and verify the example YAML
 
-Write a spec with realistic values that satisfies every `validate` tag:
+Write `examples/destination/<type>.yaml` with realistic values that satisfies every `validate` tag:
 
 ```yaml
 version: rudder/v1
@@ -262,10 +263,13 @@ spec:
     # snake_case keys with realistic values
 ```
 
-Verify it mechanically, not by eye: either include a `ValidateConfig` test
-case using the exact example config, or run a temp-project
-`rudder-cli project validate` with the experimental flag on. The example must
-pass before it ships in the response.
+Verify it mechanically, not by eye: the repository's examples test loads
+`examples/destination/` through the offline project validation path. Unverified
+destinations stay out of `examples/` until they are verified; do not gate the
+shared destination catalog with `examples/destination/.flags`. Once verified,
+commit the example and run
+`go test ./cli/internal/app -run TestExamples -count=1`. The committed example
+must pass before it ships.
 
 ### Step 8: Add destination e2e fixtures
 
@@ -299,7 +303,7 @@ live e2e with `RUN_DESTINATION_E2E=1` when the required live stack is available.
 Final response must include:
 
 - Files created/modified
-- The validated example YAML
+- The committed, validated `examples/destination/<type>.yaml`
 - Destination e2e coverage added: each meaningful variation covered by fixtures
   and snapshots, or the documented deferral reason
 - E2E verification status: skip/compile result and whether the gated live run was

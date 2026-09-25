@@ -1,0 +1,9 @@
+version: rudder/v0.1
+kind: events
+metadata:
+  name: basic_tracking
+spec:
+  events:
+    - id: signed_up
+      name: Signed Up
+      event_type: track

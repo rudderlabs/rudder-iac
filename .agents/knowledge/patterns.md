@@ -256,3 +256,9 @@
 - Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
 - The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must name its source type under `connection_mode`. DEX-848 removed `use_native_sdk`, so `connection_mode` is the only block `validateSourceTypeSettings` can accept — an empty config there fails the connect-time check for the android source.
 - Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.
+
+## DEX-1002 — Canonical Example Validation
+
+- Each `examples/<kind>` directory is one recursively loaded project. Minimal and full YAML examples coexist in that validation unit, must use distinct identities where uniqueness rules apply, and include sibling specs for any references.
+- A directory-local `.flags` file lists whitespace-separated `ExperimentalConfig` mapstructure names; example validation enables the experimental umbrella and only those requested flags for that project.
+- Offline validation composes the real provider set while clearing `RUDDERSTACK_ACCESS_TOKEN` and injecting an HTTP client whose `Do` method fails immediately. This makes both no-credentials and no-network behavior explicit invariants instead of incidental properties of the current project-load path.
