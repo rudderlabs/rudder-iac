@@ -101,12 +101,6 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		assert.Empty(t, store.requests)
 	})
 
-	// #851 puts a PropertyRef under the account key when the spec references an
-	// account, and preview runs before the ref resolves to a remote id.
-
-	// The same ref stored by value, as datacatalog stores it. Matching only the
-	// pointer form would fall through to "account ID not found in resource data".
-
 	t.Run("unknown source definition", func(t *testing.T) {
 		t.Parallel()
 		store := &previewStore{}

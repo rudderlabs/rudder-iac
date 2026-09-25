@@ -71,15 +71,8 @@ func newCmdValidate() *cobra.Command {
 	return cmd
 }
 
-// reportValidation prints the outcome of validating a source and returns the
-// error the command should exit with.
-//
-// A source with no query to run is not a failure. An s3 table source has no
-// warehouse query, and that is its steady state rather than a defect — so a CI
-// step that validates every source in a project must not go red the day someone
-// adds one. ErrPreviewUnsupported carries exactly that distinction, which is why
-// it prints and returns nil, while a query that genuinely failed returns the
-// error and exits non-zero.
+// reportValidation treats ErrPreviewUnsupported (an s3 table source) as a pass,
+// so validating every source in a project in CI does not fail on one.
 func reportValidation(w io.Writer, err error) error {
 	switch {
 	case err == nil:

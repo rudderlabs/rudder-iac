@@ -70,12 +70,8 @@ func previewSQL(t TableSpec, limit int) (string, error) {
 		// identifier, and escapes with backslashes rather than by doubling.
 		relation = "`" + bigQueryEscaper.Replace(path) + "`"
 	default:
-		// Not ErrPreviewUnsupported: the definition IS supported as a source,
-		// only its identifier quoting is unknown here. Reporting it as
-		// unsupported would send the reader looking for a missing feature
-		// rather than for this switch. Reachable only by adding a warehouse to
-		// TableSpec's oneof tag without adding it here; collapsing the three
-		// enumerations into one is DEX-877.
+		// Reachable only if TableSpec's oneof gains a warehouse this switch lacks;
+		// collapsing the three enumerations into one is DEX-877.
 		return "", fmt.Errorf("preview cannot quote identifiers for source_definition %q: add its quoting to previewSQL", t.SourceDefinition)
 	}
 	return "select * from " + relation + " limit " + strconv.Itoa(max(limit, 1)), nil

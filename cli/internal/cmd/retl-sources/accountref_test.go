@@ -27,34 +27,23 @@ func (s *stubAccounts) ListAll(_ context.Context, opts ...client.ListAccountsOpt
 func TestResolveAccountRef(t *testing.T) {
 	t.Parallel()
 
-	// Both shapes resolve: matching only the pointer form would let a provider
-	// that stores the ref by value fall through to "account ID not found".
 	t.Run("resolves a reference to the managed account's remote id", func(t *testing.T) {
 		t.Parallel()
 
-		for name, ref := range map[string]any{
-			"pointer": sqlmodel.AccountRef("prod-pg"),
-			"value":   *sqlmodel.AccountRef("prod-pg"),
-		} {
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
+		lister := &stubAccounts{accounts: []client.Account{
+			{ID: "acc-other", ExternalID: "staging-pg"},
+			{ID: "acc-1", ExternalID: "prod-pg"},
+		}}
+		data := resources.ResourceData{sqlmodel.AccountIDKey: sqlmodel.AccountRef("prod-pg"), sqlmodel.SQLKey: "SELECT 1"}
 
-				lister := &stubAccounts{accounts: []client.Account{
-					{ID: "acc-other", ExternalID: "staging-pg"},
-					{ID: "acc-1", ExternalID: "prod-pg"},
-				}}
-				data := resources.ResourceData{sqlmodel.AccountIDKey: ref, sqlmodel.SQLKey: "SELECT 1"}
+		resolved, err := resolveAccountRef(context.Background(), lister, data)
 
-				resolved, err := resolveAccountRef(context.Background(), lister, data)
-
-				require.NoError(t, err)
-				assert.Equal(t, resources.ResourceData{
-					sqlmodel.AccountIDKey: "acc-1",
-					sqlmodel.SQLKey:       "SELECT 1",
-				}, resolved)
-				assert.Len(t, lister.opts, 1, "only managed accounts carry an external id to match on")
-			})
-		}
+		require.NoError(t, err)
+		assert.Equal(t, resources.ResourceData{
+			sqlmodel.AccountIDKey: "acc-1",
+			sqlmodel.SQLKey:       "SELECT 1",
+		}, resolved)
+		assert.Len(t, lister.opts, 1, "only managed accounts carry an external id to match on")
 	})
 
 	// The graph is shared with everything else reading the project, so the

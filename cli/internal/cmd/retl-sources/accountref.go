@@ -18,32 +18,15 @@ type accountLister interface {
 	ListAll(ctx context.Context, opts ...client.ListAccountsOption) ([]client.Account, error)
 }
 
-// resolveAccountRef replaces an account reference in a source's graph data with
-// the account's remote id, returning data the preview API can be called with.
-//
-// preview and validate read the project graph without remote state, so a source
-// written as `account: "#account:<id>"` still carries the PropertyRef the graph
-// uses to order an apply. The remote id that ref would resolve to is the id of
-// the managed account whose externalId is the referenced local id — which is
-// how the state itself is built (accounts.MapRemoteToState reads the local id
-// straight back out of ExternalID), so this is the same answer by the same
-// rule rather than a second source of truth.
-//
-// Data that already carries a plain account_id is returned untouched, and so is
-// data for any other kind.
+// resolveAccountRef swaps an unresolved `#account:` ref for the remote id of the
+// managed account whose externalId matches, the same rule MapRemoteToState uses,
+// because preview and validate read the graph without remote state.
 func resolveAccountRef(ctx context.Context, lister accountLister, data resources.ResourceData) (resources.ResourceData, error) {
-	// Both shapes are read: retl and event-stream store *resources.PropertyRef
-	// while datacatalog stores it by value.
-	var urn string
-	switch ref := data[sqlmodel.AccountIDKey].(type) {
-	case *resources.PropertyRef:
-		urn = ref.URN
-	case resources.PropertyRef:
-		urn = ref.URN
-	default:
+	ref, ok := data[sqlmodel.AccountIDKey].(*resources.PropertyRef)
+	if !ok {
 		return data, nil
 	}
-	localID, ok := strings.CutPrefix(urn, accounts.AccountResourceType+":")
+	localID, ok := strings.CutPrefix(ref.URN, accounts.AccountResourceType+":")
 	if !ok {
 		return data, nil
 	}

@@ -41,14 +41,8 @@ func newCmdPreview() *cobra.Command {
 				}...)
 			}()
 
-			// Rejected here rather than clamped downstream: previewSQL bounds the
-			// query with max(limit, 1) while the limit also travels in the request
-			// unchanged, so a negative value would ask the server for -1 rows and
-			// the warehouse for 1. validate's limit of 0 is the one deliberate
-			// mismatch (no rows returned, one row read to prove the table reads).
-			//
-			// Below the defer so this failure records a TrackCommand event like
-			// every other one.
+			// The request carries limit unchanged while the SQL uses max(limit, 1),
+			// so a negative value would disagree; checked below the defer so it is tracked.
 			if limit < 0 {
 				err = fmt.Errorf("--limit cannot be negative, got %d", limit)
 				return err

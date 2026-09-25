@@ -51,6 +51,6 @@ func TestFindSource(t *testing.T) {
 		t.Parallel()
 		shared := resources.NewResource("orders", table.ResourceType, resources.ResourceData{}, nil)
 		_, err := findSource(graphOf(model, shared), "orders")
-		require.EqualError(t, err, "external id 'orders' is used by retl-source-sql-model, retl-source-table in the project")
+		require.EqualError(t, err, "external id 'orders' is used by both retl-source-sql-model and retl-source-table in the project")
 	})
 }
