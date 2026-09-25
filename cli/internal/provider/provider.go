@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -34,6 +35,12 @@ type TypeProvider interface {
 	// Providers must explicitly declare their supported patterns. Returning nil means
 	// the provider does not handle any (kind, version) combinations for validation.
 	SupportedMatchPatterns() []rules.MatchPattern
+}
+
+// SchemaProvider exposes schemas for exactly the spec kinds a provider owns.
+// It is optional so providers with no YAML kinds do not need an empty method.
+type SchemaProvider interface {
+	SpecSchemas() schema.Set
 }
 
 type SpecLoader interface {

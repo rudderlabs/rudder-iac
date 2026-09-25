@@ -6,20 +6,24 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 	"github.com/spf13/cobra"
 )
 
 func NewCmdMigrate() *cobra.Command {
 	var (
-		deps     app.Deps
-		err      error
-		location string
-		confirm  bool
-		proj     project.Project
-		varFiles []string
+		deps           app.Deps
+		err            error
+		location       string
+		confirm        bool
+		proj           project.Project
+		varFiles       []string
+		schemaModeline bool
+		schemaURLBase  string
 	)
 
 	cmd := &cobra.Command{
@@ -38,6 +42,17 @@ func NewCmdMigrate() *cobra.Command {
 			$ rudder-cli migrate --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			configuredSchemaURLBase := config.GetConfig().SchemaBaseURL
+			if !cmd.Flags().Changed("schema-url-base") && configuredSchemaURLBase != "" {
+				schemaURLBase = configuredSchemaURLBase
+			}
+			if cmd.Flags().Changed("schema-url-base") || configuredSchemaURLBase != "" {
+				schemaModeline = true
+			}
+			if schemaModeline {
+				schemaURLBase = editor.URLBase(schemaURLBase)
+			}
+
 			// Initialize dependencies
 			deps, err = app.NewDeps()
 			if err != nil {
@@ -65,7 +80,11 @@ func NewCmdMigrate() *cobra.Command {
 				telemetry.TrackCommand("migrate", err, migrateTelemetryExtras(location, confirm)...)
 			}()
 
-			m := migrator.New(proj, deps.CompositeProvider())
+			migratorOpts := make([]migrator.Option, 0, 1)
+			if schemaModeline {
+				migratorOpts = append(migratorOpts, migrator.WithSchemaModeline(schemaURLBase))
+			}
+			m := migrator.New(proj, deps.CompositeProvider(), migratorOpts...)
 			err = m.Migrate(confirm)
 			return err
 		},
@@ -74,6 +93,8 @@ func NewCmdMigrate() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
+	cmd.Flags().BoolVar(&schemaModeline, "schema-modeline", false, "Add yaml-language-server schema modelines to migrated specs")
+	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "URL root for schemas (implies --schema-modeline)")
 
 	return cmd
 }

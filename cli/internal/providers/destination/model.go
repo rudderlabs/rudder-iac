@@ -8,13 +8,13 @@ import (
 
 // DestinationSpec is the user-authored YAML representation of a destination.
 type DestinationSpec struct {
-	ID                string         `mapstructure:"id" validate:"required"`
-	DisplayName       string         `mapstructure:"display_name" validate:"required,pattern=destination_display_name"`
-	Type              string         `mapstructure:"type" validate:"required"`
-	Enabled           bool           `mapstructure:"enabled"`
-	DefinitionVersion int64          `mapstructure:"definition_version" validate:"required"`
-	Transformation    string         `mapstructure:"transformation"` // scalar "#transformation:<id>" — object form deferred
-	Config            map[string]any `mapstructure:"config"`
+	ID                string         `json:"id" mapstructure:"id" validate:"required"`
+	DisplayName       string         `json:"display_name" mapstructure:"display_name" validate:"required,pattern=destination_display_name"`
+	Type              string         `json:"type" mapstructure:"type" validate:"required"`
+	Enabled           bool           `json:"enabled" mapstructure:"enabled"`
+	DefinitionVersion int64          `json:"definition_version" mapstructure:"definition_version" validate:"required"`
+	Transformation    string         `json:"transformation" mapstructure:"transformation"` // scalar "#transformation:<id>" — object form deferred
+	Config            map[string]any `json:"config" mapstructure:"config"`
 }
 
 // DestinationResource is the resolved in-memory representation compared by the

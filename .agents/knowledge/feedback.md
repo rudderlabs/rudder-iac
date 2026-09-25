@@ -59,3 +59,8 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## DEX-1000 — Canonical JSON Schema Publishing Contract
+<!-- ticket:DEX-1000 -->
+- Use `https://www.rudderstack.com/docs/schemas/rudder-cli/v1/<kind>.schema.json` as the canonical modeline and per-kind schema ID namespace, and name the combined schema `rudder-spec.schema.json`.
+- Treat GitHub release assets as an explicitly uploaded offline fallback after GoReleaser, not as the canonical URL or as `release.extra_files` managed by GoReleaser.

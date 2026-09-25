@@ -31,6 +31,7 @@ var (
 )
 
 type ImportProvider interface {
+	provider.TypeProvider
 	provider.RemoteResourceLoader
 	provider.StateLoader
 	provider.Exporter
@@ -46,7 +47,9 @@ type Project interface {
 // conflict detection (link matching remote resources to existing local
 // resources instead of writing duplicate specs).
 type ImportOptions struct {
-	Merge bool
+	Merge                 bool
+	SchemaModeline        bool
+	SchemaModelineBaseURL string
 }
 
 func WorkspaceImport(
@@ -108,10 +111,14 @@ func WorkspaceImport(
 	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
+	writerOpts := make([]writer.Option, 0, 1)
+	if opts.SchemaModeline {
+		writerOpts = append(writerOpts, writer.WithSchemaModeline(opts.SchemaModelineBaseURL, p.SupportedKinds()...))
+	}
 
 	location := project.Location()
 	importDir := filepath.Join(location, ImportedDir)
-	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
+	if err := writer.Write(ctx, importDir, formatters, entities, writerOpts...); err != nil {
 		return fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
@@ -128,7 +135,7 @@ func WorkspaceImport(
 				Content:      manifestNode,
 				RelativePath: importmanifest.FileName,
 			}
-			if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
+			if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}, writerOpts...); err != nil {
 				return fmt.Errorf("writing import manifest: %w", err)
 			}
 		}

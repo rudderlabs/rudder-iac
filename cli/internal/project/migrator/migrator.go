@@ -22,15 +22,30 @@ type Migrator struct {
 	project          project.Project
 	provider         provider.Provider
 	commonMigrations CommonMigrations
+	writerOptions    []writer.Option
 }
 
-// New creates a new Migrator instance with common migrations
-func New(proj project.Project, p provider.Provider) *Migrator {
-	return &Migrator{
+// Option configures migration output.
+type Option func(*Migrator)
+
+// WithSchemaModeline adds schema modelines to migrated specs.
+func WithSchemaModeline(baseURL string) Option {
+	return func(m *Migrator) {
+		m.writerOptions = append(m.writerOptions, writer.WithSchemaModeline(baseURL, m.provider.SupportedKinds()...))
+	}
+}
+
+// New creates a new Migrator instance with common migrations.
+func New(proj project.Project, p provider.Provider, opts ...Option) *Migrator {
+	m := &Migrator{
 		project:          proj,
 		provider:         p,
 		commonMigrations: GetCommonMigrations(),
 	}
+	for _, apply := range opts {
+		apply(m)
+	}
+	return m
 }
 
 // DisplayFilesToMigrate shows the list of files that will be migrated in a table
@@ -114,7 +129,7 @@ func (m *Migrator) WriteSpecs(migratedSpecs map[string]*specs.Spec) error {
 			Content:      migratedSpec,
 			RelativePath: path,
 		}
-		if err := writer.OverwriteFile(formatters, entity); err != nil {
+		if err := writer.OverwriteFile(formatters, entity, m.writerOptions...); err != nil {
 			return fmt.Errorf("writing file %s: %w", path, err)
 		}
 	}

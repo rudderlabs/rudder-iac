@@ -13,6 +13,7 @@ import (
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -239,7 +240,6 @@ func TestLoadSpec_DataGraphWithoutModels(t *testing.T) {
 	}, dgData)
 }
 
-
 func TestLoadSpec_DuplicateResourceIDs(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{}
 	provider := datagraph.NewProvider(mockClient, nil)
@@ -280,6 +280,7 @@ func TestProvider_SupportedKinds(t *testing.T) {
 
 	kinds := provider.SupportedKinds()
 	assert.Contains(t, kinds, "data-graph")
+	assert.ElementsMatch(t, kinds, schema.Kinds(provider.SpecSchemas()))
 }
 
 func TestProvider_SupportedTypes(t *testing.T) {

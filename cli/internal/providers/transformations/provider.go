@@ -22,6 +22,7 @@ import (
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
@@ -73,6 +74,23 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return fmt.Errorf("transformation specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
+}
+
+// SpecSchemas returns the two top-level spec shapes owned by transformations.
+func (p *Provider) SpecSchemas() schema.Set {
+	patterns := p.SupportedMatchPatterns()
+	return schema.Set{
+		ttypes.TransformationSpecKind: schema.MustForKindVersions(
+			ttypes.TransformationSpecKind,
+			model.TransformationSpec{},
+			schema.VersionsForKind(ttypes.TransformationSpecKind, patterns)...,
+		),
+		ttypes.LibrarySpecKind: schema.MustForKindVersions(
+			ttypes.LibrarySpecKind,
+			model.LibrarySpec{},
+			schema.VersionsForKind(ttypes.LibrarySpecKind, patterns)...,
+		),
+	}
 }
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.

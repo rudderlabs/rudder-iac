@@ -15,9 +15,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
-	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -87,6 +88,37 @@ func TestCompositeProvider_SupportedKinds(t *testing.T) {
 			assert.Equal(t, tt.expected, actual, "Expected kinds do not match")
 		})
 	}
+}
+
+type schemaMockProvider struct {
+	*testutils.MockProvider
+	schemas schema.Set
+}
+
+func (m *schemaMockProvider) SpecSchemas() schema.Set {
+	return m.schemas
+}
+
+func TestCompositeProvider_SpecSchemas(t *testing.T) {
+	t.Parallel()
+
+	alpha := &schemaMockProvider{
+		MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil),
+		schemas: schema.Set{
+			"kindA": schema.MustForKind("kindA", struct {
+				ID string `json:"id" validate:"required"`
+			}{}),
+		},
+	}
+	plain := testutils.NewMockProvider([]string{"kindB"}, nil)
+
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"alpha": alpha,
+		"plain": plain,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, alpha.schemas, cp.(*provider.CompositeProvider).SpecSchemas())
 }
 
 func TestCompositeProvider_SupportedMatchPatterns(t *testing.T) {
