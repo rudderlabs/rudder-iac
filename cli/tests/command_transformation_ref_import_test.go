@@ -32,6 +32,8 @@ func TestImportReferencesManagedTransformation(t *testing.T) {
 	}
 
 	allowManagedResidue(t)
+	// pruneImport rewrites import-manifest.yaml, which import only emits under this flag.
+	t.Setenv("RUDDERSTACK_X_IMPORT_MERGE", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
