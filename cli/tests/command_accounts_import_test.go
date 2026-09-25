@@ -82,7 +82,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	importedDir := filepath.Join(projectDir, importer.ImportedDir)
 
-	specPath, spec := findAccountSpec(t, importedDir)
+	specPath, spec := findImportedSpec(t, importedDir, "accounts", importedAccountName)
 	assert.Contains(t, spec, "SOURCE_BIGQUERY", "scaffolded spec must carry the account definition")
 
 	reference := varReference.FindStringSubmatch(spec)
@@ -172,25 +172,25 @@ func seedUnmanagedAccount(t *testing.T, apiClient *client.Client) string {
 	return account.ID
 }
 
-// findAccountSpec returns the scaffolded spec for the seeded account. The
-// workspace may hold other importable accounts, so the spec is matched by name
-// rather than by being the only one present.
-func findAccountSpec(t *testing.T, importedDir string) (string, string) {
+// findImportedSpec returns the scaffolded spec under kindDir that names the
+// seeded resource. The workspace may hold other importable resources of the
+// kind, so the spec is matched by name rather than by being the only one present.
+func findImportedSpec(t *testing.T, importedDir, kindDir, name string) (string, string) {
 	t.Helper()
 
-	matches, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
+	matches, err := filepath.Glob(filepath.Join(importedDir, kindDir, "*.yaml"))
 	require.NoError(t, err)
-	require.NotEmpty(t, matches, "expected a scaffolded account spec in %s", importedDir)
+	require.NotEmpty(t, matches, "expected a scaffolded spec in %s", filepath.Join(importedDir, kindDir))
 
 	for _, path := range matches {
 		content, err := os.ReadFile(path)
 		require.NoError(t, err)
-		if strings.Contains(string(content), importedAccountName) {
+		if strings.Contains(string(content), name) {
 			return path, string(content)
 		}
 	}
 
-	t.Fatalf("no scaffolded spec found for account %q among %v", importedAccountName, matches)
+	t.Fatalf("no scaffolded %s spec found for %q among %v", kindDir, name, matches)
 	return "", ""
 }
 

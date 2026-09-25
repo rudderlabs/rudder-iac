@@ -14,6 +14,8 @@ var (
 // runs the package tests. It honours the cli/logging and cli/testing rules by
 // printing only essential information and performing cleanup after execution.
 func TestMain(m *testing.M) {
+	sweepLeftoverUnmanagedWebhooks()
+
 	exec, err := NewCmdExecutor("")
 	if err != nil {
 		fmt.Println("failed to init executor:", err)

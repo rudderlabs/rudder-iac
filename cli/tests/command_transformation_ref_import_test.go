@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,16 +19,18 @@ import (
 const (
 	transformationExternalID = "tag-source"
 	unmanagedWebhookPrefix   = "E2E Unmanaged Webhook"
+	importE2EEnv             = "RUN_IMPORT_E2E"
 )
 
 // TestImportReferencesManagedTransformation checks that an unmanaged destination
 // linked to a managed transformation is imported with a "#transformation:" ref
 // rather than the server-assigned id, and that adopting it keeps the link.
 //
-// Like TestAccountsImportWorkspace, it opens with a workspace-wide destroy and
-// runs `import workspace`, which stays opt-in until it has a CI-proven run.
+// It opens with a workspace-wide destroy, so it runs only under RUN_IMPORT_E2E:
+// the e2e CI lane sets it, and a local run should set it only against a
+// disposable workspace.
 func TestImportReferencesManagedTransformation(t *testing.T) {
-	if os.Getenv("RUN_IMPORT_E2E") != "1" {
+	if os.Getenv(importE2EEnv) != "1" {
 		t.Skip("set RUN_IMPORT_E2E=1 with a disposable live stack to run the transformation ref import e2e")
 	}
 
@@ -40,10 +43,6 @@ func TestImportReferencesManagedTransformation(t *testing.T) {
 
 	ctx := context.Background()
 	apiClient := newAccountsAPIClient(t)
-
-	// A cancelled run skips t.Cleanup, and its seeded destination would still be
-	// linked to the managed transformation, which blocks the destroy below.
-	deleteLeftoverUnmanagedWebhooks(t, apiClient)
 
 	out, err := executor.Execute(cliBinPath, "destroy", "--confirm=false")
 	require.NoError(t, err, "destroy failed: %s", out)
@@ -80,7 +79,8 @@ func TestImportReferencesManagedTransformation(t *testing.T) {
 	})
 	require.NoError(t, err, "seeding the unmanaged destination failed")
 	t.Cleanup(func() {
-		// Once adopted, the cleanup destroy has already removed it.
+		// Cleanups run last-in-first-out, so this runs before the cleanup destroy
+		// above. It must: the destination's transformation link blocks destroy.
 		if err := apiClient.Destinations.Delete(context.Background(), seeded.ID); err != nil {
 			t.Logf("cleaning up seeded destination %s: %v", seeded.ID, err)
 		}
@@ -93,7 +93,7 @@ func TestImportReferencesManagedTransformation(t *testing.T) {
 	require.NoError(t, err, "import workspace failed: %s", out)
 
 	importedDir := filepath.Join(projectDir, importer.ImportedDir)
-	specPath, spec := findDestinationSpec(t, importedDir, seededName)
+	specPath, spec := findImportedSpec(t, importedDir, "destinations", seededName)
 
 	assert.Contains(t, spec, "#transformation:"+transformationExternalID,
 		"the imported destination must reference the managed transformation by name")
@@ -116,36 +116,42 @@ func TestImportReferencesManagedTransformation(t *testing.T) {
 	verifyNoChangesToApplyWithArgs(t, executor, projectDir)
 }
 
-func deleteLeftoverUnmanagedWebhooks(t *testing.T, apiClient *client.Client) {
-	t.Helper()
+// sweepLeftoverUnmanagedWebhooks runs from TestMain because a cancelled run
+// skips t.Cleanup, and its seeded destination stays linked to the managed
+// transformation. That link blocks the destroy every live suite opens with, so
+// the sweep must precede the first of them, not just this test's.
+func sweepLeftoverUnmanagedWebhooks() {
+	if os.Getenv(importE2EEnv) != "1" {
+		return
+	}
+	if err := deleteLeftoverUnmanagedWebhooks(context.Background()); err != nil {
+		fmt.Println("failed to sweep leftover unmanaged webhooks:", err)
+		os.Exit(1)
+	}
+}
 
-	destinations, err := apiClient.Destinations.GetAll(context.Background())
-	require.NoError(t, err)
+func deleteLeftoverUnmanagedWebhooks(ctx context.Context) error {
+	config.InitConfig(config.DefaultConfigFile())
+	apiClient, err := client.New(
+		config.GetConfig().Auth.AccessToken,
+		client.WithBaseURL(config.GetConfig().APIURL),
+		client.WithUserAgent("rudder-cli-test"),
+	)
+	if err != nil {
+		return fmt.Errorf("creating api client: %w", err)
+	}
+
+	destinations, err := apiClient.Destinations.GetAll(ctx)
+	if err != nil {
+		return fmt.Errorf("listing destinations: %w", err)
+	}
 	for _, destination := range destinations {
 		if destination.ExternalID != "" || !strings.HasPrefix(destination.Name, unmanagedWebhookPrefix) {
 			continue
 		}
-		require.NoError(t, apiClient.Destinations.Delete(context.Background(), destination.ID),
-			"deleting leftover destination %s", destination.ID)
-	}
-}
-
-// findDestinationSpec matches by name because the workspace may hold other
-// importable destinations.
-func findDestinationSpec(t *testing.T, importedDir, name string) (string, string) {
-	t.Helper()
-
-	matches, err := filepath.Glob(filepath.Join(importedDir, "destinations", "*.yaml"))
-	require.NoError(t, err)
-
-	for _, path := range matches {
-		content, err := os.ReadFile(path)
-		require.NoError(t, err)
-		if strings.Contains(string(content), name) {
-			return path, string(content)
+		if err := apiClient.Destinations.Delete(ctx, destination.ID); err != nil {
+			return fmt.Errorf("deleting leftover destination %s: %w", destination.ID, err)
 		}
 	}
-
-	t.Fatalf("no scaffolded spec found for destination %q among %v", name, matches)
-	return "", ""
+	return nil
 }
