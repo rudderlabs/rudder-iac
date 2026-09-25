@@ -98,3 +98,10 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## DEX-1006 — Generated Command Docs and Terminal Startup Output
+
+<!-- session: 2026-09-25 -->
+
+- `cli/internal/cmddocs/generate_test.go::TestGeneratedCommandDocsAreCurrent` compares generated Markdown, YAML, and man pages with checked-in artifacts. CI tests the PR merged with current `main`, so an upstream command help change can make branch artifacts stale even when the head branch passes alone; integrate current `main` and run `make docs-commands` before publishing command-doc changes.
+- `cli/internal/ui/taskreporter_test.go::TestTaskReporter_Model` must not assert that `teatest.TestModel.Output` is byte-empty immediately after startup. Bubble Tea can emit terminal setup controls such as `ESC[?25l` and `ESC[?2004h` before model content, and the immediate read is timing-dependent; assert the model's initial `View` state when testing initial progress and task content.
