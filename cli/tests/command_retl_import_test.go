@@ -50,6 +50,9 @@ const (
 // sources are managed on an unmanaged account, which destroy can delete. Seeds
 // are found by name at the start of the next run and removed.
 func TestRETLSourcesImportClaim(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
