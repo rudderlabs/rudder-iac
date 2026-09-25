@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
@@ -26,8 +27,10 @@ func TestGenerateSchemas(t *testing.T) {
 		composite, err := newCompositeProvider()
 		require.NoError(t, err)
 		require.Implements(t, (*provider.SchemaProvider)(nil), composite)
-		assert.ElementsMatch(t, composite.SupportedKinds(), schema.Kinds(schemas))
+		expectedKinds := append(composite.SupportedKinds(), importmanifest.New().SupportedKinds()...)
+		assert.ElementsMatch(t, expectedKinds, schema.Kinds(schemas))
 		assert.Contains(t, schemas, "data-graph")
+		assert.Contains(t, schemas, importmanifest.KindImportManifest)
 	})
 
 	t.Run("experimental flags include RETL table and connection schemas", func(t *testing.T) {

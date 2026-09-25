@@ -6,14 +6,16 @@ package editor
 
 import (
 	"bytes"
+	"os"
 	"strings"
 )
 
 // headerPrefix is the modeline yaml-language-server reads to associate a schema
 // with a YAML file, giving editors inline completion and validation.
 const (
-	headerPrefix          = "# yaml-language-server: $schema="
-	DefaultReleaseURLBase = "https://github.com/rudderlabs/rudder-iac/releases/download"
+	headerPrefix         = "# yaml-language-server: $schema="
+	SchemaBaseURLEnv     = "RUDDERSTACK_CLI_SCHEMA_BASE_URL"
+	DefaultSchemaURLBase = "https://www.rudderstack.com/docs/schemas/rudder-cli/v1"
 )
 
 // Header returns the yaml-language-server modeline pointing at schemaRef (a path
@@ -51,19 +53,18 @@ func FileName(kind string) string {
 	return kind + ".schema.json"
 }
 
-// VersionedReleaseURLBase returns the release-download base for version. An
-// empty baseURL uses DefaultReleaseURLBase; overrides are trimmed before the
-// version is appended.
-func VersionedReleaseURLBase(baseURL, version string) string {
+// URLBase returns the canonical schema URL root unless an explicit option or
+// environment override is present. The namespace is versioned by the spec
+// contract, not the CLI binary version.
+func URLBase(baseURL string) string {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	version = strings.Trim(strings.TrimSpace(version), "/")
 	if baseURL == "" {
-		baseURL = DefaultReleaseURLBase
-		if version != "" && !strings.HasPrefix(version, "v") {
-			version = "v" + version
-		}
+		baseURL = strings.TrimRight(strings.TrimSpace(os.Getenv(SchemaBaseURLEnv)), "/")
 	}
-	return baseURL + "/" + version
+	if baseURL == "" {
+		baseURL = DefaultSchemaURLBase
+	}
+	return baseURL
 }
 
 // SchemaURL appends a kind's schema filename to baseURL. Surrounding whitespace
@@ -72,7 +73,7 @@ func SchemaURL(baseURL, kind string) string {
 	return strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/" + FileName(kind)
 }
 
-// ReleaseURL returns the canonical versioned release URL for a kind's schema.
-func ReleaseURL(version, kind string) string {
-	return SchemaURL(VersionedReleaseURLBase("", version), kind)
+// URL returns the canonical public URL for a kind's schema.
+func URL(kind string) string {
+	return SchemaURL(DefaultSchemaURLBase, kind)
 }

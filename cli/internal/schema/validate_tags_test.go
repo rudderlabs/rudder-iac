@@ -132,6 +132,19 @@ func TestValidationTagsEnrichEmbeddedAndNestedStructs(t *testing.T) {
 	assert.NotEmpty(t, byName.AdditionalProperties.Ref)
 }
 
+func TestValidationTagsRequireValueStructWithRequiredDescendants(t *testing.T) {
+	type config struct {
+		Mode string `json:"mode" validate:"required"`
+	}
+	type spec struct {
+		Config config `json:"config"`
+	}
+
+	s := specBlock(spec{})
+
+	assert.Equal(t, []string{"config"}, s.Required)
+}
+
 func TestValidationTagsApplyDiveRulesToArrayItems(t *testing.T) {
 	type catalogShape struct {
 		Types []string `json:"types,omitempty" validate:"dive,oneof=string number integer boolean null array object"`

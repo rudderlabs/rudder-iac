@@ -137,8 +137,54 @@ func (e *enricher) walkStructFields(s *jsonschema.Schema, t reflect.Type) []stri
 		applyConditionalRules(s, name, rules, fields)
 
 		e.walk(prop, field.Type)
+		if !rules.required && e.valueStructFieldRequired(field, prop) {
+			required = append(required, name)
+		}
 	}
 	return required
+}
+
+func (e *enricher) valueStructFieldRequired(field reflect.StructField, prop *jsonschema.Schema) bool {
+	if field.Type.Kind() == reflect.Pointer || strings.Contains(field.Tag.Get("json"), "omitempty") || strings.Contains(field.Tag.Get("mapstructure"), "omitempty") {
+		return false
+	}
+	if deref(field.Type).Kind() != reflect.Struct {
+		return false
+	}
+	return hasRequiredDescendant(e.resolveSchema(prop), map[*jsonschema.Schema]bool{})
+}
+
+func hasRequiredDescendant(s *jsonschema.Schema, seen map[*jsonschema.Schema]bool) bool {
+	if s == nil || seen[s] {
+		return false
+	}
+	seen[s] = true
+	if len(s.Required) > 0 {
+		return true
+	}
+	for _, child := range schemaChildren(s) {
+		if hasRequiredDescendant(child, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+func schemaChildren(s *jsonschema.Schema) []*jsonschema.Schema {
+	children := append(append(append([]*jsonschema.Schema{}, s.AllOf...), s.AnyOf...), s.OneOf...)
+	children = append(children, s.Not, s.If, s.Then, s.Else, s.Items, s.Contains, s.AdditionalProperties, s.PropertyNames, s.ContentSchema)
+	children = append(children, s.PrefixItems...)
+	if s.Properties != nil {
+		for pair := s.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			children = append(children, pair.Value)
+		}
+	}
+	for _, definitions := range []map[string]*jsonschema.Schema{s.PatternProperties, s.DependentSchemas, s.Definitions} {
+		for _, child := range definitions {
+			children = append(children, child)
+		}
+	}
+	return children
 }
 
 type schemaField struct {

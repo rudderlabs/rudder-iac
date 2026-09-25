@@ -10,7 +10,8 @@ import (
 
 func TestDestinationSchemaUsesYAMLFieldNamesAndRequiredConstraints(t *testing.T) {
 	generated := NewProvider(nil, ruleTestRegistry(t)).SpecSchemas()[DestinationSpecKind]
-	spec, ok := generated.Properties.Get("spec")
+	require.NotEmpty(t, generated.OneOf)
+	spec, ok := generated.OneOf[0].Properties.Get("spec")
 	require.True(t, ok)
 
 	assert.ElementsMatch(t, []string{"id", "display_name", "type", "definition_version"}, spec.Required)

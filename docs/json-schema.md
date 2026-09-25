@@ -22,10 +22,16 @@ rudder-cli schema --out .rudder/schemas --overwrite
 ```
 
 Per-kind files are named `<kind>.schema.json`. The combined
-`rudder-cli.schema.json` uses `oneOf` branches discriminated by `kind`, so one
+`rudder-spec.schema.json` uses `oneOf` branches discriminated by `kind`, so one
 mapping can cover a directory containing different spec kinds. `--out` creates
 the target directory, but refuses to replace any existing artifact unless
-`--overwrite` is supplied.
+`--overwrite` is supplied. A kind argument is stdout-only and cannot be combined
+with `--out`.
+
+The generated set contains every active provider kind plus the built-in
+`import-manifest` project spec. The manifest is loaded before provider dispatch,
+so its dedicated project provider owns that schema outside the resource-provider
+composite.
 
 The command is local-only and does not require a RudderStack access token.
 Experimental provider flags affect the generated set: for example, enabling the
@@ -41,25 +47,30 @@ rudder-cli import workspace --schema-modeline
 rudder-cli migrate --schema-modeline
 ```
 
-The resulting header points to the matching versioned GitHub release asset:
+The resulting header points to the matching schema in the stable, spec-versioned
+RudderStack docs namespace:
 
 ```yaml
-# yaml-language-server: $schema=https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3/events.schema.json
+# yaml-language-server: $schema=https://www.rudderstack.com/docs/schemas/rudder-cli/v1/events.schema.json
 version: rudder/v1
 kind: events
 ```
 
-Use `--schema-url-base` to replace the release-download root; this also enables
-the modeline. The running CLI version is appended to the supplied root:
+Use `--schema-url-base` to replace this root; this also enables the modeline.
+The custom root is used exactly as supplied, without appending the CLI version:
 
 ```sh
 rudder-cli import workspace \
-  --schema-url-base https://schemas.example.com/rudder-cli
+  --schema-url-base https://schemas.example.com/rudder-cli/v1
 ```
 
+The same override can be set for import and migration through
+`RUDDERSTACK_CLI_SCHEMA_BASE_URL`.
+
 Modelines are off by default. They are added only to YAML entities that are full
-CLI specs, not variable files, SQL, text artifacts, or import manifests. YAML
-comments remain valid input to the project loader.
+CLI specs whose kinds are supported by the active providers. Unknown kinds,
+variable files, SQL, text artifacts, and the generated import manifest are not
+annotated. YAML comments remain valid input to the project loader.
 
 ## VS Code
 
@@ -70,7 +81,7 @@ A modeline is sufficient. Alternatively, generate local schemas and map files in
 ```jsonc
 {
   "yaml.schemas": {
-    "./.rudder/schemas/rudder-cli.schema.json": [
+    "./.rudder/schemas/rudder-spec.schema.json": [
       "**/*.yaml",
       "**/*.yml"
     ]
@@ -84,7 +95,7 @@ Use narrower globs if the repository also contains non-Rudder YAML.
 
 1. Run `rudder-cli schema --out .rudder/schemas`.
 2. Open **Settings/Preferences → Languages & Frameworks → Schemas and DTDs → JSON Schema Mappings**.
-3. Add a schema, select `.rudder/schemas/rudder-cli.schema.json`, and map it to
+3. Add a schema, select `.rudder/schemas/rudder-spec.schema.json`, and map it to
    the directory or file pattern containing RudderStack specs.
 
 JetBrains uses its mapping UI rather than the yaml-language-server modeline, so
@@ -103,8 +114,9 @@ The generated schemas intentionally omit those checks rather than rejecting
 valid templated or imported specs. Run `rudder-cli validate` for authoritative
 CLI validation.
 
-Release URLs are backed by standalone `*.schema.json` assets generated and
-attached by the GoReleaser workflow for each CLI release. Release publication
-enables all distributable experimental providers, so flag-gated rETL kinds are
-available as assets even though a default local generation omits them. Automatic
-SchemaStore publication is not part of this change.
+Each generated schema's `$id` uses the canonical docs-hosted `/v1/` URL. CLI
+releases also attach the same standalone `*.schema.json` files as an offline
+fallback. Release publication enables all distributable experimental providers,
+so flag-gated rETL kinds are available as assets even though a default local
+generation omits them. Automatic SchemaStore publication is not part of this
+change.

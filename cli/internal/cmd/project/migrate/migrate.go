@@ -6,6 +6,7 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -41,11 +42,15 @@ func NewCmdMigrate() *cobra.Command {
 			$ rudder-cli migrate --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed("schema-url-base") {
+			configuredSchemaURLBase := config.GetConfig().SchemaBaseURL
+			if !cmd.Flags().Changed("schema-url-base") && configuredSchemaURLBase != "" {
+				schemaURLBase = configuredSchemaURLBase
+			}
+			if cmd.Flags().Changed("schema-url-base") || configuredSchemaURLBase != "" {
 				schemaModeline = true
 			}
 			if schemaModeline {
-				schemaURLBase = editor.VersionedReleaseURLBase(schemaURLBase, app.GetVersion())
+				schemaURLBase = editor.URLBase(schemaURLBase)
 			}
 
 			// Initialize dependencies
@@ -89,7 +94,7 @@ func NewCmdMigrate() *cobra.Command {
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVar(&schemaModeline, "schema-modeline", false, "Add yaml-language-server schema modelines to migrated specs")
-	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "Release URL root for schemas; the CLI version is appended (implies --schema-modeline)")
+	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "URL root for schemas (implies --schema-modeline)")
 
 	return cmd
 }

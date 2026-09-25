@@ -20,8 +20,8 @@ type testSpec struct {
 
 func testSchemas() schemapkg.Set {
 	return schemapkg.Set{
-		"beta":  schemapkg.ForKind("beta", testSpec{}),
-		"alpha": schemapkg.ForKind("alpha", testSpec{}),
+		"beta":  schemapkg.MustForKind("beta", testSpec{}),
+		"alpha": schemapkg.MustForKind("alpha", testSpec{}),
 	}
 }
 
@@ -68,6 +68,13 @@ func TestSchemaOutCreatesDirectoryAndWritesAllArtifacts(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, json.Valid(data), name)
 	}
+}
+
+func TestSchemaOutRejectsKindInsteadOfIgnoringIt(t *testing.T) {
+	_, err := executeCommand(t, "alpha", "--out", t.TempDir())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be combined with --out")
 }
 
 func TestSchemaOutRefusesAnyExistingArtifactBeforeWriting(t *testing.T) {

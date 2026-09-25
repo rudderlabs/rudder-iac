@@ -2,7 +2,9 @@ package destination
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/invopop/jsonschema"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -42,17 +44,110 @@ func (p *Provider) LoadLegacySpec(_ string, s *specs.Spec) error {
 	return fmt.Errorf("destination specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
 }
 
-// SpecSchemas returns the destination envelope. The config field deliberately
-// remains open because its concrete shape is selected dynamically by type and
-// definition_version from the provider's registry.
+// SpecSchemas returns one destination branch per registered type/version so
+// editors see the concrete config fields and connection-mode constraints.
 func (p *Provider) SpecSchemas() schema.Set {
-	return schema.Set{
-		DestinationSpecKind: schema.ForKindVersions(
-			DestinationSpecKind,
-			DestinationSpec{},
-			schema.VersionsForKind(DestinationSpecKind, p.SupportedMatchPatterns())...,
-		),
+	definitions := p.registry.Definitions()
+	variants := make([]schema.Variant, 0, len(definitions))
+	for _, definition := range definitions {
+		variants = append(variants, schema.Variant{
+			Sample: DestinationSpec{},
+			Replacements: map[string]any{
+				"config": definition.NewConfigSchema(),
+			},
+			Constants: map[string]any{
+				"type":               definition.Type,
+				"definition_version": definition.Version,
+			},
+			Transforms: []schema.Transform{destinationDefinitionTransform(definition)},
+		})
 	}
+	versions := schema.VersionsForKind(DestinationSpecKind, p.SupportedMatchPatterns())
+	return schema.Set{
+		DestinationSpecKind: schema.MustForKindVariants(DestinationSpecKind, versions, variants...),
+	}
+}
+
+func destinationDefinitionTransform(definition *definitions.RegisteredDefinition) schema.Transform {
+	return func(spec *jsonschema.Schema) {
+		config, ok := spec.Properties.Get("config")
+		if !ok {
+			return
+		}
+		if config.Ref != "" {
+			config = resolveLocalDefinition(spec, config.Ref)
+		}
+		if config == nil || config.Properties == nil {
+			return
+		}
+		// Destination defaults and custom validators can satisfy or replace many
+		// field-level `required` tags. Keep generated config schemas structural so
+		// they do not reject specs accepted after ApplyDefaults.
+		clearRequiredConstraints(config, spec.Definitions, map[*jsonschema.Schema]bool{})
+		restrictConnectionMode(config, definition)
+	}
+}
+
+func clearRequiredConstraints(node *jsonschema.Schema, defs jsonschema.Definitions, seen map[*jsonschema.Schema]bool) {
+	if node == nil || seen[node] {
+		return
+	}
+	seen[node] = true
+	if node.Ref != "" {
+		if resolved := resolveLocalDefinition(&jsonschema.Schema{Definitions: defs}, node.Ref); resolved != nil {
+			clearRequiredConstraints(resolved, defs, seen)
+		}
+		return
+	}
+	node.Required = nil
+	for _, child := range schemaNodeChildren(node) {
+		clearRequiredConstraints(child, defs, seen)
+	}
+}
+
+func schemaNodeChildren(node *jsonschema.Schema) []*jsonschema.Schema {
+	children := append(append(append([]*jsonschema.Schema{}, node.AllOf...), node.AnyOf...), node.OneOf...)
+	children = append(children, node.Not, node.If, node.Then, node.Else, node.Items, node.Contains, node.AdditionalProperties, node.PropertyNames, node.ContentSchema)
+	children = append(children, node.PrefixItems...)
+	if node.Properties != nil {
+		for pair := node.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			children = append(children, pair.Value)
+		}
+	}
+	return children
+}
+
+func resolveLocalDefinition(spec *jsonschema.Schema, ref string) *jsonschema.Schema {
+	const prefix = "#/$defs/"
+	name, ok := strings.CutPrefix(ref, prefix)
+	if !ok || spec.Definitions == nil {
+		return nil
+	}
+	return spec.Definitions[name]
+}
+
+func restrictConnectionMode(config *jsonschema.Schema, definition *definitions.RegisteredDefinition) {
+	property, ok := config.Properties.Get("connection_mode")
+	if !ok {
+		return
+	}
+
+	properties := jsonschema.NewProperties()
+	for _, sourceType := range definition.SupportedSourceTypes() {
+		modes, err := definition.ConnectionModes(sourceType)
+		if err != nil {
+			continue
+		}
+		values := make([]any, len(modes))
+		for i, mode := range modes {
+			values[i] = mode
+		}
+		properties.Set(sourceType, &jsonschema.Schema{Type: "string", Enum: values})
+	}
+	property.Ref = ""
+	property.Type = "object"
+	property.Properties = properties
+	property.AdditionalProperties = jsonschema.FalseSchema
 }
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully

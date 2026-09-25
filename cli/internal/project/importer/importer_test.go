@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -167,6 +168,18 @@ type stubImportProvider struct {
 	entries    []importmanifest.ImportEntry
 }
 
+func (p *stubImportProvider) SupportedKinds() []string {
+	return []string{"source"}
+}
+
+func (p *stubImportProvider) SupportedTypes() []string {
+	return []string{"source"}
+}
+
+func (p *stubImportProvider) SupportedMatchPatterns() []vrules.MatchPattern {
+	return nil
+}
+
 func (p *stubImportProvider) LoadResourcesFromRemote(context.Context) (*resources.RemoteResources, error) {
 	return resources.NewRemoteResources(), nil
 }
@@ -260,6 +273,29 @@ func TestWorkspaceImport_WritesSchemaModelineOnlyToSpecs(t *testing.T) {
 	manifestContent, err := os.ReadFile(filepath.Join(dir, ImportedDir, importmanifest.FileName))
 	require.NoError(t, err)
 	assert.NotContains(t, string(manifestContent), "# yaml-language-server:")
+}
+
+func TestWorkspaceImport_SkipsSchemaModelineForUnknownKind(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+	entities[0].Content.(*specs.Spec).Kind = "future-kind"
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entities:   entities,
+		entries:    entries,
+	}, ImportOptions{
+		SchemaModeline:        true,
+		SchemaModelineBaseURL: "https://schemas.example.test/v1",
+	})
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, ImportedDir, "sources", "my-src.yaml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), "# yaml-language-server:")
 }
 
 func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {

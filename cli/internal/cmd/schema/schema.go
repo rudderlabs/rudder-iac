@@ -34,6 +34,9 @@ func newCmdSchema(generate generateFunc) *cobra.Command {
 			}
 
 			if outDir != "" {
+				if len(args) != 0 {
+					return errors.New("a schema kind cannot be combined with --out; omit the kind to write all schemas")
+				}
 				return writeSchemas(outDir, schemas, overwrite)
 			}
 			if overwrite {

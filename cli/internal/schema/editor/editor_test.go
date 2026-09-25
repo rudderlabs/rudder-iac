@@ -33,41 +33,41 @@ func TestFileName(t *testing.T) {
 	assert.Equal(t, "properties.schema.json", FileName("properties"))
 }
 
-func TestReleaseURL(t *testing.T) {
+func TestURL(t *testing.T) {
 	assert.Equal(t,
-		"https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3/source.schema.json",
-		ReleaseURL("v1.2.3", "source"),
+		"https://www.rudderstack.com/docs/schemas/rudder-cli/v1/source.schema.json",
+		URL("source"),
 	)
 }
 
-func TestVersionedReleaseURLBase(t *testing.T) {
+func TestURLBase(t *testing.T) {
 	tests := []struct {
 		name    string
 		baseURL string
-		version string
+		envURL  string
 		want    string
 	}{
 		{
-			name:    "default release URL normalizes GoReleaser version to tag",
-			version: "1.2.3",
-			want:    "https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3",
+			name: "default docs URL",
+			want: DefaultSchemaURLBase,
 		},
 		{
-			name:    "default release URL keeps prefixed tag",
-			version: "v1.2.3",
-			want:    "https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3",
+			name:   "environment override",
+			envURL: " https://schemas.example.test/env/// ",
+			want:   "https://schemas.example.test/env",
 		},
 		{
-			name:    "custom URL preserves version convention",
+			name:    "explicit override wins",
 			baseURL: "  https://schemas.example.test/releases///  ",
-			version: "1.2.3",
-			want:    "https://schemas.example.test/releases/1.2.3",
+			envURL:  "https://schemas.example.test/env",
+			want:    "https://schemas.example.test/releases",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, VersionedReleaseURLBase(tt.baseURL, tt.version))
+			t.Setenv(SchemaBaseURLEnv, tt.envURL)
+			assert.Equal(t, tt.want, URLBase(tt.baseURL))
 		})
 	}
 }

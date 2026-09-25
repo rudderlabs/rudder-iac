@@ -125,12 +125,12 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SpecSchemas() schema.Set {
 	patterns := p.SupportedMatchPatterns()
 	return schema.Set{
-		sourceHandler.ResourceKind: schema.ForKindVersions(
+		sourceHandler.ResourceKind: schema.MustForKindVersions(
 			sourceHandler.ResourceKind,
 			sourceHandler.SourceSpec{},
 			schema.VersionsForKind(sourceHandler.ResourceKind, patterns)...,
 		),
-		connectionHandler.EventStreamConnectionResourceKind: schema.ForKindVersions(
+		connectionHandler.EventStreamConnectionResourceKind: schema.MustForKindVersions(
 			connectionHandler.EventStreamConnectionResourceKind,
 			connectionHandler.ConnectionsSpec{},
 			schema.VersionsForKind(connectionHandler.EventStreamConnectionResourceKind, patterns)...,

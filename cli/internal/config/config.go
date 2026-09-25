@@ -23,10 +23,11 @@ var (
 )
 
 type Config = struct {
-	Debug   bool   `mapstructure:"debug"`
-	Verbose bool   `mapstructure:"verbose"`
-	APIURL  string `mapstructure:"apiURL"`
-	Auth    struct {
+	Debug         bool   `mapstructure:"debug"`
+	Verbose       bool   `mapstructure:"verbose"`
+	APIURL        string `mapstructure:"apiURL"`
+	SchemaBaseURL string `mapstructure:"schemaBaseURL"`
+	Auth          struct {
 		AccessToken string `mapstructure:"accessToken"`
 	} `mapstructure:"auth"`
 	Telemetry struct {
@@ -74,6 +75,7 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL)
+	viper.SetDefault("schemaBaseURL", "")
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
@@ -85,6 +87,7 @@ func InitConfig(cfgFile string) {
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	viper.BindEnv("schemaBaseURL", "RUDDERSTACK_CLI_SCHEMA_BASE_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")

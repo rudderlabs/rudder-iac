@@ -80,12 +80,12 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 func (p *Provider) SpecSchemas() schema.Set {
 	patterns := p.SupportedMatchPatterns()
 	return schema.Set{
-		ttypes.TransformationSpecKind: schema.ForKindVersions(
+		ttypes.TransformationSpecKind: schema.MustForKindVersions(
 			ttypes.TransformationSpecKind,
 			model.TransformationSpec{},
 			schema.VersionsForKind(ttypes.TransformationSpecKind, patterns)...,
 		),
-		ttypes.LibrarySpecKind: schema.ForKindVersions(
+		ttypes.LibrarySpecKind: schema.MustForKindVersions(
 			ttypes.LibrarySpecKind,
 			model.LibrarySpec{},
 			schema.VersionsForKind(ttypes.LibrarySpecKind, patterns)...,

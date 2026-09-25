@@ -24,15 +24,22 @@ type Option func(*options)
 type options struct {
 	schemaModeline        bool
 	schemaModelineBaseURL string
+	schemaKinds           map[string]struct{}
 }
 
 // WithSchemaModeline prepends a yaml-language-server modeline to YAML entities
 // whose content is a *specs.Spec. baseURL is the versioned schema directory used
 // to build the per-kind schema URL.
-func WithSchemaModeline(baseURL string) Option {
+func WithSchemaModeline(baseURL string, kinds ...string) Option {
 	return func(opts *options) {
 		opts.schemaModeline = true
 		opts.schemaModelineBaseURL = baseURL
+		if len(kinds) > 0 {
+			opts.schemaKinds = make(map[string]struct{}, len(kinds))
+			for _, kind := range kinds {
+				opts.schemaKinds[kind] = struct{}{}
+			}
+		}
 	}
 }
 
@@ -75,6 +82,11 @@ func addSchemaModeline(content []byte, ext string, value any, opts options) []by
 	spec, ok := value.(*specs.Spec)
 	if !ok || spec == nil {
 		return content
+	}
+	if opts.schemaKinds != nil {
+		if _, ok := opts.schemaKinds[spec.Kind]; !ok {
+			return content
+		}
 	}
 	return editor.EnsureHeader(content, editor.SchemaURL(opts.schemaModelineBaseURL, spec.Kind))
 }

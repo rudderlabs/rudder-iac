@@ -20,14 +20,6 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Validate release tag
-        env:
-          RELEASE_TAG: ${{ github.event.client_payload.tag }}
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
-            echo "Invalid release tag: $RELEASE_TAG" >&2
-            exit 1
-          fi
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -55,3 +47,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEMETRY_WRITE_KEY: ${{ vars.TELEMETRY_WRITE_KEY }}
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
+      - name: Upload JSON Schema assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.client_payload.tag }}
+        run: gh release upload "$RELEASE_TAG" .release-schemas/*.schema.json --clobber

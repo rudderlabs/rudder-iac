@@ -96,32 +96,32 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SpecSchemas() schema.Set {
 	patterns := p.SupportedMatchPatterns()
 	return schema.Set{
-		localcatalog.KindProperties: schema.ForVersionedKind(localcatalog.KindProperties, map[string]any{
+		localcatalog.KindProperties: schema.MustForVersionedKind(localcatalog.KindProperties, map[string]any{
 			specs.SpecVersionV0_1:        localcatalog.PropertySpec{},
 			specs.SpecVersionV0_1Variant: localcatalog.PropertySpec{},
 			specs.SpecVersionV1:          localcatalog.PropertySpecV1{},
 		}),
-		localcatalog.KindEvents: schema.ForVersionedKind(localcatalog.KindEvents, map[string]any{
+		localcatalog.KindEvents: schema.MustForVersionedKind(localcatalog.KindEvents, map[string]any{
 			specs.SpecVersionV0_1:        localcatalog.EventSpec{},
 			specs.SpecVersionV0_1Variant: localcatalog.EventSpec{},
 			specs.SpecVersionV1:          localcatalog.EventSpecV1{},
 		}),
-		localcatalog.KindTrackingPlans: schema.ForKindVersions(
+		localcatalog.KindTrackingPlans: schema.MustForKindVersions(
 			localcatalog.KindTrackingPlans,
 			localcatalog.TrackingPlan{},
 			schema.VersionsForKind(localcatalog.KindTrackingPlans, patterns)...,
 		),
-		localcatalog.KindTrackingPlansV1: schema.ForKindVersions(
+		localcatalog.KindTrackingPlansV1: schema.MustForKindVersions(
 			localcatalog.KindTrackingPlansV1,
 			localcatalog.TrackingPlanV1{},
 			schema.VersionsForKind(localcatalog.KindTrackingPlansV1, patterns)...,
 		),
-		localcatalog.KindCustomTypes: schema.ForVersionedKind(localcatalog.KindCustomTypes, map[string]any{
+		localcatalog.KindCustomTypes: schema.MustForVersionedKind(localcatalog.KindCustomTypes, map[string]any{
 			specs.SpecVersionV0_1:        localcatalog.CustomTypeSpec{},
 			specs.SpecVersionV0_1Variant: localcatalog.CustomTypeSpec{},
 			specs.SpecVersionV1:          localcatalog.CustomTypeSpecV1{},
 		}),
-		localcatalog.KindCategories: schema.ForKindVersions(
+		localcatalog.KindCategories: schema.MustForKindVersions(
 			localcatalog.KindCategories,
 			localcatalog.CategorySpecV1{},
 			schema.VersionsForKind(localcatalog.KindCategories, patterns)...,

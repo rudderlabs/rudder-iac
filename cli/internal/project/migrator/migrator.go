@@ -31,7 +31,7 @@ type Option func(*Migrator)
 // WithSchemaModeline adds schema modelines to migrated specs.
 func WithSchemaModeline(baseURL string) Option {
 	return func(m *Migrator) {
-		m.writerOptions = append(m.writerOptions, writer.WithSchemaModeline(baseURL))
+		m.writerOptions = append(m.writerOptions, writer.WithSchemaModeline(baseURL, m.provider.SupportedKinds()...))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ type trackingPlanSpec struct {
 }
 
 func TestForKindEmitsDraft202012Envelope(t *testing.T) {
-	s := ForKind("tracking-plan", trackingPlanSpec{})
+	s := MustForKind("tracking-plan", trackingPlanSpec{})
 
 	raw, err := json.Marshal(s)
 	require.NoError(t, err)
@@ -27,6 +28,7 @@ func TestForKindEmitsDraft202012Envelope(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &doc))
 
 	assert.Equal(t, draft202012, doc["$schema"], "must declare Draft 2020-12 dialect")
+	assert.Equal(t, editor.URL("tracking-plan"), doc["$id"])
 
 	props, ok := doc["properties"].(map[string]any)
 	require.True(t, ok, "schema must expose top-level properties")
@@ -52,13 +54,19 @@ func TestForKindEmitsDraft202012Envelope(t *testing.T) {
 	assert.ElementsMatch(t, []any{"name"}, metadata["required"])
 }
 
+func TestForKindNilSpecErrors(t *testing.T) {
+	_, err := ForKind("tracking-plan", nil)
+
+	assert.ErrorIs(t, err, ErrNilSpec)
+}
+
 func TestForKindUsesYAMLFieldNamesForMapstructureModels(t *testing.T) {
 	type mapstructureSpec struct {
 		ID                string `json:"id" mapstructure:"id" validate:"required"`
 		DefinitionVersion int64  `json:"definition_version" mapstructure:"definition_version" validate:"required"`
 	}
 
-	s := ForKind("example", mapstructureSpec{})
+	s := MustForKind("example", mapstructureSpec{})
 	spec := property(t, s, "spec")
 
 	assert.Equal(t, []string{"id", "definition_version"}, spec.Required)
@@ -72,8 +80,8 @@ func TestForKindUsesYAMLFieldNamesForMapstructureModels(t *testing.T) {
 
 func TestSetHelpers(t *testing.T) {
 	schemas := Set{
-		"tracking-plan": ForKind("tracking-plan", trackingPlanSpec{}),
-		"properties":    ForKind("properties", struct{}{}),
+		"tracking-plan": MustForKind("tracking-plan", trackingPlanSpec{}),
+		"properties":    MustForKind("properties", struct{}{}),
 	}
 
 	assert.Equal(t, []string{"properties", "tracking-plan"}, Kinds(schemas))
@@ -98,7 +106,7 @@ func TestVersionsForKindUsesSupportedMatchPatterns(t *testing.T) {
 }
 
 func TestMetadataIsRequiredAndStructured(t *testing.T) {
-	s := ForKindVersions("example", trackingPlanSpec{}, "rudder/v1")
+	s := MustForKindVersions("example", trackingPlanSpec{}, "rudder/v1")
 
 	raw, err := json.Marshal(s)
 	require.NoError(t, err)
@@ -110,7 +118,7 @@ func TestMetadataIsRequiredAndStructured(t *testing.T) {
 }
 
 func TestForKindVersionsRejectsUnsupportedVersion(t *testing.T) {
-	s := ForKindVersions("example", trackingPlanSpec{}, "rudder/v1")
+	s := MustForKindVersions("example", trackingPlanSpec{}, "rudder/v1")
 
 	raw, err := json.Marshal(s)
 	require.NoError(t, err)
@@ -121,7 +129,7 @@ func TestForKindVersionsRejectsUnsupportedVersion(t *testing.T) {
 }
 
 func TestForVersionedKindSelectsBodyByVersion(t *testing.T) {
-	s := ForVersionedKind("example", map[string]any{
+	s := MustForVersionedKind("example", map[string]any{
 		"rudder/v0.1": struct {
 			Legacy string `json:"legacy" validate:"required"`
 		}{},
@@ -141,8 +149,8 @@ func TestForVersionedKindSelectsBodyByVersion(t *testing.T) {
 
 func TestRootSchemaDiscriminatesByKind(t *testing.T) {
 	schemas := Set{
-		"properties":    ForKind("properties", struct{}{}),
-		"tracking-plan": ForKind("tracking-plan", trackingPlanSpec{}),
+		"properties":    MustForKind("properties", struct{}{}),
+		"tracking-plan": MustForKind("tracking-plan", trackingPlanSpec{}),
 	}
 	root, err := Root(schemas)
 	require.NoError(t, err)
@@ -154,6 +162,7 @@ func TestRootSchemaDiscriminatesByKind(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &doc))
 
 	assert.Equal(t, draft202012, doc["$schema"])
+	assert.Equal(t, editor.DefaultSchemaURLBase+"/"+RootFileName, doc["$id"])
 	oneOf, ok := doc["oneOf"].([]any)
 	require.True(t, ok, "root schema must branch on kind via oneOf")
 	assert.Len(t, oneOf, len(schemas))

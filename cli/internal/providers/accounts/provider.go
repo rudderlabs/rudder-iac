@@ -25,7 +25,7 @@ func NewProvider(store AccountStore) *Provider {
 // SpecSchemas returns the account spec envelope.
 func (p *Provider) SpecSchemas() schema.Set {
 	return schema.Set{
-		AccountSpecKind: schema.ForKindVersions(
+		AccountSpecKind: schema.MustForKindVersions(
 			AccountSpecKind,
 			AccountSpec{},
 			schema.VersionsForKind(AccountSpecKind, p.SupportedMatchPatterns())...,

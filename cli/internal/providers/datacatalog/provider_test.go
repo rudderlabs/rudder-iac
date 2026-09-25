@@ -24,6 +24,18 @@ func TestProvider_SpecSchemasCoverSupportedKinds(t *testing.T) {
 	assert.ElementsMatch(t, p.SupportedKinds(), schema.Kinds(p.SpecSchemas()))
 }
 
+func TestProvider_TrackingPlanSchemasHideExpandedEventProps(t *testing.T) {
+	t.Parallel()
+
+	p := datacatalog.New(&datacatalog.EmptyCatalog{})
+	for _, kind := range []string{localcatalog.KindTrackingPlans, localcatalog.KindTrackingPlansV1} {
+		raw, err := json.Marshal(p.SpecSchemas()[kind])
+		require.NoError(t, err)
+		assert.NotContains(t, string(raw), "event_props", kind)
+		assert.NotContains(t, string(raw), "localID", kind)
+	}
+}
+
 func TestProvider_SpecSchemasSelectDataCatalogBodyByVersion(t *testing.T) {
 	p := datacatalog.New(&datacatalog.EmptyCatalog{})
 

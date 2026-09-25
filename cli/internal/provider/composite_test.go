@@ -105,7 +105,7 @@ func TestCompositeProvider_SpecSchemas(t *testing.T) {
 	alpha := &schemaMockProvider{
 		MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil),
 		schemas: schema.Set{
-			"kindA": schema.ForKind("kindA", struct {
+			"kindA": schema.MustForKind("kindA", struct {
 				ID string `json:"id" validate:"required"`
 			}{}),
 		},

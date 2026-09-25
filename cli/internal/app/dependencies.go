@@ -199,7 +199,16 @@ func GenerateSchemas() (schema.Set, error) {
 	if !ok {
 		return nil, fmt.Errorf("composite provider does not provide schemas")
 	}
-	return sp.SpecSchemas(), nil
+	schemas := sp.SpecSchemas()
+	// Import manifests are project specs handled before resource-provider
+	// dispatch, so their dedicated project provider owns this schema.
+	for kind, generated := range importmanifest.New().SpecSchemas() {
+		if _, exists := schemas[kind]; exists {
+			return nil, fmt.Errorf("duplicate schema kind %q", kind)
+		}
+		schemas[kind] = generated
+	}
+	return schemas, nil
 }
 
 // newCompositeProvider builds the composite provider without requiring

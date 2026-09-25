@@ -41,11 +41,15 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			if merge && !config.GetConfig().ExperimentalFlags.ImportMerge {
 				return fmt.Errorf("--merge requires the %q experimental flag to be enabled", "importMerge")
 			}
-			if cmd.Flags().Changed("schema-url-base") {
+			configuredSchemaURLBase := config.GetConfig().SchemaBaseURL
+			if !cmd.Flags().Changed("schema-url-base") && configuredSchemaURLBase != "" {
+				schemaURLBase = configuredSchemaURLBase
+			}
+			if cmd.Flags().Changed("schema-url-base") || configuredSchemaURLBase != "" {
 				schemaModeline = true
 			}
 			if schemaModeline {
-				schemaURLBase = editor.VersionedReleaseURLBase(schemaURLBase, app.GetVersion())
+				schemaURLBase = editor.URLBase(schemaURLBase)
 			}
 
 			deps, err = app.NewDeps()
@@ -112,6 +116,6 @@ func NewCmdWorkspaceImport() *cobra.Command {
 	cmd.Flags().BoolVar(&merge, "merge", false, "Allow import on a diverged project, linking remote resources that match existing local resources (experimental)")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVar(&schemaModeline, "schema-modeline", false, "Add yaml-language-server schema modelines to imported specs")
-	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "Release URL root for schemas; the CLI version is appended (implies --schema-modeline)")
+	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "URL root for schemas (implies --schema-modeline)")
 	return cmd
 }

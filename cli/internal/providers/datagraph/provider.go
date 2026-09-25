@@ -97,7 +97,7 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 func (p *Provider) SpecSchemas() schema.Set {
 	kind := datagraph.HandlerMetadata.SpecKind
 	return schema.Set{
-		kind: schema.ForKindVersions(kind, dgModel.DataGraphSpec{}, schema.VersionsForKind(kind, p.SupportedMatchPatterns())...),
+		kind: schema.MustForKindVersions(kind, dgModel.DataGraphSpec{}, schema.VersionsForKind(kind, p.SupportedMatchPatterns())...),
 	}
 }
 

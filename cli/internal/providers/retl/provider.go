@@ -153,21 +153,21 @@ func (p *Provider) SupportedKinds() []string {
 func (p *Provider) SpecSchemas() schema.Set {
 	patterns := p.SupportedMatchPatterns()
 	schemas := schema.Set{
-		sqlmodel.ResourceKind: schema.ForKindVersions(
+		sqlmodel.ResourceKind: schema.MustForKindVersions(
 			sqlmodel.ResourceKind,
 			sqlmodel.SQLModelSpec{},
 			schema.VersionsForKind(sqlmodel.ResourceKind, patterns)...,
 		),
 	}
 	if _, ok := p.kindToType[table.ResourceKind]; ok {
-		schemas[table.ResourceKind] = schema.ForKindVersions(
+		schemas[table.ResourceKind] = schema.MustForKindVersions(
 			table.ResourceKind,
 			table.TableSpec{},
 			schema.VersionsForKind(table.ResourceKind, patterns)...,
 		)
 	}
 	if _, ok := p.kindToType[connection.ResourceKind]; ok {
-		schemas[connection.ResourceKind] = schema.ForKindVersions(
+		schemas[connection.ResourceKind] = schema.MustForKindVersions(
 			connection.ResourceKind,
 			connection.ConnectionsSpec{},
 			schema.VersionsForKind(connection.ResourceKind, patterns)...,

@@ -16,7 +16,7 @@ func FileName(kind string) string {
 
 // RootFileName is the file name used for the combined, kind-discriminated root
 // schema written alongside the per-kind schemas.
-const RootFileName = "rudder-cli.schema.json"
+const RootFileName = "rudder-spec.schema.json"
 
 // MarshalKind renders a kind's schema as indented JSON bytes.
 func MarshalKind(schemas Set, kind string) ([]byte, error) {

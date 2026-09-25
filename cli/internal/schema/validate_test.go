@@ -13,7 +13,7 @@ import (
 func compileKind(t *testing.T, kind string, sample any) *jsonschema.Schema {
 	t.Helper()
 
-	raw, err := json.Marshal(ForKind(kind, sample))
+	raw, err := json.Marshal(MustForKind(kind, sample))
 	require.NoError(t, err)
 	return compileDocument(t, raw)
 }

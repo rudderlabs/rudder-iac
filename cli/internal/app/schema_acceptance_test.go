@@ -118,6 +118,38 @@ spec:
         - bogus
 `,
 		},
+		{
+			name: "destination rejects unsupported connection mode",
+			kind: "destination",
+			yaml: `version: rudder/v1
+kind: destination
+metadata:
+  name: firebase
+spec:
+  id: firebase
+  display_name: Firebase
+  type: firebase
+  enabled: true
+  definition_version: 1
+  config:
+    connection_mode:
+      warehouse: cloud
+`,
+		},
+		{
+			name: "retl connection requires config",
+			kind: "retl-connections",
+			yaml: `version: rudder/v1
+kind: retl-connections
+metadata:
+  name: missing-config
+spec:
+  connections:
+    - id: users-to-webhook
+      source: "#retl-source-sql-model:users"
+      destination: "#destination:webhook"
+`,
+		},
 	}
 
 	for _, tt := range invalid {
@@ -135,6 +167,7 @@ func TestGeneratedSchemasValidateProjectFixtures(t *testing.T) {
 	schemas, err := GenerateSchemas()
 	require.NoError(t, err)
 	compiled := compileSchemas(t, schemas)
+	root := compileRootSchema(t, schemas)
 
 	var (
 		fixtureCount int
@@ -163,6 +196,7 @@ func TestGeneratedSchemasValidateProjectFixtures(t *testing.T) {
 		fixtureCount++
 		seenKinds[envelope.Kind] = true
 		assert.NoError(t, validateFixture(validator, data), path)
+		assert.NoError(t, validateFixture(root, data), "root schema: "+path)
 		return nil
 	}))
 
@@ -176,6 +210,21 @@ func TestGeneratedSchemasValidateProjectFixtures(t *testing.T) {
 	}
 }
 
+func TestGeneratedRootSchemaMatchesLegacyTrackingPlanVersions(t *testing.T) {
+	enableAllSchemaKinds(t)
+	schemas, err := GenerateSchemas()
+	require.NoError(t, err)
+	root := compileRootSchema(t, schemas)
+
+	legacyPath := filepath.Join("..", "providers", "datacatalog", "localcatalog", "testdata", "trackingplan_1.yaml")
+	legacy, err := os.ReadFile(legacyPath)
+	require.NoError(t, err)
+	assert.NoError(t, validateFixture(root, legacy))
+
+	invalidV1 := []byte("version: rudder/v1\nkind: tp\nmetadata:\n  name: legacy-name\nspec:\n  id: legacy-name\n  display_name: Legacy Name\n")
+	assert.Error(t, validateFixture(root, invalidV1))
+}
+
 func enableAllSchemaKinds(t *testing.T) {
 	t.Helper()
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
@@ -183,8 +232,13 @@ func enableAllSchemaKinds(t *testing.T) {
 	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	previous := viper.Get("flags.retlConnectionSupport")
+	previousUnverified := viper.Get("flags.unverifiedDestinations")
 	viper.Set("flags.retlConnectionSupport", true)
-	t.Cleanup(func() { viper.Set("flags.retlConnectionSupport", previous) })
+	viper.Set("flags.unverifiedDestinations", true)
+	t.Cleanup(func() {
+		viper.Set("flags.retlConnectionSupport", previous)
+		viper.Set("flags.unverifiedDestinations", previousUnverified)
+	})
 }
 
 func compileSchemas(t *testing.T, schemas schema.Set) map[string]*compiledschema.Schema {
@@ -194,13 +248,19 @@ func compileSchemas(t *testing.T, schemas schema.Set) map[string]*compiledschema
 		compiled[kind] = compileSchema(t, kind, generated)
 	}
 
+	_ = compileRootSchema(t, schemas)
+	return compiled
+}
+
+func compileRootSchema(t *testing.T, schemas schema.Set) *compiledschema.Schema {
+	t.Helper()
 	root, err := schema.MarshalRoot(schemas)
 	require.NoError(t, err)
 	var document any
 	require.NoError(t, json.Unmarshal(root, &document))
 	compiler := compiledschema.NewCompiler()
 	require.NoError(t, compiler.AddResource("mem://root.json", document))
-	_, err = compiler.Compile("mem://root.json")
+	compiled, err := compiler.Compile("mem://root.json")
 	require.NoError(t, err)
 	return compiled
 }
@@ -224,6 +284,19 @@ func flagGatedKind(kind string) bool {
 }
 
 func representativeFixture(kind string) []byte {
+	if kind == "import-manifest" {
+		return []byte(`version: rudder/v1
+kind: import-manifest
+metadata:
+  name: import-manifest
+spec:
+  workspaces:
+    - workspace_id: workspace-1
+      resources:
+        - urn: source:source-1
+          remote_id: remote-1
+`)
+	}
 	if kind == "data-graph" {
 		return []byte(`version: rudder/v1
 kind: data-graph

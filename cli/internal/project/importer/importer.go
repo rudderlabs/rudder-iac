@@ -31,6 +31,7 @@ var (
 )
 
 type ImportProvider interface {
+	provider.TypeProvider
 	provider.RemoteResourceLoader
 	provider.StateLoader
 	provider.Exporter
@@ -112,7 +113,7 @@ func WorkspaceImport(
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 	writerOpts := make([]writer.Option, 0, 1)
 	if opts.SchemaModeline {
-		writerOpts = append(writerOpts, writer.WithSchemaModeline(opts.SchemaModelineBaseURL))
+		writerOpts = append(writerOpts, writer.WithSchemaModeline(opts.SchemaModelineBaseURL, p.SupportedKinds()...))
 	}
 
 	location := project.Location()
