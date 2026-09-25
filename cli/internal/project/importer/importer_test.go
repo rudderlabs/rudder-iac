@@ -260,11 +260,13 @@ func TestImportSummary(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		location   string
 		importable map[string]map[string]*resources.RemoteResource
 		expected   string
 	}{
 		{
-			name: "plain import omits the merged section",
+			name:     "plain import omits the merged section",
+			location: ".",
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source":              {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 				"event-stream-source": {"rid-2": {ID: "rid-2", ExternalID: "web"}},
@@ -275,7 +277,8 @@ func TestImportSummary(t *testing.T) {
 ` + applyHint,
 		},
 		{
-			name: "merge lists merged resources by local URN",
+			name:     "merge lists merged resources by local URN",
+			location: ".",
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 				"event-stream-source": {
@@ -294,7 +297,8 @@ Merged 2 remote resources into existing local resources:
 ` + applyHint,
 		},
 		{
-			name: "everything merged still prints the imported total",
+			name:     "everything merged still prints the imported total",
+			location: ".",
 			importable: map[string]map[string]*resources.RemoteResource{
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
@@ -302,6 +306,18 @@ Merged 2 remote resources into existing local resources:
 Merged 1 remote resources into existing local resources:
   tracking-plan:checkout  <- remote tp-1
 ` + applyHint,
+		},
+		{
+			name:     "non-default location shows the real path and passes it to apply",
+			location: "./myproj",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			expected: `Imported 1 resources into myproj/imported/:
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l ./myproj`" + ` to start managing them.
+`,
 		},
 	}
 
@@ -312,7 +328,7 @@ Merged 1 remote resources into existing local resources:
 				importable.Set(resourceType, rs)
 			}
 
-			assert.Equal(t, tt.expected, importSummary(importable))
+			assert.Equal(t, tt.expected, importSummary(importable, tt.location))
 		})
 	}
 }

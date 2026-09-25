@@ -148,12 +148,12 @@ func WorkspaceImport(
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
-	return importSummary(importable), nil
+	return importSummary(importable, location), nil
 }
 
 // importSummary shows what landed on disk and that apply is still needed:
 // imported specs are not managed by the CLI until they are applied.
-func importSummary(importable *resources.RemoteResources) string {
+func importSummary(importable *resources.RemoteResources, location string) string {
 	var (
 		importedRows []string
 		merged       []string
@@ -181,11 +181,16 @@ func importSummary(importable *resources.RemoteResources) string {
 		b strings.Builder
 		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	)
-	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, ImportedDir, strings.Join(importedRows, ""))
+	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, filepath.Join(location, ImportedDir), strings.Join(importedRows, ""))
 	if len(merged) > 0 {
 		fmt.Fprintf(w, "Merged %d remote resources into existing local resources:\n%s", len(merged), strings.Join(merged, ""))
 	}
-	fmt.Fprint(w, "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n")
+
+	applyCmd := "rudder-cli apply"
+	if filepath.Clean(location) != "." {
+		applyCmd += " -l " + location
+	}
+	fmt.Fprintf(w, "\nThe imported resources are not managed by the CLI yet. Run `%s` to start managing them.\n", applyCmd)
 	_ = w.Flush()
 	return b.String()
 }
