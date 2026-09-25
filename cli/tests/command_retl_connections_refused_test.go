@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,6 +33,9 @@ import (
 // destination and its type, and that a refused project reaches the API with
 // nothing.
 func TestRETLConnectionRefusedAtCreate(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
