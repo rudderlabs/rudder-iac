@@ -181,9 +181,9 @@ func importSummary(importable *resources.RemoteResources, location string) strin
 		b strings.Builder
 		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	)
-	fmt.Fprintf(w, "Imported %d resources into %s/:\n%s", total, filepath.Join(location, ImportedDir), strings.Join(importedRows, ""))
+	fmt.Fprintf(w, "Resources imported into %s/: %d\n%s", filepath.Join(location, ImportedDir), total, strings.Join(importedRows, ""))
 	if len(merged) > 0 {
-		fmt.Fprintf(w, "Merged %d remote resources into existing local resources:\n%s", len(merged), strings.Join(merged, ""))
+		fmt.Fprintf(w, "Remote resources merged into existing local resources: %d\n%s", len(merged), strings.Join(merged, ""))
 	}
 
 	applyCmd := "rudder-cli apply"

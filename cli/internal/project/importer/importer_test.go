@@ -271,7 +271,7 @@ func TestImportSummary(t *testing.T) {
 				"source":              {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 				"event-stream-source": {"rid-2": {ID: "rid-2", ExternalID: "web"}},
 			},
-			expected: `Imported 2 resources into imported/:
+			expected: `Resources imported into imported/: 2
   event-stream-source  1
   source               1
 ` + applyHint,
@@ -288,10 +288,10 @@ func TestImportSummary(t *testing.T) {
 				},
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
-			expected: `Imported 3 resources into imported/:
+			expected: `Resources imported into imported/: 3
   event-stream-source  2
   source               1
-Merged 2 remote resources into existing local resources:
+Remote resources merged into existing local resources: 2
   event-stream-source:android  <- remote rid-4
   tracking-plan:checkout       <- remote tp-1
 ` + applyHint,
@@ -302,8 +302,8 @@ Merged 2 remote resources into existing local resources:
 			importable: map[string]map[string]*resources.RemoteResource{
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
-			expected: `Imported 0 resources into imported/:
-Merged 1 remote resources into existing local resources:
+			expected: `Resources imported into imported/: 0
+Remote resources merged into existing local resources: 1
   tracking-plan:checkout  <- remote tp-1
 ` + applyHint,
 		},
@@ -313,7 +313,7 @@ Merged 1 remote resources into existing local resources:
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 			},
-			expected: `Imported 1 resources into myproj/imported/:
+			expected: `Resources imported into myproj/imported/: 1
   source  1
 
 The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l ./myproj`" + ` to start managing them.
