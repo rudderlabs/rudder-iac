@@ -256,20 +256,69 @@ func TestList(t *testing.T) {
 	assert.Equal(t, lo.ToPtr(true), mock.ListCalls[0].HasExternalID)
 	assert.Equal(t, []resources.ResourceData{
 		{
-			IDKey:            "conn-1",
-			SourceIDKey:      "src-1",
-			DestinationIDKey: "dst-1",
-			EnabledKey:       true,
-			ExternalIDKey:    "users-to-webhook",
+			IDKey:              "conn-1",
+			"name":             "users-to-webhook",
+			SourceIDKey:        "src-1",
+			SourceNameKey:      "Users",
+			DestinationIDKey:   "dst-1",
+			DestinationNameKey: "Webhook",
+			EnabledKey:         true,
+			ExternalIDKey:      "users-to-webhook",
 		},
 		{
-			IDKey:            "conn-2",
-			SourceIDKey:      "src-1",
-			DestinationIDKey: "dst-object",
-			EnabledKey:       false,
-			ExternalIDKey:    "",
+			IDKey:              "conn-2",
+			"name":             "",
+			SourceIDKey:        "src-1",
+			SourceNameKey:      "Users",
+			DestinationIDKey:   "dst-object",
+			DestinationNameKey: "Bing Ads",
+			EnabledKey:         false,
+			ExternalIDKey:      "",
 		},
 	}, rows)
+}
+
+// A list is a report of the workspace. Names make each row say what it
+// connects, the way the webapp does, but they are decoration: losing them must
+// never cost a row, and an endpoint the catalog does not carry is not an error.
+func TestListNamesAreBestEffort(t *testing.T) {
+	t.Parallel()
+
+	t.Run("an unreadable catalog still lists every connection", func(t *testing.T) {
+		t.Parallel()
+
+		mock := remoteClient([]retlClient.RETLConnection{remoteRow("conn-1", "users-to-webhook", "src-1", "dst-1")})
+		mock.EndpointsErr = errors.New("forbidden")
+
+		rows, err := remoteHandler(mock, t).List(t.Context(), nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, []resources.ResourceData{
+			{
+				IDKey:              "conn-1",
+				"name":             "users-to-webhook",
+				SourceIDKey:        "src-1",
+				SourceNameKey:      "",
+				DestinationIDKey:   "dst-1",
+				DestinationNameKey: "",
+				EnabledKey:         true,
+				ExternalIDKey:      "users-to-webhook",
+			},
+		}, rows)
+	})
+
+	t.Run("an endpoint missing from the catalog leaves its name empty", func(t *testing.T) {
+		t.Parallel()
+
+		mock := remoteClient([]retlClient.RETLConnection{remoteRow("conn-1", "orphan", "src-gone", "dst-1")})
+
+		rows, err := remoteHandler(mock, t).List(t.Context(), nil)
+
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, "", rows[0][SourceNameKey])
+		assert.Equal(t, "Webhook", rows[0][DestinationNameKey])
+	})
 }
 
 func TestLoadResourcesFromRemote(t *testing.T) {
