@@ -1,7 +1,6 @@
 package importer
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
-	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -223,7 +221,7 @@ func TestWorkspaceImport_SkipsManifestWhenFlagOff(t *testing.T) {
 	dir := t.TempDir()
 	entities, entries := exportFixture()
 
-	err := WorkspaceImport(context.Background(), &stubProject{
+	_, err := WorkspaceImport(context.Background(), &stubProject{
 		location: dir,
 		graph:    resources.NewGraph(),
 	}, &stubImportProvider{
@@ -243,7 +241,7 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 	dir := t.TempDir()
 	entities, entries := exportFixture()
 
-	err := WorkspaceImport(context.Background(), &stubProject{
+	_, err := WorkspaceImport(context.Background(), &stubProject{
 		location: dir,
 		graph:    resources.NewGraph(),
 	}, &stubImportProvider{
@@ -257,13 +255,12 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 	assert.NoError(t, err, "import-manifest.yaml must be written when importMerge is on")
 }
 
-func TestWorkspaceImport_PrintsSummary(t *testing.T) {
+func TestImportSummary(t *testing.T) {
 	const applyHint = "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n"
 
 	tests := []struct {
 		name       string
 		importable map[string]map[string]*resources.RemoteResource
-		merge      bool
 		expected   string
 	}{
 		{
@@ -278,8 +275,7 @@ func TestWorkspaceImport_PrintsSummary(t *testing.T) {
 ` + applyHint,
 		},
 		{
-			name:  "merge lists merged resources by local URN",
-			merge: true,
+			name: "merge lists merged resources by local URN",
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 				"event-stream-source": {
@@ -298,8 +294,7 @@ Merged 2 remote resources into existing local resources:
 ` + applyHint,
 		},
 		{
-			name:  "everything merged still prints the imported total",
-			merge: true,
+			name: "everything merged still prints the imported total",
 			importable: map[string]map[string]*resources.RemoteResource{
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
@@ -312,22 +307,12 @@ Merged 1 remote resources into existing local resources:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var out bytes.Buffer
-			ui.SetWriter(&out)
-			t.Cleanup(ui.RestoreWriter)
-
 			importable := resources.NewRemoteResources()
 			for resourceType, rs := range tt.importable {
 				importable.Set(resourceType, rs)
 			}
 
-			err := WorkspaceImport(context.Background(), &stubProject{
-				location: t.TempDir(),
-				graph:    resources.NewGraph(),
-			}, &stubImportProvider{importable: importable}, ImportOptions{Merge: tt.merge})
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.expected, out.String())
+			assert.Equal(t, tt.expected, importSummary(importable))
 		})
 	}
 }

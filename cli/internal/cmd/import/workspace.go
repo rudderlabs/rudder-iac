@@ -82,7 +82,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			spinner := ui.NewSpinner("Importing ...")
 			spinner.Start()
 
-			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
+			summary, err := importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
 
 			spinner.Stop()
 			if err == nil {
@@ -91,6 +91,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
          Add any required secret fields to the exported specs using
          variable substitution ({{ .VAR }}), and pass them with
          --var-file to apply and to later imports.`)
+				ui.Print(summary)
 			}
 
 			return err

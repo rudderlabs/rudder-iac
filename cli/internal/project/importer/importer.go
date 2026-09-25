@@ -51,62 +51,65 @@ type ImportOptions struct {
 	Merge bool
 }
 
+// WorkspaceImport returns the import summary instead of printing it, so the
+// caller can print it after its own output (spinner, warnings) and the apply
+// hint comes last.
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
 	p ImportProvider,
-	opts ImportOptions) error {
+	opts ImportOptions) (string, error) {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
-		return fmt.Errorf("loading remote resources: %w", err)
+		return "", fmt.Errorf("loading remote resources: %w", err)
 	}
 
 	pstate, err := p.MapRemoteToState(remoteCollection)
 	if err != nil {
-		return fmt.Errorf("loading state from resources: %w", err)
+		return "", fmt.Errorf("loading state from resources: %w", err)
 	}
 
 	sourceGraph := syncer.StateToGraph(pstate)
 	targetGraph, err := project.ResourceGraph()
 	if err != nil {
-		return fmt.Errorf("getting resource graph: %w", err)
+		return "", fmt.Errorf("getting resource graph: %w", err)
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
 	if err := checkSyncStatus(diff, opts.Merge); err != nil {
-		return err
+		return "", err
 	}
 
 	idNamer, err := initNamer(targetGraph)
 	if err != nil {
-		return fmt.Errorf("initializing namer: %w", err)
+		return "", fmt.Errorf("initializing namer: %w", err)
 	}
 
 	importable, err := p.LoadImportable(ctx, idNamer)
 	if err != nil {
-		return fmt.Errorf("loading importable resources: %w", err)
+		return "", fmt.Errorf("loading importable resources: %w", err)
 	}
 
 	if importable.Len() == 0 {
 		fmt.Println("No resources to import")
-		return nil
+		return "", nil
 	}
 
 	if opts.Merge {
 		if err := markMatchedWith(p, sourceGraph, targetGraph, importable); err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
 	if err != nil {
-		return fmt.Errorf("setting up import ref resolver: %w", err)
+		return "", fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
 	entities, importEntries, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
-		return fmt.Errorf("normalizing for import: %w", err)
+		return "", fmt.Errorf("normalizing for import: %w", err)
 	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
@@ -114,7 +117,7 @@ func WorkspaceImport(
 	location := project.Location()
 	importDir := filepath.Join(location, ImportedDir)
 	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
-		return fmt.Errorf("writing files for formattable entities: %w", err)
+		return "", fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
 	// Only emit the import-manifest when the importMerge experimental flag is
@@ -122,7 +125,7 @@ func WorkspaceImport(
 	if config.GetConfig().ExperimentalFlags.ImportMerge {
 		manifestNode, err := importmanifest.BuildNode(importEntries)
 		if err != nil {
-			return fmt.Errorf("building import manifest: %w", err)
+			return "", fmt.Errorf("building import manifest: %w", err)
 		}
 
 		if manifestNode != nil {
@@ -131,27 +134,26 @@ func WorkspaceImport(
 				RelativePath: importmanifest.FileName,
 			}
 			if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
-				return fmt.Errorf("writing import manifest: %w", err)
+				return "", fmt.Errorf("writing import manifest: %w", err)
 			}
 		}
 	}
 
 	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
 	if err != nil {
-		return fmt.Errorf("scaffolding secrets var file: %w", err)
+		return "", fmt.Errorf("scaffolding secrets var file: %w", err)
 	}
 	if varFile != "" {
 		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
-	printImportSummary(importable)
-	return nil
+	return importSummary(importable), nil
 }
 
-// printImportSummary shows what landed on disk and that apply is still needed:
+// importSummary shows what landed on disk and that apply is still needed:
 // imported specs are not managed by the CLI until they are applied.
-func printImportSummary(importable *resources.RemoteResources) {
+func importSummary(importable *resources.RemoteResources) string {
 	var (
 		importedRows []string
 		merged       []string
@@ -185,7 +187,7 @@ func printImportSummary(importable *resources.RemoteResources) {
 	}
 	fmt.Fprint(w, "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n")
 	_ = w.Flush()
-	ui.Print(b.String())
+	return b.String()
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,
