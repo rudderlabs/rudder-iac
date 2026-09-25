@@ -64,16 +64,19 @@ func TestRETLLifecycle(t *testing.T) {
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 	})
 
-	var modelID, tableID, connectionID string
+	var (
+		model                 retlClient.RETLSource
+		tableID, connectionID string
+	)
 
 	// Every later step compares against these ids, so a failed create would turn
 	// one failure into a cascade of misleading ones.
 	if !t.Run("apply create", func(t *testing.T) {
 		applyRETLProject(t, executor, step("create"), credentials)
 
-		modelID = managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID).ID
+		model = managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID)
 		tableID = assertLifecycleTable(t)
-		connectionID = assertLifecycleConnection(t, modelID)
+		connectionID = assertLifecycleConnection(t, model.ID)
 	}) {
 		t.FailNow()
 	}
@@ -87,7 +90,7 @@ func TestRETLLifecycle(t *testing.T) {
 		// soft-deleted row under its old id.
 		connectionID = assertLifecycleConnection(t, tableID)
 
-		assert.Equal(t, modelID, managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID).ID,
+		assert.Equal(t, model, managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID),
 			"the source the connection left must be untouched")
 	})
 
@@ -137,8 +140,8 @@ func TestRETLLifecycle(t *testing.T) {
 		assert.NotContains(t, managedRETLSourceExternalIDs(t), lifecycleTableExternalID)
 		assert.NotContains(t, managedAccountExternalIDs(t), lifecycleSFAccountExternalID)
 
-		assert.Equal(t, modelID, managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID).ID,
-			"a source still in the project must survive the prune")
+		assert.Equal(t, model, managedRETLSource(t, retlClient.ModelSourceType, lifecycleModelExternalID),
+			"a source still in the project must survive the prune unchanged")
 		assert.Contains(t, retlVisibleDestinationExternalIDs(t), lifecycleDestinationExternalID,
 			"a destination still in the project must survive the prune")
 	})
