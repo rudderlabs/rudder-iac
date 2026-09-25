@@ -88,8 +88,8 @@ func TestHandlerImpl_FormatForExport_ManagedTransformation(t *testing.T) {
 
 // managedTransformationResolver is the resolver `import workspace` builds when a
 // transformation is already managed by the project: remote state and the project
-// graph both hold it, and the importable set is empty because the destination is
-// the only thing being imported.
+// graph both hold it. The importable set is empty because the test calls
+// FormatForExport directly rather than going through LoadImportable.
 func managedTransformationResolver(t *testing.T, remoteID, localID string) *resolver.ImportRefResolver {
 	t.Helper()
 
