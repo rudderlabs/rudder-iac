@@ -34,6 +34,11 @@ clean:
 	rm -rf bin
 
 RULE_DOCS_OUTPUT_DIR ?= docs/generated
+COMMAND_DOCS_OUTPUT_DIR ?= .
+
+.PHONY: docs-commands
+docs-commands: ## Generate Markdown, YAML, and man-page command reference artifacts
+	$(GO) run ./cli/cmd/gen-cmd-docs --output-dir $(COMMAND_DOCS_OUTPUT_DIR)
 
 .PHONY: gen-rule-docs
 # The catalog documents the complete rule set, so generation turns on the

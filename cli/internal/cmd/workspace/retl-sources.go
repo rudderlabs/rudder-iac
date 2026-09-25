@@ -10,9 +10,11 @@ import (
 
 func NewCmdRetlSource() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "retl-sources",
-		Short: "Manage RETL sources in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "retl-sources",
+		Short:   "Inspect RETL sources in the workspace",
+		Long:    "Inspect RETL SQL model sources in the authenticated workspace. Use the list subcommand for table or JSON output.",
+		Example: `  rudder-cli workspace retl-sources list --json`,
+		Args:    cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListRetlSources())
@@ -22,9 +24,11 @@ func NewCmdRetlSource() *cobra.Command {
 
 func newCmdListRetlSources() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List RETL sources in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List RETL sources in the workspace",
+		Long:    "List RETL SQL model sources from the authenticated workspace. Results are printed as a table unless --json is supplied.",
+		Example: "  rudder-cli workspace retl-sources list\n  rudder-cli workspace retl-sources list --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

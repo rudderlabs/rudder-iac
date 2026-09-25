@@ -35,9 +35,10 @@ func NewCmdValidate() *cobra.Command {
 		Use:   "validate",
 		Short: "Validate project configuration",
 		Long: heredoc.Doc(`
-			Validates the project configuration files for correctness and consistency.
-			This includes checking for valid syntax, required fields, and relationships
-			between resources.
+			Validate local RudderStack project files without applying changes.
+			The command checks strict YAML syntax, required fields, provider rules, resource references,
+			dependency cycles, and workspace-aware constraints. Use --location for a file or directory and
+			repeat --var-file to resolve environment-specific values before validation.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli validate --location </path/to/dir or file>

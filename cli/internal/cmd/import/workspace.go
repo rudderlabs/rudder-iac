@@ -29,7 +29,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace",
 		Short: "Import workspace resources",
-		Long:  "Import upstream workspace resources using available providers into configuration files",
+		Long:  "Export manageable resources from the authenticated workspace into an imported/ directory under the local project. The project must match remote state unless experimental --merge is used; secrets are omitted and must be supplied through variable files.",
 		Example: heredoc.Doc(`
 			$ rudder-cli import workspace --location </path/to/project_dir>
 			$ rudder-cli import workspace --location </path/to/project_dir> --var-file prod.vars.yaml

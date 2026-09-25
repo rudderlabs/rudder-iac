@@ -11,9 +11,10 @@ import (
 
 func NewCmdList() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all available experimental flags",
-		Long:  "Display all available experimental flags with their current status and environment variable names",
+		Use:     "list",
+		Short:   "List all available experimental flags",
+		Long:    "Display every available experimental flag, its effective enabled state, and the environment variable that can override it.",
+		Example: `  rudder-cli experimental list`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.GetConfig()
 

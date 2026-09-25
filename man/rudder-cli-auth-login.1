@@ -1,0 +1,33 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-auth-login - Login with an access token
+
+
+.SH SYNOPSIS
+\fBrudder-cli auth login [flags]\fP
+
+
+.SH DESCRIPTION
+Prompt for a RudderStack access token, verify it, and save it to the selected CLI configuration file for later workspace API requests.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for login
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli auth login
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-auth(1)\fP

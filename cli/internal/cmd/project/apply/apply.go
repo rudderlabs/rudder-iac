@@ -39,9 +39,10 @@ func NewCmdApply() *cobra.Command {
 		Use:   "apply",
 		Short: "Apply project configuration changes",
 		Long: heredoc.Doc(`
-			Applies the project configuration changes to the RudderStack workspace associated with your access token.
-			This includes creating, updating, or deleting resources based on
-			the differences between local configuration and the workspace resources.
+			Apply local project specs to the RudderStack workspace associated with the configured access token.
+			The command validates the project, compares it with remote state, then creates, updates, imports,
+			or deletes resources in dependency order. Use --dry-run to inspect the plan without changing the
+			workspace, --confirm=false for non-interactive execution, and repeat --var-file to resolve variables.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli apply --location </path/to/dir or file>

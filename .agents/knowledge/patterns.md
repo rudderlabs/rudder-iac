@@ -256,3 +256,10 @@
 - Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
 - The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must name its source type under `connection_mode`. DEX-848 removed `use_native_sdk`, so `connection_mode` is the only block `validateSourceTypeSettings` can accept — an empty config there fails the connect-time check for the android source.
 - Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.
+
+## DEX-1006 — Deterministic Command Documentation Generation
+
+- Command-reference generation is centralized in `cli/internal/cmddocs` and invoked through `cli/cmd/gen-cmd-docs` or `make docs-commands`; it emits checked-in Markdown under `commands/*.md`, machine-readable YAML under `commands/*.yaml`, and man pages under `man/*.1`.
+- Before invoking `cobra/doc`, the generator removes hidden and deprecated commands and sets `DisableAutoGenTag`, so generated artifacts follow public Cobra visibility and do not contain run timestamps.
+- The docs-only command tree rewrites the config flag default to the stable generic path `~/.rudder/config.json` instead of using the generator machine's expanded home directory. Man-page dates use the epoch for the same reproducibility reason.
+- Cobra's underscore-based generated filenames are normalized to hyphenated filenames, and relative links in generated Markdown are rewritten to match the normalized names.

@@ -12,9 +12,11 @@ import (
 
 func newCmdStacktrace() *cobra.Command {
 	return &cobra.Command{
-		Use:   "stacktrace",
-		Short: "Display the last panic stacktrace from the log file",
-		Args:  cobra.NoArgs,
+		Use:     "stacktrace",
+		Short:   "Display the last panic stacktrace from the log file",
+		Long:    "Read ~/.rudder/cli.log and print the stack trace from its most recent panic entry. Use this diagnostic when reporting an unexpected CLI failure.",
+		Example: `  rudder-cli debug stacktrace`,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {

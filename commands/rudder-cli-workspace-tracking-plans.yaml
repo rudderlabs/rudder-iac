@@ -1,0 +1,18 @@
+name: rudder-cli workspace tracking-plans
+synopsis: Inspect tracking plans in the workspace
+description: |
+    Inspect tracking plans in the authenticated workspace. Use the list subcommand for table or JSON output.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for tracking-plans
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: '  rudder-cli workspace tracking-plans list --json'
+see_also:
+    - rudder-cli workspace - Inspect workspace resources
+    - rudder-cli workspace tracking-plans list - List tracking plans in the workspace

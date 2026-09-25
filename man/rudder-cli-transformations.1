@@ -1,0 +1,36 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-transformations - Manage transformations
+
+
+.SH SYNOPSIS
+\fBrudder-cli transformations  [flags]\fP
+
+
+.SH DESCRIPTION
+Test transformation specs and inspect the default event payloads used by local test suites. Use --all or --modified to select multiple project transformations.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for transformations
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli transformations test my-transformation-id
+$ rudder-cli transformations test --all
+$ rudder-cli transformations test --modified
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-transformations-show-default-events(1)\fP, \fBrudder-cli-transformations-test(1)\fP

@@ -10,9 +10,11 @@ import (
 
 func NewCmdAccounts() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "accounts",
-		Short: "Manage accounts in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "accounts",
+		Short:   "Inspect accounts in the workspace",
+		Long:    "Inspect account resources available in the authenticated workspace. Use the list subcommand to filter accounts by category or type.",
+		Example: "  rudder-cli workspace accounts list\n  rudder-cli workspace accounts list --category destination --json",
+		Args:    cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListAccounts())
@@ -22,9 +24,11 @@ func NewCmdAccounts() *cobra.Command {
 
 func newCmdListAccounts() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List accounts in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List accounts in the workspace",
+		Long:    "List workspace accounts, optionally filtered by account category or type. Results are printed as a table unless --json is supplied.",
+		Example: "  rudder-cli workspace accounts list\n  rudder-cli workspace accounts list --type DESTINATION_SNOWFLAKE --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			category, _ := cmd.Flags().GetString("category")
 			accountType, _ := cmd.Flags().GetString("type")

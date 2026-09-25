@@ -1,0 +1,33 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-auth - Authentication commands
+
+
+.SH SYNOPSIS
+\fBrudder-cli auth [flags]\fP
+
+
+.SH DESCRIPTION
+Authenticate rudder-cli with RudderStack so workspace and project commands can call the Public API. Credentials are stored in the selected CLI configuration file.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for auth
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli auth login
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-auth-login(1)\fP

@@ -7,9 +7,10 @@ import (
 
 func NewCmdReset() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "reset",
-		Short: "Reset all experimental flags to their defaults",
-		Long:  "Reset all experimental flags by removing the experimental section from the configuration",
+		Use:     "reset",
+		Short:   "Reset all experimental flags to their defaults",
+		Long:    "Remove all persisted experimental feature overrides from the selected CLI configuration file so every flag returns to its default.",
+		Example: `  rudder-cli experimental reset`,
 		Run: func(cmd *cobra.Command, args []string) {
 			config.ResetExperimentalFlags()
 		},

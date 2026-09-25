@@ -1,0 +1,43 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli - Manage RudderStack resources as code
+
+
+.SH SYNOPSIS
+\fBrudder-cli [flags]\fP
+
+
+.SH DESCRIPTION
+Manage RudderStack workspace resources from declarative YAML project files.
+
+.PP
+Use rudder-cli to validate and apply local infrastructure-as-code specs, preview
+changes before updating a workspace, import existing remote resources, inspect
+workspace entities, and generate tracking-plan types. Authentication, telemetry,
+and experimental settings are stored in the CLI configuration file selected by
+--config. Start with auth login, then use validate and apply for the normal
+project workflow.
+
+
+.SH OPTIONS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for rudder-cli
+
+
+.SH EXAMPLE
+.EX
+  # Authenticate, validate a project, and preview its changes
+  rudder-cli auth login
+  rudder-cli validate --location ./project
+  rudder-cli apply --location ./project --dry-run
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-apply(1)\fP, \fBrudder-cli-auth(1)\fP, \fBrudder-cli-data-graphs(1)\fP, \fBrudder-cli-destroy(1)\fP, \fBrudder-cli-import(1)\fP, \fBrudder-cli-retl-sources(1)\fP, \fBrudder-cli-telemetry(1)\fP, \fBrudder-cli-transformations(1)\fP, \fBrudder-cli-typer(1)\fP, \fBrudder-cli-validate(1)\fP, \fBrudder-cli-workspace(1)\fP

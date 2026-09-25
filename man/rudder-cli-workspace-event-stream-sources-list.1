@@ -1,0 +1,38 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace-event-stream-sources-list - List event stream sources in the workspace
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace event-stream-sources list [flags]\fP
+
+
+.SH DESCRIPTION
+List event stream sources from the authenticated workspace, including their IDs, names, types, and enabled state. Use --json for machine-readable output.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for list
+
+.PP
+\fB--json\fP[=false]
+	Output as JSON
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli workspace event-stream-sources list
+  rudder-cli workspace event-stream-sources list --json
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-workspace-event-stream-sources(1)\fP

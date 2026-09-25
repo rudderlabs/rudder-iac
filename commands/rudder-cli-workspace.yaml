@@ -1,0 +1,24 @@
+name: rudder-cli workspace
+synopsis: Inspect workspace resources
+description: |
+    Inspect the authenticated RudderStack workspace and list supported remote resource types without changing them. Listing commands use table output by default and support --json for automation.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for workspace
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |4-
+      rudder-cli workspace info
+      rudder-cli workspace event-stream-sources list --json
+see_also:
+    - rudder-cli - Manage RudderStack resources as code
+    - rudder-cli workspace accounts - Inspect accounts in the workspace
+    - rudder-cli workspace event-stream-sources - Manage event stream sources in the workspace
+    - rudder-cli workspace info - Show information about the authenticated workspace
+    - rudder-cli workspace retl-sources - Inspect RETL sources in the workspace
+    - rudder-cli workspace tracking-plans - Inspect tracking plans in the workspace

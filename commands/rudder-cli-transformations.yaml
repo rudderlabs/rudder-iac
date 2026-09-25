@@ -1,0 +1,22 @@
+name: rudder-cli transformations
+synopsis: Manage transformations
+description: |
+    Test transformation specs and inspect the default event payloads used by local test suites. Use --all or --modified to select multiple project transformations.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for transformations
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    $ rudder-cli transformations test my-transformation-id
+    $ rudder-cli transformations test --all
+    $ rudder-cli transformations test --modified
+see_also:
+    - rudder-cli - Manage RudderStack resources as code
+    - rudder-cli transformations show-default-events - Show default test events
+    - rudder-cli transformations test - Test transformations

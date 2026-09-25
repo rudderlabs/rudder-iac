@@ -1,0 +1,18 @@
+name: rudder-cli auth login
+synopsis: Login with an access token
+description: |
+    Prompt for a RudderStack access token, verify it, and save it to the selected CLI configuration file for later workspace API requests.
+usage: rudder-cli auth login [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for login
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: '  rudder-cli auth login'
+see_also:
+    - rudder-cli auth - Authentication commands

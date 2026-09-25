@@ -1,0 +1,24 @@
+name: rudder-cli retl-sources validate
+synopsis: Validate a RETL source SQL model
+description: |
+    Validate a RETL source SQL model by executing the query without returning data
+usage: rudder-cli retl-sources validate <external-id> [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for validate
+    - name: location
+      shorthand: l
+      default_value: .
+      usage: Path to the project directory
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    $ rudder-cli retl-sources validate my-model
+    $ rudder-cli retl-sources validate my-model --location ./project
+see_also:
+    - rudder-cli retl-sources - Manage RETL sources

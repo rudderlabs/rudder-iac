@@ -7,10 +7,11 @@ import (
 
 func NewCmdEnable() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "enable <flag-name>",
-		Short: "Enable an experimental flag",
-		Long:  "Enable a specific experimental flag by name",
-		Args:  cobra.ExactArgs(1),
+		Use:     "enable <flag-name>",
+		Short:   "Enable an experimental flag",
+		Long:    "Enable one experimental feature by its configuration flag name. Use experimental list to find valid names and inspect their current state.",
+		Example: `  rudder-cli experimental enable importMerge`,
+		Args:    cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			flagName := args[0]
 			config.SetExperimentalFlag(flagName, true)

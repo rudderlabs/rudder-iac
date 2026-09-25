@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-retl-sources - Manage RETL sources
+
+
+.SH SYNOPSIS
+\fBrudder-cli retl-sources [flags]\fP
+
+
+.SH DESCRIPTION
+Validate or preview RETL SQL model source specs from a local project before applying them. Select a source by its external ID and use --location when the project is not in the current directory.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for retl-sources
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli retl-sources validate orders-model --location ./project
+  rudder-cli retl-sources preview orders-model --limit 5
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-retl-sources-preview(1)\fP, \fBrudder-cli-retl-sources-validate(1)\fP

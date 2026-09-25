@@ -1,0 +1,38 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace-info - Show information about the authenticated workspace
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace info [flags]\fP
+
+
+.SH DESCRIPTION
+Fetch and display identity, environment, status, region, and data-plane details for the workspace associated with the configured access token. Use --json for machine-readable output.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for info
+
+.PP
+\fB--json\fP[=false]
+	Output workspace information as JSON
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli workspace info
+  rudder-cli workspace info --json
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-workspace(1)\fP

@@ -1,0 +1,67 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-data-graphs-validate - Validate data graph resources
+
+
+.SH SYNOPSIS
+\fBrudder-cli data-graphs validate [type] [id] [flags]\fP
+
+
+.SH DESCRIPTION
+Validates data graph resources (models and relationships) against the warehouse.
+
+.PP
+Checks include table existence, column existence, type compatibility, and more.
+You can validate all resources, only modified ones, or a specific resource by type and ID.
+
+
+.SH OPTIONS
+\fB--all\fP[=false]
+	Validate all data graph resources in the project
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for validate
+
+.PP
+\fB-j\fP, \fB--json\fP[=false]
+	Output results as JSON
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the directory containing the project files or a specific file
+
+.PP
+\fB--modified\fP[=false]
+	Validate only new or modified data graph resources
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+# Validate all resources
+$ rudder-cli data-graphs validate --all
+
+# Validate only modified resources
+$ rudder-cli data-graphs validate --modified
+
+# Validate a specific model
+$ rudder-cli data-graphs validate model my-model-id
+
+# Validate a specific relationship
+$ rudder-cli data-graphs validate relationship my-relationship-id
+
+# Output as JSON
+$ rudder-cli data-graphs validate --all --json
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-data-graphs(1)\fP

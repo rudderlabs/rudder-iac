@@ -1,0 +1,18 @@
+name: rudder-cli auth
+synopsis: Authentication commands
+description: |
+    Authenticate rudder-cli with RudderStack so workspace and project commands can call the Public API. Credentials are stored in the selected CLI configuration file.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for auth
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: '  rudder-cli auth login'
+see_also:
+    - rudder-cli - Manage RudderStack resources as code
+    - rudder-cli auth login - Login with an access token

@@ -1,0 +1,47 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-import-workspace - Import workspace resources
+
+
+.SH SYNOPSIS
+\fBrudder-cli import workspace [flags]\fP
+
+
+.SH DESCRIPTION
+Export manageable resources from the authenticated workspace into an imported/ directory under the local project. The project must match remote state unless experimental --merge is used; secrets are omitted and must be supplied through variable files.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for workspace
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the directory containing the project files
+
+.PP
+\fB--merge\fP[=false]
+	Allow import on a diverged project, linking remote resources that match existing local resources (experimental)
+
+.PP
+\fB--var-file\fP=[]
+	Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli import workspace --location </path/to/project_dir>
+$ rudder-cli import workspace --location </path/to/project_dir> --var-file prod.vars.yaml
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-import(1)\fP

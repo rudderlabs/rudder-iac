@@ -1,0 +1,59 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-typer-generate - Generate type-safe code from tracking plan
+
+
+.SH SYNOPSIS
+\fBrudder-cli typer generate [flags]\fP
+
+
+.SH DESCRIPTION
+Generate type-safe code from a RudderStack tracking plan
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for generate
+
+.PP
+\fB--local\fP[=false]
+	Generate from local specs instead of the remote workspace (no workspace, apply, auth or network needed)
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the project directory or spec file (used with --local)
+
+.PP
+\fB--option\fP=[]
+	Platform-specific options in key=value format (use 'rudder-cli typer options \&' to see available options)
+
+.PP
+\fB-o\fP, \fB--output\fP="."
+	Output directory for generated files
+
+.PP
+\fB--platform\fP="kotlin"
+	Platform to generate code for (kotlin, swift, typescript)
+
+.PP
+\fB--tracking-plan-id\fP=""
+	Tracking plan ID to generate code from (remote), or local id of the plan in the specs (with --local)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli typer generate --tracking-plan-id <id> --platform kotlin
+$ rudder-cli typer generate --local --location ./project --platform kotlin
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-typer(1)\fP

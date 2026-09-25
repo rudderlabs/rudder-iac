@@ -331,3 +331,9 @@
 - The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
 - Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
 - GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.
+
+## DEX-1006 — Fresh Command Trees For Documentation
+
+- `NewRootCmd` constructs an independent Cobra tree for documentation and completeness checks; its `--config` flag uses `StringP` rather than binding directly to the package-global `cfgFile`.
+- Runtime initialization reads the selected config value from the process root command immediately before configuration setup. This preserves normal `Execute` behavior while allowing generated/test command trees to be constructed or mutated without sharing flag state.
+- Checked-in command docs intentionally exclude commands whose Cobra `Hidden` flag is true or whose `Deprecated` field is set. Hidden commands still carry complete `Long` and `Example` metadata so they are ready if later exposed, but deterministic artifacts do not vary with runtime feature configuration.

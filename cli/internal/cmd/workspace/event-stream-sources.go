@@ -10,9 +10,11 @@ import (
 
 func NewCmdEventStreamSources() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "event-stream-sources",
-		Short: "Manage event stream sources in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "event-stream-sources",
+		Short:   "Manage event stream sources in the workspace",
+		Long:    "Inspect event stream source resources in the authenticated workspace. Use the list subcommand for table or JSON output.",
+		Example: `  rudder-cli workspace event-stream-sources list --json`,
+		Args:    cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListEventStreamSources())
@@ -22,9 +24,11 @@ func NewCmdEventStreamSources() *cobra.Command {
 
 func newCmdListEventStreamSources() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List event stream sources in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List event stream sources in the workspace",
+		Long:    "List event stream sources from the authenticated workspace, including their IDs, names, types, and enabled state. Use --json for machine-readable output.",
+		Example: "  rudder-cli workspace event-stream-sources list\n  rudder-cli workspace event-stream-sources list --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

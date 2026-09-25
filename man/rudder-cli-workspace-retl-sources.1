@@ -1,0 +1,33 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace-retl-sources - Inspect RETL sources in the workspace
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace retl-sources [flags]\fP
+
+
+.SH DESCRIPTION
+Inspect RETL SQL model sources in the authenticated workspace. Use the list subcommand for table or JSON output.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for retl-sources
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli workspace retl-sources list --json
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-workspace(1)\fP, \fBrudder-cli-workspace-retl-sources-list(1)\fP

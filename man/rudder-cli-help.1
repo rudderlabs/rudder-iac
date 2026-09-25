@@ -1,0 +1,43 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-help - Show help for a command
+
+
+.SH SYNOPSIS
+\fBrudder-cli help [command] [flags]\fP
+
+
+.SH DESCRIPTION
+Show detailed help for rudder-cli or one of its commands.
+
+.PP
+Use this command when you want the same information printed by --help but prefer
+subcommand syntax, or when you need help for a nested command path. The command
+accepts any visible command path and prints its usage, flags, examples, and child
+commands without contacting RudderStack APIs.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for help
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  # Show root help
+  rudder-cli help
+
+  # Show help for a nested command
+  rudder-cli help import workspace
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP

@@ -16,6 +16,7 @@ before:
     - go mod tidy
     # you may remove this if you don't need go generate
     - go generate ./...
+    - make docs-commands
 
 builds:
   - env:
@@ -45,6 +46,11 @@ archives:
     format_overrides:
       - goos: windows
         formats: [ 'zip' ]
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - man/*.1
 
 changelog:
   sort: asc

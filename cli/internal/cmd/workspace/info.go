@@ -26,9 +26,11 @@ func NewCmdInfo() *cobra.Command {
 	var jsonOutput bool
 
 	cmd := &cobra.Command{
-		Use:   "info",
-		Short: "Show information about the authenticated workspace",
-		Args:  cobra.NoArgs,
+		Use:     "info",
+		Short:   "Show information about the authenticated workspace",
+		Long:    "Fetch and display identity, environment, status, region, and data-plane details for the workspace associated with the configured access token. Use --json for machine-readable output.",
+		Example: "  rudder-cli workspace info\n  rudder-cli workspace info --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			defer func() {

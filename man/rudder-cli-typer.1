@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-typer - Generate type-safe tracking code
+
+
+.SH SYNOPSIS
+\fBrudder-cli typer [flags]\fP
+
+
+.SH DESCRIPTION
+Generate type-safe tracking code from a remote or local RudderStack tracking plan. Inspect platform defaults with typer options, then use typer generate to write Kotlin, Swift, or TypeScript output.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for typer
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli typer options --platform kotlin
+  rudder-cli typer generate --tracking-plan-id 2abc123 --platform kotlin
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-typer-generate(1)\fP, \fBrudder-cli-typer-options(1)\fP

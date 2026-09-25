@@ -1,0 +1,55 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-apply - Apply project configuration changes
+
+
+.SH SYNOPSIS
+\fBrudder-cli apply [flags]\fP
+
+
+.SH DESCRIPTION
+Apply local project specs to the RudderStack workspace associated with the configured access token.
+The command validates the project, compares it with remote state, then creates, updates, imports,
+or deletes resources in dependency order. Use --dry-run to inspect the plan without changing the
+workspace, --confirm=false for non-interactive execution, and repeat --var-file to resolve variables.
+
+
+.SH OPTIONS
+\fB--confirm\fP[=true]
+	Confirm changes before applying them
+
+.PP
+\fB--dry-run\fP[=false]
+	Only show the changes without applying them
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for apply
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the directory containing the project files or a specific file
+
+.PP
+\fB--var-file\fP=[]
+	Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli apply --location </path/to/dir or file>
+$ rudder-cli apply --location </path/to/dir or file> --dry-run
+$ rudder-cli apply --location </path/to/dir or file> --confirm=false
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP

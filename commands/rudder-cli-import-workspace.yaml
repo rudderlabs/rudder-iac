@@ -1,0 +1,32 @@
+name: rudder-cli import workspace
+synopsis: Import workspace resources
+description: |
+    Export manageable resources from the authenticated workspace into an imported/ directory under the local project. The project must match remote state unless experimental --merge is used; secrets are omitted and must be supplied through variable files.
+usage: rudder-cli import workspace [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for workspace
+    - name: location
+      shorthand: l
+      default_value: .
+      usage: Path to the directory containing the project files
+    - name: merge
+      default_value: "false"
+      usage: |
+        Allow import on a diverged project, linking remote resources that match existing local resources (experimental)
+    - name: var-file
+      default_value: '[]'
+      usage: |
+        Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    $ rudder-cli import workspace --location </path/to/project_dir>
+    $ rudder-cli import workspace --location </path/to/project_dir> --var-file prod.vars.yaml
+see_also:
+    - rudder-cli import - Import remote resources to local configuration

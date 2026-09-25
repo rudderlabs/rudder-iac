@@ -9,14 +9,18 @@ import (
 func NewCmdAuth() *cobra.Command {
 
 	var authCmd = &cobra.Command{
-		Use:   "auth",
-		Short: "Authentication commands",
+		Use:     "auth",
+		Short:   "Authentication commands",
+		Long:    "Authenticate rudder-cli with RudderStack so workspace and project commands can call the Public API. Credentials are stored in the selected CLI configuration file.",
+		Example: `  rudder-cli auth login`,
 	}
 
 	var loginCmd = &cobra.Command{
-		Use:   "login",
-		Short: "Login with an access token",
-		Args:  cobra.NoArgs,
+		Use:     "login",
+		Short:   "Login with an access token",
+		Long:    "Prompt for a RudderStack access token, verify it, and save it to the selected CLI configuration file for later workspace API requests.",
+		Example: `  rudder-cli auth login`,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 

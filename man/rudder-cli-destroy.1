@@ -1,0 +1,47 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-destroy - Delete all resources from both the upstream system and state
+
+
+.SH SYNOPSIS
+\fBrudder-cli destroy [flags]\fP
+
+
+.SH DESCRIPTION
+Deletes all resources from both the upstream system and local state.
+This operation is destructive and will remove ALL resources managed
+by the CLI, regardless of any configuration files.
+Use with extreme caution.
+
+
+.SH OPTIONS
+\fB--confirm\fP[=true]
+	Confirm before destroying resources
+
+.PP
+\fB--dry-run\fP[=false]
+	Only show the resources that would be destroyed without actually destroying them
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for destroy
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli destroy
+$ rudder-cli destroy --dry-run
+$ rudder-cli destroy --confirm=false
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP

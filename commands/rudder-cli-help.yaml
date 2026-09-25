@@ -1,0 +1,28 @@
+name: rudder-cli help
+synopsis: Show help for a command
+description: |-
+    Show detailed help for rudder-cli or one of its commands.
+
+    Use this command when you want the same information printed by --help but prefer
+    subcommand syntax, or when you need help for a nested command path. The command
+    accepts any visible command path and prints its usage, flags, examples, and child
+    commands without contacting RudderStack APIs.
+usage: rudder-cli help [command] [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for help
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |4-
+      # Show root help
+      rudder-cli help
+
+      # Show help for a nested command
+      rudder-cli help import workspace
+see_also:
+    - rudder-cli - Manage RudderStack resources as code

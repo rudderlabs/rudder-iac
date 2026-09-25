@@ -1,0 +1,18 @@
+name: rudder-cli workspace event-stream-sources
+synopsis: Manage event stream sources in the workspace
+description: |
+    Inspect event stream source resources in the authenticated workspace. Use the list subcommand for table or JSON output.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for event-stream-sources
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: '  rudder-cli workspace event-stream-sources list --json'
+see_also:
+    - rudder-cli workspace - Inspect workspace resources
+    - rudder-cli workspace event-stream-sources list - List event stream sources in the workspace

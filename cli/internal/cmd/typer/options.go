@@ -14,9 +14,10 @@ func newCmdOptions() *cobra.Command {
 	var platform string
 
 	cmd := &cobra.Command{
-		Use:   "options",
-		Short: "Show available options for a platform",
-		Long:  "Show all available platform-specific options for code generation",
+		Use:     "options",
+		Short:   "Show available options for a platform",
+		Long:    "Show the supported generator options, descriptions, and defaults for a target platform. Pass --platform with kotlin, swift, or typescript.",
+		Example: "  rudder-cli typer options --platform kotlin\n  rudder-cli typer options --platform typescript",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gen, err := generator.GeneratorForPlatform(platform)
 			if err != nil {

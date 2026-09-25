@@ -1,0 +1,23 @@
+name: rudder-cli workspace tracking-plans list
+synopsis: List tracking plans in the workspace
+description: |
+    List tracking plans from the authenticated workspace, including their remote IDs and names. Results are printed as a table unless --json is supplied.
+usage: rudder-cli workspace tracking-plans list [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for list
+    - name: json
+      default_value: "false"
+      usage: Output as JSON
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |4-
+      rudder-cli workspace tracking-plans list
+      rudder-cli workspace tracking-plans list --json
+see_also:
+    - rudder-cli workspace tracking-plans - Inspect tracking plans in the workspace

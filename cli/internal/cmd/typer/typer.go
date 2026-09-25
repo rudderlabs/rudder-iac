@@ -23,10 +23,11 @@ const (
 
 func NewCmdTyper() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "typer",
-		Short: "Generate type-safe tracking code",
-		Long:  "Generate type-safe tracking code from RudderStack tracking plans",
-		Args:  cobra.NoArgs,
+		Use:     "typer",
+		Short:   "Generate type-safe tracking code",
+		Long:    "Generate type-safe tracking code from a remote or local RudderStack tracking plan. Inspect platform defaults with typer options, then use typer generate to write Kotlin, Swift, or TypeScript output.",
+		Example: "  rudder-cli typer options --platform kotlin\n  rudder-cli typer generate --tracking-plan-id 2abc123 --platform kotlin",
+		Args:    cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdGenerate())

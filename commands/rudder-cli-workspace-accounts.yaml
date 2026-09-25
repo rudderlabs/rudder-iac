@@ -1,0 +1,20 @@
+name: rudder-cli workspace accounts
+synopsis: Inspect accounts in the workspace
+description: |
+    Inspect account resources available in the authenticated workspace. Use the list subcommand to filter accounts by category or type.
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for accounts
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |4-
+      rudder-cli workspace accounts list
+      rudder-cli workspace accounts list --category destination --json
+see_also:
+    - rudder-cli workspace - Inspect workspace resources
+    - rudder-cli workspace accounts list - List accounts in the workspace

@@ -10,9 +10,11 @@ import (
 
 func NewCmdTrackingPlans() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tracking-plans",
-		Short: "Manage tracking plans in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "tracking-plans",
+		Short:   "Inspect tracking plans in the workspace",
+		Long:    "Inspect tracking plans in the authenticated workspace. Use the list subcommand for table or JSON output.",
+		Example: `  rudder-cli workspace tracking-plans list --json`,
+		Args:    cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListTrackingPlans())
@@ -22,9 +24,11 @@ func NewCmdTrackingPlans() *cobra.Command {
 
 func newCmdListTrackingPlans() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List tracking plans in the workspace",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List tracking plans in the workspace",
+		Long:    "List tracking plans from the authenticated workspace, including their remote IDs and names. Results are printed as a table unless --json is supplied.",
+		Example: "  rudder-cli workspace tracking-plans list\n  rudder-cli workspace tracking-plans list --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

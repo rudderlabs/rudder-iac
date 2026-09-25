@@ -1,0 +1,46 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace-accounts-list - List accounts in the workspace
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace accounts list [flags]\fP
+
+
+.SH DESCRIPTION
+List workspace accounts, optionally filtered by account category or type. Results are printed as a table unless --json is supplied.
+
+
+.SH OPTIONS
+\fB--category\fP=""
+	Filter by account category
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for list
+
+.PP
+\fB--json\fP[=false]
+	Output as JSON
+
+.PP
+\fB--type\fP=""
+	Filter by account type
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli workspace accounts list
+  rudder-cli workspace accounts list --type DESTINATION_SNOWFLAKE --json
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-workspace-accounts(1)\fP

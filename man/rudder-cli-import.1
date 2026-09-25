@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-import - Import remote resources to local configuration
+
+
+.SH SYNOPSIS
+\fBrudder-cli import  [flags]\fP
+
+
+.SH DESCRIPTION
+Export existing RudderStack resources into local YAML specs that can be managed as code. Import a complete synchronized workspace or select a supported resource-specific workflow.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for import
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+  rudder-cli import workspace --location ./project
+  rudder-cli import retl-sources --local-id orders --remote-id 2abc123
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-import-retl-sources(1)\fP, \fBrudder-cli-import-workspace(1)\fP
