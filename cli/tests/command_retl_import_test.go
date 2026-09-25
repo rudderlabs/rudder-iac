@@ -41,9 +41,11 @@ const (
 //   - The table source has no single-source import command; `import workspace`
 //     is its only exporter. That command scaffolds every importable resource in
 //     the workspace, so it is not run here (see TestAccountsImportWorkspace for
-//     why that stays opt-in); the test writes the spec the exporter would, which
-//     exercises the same claim on apply. The spec's table differs from the
-//     remote one on purpose, so the claim is followed by an update.
+//     why that stays opt-in). The test writes an import spec by hand instead: it
+//     names the account by id rather than by the #account: reference the
+//     exporter emits, since the account is not in the project, but the import
+//     metadata and so the claim on apply are the same. The spec's table differs
+//     from the remote one on purpose, so the claim is followed by an update.
 //
 // Everything seeded is unmanaged, the account included, so a run killed midway
 // leaves nothing a later run's opening destroy has to delete. The claimed
@@ -96,10 +98,9 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 
 	// Anchors the NotContains after the claim: were the HasExternalID filter to
 	// regress to an empty result, that assertion would pass vacuously.
-	require.Contains(t, unmanagedRETLSourceIDs(t, store, retlClient.ModelSourceType), model.ID,
-		"the seeded model must start in the importable set")
-	require.Contains(t, unmanagedRETLSourceIDs(t, store, retlClient.TableSourceType), table.ID,
-		"the seeded table must start in the importable set")
+	importable := unmanagedRETLSourceIDs(t, store)
+	require.Contains(t, importable, model.ID, "the seeded model must start in the importable set")
+	require.Contains(t, importable, table.ID, "the seeded table must start in the importable set")
 
 	projectDir := t.TempDir()
 
@@ -108,7 +109,10 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 			"--local-id", importModelLocalID, "--remote-id", model.ID, "--location", projectDir)
 		require.NoError(t, err, "import retl-sources failed: %s", out)
 
-		spec := readSpec(t, filepath.Join(projectDir, importModelLocalID+".yaml"))
+		raw, err := os.ReadFile(filepath.Join(projectDir, importModelLocalID+".yaml"))
+		require.NoError(t, err)
+		var spec specs.Spec
+		require.NoError(t, yaml.Unmarshal(raw, &spec))
 		assert.Equal(t, importSpec(t, importModelLocalID, "retl-source-sql-model", model, map[string]any{
 			"id":                importModelLocalID,
 			"display_name":      importSeedModelName,
@@ -118,20 +122,21 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 			"source_definition": "postgres",
 			"enabled":           true,
 			"sql":               "SELECT id, email FROM users",
-		}), spec)
+		}), &spec)
 	})
 
-	writeSpec(t, filepath.Join(projectDir, importTableLocalID+".yaml"),
-		importSpec(t, importTableLocalID, "retl-source-table", table, map[string]any{
-			"id":                importTableLocalID,
-			"display_name":      importSeedTableName,
-			"account_id":        accountID,
-			"primary_key":       "id",
-			"source_definition": "postgres",
-			"schema":            "analytics",
-			"table":             "users_claimed",
-			"enabled":           true,
-		}))
+	raw, err := yaml.Marshal(importSpec(t, importTableLocalID, "retl-source-table", table, map[string]any{
+		"id":                importTableLocalID,
+		"display_name":      importSeedTableName,
+		"account_id":        accountID,
+		"primary_key":       "id",
+		"source_definition": "postgres",
+		"schema":            "analytics",
+		"table":             "users_claimed",
+		"enabled":           true,
+	}))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, importTableLocalID+".yaml"), raw, 0o644))
 
 	wantModel := retlClient.RETLSource{
 		ID:                   model.ID,
@@ -161,10 +166,7 @@ func TestRETLSourcesImportClaim(t *testing.T) {
 		assert.Equal(t, wantModel, managedRETLSource(t, retlClient.ModelSourceType, importModelLocalID))
 		assert.Equal(t, wantTable, managedRETLSource(t, retlClient.TableSourceType, importTableLocalID))
 
-		importable := append(
-			unmanagedRETLSourceIDs(t, store, retlClient.ModelSourceType),
-			unmanagedRETLSourceIDs(t, store, retlClient.TableSourceType)...,
-		)
+		importable := unmanagedRETLSourceIDs(t, store)
 		assert.NotContains(t, importable, model.ID, "a claimed model must leave the importable set")
 		assert.NotContains(t, importable, table.ID, "a claimed table must leave the importable set")
 	})
@@ -261,20 +263,18 @@ func removeImportSeeds(t *testing.T, apiClient *client.Client, store retlClient.
 	assert.NoError(t, errors.Join(failures...), "import seeds left behind")
 }
 
-func unmanagedRETLSourceIDs(t *testing.T, store retlClient.RETLStore, sourceType retlClient.SourceType) []string {
+func unmanagedRETLSourceIDs(t *testing.T, store retlClient.RETLStore) []string {
 	t.Helper()
 
-	sources, err := store.ListRetlSources(context.Background(),
-		retlClient.WithSourceType(string(sourceType)), retlClient.WithHasExternalId(lo.ToPtr(false)))
+	sources, err := store.ListRetlSources(context.Background(), retlClient.WithHasExternalId(lo.ToPtr(false)))
 	require.NoError(t, err, "listing unmanaged RETL sources")
 	return lo.Map(sources.Data, func(s retlClient.RETLSource, _ int) string { return s.ID })
 }
 
-// importSpec is the spec the exporter would write for a remote source: the
-// import metadata ties the local id to the remote one. It goes through
-// specs.ToImportSpec rather than a hand-rolled map, so a yaml-tag change or a
-// urn/local_id swap cannot leave this test green while real exports stop
-// claiming.
+// importSpec builds an import spec for a remote source: the import metadata
+// ties the local id to the remote one. It goes through specs.ToImportSpec
+// rather than a hand-rolled map, so a yaml-tag change or a urn/local_id swap
+// cannot leave this test green while real exports stop claiming.
 func importSpec(t *testing.T, localID, kind string, remote *retlClient.RETLSource, specData map[string]any) *specs.Spec {
 	t.Helper()
 
@@ -284,22 +284,4 @@ func importSpec(t *testing.T, localID, kind string, remote *retlClient.RETLSourc
 	}, specData)
 	require.NoError(t, err, "building the %s import spec", kind)
 	return spec
-}
-
-func readSpec(t *testing.T, path string) *specs.Spec {
-	t.Helper()
-
-	raw, err := os.ReadFile(path)
-	require.NoError(t, err, "reading %s", path)
-	var spec specs.Spec
-	require.NoError(t, yaml.Unmarshal(raw, &spec), "decoding %s", path)
-	return &spec
-}
-
-func writeSpec(t *testing.T, path string, spec *specs.Spec) {
-	t.Helper()
-
-	raw, err := yaml.Marshal(spec)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(path, raw, 0o644))
 }
