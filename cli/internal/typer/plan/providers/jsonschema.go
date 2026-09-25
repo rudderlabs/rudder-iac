@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
 
 type JSONSchemaPlanProvider struct {

@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/typer/generator"
+	"github.com/rudderlabs/rudder-iac/typer/generator/core"
+	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
 
 var (
