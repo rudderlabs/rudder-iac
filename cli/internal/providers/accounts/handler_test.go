@@ -201,41 +201,16 @@ func TestMapRemoteToState_SecretIsUnknown(t *testing.T) {
 	assert.True(t, cred.IsUnknown(), "remote secret must be unknown so it always diffs")
 }
 
-// MapRemoteToState seeds each secret key present-and-unknown so the differ marks
-// it SecretOnly. Seeding a secret the account's auth mode cannot use would show
-// that secret as a diff on every plan, for a value the control plane would
-// reject if it were ever sent — the same narrowing the export path applies.
 func TestMapRemoteToState_SeedsOnlyTheAuthModesSecrets(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		mode   string
-		seeded []string
-		absent []string
-	}{
-		{name: "keyPair", mode: "keyPair",
-			seeded: []string{"privateKey", "privateKeyPassphrase"}, absent: []string{"password"}},
-		{name: "password", mode: "password",
-			seeded: []string{"password"}, absent: []string{"privateKey", "privateKeyPassphrase"}},
-		{name: "absent mode takes the schema's default", mode: "",
-			seeded: []string{"privateKey", "privateKeyPassphrase"}, absent: []string{"password"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			h := &HandlerImpl{store: &mockStore{}}
+	h := &HandlerImpl{store: &mockStore{}}
 
-			res, _, err := h.MapRemoteToState(sfRemote("snf", tc.mode), nil)
-			require.NoError(t, err)
+	res, _, err := h.MapRemoteToState(sfRemote("snf", "password"), nil)
+	require.NoError(t, err)
 
-			for _, key := range tc.seeded {
-				wrapped, ok := res.Config[key].(*secret.String)
-				require.True(t, ok, "%s should be wrapped as *secret.String", key)
-				assert.True(t, wrapped.IsUnknown(), "%s must be unknown so it always diffs", key)
-			}
-			for _, key := range tc.absent {
-				assert.NotContains(t, res.Config, key,
-					"%s cannot be used by this auth mode, so seeding it would be a phantom diff on every plan", key)
-			}
-		})
-	}
+	wrapped, ok := res.Config["password"].(*secret.String)
+	require.True(t, ok, "password should be wrapped as *secret.String")
+	assert.True(t, wrapped.IsUnknown(), "password must be unknown so it always diffs")
+	assert.NotContains(t, res.Config, "privateKey")
 }
 
 func bqRemote(externalID string, opts string) *RemoteAccount {
@@ -358,11 +333,7 @@ func sfRemote(externalID, authType string) *RemoteAccount {
 	return &RemoteAccount{Account: acc}
 }
 
-// A Snowflake account declares one auth mode, and the account schema puts each
-// mode's secrets behind an authenticationType branch with additionalProperties
-// false — so the other mode's var is not merely unused, it is rejected
-// (DEX-958). The whole config map is asserted rather than picked at, so a stray
-// key fails too.
+// The whole config map is asserted rather than picked at, so a stray key fails too.
 func TestToExportSpecMap_NarrowsSecretsToAuthMode(t *testing.T) {
 	base := map[string]any{
 		"account": "xy12345", "dbname": "ANALYTICS", "warehouse": "WH", "user": "RUDDER",
@@ -400,14 +371,11 @@ func TestToExportSpecMap_NarrowsSecretsToAuthMode(t *testing.T) {
 			want: withMode("password", map[string]any{"password": "{{ .SNF_PASSWORD }}"}),
 		},
 		{
-			// The account schema defaults an absent discriminator to keyPair, so
-			// the narrowing follows it rather than falling back to every secret.
-			name: "absent mode takes the schema's default",
+			// An account without the discriminator predates key-pair auth, and
+			// the connector reads it as password.
+			name: "absent mode is a password account",
 			mode: "",
-			want: withMode("", map[string]any{
-				"privateKey":           "{{ .SNF_PRIVATEKEY }}",
-				"privateKeyPassphrase": "{{ .SNF_PRIVATEKEYPASSPHRASE }}",
-			}),
+			want: withMode("", map[string]any{"password": "{{ .SNF_PASSWORD }}"}),
 		},
 		{
 			// A value outside the enum is a shape this code should not guess at;

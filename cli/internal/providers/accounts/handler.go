@@ -60,54 +60,44 @@ var registeredAccounts = map[string]accountDefinition{
 	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
 }
 
-// authModeSecrets narrows a definition's secret set by the auth mode its own
-// config declares. A definition absent here has a single mode and keeps its
-// full set. defaultMode mirrors the account schema's own default for an absent
-// discriminator, so a config that omits it is narrowed the way the control
-// plane would read it rather than falling back to every secret.
+// authModeSecrets maps each auth mode of a discriminated definition to the
+// secrets it uses. A definition absent here has a single mode.
 //
 // ponytail: hardcoded alongside registeredAccounts and goes away with the same
 // DEX-467 move to the control-plane account-definitions API, whose db-config
 // already carries the discriminator ("authenticationType": "key_pair_or_password").
-var authModeSecrets = map[string]struct {
-	defaultMode string
-	byMode      map[string][]string
-}{
-	// accounts/SOURCE_SNOWFLAKE/schema.json: enum [keyPair password], default keyPair.
+var authModeSecrets = map[string]map[string][]string{
 	"SOURCE_SNOWFLAKE": {
-		defaultMode: "keyPair",
-		byMode: map[string][]string{
-			"keyPair":  {"privateKey", "privateKeyPassphrase"},
-			"password": {"password"},
-		},
+		"keyPair":  {"privateKey", "privateKeyPassphrase"},
+		"password": {"password"},
+		// The connector enables key-pair auth only on an explicit "keyPair"
+		// (rudder-sources snowflake.NewClient); an absent value predates key-pair
+		// support, so it is a password account whatever the form's default says.
+		"": {"password"},
 	},
 }
 
-// exportSecretKeys is the subset of a definition's secret keys the account's own
-// config can actually use. The account schema puts each mode's secrets behind an
-// authenticationType branch with additionalProperties false, so the other mode's
-// secret is not merely unused — it is rejected (DEX-958).
+// authModeSecretKeys is the subset of a definition's secret keys the account's
+// own config can actually use. The account schema puts each mode's secrets
+// behind an authenticationType branch with additionalProperties false, so the
+// other mode's secret is not merely unused — it is rejected (DEX-958).
 //
-// An absent mode takes the definition's default, which is what the schema does.
 // A mode outside the enum keeps the full set: under-exporting would drop a
 // secret the account needs, and a value the schema does not know is a shape this
 // code should not be guessing at.
-func exportSecretKeys(definitionName string, config map[string]any) ([]string, bool) {
+func authModeSecretKeys(definitionName string, config map[string]any) ([]string, bool) {
 	keys, ok := secretKeys(definitionName)
 	if !ok {
 		return nil, false
 	}
 
-	modes, discriminated := authModeSecrets[definitionName]
+	byMode, discriminated := authModeSecrets[definitionName]
 	if !discriminated {
 		return keys, true
 	}
 
 	mode, _ := config["authenticationType"].(string)
-	if mode == "" {
-		mode = modes.defaultMode
-	}
-	modeKeys, known := modes.byMode[mode]
+	modeKeys, known := byMode[mode]
 	if !known {
 		return keys, true
 	}
@@ -241,10 +231,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 		return nil, nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
 	}
 
-	// Narrowed by the auth mode for the same reason the export path narrows:
-	// seeding the other mode's secret here would mark it present-and-unknown and
-	// show a secret-only diff on every plan for a secret the account cannot use.
-	keys, ok := exportSecretKeys(remote.Definition.Name, config)
+	keys, ok := authModeSecretKeys(remote.Definition.Name, config)
 	if !ok {
 		return nil, nil, fmt.Errorf("managed account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -366,7 +353,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 		return nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
 	}
 
-	keys, ok := exportSecretKeys(remote.Definition.Name, config)
+	keys, ok := authModeSecretKeys(remote.Definition.Name, config)
 	if !ok {
 		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
