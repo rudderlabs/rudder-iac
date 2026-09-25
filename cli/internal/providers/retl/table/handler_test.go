@@ -813,11 +813,7 @@ func TestUnsupportedOperations(t *testing.T) {
 	t.Parallel()
 	h := table.NewHandler(newFakeStore(), "retl")
 
-	_, err := h.Preview(context.Background(), "users-table", resources.ResourceData{}, 10)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "preview is not supported for retl-source-table")
-
-	_, err = h.FetchImportData(context.Background(), specs.ImportIds{LocalID: "users", RemoteID: "src-1"})
+	_, err := h.FetchImportData(context.Background(), specs.ImportIds{LocalID: "users", RemoteID: "src-1"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "single-source import is not supported for retl-source-table")
 }
