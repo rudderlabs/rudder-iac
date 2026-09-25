@@ -4,12 +4,12 @@ metadata:
   name: e2e-scn-connections
 spec:
   connections:
-    # basic -> cron, so a backend that kept the stale everyMinutes re-plans
-    # forever and the convergence subtest says so. enabled goes false, and the
-    # partial sync_settings block names one non-default field: the CLI fills the
-    # rest from the backend's defaults before sending, so the stored false/0/0
-    # are replaced rather than merged into. The field has to be non-default —
-    # an all-default block normalizes to nothing and takes the drop path below.
+    # cron -> manual, the reverse of the column connection's move. enabled goes
+    # false, and the partial sync_settings block names one non-default field:
+    # the CLI fills the rest from the backend's defaults before sending, so the
+    # stored false/0/0 are replaced rather than merged into. The field has to be
+    # non-default — an all-default block normalizes to nothing and takes the
+    # drop path below.
     - id: e2e-scn-orders-track
       source: "#retl-source-sql-model:e2e-scn-model"
       destination: "#destination:e2e-scn-http-track"
@@ -18,8 +18,7 @@ spec:
         sync_behaviour: upsert
         cursor_column: updated_at
         schedule:
-          type: cron
-          cron_expression: "30 2 * * *"
+          type: manual
         identifiers:
           - from: id
             to: user_id

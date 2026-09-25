@@ -78,7 +78,7 @@ func TestRETLConnectionScenarios(t *testing.T) {
 			DestinationID: managedDestinationID(t, scenarioTrackDestinationExternalID),
 			Enabled:       true,
 			ExternalID:    scenarioTrackConnectionExternalID,
-			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
+			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("30 2 * * *")},
 			SyncSettings:  syncSettings(false, 0, 0, false),
 			SyncBehaviour: retlClient.SyncBehaviourUpsert,
 			Identifiers:   []retlClient.Mapping{{From: "id", To: "user_id"}},
@@ -117,13 +117,12 @@ func TestRETLConnectionScenarios(t *testing.T) {
 		// A partial sync_settings block names retention_days only: the CLI fills
 		// every field it leaves out with the backend default before sending, so
 		// the stored false/0/0/false are replaced rather than merged into.
-		// everyMinutes must be gone with the basic schedule that carried it.
 		assert.Equal(t, retlClient.RETLConnection{
 			SourceID:      managedRETLSource(t, retlClient.ModelSourceType, scenarioModelExternalID).ID,
 			DestinationID: managedDestinationID(t, scenarioTrackDestinationExternalID),
 			Enabled:       false,
 			ExternalID:    scenarioTrackConnectionExternalID,
-			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeCron, CronExpression: lo.ToPtr("30 2 * * *")},
+			Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeManual},
 			SyncSettings:  syncSettings(true, 7, 5, true),
 			SyncBehaviour: retlClient.SyncBehaviourUpsert,
 			Identifiers:   []retlClient.Mapping{{From: "id", To: "user_id"}},

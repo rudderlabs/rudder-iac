@@ -17,8 +17,8 @@ spec:
         sync_behaviour: upsert
         cursor_column: updated_at
         schedule:
-          type: basic
-          every_minutes: 30
+          type: cron
+          cron_expression: "30 2 * * *"
         identifiers:
           - from: id
             to: user_id
