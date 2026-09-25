@@ -63,3 +63,5 @@
 ## DEX-1012 — Editor Completion Evidence
 
 - Distinguish headless `yaml-language-server` verification from actual VS Code/Red Hat YAML UI proof. If the editor cannot be run, report screenshot/GIF acceptance as incomplete rather than presenting reconstructed UI as evidence.
+- Keep the DEX-1012 decision record and executable demo in `docs/spikes/DEX-1012/` in rudder-iac, next to the schema generator they constrain. rudder-hugo should receive only later customer-facing narrative and schema-hosting changes after prerequisites land.
+- Label the spike status `Proposed: pending project lead sign-off` until a project lead explicitly accepts the recommendation.

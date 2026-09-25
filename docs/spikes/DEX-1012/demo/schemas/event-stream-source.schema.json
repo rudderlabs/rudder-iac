@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rudderlabs/rudder-iac/releases/latest/download/schemas/event-stream-source.schema.json",
+  "$defs": {
+    "MetadataImportIds": {
+      "properties": {
+        "local_id": {
+          "type": "string"
+        },
+        "urn": {
+          "type": "string"
+        },
+        "remote_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "remote_id"
+      ]
+    },
+    "MetadataWorkspaceImportMetadata": {
+      "properties": {
+        "workspace_id": {
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/MetadataImportIds"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "workspace_id"
+      ]
+    },
+    "MetadataWorkspacesImportMetadata": {
+      "properties": {
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/MetadataWorkspaceImportMetadata"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Spec0EventConfigSpec": {
+      "properties": {
+        "propagate_violations": {
+          "type": "boolean"
+        },
+        "drop_unplanned_properties": {
+          "type": "boolean"
+        },
+        "drop_other_violations": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Spec0SourceGovernanceSpec": {
+      "properties": {
+        "validations": {
+          "$ref": "#/$defs/Spec0TrackingPlanSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Spec0TrackConfigSpec": {
+      "properties": {
+        "propagate_violations": {
+          "type": "boolean"
+        },
+        "drop_unplanned_properties": {
+          "type": "boolean"
+        },
+        "drop_other_violations": {
+          "type": "boolean"
+        },
+        "drop_unplanned_events": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Spec0TrackingPlanConfigSpec": {
+      "properties": {
+        "track": {
+          "$ref": "#/$defs/Spec0TrackConfigSpec"
+        },
+        "identify": {
+          "$ref": "#/$defs/Spec0EventConfigSpec"
+        },
+        "group": {
+          "$ref": "#/$defs/Spec0EventConfigSpec"
+        },
+        "page": {
+          "$ref": "#/$defs/Spec0EventConfigSpec"
+        },
+        "screen": {
+          "$ref": "#/$defs/Spec0EventConfigSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Spec0TrackingPlanSpec": {
+      "properties": {
+        "tracking_plan": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/$defs/Spec0TrackingPlanConfigSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tracking_plan",
+        "config"
+      ]
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "rudder/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "event-stream-source"
+    },
+    "metadata": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "import": {
+          "$ref": "#/$defs/MetadataWorkspacesImportMetadata"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "spec": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "java",
+            "dotnet",
+            "php",
+            "flutter",
+            "cordova",
+            "rust",
+            "react_native",
+            "python",
+            "ios",
+            "android",
+            "javascript",
+            "go",
+            "node",
+            "ruby",
+            "unity",
+            "ios_swift",
+            "android_kotlin"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "governance": {
+          "$ref": "#/$defs/Spec0SourceGovernanceSpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "type"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "title": "RudderStack event-stream-source spec"
+}

@@ -1,6 +1,6 @@
 # DEX-1012: stable schema URLs and editor association
 
-**Status:** spike decision, 2026-09-25
+**Status:** Proposed: pending project lead sign-off, 2026-09-25
 
 **Scope:** decision and editor proof only. **Part 2 is deferred and not
 implemented by this spike.** Publication, importer/scaffolding changes,
@@ -9,14 +9,15 @@ DEX-1004.
 
 ## Decision
 
-1. In Part 2, publish a kind-discriminated root and each per-kind schema under
-   a Rudder-owned, spec-versioned URL. The proposed future canonical URLs (not
-   published by this spike) are
-   `https://www.rudderstack.com/docs/schemas/rudder-cli/v1/root.json` and
-   `.../v1/<kind>.json`.
-2. Make the root URL the default modeline written by import/scaffolding. A file's
-   `kind` selects its `spec` schema. Generated/exported files may use a per-kind
-   URL when the kind is already known.
+1. In Part 2, publish the generated kind-discriminated root and every per-kind
+   schema under a Rudder-owned, spec-versioned URL. The proposed future
+   canonical URLs (not published by this spike) are
+   `https://www.rudderstack.com/docs/schemas/rudder-cli/v1/rudder-spec.schema.json`
+   and `.../v1/<kind>.schema.json`.
+2. Make the per-kind URL the modeline written by import/scaffolding. Those
+   writers already know the document kind, and a direct schema avoids the
+   combined root's mixed suggestions before `kind` is present. Reserve the root
+   for SchemaStore and project-level mappings that must cover multiple kinds.
 3. Use `# yaml-language-server: $schema=<URL>` as the primary association for
    arbitrary filenames. Document VS Code `yaml.schemas`, JetBrains JSON Schema
    mappings, and future rudder-next-vscode content detection as bulk/automatic
@@ -27,10 +28,12 @@ DEX-1004.
 5. Attach the same generated schema bundle to CLI releases for pinned/offline
    use, but do not use a moving release URL as the canonical modeline target.
 
-The reproducible two-kind demo and headless language-server evidence are in
-[`dex-1012-demo/`](dex-1012-demo/README.md). The VS Code UI screenshot/GIF
-acceptance proof is explicitly still incomplete because this spike environment
-could not run VS Code with the Red Hat YAML extension.
+The reproducible demo and headless language-server evidence are in
+[`demo/`](demo/README.md). Its root and event-stream-source schemas were
+generated from rudder-iac PR #927 at commit `bbcee89`; the root contains all 14
+kind branches. The VS Code UI screenshot/GIF acceptance proof is explicitly
+still incomplete because this spike environment could not run VS Code with the
+Red Hat YAML extension.
 
 ## 1. SchemaStore matching
 
@@ -69,9 +72,9 @@ the CLI binary release. These are proposed future canonical URLs; this spike
 does not publish them:
 
 ```text
-https://www.rudderstack.com/docs/schemas/rudder-cli/v1/root.json
-https://www.rudderstack.com/docs/schemas/rudder-cli/v1/event-stream-source.json
-https://www.rudderstack.com/docs/schemas/rudder-cli/v1/data-graph.json
+https://www.rudderstack.com/docs/schemas/rudder-cli/v1/rudder-spec.schema.json
+https://www.rudderstack.com/docs/schemas/rudder-cli/v1/event-stream-source.schema.json
+https://www.rudderstack.com/docs/schemas/rudder-cli/v1/data-graph.schema.json
 ```
 
 | Candidate | Strengths | Weaknesses |
@@ -94,59 +97,55 @@ Publication requirements for Part 2:
 
 ## 3. Root versus per-kind schemas
 
-Publish both; use the root by default. A single root gives importer/init one URL,
-keeps association valid if a user changes `kind`, and permits top-level kind
-completion. The root should use Draft 7-compatible `if`/`then` branches and each
-`if` must include `required: [kind]`: `properties.kind.const` alone also passes
-when `kind` is absent.
+Publish both; write per-kind modelines. The demo uses PR #927's actual generated
+root, whose 14 `oneOf` branches are discriminated by constant `kind` values, and
+its generated `event-stream-source.schema.json`. yaml-language-server 1.24.0
+produced these results:
 
-The demo tested `event-stream-source` (simple resource) and `data-graph` (nested
-resource) with yaml-language-server 1.24.0:
-
-| Exercised state | Root | Event-stream-source per-kind |
+| Exercised state | Generated root | Generated event-stream-source schema |
 | --- | --- | --- |
 | Blank document | Envelope completion | Envelope completion |
-| Recognized `kind` | Correct source or graph `spec` fields | Source fields |
-| Nested `spec` | Expected kind fields included and other tested kind's fields excluded | Source completion and hover |
-| Missing `kind` | No kind-specific fields; missing-kind diagnostic | Not exercised |
-| Kind changed while source fields remain | Wrong-kind fields rejected; required graph fields reported | Not exercised |
+| After `version`, before `kind` | `kind`, `metadata`, and `spec` completion | `kind`, `metadata`, and `spec` completion |
+| Inside `spec`, before `kind` | Mixed suggestions from multiple branches, including source `enabled` and graph `account_id` | Focused source suggestions |
+| Inside `spec`, after `kind: event-stream-source` | Focused source fields; graph fields excluded | Focused source fields |
+| After `kind` changes to `data-graph` | Source fields rejected and required graph fields reported | Not applicable; the schema intentionally fixes the kind |
+| Hover on `spec.enabled` | Selected event-stream-source schema title and source link | Event-stream-source schema title and source link |
 
-The checked-in matrix does not exercise the data-graph per-kind endpoint or a
-live edit sequence in an IDE. The root kind-change case is evaluated as the
-resulting changed document, which proves branch-sensitive completion and
-validation but not editor UI timing.
+The root validates and narrows correctly once `kind` is present, so it remains
+appropriate for SchemaStore and directory mappings. Its pre-discriminator
+completion is noisy, however. Import and scaffolding writers already know the
+kind, so they must emit the direct URL:
 
-This confirms completion quality is acceptable after `kind` is present. The
-trade-off is weaker kind-specific completion before that discriminator is typed;
-this is preferable to merging fields from every kind. Per-kind files remain a
-useful direct endpoint and can provide earlier suggestions when a producer knows
-the kind.
+```text
+schemaBaseURL + "/" + <kind> + ".schema.json"
+```
 
-The committed `verify.mjs` asserts top-level/nested completion, hover, wrong-kind
-validation, missing-kind behavior, and changing-kind behavior. Its output is
+For example, an imported event stream source gets
+`https://www.rudderstack.com/docs/schemas/rudder-cli/v1/event-stream-source.schema.json`.
+No importer-written artifact should point at `rudder-spec.schema.json`.
+
+The committed `verify.mjs` asserts completion before and after `kind`, hover,
+wrong-kind validation, missing-kind behavior, and project mapping. Its output is
 checked in as
-[`yaml-language-server-matrix.json`](dex-1012-demo/evidence/yaml-language-server-matrix.json).
-The visual artifact is
-[`completion-hover.svg`](dex-1012-demo/evidence/completion-hover.svg), a
-reconstructed UI illustration rather than completed VS Code acceptance proof.
-The JSON schemas are explicitly illustrative fixtures, not the DEX-1000 schema
-output.
+[`yaml-language-server-matrix.json`](demo/evidence/yaml-language-server-matrix.json).
+This headless result is not a substitute for the remaining VS Code UI check.
 
 ## 4. JetBrains
 
-IntelliJ Platform 2025.2 source and documentation indicate recognition of both
-YAML comments:
+IntelliJ Platform 2025.2 is the minimum version this spike claims for schema
+association by YAML comment. Its source and documentation recognize both
+comments:
 
 ```yaml
 # yaml-language-server: $schema=https://example/schema.json
 # $schema: https://example/schema.json
 ```
 
-Therefore the chosen modeline is portable to current JetBrains IDEs with YAML
-and JSON Schema support. JetBrains also supports Draft 7 conditional completion,
-so the root-schema design applies. One precedence difference matters: a
-JetBrains user mapping can override a schema comment, while yaml-language-server
-gives the modeline higher priority.
+Therefore the chosen modeline is portable to JetBrains 2025.2 IDEs with YAML and
+JSON Schema support. Earlier versions are unverified and should use a manual
+mapping. One precedence difference matters: a JetBrains user mapping can
+override a schema comment, while yaml-language-server gives the modeline higher
+priority.
 
 Fallback for older/product-specific installations:
 
@@ -169,9 +168,11 @@ and IntelliJ Platform 2025.2
 
 After DEX-1000 and DEX-1004 land:
 
-- publish generated `root.json`, all per-kind schemas, and their references at
-  the docs-hosted `/v1/` namespace; attach the bundle to releases;
-- update importer and future scaffolding modelines to the stable root URL;
+- publish generated `rudder-spec.schema.json`, all `<kind>.schema.json` files,
+  and their references at the docs-hosted `/v1/` namespace; attach the bundle
+  to releases;
+- set `schemaBaseURL` to the verified docs-hosted `/v1` URL and make PR #927's
+  writer emit `schemaBaseURL + "/" + <kind> + ".schema.json"`;
 - add Hugo editor-setup documentation for modeline, VS Code `yaml.schemas`,
   JetBrains mapping, and offline bundles;
 - propose the narrow SchemaStore entry only after URLs are live;

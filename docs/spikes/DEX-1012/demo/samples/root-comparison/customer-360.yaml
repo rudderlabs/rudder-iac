@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=../schemas/root.json
 version: rudder/v1
 kind: data-graph
 metadata:

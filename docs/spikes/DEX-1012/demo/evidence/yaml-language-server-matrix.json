@@ -1,0 +1,102 @@
+{
+  "runtime": {
+    "schemaGeneratorCommit": "bbcee89",
+    "rootSchemaBranches": 14,
+    "yamlLanguageServer": "1.24.0",
+    "vscodeLanguageserverTextdocument": "1.0.15",
+    "node": "v20.20.2"
+  },
+  "matrix": [
+    {
+      "sample": "all",
+      "association": "modelines and yaml.schemas equivalent",
+      "case": "fixture validation",
+      "expected": "no diagnostics",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "blank top level",
+      "expected": "version, kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "per-kind modeline",
+      "case": "blank top level",
+      "expected": "version, kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "top level before kind",
+      "expected": "kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "per-kind modeline",
+      "case": "top level before kind",
+      "expected": "kind, metadata, spec",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "source spec completion",
+      "expected": "includes source fields; excludes data-graph fields",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/customer-360.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "data-graph spec completion",
+      "expected": "includes data-graph fields; excludes source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "per-kind modeline",
+      "case": "source spec completion",
+      "expected": "source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "settings-associated.yaml",
+      "association": "yaml.schemas equivalent",
+      "case": "source spec completion",
+      "expected": "source fields",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "kind changed with source fields",
+      "expected": "wrong-kind and missing-field diagnostics",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "spec completion before kind",
+      "expected": "mixed suggestions from multiple kinds; missing-kind diagnostic",
+      "result": "pass"
+    },
+    {
+      "sample": "root-comparison/mobile.yaml",
+      "association": "root yaml.schemas equivalent",
+      "case": "hover on spec.enabled",
+      "expected": "selected schema title and source link",
+      "result": "pass"
+    },
+    {
+      "sample": "sources/mobile.yaml",
+      "association": "per-kind modeline",
+      "case": "hover on spec.enabled",
+      "expected": "schema title and source link",
+      "result": "pass"
+    }
+  ]
+}
