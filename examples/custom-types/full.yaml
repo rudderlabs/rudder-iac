@@ -1,0 +1,20 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: constrained-types
+spec:
+  types:
+    - id: email_address
+      name: EmailAddress
+      description: A validated email address.
+      type: string
+      config:
+        format: email
+        min_length: 5
+        max_length: 255
+    - id: satisfaction_score
+      name: SatisfactionScore
+      type: integer
+      config:
+        minimum: 1
+        maximum: 5

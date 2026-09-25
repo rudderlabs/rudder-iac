@@ -1,0 +1,9 @@
+version: rudder/v0.1
+kind: events
+metadata:
+  name: commerce_tracking
+spec:
+  events:
+    - id: checkout_completed
+      name: Checkout Completed
+      event_type: track

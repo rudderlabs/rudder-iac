@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: mobile-app
+spec:
+  id: mobile-app
+  name: Mobile App
+  type: android_kotlin
+  enabled: true

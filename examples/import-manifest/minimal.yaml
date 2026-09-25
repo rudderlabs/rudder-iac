@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: import-manifest
+metadata:
+  name: minimal-import-manifest
+spec:
+  workspaces:
+    - workspace_id: workspace-development
+      resources:
+        - urn: property:imported_user_id
+          remote_id: prop_remote_user_id

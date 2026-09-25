@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: commerce-tracking-plan
+spec:
+  id: commerce-tracking-plan
+  display_name: Commerce Tracking Plan
+  description: Governs the checkout funnel.
+  rules:
+    - type: event_rule
+      id: checkout_started_rule
+      event: "#event:checkout_started"
+      additional_properties: false
+      properties:
+        - property: "#property:cart_id"
+          required: true
+        - property: "#property:cart_value"
+          required: false
