@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 var (
@@ -64,8 +65,9 @@ func (rt *RudderTyper) Generate(ctx context.Context, options core.GenerateOption
 	}
 
 	// Step 1: Fetch tracking plan data
-	fmt.Println("📥 Fetching tracking plan data...")
+	ui.StartSpinner("Fetching tracking plan data ...")
 	trackingPlan, err := rt.fetchTrackingPlan(ctx)
+	ui.StopSpinner()
 	if err != nil {
 		return fmt.Errorf("fetching tracking plan: %w", err)
 	}
