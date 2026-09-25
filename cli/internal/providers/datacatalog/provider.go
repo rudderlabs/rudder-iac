@@ -89,6 +89,30 @@ func (p *Provider) SupportedKinds() []string {
 	}
 }
 
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	legacyVersions := []string{specs.SpecVersionV0_1, specs.SpecVersionV0_1Variant}
+	return map[string][]provider.SchemaVariant{
+		localcatalog.KindProperties: {
+			{Spec: localcatalog.PropertySpec{}, Versions: legacyVersions},
+			{Spec: localcatalog.PropertySpecV1{}, Versions: []string{specs.SpecVersionV1}},
+		},
+		localcatalog.KindEvents: {
+			{Spec: localcatalog.EventSpec{}, Versions: legacyVersions},
+			{Spec: localcatalog.EventSpecV1{}, Versions: []string{specs.SpecVersionV1}},
+		},
+		localcatalog.KindTrackingPlans:   {{Spec: localcatalog.TrackingPlan{}, Versions: legacyVersions}},
+		localcatalog.KindTrackingPlansV1: {{Spec: localcatalog.TrackingPlanV1{}, Versions: []string{specs.SpecVersionV1}}},
+		localcatalog.KindCustomTypes: {
+			{Spec: localcatalog.CustomTypeSpec{}, Versions: legacyVersions},
+			{Spec: localcatalog.CustomTypeSpecV1{}, Versions: []string{specs.SpecVersionV1}},
+		},
+		localcatalog.KindCategories: {
+			{Spec: localcatalog.CategorySpec{}, Versions: legacyVersions},
+			{Spec: localcatalog.CategorySpecV1{}, Versions: []string{specs.SpecVersionV1}},
+		},
+	}
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	var patterns []rules.MatchPattern
 	// properties, events, categories, custom-types support both legacy and v1 versions

@@ -53,3 +53,8 @@
 - Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
 - Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
 - `converter.ArrayWithStrings` can drop explicitly empty lists because of its non-empty-content guard, so fixing array defaults requires both defaults-engine support and empty-list preservation in converters rather than only adding `default:"[]"` tags.
+
+## DEX-1000 — Legacy Tracking-Plan Schema Version Mismatch
+
+- The generated schema catalog retains legacy kind `tp` because schema-kind parity is defined against `Provider.SupportedKinds()`, where DataCatalog still advertises it.
+- Its generated envelope uses `rudder/v1` like the other schema outputs even though `SupportedMatchPatterns` marks `tp` as legacy-only. Removing it would break kind parity and changing provider routing semantics is outside schema generation, so this mismatch should remain explicitly documented until legacy kind handling is resolved.

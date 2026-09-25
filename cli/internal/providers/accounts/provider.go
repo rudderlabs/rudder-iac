@@ -23,6 +23,12 @@ func NewProvider(store AccountStore) *Provider {
 
 // SupportedMatchPatterns declares the account kind for rudder/v1 only (accounts
 // are new — no legacy versions), scoping the gatekeeper rules to it.
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	return map[string][]provider.SchemaVariant{
+		AccountSpecKind: {{Spec: AccountSpec{}}},
+	}
+}
+
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	return prules.V1VersionPatterns(AccountSpecKind)
 }

@@ -72,6 +72,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -185,9 +186,23 @@ func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, err
 	return ruledoc.Build(cp, GetVersion(), generatedAt)
 }
 
+// GenerateSchemas composes the same providers project loading uses and builds
+// schemas from their kind declarations without requiring credentials.
+func GenerateSchemas() (*schema.Catalog, error) {
+	cp, err := newCompositeProvider()
+	if err != nil {
+		return nil, fmt.Errorf("building composite provider: %w", err)
+	}
+	catalog, err := schema.New(cp)
+	if err != nil {
+		return nil, fmt.Errorf("building schema catalog: %w", err)
+	}
+	return catalog, nil
+}
+
 // newCompositeProvider builds the composite provider without requiring
-// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
-// enumerates rules and reads authored fragments but makes no network calls, so
+// credentials. It supports local metadata generation, which enumerates provider
+// capabilities but makes no network calls, so
 // it skips the auth check NewDeps enforces and feeds client.New a placeholder
 // token (an empty token is rejected outright, which would otherwise break
 // generation in CI where no credentials are configured). It shares
@@ -197,7 +212,7 @@ func newCompositeProvider() (provider.Provider, error) {
 	cfg := config.GetConfig()
 
 	c, err := client.New(
-		"rule-doc-generation", // unused: generation makes no API calls
+		"local-metadata-generation", // unused: generation makes no API calls
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+v),
 	)

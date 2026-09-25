@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	invopop "github.com/invopop/jsonschema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -34,6 +35,28 @@ type TypeProvider interface {
 	// Providers must explicitly declare their supported patterns. Returning nil means
 	// the provider does not handle any (kind, version) combinations for validation.
 	SupportedMatchPatterns() []rules.MatchPattern
+}
+
+// SchemaTransform customizes a generated schema branch when provider metadata
+// carries constraints that are not expressible on the Go spec struct alone.
+type SchemaTransform func(*invopop.Schema)
+
+// SchemaVariant describes one accepted shape for a spec kind. Most kinds have
+// one variant; definition-backed kinds such as destination can provide several
+// variants with field replacements and constants.
+type SchemaVariant struct {
+	Spec         any
+	Versions     []string
+	Replacements map[string]any
+	Constants    map[string]any
+	Transforms   []SchemaTransform
+}
+
+// SchemaProvider exposes provider-owned schema inputs keyed by the same kinds
+// advertised through SupportedKinds. Keeping this capability on providers
+// prevents schema generation from maintaining a second kind registry.
+type SchemaProvider interface {
+	SpecSchemas() map[string][]SchemaVariant
 }
 
 type SpecLoader interface {
@@ -253,6 +276,7 @@ type ResourceMatcherProvider interface {
 // and specific resource types or backend systems.
 type Provider interface {
 	TypeProvider
+	SchemaProvider
 	SpecLoader
 	RemoteResourceLoader
 	StateLoader

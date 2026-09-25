@@ -138,6 +138,19 @@ func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
 	return nil
 }
 
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	schemas := map[string][]provider.SchemaVariant{
+		sqlmodel.ResourceKind: {{Spec: sqlmodel.SQLModelSpec{}}},
+	}
+	if _, ok := p.kindToType[table.ResourceKind]; ok {
+		schemas[table.ResourceKind] = []provider.SchemaVariant{{Spec: table.TableSpec{}}}
+	}
+	if _, ok := p.kindToType[connection.ResourceKind]; ok {
+		schemas[connection.ResourceKind] = []provider.SchemaVariant{{Spec: connection.ConnectionsSpec{}}}
+	}
+	return schemas
+}
+
 func (p *Provider) SupportedKinds() []string {
 	kinds := make([]string, 0, len(p.kindToType))
 	for kind := range p.kindToType {

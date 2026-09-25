@@ -92,6 +92,12 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.
 // Data-graph specs only support the V1 version; no legacy version support.
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	return map[string][]provider.SchemaVariant{
+		"data-graph": {{Spec: dgModel.DataGraphSpec{}}},
+	}
+}
+
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	return prules.V1VersionPatterns("data-graph")
 }

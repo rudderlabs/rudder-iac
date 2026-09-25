@@ -116,6 +116,10 @@ func (d *RegisteredDefinition) SelectedKeyRoots(apiConfig map[string]any) []stri
 	return roots
 }
 
+func (d *RegisteredDefinition) NewConfigSchema() any {
+	return d.NewConfig()
+}
+
 func (d *RegisteredDefinition) SecretKeys() []string {
 	if d.DestinationDefinition == nil || d.DestinationDefinition.SecretKeys == nil {
 		return []string{}

@@ -77,6 +77,13 @@ func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.
 // Transformations only support the V1 version; legacy versions are explicitly rejected.
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	return map[string][]provider.SchemaVariant{
+		ttypes.TransformationResourceType: {{Spec: specs.TransformationSpec{}}},
+		ttypes.LibraryResourceType:        {{Spec: specs.TransformationLibrarySpec{}}},
+	}
+}
+
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	var patterns []vrules.MatchPattern
 	patterns = append(patterns, prules.V1VersionPatterns(ttypes.TransformationResourceType)...)

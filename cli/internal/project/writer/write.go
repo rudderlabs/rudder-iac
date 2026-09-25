@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 )
 
 // FormattableEntity represents an importable entity with content and path.
@@ -33,6 +37,7 @@ func Write(_ context.Context, baseDir string, formatters formatter.Formatters, d
 		if err != nil {
 			return fmt.Errorf("formatting %s: %w", path, err)
 		}
+		content = withEditorModeline(datum.Content, filepath.Ext(path), content)
 
 		err = writeFile(path, content)
 		if err != nil {
@@ -45,6 +50,21 @@ func Write(_ context.Context, baseDir string, formatters formatter.Formatters, d
 
 // writeFile writes content to a file, but fails if the file already exists.
 // This prevents accidental overwriting of existing files.
+func withEditorModeline(content any, extension string, formatted []byte) []byte {
+	if extension != ".yaml" && extension != ".yml" {
+		return formatted
+	}
+	spec, ok := content.(*specs.Spec)
+	if !ok || spec.Kind == "" {
+		return formatted
+	}
+	baseURL := strings.TrimRight(config.GetConfig().SchemaBaseURL, "/")
+	if baseURL == "" {
+		return formatted
+	}
+	return editor.EnsureModeline(formatted, baseURL+"/"+editor.FileName(spec.Kind))
+}
+
 func writeFile(path string, content []byte) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
@@ -62,10 +82,12 @@ func writeFile(path string, content []byte) error {
 // OverwriteFile writes a FormattableEntity to a file, overwriting it if it already exists.
 // This is used for operations like migration where we intentionally want to replace existing files.
 func OverwriteFile(formatters formatter.Formatters, entity FormattableEntity) error {
-	formatted, err := formatters.Format(entity.Content, filepath.Ext(entity.RelativePath))
+	extension := filepath.Ext(entity.RelativePath)
+	formatted, err := formatters.Format(entity.Content, extension)
 	if err != nil {
 		return fmt.Errorf("formatting %s: %w", entity.RelativePath, err)
 	}
+	formatted = withEditorModeline(entity.Content, extension, formatted)
 
 	if err := os.WriteFile(entity.RelativePath, formatted, 0644); err != nil {
 		return fmt.Errorf("writing file %s: %w", entity.RelativePath, err)

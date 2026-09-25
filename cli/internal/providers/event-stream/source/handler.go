@@ -40,6 +40,10 @@ func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 	}
 }
 
+func (h *Handler) SpecSchema() any {
+	return SourceSpec{}
+}
+
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	id, ok := s.Spec["id"].(string)
 	if !ok {

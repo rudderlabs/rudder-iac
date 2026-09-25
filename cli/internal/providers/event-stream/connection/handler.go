@@ -46,6 +46,10 @@ func NewHandler(client esClient.EventStreamStore, importDir string) *Handler {
 
 // ParseSpec collects one URN per connection entry — the spec body is a list,
 // unlike the single-resource event stream source spec.
+func (h *Handler) SpecSchema() any {
+	return ConnectionsSpec{}
+}
+
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	raw, ok := s.Spec[ConnectionsKey].([]any)
 	if !ok {

@@ -51,6 +51,10 @@ func NewHandler(client retlClient.RETLStore, importDir string) *Handler {
 
 // ParseSpec leaves LegacyResourceType empty: retl-source-table is v1-only, so
 // import metadata must use urn rather than the legacy local_id.
+func (h *Handler) SpecSchema() any {
+	return TableSpec{}
+}
+
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	id, ok := s.Spec[sqlmodel.IDKey].(string)
 	if !ok {

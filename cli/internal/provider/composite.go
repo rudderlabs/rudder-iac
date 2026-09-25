@@ -88,6 +88,14 @@ func (p *CompositeProvider) SupportedTypes() []string {
 	return maps.Keys(p.registeredTypes)
 }
 
+func (p *CompositeProvider) SpecSchemas() map[string][]SchemaVariant {
+	schemas := make(map[string][]SchemaVariant, len(p.registeredKinds))
+	for kind, provider := range p.registeredKinds {
+		schemas[kind] = provider.SpecSchemas()[kind]
+	}
+	return schemas
+}
+
 func (p *CompositeProvider) ParseSpec(path string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	provider, err := p.providerForKind(s.Kind)
 	if err != nil {

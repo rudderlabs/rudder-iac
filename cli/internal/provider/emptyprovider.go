@@ -80,6 +80,10 @@ func (p *EmptyProvider) SupportedMatchPatterns() []rules.MatchPattern {
 	return nil
 }
 
+func (p *EmptyProvider) SpecSchemas() map[string][]SchemaVariant {
+	return nil
+}
+
 func (p *EmptyProvider) SyntacticRules() []rules.Rule {
 	return []rules.Rule{}
 }

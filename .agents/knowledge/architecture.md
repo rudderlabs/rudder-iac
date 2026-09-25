@@ -331,3 +331,13 @@
 - The destination definition source-type config surface now retains only `connection_mode`; `use_native_sdk` / API `useNativeSDK` is removed from shared source-type config keys and destination-specific converter mappings.
 - Event-stream connection semantic validation should only expect destination source-type config entries for `connection_mode`, because no destination definition supports the native-SDK config path after this removal.
 - GA4's separate `use_native_sdk_to_send` / `useNativeSDKToSend` setting was removed as part of this task because the required repository-wide destination-definition grep gate treats any `useNativeSDK` API-key prefix as out of scope.
+
+## DEX-1000 — Provider-Owned JSON Schema Generation
+
+<!-- session: 2026-09-25 -->
+
+- JSON Schema ownership follows kind ownership: `cli/internal/provider/provider.go::SchemaProvider` and each provider's `SpecSchemas` sit beside `SupportedKinds`, while `cli/internal/app/dependencies.go::GenerateSchemas` aggregates through the credential-free composite-provider construction path. Do not introduce a separate hardcoded kind registry.
+- `cli/internal/schema` generates deterministic Draft 2020-12 per-kind schemas and a kind-discriminated root, translating only safely representable validator tags and hoisting/namespacing definitions so each emitted schema compiles independently.
+- YAML schema modelines are opt-in through `schemaBaseURL` / `RUDDERSTACK_CLI_SCHEMA_BASE_URL` until a stable hosted SchemaStore endpoint exists; default writer/import behavior must remain byte-compatible and non-spec helper files must remain unannotated.
+- Providers expose neutral schema variants/spec samples rather than importing `cli/internal/schema`; the schema package owns reflection, validation-tag enrichment, and envelope/root composition, avoiding a provider↔schema import cycle.
+- Schema variants must follow runtime provider composition: destination variants come from the active destination-definition registry, while RETL variants use the same options that govern `SupportedKinds`, so flag-gated kind/schema parity remains testable.

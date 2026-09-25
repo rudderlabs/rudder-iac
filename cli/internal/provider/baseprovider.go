@@ -55,6 +55,10 @@ type BaseProvider struct {
 	kindToType map[string]string
 }
 
+type schemaHandler interface {
+	SpecSchema() any
+}
+
 func NewBaseProvider(handlers []Handler) *BaseProvider {
 	kindToType := map[string]string{}
 	for _, handler := range handlers {
@@ -85,6 +89,18 @@ func (p *BaseProvider) SupportedKinds() []string {
 		kinds = append(kinds, kind)
 	}
 	return kinds
+}
+
+func (p *BaseProvider) SpecSchemas() map[string][]SchemaVariant {
+	schemas := make(map[string][]SchemaVariant, len(p.kindToType))
+	for kind, resourceType := range p.kindToType {
+		handler, ok := p.handlers[resourceType].(schemaHandler)
+		if !ok {
+			continue
+		}
+		schemas[kind] = []SchemaVariant{{Spec: handler.SpecSchema()}}
+	}
+	return schemas
 }
 
 func (p *BaseProvider) SupportedTypes() []string {

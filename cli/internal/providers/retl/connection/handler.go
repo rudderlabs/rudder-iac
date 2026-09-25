@@ -81,6 +81,10 @@ func NewHandler(client retlClient.RETLStore, importDir string, registry *definit
 	}
 }
 
+func (h *Handler) SpecSchema() any {
+	return ConnectionsSpec{}
+}
+
 func (h *Handler) ParseSpec(_ string, s *specs.Spec) (*specs.ParsedSpec, error) {
 	raw, ok := s.Spec[ConnectionsKey].([]any)
 	if !ok {

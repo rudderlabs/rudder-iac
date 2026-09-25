@@ -40,6 +40,7 @@ type handler interface {
 	LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error)
 	MapRemoteToState(collection *resources.RemoteResources) (*state.State, error)
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
+	SpecSchema() any
 	FormatForExport(
 		collection *resources.RemoteResources,
 		idNamer namer.Namer,
@@ -110,6 +111,18 @@ func (p *Provider) LoadImportManifest(m *specs.WorkspaceImportMetadata) error {
 		}
 	}
 	return nil
+}
+
+func (p *Provider) SpecSchemas() map[string][]provider.SchemaVariant {
+	schemas := make(map[string][]provider.SchemaVariant, len(p.kindToType))
+	for kind, resourceType := range p.kindToType {
+		handler, ok := p.handlers[resourceType]
+		if !ok {
+			continue
+		}
+		schemas[kind] = []provider.SchemaVariant{{Spec: handler.SpecSchema()}}
+	}
+	return schemas
 }
 
 func (p *Provider) SupportedKinds() []string {

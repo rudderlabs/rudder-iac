@@ -60,6 +60,10 @@ func (h *BaseHandler[Spec, Res, State, Remote]) SpecKind() string {
 	return h.metadata.SpecKind
 }
 
+func (h *BaseHandler[Spec, Res, State, Remote]) SpecSchema() any {
+	return h.Impl.NewSpec()
+}
+
 // AddResource registers a resource with the handler
 // This is used when resources are extracted from inline definitions
 func (h *BaseHandler[Spec, Res, State, Remote]) AddResource(id string, resource *Res) error {

@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,6 +168,26 @@ func TestWrite(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, formatterFail)
 	})
+}
+
+func TestWriteAddsOptInSchemaModelineToSpecs(t *testing.T) {
+	viper.Set("schemaBaseURL", "https://schemas.example.com/v1")
+	t.Cleanup(viper.Reset)
+
+	var (
+		tmpDir     = t.TempDir()
+		formatters = formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("version: rudder/v1\n")})
+		entity     = FormattableEntity{
+			Content:      &specs.Spec{Kind: "source"},
+			RelativePath: "source.yaml",
+		}
+	)
+
+	err := Write(context.Background(), tmpDir, formatters, []FormattableEntity{entity})
+	require.NoError(t, err)
+	content, err := os.ReadFile(filepath.Join(tmpDir, entity.RelativePath))
+	require.NoError(t, err)
+	assert.Equal(t, "# yaml-language-server: $schema=https://schemas.example.com/v1/source.schema.json\nversion: rudder/v1\n", string(content))
 }
 
 func TestOverwriteFile(t *testing.T) {
