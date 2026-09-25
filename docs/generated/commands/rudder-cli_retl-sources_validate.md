@@ -4,11 +4,17 @@ command: "rudder-cli retl-sources validate"
 
 ## rudder-cli retl-sources validate
 
-Validate a RETL source (SQL model or table)
+Validate a RETL source's spec (SQL model or table)
 
 ### Synopsis
 
-Validate a RETL source (SQL model or warehouse table) by executing its query without returning data. s3 table sources have no query to validate.
+Validate a RETL source's spec.
+
+This checks the project's specs and that the source is defined in it. It
+does not run the source's query: reading from the warehouse is what
+`rudder-cli retl-sources preview` is for, and it is opt-in because it
+executes a query against live data.
+
 
 ```
 rudder-cli retl-sources validate <external-id> [flags]

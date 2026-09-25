@@ -2,7 +2,7 @@
 .TH "RUDDER-CLI-RETL-SOURCES-VALIDATE" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
 
 .SH NAME
-rudder-cli-retl-sources-validate - Validate a RETL source (SQL model or table)
+rudder-cli-retl-sources-validate - Validate a RETL source's spec (SQL model or table)
 
 
 .SH SYNOPSIS
@@ -10,7 +10,13 @@ rudder-cli-retl-sources-validate - Validate a RETL source (SQL model or table)
 
 
 .SH DESCRIPTION
-Validate a RETL source (SQL model or warehouse table) by executing its query without returning data. s3 table sources have no query to validate.
+Validate a RETL source's spec.
+
+.PP
+This checks the project's specs and that the source is defined in it. It
+does not run the source's query: reading from the warehouse is what
+\fBrudder-cli retl-sources preview\fR is for, and it is opt-in because it
+executes a query against live data.
 
 
 .SH OPTIONS
