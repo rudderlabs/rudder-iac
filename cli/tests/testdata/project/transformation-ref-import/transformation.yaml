@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: tag_source_transformation
+spec:
+  id: tag-source
+  name: Tag Source
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) { return event; }

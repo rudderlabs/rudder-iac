@@ -2,56 +2,66 @@ package retlsource
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
+// validate reports the spec check and points at the command that does reach the
+// warehouse. The whole two-line output is compared, so the wording cannot drift
+// unnoticed — and an s3 source must not be pointed at preview, which exits 1 on
+// it.
 func TestReportValidation(t *testing.T) {
 	t.Parallel()
 
-	queryFailed := errors.New("preview request failed: relation does not exist")
-
-	cases := []struct {
-		name string
-		err  error
-		want string
-		// wantExit is the error the command exits with. A source with nothing to
-		// validate must exit 0, so that a CI step covering every source in a
-		// project does not fail once an s3 source joins it.
-		wantExit error
+	for _, tc := range []struct {
+		name             string
+		externalID       string
+		location         string
+		resourceType     string
+		sourceDefinition string
+		want             string
 	}{
 		{
-			name: "a query that ran is a pass",
-			err:  nil,
-			want: "✅ SQL query executed successfully\n",
+			name:             "a warehouse source is pointed at preview",
+			externalID:       "orders-model",
+			location:         ".",
+			resourceType:     "retl-source-sql-model",
+			sourceDefinition: "postgres",
+			want: "✅ retl-source-sql-model 'orders-model' is valid\n" +
+				"   To check that its query runs against the warehouse: rudder-cli retl-sources preview orders-model\n",
 		},
 		{
-			name:     "a source with no query to run is a pass, not a failure",
-			err:      fmt.Errorf("%w for s3 table sources", table.ErrPreviewUnsupported),
-			want:     "✅ Nothing to validate: preview is not supported for s3 table sources\n",
-			wantExit: nil,
+			name:             "a warehouse source outside the working directory keeps its location in the hint",
+			externalID:       "orders-model",
+			location:         "./project",
+			resourceType:     "retl-source-sql-model",
+			sourceDefinition: "postgres",
+			want: "✅ retl-source-sql-model 'orders-model' is valid\n" +
+				"   To check that its query runs against the warehouse: rudder-cli retl-sources preview orders-model --location ./project\n",
 		},
 		{
-			name:     "a query that failed is a failure",
-			err:      queryFailed,
-			want:     "❌ SQL query failed to execute: preview request failed: relation does not exist\n",
-			wantExit: queryFailed,
+			name:             "an s3 source is told there is nothing to preview",
+			externalID:       "archive-bucket",
+			location:         "./project",
+			resourceType:     "retl-source-table",
+			sourceDefinition: "s3",
+			want: "✅ retl-source-table 'archive-bucket' is valid\n" +
+				"   It has no query to run, so there is nothing to preview.\n",
 		},
-	}
-	for _, tc := range cases {
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			var out bytes.Buffer
 
-			exit := reportValidation(&out, tc.err)
+			var out bytes.Buffer
+			reportValidation(&out, tc.externalID, tc.location, tc.resourceType, resources.ResourceData{
+				sqlmodel.SourceDefinitionKey: tc.sourceDefinition,
+			})
 
 			assert.Equal(t, tc.want, out.String())
-			assert.Equal(t, tc.wantExit, exit)
 		})
 	}
 }
