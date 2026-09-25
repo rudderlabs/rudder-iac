@@ -50,5 +50,5 @@ memory-bank
 # Rudder typer platform specific
 .gradle
 .idea
-cli/internal/typer/generator/platforms/kotlin/testdata/validator/build
-cli/internal/typer/generator/platforms/kotlin/testdata/validator/gradle
+typer/generator/platforms/kotlin/testdata/validator/build
+typer/generator/platforms/kotlin/testdata/validator/gradle

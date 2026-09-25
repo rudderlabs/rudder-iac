@@ -33,13 +33,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json narrows syncBehaviours to upsert and mirror and declares no
+	// visual mapper.
+	assert.Equal(t, []string{"upsert", "mirror"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -52,6 +56,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -404,6 +409,7 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
@@ -499,9 +505,10 @@ func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinit
 
 func minimalConfig() map[string]any {
 	return map[string]any{
-		"site_id":    "site-id-1",
-		"api_key":    "api-key-1",
-		"datacenter": "US",
+		"site_id":                 "site-id-1",
+		"api_key":                 "api-key-1",
+		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 	}
 }
 
@@ -511,6 +518,7 @@ func fullConfig() map[string]any {
 		"api_key":                              "api-key-1",
 		"device_token_event_name":              "Device Token Registered",
 		"datacenter":                           "EU",
+		"user_id_identifier_type":              "email",
 		"send_page_name_in_sdk":                map[string]any{"web": true},
 		"data_use_in_app":                      map[string]any{"web": false},
 		"auto_track_device_attributes":         map[string]any{"android": true, "ios": true},
@@ -542,6 +550,7 @@ func exampleConfig() map[string]any {
 		"site_id":                 "cio-site-id",
 		"api_key":                 "cio-api-key",
 		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 		"device_token_event_name": "Device Token Registered",
 		"send_page_name_in_sdk":   map[string]any{"web": true},
 		"data_use_in_app":         map[string]any{"web": false},
@@ -627,9 +636,12 @@ func TestCustomerioAPIVersionKeys(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(base(map[string]any{"api_version": "v1"})))
 	})
 
-	t.Run("both keys are optional when api_version is unset", func(t *testing.T) {
+	t.Run("omitted api_version defaults to v2", func(t *testing.T) {
 		t.Parallel()
-		assert.Empty(t, registered.ValidateConfig(base(nil)))
+		errors := registered.ValidateConfig(base(nil))
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/user_id_identifier_type", errors[0].Path)
 	})
 
 	t.Run("invalid enum values rejected", func(t *testing.T) {

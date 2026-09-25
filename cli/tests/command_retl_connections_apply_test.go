@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
@@ -18,19 +20,26 @@ import (
 const (
 	retlModelConnectionExternalID = "orders-to-http"
 	retlTableConnectionExternalID = "customers-to-http"
-	retlDestinationExternalID     = "e2e-retl-http"
+	// One destination per connection: a JSON-mapper destination (anything outside
+	// DESTINATION_SPECIFIC_REGISTRY) accepts a single rETL connection, and
+	// config-backend refuses a second with "Destination does not support multiple
+	// connections". Sharing one only passed when concurrent creates raced past
+	// that check.
+	retlModelDestinationExternalID = "e2e-retl-http"
+	retlTableDestinationExternalID = "e2e-retl-http-customers"
 )
 
 type retlConnectionWant struct {
 	externalID       string
 	sourceType       retlClient.SourceType
 	sourceExternalID string
+	destExternalID   string
 	everyMinutes     int
 	emailTarget      string
 }
 
 // TestRETLConnectionsApply drives a retl-connections entry end to end: the
-// project carries the account, both source kinds and the destination the
+// project carries the account, both source kinds and the destinations the
 // connections join, so one apply has to order them all and substitute
 // server-assigned ids into each connection.
 //
@@ -40,10 +49,11 @@ type retlConnectionWant struct {
 // connection read path skips any row whose destination is not one of them,
 // which would leave this suite creating a connection it could never read back.
 //
-// Ungated for the reason given on TestRETLSourcesApply. Against production it
-// fails until the config-backend release carrying DEX-892 (externalId on
-// connection create) ships; the PR that adds it is held until then.
+// Gated behind RUN_RETL_E2E; test-with-coverage.yml records why.
 func TestRETLConnectionsApply(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
@@ -60,8 +70,8 @@ func TestRETLConnectionsApply(t *testing.T) {
 		assert.NoError(t, err, "cleanup destroy failed: %s", out)
 	})
 
-	model := retlConnectionWant{retlModelConnectionExternalID, retlClient.ModelSourceType, retlModelExternalID, 30, "traits.email"}
-	table := retlConnectionWant{retlTableConnectionExternalID, retlClient.TableSourceType, retlTableExternalID, 45, "traits.email"}
+	model := retlConnectionWant{retlModelConnectionExternalID, retlClient.ModelSourceType, retlModelExternalID, retlModelDestinationExternalID, 30, "traits.email"}
+	table := retlConnectionWant{retlTableConnectionExternalID, retlClient.TableSourceType, retlTableExternalID, retlTableDestinationExternalID, 45, "traits.email"}
 
 	t.Run("apply create", func(t *testing.T) {
 		applyRETLProject(t, executor, filepath.Join(projectDir, "create"), credentials)
@@ -107,7 +117,7 @@ func assertRETLConnection(t *testing.T, want retlConnectionWant) string {
 
 	assert.True(t, actual.Enabled, "connection should be enabled")
 	assert.Equal(t, managedRETLSource(t, want.sourceType, want.sourceExternalID).ID, actual.SourceID, "connection is not on the managed source")
-	assert.Equal(t, managedDestinationID(t, retlDestinationExternalID), actual.DestinationID, "connection is not on the managed destination")
+	assert.Equal(t, managedDestinationID(t, want.destExternalID), actual.DestinationID, "connection is not on the managed destination")
 	assert.Equal(t, retlClient.SyncBehaviourUpsert, actual.SyncBehaviour)
 	assert.Equal(t, &retlClient.Event{Type: retlClient.EventTypeIdentify}, actual.Event)
 	require.NotNil(t, actual.Schedule.EveryMinutes, "basic schedule came back without everyMinutes")
@@ -122,13 +132,21 @@ func assertRETLConnection(t *testing.T, want retlConnectionWant) string {
 func managedRETLConnections(t *testing.T) []retlClient.RETLConnection {
 	t.Helper()
 
-	store := retlClient.NewRudderRETLStore(newAccountsAPIClient(t))
+	return listRETLConnections(t, retlClient.NewRudderRETLStore(newAccountsAPIClient(t)),
+		&retlClient.ListRETLConnectionsRequest{HasExternalID: lo.ToPtr(true)})
+}
+
+// listRETLConnections walks every page of a connection listing. The caller owns
+// the filters; paging is set here so no caller can forget it.
+func listRETLConnections(t testing.TB, store retlClient.RETLStore, filters *retlClient.ListRETLConnectionsRequest) []retlClient.RETLConnection {
+	t.Helper()
+
 	var all []retlClient.RETLConnection
 	for page := 1; ; page++ {
-		result, err := store.ListConnections(context.Background(), &retlClient.ListRETLConnectionsRequest{
-			HasExternalID: lo.ToPtr(true), Page: page, PageSize: 100,
-		})
-		require.NoError(t, err, "listing managed RETL connections")
+		request := *filters
+		request.Page, request.PageSize = page, 100
+		result, err := store.ListConnections(context.Background(), &request)
+		require.NoError(t, err, "listing RETL connections")
 		all = append(all, result.Data...)
 		if result.Paging.Next == "" {
 			return all
@@ -152,4 +170,50 @@ func managedDestinationID(t *testing.T, externalID string) string {
 	}
 	require.Len(t, ids, 1, "destinations claiming %q", externalID)
 	return ids[0]
+}
+
+// The four readers below answer one question — "what does the workspace still
+// hold that this project managed?" — and every destroy or prune assertion is
+// phrased against them. They live here, beside managedRETLConnections, because
+// more than one suite needs them.
+
+// managedRETLConnectionExternalIDs lists the externalIds of every managed
+// connection in the workspace.
+func managedRETLConnectionExternalIDs(t *testing.T) []string {
+	t.Helper()
+
+	return lo.Map(managedRETLConnections(t), func(c retlClient.RETLConnection, _ int) string { return c.ExternalID })
+}
+
+// managedRETLSourceExternalIDs lists the externalIds of every managed rETL
+// source in the workspace, of every source type.
+func managedRETLSourceExternalIDs(t *testing.T) []string {
+	t.Helper()
+
+	sources, err := retlClient.NewRudderRETLStore(newAccountsAPIClient(t)).ListRetlSources(
+		context.Background(), retlClient.WithHasExternalId(lo.ToPtr(true)))
+	require.NoError(t, err, "listing managed RETL sources")
+	return lo.Map(sources.Data, func(s retlClient.RETLSource, _ int) string { return s.ExternalID })
+}
+
+// managedAccountExternalIDs lists the externalIds of every managed account in
+// the workspace.
+func managedAccountExternalIDs(t *testing.T) []string {
+	t.Helper()
+
+	accounts, err := newAccountsAPIClient(t).Accounts.ListAll(context.Background(), client.WithHasExternalID(true))
+	require.NoError(t, err, "listing managed accounts")
+	return lo.Map(accounts, func(a client.Account, _ int) string { return a.ExternalID })
+}
+
+// retlVisibleDestinationExternalIDs lists the externalIds of every destination
+// the rETL store can see. GetDestinations has no managed filter, so unmanaged
+// destinations come back with an empty externalId — enough for the NotContains
+// checks, not a list of managed destinations.
+func retlVisibleDestinationExternalIDs(t *testing.T) []string {
+	t.Helper()
+
+	destinations, err := retlClient.NewRudderRETLStore(newAccountsAPIClient(t)).GetDestinations(context.Background())
+	require.NoError(t, err, "listing destinations")
+	return lo.Map(destinations, func(d client.Destination, _ int) string { return d.ExternalID })
 }

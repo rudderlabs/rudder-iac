@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -60,9 +61,10 @@ func newCmdValidate() *cobra.Command {
 			retlProvider := d.Providers().RETL
 
 			// Validate by attempting to preview with limit=0
+			ui.StartSpinner("Validating SQL query ...")
 			_, err = retlProvider.Preview(cmd.Context(), externalID, resource.Type(), resourceData, 0)
-			err = reportValidation(cmd.OutOrStdout(), err)
-			return err
+			ui.StopSpinner()
+			return reportValidation(cmd.OutOrStdout(), err)
 		},
 	}
 

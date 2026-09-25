@@ -1,0 +1,793 @@
+rule_id: "retl/connection/semantic-valid"
+match_behavior:
+  # Cross-resource checks over the project graph: both endpoint refs must
+  # resolve to project resources (V-C1), a source-destination pair can only be
+  # connected once (V-C3), a destination cannot receive from both event stream
+  # and rETL sources (V-E1) nor from two different rETL sources (V-R1), the
+  # destination must accept warehouse sources (V-C4) and carry the config that
+  # source type needs to connect (V-C5) plus an entry for it in a settings block
+  # (V-C8), the mappings and sync behaviour must match the flow the destination
+  # runs (V-R2, V-R4, V-R5, V-R9b, V-R10), and the source's warehouse must
+  # support the connection whatever state the destination is in (V-R11, V-R13,
+  # V-R14). Every source_definition a SQL model accepts is a SQL warehouse
+  # whose metadata this CLI knows, so the
+  # unknown-metadata, SQL-model and sync-settings capability checks cannot be
+  # reached from a valid SQL model and have no example either. V-R11 is
+  # unreachable for the same reason — primary_key is a required field on every
+  # source definition a SQL model accepts, and the exempt file-based definitions
+  # (s3, sftp) are not among them — and stays unreachable once connections reach
+  # table sources, which require primary_key unless the definition is file-based
+  # and forbid it when it is, so the only sources that can omit it are the
+  # exempt ones. So is V-R10,
+  # because no destination that supports object mapping carries a hyphen in its
+  # type or API type. Known limitation: these checks see only
+  # project-managed connections; a connection that exists remotely but is not in
+  # the project is invisible at validate time.
+  - applies_to:
+      - kind: "retl-connections"
+        version: "rudder/v1"
+    valid:
+      - example_id: "retl-connection-semantic-valid-full-project"
+        title: "JSON mapper connection from a SQL model to an HTTP destination"
+        description: "The HTTP destination has no visual mapper and the connection names no object, so it runs the JSON mapper flow: identifiers target user_id or anonymous_id and mappings are required."
+        files:
+          model.yaml: &users-model |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: users-model
+            spec:
+              id: users-model
+              display_name: Users
+              account_id: acc-123
+              primary_key: user_id
+              source_definition: postgres
+              sql: SELECT user_id, anonymous_id, email FROM users
+          destination.yaml: &http-destination |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: &http-connection |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: basic
+                      every_minutes: 30
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+      - example_id: "retl-connection-semantic-valid-object-mapper"
+        title: "Object mapping connection to Bing Ads Offline Conversions"
+        description: "Bing supports the visual mapper, so naming an object runs the object mapping flow: one identifier, no constants or event, and the only sync behaviour Bing accepts, mirror."
+        files:
+          model.yaml: &conversions-model |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: conversions-model
+            spec:
+              id: conversions-model
+              display_name: Offline Conversions
+              account_id: acc-123
+              primary_key: conversion_id
+              source_definition: postgres
+              sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
+          destination.yaml: &bing-destination |
+            # bingads_offline_conversions is unverified: validate this project
+            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
+            # unknown.
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-bing-destination
+            spec:
+              id: my-bing-destination
+              display_name: Bing Offline Conversions
+              type: bingads_offline_conversions
+              enabled: true
+              definition_version: 1
+              config:
+                rudder_account_id: my-bing-account
+                customer_account_id: "1234567"
+                customer_id: "7654321"
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: conversions
+                    sync_behaviour: mirror
+                    schedule:
+                      type: basic
+                      every_minutes: 60
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+                      - from: conversion_time
+                        to: conversionTime
+    invalid:
+      - example_id: "retl-connection-semantic-source-not-found"
+        title: "Connection whose rETL source does not exist in the project"
+        files:
+          destination.yaml: *http-destination
+          connections.yaml: *http-connection
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/source"
+            severity: "error"
+            message_contains: "rETL source 'users-model' not found in the project"
+      - example_id: "retl-connection-semantic-destination-not-found"
+        title: "Connection whose destination does not exist in the project"
+        files:
+          model.yaml: *users-model
+          connections.yaml: *http-connection
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' not found in the project"
+      - example_id: "retl-connection-semantic-duplicate-pair-across-files"
+        title: "The same source-destination pair connected from two spec files"
+        description: "The pair count spans every connection spec in the project, so each copy is reported in its own file."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: *http-connection
+          more-connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: more-retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook-again
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0"
+            severity: "error"
+            message_contains: "source 'users-model' and destination 'my-http-destination' are connected more than once in the project"
+          - file: "more-connections.yaml"
+            reference: "/spec/connections/0"
+            severity: "error"
+            message_contains: "source 'users-model' and destination 'my-http-destination' are connected more than once in the project"
+      - example_id: "retl-connection-semantic-two-retl-sources"
+        title: "Two rETL sources connected to one destination"
+        description: "A destination receives from a single rETL source, so both connections are reported."
+        files:
+          model.yaml: *users-model
+          accounts-model.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: accounts-model
+            spec:
+              id: accounts-model
+              display_name: Accounts
+              account_id: acc-123
+              primary_key: account_id
+              source_definition: postgres
+              sql: SELECT account_id, owner_id, plan FROM accounts
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+                - id: accounts-to-webhook
+                  source: "#retl-source-sql-model:accounts-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: owner_id
+                        to: user_id
+                    mappings:
+                      - from: plan
+                        to: traits.plan
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' is also connected to rETL source 'accounts-model' in this project; a destination can only receive from one rETL source"
+          - file: "connections.yaml"
+            reference: "/spec/connections/1/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination can only receive from one rETL source"
+      - example_id: "retl-connection-semantic-shared-with-event-stream"
+        title: "Destination fed by both an event stream source and a rETL source"
+        description: "Both connection families scan every project connection, so the clash is reported from the rETL connection and from the event stream connection alike."
+        files:
+          model.yaml: *users-model
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+                connection_mode:
+                  web: cloud
+                  warehouse: cloud
+          event-stream-connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-webhook
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-http-destination"
+          connections.yaml: *http-connection
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' is also connected to event stream source 'my-js-source' in this project; a destination cannot receive from both event stream and rETL sources"
+          - file: "event-stream-connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination cannot receive from both event stream and rETL sources"
+      - example_id: "retl-connection-semantic-destination-rejects-warehouse-sources"
+        title: "Destination whose definition does not accept warehouse sources"
+        description: "Google Ads supports only event stream sources upstream, and rETL sources connect as warehouse sources."
+        files:
+          model.yaml: *users-model
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-googleads-destination
+            spec:
+              id: my-googleads-destination
+              display_name: Google Ads
+              type: googleads
+              enabled: true
+              definition_version: 1
+              config:
+                conversion_id: AW-123456789
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-googleads
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-googleads-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-googleads-destination' (type 'googleads') does not accept rETL sources: source type 'warehouse' is not among supported source types"
+      - example_id: "retl-connection-semantic-missing-warehouse-settings"
+        title: "Destination with no connection_mode entry for warehouse sources"
+        files:
+          model.yaml: *users-model
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-http-destination
+            spec:
+              id: my-http-destination
+              display_name: Events Webhook
+              type: http
+              enabled: true
+              definition_version: 1
+              config:
+                api_url: "https://example.com/events"
+                auth: noAuth
+                method: POST
+                format: JSON
+          connections.yaml: *http-connection
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-http-destination' config has no 'connection_mode' entry for source type 'warehouse'"
+      - example_id: "retl-connection-semantic-missing-warehouse-required-config"
+        title: "Destination config missing a key a warehouse source needs to connect"
+        description: "Facebook Pixel needs an access token for every cloud-mode source, warehouse included. The destination config passes on its own, since schema.json demands the token there only when connection_mode names a web source outside device mode, so the gap surfaces when the warehouse source connects."
+        files:
+          model.yaml: *users-model
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-pixel-destination
+            spec:
+              id: my-pixel-destination
+              display_name: Facebook Pixel
+              type: facebook_pixel
+              enabled: true
+              definition_version: 1
+              config:
+                pixel_id: "123456789012345"
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-pixel
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-pixel-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-pixel-destination' config is missing fields required to connect a 'warehouse' source: access_token"
+      - example_id: "retl-connection-semantic-destination-specific-flow"
+        title: "Destination that drives rETL through its own flow"
+        description: "Customer.io Audience connections run a destination-specific flow this CLI does not support, whatever the connection config says."
+        files:
+          model.yaml: *users-model
+          destination.yaml: |
+            # customerio_audience is one of the two destinations running their own
+            # rETL flow, and it is unverified: validate this project with
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-customerio-audience
+            spec:
+              id: my-customerio-audience
+              display_name: Customer.io Audience
+              type: customerio_audience
+              enabled: true
+              definition_version: 1
+              config:
+                site_id: example-site-id
+                api_key: example-api-key
+                app_api_key: example-app-api-key
+                region: US
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-audience
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-customerio-audience"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination api type \"CUSTOMERIO_AUDIENCE\" uses a destination-specific rETL flow, which is not supported"
+      - example_id: "retl-connection-semantic-object-without-visual-mapper"
+        title: "Object on a destination that only runs the JSON mapper"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    object: users
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/object"
+            severity: "error"
+            message_contains: "'object' is not allowed: destination api type \"HTTP\" does not support object mapping"
+      - example_id: "retl-connection-semantic-json-identifier-target"
+        title: "JSON mapping identifier aimed at a field other than a user identity"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: email
+                        to: traits.email
+                    mappings:
+                      - from: user_id
+                        to: traits.user_id
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/identifiers/0/to"
+            severity: "error"
+            message_contains: "'to' is not valid: a JSON mapping identifier must target 'user_id' or 'anonymous_id'"
+      - example_id: "retl-connection-semantic-reserved-mapping-target"
+        title: "JSON mapping aimed at user_id, which the backend reserves for identifiers"
+        description: "The backend folds a mapping to user_id into the identifiers, so it never comes back where it was written and the connection would diff on every apply."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: anonymous_id
+                        to: anonymous_id
+                    mappings:
+                      - from: user_id
+                        to: user_id
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/mappings/0/to"
+            severity: "error"
+            message_contains: "'to' is not valid: mapping to 'user_id' is reserved for identifiers"
+      - example_id: "retl-connection-semantic-reserved-mapping-target-anonymous-id"
+        title: "JSON mapping aimed at anonymous_id, which the backend reserves for identifiers"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: anonymous_id
+                        to: anonymous_id
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/mappings/0/to"
+            severity: "error"
+            message_contains: "'to' is not valid: mapping to 'anonymous_id' is reserved for identifiers"
+      - example_id: "retl-connection-semantic-reserved-mapping-target-external-id"
+        title: "Object mapping aimed at the external id, which the backend reserves for the identifier"
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: conversions
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_id
+                        to: context.externalId[0].id
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/mappings/0/to"
+            severity: "error"
+            message_contains: "'to' is not valid: mapping to 'context.externalId[0].id' is reserved for identifiers"
+      - example_id: "retl-connection-semantic-json-mapper-mirror"
+        title: "Mirror sync on the JSON mapper flow"
+        description: "Postgres and the HTTP destination both accept mirror, but mirror is offered for object mapping only."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on the json_mapper flow"
+      - example_id: "retl-connection-semantic-bing-upsert"
+        title: "Upsert sync to Bing, which accepts mirror only"
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: conversions
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-bing-destination' on the object_mapping flow"
+      - example_id: "retl-connection-semantic-bing-json-mapper"
+        title: "Bing connection without an object"
+        description: "Without an object the connection runs the JSON mapper flow, which drops mirror, the only behaviour Bing accepts; no sync behaviour is left."
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: user_id
+                    mappings:
+                      - from: conversion_name
+                        to: properties.conversion_name
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the json_mapper flow; the connection cannot sync"
+      - example_id: "retl-connection-semantic-object-mapping-constants"
+        title: "Constants on an object mapping connection"
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: conversions
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+                    constants:
+                      - key: conversionCurrencyCode
+                        value: USD
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/constants"
+            severity: "error"
+            message_contains: "'constants' is not allowed with object mapping"
+      - example_id: "retl-connection-semantic-object-mapping-event"
+        title: "Event on an object mapping connection"
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    object: conversions
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: microsoftClickId
+                    mappings:
+                      - from: conversion_name
+                        to: conversionName
+                    event:
+                      type: track
+                      name: Offline Conversion
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/event"
+            severity: "error"
+            message_contains: "'event' is not allowed with object mapping"

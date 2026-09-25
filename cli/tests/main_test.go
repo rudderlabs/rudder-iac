@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
 var (
@@ -14,6 +16,12 @@ var (
 // runs the package tests. It honours the cli/logging and cli/testing rules by
 // printing only essential information and performing cleanup after execution.
 func TestMain(m *testing.M) {
+	// A cancelled run can leave its connection seed behind, and the suites that
+	// run before TestRETLConnectionImportClaim cannot destroy past it.
+	if os.Getenv("RUN_RETL_E2E") == "1" {
+		sweepSeededConnections()
+	}
+
 	exec, err := NewCmdExecutor("")
 	if err != nil {
 		fmt.Println("failed to init executor:", err)
@@ -41,6 +49,32 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(exitCode)
+}
+
+// sweepSeededConnections runs removeSeededConnections outside any test, which
+// TestMain has no *testing.T for. Any failure exits before a suite runs.
+func sweepSeededConnections() {
+	t := &mainTB{}
+	removeSeededConnections(t, retlClient.NewRudderRETLStore(newAccountsAPIClient(t)))
+	if t.failed {
+		os.Exit(1)
+	}
+}
+
+// mainTB implements only the testing.TB methods the sweep's helpers and
+// testify reach; the embedded nil TB panics on any other, loudly.
+type mainTB struct {
+	testing.TB
+	failed bool
+}
+
+func (*mainTB) Helper()      {}
+func (*mainTB) Name() string { return "TestMain" }
+func (*mainTB) FailNow()     { os.Exit(1) }
+
+func (tb *mainTB) Errorf(format string, args ...any) {
+	tb.failed = true
+	fmt.Printf(format+"\n", args...)
 }
 
 // allowManagedResidue lets remote state loading see every managed kind a

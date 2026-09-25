@@ -12,8 +12,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -30,7 +30,7 @@ const importDir = "retl"
 // testRegistry holds the destination definitions the remote fixtures name:
 // http accepts warehouse sources through the JSON mapper, bingads also supports
 // the visual mapper (object mapping), customerio_audience drives its own
-// destination-specific rETL flow, and s3 takes no warehouse source at all.
+// destination-specific rETL flow, and googleads takes no warehouse source at all.
 func testRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
@@ -38,7 +38,7 @@ func testRegistry(t *testing.T) *definitions.Registry {
 	require.NoError(t, registry.Register(httpdest.NewDefinition()))
 	require.NoError(t, registry.Register(bingads.NewDefinition()))
 	require.NoError(t, registry.Register(customerioaudience.NewDefinition()))
-	require.NoError(t, registry.Register(s3.NewDefinition()))
+	require.NoError(t, registry.Register(googleads.NewDefinition()))
 	return registry
 }
 
@@ -59,7 +59,7 @@ func remoteDestinations() []apiClient.Destination {
 		{ID: "dst-2", Name: "Webhook Two", Type: "HTTP", Version: 1, ExternalID: "webhook-two"},
 		{ID: "dst-object", Name: "Bing Ads", Type: "BINGADS_OFFLINE_CONVERSIONS", Version: 1},
 		{ID: "dst-specific", Name: "Customer IO", Type: "CUSTOMERIO_AUDIENCE", Version: 1},
-		{ID: "dst-eventstream", Name: "S3 Bucket", Type: "S3", Version: 1},
+		{ID: "dst-eventstream", Name: "Google Ads", Type: "GOOGLEADS", Version: 1},
 		{ID: "dst-old", Name: "Legacy Webhook", Type: "HTTP", Version: 9},
 	}
 }
