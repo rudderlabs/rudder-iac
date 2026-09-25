@@ -83,9 +83,24 @@ match_behavior:
               primary_key: id
               source_definition: snowflake
               sql: SELECT id, name FROM orders
+      - example_id: "sqlmodel-v1-valid-account-reference"
+        title: "Valid v1 SQL model spec referencing an account in the project instead of an account_id"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: user-orders-model
+            spec:
+              id: user-orders-model
+              display_name: User Orders
+              account: "#account:prod-snowflake"
+              primary_key: id
+              source_definition: snowflake
+              sql: SELECT id, name FROM orders
     invalid:
       - example_id: "sqlmodel-v1-missing-account-id"
-        title: "v1 SQL model missing required account_id"
+        title: "v1 SQL model with neither account_id nor an account reference"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -102,7 +117,47 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/account_id"
             severity: "error"
-            message_contains: "'account_id' is required"
+            message_contains: "'account_id' is required when 'account' is not specified"
+      - example_id: "sqlmodel-v1-both-account-id-and-account"
+        title: "v1 SQL model specifying both account_id and account (mutually exclusive)"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: user-orders-model
+            spec:
+              id: user-orders-model
+              display_name: User Orders
+              account_id: acc-123
+              account: "#account:prod-snowflake"
+              primary_key: id
+              source_definition: snowflake
+              sql: SELECT id, name FROM orders
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/account_id"
+            severity: "error"
+            message_contains: "'account_id' and 'account' cannot be specified together"
+      - example_id: "sqlmodel-v1-missing-primary-key"
+        title: "v1 SQL model missing the required primary_key field"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: user-orders-model
+            spec:
+              id: user-orders-model
+              display_name: User Orders
+              account_id: acc-123
+              source_definition: snowflake
+              sql: SELECT id, name FROM orders
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/primary_key"
+            severity: "error"
+            message_contains: "'primary_key' is required"
       - example_id: "sqlmodel-v1-both-sql-and-file"
         title: "v1 SQL model specifies both sql and file"
         files:

@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: publish-rules-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag || inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   resolve-release:
     name: "resolve release tag"
@@ -135,6 +139,13 @@ jobs:
           ]
           missing = required_ids - ids
           fail_with("missing required rules: #{missing.join(", ")}") unless missing.empty?
+
+          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") do |summary|
+            summary.puts "## Validation rule catalog"
+            summary.puts
+            summary.puts "- CLI version: `#{version}`"
+            summary.puts "- Rule count: #{rules.length}"
+          end
           RUBY
 
       - name: Upload generated rule catalog
@@ -149,6 +160,8 @@ jobs:
     name: "publish validation rule catalog to rudder-hugo"
     needs: [resolve-release, generate-rules]
     runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
     permissions:
       actions: read
       contents: write
@@ -165,46 +178,6 @@ jobs:
           set -euo pipefail
           mkdir -p docs/generated
           gh run download "$GITHUB_RUN_ID" --name rules-yaml --dir docs/generated
-
-      - name: Verify catalog artifact
-        env:
-          VERSION: ${{ needs.resolve-release.outputs.version }}
-        run: |
-          set -euo pipefail
-          test -s docs/generated/rules.yaml
-          ruby -ryaml -rdate <<'RUBY'
-          def fail_with(message)
-            warn "::error::#{message}"
-            exit 1
-          end
-
-          doc = YAML.safe_load_file(
-            "docs/generated/rules.yaml",
-            permitted_classes: [Date, Time],
-            aliases: false,
-          )
-          version = doc.dig("tool_metadata", "cli_version")
-          expected_version = ENV.fetch("VERSION")
-          fail_with("expected cli_version #{expected_version}, got #{version.inspect}") unless version == expected_version
-
-          rules = doc.fetch("rules")
-          fail_with("expected at least 38 rules, got #{rules.length}") unless rules.length >= 38
-
-          ids = rules.map { |rule| rule.fetch("rule_id") }
-          required_ids = %w[
-            destination/semantic-valid
-            destination/spec-syntax-valid
-            event-stream/connection/enabled-endpoints-valid
-            event-stream/connection/semantic-valid
-            event-stream/connection/spec-syntax-valid
-            import-manifest/duplicate-urn
-            import-manifest/orphaned-urn
-            import-manifest/spec-syntax-valid
-            project/manifest-inline-conflict
-          ]
-          missing = required_ids - ids
-          fail_with("missing required rules: #{missing.join(", ")}") unless missing.empty?
-          RUBY
 
       - name: Attach rule catalog to release
         env:
@@ -243,7 +216,7 @@ jobs:
           set -euo pipefail
 
           BRANCH="auto/rudder-cli-rules-${VERSION}"
-          BASE_BRANCH="$(git remote show origin | sed -n '/HEAD branch/s/.*: //p')"
+          BASE_BRANCH="$(gh api repos/rudderlabs/rudder-hugo --jq .default_branch)"
           TITLE="chore: update rudder-cli validation rules (${VERSION})"
           BODY="$(cat <<EOF
           Auto-generated from rudder-iac release ${TAG}.
