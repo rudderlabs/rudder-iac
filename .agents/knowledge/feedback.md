@@ -59,3 +59,8 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## DEX-1001 — README Link And Docker Example
+<!-- ticket:DEX-1001 -->
+- Link the CLI validation reference to `https://www.rudderstack.com/docs/dev-tools/rudder-cli/validations/`; the `/validation-rules/` route does not exist.
+- Keep at least one runnable Docker project-command example in the README that mounts the host `~/.rudder` directory and current project and supports `RUDDERSTACK_ACCESS_TOKEN`; the public installation page can lag current CLI usage and is not a sufficient substitute.
