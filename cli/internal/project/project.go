@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
@@ -180,6 +181,9 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 func (p *project) Load(location string) error {
 	p.location = location
 
+	ui.StartSpinner("Loading project ...")
+	defer ui.StopSpinner()
+
 	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
@@ -188,8 +192,8 @@ func (p *project) Load(location string) error {
 	if p.substitutor != nil {
 		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
-			if err := p.renderer.Render(subDiags); err != nil {
-				return fmt.Errorf("rendering diagnostics: %w", err)
+			if err := p.render(subDiags); err != nil {
+				return err
 			}
 			// An undefined variable almost always means a var file was not
 			// passed, not a broken spec, so point at the fix.
@@ -311,8 +315,10 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 }
 
 // render is the single exit for diagnostics, so both validation phases report
-// in the same file order whichever one reached the renderer.
+// in the same file order whichever one reached the renderer. It also clears the
+// Load spinner, which would otherwise interleave with the printed diagnostics.
 func (p *project) render(diagnostics validation.Diagnostics) error {
+	ui.StopSpinner()
 	diagnostics.Sort()
 	if err := p.renderer.Render(diagnostics); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
