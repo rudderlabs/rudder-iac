@@ -1,9 +1,9 @@
 package cmddocs_test
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -21,6 +21,9 @@ func TestGenerateWritesOneArtifactPerDocumentedCommand(t *testing.T) {
 
 	var paths []string
 	walk(root, func(command *cobra.Command) {
+		if command != root && (!command.IsAvailableCommand() || command.IsAdditionalHelpTopicCommand()) {
+			return
+		}
 		paths = append(paths, command.CommandPath())
 	})
 
@@ -44,8 +47,12 @@ func TestGenerateWritesOneArtifactPerDocumentedCommand(t *testing.T) {
 	assert.Contains(t, paths, "rudder-cli completion bash")
 	assert.Contains(t, paths, "rudder-cli debug")
 	assert.Contains(t, paths, "rudder-cli experimental")
-	assert.Contains(t, paths, "rudder-cli help")
+	assert.NotContains(t, paths, "rudder-cli help")
 	_, err := os.Stat(filepath.Join(outputDir, "commands", "rudder-cli_tp.md"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(outputDir, "commands", "rudder-cli_help.md"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(manDir, "rudder-cli-help.1"))
 	assert.ErrorIs(t, err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(manDir, "rudder-cli-migrate.1"))
 	assert.ErrorIs(t, err, os.ErrNotExist)
@@ -70,7 +77,7 @@ func TestGeneratePreservesUnrelatedFiles(t *testing.T) {
 	}
 	require.NoError(t, os.WriteFile(staleCommandMarkdown, []byte("---\ncommand: \"rudder-cli stale\"\n---\n"), 0o644))
 	require.NoError(t, os.WriteFile(staleCommandYAML, []byte("name: rudder-cli stale\n"), 0o644))
-	require.NoError(t, os.WriteFile(staleManPage, []byte(".TH \"RUDDER-CLI-STALE\" \"1\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(staleManPage, []byte(".nh\n.TH \"RUDDER-CLI-STALE\" \"1\"\n"), 0o644))
 
 	require.NoError(t, cmddocs.Generate(preparedDocsTree(), outputDir, manDir))
 
@@ -85,75 +92,48 @@ func TestGeneratePreservesUnrelatedFiles(t *testing.T) {
 	}
 }
 
-func TestGeneratedCommandDocsAreCurrent(t *testing.T) {
-	outputDir := filepath.Join(t.TempDir(), "generated")
-	manDir := filepath.Join(t.TempDir(), "man")
-	root := preparedDocsTree()
-	expected := documentedFilenames(root)
+func TestGenerateIsDeterministic(t *testing.T) {
+	t.Setenv("SOURCE_DATE_EPOCH", "946684800")
+	firstDir := t.TempDir()
+	secondDir := t.TempDir()
 
-	require.NoError(t, cmddocs.Generate(root, outputDir, manDir))
+	require.NoError(t, cmddocs.Generate(preparedDocsTree(), filepath.Join(firstDir, "docs"), filepath.Join(firstDir, "man")))
+	require.NoError(t, cmddocs.Generate(preparedDocsTree(), filepath.Join(secondDir, "docs"), filepath.Join(secondDir, "man")))
 
-	repoRoot := repositoryRoot(t)
-	assertGeneratedDirectoryCurrent(t, filepath.Join(outputDir, "commands"), filepath.Join(repoRoot, "docs", "generated", "commands"), expected.commands)
-	assertGeneratedDirectoryCurrent(t, manDir, filepath.Join(repoRoot, "man"), expected.man)
-}
-
-type generatedFilenames struct {
-	commands map[string]struct{}
-	man      map[string]struct{}
-}
-
-func documentedFilenames(root *cobra.Command) generatedFilenames {
-	files := generatedFilenames{
-		commands: make(map[string]struct{}),
-		man:      make(map[string]struct{}),
-	}
-	walk(root, func(command *cobra.Command) {
-		commandPath := command.CommandPath()
-		files.commands[strings.ReplaceAll(commandPath, " ", "_")+".md"] = struct{}{}
-		files.commands[strings.ReplaceAll(commandPath, " ", "_")+".yaml"] = struct{}{}
-		files.man[strings.ReplaceAll(commandPath, " ", "-")+".1"] = struct{}{}
-	})
-	return files
-}
-
-func assertGeneratedDirectoryCurrent(t *testing.T, generatedDir, committedDir string, expected map[string]struct{}) {
-	t.Helper()
-
-	entries, err := os.ReadDir(committedDir)
+	assert.Equal(t, generatedTree(t, firstDir), generatedTree(t, secondDir))
+	manPage, err := os.ReadFile(filepath.Join(firstDir, "man", "rudder-cli-apply.1"))
 	require.NoError(t, err)
-	for _, entry := range entries {
-		if entry.IsDir() || !isGeneratedArtifact(entry.Name()) {
-			continue
-		}
-		_, ok := expected[entry.Name()]
-		assert.True(t, ok, "unexpected checked-in command doc: %s", filepath.Join(committedDir, entry.Name()))
-	}
-
-	for filename := range expected {
-		generated, err := os.ReadFile(filepath.Join(generatedDir, filename))
-		require.NoError(t, err, filename)
-		committed, err := os.ReadFile(filepath.Join(committedDir, filename))
-		require.NoError(t, err, filename)
-		assert.Equal(t, string(generated), string(committed), filename)
-	}
+	assert.Contains(t, string(manPage), `"Jan 2000"`)
 }
 
-func isGeneratedArtifact(name string) bool {
-	return strings.HasPrefix(name, "rudder-cli") && (strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".1"))
+func generatedTree(t *testing.T, root string) map[string][]byte {
+	t.Helper()
+	files := make(map[string][]byte)
+	require.NoError(t, filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relativePath, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(relativePath)] = contents
+		return nil
+	}))
+	return files
 }
 
 func preparedDocsTree() *cobra.Command {
 	root := cmd.NewRootCommand(cmd.ModeDocs)
 	cmd.PrepareDocsTree(root)
 	return root
-}
-
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	return filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
 }
 
 func walk(command *cobra.Command, visit func(*cobra.Command)) {

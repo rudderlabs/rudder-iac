@@ -341,8 +341,8 @@
 
 ## DEX-1006 — Deterministic Command Documentation Tree
 
-- Runtime and generated command references share a fresh Cobra tree created by `cli/internal/cmd.NewRootCommand`; command help metadata is centralized in `cli/internal/cmd/docs_metadata.go` and applied to both trees, while constructor-authored `Long` and `Example` values remain unless a command path has an explicit override.
+- Runtime and generated command references share a fresh Cobra tree created by `cli/internal/cmd.NewRootCommand`; command constructors own their `Long` and `Example` values, while `cli/internal/cmd/root.go::configureDefaultCommands` adds documentation metadata to Cobra's default help and completion commands.
 - Documentation mode intentionally exposes the `debug` and `experimental` troubleshooting/configuration surfaces, then filters commands that remain hidden or deprecated, including `migrate` and the `tp` subtree. This keeps runtime feature gating separate from reference-document visibility.
 - The docs tree uses the stable displayed config default `~/.rudder/config.json` rather than resolving the generator user's home directory. Cobra includes inherited flag defaults in Markdown, YAML, and man output, so machine-resolved defaults would make generated artifacts nondeterministic.
-- The CLI owns visible `help` and `completion` commands explicitly so generation and completeness checks cover the same user-facing command surface. Cobra's default completion command is disabled and its internal help command is hidden as `__help`.
+- The CLI initializes Cobra's default visible `help` and `completion` commands, then supplies the examples needed for generation and completeness checks without reimplementing their behavior.
 - Completeness enforcement intentionally has no generic fallback: every future visible command must supply meaningful `Long` and `Example` help before the command tree passes its documentation contract test.

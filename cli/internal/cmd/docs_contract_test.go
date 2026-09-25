@@ -51,10 +51,8 @@ func TestNewRootCommandBuildsFreshTrees(t *testing.T) {
 	assert.NotSame(t, firstTelemetry, secondTelemetry)
 }
 
-func TestRuntimeCommandTreeOwnsHelpAndCompletionCommands(t *testing.T) {
+func TestRuntimeCommandTreeUsesDocumentedCobraDefaults(t *testing.T) {
 	root := NewRootCommand(ModeRuntime)
-	root.InitDefaultHelpCmd()
-	root.InitDefaultCompletionCmd()
 
 	completion, _, err := root.Find([]string{"completion"})
 	require.NoError(t, err)
@@ -65,8 +63,14 @@ func TestRuntimeCommandTreeOwnsHelpAndCompletionCommands(t *testing.T) {
 	help, _, err := root.Find([]string{"help"})
 	require.NoError(t, err)
 	assert.False(t, help.Hidden)
+	assert.True(t, help.Runnable())
+	assert.False(t, help.IsAdditionalHelpTopicCommand())
 	assert.NotEmpty(t, strings.TrimSpace(help.Long))
 	assert.NotEmpty(t, strings.TrimSpace(help.Example))
+
+	for _, command := range root.Commands() {
+		assert.NotEqual(t, "__help", command.Name())
+	}
 }
 
 func TestDocsEligible(t *testing.T) {

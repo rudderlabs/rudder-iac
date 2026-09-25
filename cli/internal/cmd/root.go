@@ -86,14 +86,15 @@ func NewRootCommand(mode Mode) *cobra.Command {
 	}
 
 	root := &cobra.Command{
-		Use:   "rudder-cli",
-		Short: "Manage RudderStack resources as code",
+		Use:     "rudder-cli",
+		Short:   "Manage RudderStack resources as code",
+		Version: "dev",
 		Long: `Manage RudderStack resources with declarative YAML project files.
 
 Use apply, validate, destroy, and import to manage project state; inspect remote
-resources with workspace listings; configure authentication and telemetry; and
-use debug or experimental tools when needed. Run help for command guidance or
-consult the generated command documentation for the complete reference.`,
+resources with workspace listings; and configure authentication and telemetry.
+Run help for command guidance or consult the generated command documentation for
+the complete reference.`,
 		Example: `  # Safely validate local declarative YAML before applying changes
   rudder-cli validate --location ./project
 
@@ -108,20 +109,16 @@ consult the generated command documentation for the complete reference.`,
 			_ = cmd.Help()
 		},
 	}
-	root.CompletionOptions.DisableDefaultCmd = true
-	root.SetHelpCommand(newCmdInternalHelp(root))
 
 	root.PersistentFlags().StringVarP(
 		configTarget,
 		"config",
 		"c",
 		configDefault,
-		fmt.Sprintf("config file (default is '%s')", configDefault),
+		"config file",
 	)
 
 	root.AddCommand(auth.NewCmdAuth())
-	root.AddCommand(newCmdHelp(root))
-	root.AddCommand(newCmdCompletion(root))
 	root.AddCommand(trackingplan.NewCmdTrackingPlan())
 	root.AddCommand(telemetryCmd.NewCmdTelemetry())
 	root.AddCommand(workspace.NewCmdWorkspace())
@@ -144,197 +141,68 @@ consult the generated command documentation for the complete reference.`,
 	root.AddCommand(typer.NewCmdTyper())
 	root.AddCommand(transformations.NewCmdTransformations())
 	root.AddCommand(datagraphPkg.NewCmdDataGraph())
+	configureDefaultCommands(root)
+	root.InitDefaultVersionFlag()
 
 	return root
 }
 
-func newCmdHelp(root *cobra.Command) *cobra.Command {
-	return &cobra.Command{
-		Use:   "help [command]",
-		Short: "Help about any command",
-		Long: heredoc.Doc(`
-			Show detailed help for rudder-cli or one of its subcommands.
+func configureDefaultCommands(root *cobra.Command) {
+	root.InitDefaultCompletionCmd()
+	completion, _, _ := root.Find([]string{"completion"})
+	completion.Long = heredoc.Doc(`
+		Generate shell completion scripts for rudder-cli.
 
-			Use this command when you need command syntax, available flags, examples, or
-			the list of child commands from the installed CLI. Passing a command path shows
-			help for that command; omitting it shows the root command help.
-		`),
-		Example: heredoc.Doc(`
-			rudder-cli help
-			rudder-cli help apply
-			rudder-cli help workspace tracking-plans list
-		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			target, _, err := root.Find(args)
-			if err != nil || target == nil {
-				return fmt.Errorf("unknown help topic %q", args)
-			}
-			return target.Help()
-		},
+		Use this command to install tab completion for a supported shell. Each shell
+		subcommand prints the script to standard output so you can source it for the
+		current session or redirect it to the location your shell loads at startup.
+	`)
+	completion.Example = heredoc.Doc(`
+		# Load bash completions for the current shell
+		source <(rudder-cli completion bash)
+
+		# Install zsh completions for future shells
+		rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
+	`)
+
+	completionExamples := map[string]string{
+		"bash": `# Load completions for the current shell
+source <(rudder-cli completion bash)
+
+# Install completions system-wide on Linux
+rudder-cli completion bash > /etc/bash_completion.d/rudder-cli`,
+		"fish": `# Load completions for the current shell
+rudder-cli completion fish | source
+
+# Install completions for future fish shells
+rudder-cli completion fish > ~/.config/fish/completions/rudder-cli.fish`,
+		"powershell": `# Load completions for the current shell
+rudder-cli completion powershell | Out-String | Invoke-Expression`,
+		"zsh": `# Load completions for the current shell
+source <(rudder-cli completion zsh)
+
+# Install completions for future zsh shells
+rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"`,
 	}
-}
-
-func newCmdInternalHelp(root *cobra.Command) *cobra.Command {
-	return &cobra.Command{
-		Use:    "__help [command]",
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			target, _, err := root.Find(args)
-			if err != nil || target == nil {
-				return fmt.Errorf("unknown help topic %q", args)
-			}
-			return target.Help()
-		},
-	}
-}
-
-func newCmdCompletion(root *cobra.Command) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "completion <bash|fish|powershell|zsh>",
-		Short: "Generate shell completion scripts",
-		Long: heredoc.Doc(`
-			Generate shell completion scripts for rudder-cli.
-
-			Use this command to install tab completion for a supported shell. Each shell
-			subcommand prints the script to standard output so you can source it for the
-			current session or redirect it to the location your shell loads at startup.
-		`),
-		Example: heredoc.Doc(`
-			# Load bash completions for the current shell
-			source <(rudder-cli completion bash)
-
-			# Install zsh completions for future shells
-			rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
-		`),
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
+	for shell, example := range completionExamples {
+		command, _, _ := completion.Find([]string{shell})
+		command.Example = example
 	}
 
-	cmd.AddCommand(newCmdCompletionBash(root))
-	cmd.AddCommand(newCmdCompletionFish(root))
-	cmd.AddCommand(newCmdCompletionPowerShell(root))
-	cmd.AddCommand(newCmdCompletionZsh(root))
-	return cmd
-}
+	root.InitDefaultHelpCmd()
+	help, _, _ := root.Find([]string{"help"})
+	help.Long = heredoc.Doc(`
+		Show detailed help for rudder-cli or one of its subcommands.
 
-func newCmdCompletionBash(root *cobra.Command) *cobra.Command {
-	var noDescriptions bool
-	cmd := &cobra.Command{
-		Use:   "bash",
-		Short: "Generate the autocompletion script for bash",
-		Long: heredoc.Doc(`
-			Generate the autocompletion script for the bash shell.
-
-			The generated script requires the bash-completion package. Source the script
-			for the current shell or install it in your bash completion directory so new
-			shells load rudder-cli completions automatically.
-		`),
-		Example: heredoc.Doc(`
-			# Load completions for the current shell
-			source <(rudder-cli completion bash)
-
-			# Install completions system-wide on Linux
-			rudder-cli completion bash > /etc/bash_completion.d/rudder-cli
-		`),
-		Args:                  cobra.NoArgs,
-		DisableFlagsInUseLine: true,
-		ValidArgsFunction:     cobra.NoFileCompletions,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return root.GenBashCompletionV2(cmd.OutOrStdout(), !noDescriptions)
-		},
-	}
-	cmd.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "disable completion descriptions")
-	return cmd
-}
-
-func newCmdCompletionFish(root *cobra.Command) *cobra.Command {
-	var noDescriptions bool
-	cmd := &cobra.Command{
-		Use:   "fish",
-		Short: "Generate the autocompletion script for fish",
-		Long: heredoc.Doc(`
-			Generate the autocompletion script for the fish shell.
-
-			The generated script can be sourced for the current session or written to the
-			fish completions directory so new shells load rudder-cli completions
-			automatically.
-		`),
-		Example: heredoc.Doc(`
-			# Load completions for the current shell
-			rudder-cli completion fish | source
-
-			# Install completions for future fish shells
-			rudder-cli completion fish > ~/.config/fish/completions/rudder-cli.fish
-		`),
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return root.GenFishCompletion(cmd.OutOrStdout(), !noDescriptions)
-		},
-	}
-	cmd.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "disable completion descriptions")
-	return cmd
-}
-
-func newCmdCompletionPowerShell(root *cobra.Command) *cobra.Command {
-	var noDescriptions bool
-	cmd := &cobra.Command{
-		Use:   "powershell",
-		Short: "Generate the autocompletion script for powershell",
-		Long: heredoc.Doc(`
-			Generate the autocompletion script for PowerShell.
-
-			The generated script can be evaluated for the current session or added to your
-			PowerShell profile so new sessions load rudder-cli completions automatically.
-		`),
-		Example: heredoc.Doc(`
-			# Load completions for the current shell
-			rudder-cli completion powershell | Out-String | Invoke-Expression
-		`),
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if noDescriptions {
-				return root.GenPowerShellCompletion(cmd.OutOrStdout())
-			}
-			return root.GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
-		},
-	}
-	cmd.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "disable completion descriptions")
-	return cmd
-}
-
-func newCmdCompletionZsh(root *cobra.Command) *cobra.Command {
-	var noDescriptions bool
-	cmd := &cobra.Command{
-		Use:   "zsh",
-		Short: "Generate the autocompletion script for zsh",
-		Long: heredoc.Doc(`
-			Generate the autocompletion script for the zsh shell.
-
-			Source the generated script for the current shell or install it in a directory
-			listed in fpath so new zsh sessions load rudder-cli completions automatically.
-		`),
-		Example: heredoc.Doc(`
-			# Load completions for the current shell
-			source <(rudder-cli completion zsh)
-
-			# Install completions for future zsh shells
-			rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
-		`),
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if noDescriptions {
-				return root.GenZshCompletionNoDesc(cmd.OutOrStdout())
-			}
-			return root.GenZshCompletion(cmd.OutOrStdout())
-		},
-	}
-	cmd.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "disable completion descriptions")
-	return cmd
+		Use this command when you need command syntax, available flags, examples, or
+		the list of child commands from the installed CLI. Passing a command path shows
+		help for that command; omitting it shows the root command help.
+	`)
+	help.Example = heredoc.Doc(`
+		rudder-cli help
+		rudder-cli help apply
+		rudder-cli help workspace tracking-plans list
+	`)
 }
 
 func init() {

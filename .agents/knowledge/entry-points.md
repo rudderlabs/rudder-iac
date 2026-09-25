@@ -62,6 +62,6 @@ Read these first when working on HTTP destination onboarding or destination defi
 <!-- session: 2026-09-25 -->
 Read these first when changing generated command documentation or command help completeness:
 - `cli/internal/cmddocs/generate.go`: owns the deterministic Markdown, YAML, and man-page generation lifecycle, including eligibility filtering and scoped cleanup.
-- `cli/internal/cmd/docs_metadata.go`: builds the side-effect-free documentation command tree and supplies shared help metadata without running normal CLI initialization.
+- `cli/internal/cmd/root.go`: builds the side-effect-free documentation command tree and adds help metadata to Cobra's default help and completion commands without running normal CLI initialization.
 - `cli/cmd/gen-cmd-docs/main.go`: generator executable used by the `Makefile` `docs-commands` target.
-- `cli/internal/cmd/docs_contract_test.go` and `cli/internal/cmddocs/generate_test.go`: enforce `Long`/`Example` completeness and generated-artifact parity for visible, non-deprecated commands.
+- `cli/internal/cmd/docs_contract_test.go` and `cli/internal/cmddocs/generate_test.go`: enforce `Long`/`Example` completeness, output coverage, and deterministic generation for visible, non-deprecated commands.

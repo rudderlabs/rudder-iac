@@ -11,7 +11,7 @@ func NewCmdDataGraph() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "data-graphs <command>",
 		Short: "Manage data graphs",
-		Long:  "Manage the lifecycle of data graph resources (models and relationships)",
+		Long:  "Validate data graph models and relationships in a local project against their warehouse account. Use the validate subcommand to check all, modified, or one selected resource.",
 		Example: heredoc.Doc(`
 			$ rudder-cli data-graphs validate --all
 			$ rudder-cli data-graphs validate --modified
