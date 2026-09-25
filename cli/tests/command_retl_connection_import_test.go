@@ -2,8 +2,6 @@ package tests
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,6 +95,8 @@ func TestRETLConnectionImportClaim(t *testing.T) {
 	writeConnectionClaimSpec(t, filepath.Join(projectDir, "connection.yaml"), workspaceID, seeded.ID)
 
 	t.Run("apply claims the existing connection instead of creating one", func(t *testing.T) {
+		assert.Contains(t, planRETLProject(t, executor, projectDir, credentials),
+			connectionURNPrefix+connectionImportLocalID, "the plan must name the connection it will claim")
 		applyRETLProject(t, executor, projectDir, credentials)
 
 		id, claimed := managedRETLConnectionByExternalID(t, connectionImportLocalID)
@@ -138,32 +138,28 @@ func projectWorkspaceID(t *testing.T) string {
 
 // removeSeededConnections deletes the unmanaged connections on the fixture
 // destination, whichever run seeded them. A claimed connection is managed and
-// left to destroy. Every deletion is attempted before any failure is reported,
-// so cleanup gets as far as it can, but a failure is asserted rather than
-// logged: this also runs as a precondition, and a seed left behind on a
-// managed destination breaks the opening destroy of every other suite, far
-// from the cause.
-func removeSeededConnections(t *testing.T, store retlClient.RETLStore) {
+// left to destroy. A failed deletion does not stop the rest, so cleanup gets as
+// far as it can, but it is asserted rather than logged: this also runs as a
+// precondition, here and in TestMain, and a seed left behind on a managed
+// destination breaks the opening destroy of every other suite, far from the
+// cause.
+func removeSeededConnections(t testing.TB, store retlClient.RETLStore) {
 	t.Helper()
 
 	destinations, err := store.GetDestinations(context.Background())
 	require.NoError(t, err, "listing destinations")
 
-	var failures []error
 	for _, destination := range destinations {
 		if destination.ExternalID != connectionImportDestinationExternalID {
 			continue
 		}
 		for _, id := range unmanagedConnectionIDs(t, store, destination.ID) {
-			if err := store.DeleteConnection(context.Background(), id); err != nil {
-				failures = append(failures, fmt.Errorf("deleting seeded RETL connection %s: %w", id, err))
-			}
+			assert.NoError(t, store.DeleteConnection(context.Background(), id), "deleting seeded RETL connection %s", id)
 		}
 	}
-	assert.NoError(t, errors.Join(failures...), "seeded RETL connections left behind")
 }
 
-func unmanagedConnectionIDs(t *testing.T, store retlClient.RETLStore, destinationID string) []string {
+func unmanagedConnectionIDs(t testing.TB, store retlClient.RETLStore, destinationID string) []string {
 	t.Helper()
 
 	connections := listRETLConnections(t, store, &retlClient.ListRETLConnectionsRequest{

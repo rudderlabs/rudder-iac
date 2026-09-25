@@ -50,9 +50,6 @@ type retlConnectionWant struct {
 // which would leave this suite creating a connection it could never read back.
 //
 // Gated behind RUN_RETL_E2E; test-with-coverage.yml records why.
-//
-// Against production it fails until the config-backend release carrying DEX-892
-// (externalId on connection create) ships; the PR that adds it is held until then.
 func TestRETLConnectionsApply(t *testing.T) {
 	if os.Getenv("RUN_RETL_E2E") != "1" {
 		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
@@ -141,7 +138,7 @@ func managedRETLConnections(t *testing.T) []retlClient.RETLConnection {
 
 // listRETLConnections walks every page of a connection listing. The caller owns
 // the filters; paging is set here so no caller can forget it.
-func listRETLConnections(t *testing.T, store retlClient.RETLStore, filters *retlClient.ListRETLConnectionsRequest) []retlClient.RETLConnection {
+func listRETLConnections(t testing.TB, store retlClient.RETLStore, filters *retlClient.ListRETLConnectionsRequest) []retlClient.RETLConnection {
 	t.Helper()
 
 	var all []retlClient.RETLConnection

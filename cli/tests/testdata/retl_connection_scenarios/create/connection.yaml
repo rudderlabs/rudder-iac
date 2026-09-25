@@ -42,8 +42,7 @@ spec:
             retry: false
     # enabled is omitted on purpose: an omitted flag means an enabled connection.
     # manual is the schedule a create has to carry itself: there is nothing to
-    # clear and nothing to poll, so a backend that invents a default interval
-    # for it only shows up here. The non-default sync_settings block is what
+    # clear and nothing to poll. The non-default sync_settings block is what
     # update drops, and a drop has to start from something the defaults differ
     # from to be visible at all.
     - id: e2e-scn-customers-full

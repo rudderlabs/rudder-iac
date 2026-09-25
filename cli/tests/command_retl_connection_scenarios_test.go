@@ -196,11 +196,11 @@ func managedRETLConnectionByExternalID(t *testing.T, externalID string) (string,
 	})
 	require.Len(t, matches, 1, "managed RETL connections claiming %q", externalID)
 
-	connection := matches[0]
-	id := connection.ID
+	conn := matches[0]
+	id := conn.ID
 	require.NotEmpty(t, id, "managed RETL connection %q has no id", externalID)
-	connection.ID, connection.CreatedAt, connection.UpdatedAt = "", nil, nil
-	return id, connection
+	conn.ID, conn.CreatedAt, conn.UpdatedAt = "", nil, nil
+	return id, conn
 }
 
 // connectionURNPrefix is what the plan reporter prints for a connection. It is

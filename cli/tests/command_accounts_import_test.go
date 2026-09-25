@@ -131,7 +131,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 // newAccountsAPIClient builds an API client from the same config the CLI binary
 // uses, so the test and the CLI act on one workspace.
-func newAccountsAPIClient(t *testing.T) *client.Client {
+func newAccountsAPIClient(t testing.TB) *client.Client {
 	t.Helper()
 
 	config.InitConfig(config.DefaultConfigFile())
