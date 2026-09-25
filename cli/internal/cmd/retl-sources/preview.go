@@ -28,6 +28,9 @@ func newCmdPreview() *cobra.Command {
 			$ rudder-cli retl-sources preview my-model --json
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePreviewLimit(limit); err != nil {
+				return err
+			}
 			if len(args) == 0 {
 				return fmt.Errorf("retl-source external id is required")
 			}
@@ -77,8 +80,24 @@ func newCmdPreview() *cobra.Command {
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output preview rows as JSON")
-	cmd.Flags().IntVar(&limit, "limit", 10, "Number of rows to preview")
+	cmd.Flags().IntVar(&limit, "limit", 10, fmt.Sprintf("Number of rows to preview (%d-%d)", minPreviewLimit, maxPreviewLimit))
 	cmd.Flags().BoolVar(&interactive, "interactive", true, "Enable interactive table display")
 
 	return cmd
+}
+
+// The upper bound mirrors rudder-sources' MAX_ROW_LIMIT_IN_PREVIEW, which
+// otherwise rejects the preview only after it has been submitted. 0 is excluded
+// because the API client omits it from the request, so it would silently mean
+// the server default of 10 rows.
+const (
+	minPreviewLimit = 1
+	maxPreviewLimit = 100
+)
+
+func validatePreviewLimit(limit int) error {
+	if limit < minPreviewLimit || limit > maxPreviewLimit {
+		return fmt.Errorf("--limit must be between %d and %d, got %d", minPreviewLimit, maxPreviewLimit, limit)
+	}
+	return nil
 }
