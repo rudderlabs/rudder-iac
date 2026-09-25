@@ -1,0 +1,35 @@
+.nh
+.TH "RUDDER-CLI-WORKSPACE" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace - Manage workspace resources
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace [flags]\fP
+
+
+.SH DESCRIPTION
+Inspect the authenticated RudderStack workspace and list supported remote resource types without changing them.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for workspace
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+rudder-cli workspace info
+rudder-cli workspace tracking-plans list --json
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-workspace-accounts(1)\fP, \fBrudder-cli-workspace-event-stream-sources(1)\fP, \fBrudder-cli-workspace-info(1)\fP, \fBrudder-cli-workspace-retl-sources(1)\fP, \fBrudder-cli-workspace-tracking-plans(1)\fP

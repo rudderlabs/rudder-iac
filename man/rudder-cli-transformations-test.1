@@ -1,0 +1,82 @@
+.nh
+.TH "RUDDER-CLI-TRANSFORMATIONS-TEST" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-transformations-test - Test transformations
+
+
+.SH SYNOPSIS
+\fBrudder-cli transformations test [id] [flags]\fP
+
+
+.SH DESCRIPTION
+Tests transformations by executing their code against test input events.
+
+.PP
+You can test a single transformation by ID, all transformations, or only
+modified transformations. Test results show pass/fail status with optional
+verbose output showing diffs for failures.
+
+
+.SH OPTIONS
+\fB--all\fP[=false]
+	Test all transformations in the project
+
+.PP
+\fB--force\fP[=false]
+	Overwrite output file if it already exists
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for test
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the directory containing the project files or a specific file
+
+.PP
+\fB--modified\fP[=false]
+	Test only new or modified transformations
+
+.PP
+\fB-o\fP, \fB--output\fP=""
+	Path to write test results JSON file (default: test-results.json)
+
+.PP
+\fB--verbose\fP[=false]
+	Show detailed output including diffs for failures
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+# Test a single transformation
+$ rudder-cli transformations test my-transformation-id
+
+# Test all transformations
+$ rudder-cli transformations test --all
+
+# Test only modified transformations
+$ rudder-cli transformations test --modified
+
+# Test with verbose output (shows diffs)
+$ rudder-cli transformations test --all --verbose
+
+# Test from a specific project directory
+$ rudder-cli transformations test --all -l ./my-project
+
+# Write results to a custom file path
+$ rudder-cli transformations test --all -o /tmp/results.json
+
+# Overwrite an existing results file
+$ rudder-cli transformations test --all --force
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-transformations(1)\fP

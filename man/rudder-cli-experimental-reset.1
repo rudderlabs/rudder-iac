@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI-EXPERIMENTAL-RESET" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-experimental-reset - Reset all experimental flags to their defaults
+
+
+.SH SYNOPSIS
+\fBrudder-cli experimental reset [flags]\fP
+
+
+.SH DESCRIPTION
+Reset all experimental flags by removing the experimental section from the configuration
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for reset
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental reset
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-experimental(1)\fP

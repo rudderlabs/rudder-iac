@@ -1,0 +1,19 @@
+name: rudder-cli debug config
+synopsis: Dump the active configuration
+description: |
+    Print the effective CLI configuration as formatted JSON for troubleshooting.
+usage: rudder-cli debug config [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for config
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    RUDDERSTACK_CLI_DEBUG=true rudder-cli debug config
+see_also:
+    - rudder-cli debug - Debug commands

@@ -1,0 +1,38 @@
+.nh
+.TH "RUDDER-CLI-TYPER-OPTIONS" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-typer-options - Show available options for a platform
+
+
+.SH SYNOPSIS
+\fBrudder-cli typer options [flags]\fP
+
+
+.SH DESCRIPTION
+List platform-specific code generation options and their default values.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for options
+
+.PP
+\fB--platform\fP=""
+	Platform to show options for (kotlin, swift, typescript)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+rudder-cli typer options --platform kotlin
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-typer(1)\fP

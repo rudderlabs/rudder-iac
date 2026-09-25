@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI-EXPERIMENTAL-ENABLE" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-experimental-enable - Enable an experimental flag
+
+
+.SH SYNOPSIS
+\fBrudder-cli experimental enable  [flags]\fP
+
+
+.SH DESCRIPTION
+Enable a specific experimental flag by name
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for enable
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental enable importMerge
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-experimental(1)\fP

@@ -1,0 +1,23 @@
+name: rudder-cli workspace info
+synopsis: Show information about the authenticated workspace
+description: |
+    Display identifying and environment information for the workspace associated with the current access token.
+usage: rudder-cli workspace info [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for info
+    - name: json
+      default_value: "false"
+      usage: Output workspace information as JSON
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    rudder-cli workspace info
+    rudder-cli workspace info --json
+see_also:
+    - rudder-cli workspace - Manage workspace resources

@@ -1,0 +1,53 @@
+.nh
+.TH "RUDDER-CLI-RETL-SOURCES-PREVIEW" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-retl-sources-preview - Preview a RETL source (SQL model or table)
+
+
+.SH SYNOPSIS
+\fBrudder-cli retl-sources preview  [flags]\fP
+
+
+.SH DESCRIPTION
+Preview a RETL source (SQL model or warehouse table) to see the data structure and sample rows. s3 table sources have no query to preview.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for preview
+
+.PP
+\fB--interactive\fP[=true]
+	Enable interactive table display
+
+.PP
+\fB-j\fP, \fB--json\fP[=false]
+	Output preview rows as JSON
+
+.PP
+\fB--limit\fP=10
+	Number of rows to preview
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the project directory
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+$ rudder-cli retl-sources preview my-model
+$ rudder-cli retl-sources preview my-model --location ./project --limit 5
+$ rudder-cli retl-sources preview my-model --interactive=false
+$ rudder-cli retl-sources preview my-model --json
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-retl-sources(1)\fP

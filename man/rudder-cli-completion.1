@@ -1,0 +1,43 @@
+.nh
+.TH "RUDDER-CLI-COMPLETION" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-completion - Generate shell completion scripts
+
+
+.SH SYNOPSIS
+\fBrudder-cli completion  [flags]\fP
+
+
+.SH DESCRIPTION
+Generate shell completion scripts for rudder-cli.
+
+.PP
+Use this command to install tab completion for a supported shell. Each shell
+subcommand prints the script to standard output so you can source it for the
+current session or redirect it to the location your shell loads at startup.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for completion
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+# Load bash completions for the current shell
+source <(rudder-cli completion bash)
+
+# Install zsh completions for future shells
+rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-completion-bash(1)\fP, \fBrudder-cli-completion-fish(1)\fP, \fBrudder-cli-completion-powershell(1)\fP, \fBrudder-cli-completion-zsh(1)\fP

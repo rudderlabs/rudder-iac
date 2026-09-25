@@ -1,0 +1,45 @@
+.nh
+.TH "RUDDER-CLI-TELEMETRY" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-telemetry - Manage telemetry settings
+
+
+.SH SYNOPSIS
+\fBrudder-cli telemetry [flags]\fP
+
+
+.SH DESCRIPTION
+Manage telemetry settings for the CLI.
+
+.PP
+Telemetry helps us understand how the CLI is being used and helps us improve it.
+No sensitive information is collected. The data collected includes:
+- Command usage statistics
+- Error occurrences (without sensitive details)
+- Basic system information
+
+.PP
+Use 'status' to check current telemetry settings
+Use 'enable' or 'disable' to modify telemetry collection
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for telemetry
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+rudder-cli telemetry status
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP, \fBrudder-cli-telemetry-disable(1)\fP, \fBrudder-cli-telemetry-enable(1)\fP, \fBrudder-cli-telemetry-status(1)\fP

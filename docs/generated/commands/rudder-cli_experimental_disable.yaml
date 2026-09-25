@@ -1,0 +1,18 @@
+name: rudder-cli experimental disable
+synopsis: Disable an experimental flag
+description: Disable a specific experimental flag by name
+usage: rudder-cli experimental disable <flag-name> [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for disable
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental disable importMerge
+see_also:
+    - rudder-cli experimental - Manage experimental features

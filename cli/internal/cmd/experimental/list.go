@@ -3,6 +3,7 @@ package experimental
 import (
 	"reflect"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -13,7 +14,10 @@ func NewCmdList() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available experimental flags",
-		Long:  "Display all available experimental flags with their current status and environment variable names",
+		Long:  "List every available experimental feature flag, its status, and its environment variable.",
+		Example: heredoc.Doc(`
+			RUDDERSTACK_CLI_EXPERIMENTAL=true rudder-cli experimental list
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.GetConfig()
 

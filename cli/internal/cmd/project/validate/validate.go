@@ -40,7 +40,8 @@ func NewCmdValidate() *cobra.Command {
 			between resources.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli validate --location </path/to/dir or file>
+			rudder-cli validate --location ./project
+			rudder-cli validate --location ./project --var-file production.vars.yaml
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()

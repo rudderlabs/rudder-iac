@@ -1,0 +1,36 @@
+name: rudder-cli retl-sources preview
+synopsis: Preview a RETL source (SQL model or table)
+description: |
+    Preview a RETL source (SQL model or warehouse table) to see the data structure and sample rows. s3 table sources have no query to preview.
+usage: rudder-cli retl-sources preview <external-id> [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for preview
+    - name: interactive
+      default_value: "true"
+      usage: Enable interactive table display
+    - name: json
+      shorthand: j
+      default_value: "false"
+      usage: Output preview rows as JSON
+    - name: limit
+      default_value: "10"
+      usage: Number of rows to preview
+    - name: location
+      shorthand: l
+      default_value: .
+      usage: Path to the project directory
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    $ rudder-cli retl-sources preview my-model
+    $ rudder-cli retl-sources preview my-model --location ./project --limit 5
+    $ rudder-cli retl-sources preview my-model --interactive=false
+    $ rudder-cli retl-sources preview my-model --json
+see_also:
+    - rudder-cli retl-sources - Manage RETL sources

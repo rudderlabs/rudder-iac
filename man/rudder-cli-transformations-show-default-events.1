@@ -1,0 +1,41 @@
+.nh
+.TH "RUDDER-CLI-TRANSFORMATIONS-SHOW-DEFAULT-EVENTS" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-transformations-show-default-events - Show default test events
+
+
+.SH SYNOPSIS
+\fBrudder-cli transformations show-default-events [flags]\fP
+
+
+.SH DESCRIPTION
+Displays the built-in default test events that are used when testing
+transformations without custom test inputs.
+
+.PP
+These default events cover common RudderStack event types (track, identify,
+page, screen, group, alias) and can be used as a reference when creating
+custom test inputs for your transformations.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for show-default-events
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+# Show all default test events
+$ rudder-cli transformations show-default-events
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-transformations(1)\fP

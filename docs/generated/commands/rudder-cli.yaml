@@ -1,0 +1,44 @@
+name: rudder-cli
+synopsis: Manage RudderStack resources as code
+description: |-
+    Manage RudderStack resources with declarative YAML project files.
+
+    Use apply, validate, destroy, and import to manage project state; inspect remote
+    resources with workspace listings; configure authentication and telemetry; and
+    use debug or experimental tools when needed. Run help for command guidance or
+    consult the generated command documentation for the complete reference.
+usage: rudder-cli [flags]
+options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for rudder-cli
+example: |4-
+      # Safely validate local declarative YAML before applying changes
+      rudder-cli validate --location ./project
+
+      # Preview the changes without modifying the workspace
+      rudder-cli apply --location ./project --dry-run
+
+      # Browse available commands and documentation
+      rudder-cli help
+see_also:
+    - rudder-cli apply - Apply project configuration changes
+    - rudder-cli auth - Authentication commands
+    - rudder-cli completion - Generate shell completion scripts
+    - rudder-cli data-graphs - Manage data graphs
+    - rudder-cli debug - Debug commands
+    - rudder-cli destroy - Delete all resources from both the upstream system and state
+    - rudder-cli experimental - Manage experimental features
+    - rudder-cli help - Help about any command
+    - rudder-cli import - Import remote resources to local configuration
+    - rudder-cli retl-sources - Manage RETL sources
+    - rudder-cli telemetry - Manage telemetry settings
+    - rudder-cli transformations - Manage transformations
+    - rudder-cli typer - Generate type-safe tracking code
+    - rudder-cli validate - Validate project configuration
+    - rudder-cli workspace - Manage workspace resources

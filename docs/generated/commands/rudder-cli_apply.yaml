@@ -1,0 +1,38 @@
+name: rudder-cli apply
+synopsis: Apply project configuration changes
+description: |
+    Applies the project configuration changes to the RudderStack workspace associated with your access token.
+    This includes creating, updating, or deleting resources based on
+    the differences between local configuration and the workspace resources.
+usage: rudder-cli apply [flags]
+options:
+    - name: confirm
+      default_value: "true"
+      usage: Confirm changes before applying them
+    - name: dry-run
+      default_value: "false"
+      usage: Only show the changes without applying them
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for apply
+    - name: location
+      shorthand: l
+      default_value: .
+      usage: |
+        Path to the directory containing the project files or a specific file
+    - name: var-file
+      default_value: '[]'
+      usage: |
+        Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    rudder-cli apply --location ./project
+    rudder-cli apply --location ./project --dry-run
+    rudder-cli apply --location ./project --confirm=false
+see_also:
+    - rudder-cli - Manage RudderStack resources as code

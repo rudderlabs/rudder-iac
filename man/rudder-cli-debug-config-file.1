@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI-DEBUG-CONFIG-FILE" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-debug-config-file - Print the path to the active configuration file
+
+
+.SH SYNOPSIS
+\fBrudder-cli debug config-file [flags]\fP
+
+
+.SH DESCRIPTION
+Print the path of the configuration file loaded by the CLI.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for config-file
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+RUDDERSTACK_CLI_DEBUG=true rudder-cli debug config-file
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-debug(1)\fP

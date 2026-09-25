@@ -1,0 +1,47 @@
+.nh
+.TH "RUDDER-CLI-COMPLETION-BASH" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-completion-bash - Generate the autocompletion script for bash
+
+
+.SH SYNOPSIS
+\fBrudder-cli completion bash\fP
+
+
+.SH DESCRIPTION
+Generate the autocompletion script for the bash shell.
+
+.PP
+The generated script requires the bash-completion package. Source the script
+for the current shell or install it in your bash completion directory so new
+shells load rudder-cli completions automatically.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for bash
+
+.PP
+\fB--no-descriptions\fP[=false]
+	disable completion descriptions
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+# Load completions for the current shell
+source <(rudder-cli completion bash)
+
+# Install completions system-wide on Linux
+rudder-cli completion bash > /etc/bash_completion.d/rudder-cli
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-completion(1)\fP

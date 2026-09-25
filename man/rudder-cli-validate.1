@@ -1,0 +1,45 @@
+.nh
+.TH "RUDDER-CLI-VALIDATE" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-validate - Validate project configuration
+
+
+.SH SYNOPSIS
+\fBrudder-cli validate [flags]\fP
+
+
+.SH DESCRIPTION
+Validates the project configuration files for correctness and consistency.
+This includes checking for valid syntax, required fields, and relationships
+between resources.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for validate
+
+.PP
+\fB-l\fP, \fB--location\fP="."
+	Path to the directory containing the project files or a specific file
+
+.PP
+\fB--var-file\fP=[]
+	Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+rudder-cli validate --location ./project
+rudder-cli validate --location ./project --var-file production.vars.yaml
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli(1)\fP

@@ -1,0 +1,18 @@
+name: rudder-cli debug config-file
+synopsis: Print the path to the active configuration file
+description: Print the path of the configuration file loaded by the CLI.
+usage: rudder-cli debug config-file [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for config-file
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    RUDDERSTACK_CLI_DEBUG=true rudder-cli debug config-file
+see_also:
+    - rudder-cli debug - Debug commands

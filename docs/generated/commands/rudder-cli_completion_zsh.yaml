@@ -1,0 +1,29 @@
+name: rudder-cli completion zsh
+synopsis: Generate the autocompletion script for zsh
+description: |
+    Generate the autocompletion script for the zsh shell.
+
+    Source the generated script for the current shell or install it in a directory
+    listed in fpath so new zsh sessions load rudder-cli completions automatically.
+usage: rudder-cli completion zsh [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for zsh
+    - name: no-descriptions
+      default_value: "false"
+      usage: disable completion descriptions
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    # Load completions for the current shell
+    source <(rudder-cli completion zsh)
+
+    # Install completions for future zsh shells
+    rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
+see_also:
+    - rudder-cli completion - Generate shell completion scripts

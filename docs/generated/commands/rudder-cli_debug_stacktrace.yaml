@@ -1,0 +1,19 @@
+name: rudder-cli debug stacktrace
+synopsis: Display the last panic stacktrace from the log file
+description: |
+    Read the CLI log and display the most recent recorded panic stack trace.
+usage: rudder-cli debug stacktrace [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for stacktrace
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    RUDDERSTACK_CLI_DEBUG=true rudder-cli debug stacktrace
+see_also:
+    - rudder-cli debug - Debug commands

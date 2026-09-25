@@ -1,0 +1,42 @@
+name: rudder-cli typer generate
+synopsis: Generate type-safe code from tracking plan
+description: Generate type-safe code from a RudderStack tracking plan
+usage: rudder-cli typer generate [flags]
+options:
+    - name: help
+      shorthand: h
+      default_value: "false"
+      usage: help for generate
+    - name: local
+      default_value: "false"
+      usage: |
+        Generate from local specs instead of the remote workspace (no workspace, apply, auth or network needed)
+    - name: location
+      shorthand: l
+      default_value: .
+      usage: |
+        Path to the project directory or spec file (used with --local)
+    - name: option
+      default_value: '[]'
+      usage: |
+        Platform-specific options in key=value format (use 'rudder-cli typer options --platform <platform>' to see available options)
+    - name: output
+      shorthand: o
+      default_value: .
+      usage: Output directory for generated files
+    - name: platform
+      default_value: kotlin
+      usage: Platform to generate code for (kotlin, swift, typescript)
+    - name: tracking-plan-id
+      usage: |
+        Tracking plan ID to generate code from (remote), or local id of the plan in the specs (with --local)
+inherited_options:
+    - name: config
+      shorthand: c
+      default_value: ~/.rudder/config.json
+      usage: config file (default is '~/.rudder/config.json')
+example: |
+    $ rudder-cli typer generate --tracking-plan-id tracking-plan-id --platform kotlin
+    $ rudder-cli typer generate --local --location ./project --platform kotlin
+see_also:
+    - rudder-cli typer - Generate type-safe tracking code

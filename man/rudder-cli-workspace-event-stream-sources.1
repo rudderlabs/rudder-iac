@@ -1,0 +1,34 @@
+.nh
+.TH "RUDDER-CLI-WORKSPACE-EVENT-STREAM-SOURCES" "1" "Jan 1970" "rudder-cli" "Rudder CLI Manual"
+
+.SH NAME
+rudder-cli-workspace-event-stream-sources - Manage event stream sources in the workspace
+
+
+.SH SYNOPSIS
+\fBrudder-cli workspace event-stream-sources [flags]\fP
+
+
+.SH DESCRIPTION
+Inspect event stream sources available in the authenticated workspace.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for event-stream-sources
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB-c\fP, \fB--config\fP="~/.rudder/config.json"
+	config file (default is '~/.rudder/config.json')
+
+
+.SH EXAMPLE
+.EX
+rudder-cli workspace event-stream-sources list --json
+
+.EE
+
+
+.SH SEE ALSO
+\fBrudder-cli-workspace(1)\fP, \fBrudder-cli-workspace-event-stream-sources-list(1)\fP

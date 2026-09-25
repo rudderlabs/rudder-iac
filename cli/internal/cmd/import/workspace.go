@@ -31,8 +31,8 @@ func NewCmdWorkspaceImport() *cobra.Command {
 		Short: "Import workspace resources",
 		Long:  "Import upstream workspace resources using available providers into configuration files",
 		Example: heredoc.Doc(`
-			$ rudder-cli import workspace --location </path/to/project_dir>
-			$ rudder-cli import workspace --location </path/to/project_dir> --var-file prod.vars.yaml
+			rudder-cli import workspace --location ./project
+			rudder-cli import workspace --location ./project --var-file prod.vars.yaml
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if merge && !config.GetConfig().ExperimentalFlags.ImportMerge {
