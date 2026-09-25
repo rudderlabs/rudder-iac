@@ -12,12 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
-// errNoQueryToPreview is the refusal for a table source that has no warehouse
-// query. It was a sentinel while `validate` previewed and had to tell "nothing
-// to run" apart from "the query failed"; validate no longer previews, so no
-// caller matches on it and a plain error carries the same text.
-var errNoQueryToPreview = errors.New("preview is not supported")
-
 // bigQueryEscaper escapes quote characters the way BigQuery string literals
 // do, which is also how its quoted identifiers are escaped.
 var bigQueryEscaper = strings.NewReplacer(`'`, `\'`, `"`, `\"`, "`", "\\`")
@@ -45,12 +39,9 @@ func (h *Handler) Preview(ctx context.Context, id string, data resources.Resourc
 // previewSQL quotes the schema and table as sqlconnect-go does when
 // rudder-sources queries a table source, so the preview reads the same relation:
 // quoted names keep their case and may contain any character.
-//
-// A limit of 0 still reads one row, so a caller asking only "can this be read?"
-// gets an answer without pulling data back.
 func previewSQL(t TableSpec, limit int) (string, error) {
 	if t.isS3() {
-		return "", fmt.Errorf("%w for s3 table sources", errNoQueryToPreview)
+		return "", errors.New("preview is not supported for s3 table sources")
 	}
 
 	var relation string

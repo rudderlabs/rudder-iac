@@ -113,8 +113,6 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		}, 10)
 
 		require.EqualError(t, err, `preview cannot quote identifiers for source_definition "oracle": add its quoting to previewSQL`)
-		// An unknown definition is a gap in previewSQL, not a source with nothing
-		// to run; the two messages must stay distinguishable.
 		assert.Empty(t, store.requests)
 	})
 

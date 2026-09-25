@@ -20,7 +20,7 @@ type accountLister interface {
 
 // resolveAccountRef swaps an unresolved `#account:` ref for the remote id of the
 // managed account whose externalId matches, the same rule MapRemoteToState uses,
-// because preview and validate read the graph without remote state.
+// because preview reads the graph without remote state.
 func resolveAccountRef(ctx context.Context, lister accountLister, data resources.ResourceData) (resources.ResourceData, error) {
 	ref, ok := data[sqlmodel.AccountIDKey].(*resources.PropertyRef)
 	if !ok {
