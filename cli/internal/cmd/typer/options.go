@@ -5,8 +5,8 @@ import (
 	"reflect"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/typer/generator"
 	"github.com/spf13/cobra"
 )
 

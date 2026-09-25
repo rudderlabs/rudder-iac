@@ -138,13 +138,10 @@ func NewCmdTest() *cobra.Command {
 				targetID = args[0]
 			}
 
-			spinner := ui.NewSpinner("Running tests...")
-			spinner.Start()
-
+			ui.StartSpinner("Running tests...")
 			runner := testorchestrator.NewRunner(deps.Client(), trProvider, graph, workspace.ID)
 			results, err := runner.Run(ctx, mode, targetID)
-
-			spinner.Stop()
+			ui.StopSpinner()
 
 			if err != nil {
 				return fmt.Errorf("running tests: %w", err)

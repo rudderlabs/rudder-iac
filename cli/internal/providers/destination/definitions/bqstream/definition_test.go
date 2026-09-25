@@ -27,7 +27,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "react_native", "flutter", "cordova", "cloud",
+		"unity", "react_native", "flutter", "cordova", "cloud", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -39,7 +39,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, bqstream.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("BQSTREAM", 1)
 	require.NoError(t, err)
@@ -229,12 +233,12 @@ func TestBQStreamConfigValidation(t *testing.T) {
 			"table_id":    "my_table",
 			"credentials": `{"type":"service_account"}`,
 			"consent_management": map[string]any{
-				"warehouse": []any{},
+				"amp": []any{},
 			},
 		})
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
+		assert.Equal(t, "/consent_management/amp", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'amp' is not supported")
 	})
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
@@ -381,5 +385,6 @@ func TestBQStreamConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }

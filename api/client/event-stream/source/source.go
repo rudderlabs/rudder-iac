@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 )
@@ -16,7 +18,19 @@ type SourceStore interface {
 	Update(ctx context.Context, sourceId string, source *UpdateSourceRequest) (*CreateUpdateSourceResponse, error)
 	Delete(ctx context.Context, sourceId string) error
 	SetExternalID(ctx context.Context, sourceId string, externalID string) error
-	GetSources(ctx context.Context) ([]EventStreamSource, error)
+	GetSources(ctx context.Context, opts ...ListSourcesOption) ([]EventStreamSource, error)
+}
+
+type ListSourcesOption func(*ListSourcesOptions)
+
+func WithSourcesHasExternalID(hasExternalID bool) ListSourcesOption {
+	return func(o *ListSourcesOptions) {
+		o.HasExternalID = &hasExternalID
+	}
+}
+
+type ListSourcesOptions struct {
+	HasExternalID *bool
 }
 
 type rudderSourceStore struct {
@@ -86,11 +100,27 @@ func (r *rudderSourceStore) SetExternalID(ctx context.Context, sourceId string, 
 	return err
 }
 
-func (r *rudderSourceStore) GetSources(ctx context.Context) ([]EventStreamSource, error) {
+// GetSources walks every page, following the server-issued next link verbatim
+// so any filter in the first URL is carried over by the server itself.
+func (r *rudderSourceStore) GetSources(ctx context.Context, opts ...ListSourcesOption) ([]EventStreamSource, error) {
+	options := &ListSourcesOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	path := prefix
+	query := url.Values{}
+	if options.HasExternalID != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*options.HasExternalID))
+	}
+	if len(query) > 0 {
+		path = fmt.Sprintf("%s?%s", path, query.Encode())
+	}
+
 	page := &eventStreamSourcesPage{
 		APIPage: client.APIPage{
 			Paging: client.Paging{
-				Next: prefix,
+				Next: path,
 			},
 		},
 	}

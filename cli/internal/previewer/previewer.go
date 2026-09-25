@@ -115,10 +115,9 @@ func (m previewModel) View() string {
 }
 
 func (p *Previewer) Preview(ctx context.Context, ID string, resourceType string, data resources.ResourceData) error {
-	spinner := ui.NewSpinner(fmt.Sprintf("Previewing %s...", ID))
-	spinner.Start()
+	ui.StartSpinner(fmt.Sprintf("Previewing %s...", ID))
 	rowsData, err := p.Provider.Preview(ctx, ID, resourceType, data, p.Limit)
-	spinner.Stop()
+	ui.StopSpinner()
 
 	if err != nil {
 		return err
