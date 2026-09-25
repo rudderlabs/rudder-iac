@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: full-retl-destination
+spec:
+  id: full-retl-destination
+  display_name: Full RETL Destination
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://api.example.com/customers
+    auth: apiKeyAuth
+    api_key_name: X-API-Key
+    api_key_value: replace-with-api-key
+    method: POST
+    format: JSON
+    is_batching_enabled: true
+    max_batch_size: "100"
+    connection_mode:
+      warehouse: cloud

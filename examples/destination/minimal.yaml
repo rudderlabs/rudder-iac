@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: minimal-webhook
+spec:
+  id: minimal-webhook
+  display_name: Minimal Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://webhooks.example.com/events

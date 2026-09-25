@@ -1,0 +1,17 @@
+version: rudder/0.1
+kind: tp
+metadata:
+  name: ecommerce-legacy-tracking-plan
+spec:
+  id: ecommerce-legacy-tracking-plan
+  display_name: Ecommerce Legacy Tracking Plan
+  description: Defines the order completed event and its required identifier
+  rules:
+    - type: event_rule
+      id: order-completed-rule
+      event:
+        $ref: "#/events/legacy-events/order_completed"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/legacy-properties/order_id"
+          required: true

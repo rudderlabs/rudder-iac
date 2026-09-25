@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: ecommerce-tracking-plan
+spec:
+  id: ecommerce-tracking-plan
+  display_name: Ecommerce Tracking Plan
+  description: Defines the checkout events and their properties
+  rules:
+    - type: event_rule
+      id: checkout-started-rule
+      event: "#event:checkout_started"
+      additional_properties: false
+      properties:
+        - property: "#property:order_id"
+          required: true
+        - property: "#property:order_total"
+          required: true

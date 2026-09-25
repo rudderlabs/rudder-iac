@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: minimal-transformation-library
+spec:
+  id: minimal-transformation-library
+  name: Minimal Transformation Library
+  language: javascript
+  import_name: minimalTransformationLibrary
+  code: |
+    export function identity(value) {
+      return value;
+    }

@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: minimal-connection-destination
+spec:
+  id: minimal-connection-destination
+  display_name: Minimal Connection Destination
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://webhooks.example.com/minimal
+    connection_mode:
+      web: cloud

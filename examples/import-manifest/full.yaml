@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: import-manifest
+metadata:
+  name: full-import-manifest
+spec:
+  workspaces:
+    - workspace_id: example-workspace
+      resources:
+        - urn: property:imported-email
+          remote_id: prop_123456789

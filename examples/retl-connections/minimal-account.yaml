@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: minimal-retl-account
+spec:
+  id: minimal-retl-account
+  name: Minimal RETL Account
+  account_definition_name: SOURCE_POSTGRES
+  config:
+    host: postgres.example.com
+    dbname: analytics
+    user: rudder
+    port: 5432
+    sslMode: require
+    password: replace-with-postgres-password

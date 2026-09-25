@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: full-retl-account
+spec:
+  id: full-retl-account
+  name: Full RETL Account
+  account_definition_name: SOURCE_POSTGRES
+  config:
+    host: warehouse.example.com
+    dbname: analytics
+    user: rudder
+    port: 5432
+    sslMode: verify-full
+    password: replace-with-postgres-password

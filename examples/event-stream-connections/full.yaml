@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: event-stream-connections
+metadata:
+  name: full-event-stream-connections
+spec:
+  connections:
+    - id: web-to-webhook
+      source: "#event-stream-source:full-web-source"
+      destination: "#destination:full-webhook-destination"
+      enabled: true
+    - id: android-to-webhook
+      source: "#event-stream-source:full-android-source"
+      destination: "#destination:full-android-destination"
+      enabled: false

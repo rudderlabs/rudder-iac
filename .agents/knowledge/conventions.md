@@ -287,3 +287,12 @@
 - Do not make a key `required` so that validation sees a value; declare its schema default instead. Nested defaults still fill only a block the spec carries, so a key inside an omitted block stays absent during validation too.
 - A key that stays required declares no default, even when `schema.json` has one: a default would fill in before validation and switch the requirement off. Registration rejects this only for a bare `required` tag, not for custom required checks. Redshift `use_iam_for_auth`, Snowflake `use_key_pair_auth` and Snowflake `s3.role_based_auth` stay required on purpose.
 - Customer.io `api_version` defaults to `v2`, matching integrations-config #2705, so a spec that omits it requires `user_id_identifier_type`.
+
+## DEX-1002 — Canonical Spec Examples
+
+<!-- session: 2026-09-25 -->
+
+- Canonical CLI examples live under `examples/<kind>/`, where `<kind>` must exactly match the all-flags composite provider's `SupportedKinds()` output; in particular, the current connection kind names are plural: `event-stream-connections` and `retl-connections`.
+- Every supported kind directory must contain `minimal.yaml` and `full.yaml`. Additional sibling YAML files may make those scenarios self-contained, and experimental requirements belong in a newline-delimited `.flags` file in the same directory.
+- `cli/internal/app/examples_test.go` is the drift and hermeticity gate: it loads each kind directory through the production composite provider and project loader, injects a rejecting HTTP transport, and requires zero diagnostics plus complete `SupportedKinds()` coverage.
+- The examples test derives its all-flags setup from `config.ExperimentalConfig` mapstructure tags and clears the umbrella and per-flag environment variables before config initialization; keep this reflective setup so new gated kinds join coverage automatically and ambient CI/developer flags cannot change the tested provider composition.

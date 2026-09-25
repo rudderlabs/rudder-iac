@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: full-transformation-library-dependency
+spec:
+  id: full-transformation-library-dependency
+  name: Email Utilities
+  language: javascript
+  import_name: emailUtilities
+  code: |
+    export function normalizeEmail(email) {
+      return email.trim().toLowerCase();
+    }

@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: minimal-customers-table
+spec:
+  id: minimal-customers-table
+  display_name: Minimal Customers Table
+  account: "#account:minimal-table-account"
+  primary_key: id
+  source_definition: postgres
+  schema: public
+  table: customers
+  enabled: true

@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: categories
+metadata:
+  name: minimal-categories
+spec:
+  categories:
+    - id: product
+      name: Product

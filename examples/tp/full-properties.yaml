@@ -1,0 +1,10 @@
+version: rudder/0.1
+kind: properties
+metadata:
+  name: legacy-properties
+spec:
+  properties:
+    - id: order_id
+      name: Order ID
+      description: Unique order identifier
+      type: string

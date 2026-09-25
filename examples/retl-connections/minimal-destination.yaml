@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: minimal-retl-destination
+spec:
+  id: minimal-retl-destination
+  display_name: Minimal RETL Destination
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://api.example.com/users
+    auth: noAuth
+    method: POST
+    format: JSON
+    connection_mode:
+      warehouse: cloud

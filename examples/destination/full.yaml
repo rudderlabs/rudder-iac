@@ -1,0 +1,24 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: full-webhook
+spec:
+  id: full-webhook
+  display_name: Full Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://webhooks.example.com/events
+    webhook_method: POST
+    headers:
+      - from: X-Event-Type
+        to: track
+    connection_mode:
+      web: cloud
+      android: cloud
+    consent_management:
+      web:
+        - provider: oneTrust
+          consents:
+            - analytics

@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: source-tracking-plan
+spec:
+  id: source-tracking-plan
+  display_name: Source Tracking Plan
+  rules: []

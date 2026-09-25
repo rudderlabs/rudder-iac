@@ -1,0 +1,11 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: minimal-custom-types
+spec:
+  types:
+    - id: email
+      name: Email
+      type: string
+      config:
+        format: email

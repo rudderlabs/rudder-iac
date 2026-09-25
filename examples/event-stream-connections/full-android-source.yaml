@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: full-android-source
+spec:
+  id: full-android-source
+  name: Full Android Source
+  type: android
+  enabled: true

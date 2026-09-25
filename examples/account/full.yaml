@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: full-postgres-account
+spec:
+  id: full-postgres-account
+  name: Production Postgres Account
+  account_definition_name: SOURCE_POSTGRES
+  config:
+    host: warehouse.example.com
+    dbname: analytics
+    user: rudder
+    port: 5432
+    sslMode: verify-full
+    password: replace-with-postgres-password
+    connectionTimeout: 30

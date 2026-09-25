@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: minimal-orders-model
+spec:
+  id: minimal-orders-model
+  display_name: Minimal Orders Model
+  account: "#account:minimal-model-account"
+  primary_key: id
+  source_definition: postgres
+  enabled: true
+  sql: SELECT id FROM orders

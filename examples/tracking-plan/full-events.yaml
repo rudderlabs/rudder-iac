@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: ecommerce-events
+spec:
+  events:
+    - id: checkout_started
+      name: Checkout Started
+      event_type: track
+      description: Emitted when a customer starts checkout

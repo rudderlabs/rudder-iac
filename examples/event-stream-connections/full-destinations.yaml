@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: full-webhook-destination
+spec:
+  id: full-webhook-destination
+  display_name: Full Webhook Destination
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://webhooks.example.com/web
+    connection_mode:
+      web: cloud

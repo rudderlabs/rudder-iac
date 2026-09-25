@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: minimal-transformation
+spec:
+  id: minimal-transformation
+  name: Minimal Transformation
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) {
+      return event;
+    }

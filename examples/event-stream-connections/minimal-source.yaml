@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: minimal-connection-source
+spec:
+  id: minimal-connection-source
+  name: Minimal Connection Source
+  type: javascript
+  enabled: true

@@ -1,0 +1,7 @@
+version: rudder/v1
+kind: data-graph
+metadata:
+  name: minimal-data-graph
+spec:
+  id: minimal-data-graph
+  account_id: warehouse-account-id

@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: minimal-web-source
+spec:
+  id: minimal-web-source
+  name: Minimal Web Source
+  type: javascript
+  enabled: true

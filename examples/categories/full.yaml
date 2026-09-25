@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: categories
+metadata:
+  name: full-categories
+spec:
+  categories:
+    - id: acquisition
+      name: Acquisition
+    - id: lifecycle
+      name: Lifecycle

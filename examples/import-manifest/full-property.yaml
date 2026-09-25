@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: imported-property
+spec:
+  properties:
+    - id: imported-email
+      name: Imported Email
+      type: string

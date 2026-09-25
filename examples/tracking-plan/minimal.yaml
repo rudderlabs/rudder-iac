@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: minimal-tracking-plan
+spec:
+  id: minimal-tracking-plan
+  display_name: Minimal Tracking Plan
+  rules: []

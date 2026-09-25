@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: full-transformation
+spec:
+  id: full-transformation
+  name: Full Transformation
+  description: Normalizes an email address using a shared library
+  language: javascript
+  code: |
+    import { normalizeEmail } from "emailUtilities";
+
+    export function transformEvent(event, metadata) {
+      if (event.context && event.context.traits && event.context.traits.email) {
+        event.context.traits.email = normalizeEmail(event.context.traits.email);
+      }
+      return event;
+    }

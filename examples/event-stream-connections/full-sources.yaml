@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: full-web-source
+spec:
+  id: full-web-source
+  name: Full Web Source
+  type: javascript
+  enabled: true

@@ -1,0 +1,22 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: minimal-retl-connection
+spec:
+  connections:
+    - id: minimal-retl-connection
+      source: "#retl-source-sql-model:minimal-retl-model"
+      destination: "#destination:minimal-retl-destination"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        schedule:
+          type: manual
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: traits.email
+        event:
+          type: identify

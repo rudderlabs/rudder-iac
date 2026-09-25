@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: full-events
+spec:
+  events:
+    - id: product_viewed
+      name: Product Viewed
+      event_type: track
+      description: Emitted when a customer views a product
+    - id: checkout_started
+      name: Checkout Started
+      event_type: track
+      description: Emitted when a customer starts checkout
+    - id: checkout_page
+      event_type: page
+      description: Emitted when the checkout page is viewed

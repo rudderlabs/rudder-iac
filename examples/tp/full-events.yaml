@@ -1,0 +1,10 @@
+version: rudder/0.1
+kind: events
+metadata:
+  name: legacy-events
+spec:
+  events:
+    - id: order_completed
+      name: Order Completed
+      event_type: track
+      description: Emitted when an order completes

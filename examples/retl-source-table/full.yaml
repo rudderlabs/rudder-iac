@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: full-orders-table
+spec:
+  id: full-orders-table
+  display_name: Full Orders Table
+  account: "#account:full-table-account"
+  primary_key: order_id
+  source_definition: postgres
+  schema: analytics
+  table: completed_orders
+  enabled: true

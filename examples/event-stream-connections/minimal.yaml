@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: event-stream-connections
+metadata:
+  name: minimal-event-stream-connection
+spec:
+  connections:
+    - id: minimal-event-stream-connection
+      source: "#event-stream-source:minimal-connection-source"
+      destination: "#destination:minimal-connection-destination"
+      enabled: true

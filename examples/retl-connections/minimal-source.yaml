@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: minimal-retl-model
+spec:
+  id: minimal-retl-model
+  display_name: Minimal RETL Model
+  account: "#account:minimal-retl-account"
+  primary_key: id
+  source_definition: postgres
+  enabled: true
+  sql: SELECT id, email FROM users

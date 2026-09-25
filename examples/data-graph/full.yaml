@@ -1,0 +1,32 @@
+version: rudder/v1
+kind: data-graph
+metadata:
+  name: ecommerce-data-graph
+spec:
+  id: ecommerce-data-graph
+  account_id: warehouse-account-id
+  models:
+    - id: customer
+      display_name: Customer
+      description: A customer entity
+      type: entity
+      table: analytics.public.customers
+      primary_id: customer_id
+      root: true
+      columns:
+        - name: email
+          display_name: Email Address
+          pii_mask: true
+    - id: order
+      display_name: Order
+      description: An order event
+      type: event
+      table: analytics.public.orders
+      timestamp: ordered_at
+      relationships:
+        - id: order-customer
+          display_name: Order Customer
+          cardinality: many-to-one
+          target: "#data-graph-model:customer"
+          source_join_key: customer_id
+          target_join_key: customer_id

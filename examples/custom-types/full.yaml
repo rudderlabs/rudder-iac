@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: full-custom-types
+spec:
+  types:
+    - id: percentage
+      name: Percentage
+      description: A percentage from zero to one hundred
+      type: number
+      config:
+        minimum: 0
+        maximum: 100
+    - id: status
+      name: Status
+      description: Current lifecycle status
+      type: string
+      config:
+        enum:
+          - active
+          - inactive

@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: full-retl-model
+spec:
+  id: full-retl-model
+  display_name: Full RETL Model
+  account: "#account:full-retl-account"
+  primary_key: customer_id
+  source_definition: postgres
+  enabled: true
+  sql: SELECT customer_id, email, plan, updated_at FROM customers

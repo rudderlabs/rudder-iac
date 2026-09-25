@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: full-properties
+spec:
+  properties:
+    - id: order_id
+      name: Order ID
+      description: Unique order identifier
+      type: string
+    - id: order_total
+      name: Order Total
+      description: Total value of the order
+      type: number
+      config:
+        minimum: 0
+    - id: item_names
+      name: Item Names
+      description: Product names in the order
+      type: array
+      item_type: string

@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: full-customer-model
+spec:
+  id: full-customer-model
+  display_name: Full Customer Model
+  account: "#account:full-model-account"
+  primary_key: customer_id
+  source_definition: postgres
+  enabled: true
+  sql: |
+    SELECT
+      customer_id,
+      email,
+      updated_at
+    FROM analytics.customers
+    WHERE deleted_at IS NULL

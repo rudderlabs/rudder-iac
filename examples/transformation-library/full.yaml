@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: full-transformation-library
+spec:
+  id: full-transformation-library
+  name: Customer Data Utilities
+  description: Shared normalization helpers for customer data
+  language: javascript
+  import_name: customerDataUtilities
+  code: |
+    export function normalizeEmail(email) {
+      return email.trim().toLowerCase();
+    }
+
+    export function fullName(firstName, lastName) {
+      return `${firstName} ${lastName}`.trim();
+    }

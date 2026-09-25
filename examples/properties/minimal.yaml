@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: minimal-properties
+spec:
+  properties:
+    - id: email
+      name: Email
+      type: string
