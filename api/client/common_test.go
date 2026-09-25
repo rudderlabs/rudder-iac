@@ -98,6 +98,30 @@ func TestAPIError_Error(t *testing.T) {
 			},
 			want: `http status code: 400, error code: '', error: 'request validation failed' (details: ["a","b"])`,
 		},
+		{
+			name: "permission 403 names the token fix",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "Insufficient permissions",
+			},
+			want: "permission denied: 'Insufficient permissions': use an access token with the required permissions, or ask a workspace admin to grant them",
+		},
+		{
+			name: "feature-flag 403 names the support fix",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "Feature is not enabled for your account: DATA_GRAPH",
+			},
+			want: "feature not enabled: 'Feature is not enabled for your account: DATA_GRAPH': ask RudderStack support to enable it for your account",
+		},
+		{
+			name: "business-rule 403 keeps the raw rendering",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "tracking plan still connected to sources: src-1",
+			},
+			want: "http status code: 403, error code: '', error: 'tracking plan still connected to sources: src-1'",
+		},
 	}
 
 	for _, tt := range tests {

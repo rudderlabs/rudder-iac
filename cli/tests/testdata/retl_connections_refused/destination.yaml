@@ -5,8 +5,10 @@ metadata:
 spec:
   id: e2e-retl-archive
   display_name: E2E RETL Archive
-  type: webhook
+  # Google Ads lists no warehouse source type upstream, so no rETL connection
+  # can reach it.
+  type: googleads
   enabled: true
   definition_version: 1
   config:
-    webhook_url: "https://archive.example.com/rudder"
+    conversion_id: AW-123456789

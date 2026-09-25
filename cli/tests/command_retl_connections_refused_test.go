@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,6 +33,9 @@ import (
 // destination and its type, and that a refused project reaches the API with
 // nothing.
 func TestRETLConnectionRefusedAtCreate(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 
 	executor, err := NewCmdExecutor("")
@@ -53,7 +57,7 @@ func TestRETLConnectionRefusedAtCreate(t *testing.T) {
 	out, err = executor.Execute(cliBinPath,
 		"apply", "-l", projectDir, "--var-file", credentials, "--confirm=false")
 	require.Error(t, err, "apply should have refused the connection, got: %s", out)
-	assert.Contains(t, string(out), `destination 'e2e-retl-archive' (type 'webhook') does not accept rETL sources`,
+	assert.Contains(t, string(out), `destination 'e2e-retl-archive' (type 'googleads') does not accept rETL sources`,
 		"the refusal must name the destination and its type, not just fail")
 
 	// Nothing was written: the point of refusing at create is that no

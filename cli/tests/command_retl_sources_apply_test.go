@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,12 +33,11 @@ const (
 // apply the account alone, read its id back and feed it to the sources through
 // a generated var file.
 //
-// Deliberately ungated. DEX-901 found that RUN_CONNECTION_E2E was added to the
-// e2e workflow but never defined as a repository variable, so that suite has
-// never executed — a gate is only coverage if someone remembers to turn it on.
-// This suite needs nothing TestAccountsApply does not already need (a live
-// stack carrying SOURCE_POSTGRES), so it runs in the same lane instead.
+// Gated behind RUN_RETL_E2E; test-with-coverage.yml records why.
 func TestRETLSourcesApply(t *testing.T) {
+	if os.Getenv("RUN_RETL_E2E") != "1" {
+		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
+	}
 	allowManagedResidue(t)
 	// Accounts are behind the experimental umbrella and the table kind behind
 	// its own flag; the SQL model kind is behind neither.

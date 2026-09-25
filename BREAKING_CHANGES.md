@@ -6,6 +6,14 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 ## Upcoming (unreleased)
 
+### Re-import destinations that already have an rETL connection
+
+**Scope:** spec
+
+**Why:** the CLI now maps `connectionMode.warehouse` and `consentManagement.warehouse` on active_campaign, am, attentive_tag, braze, bqstream, customerio, facebook_conversions, facebook_pixel, ga4, gcs, hs, iterable, mp, posthog, s3, tiktok_ads and webhook destinations. Before, it dropped them. The webapp writes these keys when you connect a warehouse source, so specs imported earlier don't have them.
+
+For those destinations, `plan` now shows an update that removes the keys, and `apply` strips them along with any warehouse consent settings. To avoid this, re-import the affected destinations with `rudder-cli import workspace` before your next `apply`.
+
 ### Spec format upgrade: `rudder/0.1` → `rudder/v1`
 
 `rudder/v1` is a comprehensive redesign of the original `rudder/0.1` spec format. It improves consistency across resource kinds, replaces ambiguous field names, adopts snake_case conventions, and moves to compact URN-style references throughout. All changes below must be applied when upgrading from `rudder/0.1` to `rudder/v1`.
