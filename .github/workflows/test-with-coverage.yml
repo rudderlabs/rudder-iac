@@ -166,7 +166,7 @@ jobs:
           # destroy. Same rule: set the repository variable to 1 only while that
           # workspace is disposable.
           RUN_CONNECTION_E2E: ${{ vars.RUN_CONNECTION_E2E }}
-          # Gates the five RETL suites. Passed as a literal rather than through a
+          # Gates the seven RETL suites. Passed as a literal rather than through a
           # repository variable on purpose: RUN_CONNECTION_E2E above reads
           # ${{ vars.RUN_CONNECTION_E2E }}, that variable has never been defined,
           # and DEX-901 found the suite it gates has therefore never run. A gate
