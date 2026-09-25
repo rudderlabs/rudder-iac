@@ -23,6 +23,7 @@ import (
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
@@ -86,6 +87,45 @@ func (p *Provider) SupportedKinds() []string {
 		localcatalog.KindTrackingPlansV1,
 		localcatalog.KindCustomTypes,
 		localcatalog.KindCategories,
+	}
+}
+
+// SpecSchemas returns the schema for every data-catalog kind, including the
+// legacy tp envelope. Properties and events use version-specific bodies because
+// their legacy and v1 decoders expose different fields.
+func (p *Provider) SpecSchemas() schema.Set {
+	patterns := p.SupportedMatchPatterns()
+	return schema.Set{
+		localcatalog.KindProperties: schema.ForVersionedKind(localcatalog.KindProperties, map[string]any{
+			specs.SpecVersionV0_1:        localcatalog.PropertySpec{},
+			specs.SpecVersionV0_1Variant: localcatalog.PropertySpec{},
+			specs.SpecVersionV1:          localcatalog.PropertySpecV1{},
+		}),
+		localcatalog.KindEvents: schema.ForVersionedKind(localcatalog.KindEvents, map[string]any{
+			specs.SpecVersionV0_1:        localcatalog.EventSpec{},
+			specs.SpecVersionV0_1Variant: localcatalog.EventSpec{},
+			specs.SpecVersionV1:          localcatalog.EventSpecV1{},
+		}),
+		localcatalog.KindTrackingPlans: schema.ForKindVersions(
+			localcatalog.KindTrackingPlans,
+			localcatalog.TrackingPlan{},
+			schema.VersionsForKind(localcatalog.KindTrackingPlans, patterns)...,
+		),
+		localcatalog.KindTrackingPlansV1: schema.ForKindVersions(
+			localcatalog.KindTrackingPlansV1,
+			localcatalog.TrackingPlanV1{},
+			schema.VersionsForKind(localcatalog.KindTrackingPlansV1, patterns)...,
+		),
+		localcatalog.KindCustomTypes: schema.ForVersionedKind(localcatalog.KindCustomTypes, map[string]any{
+			specs.SpecVersionV0_1:        localcatalog.CustomTypeSpec{},
+			specs.SpecVersionV0_1Variant: localcatalog.CustomTypeSpec{},
+			specs.SpecVersionV1:          localcatalog.CustomTypeSpecV1{},
+		}),
+		localcatalog.KindCategories: schema.ForKindVersions(
+			localcatalog.KindCategories,
+			localcatalog.CategorySpecV1{},
+			schema.VersionsForKind(localcatalog.KindCategories, patterns)...,
+		),
 	}
 }
 

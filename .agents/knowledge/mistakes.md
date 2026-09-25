@@ -98,3 +98,8 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## DEX-1000 — GoReleaser Generated-Artifact Lifecycle
+<!-- ticket:DEX-1000 -->
+- GoReleaser rejects generated schema files placed in `dist` by a `before` hook and cleans temporary source directories before `release.extra_files` can retain them in this pipeline.
+- Durable mitigation: generate all schema assets in a dedicated workflow step after GoReleaser and upload them to the release explicitly, rather than relying on GoReleaser hooks for generated schema publication.

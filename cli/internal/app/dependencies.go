@@ -72,6 +72,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/workspace"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -185,14 +186,29 @@ func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, err
 	return ruledoc.Build(cp, GetVersion(), generatedAt)
 }
 
+// GenerateSchemas returns the schemas exposed by the same composite provider
+// used for project kind routing. Schema generation only reflects local Go types,
+// so it does not require credentials or make network calls.
+func GenerateSchemas() (schema.Set, error) {
+	cp, err := newCompositeProvider()
+	if err != nil {
+		return nil, fmt.Errorf("building composite provider: %w", err)
+	}
+
+	sp, ok := cp.(provider.SchemaProvider)
+	if !ok {
+		return nil, fmt.Errorf("composite provider does not provide schemas")
+	}
+	return sp.SpecSchemas(), nil
+}
+
 // newCompositeProvider builds the composite provider without requiring
-// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
-// enumerates rules and reads authored fragments but makes no network calls, so
-// it skips the auth check NewDeps enforces and feeds client.New a placeholder
-// token (an empty token is rejected outright, which would otherwise break
-// generation in CI where no credentials are configured). It shares
-// composeProviders with NewDeps so the documented rule set stays identical to
-// the one project validation observes — they can't drift.
+// credentials. It is used by local generators that inspect provider metadata
+// but make no network calls, so it skips the auth check NewDeps enforces and
+// feeds client.New a placeholder token (an empty token is rejected outright,
+// which would otherwise break generation in CI where no credentials are
+// configured). It shares composeProviders with NewDeps so generators observe
+// the same providers as project validation.
 func newCompositeProvider() (provider.Provider, error) {
 	cfg := config.GetConfig()
 

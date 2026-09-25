@@ -235,6 +235,33 @@ func TestWorkspaceImport_SkipsManifestWhenFlagOff(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "import-manifest.yaml must not be written when importMerge is off")
 }
 
+func TestWorkspaceImport_WritesSchemaModelineOnlyToSpecs(t *testing.T) {
+	enableImportMerge(t)
+
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entities:   entities,
+		entries:    entries,
+	}, ImportOptions{
+		SchemaModeline:        true,
+		SchemaModelineBaseURL: "https://schemas.example.test/v1/",
+	})
+	require.NoError(t, err)
+
+	specContent, err := os.ReadFile(filepath.Join(dir, ImportedDir, "sources", "my-src.yaml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(specContent), "# yaml-language-server: $schema=https://schemas.example.test/v1/source.schema.json\n")
+
+	manifestContent, err := os.ReadFile(filepath.Join(dir, ImportedDir, importmanifest.FileName))
+	require.NoError(t, err)
+	assert.NotContains(t, string(manifestContent), "# yaml-language-server:")
+}
+
 func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 	enableImportMerge(t)
 

@@ -22,6 +22,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -118,6 +119,23 @@ func (p *Provider) SupportedKinds() []string {
 		kinds = append(kinds, kind)
 	}
 	return kinds
+}
+
+// SpecSchemas returns the source and connection schemas owned by event-stream.
+func (p *Provider) SpecSchemas() schema.Set {
+	patterns := p.SupportedMatchPatterns()
+	return schema.Set{
+		sourceHandler.ResourceKind: schema.ForKindVersions(
+			sourceHandler.ResourceKind,
+			sourceHandler.SourceSpec{},
+			schema.VersionsForKind(sourceHandler.ResourceKind, patterns)...,
+		),
+		connectionHandler.EventStreamConnectionResourceKind: schema.ForKindVersions(
+			connectionHandler.EventStreamConnectionResourceKind,
+			connectionHandler.ConnectionsSpec{},
+			schema.VersionsForKind(connectionHandler.EventStreamConnectionResourceKind, patterns)...,
+		),
+	}
 }
 
 // kindsWithoutLegacyVersions are kinds introduced after legacy spec versions

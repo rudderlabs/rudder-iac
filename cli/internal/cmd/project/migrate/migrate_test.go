@@ -8,6 +8,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMigrateSchemaModelineFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdMigrate()
+	modeline := cmd.Flags().Lookup("schema-modeline")
+	require.NotNil(t, modeline)
+	assert.Equal(t, "false", modeline.DefValue)
+
+	base := cmd.Flags().Lookup("schema-url-base")
+	require.NotNil(t, base)
+	assert.Empty(t, base.DefValue)
+}
+
 func TestMigrateTelemetryExtras(t *testing.T) {
 	t.Parallel()
 

@@ -21,6 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -1202,6 +1203,7 @@ func TestProviderWithoutConnectionSupport(t *testing.T) {
 	p := retl.New(newDefaultMockClient())
 
 	assert.Equal(t, []string{sqlmodel.ResourceKind}, p.SupportedKinds())
+	assert.ElementsMatch(t, p.SupportedKinds(), schema.Kinds(p.SpecSchemas()))
 	assert.Equal(t, []string{sqlmodel.ResourceType}, p.SupportedTypes())
 	assert.Equal(t, []string{sqlmodel.ResourceType}, matcherTypes(p.ResourceMatchers()))
 
@@ -1221,6 +1223,7 @@ func TestProviderWithConnectionSupport(t *testing.T) {
 	p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
 
 	assert.ElementsMatch(t, []string{sqlmodel.ResourceKind, connection.ResourceKind}, p.SupportedKinds())
+	assert.ElementsMatch(t, p.SupportedKinds(), schema.Kinds(p.SpecSchemas()))
 	assert.ElementsMatch(t, []string{sqlmodel.ResourceType, connection.ResourceType}, p.SupportedTypes())
 	assert.Equal(t, []string{sqlmodel.ResourceType, connection.ResourceType}, matcherTypes(p.ResourceMatchers()))
 

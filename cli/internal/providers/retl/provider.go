@@ -25,6 +25,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
@@ -144,6 +145,35 @@ func (p *Provider) SupportedKinds() []string {
 		kinds = append(kinds, kind)
 	}
 	return kinds
+}
+
+// SpecSchemas mirrors the option-gated kind registry: SQL models are always
+// present, while table sources and connections appear only when their support
+// options registered the corresponding handlers.
+func (p *Provider) SpecSchemas() schema.Set {
+	patterns := p.SupportedMatchPatterns()
+	schemas := schema.Set{
+		sqlmodel.ResourceKind: schema.ForKindVersions(
+			sqlmodel.ResourceKind,
+			sqlmodel.SQLModelSpec{},
+			schema.VersionsForKind(sqlmodel.ResourceKind, patterns)...,
+		),
+	}
+	if _, ok := p.kindToType[table.ResourceKind]; ok {
+		schemas[table.ResourceKind] = schema.ForKindVersions(
+			table.ResourceKind,
+			table.TableSpec{},
+			schema.VersionsForKind(table.ResourceKind, patterns)...,
+		)
+	}
+	if _, ok := p.kindToType[connection.ResourceKind]; ok {
+		schemas[connection.ResourceKind] = schema.ForKindVersions(
+			connection.ResourceKind,
+			connection.ConnectionsSpec{},
+			schema.VersionsForKind(connection.ResourceKind, patterns)...,
+		)
+	}
+	return schemas
 }
 
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {

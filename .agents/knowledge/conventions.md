@@ -287,3 +287,12 @@
 - Do not make a key `required` so that validation sees a value; declare its schema default instead. Nested defaults still fill only a block the spec carries, so a key inside an omitted block stays absent during validation too.
 - A key that stays required declares no default, even when `schema.json` has one: a default would fill in before validation and switch the requirement off. Registration rejects this only for a bare `required` tag, not for custom required checks. Redshift `use_iam_for_auth`, Snowflake `use_key_pair_auth` and Snowflake `s3.role_based_auth` stay required on purpose.
 - Customer.io `api_version` defaults to `v2`, matching integrations-config #2705, so a spec that omits it requires `user_id_identifier_type`.
+
+## DEX-1000 — Published JSON Schema Contract
+<!-- ticket:DEX-1000 -->
+- `rudder-cli schema --out` publishes one `<kind>.schema.json` file per active kind plus `rudder-cli.schema.json`; existing files are protected unless `--overwrite` is explicit. Preflight every target before writing so one collision cannot leave a partially regenerated directory.
+- YAML schema modelines remain opt-in on import and migration. Their default URLs target versioned release assets, while `--schema-url-base` supplies a custom root and implies modeline emission. Append the running CLI version exactly once; only the default GitHub release base normalizes an unprefixed version to the repository's `v`-prefixed tag convention.
+- Release schema generation must enable all distributable option-gated kinds so every URL the CLI can emit has a corresponding release asset; this includes `retl-connections` and `retl-source-table`. Generate and upload them in a dedicated post-GoReleaser workflow step against the checked-out release tag.
+- Reflected struct schemas stay closed with `additionalProperties: false` to match strict spec decoding; intentional `map[string]any` config blocks remain open.
+- Validation-tag enrichment must preserve runtime structural constraints, including `required`, `oneof` enums, `gte`/`lte` bounds, `eq` constants, `required_without`, `required_if`, `required_unless`, and element rules after `dive`; `$ref`/`$defs` traversal must remain cycle-safe.
+- Generated JSON Schemas enforce structural constraints only. Remote and cross-resource semantics remain the responsibility of `rudder-cli validate`.

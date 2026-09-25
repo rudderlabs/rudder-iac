@@ -20,6 +20,14 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -31,6 +39,12 @@ jobs:
         with:
           go-version: 1.25.0
           cache: false
+      - name: Generate JSON Schema assets
+        run: go run ./cli/cmd/rudder-cli schema --out .release-schemas
+        env:
+          RUDDERSTACK_CLI_EXPERIMENTAL: "true"
+          RUDDERSTACK_X_RETL_CONNECTION_SUPPORT: "true"
+          RUDDERSTACK_X_RETL_TABLE_SUPPORT: "true"
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:

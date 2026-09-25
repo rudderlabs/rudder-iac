@@ -46,6 +46,10 @@ archives:
       - goos: windows
         formats: [ 'zip' ]
 
+release:
+  extra_files:
+    - glob: .release-schemas/*.schema.json
+
 changelog:
   sort: asc
   filters:

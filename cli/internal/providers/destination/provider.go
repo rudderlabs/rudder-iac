@@ -9,6 +9,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -39,6 +40,19 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 // LoadLegacySpec rejects legacy spec versions — destinations are v1-only.
 func (p *Provider) LoadLegacySpec(_ string, s *specs.Spec) error {
 	return fmt.Errorf("destination specs require version '%s', got '%s'. Legacy versions are not supported", specs.SpecVersionV1, s.Version)
+}
+
+// SpecSchemas returns the destination envelope. The config field deliberately
+// remains open because its concrete shape is selected dynamically by type and
+// definition_version from the provider's registry.
+func (p *Provider) SpecSchemas() schema.Set {
+	return schema.Set{
+		DestinationSpecKind: schema.ForKindVersions(
+			DestinationSpecKind,
+			DestinationSpec{},
+			schema.VersionsForKind(DestinationSpecKind, p.SupportedMatchPatterns())...,
+		),
+	}
 }
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully

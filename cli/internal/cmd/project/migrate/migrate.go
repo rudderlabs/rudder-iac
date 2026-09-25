@@ -9,17 +9,20 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/migrator"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 	"github.com/spf13/cobra"
 )
 
 func NewCmdMigrate() *cobra.Command {
 	var (
-		deps     app.Deps
-		err      error
-		location string
-		confirm  bool
-		proj     project.Project
-		varFiles []string
+		deps           app.Deps
+		err            error
+		location       string
+		confirm        bool
+		proj           project.Project
+		varFiles       []string
+		schemaModeline bool
+		schemaURLBase  string
 	)
 
 	cmd := &cobra.Command{
@@ -38,6 +41,13 @@ func NewCmdMigrate() *cobra.Command {
 			$ rudder-cli migrate --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("schema-url-base") {
+				schemaModeline = true
+			}
+			if schemaModeline {
+				schemaURLBase = editor.VersionedReleaseURLBase(schemaURLBase, app.GetVersion())
+			}
+
 			// Initialize dependencies
 			deps, err = app.NewDeps()
 			if err != nil {
@@ -65,7 +75,11 @@ func NewCmdMigrate() *cobra.Command {
 				telemetry.TrackCommand("migrate", err, migrateTelemetryExtras(location, confirm)...)
 			}()
 
-			m := migrator.New(proj, deps.CompositeProvider())
+			migratorOpts := make([]migrator.Option, 0, 1)
+			if schemaModeline {
+				migratorOpts = append(migratorOpts, migrator.WithSchemaModeline(schemaURLBase))
+			}
+			m := migrator.New(proj, deps.CompositeProvider(), migratorOpts...)
 			err = m.Migrate(confirm)
 			return err
 		},
@@ -74,6 +88,8 @@ func NewCmdMigrate() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm migration before proceeding")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
+	cmd.Flags().BoolVar(&schemaModeline, "schema-modeline", false, "Add yaml-language-server schema modelines to migrated specs")
+	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "Release URL root for schemas; the CLI version is appended (implies --schema-modeline)")
 
 	return cmd
 }

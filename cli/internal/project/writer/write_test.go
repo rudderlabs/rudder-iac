@@ -5,9 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,6 +168,86 @@ func TestWrite(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, formatterFail)
 	})
+}
+
+func TestWriteSchemaModeline(t *testing.T) {
+	t.Parallel()
+
+	spec := &specs.Spec{
+		Version:  specs.SpecVersionV1,
+		Kind:     "source",
+		Metadata: map[string]any{"name": "test"},
+		Spec:     map[string]any{"id": "test"},
+	}
+	formatters := formatter.Setup(formatter.DefaultYAML)
+
+	t.Run("default remains off", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, Write(t.Context(), dir, formatters, []FormattableEntity{{
+			Content: spec, RelativePath: "source.yaml",
+		}}))
+		content, err := os.ReadFile(filepath.Join(dir, "source.yaml"))
+		require.NoError(t, err)
+		assert.False(t, strings.HasPrefix(string(content), "# yaml-language-server:"))
+	})
+
+	t.Run("enabled uses kind schema URL and remains parseable", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, Write(t.Context(), dir, formatters, []FormattableEntity{{
+			Content: spec, RelativePath: "source.yaml",
+		}}, WithSchemaModeline("https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3/")))
+		content, err := os.ReadFile(filepath.Join(dir, "source.yaml"))
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(string(content), "# yaml-language-server: $schema=https://github.com/rudderlabs/rudder-iac/releases/download/v1.2.3/source.schema.json\n"))
+
+		parsed, err := specs.New(content)
+		require.NoError(t, err)
+		assert.Equal(t, spec.Kind, parsed.Kind)
+	})
+
+	t.Run("custom base is trimmed", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, Write(t.Context(), dir, formatters, []FormattableEntity{{
+			Content: spec, RelativePath: "source.yml",
+		}}, WithSchemaModeline(" https://schemas.example.test/rudder/// ")))
+		content, err := os.ReadFile(filepath.Join(dir, "source.yml"))
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(string(content), "# yaml-language-server: $schema=https://schemas.example.test/rudder/source.schema.json\n"))
+	})
+
+	t.Run("non spec YAML content is unchanged", func(t *testing.T) {
+		dir := t.TempDir()
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("# existing comment\nkey: value\n")})
+		require.NoError(t, Write(t.Context(), dir, formatters, []FormattableEntity{{
+			Content: map[string]any{"key": "value"}, RelativePath: "manifest.yaml",
+		}}, WithSchemaModeline("https://schemas.example.test")))
+		content, err := os.ReadFile(filepath.Join(dir, "manifest.yaml"))
+		require.NoError(t, err)
+		assert.Equal(t, "# existing comment\nkey: value\n", string(content))
+	})
+}
+
+func TestOverwriteFileSchemaModeline(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "source.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("old"), 0644))
+
+	spec := &specs.Spec{
+		Version:  specs.SpecVersionV1,
+		Kind:     "source",
+		Metadata: map[string]any{"name": "test"},
+		Spec:     map[string]any{"id": "test"},
+	}
+	err := OverwriteFile(formatter.Setup(formatter.DefaultYAML), FormattableEntity{
+		Content: spec, RelativePath: path,
+	}, WithSchemaModeline("https://schemas.example.test/v1"))
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(content), "# yaml-language-server: $schema=https://schemas.example.test/v1/source.schema.json\n"))
 }
 
 func TestOverwriteFile(t *testing.T) {
