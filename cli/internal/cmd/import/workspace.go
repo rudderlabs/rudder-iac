@@ -88,7 +88,6 @@ func NewCmdWorkspaceImport() *cobra.Command {
          Add any required secret fields to the exported specs using
          variable substitution ({{ .VAR }}), and pass them with
          --var-file to apply and to later imports.`)
-				ui.PrintSuccess("Done")
 			}
 
 			return err
