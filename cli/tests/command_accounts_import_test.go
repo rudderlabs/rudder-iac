@@ -82,7 +82,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	importedDir := filepath.Join(projectDir, importer.ImportedDir)
 
-	specPath, spec := findAccountSpec(t, importedDir)
+	specPath, spec := findImportedSpec(t, importedDir, "accounts", importedAccountName)
 	assert.Contains(t, spec, "SOURCE_BIGQUERY", "scaffolded spec must carry the account definition")
 
 	reference := varReference.FindStringSubmatch(spec)
@@ -100,7 +100,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	assertNoSecretOnDisk(t, projectDir)
 
 	// Reduce the generated project to the seeded account before applying.
-	pruneToAccount(t, importedDir, specPath, seededID)
+	pruneImport(t, importedDir, "accounts", specPath, seededID)
 
 	// Fill in the placeholder and adopt the account. Import only scaffolds; the
 	// remote is claimed (Update + SetExternalID) on apply.
@@ -172,33 +172,33 @@ func seedUnmanagedAccount(t *testing.T, apiClient *client.Client) string {
 	return account.ID
 }
 
-// findAccountSpec returns the scaffolded spec for the seeded account. The
-// workspace may hold other importable accounts, so the spec is matched by name
-// rather than by being the only one present.
-func findAccountSpec(t *testing.T, importedDir string) (string, string) {
+// findImportedSpec returns the scaffolded spec under kindDir that names the
+// seeded resource. The workspace may hold other importable resources of the
+// kind, so the spec is matched by name rather than by being the only one present.
+func findImportedSpec(t *testing.T, importedDir, kindDir, name string) (string, string) {
 	t.Helper()
 
-	matches, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
+	matches, err := filepath.Glob(filepath.Join(importedDir, kindDir, "*.yaml"))
 	require.NoError(t, err)
-	require.NotEmpty(t, matches, "expected a scaffolded account spec in %s", importedDir)
+	require.NotEmpty(t, matches, "expected a scaffolded spec in %s", filepath.Join(importedDir, kindDir))
 
 	for _, path := range matches {
 		content, err := os.ReadFile(path)
 		require.NoError(t, err)
-		if strings.Contains(string(content), importedAccountName) {
+		if strings.Contains(string(content), name) {
 			return path, string(content)
 		}
 	}
 
-	t.Fatalf("no scaffolded spec found for account %q among %v", importedAccountName, matches)
+	t.Fatalf("no scaffolded %s spec found for %q among %v", kindDir, name, matches)
 	return "", ""
 }
 
-// pruneToAccount reduces the generated project to the seeded account: every
-// other scaffolded spec is removed, and the import manifest is filtered to the
+// pruneImport reduces the generated project to one seeded resource: every other
+// scaffolded spec is removed, and the import manifest is filtered to the
 // matching URN. Both halves are needed — a manifest entry whose spec is gone is
 // an orphaned URN and fails validation.
-func pruneToAccount(t *testing.T, importedDir, keepSpec, remoteID string) {
+func pruneImport(t *testing.T, importedDir, kindDir, keepSpec, remoteID string) {
 	t.Helper()
 
 	entries, err := os.ReadDir(importedDir)
@@ -206,16 +206,16 @@ func pruneToAccount(t *testing.T, importedDir, keepSpec, remoteID string) {
 	for _, entry := range entries {
 		path := filepath.Join(importedDir, entry.Name())
 		switch entry.Name() {
-		case "accounts", importer.SecretsVarFileName, importmanifest.FileName:
+		case kindDir, importer.SecretsVarFileName, importmanifest.FileName:
 			continue
 		default:
 			require.NoError(t, os.RemoveAll(path))
 		}
 	}
 
-	accountSpecs, err := filepath.Glob(filepath.Join(importedDir, "accounts", "*.yaml"))
+	kindSpecs, err := filepath.Glob(filepath.Join(importedDir, kindDir, "*.yaml"))
 	require.NoError(t, err)
-	for _, path := range accountSpecs {
+	for _, path := range kindSpecs {
 		if path != keepSpec {
 			require.NoError(t, os.Remove(path))
 		}
@@ -225,7 +225,7 @@ func pruneToAccount(t *testing.T, importedDir, keepSpec, remoteID string) {
 }
 
 // filterManifest rewrites the import manifest in place, keeping only the entry
-// whose remote id is the seeded account. It decodes and re-emits through the
+// whose remote id is the seeded resource. It decodes and re-emits through the
 // production types (specs.WorkspacesImportMetadata, importmanifest.BuildNode)
 // rather than a hand-rolled struct, so the test cannot drift from the real
 // manifest shape.
@@ -252,7 +252,7 @@ func filterManifest(t *testing.T, path, remoteID string) {
 			}
 		}
 	}
-	require.Len(t, kept, 1, "manifest must map the seeded account %s to a URN", remoteID)
+	require.Len(t, kept, 1, "manifest must map the seeded resource %s to a URN", remoteID)
 
 	node, err := importmanifest.BuildNode(kept)
 	require.NoError(t, err)
