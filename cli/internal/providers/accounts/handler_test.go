@@ -3,10 +3,14 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -200,6 +204,18 @@ func TestMapRemoteToState_SecretIsUnknown(t *testing.T) {
 	assert.True(t, cred.IsUnknown(), "remote secret must be unknown so it always diffs")
 }
 
+func TestMapRemoteToState_SeedsOnlyTheAuthModesSecrets(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+
+	res, _, err := h.MapRemoteToState(sfRemote("snf", "password"), nil)
+	require.NoError(t, err)
+
+	wrapped, ok := res.Config["password"].(*secret.String)
+	require.True(t, ok, "password should be wrapped as *secret.String")
+	assert.True(t, wrapped.IsUnknown(), "password must be unknown so it always diffs")
+	assert.NotContains(t, res.Config, "privateKey")
+}
+
 func bqRemote(externalID string, opts string) *RemoteAccount {
 	acc := &client.Account{
 		ID:         "remote-" + externalID,
@@ -251,6 +267,36 @@ func TestFormatForExport_NeverLeaksSecret(t *testing.T) {
 	assert.Contains(t, string(rendered), "{{ .PROD_ANALYTICS_BQ_CREDENTIALS }}")
 }
 
+// Narrowing to the auth mode decides which secrets are seeded, not which are
+// masked: a secret of the other mode that the API echoed back is still a secret.
+func TestFormatForExport_NeverLeaksOffModeSecret(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+	remote := sfRemote("snf", "keyPair")
+	remote.Options = json.RawMessage(`{"account":"xy12345","authenticationType":"keyPair","password":"leaked-password"}`)
+
+	entities, _, err := h.FormatForExport(map[string]*RemoteAccount{"snf": remote}, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, entities, 1)
+
+	rendered, err := json.Marshal(entities[0].Content)
+	require.NoError(t, err)
+	assert.NotContains(t, string(rendered), "leaked-password", "raw secret must never reach an exported spec")
+	assert.Contains(t, string(rendered), "{{ .SNF_PASSWORD }}")
+}
+
+func TestMapRemoteToState_OffModeSecretIsUnknown(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+	remote := sfRemote("snf", "keyPair")
+	remote.Options = json.RawMessage(`{"authenticationType":"keyPair","password":"leaked-password"}`)
+
+	res, _, err := h.MapRemoteToState(remote, nil)
+	require.NoError(t, err)
+
+	wrapped, ok := res.Config["password"].(*secret.String)
+	require.True(t, ok, "an echoed off-mode secret must still be wrapped as *secret.String")
+	assert.True(t, wrapped.IsUnknown())
+}
+
 func TestToExportSpecMap_UnsupportedDefinition(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
 	acc := &client.Account{ID: "remote-x", ExternalID: "x"}
@@ -296,5 +342,118 @@ func TestRegisteredAccountSecretKeys_AreFlat(t *testing.T) {
 			assert.NotContains(t, key, ".",
 				"definition %q: the accounts config split does not support nested secret keys yet", definition)
 		}
+	}
+}
+
+// sfOptions renders a Snowflake account's remote options. An empty authType
+// omits the discriminator, which is how an older account reaches the CLI.
+func sfOptions(authType string) string {
+	const base = `{"account":"xy12345","dbname":"ANALYTICS","warehouse":"WH","user":"RUDDER"`
+	if authType == "" {
+		return base + "}"
+	}
+	return fmt.Sprintf(`%s,"authenticationType":%q}`, base, authType)
+}
+
+func sfRemote(externalID, authType string) *RemoteAccount {
+	acc := &client.Account{
+		ID:         "remote-" + externalID,
+		ExternalID: externalID,
+		Name:       "name-" + externalID,
+		Options:    json.RawMessage(sfOptions(authType)),
+	}
+	acc.Definition.Name = "SOURCE_SNOWFLAKE"
+	return &RemoteAccount{Account: acc}
+}
+
+func TestToExportSpecMap_NarrowsSecretsToAuthMode(t *testing.T) {
+	base := map[string]any{
+		"account": "xy12345", "dbname": "ANALYTICS", "warehouse": "WH", "user": "RUDDER",
+	}
+	withMode := func(mode string, secrets map[string]any) map[string]any {
+		want := maps.Clone(base)
+		want["authenticationType"] = mode
+		maps.Copy(want, secrets)
+		return want
+	}
+
+	for _, tc := range []struct {
+		name string
+		mode string
+		want map[string]any
+	}{
+		{
+			name: "keyPair exports only the key-pair secrets",
+			mode: "keyPair",
+			want: withMode("keyPair", map[string]any{
+				"privateKey":           "{{ .SNF_PRIVATEKEY }}",
+				"privateKeyPassphrase": "{{ .SNF_PRIVATEKEYPASSPHRASE }}",
+			}),
+		},
+		{
+			name: "password exports only the password",
+			mode: "password",
+			want: withMode("password", map[string]any{"password": "{{ .SNF_PASSWORD }}"}),
+		},
+		{
+			name: "absent mode exports as an explicit password account",
+			mode: "",
+			want: withMode("password", map[string]any{"password": "{{ .SNF_PASSWORD }}"}),
+		},
+		{
+			name: "mode outside the enum keeps the full set",
+			mode: "oauth-someday",
+			want: withMode("oauth-someday", map[string]any{
+				"password":             "{{ .SNF_PASSWORD }}",
+				"privateKey":           "{{ .SNF_PRIVATEKEY }}",
+				"privateKeyPassphrase": "{{ .SNF_PRIVATEKEYPASSPHRASE }}",
+			}),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &HandlerImpl{store: &mockStore{}}
+
+			specMap, err := h.toExportSpecMap("snf", sfRemote("snf", tc.mode))
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, specMap["config"])
+		})
+	}
+}
+
+// An account that predates the discriminator imports with an explicit
+// "password", which the account schema requires on every update. The first
+// plan must add it as a real change once, after which only the always-unknown
+// secret diffs.
+func TestImportedAbsentModeAccount_AddsDiscriminatorOnce(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+
+	specMap, err := h.toExportSpecMap("snf", sfRemote("snf", ""))
+	require.NoError(t, err)
+	config := maps.Clone(specMap["config"].(map[string]any))
+	config["password"] = "from-var-file"
+	local, err := h.ExtractResourcesFromSpec("snf.yaml", &AccountSpec{
+		ID: "snf", Name: "name-snf", AccountDefinitionName: "SOURCE_SNOWFLAKE", Config: config,
+	})
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name           string
+		remoteMode     string
+		wantDiffKeys   []string
+		wantSecretOnly bool
+	}{
+		{name: "before the first apply", remoteMode: "", wantDiffKeys: []string{"authenticationType", "password"}},
+		{name: "after the first apply", remoteMode: "password", wantDiffKeys: []string{"password"}, wantSecretOnly: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			remote, _, err := h.MapRemoteToState(sfRemote("snf", tc.remoteMode), nil)
+			require.NoError(t, err)
+
+			diffs, secretOnly := differ.CompareData(remote.Config, local["snf"].Config)
+
+			assert.ElementsMatch(t, tc.wantDiffKeys, slices.Collect(maps.Keys(diffs)))
+			assert.Equal(t, tc.wantSecretOnly, secretOnly)
+		})
 	}
 }

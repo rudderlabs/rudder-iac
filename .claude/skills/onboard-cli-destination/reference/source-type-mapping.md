@@ -43,10 +43,10 @@ Current mapping (local → API):
   `common.SourceTypeToken` call site
   (`event-stream/rules/connection/connection_semantic_valid.go`) passes an empty
   category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` branch
-  dead. What remains is the ten types S3 declares: `android`, `android_kotlin`,
-  `ios`, `ios_swift`, `web`, `unity`, `cloud`, `react_native`, `flutter`,
-  `cordova`. When unsure about another mapped-but-unusual type, include what S3
-  includes and flag the rest.
+  dead. What remains is the eleven types S3 declares: `android`,
+  `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`,
+  `react_native`, `flutter`, `cordova`, `warehouse`. When unsure about another
+  mapped-but-unusual type, include what S3 includes and flag the rest.
 - **Declare `warehouse` whenever db-config lists it.** rETL connections reach
   destinations through that token, so it is no longer an exception —
   warehouse-only destinations (`bingads_offline_conversions`,
@@ -88,8 +88,33 @@ destination rETL can reach without saying how it may sync.
   declaring `warehouse` pulls `(warehouse, cloud)` into those branches too. The
   known cases among already-registered destinations are Braze (`rest_api_key`,
   named branch) and Facebook Pixel (`access_token`, via
-  `not(connectionMode.web == "device")`); both are backfills, so they belong to
-  DEX-834.
+  `not(connectionMode.web == "device")`).
+
+To reproduce the values from upstream (`$TYPE` is the local type, except
+`linkedin_ads`, whose upstream directory is `linkedIn_ads`):
+
+```sh
+REF=develop
+raw() { gh api "repos/rudderlabs/rudder-integrations-config/contents/src/configurations/destinations/$1?ref=$REF" -H 'Accept: application/vnd.github.raw'; }
+
+# db-config: warehouse support, its modes and the two rETL fields.
+raw "$TYPE/db-config.json" | jq -c '{
+  warehouse: (.config.supportedSourceTypes | index("warehouse") != null),
+  modes: .config.supportedConnectionModes.warehouse,
+  syncBehaviours: (.config | if has("syncBehaviours") then .syncBehaviours else "absent" end),
+  supportsVisualMapper: .config.supportsVisualMapper}'
+
+# schema.json: the connectionMode-conditioned branches with required keys.
+raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?
+  | select((.if | tostring | test("connectionMode")) and .then.required != null)
+  | {if, required: .then.required}'
+
+# Verified vs unverified, from the repo root: the types listed before the
+# UnverifiedDestinations marker are verified, the rest unverified.
+sed -n '/^func newDestinationRegistry/,/^}/p' cli/internal/app/dependencies.go |
+  grep -oE 'UnverifiedDestinations|registering [a-z0-9_]+ destination' |
+  sed -E 's/^registering ([a-z0-9_]+) destination$/\1/'
+```
 
 ## Per-source-type connect-time required keys
 
@@ -160,7 +185,9 @@ requiredness" for the full writeup and the pointer-field caveat.
    `ConnectionModes` (db-config `supportedConnectionModes`).
 4. Translate each `then.required` API key to its snake_case local key. Every key
    must be a `mapstructure` tag on the config struct — one that is not means the
-   property was dropped or renamed; re-check before excluding it.
+   property was dropped or renamed; re-check before excluding it. Drop a key the
+   struct already tags `validate:"required"` outright: every config carries it,
+   so the entry could never fire (Customer.io's `site_id` and `api_key`).
 5. Union the key lists when several branches hit the same `(source type, mode)`;
    dedupe and keep each list sorted.
 6. Omit a mode with no keys, a source type with no modes, and the whole field

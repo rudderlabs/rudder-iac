@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 )
@@ -11,6 +12,24 @@ const (
 	FeatureFlagNotEnabledMessagePrefix = "Flag is not enabled for your account"
 	FeatureNotEnabledMessagePrefix     = "Feature is not enabled for your account"
 )
+
+// blockedByConnectionsMessages are the refusals the control plane raises when a
+// source or destination still has connections. Matching on prose is fragile,
+// but it is the only signal available: BadRequestError and ValidationError
+// carry a message and a status and nothing else, so APIError.ErrorCode is empty
+// on all three paths. Each entry is a distinct service with its own wording:
+//
+//	destination.service.ts    deleting a destination
+//	source.service.ts         deleting an event-stream source
+//	retl/service.ts           deleting an rETL source
+//
+// Delete refusals only. retl/service.ts raises "connected to some destinations"
+// on an update too ("... Cannot update modelPath"), which this would match — no
+// update path calls it today, and one should not without widening this comment.
+var blockedByConnectionsMessages = []string{
+	"active connections",
+	"connected to some destinations",
+}
 
 type Paging struct {
 	Total int    `json:"total"`
@@ -30,11 +49,22 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	msg := fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, e.Msg())
+	reason := fmt.Sprintf("'%s'", e.Msg())
 	if suffix := formatDetails(e.Details); suffix != "" {
-		msg += " " + suffix
+		reason += " " + suffix
 	}
-	return msg
+
+	// Name a fix only for 403s whose message says what they are: the control plane
+	// also uses 403 for business-rule refusals (e.g. a tracking plan still connected
+	// to sources) that no token or feature change resolves.
+	if e.FeatureFlagNotEnabled() {
+		return fmt.Sprintf("feature not enabled: %s: ask RudderStack support to enable it for your account", reason)
+	}
+	if e.HTTPStatusCode == http.StatusForbidden && strings.Contains(strings.ToLower(e.Msg()), "permission") {
+		return fmt.Sprintf("permission denied: %s: use an access token with the required permissions, or ask a workspace admin to grant them", reason)
+	}
+
+	return fmt.Sprintf("http status code: %d, error code: '%s', error: %s", e.HTTPStatusCode, e.ErrorCode, reason)
 }
 
 // formatDetails renders APIError.Details as a parenthesised suffix.
@@ -69,6 +99,23 @@ func (e *APIError) FeatureFlagNotEnabled() bool {
 	return e.HTTPStatusCode == 403 &&
 		(strings.Contains(e.Msg(), FeatureFlagNotEnabledMessagePrefix) ||
 			strings.Contains(e.Msg(), FeatureNotEnabledMessagePrefix))
+}
+
+// BlockedByConnections reports whether this is the control plane refusing to
+// delete a source or destination because connections still point at it.
+func (e *APIError) BlockedByConnections() bool {
+	if e.HTTPStatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	msg := strings.ToLower(e.Msg())
+	for _, want := range blockedByConnectionsMessages {
+		if strings.Contains(msg, want) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (e *APIError) Msg() string {

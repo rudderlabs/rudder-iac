@@ -10,8 +10,8 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
+	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

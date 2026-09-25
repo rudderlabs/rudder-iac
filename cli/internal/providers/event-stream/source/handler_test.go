@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -1271,13 +1273,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:       "python",
 					Enabled:    false,
 				},
-				{
-					ID:         "remote789",
-					ExternalID: "", // This should be skipped
-					Name:       "Test Source 3",
-					Type:       "Go",
-					Enabled:    true,
-				},
 			}, nil
 		})
 		handler := source.NewHandler(mockClient, importDir)
@@ -1285,7 +1280,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadResourcesFromRemote(context.Background())
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(true)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
 		assert.Len(t, esResources, 2)
@@ -1491,6 +1486,34 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, resource123)
 		})
+
+		// Until the hasExternalId filter is live server side, unmanaged sources
+		// still reach the collection. Their UI-created tracking plan is absent
+		// from the managed-only tracking plan collection, so resolving it would
+		// abort the whole state load.
+		t.Run("skips an unmanaged source whose tracking plan is not managed", func(t *testing.T) {
+			t.Parallel()
+			handler := source.NewHandler(nil, importDir)
+
+			collection := resources.NewRemoteResources()
+			collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+				"remote456": {
+					ID: "remote456",
+					Data: sourceClient.EventStreamSource{
+						ID:           "remote456",
+						Name:         "UI Source",
+						Type:         "python",
+						TrackingPlan: &sourceClient.TrackingPlan{ID: "remote-tp-456"},
+					},
+				},
+			})
+			collection.Set(types.TrackingPlanResourceType, map[string]*resources.RemoteResource{})
+
+			st, err := handler.MapRemoteToState(collection)
+
+			require.NoError(t, err)
+			assert.Empty(t, st.Resources)
+		})
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
@@ -1499,22 +1522,15 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
 				{
-					ID:         "remote123",
-					ExternalID: "external-123", // Has ExternalID - should be filtered out
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
-				},
-				{
 					ID:         "remote456",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 2",
 					Type:       "python",
 					Enabled:    false,
 				},
 				{
 					ID:         "remote789",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 3",
 					Type:       "javascript",
 					Enabled:    true,
@@ -1526,10 +1542,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(false)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
-		require.Len(t, esResources, 2, "Should only include sources without ExternalID")
+		require.Len(t, esResources, 2)
 
 		// Verify the returned resources
 		resource456, exists := esResources["remote456"]
@@ -1893,5 +1909,56 @@ func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
 		assert.Equal(t, "rem-1", byID["src-1"].ImportMetadata().RemoteId)
 		// src-2 has no matching manifest URN, so it stays unimported.
 		assert.Nil(t, byID["src-2"].ImportMetadata())
+	})
+}
+
+// An event-stream source cannot carry an rETL connection, but SourceService's
+// refusal is the one the CLI is most likely to meet: a source the CLI manages,
+// connected in the UI to a destination it does not. Without the annotation the
+// destroy fails naming nothing the plan contains.
+//
+// The remedy here must not name the rETL flags: no rETL connection can join an
+// event-stream source (retl/connection.SourceKinds is sqlModel plus table), so
+// turning them on cannot help and would only cost the reader a second attempt.
+func TestHandler_Delete_BlockedByConnections(t *testing.T) {
+	t.Parallel()
+
+	t.Run("explains the refusal", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		mockClient.FailDeleteWith(&client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "The source has active connections, please delete those first",
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		err := handler.Delete(context.Background(), "web", resources.ResourceData{source.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The source has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "Delete them in the workspace first")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT",
+			"no rETL connection can join an event-stream source, so the flags cannot help here")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	t.Run("leaves an unrelated failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		mockClient := source.NewMockSourceClient()
+		mockClient.FailDeleteWith(&client.APIError{
+			HTTPStatusCode: http.StatusBadRequest,
+			Message:        "source is referenced by a running job",
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		err := handler.Delete(context.Background(), "web", resources.ResourceData{source.IDKey: "src-1"})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
 	})
 }
