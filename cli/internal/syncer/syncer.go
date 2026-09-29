@@ -119,8 +119,9 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
-	spinner := ui.NewSpinner("Loading state ...")
-	spinner.Start()
+	// Deferred so the early error returns below cannot leave it spinning.
+	ui.StartSpinner("Loading state ...")
+	defer ui.StopSpinner()
 
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -136,7 +137,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
-	spinner.Stop()
+	ui.StopSpinner()
 
 	s.reporter.ReportPlan(plan)
 
@@ -170,6 +171,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	// Consolidate sync: providers can perform batch operations or multi-resource
 	// coordination after all individual resources have been processed
+	ui.StartSpinner("Finalizing ...")
 	if err := s.provider.ConsolidateSync(ctx, target, state); err != nil {
 		return []error{err}
 	}
