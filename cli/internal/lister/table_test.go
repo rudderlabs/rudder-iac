@@ -115,8 +115,10 @@ func TestModel_View_WhenTerminalIsShort_CapsDetailsPane(t *testing.T) {
 	require.NotContains(t, view, "ws-42", "the last details field should be cut, not the layout")
 }
 
-// go test runs with stdout on a pipe, which is the redirected-output case.
 func TestNewModel_WithoutTerminal_KeepsEveryRow(t *testing.T) {
+	terminalHeight = func() int { return 0 }
+	t.Cleanup(func() { terminalHeight = ui.GetTerminalHeight })
+
 	m := newModel(testResources(100), nil)
 
 	require.Equal(t, 0, m.maxHeight)

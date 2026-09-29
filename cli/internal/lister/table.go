@@ -21,6 +21,9 @@ const (
 	reservedHeight = 2
 )
 
+// Overridden in tests, which may run with stdout on a real terminal.
+var terminalHeight = ui.GetTerminalHeight
+
 type model struct {
 	table     table.Model
 	help      help.Model
@@ -195,7 +198,7 @@ func newModel(rs []resources.ResourceData, columnWidths map[string]int) model {
 	// Piped output never receives a WindowSizeMsg to correct an initial guess,
 	// so it keeps every row rather than silently losing some of them.
 	maxHeight := 0
-	if h := ui.GetTerminalHeight(); h > 0 {
+	if h := terminalHeight(); h > 0 {
 		maxHeight = availableHeight(h)
 	}
 
