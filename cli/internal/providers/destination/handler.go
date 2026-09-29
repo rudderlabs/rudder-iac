@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
@@ -201,7 +202,7 @@ func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *DestinationResour
 	}
 
 	if err := h.client.Destinations.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting destination: %w", err)
+		return fmt.Errorf("deleting destination: %w", provider.ExplainBlockingConnections(err))
 	}
 
 	return nil

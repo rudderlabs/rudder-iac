@@ -23,6 +23,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -36,6 +37,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventFiltering struct {
@@ -178,6 +180,7 @@ var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeFlutter:       {"cloud": {"rest_api_key"}},
 	common.SourceTypeCordova:       {"cloud": {"rest_api_key"}},
 	common.SourceTypeCloud:         {"cloud": {"rest_api_key"}},
+	common.SourceTypeWarehouse:     {"cloud": {"rest_api_key"}},
 }
 
 // NewDefinition returns the Braze destination definition.
@@ -247,6 +250,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:            append([]string(nil), sourceTypes...),
 		ConnectionModes:        connectionModes,
+		SupportsVisualMapper:   true,
 		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }

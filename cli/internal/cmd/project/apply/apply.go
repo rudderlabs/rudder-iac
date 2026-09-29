@@ -59,6 +59,8 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
+			printWorkspaceBanner(workspace)
+
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
@@ -131,4 +133,15 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
+}
+
+// printWorkspaceBanner names the workspace the apply is about to touch, so a run
+// against the wrong token is visible before any change is planned.
+func printWorkspaceBanner(workspace *client.Workspace) {
+	ui.Printf(
+		"%s %s %s\n",
+		ui.Color("Workspace:", ui.ColorBlue),
+		ui.Bold(workspace.Name),
+		ui.GreyedOut("("+workspace.ID+")"),
+	)
 }

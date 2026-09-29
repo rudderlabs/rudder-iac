@@ -23,6 +23,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -36,6 +37,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventMapping struct {
@@ -135,6 +137,7 @@ var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeFlutter:       {"cloud": {"access_token"}},
 	common.SourceTypeCordova:       {"cloud": {"access_token"}},
 	common.SourceTypeCloud:         {"cloud": {"access_token"}},
+	common.SourceTypeWarehouse:     {"cloud": {"access_token"}},
 }
 
 // NewDefinition returns the Facebook Pixel destination definition.

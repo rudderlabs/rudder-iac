@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -89,7 +90,7 @@ type mockRETLClient struct {
 	updateCalled               bool
 	deleteCalled               bool
 	sourceID                   string
-	deleteError                bool
+	deleteErr                  error
 	updateError                bool
 	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
@@ -155,10 +156,7 @@ func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, sourceID string, 
 
 func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) error {
 	m.deleteCalled = true
-	if m.deleteError {
-		return errors.New("deleting RETL source")
-	}
-	return nil
+	return m.deleteErr
 }
 
 func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
@@ -1114,7 +1112,38 @@ func TestSQLModelHandler(t *testing.T) {
 				expectedError: true,
 				errorMessage:  "deleting RETL source",
 				mockSetup: func() *mockRETLClient {
-					return &mockRETLClient{sourceID: "error", deleteError: true}
+					return &mockRETLClient{sourceID: "error", deleteErr: errors.New("deleting RETL source")}
+				},
+			},
+			// The rETL service has its own wording for this refusal, so a case
+			// built on either "active connections" message would pass while this
+			// path stayed unannotated.
+			{
+				name: "Blocked by connections is explained",
+				state: resources.ResourceData{
+					sqlmodel.IDKey: "src123",
+				},
+				expectedError: true,
+				errorMessage:  "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+				mockSetup: func() *mockRETLClient {
+					return &mockRETLClient{sourceID: "src123", deleteErr: &client.APIError{
+						HTTPStatusCode: http.StatusBadRequest,
+						Message:        "The source is connected to some destinations.",
+					}}
+				},
+			},
+			{
+				name: "Unrelated failure keeps its own message",
+				state: resources.ResourceData{
+					sqlmodel.IDKey: "src123",
+				},
+				expectedError: true,
+				errorMessage:  "referenced by a running job",
+				mockSetup: func() *mockRETLClient {
+					return &mockRETLClient{sourceID: "src123", deleteErr: &client.APIError{
+						HTTPStatusCode: http.StatusBadRequest,
+						Message:        "source is referenced by a running job",
+					}}
 				},
 			},
 		}
