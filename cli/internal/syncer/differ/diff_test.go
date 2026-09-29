@@ -688,7 +688,9 @@ func TestCompareData_PropertyRef(t *testing.T) {
 			resources.ResourceData{"ref": (*resources.PropertyRef)(nil)},
 			resources.ResourceData{"ref": &source},
 		)
-		assert.Contains(t, diffs, "ref")
+		assert.Equal(t, map[string]differ.PropertyDiff{
+			"ref": {Property: "ref", SourceValue: (*resources.PropertyRef)(nil), TargetValue: &source},
+		}, diffs)
 	})
 
 	t.Run("an absent ref on both sides is not drift", func(t *testing.T) {
