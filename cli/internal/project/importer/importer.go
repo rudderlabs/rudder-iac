@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
+	"unicode"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -49,6 +51,9 @@ type Project interface {
 // resources instead of writing duplicate specs).
 type ImportOptions struct {
 	Merge bool
+	// VarFiles are the --var-file paths given to import, repeated in the apply
+	// hint so the printed command resolves the same {{ .VAR }} references.
+	VarFiles []string
 }
 
 // WorkspaceImport returns the import summary instead of printing it, so the
@@ -148,12 +153,16 @@ func WorkspaceImport(
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
-	return importSummary(importable, location), nil
+	varFiles := opts.VarFiles
+	if varFile != "" {
+		varFiles = append(slices.Clip(varFiles), varFile)
+	}
+	return importSummary(importable, location, varFiles), nil
 }
 
 // importSummary shows what landed on disk and that apply is still needed:
 // imported specs are not managed by the CLI until they are applied.
-func importSummary(importable *resources.RemoteResources, location string) string {
+func importSummary(importable *resources.RemoteResources, location string, varFiles []string) string {
 	var (
 		importedRows []string
 		merged       []string
@@ -188,11 +197,23 @@ func importSummary(importable *resources.RemoteResources, location string) strin
 
 	applyCmd := "rudder-cli apply"
 	if filepath.Clean(location) != "." {
-		applyCmd += " -l " + location
+		applyCmd += " -l " + quoteArg(location)
+	}
+	for _, f := range varFiles {
+		applyCmd += " --var-file " + quoteArg(f)
 	}
 	fmt.Fprintf(w, "\nThe imported resources are not managed by the CLI yet. Run `%s` to start managing them.\n", applyCmd)
 	_ = w.Flush()
 	return b.String()
+}
+
+// quoteArg keeps a copied path with spaces from splitting into several shell
+// arguments.
+func quoteArg(s string) string {
+	if strings.ContainsFunc(s, unicode.IsSpace) {
+		return strconv.Quote(s)
+	}
+	return s
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,

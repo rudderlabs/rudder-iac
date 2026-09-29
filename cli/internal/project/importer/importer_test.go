@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -261,6 +262,7 @@ func TestImportSummary(t *testing.T) {
 	tests := []struct {
 		name       string
 		location   string
+		varFiles   []string
 		importable map[string]map[string]*resources.RemoteResource
 		expected   string
 	}{
@@ -319,6 +321,19 @@ Remote resources merged into existing local resources: 1
 The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l ./myproj`" + ` to start managing them.
 `,
 		},
+		{
+			name:     "var files are passed to apply and paths with spaces are quoted",
+			location: "my proj",
+			varFiles: []string{"prod.vars.yaml", "my proj/imported/secrets.vars.yaml"},
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			expected: `Resources imported into my proj/imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l \"my proj\" --var-file prod.vars.yaml --var-file \"my proj/imported/secrets.vars.yaml\"`" + ` to start managing them.
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -328,7 +343,29 @@ The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli appl
 				importable.Set(resourceType, rs)
 			}
 
-			assert.Equal(t, tt.expected, importSummary(importable, tt.location))
+			assert.Equal(t, tt.expected, importSummary(importable, tt.location, tt.varFiles))
 		})
 	}
+}
+
+func TestWorkspaceImport_ApplyHintPassesVarFiles(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+	entities[0].Content.(*specs.Spec).Spec["token"] = "{{ .SRC_TOKEN }}"
+
+	summary, err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entities:   entities,
+		entries:    entries,
+	}, ImportOptions{VarFiles: []string{"prod.vars.yaml"}})
+	require.NoError(t, err)
+
+	importDir := filepath.Join(dir, ImportedDir)
+	expected := fmt.Sprintf("Resources imported into %s/: 1\n  source  1\n\n"+
+		"The imported resources are not managed by the CLI yet. Run `rudder-cli apply -l %s --var-file prod.vars.yaml --var-file %s` to start managing them.\n",
+		importDir, dir, filepath.Join(importDir, SecretsVarFileName))
+	assert.Equal(t, expected, summary)
 }

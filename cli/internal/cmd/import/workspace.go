@@ -80,7 +80,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			}()
 
 			ui.StartSpinner("Importing ...")
-			summary, err := importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
+			summary, err := importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge, VarFiles: varFiles})
 			ui.StopSpinner()
 			if err == nil {
 				// Continuation lines are indented to align under the text after "Warning: ".
