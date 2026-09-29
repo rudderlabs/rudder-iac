@@ -672,6 +672,15 @@ func TestCompareData_PropertyRef(t *testing.T) {
 		})
 	}
 
+	t.Run("differing Property inside a slice is not drift", func(t *testing.T) {
+		target := resources.PropertyRef{URN: "urn:resource:src", Property: "externalId"}
+		diffs, _ := differ.CompareData(
+			resources.ResourceData{"refs": []any{source}},
+			resources.ResourceData{"refs": []any{target}},
+		)
+		assert.Empty(t, diffs)
+	})
+
 	t.Run("a differing URN is drift", func(t *testing.T) {
 		target := resources.PropertyRef{URN: "urn:resource:other", Property: "id"}
 		diffs, _ := differ.CompareData(
