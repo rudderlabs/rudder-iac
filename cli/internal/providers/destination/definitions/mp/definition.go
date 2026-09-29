@@ -27,6 +27,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -40,6 +41,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type webBool struct {

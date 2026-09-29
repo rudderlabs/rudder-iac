@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 var validationLog = logger.New("validator")
@@ -68,7 +69,9 @@ func (r *Runner) Run(ctx context.Context, mode Mode, workspaceID string) (*Valid
 	case ModeAll:
 		plan, err = PlanAll(r.graph)
 	case ModeModified:
+		ui.StartSpinner("Loading remote state ...")
 		remoteGraph, loadErr := r.loadRemoteGraph(ctx)
+		ui.StopSpinner()
 		if loadErr != nil {
 			return nil, loadErr
 		}

@@ -30,13 +30,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, activecampaign.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	for _, sourceType := range expectedSourceTypes {
 		t.Run(sourceType+" connection modes", func(t *testing.T) {
@@ -407,6 +411,7 @@ func TestActiveCampaignConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

@@ -100,22 +100,20 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 
 	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
 	// applied; otherwise the file-only variable would be undefined and the dry run would error.
+	verifyNoChangesToApplyWithArgs(t, executor, path, "--var-file", varFilePath)
+}
+
+func verifyNoChangesToApplyWithArgs(t *testing.T, executor *CmdExecutor, path string, extraArgs ...string) {
+	t.Helper()
+
 	var (
 		output []byte
 		err    error
+		args   = append([]string{"apply", "-l", path, "--dry-run", "--confirm=false"}, extraArgs...)
 	)
 	deadline := time.Now().Add(upstreamConsistencyTimeout)
 	for {
-		output, err = executor.Execute(
-			cliBinPath,
-			"apply",
-			"-l",
-			path,
-			"--var-file",
-			varFilePath,
-			"--dry-run",
-			"--confirm=false",
-		)
+		output, err = executor.Execute(cliBinPath, args...)
 		if err == nil && strings.Contains(string(output), "No changes to apply") {
 			return
 		}
