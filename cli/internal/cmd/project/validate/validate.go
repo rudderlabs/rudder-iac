@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/spf13/cobra"
 )
 
@@ -23,12 +24,13 @@ var (
 
 func NewCmdValidate() *cobra.Command {
 	var (
-		deps      app.Deps
-		p         project.Project
-		workspace *client.Workspace
-		err       error
-		location  string
-		varFiles  []string
+		deps       app.Deps
+		p          project.Project
+		workspace  *client.Workspace
+		err        error
+		location   string
+		varFiles   []string
+		jsonOutput bool
 	)
 
 	cmd := &cobra.Command{
@@ -41,6 +43,7 @@ func NewCmdValidate() *cobra.Command {
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli validate --location </path/to/dir or file>
+			$ rudder-cli validate --json
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()
@@ -62,6 +65,15 @@ func NewCmdValidate() *cobra.Command {
 			}
 			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 
+			// Swap the renderer rather than post-processing text: the engine already
+			// produces structured diagnostics, and the text form is a lossy view of
+			// them.
+			if jsonOutput {
+				projectOpts = append(projectOpts, project.WithRenderer(
+					renderer.NewJSONRenderer(cmd.OutOrStdout()),
+				))
+			}
+
 			p = deps.NewProject(projectOpts...)
 			return nil
 		},
@@ -79,17 +91,24 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("validating project: %w", err)
 			}
 
-			if project.HasLegacySpecs(p.Specs()) {
+			// The deprecation notice and the success line go to stdout, where they
+			// would land inside the JSON document. The failure path needs no such
+			// guard: errors are printed to stderr, so the hints they carry (the
+			// missing --var-file, say) stay available without corrupting the parse.
+			if project.HasLegacySpecs(p.Specs()) && !jsonOutput {
 				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
 			}
 
 			validateLog.Info("Project configuration is valid")
-			ui.PrintSuccess("Project configuration is valid")
+			if !jsonOutput {
+				ui.PrintSuccess("Project configuration is valid")
+			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output diagnostics as JSON")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	return cmd
 }
