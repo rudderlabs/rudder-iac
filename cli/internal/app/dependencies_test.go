@@ -222,3 +222,22 @@ func modelsConnectionMode(def *definitions.RegisteredDefinition) bool {
 	}
 	return true
 }
+
+func TestNewOfflineDepsNeedsNoToken(t *testing.T) {
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	_, err := NewDeps()
+	require.ErrorContains(t, err, "access token is required")
+
+	offline, err := NewOfflineDeps()
+	require.NoError(t, err)
+
+	// Same providers as the online path, so validate observes the same rules
+	// apply does.
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+	online, _, err := composeProviders(c)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, online.SupportedKinds(), offline.CompositeProvider().SupportedKinds())
+}

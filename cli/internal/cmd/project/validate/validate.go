@@ -1,11 +1,9 @@
 package validate
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -23,12 +21,11 @@ var (
 
 func NewCmdValidate() *cobra.Command {
 	var (
-		deps      app.Deps
-		p         project.Project
-		workspace *client.Workspace
-		err       error
-		location  string
-		varFiles  []string
+		deps     app.Deps
+		p        project.Project
+		err      error
+		location string
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -43,24 +40,19 @@ func NewCmdValidate() *cobra.Command {
 			$ rudder-cli validate --location </path/to/dir or file>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			deps, err = app.NewDeps()
+			// Validation is local-only by design so it can run in CI without
+			// credentials: no token check and no workspace lookup. Without a
+			// workspace ID, workspace-aware import-manifest rules check every
+			// workspace in the manifest instead of only the one apply targets.
+			deps, err = app.NewOfflineDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
-			}
-
-			// Resolve the active workspace so validation scopes workspace-aware
-			// rules (e.g. import-manifest orphaned-urn) to the same workspace apply
-			// targets.
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}
-			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 
 			p = deps.NewProject(projectOpts...)
 			return nil
