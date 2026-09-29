@@ -46,7 +46,7 @@
 ## RUD-2752 — Baseline Test Failures Affecting Validation Signal
 <!-- ticket:RUD-2752 -->
 - Repository-wide test runs currently include unrelated baseline failures, so full-suite red status is not a reliable signal for regressions in event stream listing changes.
-- Known blockers include `cli/internal/typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
+- Known blockers include `typer/generator/core` atomic write failure expectations and `cli/pkg/exp/project` tests that require `RUDDERSTACK_ACCESS_TOKEN` in the environment.
 
 ## DEX-846 — Destination Empty Array Defaults Gap
 <!-- ticket:DEX-846 -->
