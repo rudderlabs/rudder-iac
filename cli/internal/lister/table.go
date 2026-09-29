@@ -2,6 +2,7 @@ package lister
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -14,6 +15,7 @@ import (
 
 const (
 	noResourcesFoundMsg = "No resources found"
+	truncatedDetailsMsg = "… more fields, rerun with --json to see all"
 
 	// Header row plus the border rendered underneath it.
 	tableHeaderHeight = 2
@@ -105,15 +107,15 @@ func (m model) View() string {
 
 	// Main Layout. The details pane is held to the same budget as the table, so
 	// that neither side of the join can outgrow the terminal.
-	detailsStyle := lipgloss.NewStyle().Padding(0, 2)
-	if m.maxHeight > 0 {
-		detailsStyle = detailsStyle.MaxHeight(m.maxHeight)
+	if m.maxHeight > 0 && lipgloss.Height(fullDetailsView) > m.maxHeight {
+		lines := strings.Split(fullDetailsView, "\n")[:m.maxHeight-1]
+		fullDetailsView = strings.Join(append(lines, ui.GreyedOut(truncatedDetailsMsg)), "\n")
 	}
 
 	mainView := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		m.table.View(),
-		detailsStyle.Render(fullDetailsView),
+		lipgloss.NewStyle().Padding(0, 2).Render(fullDetailsView),
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left,

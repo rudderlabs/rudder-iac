@@ -103,6 +103,7 @@ func TestModel_View_WhenResultSetIsSmall_KeepsDetailsIntact(t *testing.T) {
 
 	require.Contains(t, view, "snowflake")
 	require.Contains(t, view, "ws-42")
+	require.NotContains(t, view, truncatedDetailsMsg)
 	require.LessOrEqual(t, lipgloss.Height(view), 40)
 }
 
@@ -113,6 +114,7 @@ func TestModel_View_WhenTerminalIsShort_CapsDetailsPane(t *testing.T) {
 
 	require.LessOrEqual(t, lipgloss.Height(view), terminalHeight)
 	require.NotContains(t, view, "ws-42", "the last details field should be cut, not the layout")
+	require.Contains(t, view, truncatedDetailsMsg)
 }
 
 func TestNewModel_WithoutTerminal_KeepsEveryRow(t *testing.T) {
