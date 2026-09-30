@@ -1,0 +1,36 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: scheduled-customer-syncs
+spec:
+  connections:
+    - id: scheduled-orders-to-webhook
+      source: "#retl-source-sql-model:orders-model"
+      destination: "#destination:order-webhook"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        schedule:
+          type: basic
+          every_minutes: 30
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: traits.email
+          - from: status
+            to: traits.status
+        constants:
+          - key: context.source
+            value: rudder-cli
+        event:
+          type: identify
+        cursor_column: id
+        sync_settings:
+          sync_logs:
+            enabled: true
+            retention_days: 7
+            snapshots_to_retain: 3
+          failed_keys:
+            retry: true

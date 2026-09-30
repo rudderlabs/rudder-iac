@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: tracking-plan-events
+spec:
+  events:
+    - id: signed_up
+      name: Signed Up
+      event_type: track
+    - id: checkout_started
+      name: Checkout Started
+      event_type: track

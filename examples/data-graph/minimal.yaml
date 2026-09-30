@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: data-graph
+metadata:
+  name: customer-graph
+spec:
+  id: customer-graph
+  # DataGraph supports one graph per warehouse account; use a distinct account from full.yaml when applying the whole directory.
+  account_id: replace-with-warehouse-account-id

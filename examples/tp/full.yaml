@@ -1,0 +1,19 @@
+version: rudder/v0.1
+kind: tp
+metadata:
+  name: commerce_tracking
+spec:
+  id: commerce_tracking
+  display_name: Commerce Tracking Plan
+  description: Governs checkout events.
+  rules:
+    - type: event_rule
+      id: checkout_completed_rule
+      event:
+        $ref: "#/events/commerce_tracking/checkout_completed"
+        allow_unplanned: false
+      properties:
+        - $ref: "#/properties/commerce_tracking/order_id"
+          required: true
+        - $ref: "#/properties/commerce_tracking/order_total"
+          required: true

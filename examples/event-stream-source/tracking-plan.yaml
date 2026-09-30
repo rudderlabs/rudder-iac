@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: web-tracking-plan
+spec:
+  id: web-tracking-plan
+  display_name: Web Tracking Plan
+  rules:
+    - type: event_rule
+      id: page_viewed_rule
+      event: "#event:page_viewed"
+      additional_properties: false

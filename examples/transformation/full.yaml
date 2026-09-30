@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: normalize-email
+spec:
+  id: normalize-email
+  name: Normalize Email
+  description: Normalizes an email address with a shared library.
+  language: javascript
+  code: |
+    import { normalizeEmail } from 'customerUtilities';
+
+    export function transformEvent(event, metadata) {
+      if (event.traits && event.traits.email) {
+        event.traits.email = normalizeEmail(event.traits.email);
+      }
+      return event;
+    }

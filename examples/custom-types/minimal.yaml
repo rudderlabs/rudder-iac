@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: custom-types
+metadata:
+  name: identifiers
+spec:
+  types:
+    - id: customer_id
+      name: CustomerID
+      type: string

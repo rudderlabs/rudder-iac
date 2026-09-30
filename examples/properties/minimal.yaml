@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: core-properties
+spec:
+  properties:
+    - id: user_id
+      name: User ID
+      type: string

@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: commerce-properties
+spec:
+  properties:
+    - id: order_total
+      name: Order Total
+      description: Total value of an order.
+      type: number
+      config:
+        minimum: 0
+    - id: product_tags
+      name: Product Tags
+      type: array
+      item_type: string
+    - id: order_context
+      name: Order Context
+      types:
+        - object
+        - "null"

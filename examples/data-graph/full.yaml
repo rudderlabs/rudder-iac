@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: data-graph
+metadata:
+  name: commerce-graph
+spec:
+  id: commerce-graph
+  # DataGraph supports one graph per warehouse account; use a distinct account from minimal.yaml when applying the whole directory.
+  account_id: replace-with-second-warehouse-account-id
+  models:
+    - id: customer
+      display_name: Customer
+      type: entity
+      table: warehouse.analytics.customers
+      primary_id: customer_id
+      root: true
+      columns:
+        - name: email
+          display_name: Email Address
+          pii_mask: true
+    - id: order
+      display_name: Order
+      type: event
+      table: warehouse.analytics.orders
+      timestamp: ordered_at
+      relationships:
+        - id: order-customer
+          display_name: Order Customer
+          cardinality: many-to-one
+          target: "#data-graph-model:customer"
+          source_join_key: customer_id
+          target_join_key: customer_id

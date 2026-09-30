@@ -1,0 +1,13 @@
+version: rudder/v0.1
+kind: tp
+metadata:
+  name: basic_tracking
+spec:
+  id: basic_tracking
+  display_name: Basic Tracking Plan
+  rules:
+    - type: event_rule
+      id: signed_up_rule
+      event:
+        $ref: "#/events/basic_tracking/signed_up"
+        allow_unplanned: false

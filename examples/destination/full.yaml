@@ -1,0 +1,19 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: webhook-full
+spec:
+  id: webhook-full
+  display_name: Full Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://example.com/rudder/events
+    webhook_method: POST
+    headers:
+      - from: X-Example-Token
+        to: replace-with-your-token
+    connection_mode:
+      web: cloud
+      warehouse: cloud

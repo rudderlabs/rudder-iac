@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: tracking-plan-properties
+spec:
+  properties:
+    - id: cart_id
+      name: Cart ID
+      type: string
+    - id: cart_value
+      name: Cart Value
+      type: number
+      config:
+        minimum: 0

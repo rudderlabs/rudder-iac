@@ -1,0 +1,8 @@
+version: rudder/v1
+kind: categories
+metadata:
+  name: event-categories
+spec:
+  categories:
+    - id: commerce
+      name: Commerce

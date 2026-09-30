@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: order-webhook
+spec:
+  id: order-webhook
+  display_name: Order Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://example.com/orders
+    connection_mode:
+      warehouse: cloud

@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: customer-webhook
+spec:
+  id: customer-webhook
+  display_name: Customer Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  config:
+    webhook_url: https://example.com/customers
+    connection_mode:
+      warehouse: cloud

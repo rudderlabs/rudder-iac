@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: properties
+metadata:
+  name: import-manifest-properties
+spec:
+  properties:
+    - id: imported_user_id
+      name: Imported User ID
+      type: string
+    - id: imported_order_total
+      name: Imported Order Total
+      type: number
+    - id: imported_signup_source
+      name: Imported Signup Source
+      type: string

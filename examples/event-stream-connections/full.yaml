@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: event-stream-connections
+metadata:
+  name: enabled-website-connections
+spec:
+  connections:
+    - id: mobile-to-webhook
+      source: "#event-stream-source:mobile-app"
+      destination: "#destination:event-webhook"
+      enabled: true

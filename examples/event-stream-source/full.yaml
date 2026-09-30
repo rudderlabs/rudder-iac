@@ -1,0 +1,18 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: governed-web-source
+spec:
+  id: governed-web-source
+  name: Governed Website
+  type: javascript
+  enabled: true
+  governance:
+    validations:
+      tracking_plan: "#tracking-plan:web-tracking-plan"
+      config:
+        track:
+          propagate_violations: true
+          drop_unplanned_properties: true
+          drop_other_violations: false
+          drop_unplanned_events: true

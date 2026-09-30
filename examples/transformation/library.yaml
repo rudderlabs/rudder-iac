@@ -1,0 +1,14 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: customer-utils
+spec:
+  id: customer-utils
+  name: Customer Utilities
+  description: Shared customer data helpers.
+  language: javascript
+  import_name: customerUtilities
+  code: |
+    export function normalizeEmail(email) {
+      return email.trim().toLowerCase();
+    }

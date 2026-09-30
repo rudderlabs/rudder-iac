@@ -1,0 +1,12 @@
+version: rudder/v1
+kind: categories
+metadata:
+  name: business-categories
+spec:
+  categories:
+    - id: acquisition
+      name: Acquisition
+    - id: engagement
+      name: Engagement
+    - id: retention
+      name: Retention

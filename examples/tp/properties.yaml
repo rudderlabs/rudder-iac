@@ -1,0 +1,12 @@
+version: rudder/v0.1
+kind: properties
+metadata:
+  name: commerce_tracking
+spec:
+  properties:
+    - id: order_id
+      name: Order ID
+      type: string
+    - id: order_total
+      name: Order Total
+      type: number

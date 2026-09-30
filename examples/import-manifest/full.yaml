@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: import-manifest
+metadata:
+  name: full-import-manifest
+spec:
+  workspaces:
+    - workspace_id: workspace-production # Replace with the target RudderStack workspace ID.
+      resources:
+        - urn: property:imported_order_total
+          remote_id: prop_remote_order_total # Replace with the resource's remote ID in that workspace.
+        - urn: property:imported_signup_source
+          remote_id: prop_remote_signup_source # Replace with the resource's remote ID in that workspace.
+    - workspace_id: workspace-staging # Replace with the target RudderStack workspace ID.
+      resources:
+        - urn: property:imported_order_total
+          remote_id: prop_remote_order_total_staging # Replace with the resource's remote ID in that workspace.

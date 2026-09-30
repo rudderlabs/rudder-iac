@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: event-stream-source
+metadata:
+  name: website
+spec:
+  id: website
+  name: Website
+  type: javascript
+  enabled: true

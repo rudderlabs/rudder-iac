@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: active-customers
+spec:
+  id: active-customers
+  display_name: Active Customers
+  description: Customers active during the last 30 days.
+  account: "#account:retl-postgres"
+  primary_key: customer_id
+  source_definition: postgres
+  enabled: true
+  sql: |
+    SELECT customer_id, email, updated_at
+    FROM analytics.customers
+    WHERE updated_at >= CURRENT_DATE - INTERVAL '30 days'

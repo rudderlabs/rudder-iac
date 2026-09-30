@@ -1,0 +1,9 @@
+version: rudder/v1
+kind: events
+metadata:
+  name: web-events
+spec:
+  events:
+    - id: page_viewed
+      name: Page Viewed
+      event_type: track

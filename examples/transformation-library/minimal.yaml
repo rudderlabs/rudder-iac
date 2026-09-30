@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: transformation-library
+metadata:
+  name: string-utils
+spec:
+  id: string-utils
+  name: String Utilities
+  language: javascript
+  import_name: stringUtilities
+  code: |
+    export function trim(value) {
+      return value.trim();
+    }

@@ -1,0 +1,11 @@
+version: rudder/v1
+kind: retl-source-sql-model
+metadata:
+  name: recent-orders
+spec:
+  id: recent-orders
+  display_name: Recent Orders
+  account_id: replace-with-account-id
+  primary_key: id
+  source_definition: postgres
+  sql: SELECT id FROM orders
