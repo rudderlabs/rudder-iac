@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -180,6 +182,7 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 	if rec.Events == nil {
 		rec.Events = []store.Event{}
 	}
+	fingerprintWriteKey(&rec, rep.writeKey)
 	if rep.rejection != nil || rep.status < 200 || rep.status > 299 {
 		rec.Outcome = "rejected"
 		rec.Failed = true
@@ -190,7 +193,7 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 // credentialHeader matches header names that carry credentials. Cookies are
 // not scoped by port, so a browser sends the session cookies of other
 // localhost apps too.
-var credentialHeader = regexp.MustCompile(`(?i)(token|secret|api-?key|auth)`)
+var credentialHeader = regexp.MustCompile(`(?i)(token|secret|api[-_]?key|auth|password|session)`)
 
 // routeOf is the path without a trailing slash; request.target keeps it.
 // Summary counts and route filters use this form.
@@ -214,6 +217,32 @@ func redact(h http.Header) (http.Header, []string) {
 	}
 	sort.Strings(names)
 	return out, names
+}
+
+// clearWriteKeys are the keys a record keeps in clear: the listener's own.
+var clearWriteKeys = []string{"dev"}
+
+// fingerprintWriteKey replaces a key that may be real with its first and
+// last 4 characters and its sha256, and scrubs it from the target and the
+// response body (/sourceConfig echoes it). Keys under 12 characters keep no
+// characters at all.
+func fingerprintWriteKey(rec *store.Record, key string) {
+	if key == "" || slices.Contains(clearWriteKeys, key) {
+		return
+	}
+	sum := sha256.Sum256([]byte(key))
+	rec.WriteKeySha256 = hex.EncodeToString(sum[:])
+	if len(key) >= 12 {
+		rec.WriteKeyPrefix, rec.WriteKeySuffix = key[:4], key[len(key)-4:]
+	}
+	rec.WriteKey = rec.WriteKeyPrefix + "..." + rec.WriteKeySuffix
+	rec.Request.Target = scrub(rec.Request.Target, key)
+	rec.Response.Body = scrub(rec.Response.Body, key)
+}
+
+func scrub(s, key string) string {
+	s = strings.ReplaceAll(s, key, "REDACTED")
+	return strings.ReplaceAll(s, url.QueryEscape(key), "REDACTED")
 }
 
 // SourceID is the source id the server reports for a write key: "dev-" plus

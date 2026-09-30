@@ -208,6 +208,7 @@ func TestListenWarnsOnNonLoopbackBind(t *testing.T) {
 
 	require.Contains(t, stderr.String(), "warning: listening on 0.0.0.0:")
 	require.Contains(t, stderr.String(), "The query API has no authentication.")
+	require.Contains(t, stderr.String(), "any web page can post events")
 	require.Contains(t, stdout.String(), `"bind":"0.0.0.0"`)
 }
 

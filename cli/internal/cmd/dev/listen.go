@@ -50,7 +50,14 @@ func newCmdListen(deps Deps) *cobra.Command {
 			"Use --port for a fixed URL, --quiet to suppress progress, or --detach to return after\n" +
 			"readiness. Stop with Ctrl-C or rudder-cli dev stop. --idle-exit defaults to off in the\n" +
 			"foreground and 30m with --detach. Clients find the server through the state file\n" +
-			"dev-listen.json in the config directory, which follows -c.",
+			"dev-listen.json in the config directory, which follows -c.\n\n" +
+			"Security: the default bind is 127.0.0.1. With --bind 0.0.0.0 (a container) the server has no\n" +
+			"Host check, /info reports exposed: true, and a warning prints on every start: other hosts can\n" +
+			"read the capture, and because CORS reflects every origin with credentials, any web page can\n" +
+			"post events into it. Write keys other than dev are stored as writeKeyPrefix, writeKeySuffix\n" +
+			"and writeKeySha256. Headers named like token, secret, api key, auth, password or session,\n" +
+			"and Cookie, are stored as REDACTED. next commands never carry environment variables: the\n" +
+			"shell that got one already has the experimental gate set.",
 		Example: "  # Foreground; leave this shell running\n" +
 			"  rudder-cli dev listen --port 4321\n\n" +
 			"  # Agent; returns one ready JSON line after startup\n" +
@@ -245,5 +252,6 @@ func quoteOrDash(s string) string {
 }
 
 func bindWarning(bind string, port int) string {
-	return fmt.Sprintf("warning: listening on %s:%d. The query API has no authentication.", bind, port)
+	return fmt.Sprintf("warning: listening on %s:%d. The query API has no authentication. CORS reflects every "+
+		"origin with credentials, so any web page can post events into this capture.", bind, port)
 }

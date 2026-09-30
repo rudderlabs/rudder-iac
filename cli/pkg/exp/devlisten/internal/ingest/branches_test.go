@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -46,7 +47,8 @@ func TestBeaconTakesWriteKeyFromQuery(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, got.status)
 	rec := onlyRecord(t, st)
-	require.Equal(t, "wk", rec.WriteKey)
+	require.Equal(t, "...", rec.WriteKey, "a short foreign key keeps no characters")
+	require.NotEmpty(t, rec.WriteKeySha256)
 	require.Len(t, rec.Events, 1)
 }
 
@@ -381,4 +383,55 @@ func (b neverEnding) Read(p []byte) (int, error) {
 		p[i] = byte(b)
 	}
 	return len(p), nil
+}
+
+func TestRedactionCoversUnderscoreKeysPasswordsAndSessions(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	req := post("/v1/track", `{"userId":"u1"}`)
+	req.Header["X-Api_key"] = []string{"k"}
+	req.Header.Set("X-Session-Id", "s")
+	req.Header.Set("X-Db-Password", "p")
+	req.Header.Set("X-Request-Id", "keep")
+
+	send(t, g, req)
+
+	rec := onlyRecord(t, st).Request
+	require.Equal(t, []string{"Authorization", "X-Api_key", "X-Db-Password", "X-Session-Id"}, rec.RedactedHeaders)
+	require.Equal(t, []string{"keep"}, rec.Headers["X-Request-Id"])
+}
+
+// A write key other than dev may be a real one: the record keeps a
+// fingerprint, never the key.
+func TestForeignWriteKeyIsStoredAsAFingerprint(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	const key = "notrealkey-for-tests-3456"
+	req := httptest.NewRequest(http.MethodGet, "/sourceConfig?p=web", nil)
+	req.SetBasicAuth(key, "")
+	send(t, g, req)
+	beacon := httptest.NewRequest(http.MethodPost, "/beacon/v1/batch?writeKey="+key,
+		strings.NewReader(`{"batch":[{"userId":"u1"}]}`))
+	send(t, g, beacon)
+
+	for _, rec := range st.Since(0).Records {
+		require.Equal(t, "notr...3456", rec.WriteKey)
+		require.Equal(t, "notr", rec.WriteKeyPrefix)
+		require.Equal(t, "3456", rec.WriteKeySuffix)
+		require.Equal(t, "1a102365aa902010c7900e09c2bfc9548368bb58e8e3166954b5d979fcb7257f", rec.WriteKeySha256)
+		raw, err := json.Marshal(rec)
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), key)
+	}
+}
+
+func TestDevWriteKeyStaysClear(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+
+	send(t, g, post("/v1/track", `{"userId":"u1"}`))
+
+	rec := onlyRecord(t, st)
+	require.Equal(t, "dev", rec.WriteKey)
+	require.Empty(t, rec.WriteKeySha256)
 }

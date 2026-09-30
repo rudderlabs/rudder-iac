@@ -173,10 +173,13 @@ func (h *Handler) index(w http.ResponseWriter, _ *http.Request) {
 type info struct {
 	Ready bool `json:"ready"`
 	Identity
-	WriteKeys     []string  `json:"writeKeys"`
-	RecordVersion int       `json:"recordVersion"`
-	Cursor        uint64    `json:"cursor"`
-	Store         infoStore `json:"store"`
+	WriteKeys     []string `json:"writeKeys"`
+	RecordVersion int      `json:"recordVersion"`
+	Cursor        uint64   `json:"cursor"`
+	// Exposed is true on a non-loopback bind: other hosts can read and
+	// write this capture.
+	Exposed bool      `json:"exposed"`
+	Store   infoStore `json:"store"`
 }
 
 type storeStats struct {
@@ -210,6 +213,7 @@ func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
 		WriteKeys:     []string{},
 		RecordVersion: store.RecordVersion,
 		Cursor:        view.Cursor,
+		Exposed:       !IsLoopback(h.id.Bind),
 		Store: infoStore{
 			storeStats: storeStats{Requests: counts.Requests, Events: counts.Events, Control: counts.Control},
 			Bytes:      stats.Bytes, Evicted: stats.Evicted, EvictedThrough: stats.EvictedThrough,

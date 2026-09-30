@@ -21,24 +21,29 @@ const (
 
 // Record is one captured HTTP request (contract section 3).
 type Record struct {
-	RecordVersion int        `json:"recordVersion"`
-	ServerID      string     `json:"serverId"`
-	Seq           uint64     `json:"seq"`
-	Kind          string     `json:"kind"`
-	Probe         bool       `json:"probe"`
-	ReceivedAt    time.Time  `json:"receivedAt"`
-	Route         string     `json:"route"`
-	Transport     string     `json:"transport"`
-	StatusCode    int        `json:"statusCode"`
-	Failed        bool       `json:"failed"`
-	Outcome       string     `json:"outcome"`
-	WriteKey      string     `json:"writeKey"`
-	SourceID      string     `json:"sourceId"`
-	Rejection     *Rejection `json:"rejection"`
-	Hint          *string    `json:"hint"`
-	Request       Request    `json:"request"`
-	Response      Response   `json:"response"`
-	Events        []Event    `json:"events"`
+	RecordVersion int       `json:"recordVersion"`
+	ServerID      string    `json:"serverId"`
+	Seq           uint64    `json:"seq"`
+	Kind          string    `json:"kind"`
+	Probe         bool      `json:"probe"`
+	ReceivedAt    time.Time `json:"receivedAt"`
+	Route         string    `json:"route"`
+	Transport     string    `json:"transport"`
+	StatusCode    int       `json:"statusCode"`
+	Failed        bool      `json:"failed"`
+	Outcome       string    `json:"outcome"`
+	WriteKey      string    `json:"writeKey"`
+	// A write key that may be real is kept as a fingerprint: WriteKey is
+	// then prefix...suffix, never the key.
+	WriteKeyPrefix string     `json:"writeKeyPrefix,omitempty"`
+	WriteKeySuffix string     `json:"writeKeySuffix,omitempty"`
+	WriteKeySha256 string     `json:"writeKeySha256,omitempty"`
+	SourceID       string     `json:"sourceId"`
+	Rejection      *Rejection `json:"rejection"`
+	Hint           *string    `json:"hint"`
+	Request        Request    `json:"request"`
+	Response       Response   `json:"response"`
+	Events         []Event    `json:"events"`
 }
 
 type Rejection struct {

@@ -13,7 +13,7 @@ import (
 // recordRoots are the record keys a requests fields path may start with.
 var recordRoots = []string{
 	"recordVersion", "serverId", "seq", "kind", "probe", "receivedAt", "route", "transport", "statusCode",
-	"failed", "outcome", "writeKey", "sourceId", "rejection", "hint", "request", "response", "events",
+	"failed", "outcome", "writeKey", "writeKeyPrefix", "writeKeySuffix", "writeKeySha256", "sourceId", "rejection", "hint", "request", "response", "events",
 }
 
 // compactOmitted are the record parts the compact view leaves out.

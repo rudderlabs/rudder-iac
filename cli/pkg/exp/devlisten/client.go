@@ -156,6 +156,7 @@ type Info struct {
 	Ready
 	WriteKeys     []string  `json:"writeKeys"`
 	RecordVersion int       `json:"recordVersion"`
+	Exposed       bool      `json:"exposed"`
 	Store         InfoStore `json:"store"`
 	raw
 }

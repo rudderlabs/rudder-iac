@@ -292,7 +292,7 @@ func TestInfo(t *testing.T) {
 		"ready": true, "apiVersion": "v1", "serverId": "9f3ac1d2b7e4c601", "url": "http://127.0.0.1:4321",
 		"port": float64(4321), "bind": "127.0.0.1", "pid": float64(42), "startedAt": "2026-09-29T12:00:00Z",
 		"writeKey": "dev", "writeKeyPolicy": "any", "writeKeys": []any{}, "recordVersion": float64(1),
-		"cursor": float64(2), "store": map[string]any{"requests": float64(1), "events": float64(1), "control": float64(1),
+		"cursor": float64(2), "exposed": false, "store": map[string]any{"requests": float64(1), "events": float64(1), "control": float64(1),
 			"bytes": float64(st.Stats().Bytes), "evicted": float64(0), "evictedThrough": float64(0),
 			"maxRequests": float64(store.DefaultMaxRecords), "maxBytes": float64(store.DefaultMaxBytes)},
 	}, info)
