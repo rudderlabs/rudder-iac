@@ -52,6 +52,7 @@ func NewCmdDev(deps Deps) *cobra.Command {
 	cmd.AddCommand(newCmdRequests(deps))
 	cmd.AddCommand(newCmdSummary(deps))
 	cmd.AddCommand(newCmdInfo(deps))
+	cmd.AddCommand(newCmdCursor(deps))
 	cmd.AddCommand(newCmdReset(deps))
 	cmd.AddCommand(newCmdStop(deps))
 	cmd.AddCommand(newCmdSend(deps))

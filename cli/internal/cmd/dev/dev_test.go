@@ -288,7 +288,7 @@ func TestJQFiltersASuccessfulPage(t *testing.T) {
 	stdout, stderr, err := runDev(t, "events", "list", "--url", s.URL(), "--fields", "properties", "--json",
 		"--jq", ".events[].properties")
 	require.NoError(t, err)
-	require.Empty(t, stderr)
+	require.Equal(t, 1, strings.Count(stderr, "\n"), "stderr holds the cursor trailer only")
 	require.Equal(t, "{\"n\":1}\n{\"n\":2}\n", stdout)
 
 	stdout, _, err = runDev(t, "events", "list", "--url", s.URL(), "--json", "--jq", ".events[].event")

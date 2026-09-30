@@ -46,10 +46,39 @@ func (o output) result(ctx context.Context, raw []byte, note string, human func(
 	if err := o.runJQ(ctx, raw); err != nil {
 		return o.fail(err)
 	}
+	if line := trailer(raw); line != "" {
+		fmt.Fprintln(o.stderr, line)
+	}
 	if note != "" {
 		fmt.Fprintln(o.stderr, "note: "+note)
 	}
 	return nil
+}
+
+// trailer is the one stderr line --jq adds, so a projection never loses the
+// cursor: cursor=N serverId=X hasMore=B timedOut=B, each key when the
+// response has it.
+func trailer(raw []byte) string {
+	var env struct {
+		Cursor   *uint64 `json:"cursor"`
+		ServerID *string `json:"serverId"`
+		HasMore  *bool   `json:"hasMore"`
+		TimedOut *bool   `json:"timedOut"`
+	}
+	if json.Unmarshal(raw, &env) != nil || env.Cursor == nil {
+		return ""
+	}
+	parts := []string{"cursor=" + strconv.FormatUint(*env.Cursor, 10)}
+	if env.ServerID != nil {
+		parts = append(parts, "serverId="+*env.ServerID)
+	}
+	if env.HasMore != nil {
+		parts = append(parts, "hasMore="+strconv.FormatBool(*env.HasMore))
+	}
+	if env.TimedOut != nil {
+		parts = append(parts, "timedOut="+strconv.FormatBool(*env.TimedOut))
+	}
+	return strings.Join(parts, " ")
 }
 
 func (o output) runJQ(ctx context.Context, raw []byte) error {
