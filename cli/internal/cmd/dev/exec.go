@@ -18,11 +18,16 @@ import (
 )
 
 type execOptions struct {
-	port   int
-	settle time.Duration
-	expect []string
-	flags  clientFlags
+	port     int
+	settle   time.Duration
+	expect   []string
+	fields   []string
+	maxBytes int
+	flags    clientFlags
 }
+
+// defaultEvidenceBytes caps the matched events dev exec prints.
+const defaultEvidenceBytes = 24000
 
 func newCmdExec() *cobra.Command {
 	var o execOptions
@@ -32,10 +37,14 @@ func newCmdExec() *cobra.Command {
 		Long: "Start a listener in this process, run COMMAND with RUDDERSTACK_DATA_PLANE_URL and\n" +
 			"RUDDERSTACK_DEV_URL set to it, wait --settle after COMMAND exits, print the summary and stop.\n" +
 			"Use it where a detached server does not survive between shell calls, such as a sandbox.\n\n" +
+			"The summary also carries the evidence, because the listener is gone afterwards: events.items\n" +
+			"holds every captured event of each --expect name, in the compact view or only the --fields\n" +
+			"paths (seq, idx, type and event stay). --max-bytes caps the items; whole events drop last\n" +
+			"first and events.truncated counts them.\n\n" +
 			"COMMAND's stdout and stderr go to stderr, so stdout holds the summary only. The exit code\n" +
 			"is COMMAND's when it failed; else 1 when an --expect event is missing or its count differs;\n" +
 			"else 0. The app must read RUDDERSTACK_DATA_PLANE_URL, or use --port with its fixed port.",
-		Example: "  rudder-cli dev exec --expect 'Order Completed' --json -- node backend.mjs\n" +
+		Example: "  rudder-cli dev exec --expect 'Order Completed=1' --fields properties --json -- node backend.mjs\n" +
 			"  rudder-cli dev exec --port 4321 --expect 'Suggestion Sent=1' --json -- npm run e2e",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,6 +55,10 @@ func newCmdExec() *cobra.Command {
 	f.IntVar(&o.port, "port", 0, "Port to listen on; 0 lets the OS pick a free one")
 	f.DurationVar(&o.settle, "settle", 2*time.Second, "Wait `DURATION` after COMMAND exits for late requests")
 	f.StringArrayVar(&o.expect, "expect", nil, "Check that event `NAME[=COUNT]` arrived; repeat for more")
+	f.StringArrayVar(&o.fields, "fields", nil,
+		"Show only these `PATH`s of each matched event, such as properties; repeat for more")
+	f.IntVar(&o.maxBytes, "max-bytes", defaultEvidenceBytes,
+		"Cap the matched events at `N` bytes, dropping whole events last first; 0 turns it off")
 	f.BoolVarP(&o.flags.json, "json", "j", false, "Output the summary as JSON")
 	f.StringVar(&o.flags.jq, "jq", "", "Filter the JSON summary with a jq `EXPR`; needs --json")
 	return cmd
@@ -80,10 +93,36 @@ func runExec(cmd *cobra.Command, o execOptions, args []string) error {
 	if err != nil {
 		return out.fail(err)
 	}
-	if err := out.result(ctx, s.Raw, "", func(w io.Writer) { printSummary(w, s) }); err != nil {
+	raw, err := o.evidence(ctx, srv.Client(), since, s)
+	if err != nil {
+		return out.fail(err)
+	}
+	if err := out.result(ctx, raw, "", func(w io.Writer) { printSummary(w, s) }); err != nil {
 		return err
 	}
 	return execOutcome(out, exitCode, s)
+}
+
+// evidence adds the events of every expected name to the summary, so one
+// call carries presence, counts and properties before the listener stops.
+func (o execOptions) evidence(ctx context.Context, c *devlisten.Client, since uint64, s devlisten.Summary) (
+	[]byte, error,
+) {
+	names := expectedNames(s.Expected)
+	if len(names) == 0 {
+		return s.Raw, nil
+	}
+	items, err := collectEvents(ctx, c, devlisten.Query{Since: since, Event: names, Fields: o.fields})
+	if err != nil {
+		return nil, err
+	}
+	kept, dropped := boundItems(items, o.maxBytes)
+	var t *evidenceTruncated
+	if dropped > 0 {
+		t = &evidenceTruncated{By: "maxBytes", Kept: len(kept), Dropped: dropped,
+			Next: "rerun dev exec with --fields properties, or --max-bytes 0 for every event"}
+	}
+	return withEvents(s.Raw, kept, t)
 }
 
 // runChild runs COMMAND with the listener URL in its environment. A
