@@ -55,6 +55,10 @@ func newCmdEventsList(deps Deps) *cobra.Command {
 			"--json prints the compact view capped at 24000 bytes; omitted.next and truncated.next name\n" +
 			"the call that shows more. --since is exclusive: pass the cursor of the previous page.\n" +
 			"--wait long-polls for --min matches, at most 110s; a timeout exits 0 with timedOut true.\n" +
+			"seq counts every request, so gaps are control requests (sourceConfig, preflight).\n" +
+			"Views: summary (one short line per event), compact (the default; context keys that SDKs\n" +
+			"collect are left out and listed in omitted.context; --include context restores them as the\n" +
+			"item's context) and full (message and enrichedMessage). Properties pass through unchanged.\n" +
 			"Server lookup: --url, RUDDERSTACK_DEV_URL, then the state file of rudder-cli dev listen.",
 		Example: "  rudder-cli dev events list --since 0 --view summary --json\n" +
 			"  rudder-cli dev events list --since 41 --event 'Suggestion Sent' --include context --json\n" +

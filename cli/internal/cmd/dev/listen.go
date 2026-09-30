@@ -47,10 +47,22 @@ func newCmdListen(deps Deps) *cobra.Command {
 			"This command blocks in the foreground. Read events from another shell.\n" +
 			"Set the SDK data-plane URL and configUrl to the ready URL.\n" +
 			"Stdout carries exactly one JSON ready line; progress goes to stderr.\n\n" +
-			"Use --port for a fixed URL, --quiet to suppress progress, or --detach to return after\n" +
+			"If the app already targets a fixed data plane URL, start the listener on that port: --port N.\n" +
+			"Use --quiet to suppress progress, or --detach to return after\n" +
 			"readiness. Stop with Ctrl-C or rudder-cli dev stop. --idle-exit defaults to off in the\n" +
 			"foreground and 30m with --detach. Clients find the server through the state file\n" +
-			"dev-listen.json in the config directory, which follows -c.\n\n" +
+			"dev-listen.json in the config directory, which follows -c. Where a detached server does not\n" +
+			"survive between shell calls (a sandbox), use rudder-cli dev exec -- COMMAND instead.\n\n" +
+			"App checklist, when events do not arrive (see dev summary: nothing_received,\n" +
+			"no_browser_traffic, sdk_loaded_no_events):\n" +
+			"  1. The SDK dataPlaneUrl is the ready URL, or --port matches the app's fixed URL.\n" +
+			"  2. The browser SDK configUrl is the ready URL too; without it the SDK asks\n" +
+			"     api.rudderstack.com and no /sourceConfig reaches the listener.\n" +
+			"  3. The page loaded the SDK and ran load(); dev requests list --kind control shows\n" +
+			"     /sourceConfig and preflights (method OPTIONS) when it did.\n" +
+			"  4. The action that sends the event ran. Map each action to the event and count you expect,\n" +
+			"     then check with dev summary --expect NAME=COUNT.\n" +
+			"  5. dev send --json proves the listener works; if the probe arrives, the app config is wrong.\n\n" +
 			"Security: the default bind is 127.0.0.1. With --bind 0.0.0.0 (a container) the server has no\n" +
 			"Host check, /info reports exposed: true, and a warning prints on every start: other hosts can\n" +
 			"read the capture, and because CORS reflects every origin with credentials, any web page can\n" +
