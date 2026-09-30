@@ -101,6 +101,8 @@ func TestTrackIsAcceptedAndCaptured(t *testing.T) {
 func TestMissingWriteKeyIsRejectedWithOracleBody(t *testing.T) {
 	t.Parallel()
 	g, st := newTestGateway()
+	// The oracle key check applies under an allowlist only.
+	g.AllowWriteKeys([]string{"dev"})
 	r := post("/v1/track", `{"userId":"u1"}`)
 	r.Header.Del("Authorization")
 

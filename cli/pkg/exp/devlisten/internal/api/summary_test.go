@@ -110,7 +110,7 @@ func TestSummaryCounts(t *testing.T) {
 	require.Equal(t, []any{map[string]any{
 		"code": "auth_rejected", "count": float64(1),
 		"message": "Requests were rejected at the auth stage. Compare their writeKey with the SDK configuration.",
-		"next":    "rudder-cli dev requests list --failed --json",
+		"next":    "rudder-cli dev requests list --since 0 --status-code 401 --json",
 	}}, summary["diagnosis"])
 }
 
@@ -204,4 +204,43 @@ func TestNothingReceivedNamesACurlTrack(t *testing.T) {
 
 func sortedKeys(m map[string]any) []string {
 	return slices.Sorted(maps.Keys(m))
+}
+
+// Each rejection diagnosis names the requests behind it, not one shared list.
+func TestRejectionDiagnosesNameTheirOwnRequests(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A")))
+	auth := rejected("auth")
+	auth.StatusCode = 401
+	st.Append(auth)
+	st.Append(rejected("parse"))
+
+	nexts := map[string]any{}
+	for _, d := range summaryOf(t, srv.URL+"/_dev/v1/events?since=1")["diagnosis"].([]any) {
+		nexts[d.(map[string]any)["code"].(string)] = d.(map[string]any)["next"]
+	}
+
+	require.Equal(t, "rudder-cli dev requests list --since 1 --status-code 401 --json", nexts["auth_rejected"])
+	require.Equal(t, "rudder-cli dev requests list --since 1 --failed --status-code 400 --status-code 413 --json",
+		nexts["body_rejected"])
+}
+
+func TestStatusCodeClassAndEventPrefix(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "Order Completed"), track(1, "Order Refunded"), track(2, "Page Viewed")))
+	bad := rejected("parse")
+	bad.Events = []store.Event{track(0, "Order Failed")}
+	st.Append(bad)
+
+	_, byClass := get(t, srv.URL+"/_dev/v1/events?statusCode=4xx")
+	_, byPrefix := get(t, srv.URL+"/_dev/v1/events?event=Order*")
+	status, _ := get(t, srv.URL+"/_dev/v1/events?statusCode=9xx")
+
+	require.Len(t, byClass["events"], 1)
+	require.Len(t, byPrefix["events"], 3)
+	require.Equal(t, map[string]any{"Order Completed": float64(1), "Order Refunded": float64(1),
+		"Order Failed": float64(1)}, byPrefix["summary"].(map[string]any)["byEvent"], "a pattern adds no zero entry")
+	require.Equal(t, 400, status)
 }

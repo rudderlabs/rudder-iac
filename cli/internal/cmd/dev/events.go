@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"regexp"
 	"slices"
-	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -138,16 +138,18 @@ func maxBytes(n int) int {
 	return n
 }
 
-func parseCodes(raw []string) ([]int, error) {
-	codes := make([]int, 0, len(raw))
+var statusCodeFlag = regexp.MustCompile(`^([1-5][0-9][0-9]|[1-5]xx)$`)
+
+// parseCodes checks --status-code values: a code such as 401 or a class
+// such as 4xx.
+func parseCodes(raw []string) ([]string, error) {
 	for _, r := range raw {
-		n, err := strconv.Atoi(r)
-		if err != nil {
-			return nil, usageError("rudder-cli dev events list --help", "--status-code %q is not an integer", r)
+		if !statusCodeFlag.MatchString(r) {
+			return nil, usageError("rudder-cli dev events list --help",
+				"--status-code %q is not a status code such as 401 or a class such as 4xx", r)
 		}
-		codes = append(codes, n)
 	}
-	return codes, nil
+	return raw, nil
 }
 
 func runEvents(cmd *cobra.Command, deps Deps, o eventsOptions, sendView bool) error {

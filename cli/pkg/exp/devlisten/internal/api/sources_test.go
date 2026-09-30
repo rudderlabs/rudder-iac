@@ -53,6 +53,6 @@ func TestSummaryDiagnosesNoBrowserTraffic(t *testing.T) {
 
 	require.Equal(t, []string{"no_browser_traffic", "all_accepted"}, diagnosisCodes(t, summary))
 	d := summary["diagnosis"].([]any)[0].(map[string]any)
-	require.Equal(t, "rudder-cli dev requests list --kind control --json", d["next"])
+	require.Equal(t, "rudder-cli dev requests list --since 0 --kind control --json", d["next"])
 	require.Contains(t, d["message"], "check in order: 1. its configUrl is the listener URL")
 }

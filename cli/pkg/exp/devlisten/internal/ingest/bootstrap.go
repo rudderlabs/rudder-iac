@@ -17,7 +17,7 @@ func (g *Gateway) sourceConfig(r *http.Request) reply {
 
 	rep.header.Set("Content-Type", "application/json; charset=utf-8")
 	writeKey, _, ok := r.BasicAuth()
-	if !ok || writeKey == "" {
+	if (!ok || writeKey == "") && len(g.allowed) > 0 {
 		rep.status = http.StatusUnauthorized
 		rep.body = []byte(`{"message":"Writekey not found in basic auth"}`)
 		return rep
@@ -72,6 +72,8 @@ func (g *Gateway) health(r *http.Request, path string) (reply, bool) {
 			rep.status = http.StatusServiceUnavailable
 			rep.body = []byte(`{"status":"stopping"}`)
 		}
+	case "/favicon.ico":
+		rep.status = http.StatusNoContent
 	case "/internal/liveness":
 	case "/robots.txt":
 		rep.body = []byte("User-agent: * \nDisallow: / \n")

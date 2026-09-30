@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/ui"
 )
 
 func getRaw(t *testing.T, url string) (*http.Response, string) {
@@ -88,4 +89,51 @@ func TestUIScriptNeverParsesHTML(t *testing.T) {
 		require.NotContains(t, script, sink)
 	}
 	require.Contains(t, script, "textContent")
+}
+
+// A human clicks the ui link in a PR or chat: a cross-site top-level
+// navigation cannot read the response, so it is allowed; a fetch is not.
+func TestUILinkFromAnotherSiteOpens(t *testing.T) {
+	t.Parallel()
+	srv, _ := newTestServer(t)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/_dev/ui/", nil)
+	require.NoError(t, err)
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	nav := resp.StatusCode
+	fetch, _ := get(t, srv.URL+"/_dev/v1/events", "Sec-Fetch-Site", "cross-site", "Sec-Fetch-Mode", "cors",
+		"Sec-Fetch-Dest", "empty")
+
+	require.Equal(t, http.StatusOK, nav)
+	require.Equal(t, http.StatusForbidden, fetch)
+}
+
+// Everything the command line can ask of /events and /requests has a
+// control on the page.
+func TestEveryQueryParameterHasAControl(t *testing.T) {
+	t.Parallel()
+	page, _, _ := ui.File("")
+
+	for _, route := range []string{"events", "requests"} {
+		for _, p := range Params[route] {
+			id, ok := ui.Controls[route][p.Name]
+			require.True(t, ok, "%s: parameter %s has no UI control", route, p.Name)
+			require.Contains(t, string(page), `id="`+id+`"`, "%s: control %s of %s", route, id, p.Name)
+		}
+	}
+}
+
+// The page stands alone: it never tells a reader to run a command.
+func TestUINeverShowsCommands(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"", "app.js", "app.css"} {
+		body, _, ok := ui.File(name)
+		require.True(t, ok, name)
+		require.NotContains(t, string(body), "rudder-cli", name)
+	}
 }

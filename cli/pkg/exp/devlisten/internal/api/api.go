@@ -45,6 +45,8 @@ type Config struct {
 	CheckHost bool
 	// WriteKeys is the masked allowlist; empty accepts every key.
 	WriteKeys []string
+	// Guide is the workflow guide served at /_dev/v1/guide.
+	Guide string
 }
 
 type Handler struct {
@@ -66,6 +68,7 @@ func New(st *store.Store, id Identity, cfg Config) *Handler {
 		base + "info":                 {http.MethodGet, h.info},
 		base + "events":               {http.MethodGet, h.events},
 		base + "requests":             {http.MethodGet, h.requests},
+		base + "guide":                {http.MethodGet, h.guide},
 	}
 	return h
 }
@@ -117,7 +120,7 @@ func (h *Handler) guard(r *http.Request) *apiError {
 		return &apiError{status: http.StatusForbidden, Code: "host_not_allowed",
 			Message: "Host " + r.Host + " is not a loopback name for this server", Next: strp(nextShell)}
 	}
-	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "none" && site != "same-origin" {
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "none" && site != "same-origin" && !isNavigation(r) {
 		return &apiError{status: http.StatusForbidden, Code: "browser_origin",
 			Message: "the query API refuses cross-site browser requests", Next: strp(nextShell)}
 	}
@@ -150,6 +153,7 @@ type index struct {
 	Next        string            `json:"next"`
 	Curl        string            `json:"curl"`
 	Links       map[string]string `json:"links"`
+	Endpoints   []endpoint        `json:"endpoints"`
 	Help        string            `json:"help"`
 }
 
@@ -157,13 +161,54 @@ func (h *Handler) index(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, index{
 		APIVersion:  APIVersion,
 		ServerID:    h.id.ServerID,
-		Description: "Inspect local captures. Start with events: its summary block counts and diagnoses them.",
-		Next:        "rudder-cli dev events list --since 0 --json",
-		Curl:        "curl -fsS " + shellQuote(h.id.URL+base+"events?serverId="+h.id.ServerID),
-		Links: map[string]string{"events": "events", "list": "events?view=list", "requests": "requests",
-			"request": "requests/{seq}", "info": "info"},
-		Help: "rudder-cli dev --help",
+		Description: "Inspect local captures. Start with events?view=counts: its summary counts and diagnoses them.",
+		Next:        "rudder-cli dev events --since 0 --json",
+		Curl:        "curl -fsS " + shellQuote(h.id.URL+base+"events?view=counts&serverId="+h.id.ServerID),
+		Links: map[string]string{"events": "events?view=counts", "list": "events", "requests": "requests",
+			"request": "requests/{seq}", "info": "info", "guide": "guide", "ui": UIPath},
+		Endpoints: h.endpoints(),
+		Help:      "rudder-cli dev --help",
 	})
+}
+
+// endpoint describes one route for a caller that has only curl.
+type endpoint struct {
+	Method  string   `json:"method"`
+	Path    string   `json:"path"`
+	Params  []string `json:"params"`
+	About   string   `json:"about"`
+	Example string   `json:"example"`
+}
+
+// endpoints lists every route; TestIndexListsEveryRoute keeps it complete.
+func (h *Handler) endpoints() []endpoint {
+	u := h.id.URL
+	return []endpoint{
+		{http.MethodGet, base + "events", paramNames("events"),
+			"The events envelope: summary (counts, byEvent, byWriteKey, diagnosis) and events. " +
+				"view=counts leaves events empty.", u + base + "events?view=counts&event=Order%20Completed"},
+		{http.MethodGet, base + "requests", paramNames("requests"),
+			"Captured requests, including rejected and control requests.", u + base + "requests?kind=all&failed=true"},
+		{http.MethodGet, base + "requests/{seq}", paramNames("requests/{seq}"),
+			"One captured request in full.", u + base + "requests/1?fields=request.body"},
+		{http.MethodGet, base + "info", paramNames("info"),
+			"Server identity, cursor and store counts.", u + base + "info"},
+		{http.MethodGet, base + "guide", []string{}, "The workflow guide as Markdown.", u + base + "guide"},
+		{http.MethodGet, UIPath, []string{}, "Read-only review page for a browser.", u + UIPath},
+	}
+}
+
+func paramNames(route string) []string {
+	names := []string{}
+	for _, p := range Params[route] {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+func (h *Handler) guide(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	_, _ = w.Write([]byte(h.cfg.Guide))
 }
 
 type info struct {
@@ -254,4 +299,11 @@ func uiFile(name string) http.HandlerFunc {
 		w.Header().Set("Content-Security-Policy", uiCSP)
 		_, _ = w.Write(body)
 	}
+}
+
+// isNavigation is a top-level GET navigation to the review page: the
+// browser shows it but never hands the response to another site's script.
+func isNavigation(r *http.Request) bool {
+	return r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, UIPath) &&
+		r.Header.Get("Sec-Fetch-Mode") == "navigate" && r.Header.Get("Sec-Fetch-Dest") == "document"
 }

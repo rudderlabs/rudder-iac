@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -117,16 +119,26 @@ func (p *params) intIn(name string, def, lo, hi int) int {
 	return n
 }
 
-func (p *params) ints(name string) []int {
-	var out []int
-	for _, raw := range p.list(name) {
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			p.fail(name, "%q is not an integer", raw)
+var statusCodePattern = regexp.MustCompile(`^([1-5][0-9][0-9]|[1-5]xx)$`)
+
+// statusCodes reads statusCode values: a code such as 401 or a class such
+// as 4xx.
+func (p *params) statusCodes() []string {
+	codes := p.list("statusCode")
+	for _, raw := range codes {
+		if !statusCodePattern.MatchString(raw) {
+			p.fail("statusCode", "%q is not a status code such as 401 or a class such as 4xx", raw)
 		}
-		out = append(out, n)
 	}
-	return out
+	return codes
+}
+
+// codeMatches reports whether status is the code or in the class.
+func codeMatches(code string, status int) bool {
+	if class, ok := strings.CutSuffix(code, "xx"); ok {
+		return strconv.Itoa(status/100) == class
+	}
+	return code == strconv.Itoa(status)
 }
 
 // oneOf returns the value when it is in allowed, else def when absent.

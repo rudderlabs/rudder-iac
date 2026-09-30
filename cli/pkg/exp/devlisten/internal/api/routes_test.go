@@ -40,13 +40,13 @@ func TestIndexNamesTheFirstCall(t *testing.T) {
 	status, index := get(t, srv.URL+"/_dev/v1/")
 
 	require.Equal(t, http.StatusOK, status)
-	require.Equal(t, "rudder-cli dev events list --since 0 --json", index["next"])
-	require.Equal(t, "curl -fsS 'http://127.0.0.1:4321/_dev/v1/events?serverId=9f3ac1d2b7e4c601'", index["curl"])
+	require.Equal(t, "rudder-cli dev events --since 0 --json", index["next"])
+	require.Equal(t, "curl -fsS 'http://127.0.0.1:4321/_dev/v1/events?view=counts&serverId=9f3ac1d2b7e4c601'", index["curl"])
 	require.Equal(t, "rudder-cli dev --help", index["help"])
 	require.Contains(t, index["links"], "events")
 	raw, err := json.Marshal(index)
 	require.NoError(t, err)
-	require.Less(t, len(raw), 1024)
+	require.Less(t, len(raw), 4096, "the index lists every endpoint and stays small")
 }
 
 func TestHostCheckOnLoopbackBind(t *testing.T) {

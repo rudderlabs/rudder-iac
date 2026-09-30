@@ -94,7 +94,9 @@ func TestEventsEnvelope(t *testing.T) {
 	delete(page, "waitedMs")
 	require.Equal(t, map[string]any{
 		"apiVersion": "v1", "serverId": "9f3ac1d2b7e4c601", "since": float64(0), "cursor": float64(2),
-		"hasMore": false, "timedOut": false, "view": "full", "omitted": nil, "truncated": nil,
+		"hasMore": false, "timedOut": false, "view": "full", "omitted": nil, "truncated": nil, "evictedThrough": float64(0),
+		"next":  "rudder-cli dev events list --since 2 --event 'B' --view 'full' --json",
+		"links": map[string]any{"next": "events?event=B&since=2&view=full"},
 	}, withoutKey(page, "summary"))
 	require.Len(t, events, 1)
 	item := events[0].(map[string]any)
@@ -137,7 +139,7 @@ func TestUnknownParameterIsRejected(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, status)
 	require.Equal(t, map[string]any{"error": map[string]any{
 		"code": "unknown_parameter", "message": "unknown parameter: sinc", "param": "sinc", "details": nil,
-		"next": "rudder-cli dev events list --help",
+		"next": "rudder-cli dev events list --help", "status": float64(400),
 	}}, body)
 }
 

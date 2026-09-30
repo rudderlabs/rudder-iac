@@ -207,13 +207,13 @@ func TestQueryValues(t *testing.T) {
 
 	q := devlisten.Query{
 		Since: 57, Limit: 10, View: devlisten.ViewList,
-		Event: []string{"A", "B"}, Type: []string{"track"}, StatusCode: []int{200, 400},
+		Event: []string{"A", "B"}, Type: []string{"track"}, StatusCode: []string{"200", "4xx"},
 		UserID: "u1", AnonymousID: "a1", Fields: []string{"properties"},
 		MaxBytes: devlisten.MaxBytesOff, Min: 2, Wait: 30 * time.Second,
 	}
 
 	require.Equal(t, "anonymousId=a1&event=A&event=B&fields=properties&limit=10&maxBytes=0&min=2"+
-		"&since=57&statusCode=200&statusCode=400&type=track&userId=u1&view=list&wait=30s",
+		"&since=57&statusCode=200&statusCode=4xx&type=track&userId=u1&view=list&wait=30s",
 		q.Values().Encode())
 	require.Equal(t, "maxBytes=500", devlisten.Query{MaxBytes: 500}.Values().Encode())
 	require.Equal(t, "", devlisten.Query{}.Values().Encode())

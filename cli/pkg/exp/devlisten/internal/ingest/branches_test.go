@@ -29,6 +29,8 @@ func gz(t *testing.T, s string) []byte {
 func TestBeaconWithoutWriteKeyParamIsRejected(t *testing.T) {
 	t.Parallel()
 	g, st := newTestGateway()
+	// The oracle key check applies under an allowlist only.
+	g.AllowWriteKeys([]string{"dev"})
 
 	got := send(t, g, post("/beacon/v1/batch", `{"batch":[{"userId":"u1"}]}`))
 
@@ -87,6 +89,8 @@ func TestCorruptGzipFailsBeforeAuth(t *testing.T) {
 func TestBrokenGzipStreamFailsAtBodyReadAfterAuth(t *testing.T) {
 	t.Parallel()
 	g, st := newTestGateway()
+	// The oracle key check applies under an allowlist only.
+	g.AllowWriteKeys([]string{"dev"})
 	compressed := gz(t, `{"userId":"u1","event":"A"}`)
 	compressed[12] ^= 0xff
 
@@ -270,6 +274,8 @@ func TestSourceConfig(t *testing.T) {
 func TestSourceConfigWithoutWriteKey(t *testing.T) {
 	t.Parallel()
 	g, _ := newTestGateway()
+	// The oracle key check applies under an allowlist only.
+	g.AllowWriteKeys([]string{"dev"})
 
 	got := send(t, g, httptest.NewRequest(http.MethodGet, "/sourceConfig", nil))
 

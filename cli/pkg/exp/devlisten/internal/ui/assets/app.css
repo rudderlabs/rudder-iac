@@ -68,7 +68,8 @@ body {
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
 .dot.on { background: var(--ok); }
 .dot.off { background: var(--bad); }
-.links a { color: var(--accent); text-decoration: none; font-size: 13px; margin-left: 12px; }
+.links { display: flex; align-items: center; gap: 10px; }
+.links a { color: var(--accent); text-decoration: none; font-size: 13px; }
 .links a:hover { text-decoration: underline; }
 
 .summary { padding: 12px 16px 0; }
@@ -102,11 +103,41 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 10px 16px;
 }
-.search { flex: 1 1 280px; }
-.search input, .select select {
+.toolbar [hidden] { display: none; }
+
+.tabs { display: flex; gap: 4px; padding: 12px 16px 0; border-bottom: 1px solid var(--border); }
+.tab {
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 8px 8px 0 0;
+  font: inherit;
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--panel); color: var(--text); border-color: var(--border); font-weight: 600; }
+.subtabs { display: flex; gap: 6px; margin: 8px 0 0; }
+
+.banner { margin: 10px 16px 0; padding: 8px 12px; border-radius: 8px; background: var(--bad-bg); color: var(--bad); font-size: 13px; }
+.breakdown { margin-top: 10px; font-size: 13px; }
+.breakdown summary { cursor: pointer; color: var(--muted); }
+.breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+table.mini { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+table.mini tbody tr { cursor: pointer; }
+.diagnosis .action { margin-left: 8px; }
+.diagnosis ol { margin: 4px 0 0 18px; padding: 0; }
+.list-foot { padding: 8px 10px; border-top: 1px solid var(--border); }
+.related { margin-top: 12px; font-size: 13px; }
+.related button { margin: 2px 6px 2px 0; }
+td.fields { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; max-width: 360px; }
+.grow { flex: 1 1 260px; }
+.field { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.field input, .field select { width: auto; max-width: 180px; }
+.search input, .select select, .field input, .field select {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -186,7 +217,7 @@ pre {
   margin: 6px 0 0;
   white-space: pre;
 }
-.copy {
+.btn, .copy {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
@@ -196,9 +227,11 @@ pre {
   font-size: 12px;
   cursor: pointer;
 }
-.copy:hover { background: var(--hover); }
+.btn:hover, .copy:hover { background: var(--hover); }
+.btn.on { background: var(--selected); border-color: var(--accent); }
 
 @media (max-width: 860px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .split { grid-template-columns: 1fr; }
+  .breakdown-grid { grid-template-columns: 1fr; }
 }

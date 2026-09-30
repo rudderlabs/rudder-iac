@@ -9,6 +9,7 @@ import (
 // error the server returns.
 type apiError struct {
 	status  int
+	Status  int            `json:"status"`
 	Code    string         `json:"code"`
 	Message string         `json:"message"`
 	Param   *string        `json:"param"`
@@ -49,5 +50,6 @@ func invalidParam(route, param, format string, args ...any) *apiError {
 }
 
 func writeError(w http.ResponseWriter, e apiError) {
+	e.Status = e.status
 	writeJSON(w, e.status, map[string]apiError{"error": e})
 }

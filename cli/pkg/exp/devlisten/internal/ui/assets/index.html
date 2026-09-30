@@ -9,61 +9,86 @@
 <body>
 <header class="top">
   <div class="brand">
-    <span class="dot" id="live" title="Polling"></span>
-    <h1>rudder-cli dev listen</h1>
+    <span class="dot" id="live-dot" title="Live"></span>
+    <h1>Local event capture</h1>
     <span class="muted mono" id="server"></span>
   </div>
   <nav class="links">
+    <button type="button" id="pause" class="btn">Pause</button>
+    <button type="button" id="export" class="btn">Export JSON</button>
+    <a href="/_dev/v1/guide" target="_blank" rel="noopener">Guide</a>
     <a href="/_dev/v1/" target="_blank" rel="noopener">API index</a>
   </nav>
 </header>
+
+<p class="banner" id="evicted" hidden></p>
 
 <section class="summary" aria-label="Summary">
   <div class="stats">
     <div class="stat"><span class="label">Requests</span><span class="value" id="stat-requests">0</span><span class="sub" id="stat-failed"></span></div>
     <div class="stat"><span class="label">Events</span><span class="value" id="stat-events">0</span><span class="sub" id="stat-types"></span></div>
-    <div class="stat"><span class="label">Control</span><span class="value" id="stat-control">0</span><span class="sub" id="stat-control-sub"></span></div>
-    <div class="stat"><span class="label">Sources</span><span class="value" id="stat-keys">0</span><span class="sub" id="stat-sdks"></span></div>
+    <div class="stat"><span class="label">Control requests</span><span class="value" id="stat-control">0</span><span class="sub" id="stat-control-sub"></span></div>
+    <div class="stat"><span class="label">SDKs</span><span class="value" id="stat-sdks">0</span><span class="sub" id="stat-keys"></span></div>
   </div>
   <ul class="diagnosis" id="diagnosis"></ul>
+  <details class="breakdown" id="breakdown">
+    <summary>Counts by event and by write key</summary>
+    <div class="breakdown-grid">
+      <table class="mini"><thead><tr><th>Event</th><th>Count</th></tr></thead><tbody id="by-event"></tbody></table>
+      <table class="mini"><thead><tr><th>Write key</th><th>Requests</th><th>Events</th></tr></thead><tbody id="by-key"></tbody></table>
+    </div>
+  </details>
 </section>
 
+<nav class="tabs" role="tablist">
+  <button type="button" role="tab" id="tab-events" class="tab" aria-selected="true">Events</button>
+  <button type="button" role="tab" id="tab-requests" class="tab" aria-selected="false">Requests</button>
+</nav>
+
 <section class="toolbar" aria-label="Filters">
-  <label class="search">
-    <span class="visually-hidden">Search</span>
+  <label class="search grow"><span class="visually-hidden">Search</span>
     <input id="search" type="search" placeholder="Search event names and payload values" autocomplete="off" spellcheck="false">
   </label>
-  <label class="toggle"><input id="failed-only" type="checkbox"> Failed only</label>
-  <label class="select">Source
-    <select id="source"><option value="">All write keys</option></select>
+  <label class="field" data-tab="events">Event <input id="f-event" placeholder="Order* or a name" autocomplete="off"></label>
+  <label class="field" data-tab="events">Type
+    <select id="f-type"><option value="">Any</option><option>track</option><option>identify</option><option>page</option><option>screen</option><option>group</option><option>alias</option></select>
   </label>
+  <label class="field" data-tab="events">User ID <input id="f-user" autocomplete="off"></label>
+  <label class="field" data-tab="events">Anonymous ID <input id="f-anon" autocomplete="off"></label>
+  <label class="field">Status <input id="f-status" placeholder="401 or 4xx" size="7" autocomplete="off"></label>
+  <label class="field">Write key <select id="f-key"><option value="">Any</option></select></label>
+  <label class="field" data-tab="requests">Kind
+    <select id="f-kind"><option value="all">All</option><option value="ingestion">Ingestion</option><option value="control">Control</option></select>
+  </label>
+  <label class="toggle"><input id="f-failed" type="checkbox"> Failed only</label>
+  <label class="field" data-tab="events">Fields <input id="f-fields" placeholder="properties, context.page.path" autocomplete="off"></label>
+  <button type="button" id="only-new" class="btn">Show only new</button>
   <span class="muted" id="count"></span>
 </section>
 
 <main class="split">
-  <section class="list" aria-label="Events">
+  <section class="list" aria-label="List">
     <table>
-      <thead><tr><th>Time</th><th>Type</th><th>Event</th><th>Status</th><th>Source</th></tr></thead>
+      <thead id="list-head"></thead>
       <tbody id="rows"></tbody>
     </table>
-    <p class="empty" id="empty">No events yet. Point the SDK at this listener and send one.</p>
+    <p class="empty" id="empty"></p>
+    <div class="list-foot" id="fields-foot" hidden><button type="button" id="copy-fields" class="btn">Copy fields as JSON</button></div>
   </section>
-  <section class="detail" aria-label="Event detail" id="detail">
-    <p class="empty" id="detail-empty">Select an event to see its properties and the request that carried it.</p>
+  <section class="detail" aria-label="Detail">
+    <p class="empty" id="detail-empty">Select a row to see it in full.</p>
     <div id="detail-body" hidden>
       <div class="detail-head">
         <h2 id="detail-title"></h2>
         <span class="pill" id="detail-status"></span>
       </div>
       <dl class="facts" id="detail-facts"></dl>
+      <nav class="subtabs" id="detail-tabs"></nav>
       <div class="block">
-        <div class="block-head"><h3>Properties</h3><button type="button" class="copy" data-copy="properties">Copy</button></div>
-        <pre id="detail-properties"></pre>
+        <div class="block-head"><h3 id="detail-label"></h3><button type="button" class="btn" id="copy-detail">Copy</button></div>
+        <pre id="detail-json"></pre>
       </div>
-      <div class="block">
-        <div class="block-head"><h3>Request JSON</h3><button type="button" class="copy" data-copy="request">Copy</button></div>
-        <pre id="detail-request"></pre>
-      </div>
+      <div class="related" id="related"></div>
     </div>
   </section>
 </main>

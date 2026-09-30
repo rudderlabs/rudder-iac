@@ -248,7 +248,23 @@ func SourceID(writeKey string) string {
 // key. Call it before serving.
 func (g *Gateway) AllowWriteKeys(keys []string) { g.allowed = slices.Clone(keys) }
 
-// admits applies the allowlist to a key that passed authenticate.
+// admits applies the allowlist: without one every key passes, an empty
+// key included.
 func (g *Gateway) admits(key string) bool {
 	return len(g.allowed) == 0 || slices.Contains(g.allowed, key)
+}
+
+// checkKey keeps the oracle's missing-key rejection only under an
+// allowlist; without one a missing key is accepted and reported by the
+// missing_write_key diagnosis.
+func (g *Gateway) checkKey(key string, missing *gwError) *gwError {
+	switch {
+	case len(g.allowed) == 0:
+		return nil
+	case missing != nil:
+		return missing
+	case !g.admits(key):
+		return &errInvalidWriteKey
+	}
+	return nil
 }

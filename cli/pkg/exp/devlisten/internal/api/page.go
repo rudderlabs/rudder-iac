@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
+	"net/http"
+	"net/url"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
@@ -19,7 +23,7 @@ type filters struct {
 	wait         time.Duration
 	maxBytes     int
 	sentMaxBytes string
-	statusCode   []int
+	statusCode   []string
 	writeKey     []string
 }
 
@@ -31,7 +35,7 @@ func parseFilters(p *params) filters {
 		wait:         p.wait(),
 		maxBytes:     p.maxBytes(),
 		sentMaxBytes: p.single("maxBytes"),
-		statusCode:   p.ints("statusCode"),
+		statusCode:   p.statusCodes(),
 		writeKey:     p.list("writeKey"),
 	}
 	f.min = p.intIn("min", 1, 1, f.limit)
@@ -39,7 +43,7 @@ func parseFilters(p *params) filters {
 }
 
 func (f filters) matchesRecord(rec store.Record) bool {
-	return (len(f.statusCode) == 0 || slices.Contains(f.statusCode, rec.StatusCode)) &&
+	return (len(f.statusCode) == 0 || slices.ContainsFunc(f.statusCode, func(c string) bool { return codeMatches(c, rec.StatusCode) })) &&
 		(len(f.writeKey) == 0 || slices.ContainsFunc(f.writeKey, func(k string) bool { return store.MatchesWriteKey(rec, k) }))
 }
 
@@ -64,17 +68,19 @@ type group struct {
 }
 
 type scanResult struct {
-	groups     []group
-	count      int
-	hasMore    bool
-	cursor     uint64
-	unfiltered unfiltered
+	groups         []group
+	count          int
+	hasMore        bool
+	cursor         uint64
+	evictedThrough uint64
+	unfiltered     unfiltered
 }
 
 // scan builds one page under contract section 4.4: it never splits a
 // request, and the cursor never skips or repeats a request.
 func scan(view store.View, since uint64, limit int, render func(store.Record) group) scanResult {
-	res := scanResult{cursor: max(since, view.Cursor), unfiltered: countRecords(view.Records)}
+	res := scanResult{cursor: max(since, view.Cursor), evictedThrough: view.EvictedThrough,
+		unfiltered: countRecords(view.Records)}
 	for i, rec := range view.Records {
 		g := render(rec)
 		if len(g.items) == 0 {
@@ -212,4 +218,23 @@ func encode(v any) []byte {
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(v)
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n"))
+}
+
+// pageLinks are the URL continuations of an envelope, relative to /_dev/v1/.
+type pageLinks struct {
+	Next string `json:"next"`
+}
+
+// nextURL is the caller's query with since moved to cursor.
+func nextURL(route string, values url.Values, cursor uint64) string {
+	values = maps.Clone(values)
+	values.Set("since", strconv.FormatUint(cursor, 10))
+	return route + "?" + values.Encode()
+}
+
+// linkNext sends the RFC 8288 Link header when a page continues.
+func linkNext(w http.ResponseWriter, hasMore bool, next string) {
+	if hasMore {
+		w.Header().Set("Link", "<"+base+next+`>; rel="next"`)
+	}
 }

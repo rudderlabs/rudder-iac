@@ -206,7 +206,9 @@ func (s *Store) Cursor() uint64 {
 type View struct {
 	Records []Record
 	Cursor  uint64
-	Changed <-chan struct{}
+	// EvictedThrough is the highest evicted seq when the view was read.
+	EvictedThrough uint64
+	Changed        <-chan struct{}
 }
 
 func (s *Store) Since(seq uint64) View {
@@ -215,9 +217,10 @@ func (s *Store) Since(seq uint64) View {
 
 	i := sort.Search(len(s.records), func(i int) bool { return s.records[i].Seq > seq })
 	return View{
-		Records: s.records[i:len(s.records):len(s.records)],
-		Cursor:  s.cursor,
-		Changed: s.changed,
+		Records:        s.records[i:len(s.records):len(s.records)],
+		Cursor:         s.cursor,
+		EvictedThrough: s.through,
+		Changed:        s.changed,
 	}
 }
 

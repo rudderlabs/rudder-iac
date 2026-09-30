@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
@@ -78,7 +79,7 @@ func (q eventsQuery) fixed(fields []fieldArg) string {
 // filterArgs adds the caller's filters to a next command.
 func (q eventsQuery) filterArgs(c *command) *command {
 	q.filters.args(c)
-	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("status-code", intStrings(q.statusCode)...)
+	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("status-code", q.statusCode...)
 	if q.userID != "" {
 		c.quoted("user-id", q.userID)
 	}
@@ -111,9 +112,15 @@ func (q eventsQuery) matches(rec store.Record, ev store.Event) bool {
 	return q.filters.matchesRecord(rec) && q.matchesEvent(ev)
 }
 
-// matches ORs the values of one repeatable filter; no values match all.
+// matches ORs the values of one repeatable filter; no values match all. A
+// value that ends in * matches every name with that prefix.
 func matches(field *string, want []string) bool {
-	return len(want) == 0 || field != nil && slices.Contains(want, *field)
+	return len(want) == 0 || field != nil && slices.ContainsFunc(want, func(w string) bool {
+		if prefix, ok := strings.CutSuffix(w, "*"); ok {
+			return strings.HasPrefix(*field, prefix)
+		}
+		return w == *field
+	})
 }
 
 func equals(field *string, want string) bool {
@@ -136,18 +143,24 @@ type omitted struct {
 // eventsPage is the one /events envelope. Its keys never change with the
 // view: counts leaves events empty, the other views fill it.
 type eventsPage struct {
-	APIVersion string            `json:"apiVersion"`
-	ServerID   string            `json:"serverId"`
-	Since      uint64            `json:"since"`
-	Cursor     uint64            `json:"cursor"`
-	HasMore    bool              `json:"hasMore"`
-	TimedOut   bool              `json:"timedOut"`
-	WaitedMs   int64             `json:"waitedMs"`
-	Summary    summary           `json:"summary"`
-	View       string            `json:"view"`
-	Omitted    *omitted          `json:"omitted"`
-	Truncated  *truncated        `json:"truncated"`
-	Events     []json.RawMessage `json:"events"`
+	APIVersion string `json:"apiVersion"`
+	ServerID   string `json:"serverId"`
+	Since      uint64 `json:"since"`
+	Cursor     uint64 `json:"cursor"`
+	// EvictedThrough above since means the store dropped part of the window.
+	EvictedThrough uint64     `json:"evictedThrough"`
+	HasMore        bool       `json:"hasMore"`
+	TimedOut       bool       `json:"timedOut"`
+	WaitedMs       int64      `json:"waitedMs"`
+	Summary        summary    `json:"summary"`
+	View           string     `json:"view"`
+	Omitted        *omitted   `json:"omitted"`
+	Truncated      *truncated `json:"truncated"`
+	// Next is the CLI command that continues after this answer; Links.Next
+	// is the same call as a URL.
+	Next   string            `json:"next"`
+	Links  pageLinks         `json:"links"`
+	Events []json.RawMessage `json:"events"`
 }
 
 // events answers /events, long-polling until min matches exist, the wait
@@ -175,20 +188,28 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		page := eventsPage{
 			APIVersion: APIVersion, ServerID: h.id.ServerID, Since: q.since, TimedOut: timedOut,
 			WaitedMs: h.now().Sub(start).Milliseconds(), Summary: h.summarize(window.Records, q), View: q.view,
-			Events: []json.RawMessage{},
+			EvictedThrough: scanned.evictedThrough, Events: []json.RawMessage{},
+		}
+		continueAt := func(cursor uint64) {
+			page.Next = q.args(newCommand(routeCommands["events"]).num("since", cursor), true).flag("json").String()
+			page.Links = pageLinks{Next: nextURL("events", r.URL.Query(), cursor)}
 		}
 		if q.view == viewCounts {
 			page.Cursor = max(q.since, window.Cursor)
 			page.Omitted = q.omitted(nil)
+			continueAt(page.Cursor)
 			writeRaw(w, http.StatusOK, encode(page))
 			return
 		}
-		writeRaw(w, http.StatusOK, fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
+		body := fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
 			page.Cursor, page.HasMore, page.Truncated = cursor, hasMore, t
 			page.Events = flatten(groups)
 			page.Omitted = q.omitted(groups)
+			continueAt(cursor)
 			return encode(page)
-		}, q.truncatedNext))
+		}, q.truncatedNext)
+		linkNext(w, page.HasMore, page.Links.Next)
+		writeRaw(w, http.StatusOK, body)
 	}
 }
 

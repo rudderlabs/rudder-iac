@@ -66,13 +66,18 @@ func (e *APIError) Error() string {
 
 // MarshalJSON writes unused param and next as null, as the server does.
 func (e *APIError) MarshalJSON() ([]byte, error) {
+	var status *int
+	if e.StatusCode != 0 {
+		status = &e.StatusCode
+	}
 	return json.Marshal(struct {
+		Status  *int           `json:"status"`
 		Code    string         `json:"code"`
 		Message string         `json:"message"`
 		Param   *string        `json:"param"`
 		Details map[string]any `json:"details"`
 		Next    *string        `json:"next"`
-	}{e.Code, e.Message, nullString(e.Param), e.Details, nullString(e.Next)})
+	}{status, e.Code, e.Message, nullString(e.Param), e.Details, nullString(e.Next)})
 }
 
 func nullString(s string) *string {
@@ -185,12 +190,13 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 // request (at most 110 s); zero asks for a snapshot. Zero values send
 // nothing, so the server defaults apply.
 type Query struct {
-	Since       uint64
-	Limit       int
-	View        View
-	Event       []string
-	Type        []string
-	StatusCode  []int
+	Since uint64
+	Limit int
+	View  View
+	Event []string
+	Type  []string
+	// StatusCode values are codes such as 401 or classes such as 4xx.
+	StatusCode  []string
 	WriteKey    []string
 	UserID      string
 	AnonymousID string
@@ -207,7 +213,7 @@ func (q Query) Values() url.Values {
 	setInt(v, "limit", q.Limit)
 	setString(v, "view", string(q.View))
 	v["event"], v["type"], v["writeKey"] = q.Event, q.Type, q.WriteKey
-	v["statusCode"] = intStrings(q.StatusCode)
+	v["statusCode"] = q.StatusCode
 	setString(v, "userId", q.UserID)
 	setString(v, "anonymousId", q.AnonymousID)
 	v["fields"] = q.Fields
@@ -223,7 +229,7 @@ type RequestQuery struct {
 	Since      uint64
 	Limit      int
 	Kind       string
-	StatusCode []int
+	StatusCode []string
 	WriteKey   []string
 	Failed     *bool
 	View       View
@@ -236,7 +242,7 @@ func (q RequestQuery) Values() url.Values {
 	setUint(v, "since", q.Since)
 	setInt(v, "limit", q.Limit)
 	setString(v, "kind", q.Kind)
-	v["statusCode"], v["writeKey"] = intStrings(q.StatusCode), q.WriteKey
+	v["statusCode"], v["writeKey"] = q.StatusCode, q.WriteKey
 	if q.Failed != nil {
 		v.Set("failed", strconv.FormatBool(*q.Failed))
 	}
@@ -292,14 +298,6 @@ func setWait(v url.Values, d time.Duration) {
 	if d > 0 {
 		v.Set("wait", d.String())
 	}
-}
-
-func intStrings(ns []int) []string {
-	var out []string
-	for _, n := range ns {
-		out = append(out, strconv.Itoa(n))
-	}
-	return out
 }
 
 func compact(v url.Values) url.Values {

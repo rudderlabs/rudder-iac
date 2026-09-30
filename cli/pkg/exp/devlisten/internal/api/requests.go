@@ -20,18 +20,22 @@ var recordRoots = []string{
 var compactOmitted = []string{"request.headers", "request.body", "response", "events.message", "events.enrichedMessage"}
 
 type requestsPage struct {
-	APIVersion string            `json:"apiVersion"`
-	ServerID   string            `json:"serverId"`
-	Since      uint64            `json:"since"`
-	Cursor     uint64            `json:"cursor"`
-	HasMore    bool              `json:"hasMore"`
-	TimedOut   bool              `json:"timedOut"`
-	WaitedMs   int64             `json:"waitedMs"`
-	Unfiltered unfiltered        `json:"unfiltered"`
-	View       string            `json:"view"`
-	Omitted    *omitted          `json:"omitted"`
-	Truncated  *truncated        `json:"truncated"`
-	Requests   []json.RawMessage `json:"requests"`
+	APIVersion string `json:"apiVersion"`
+	ServerID   string `json:"serverId"`
+	Since      uint64 `json:"since"`
+	Cursor     uint64 `json:"cursor"`
+	// EvictedThrough above since means the store dropped part of the window.
+	EvictedThrough uint64            `json:"evictedThrough"`
+	HasMore        bool              `json:"hasMore"`
+	TimedOut       bool              `json:"timedOut"`
+	WaitedMs       int64             `json:"waitedMs"`
+	Unfiltered     unfiltered        `json:"unfiltered"`
+	View           string            `json:"view"`
+	Omitted        *omitted          `json:"omitted"`
+	Truncated      *truncated        `json:"truncated"`
+	Next           string            `json:"next"`
+	Links          pageLinks         `json:"links"`
+	Requests       []json.RawMessage `json:"requests"`
 }
 
 type requestsQuery struct {
@@ -82,7 +86,7 @@ func (q requestsQuery) args(c *command, withShape bool) *command {
 	if q.kind != "ingestion" {
 		c.quoted("kind", q.kind)
 	}
-	c.quoted("status-code", intStrings(q.statusCode)...)
+	c.quoted("status-code", q.statusCode...)
 	if q.failed != nil {
 		c.parts = append(c.parts, "--failed="+strconv.FormatBool(*q.failed))
 	}
@@ -124,11 +128,14 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 		page := requestsPage{
 			APIVersion: APIVersion, ServerID: h.id.ServerID, Since: q.since, TimedOut: timedOut,
 			WaitedMs: h.now().Sub(start).Milliseconds(), Unfiltered: scanned.unfiltered, View: q.view,
+			EvictedThrough: scanned.evictedThrough,
 		}
-		writeRaw(w, http.StatusOK, fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
+		body := fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
 			page.Cursor, page.HasMore, page.Truncated = cursor, hasMore, t
 			page.Requests = flatten(groups)
 			page.Omitted = q.omitted(groups)
+			page.Next = q.args(newCommand(routeCommands["requests"]).num("since", cursor), true).flag("json").String()
+			page.Links = pageLinks{Next: nextURL("requests", r.URL.Query(), cursor)}
 			return encode(page)
 		}, func(cursor uint64, oversized bool) string {
 			c := newCommand(routeCommands["requests"])
@@ -136,7 +143,9 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 				return q.args(c.num("since", q.since), false).bare("fields", "request.headers").flag("json").String()
 			}
 			return q.args(c.num("since", cursor), true).flag("json").String()
-		}))
+		})
+		linkNext(w, page.HasMore, page.Links.Next)
+		writeRaw(w, http.StatusOK, body)
 	}
 }
 

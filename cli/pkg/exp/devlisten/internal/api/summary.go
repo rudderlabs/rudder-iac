@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
@@ -60,7 +61,9 @@ type diagnosisItem struct {
 func (h *Handler) summarize(records []store.Record, q eventsQuery) summary {
 	c := countSummary(records, q)
 	for _, name := range q.event {
-		c.events.byEvent[name] += 0
+		if !strings.HasSuffix(name, "*") {
+			c.events.byEvent[name] += 0
+		}
 	}
 	for _, key := range q.writeKey {
 		c.keys.of(store.MaskWriteKey(key))
@@ -115,11 +118,9 @@ func countSummary(records []store.Record, q eventsQuery) counts {
 		}
 		c.requests.add(rec)
 		matched := c.events.add(rec, q.matchesEvent)
-		if rec.WriteKey != "" {
-			k := c.keys.of(rec.WriteKey)
-			k.Requests++
-			k.Events += matched
-		}
+		k := c.keys.of(rec.WriteKey)
+		k.Requests++
+		k.Events += matched
 	}
 	return c
 }
@@ -185,9 +186,10 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 // holds appears. A next never carries a captured value.
 func (h *Handler) diagnose(c counts, q eventsQuery) []diagnosisItem {
 	var d diagnosis
-	d.transport(c.requests, c.control, h.curlTrack())
-	d.browser(c.sources, c.control)
-	d.rejections(c.requests)
+	d.transport(c.requests, c.control, h.curlTrack(), q.since)
+	d.browser(c.sources, c.control, q.since)
+	d.rejections(c.requests, q.since)
+	d.missingKey(c.keys, q.since)
 	d.add(c.requests.Total > 0 && c.requests.Failed == 0, "all_accepted", c.requests.Total,
 		"Every received request was accepted. This says nothing about events that never arrived: "+
 			"compare summary.byEvent with the events you expect, then list them.",
@@ -213,40 +215,57 @@ func (d *diagnosis) add(ok bool, code string, count int, message, next string) {
 }
 
 // transport covers requests that never became events.
-func (d *diagnosis) transport(req requestCounts, ctl controlCounts, curlTrack string) {
+
+// requestsCmd is dev requests list after the caller's cursor.
+func requestsCmd(since uint64) *command {
+	return newCommand(routeCommands["requests"]).num("since", since)
+}
+
+// transport covers requests that never became events.
+func (d *diagnosis) transport(req requestCounts, ctl controlCounts, curlTrack string, since uint64) {
 	d.add(req.Total == 0 && ctl.Total == 0, "nothing_received", 0,
 		"No request reached the listener. Send a test track with next; if it arrives, check the SDK "+
 			"dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
 		curlTrack)
 	d.add(ctl.Preflight > 0 && ctl.SourceConfig == 0 && req.Total == 0, "preflight_only", ctl.Preflight,
 		"Only CORS preflights arrived. Read response.headers of the control requests.",
-		"rudder-cli dev requests list --kind control --json")
+		requestsCmd(since).bare("kind", "control").flag("json").String())
 	d.add(ctl.SourceConfigFailed > 0, "sdk_config_rejected", ctl.SourceConfigFailed,
 		"The SDK could not load its configuration from /sourceConfig.",
-		"rudder-cli dev requests list --kind control --failed --json")
+		requestsCmd(since).bare("kind", "control").flag("failed").flag("json").String())
 	d.add(ctl.SourceConfig > 0 && ctl.SourceConfigFailed == 0 && req.Total == 0, "sdk_loaded_no_events",
 		ctl.SourceConfig,
 		"The SDK loaded its configuration but sent no events. Check that the app calls track or page, and that the SDK does not wait on CDN plugins.",
-		"rudder-cli dev requests list --kind control --json")
+		requestsCmd(since).bare("kind", "control").flag("json").String())
 }
 
 // browser covers a browser SDK that never reached the listener while a
 // server SDK did.
-func (d *diagnosis) browser(src sourceCounts, ctl controlCounts) {
+func (d *diagnosis) browser(src sourceCounts, ctl controlCounts, since uint64) {
 	d.add(src.sdkRequests() > 0 && src.browser().Requests == 0 && ctl.SourceConfig == 0 && ctl.Preflight == 0,
 		"no_browser_traffic", src.sdkRequests(),
 		"Server SDK requests arrived, but no browser request, no /sourceConfig and no preflight. "+
 			"If the app also runs a browser SDK, check in order: 1. its configUrl is the listener URL; "+
 			"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on.",
-		"rudder-cli dev requests list --kind control --json")
+		requestsCmd(since).bare("kind", "control").flag("json").String())
 }
 
-func (d *diagnosis) rejections(req requestCounts) {
+func (d *diagnosis) missingKey(keys keyTable, since uint64) {
+	missing := keys[""]
+	if missing == nil || missing.Requests == 0 {
+		return
+	}
+	d.add(true, "missing_write_key", missing.Requests,
+		strconv.Itoa(missing.Requests)+" requests had no write key; RudderStack rejects these with 401.",
+		newCommand(routeCommands["requests"]).num("since", since).quoted("write-key", "").flag("json").String())
+}
+
+func (d *diagnosis) rejections(req requestCounts, since uint64) {
 	d.add(req.ByStage["auth"] > 0, "auth_rejected", req.ByStage["auth"],
 		"Requests were rejected at the auth stage. Compare their writeKey with the SDK configuration.",
-		"rudder-cli dev requests list --failed --json")
+		requestsCmd(since).bare("status-code", "401").flag("json").String())
 	bodyRejected := sumStages(req.ByStage, bodyStages)
 	d.add(bodyRejected > 0, "body_rejected", bodyRejected,
 		"Requests were rejected because of their body. Read rejection.reason on each.",
-		"rudder-cli dev requests list --failed --json")
+		requestsCmd(since).flag("failed").bare("status-code", "400").bare("status-code", "413").flag("json").String())
 }
