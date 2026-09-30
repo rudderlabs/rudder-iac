@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/itchyny/gojq"
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
@@ -19,8 +21,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten"
 )
 
-// defaultJQTimeout bounds --jq when no --timeout is given.
-const defaultJQTimeout = 10 * time.Second
+const (
+	// defaultJQTimeout bounds --jq when no --timeout is given.
+	defaultJQTimeout = 10 * time.Second
+	// jqCeiling is the page size a --jq command fetches: --max-bytes then
+	// applies to the jq output, so a projection sees the whole page.
+	jqCeiling = 4 << 20
+)
 
 // output prints one command result. Machine mode (--json) prints the
 // server bytes, or the --jq results, on stdout and errors as one JSON
@@ -29,6 +36,17 @@ type output struct {
 	stdout io.Writer
 	stderr io.Writer
 	flags  clientFlags
+	// jqCap is --max-bytes for the --jq output, 0 for no cap; jqRetry is
+	// the command that lifts it.
+	jqCap   int
+	jqRetry string
+}
+
+// withJQCap applies --max-bytes to the --jq output of a page command.
+func (o output) withJQCap(cmd *cobra.Command, args []string, maxBytes int) output {
+	o.jqCap = maxBytes
+	o.jqRetry = commandLine(cmd, args, "max-bytes") + " --max-bytes 0"
+	return o
 }
 
 // result prints raw in machine mode, or calls human otherwise. note, when
@@ -43,7 +61,15 @@ func (o output) result(ctx context.Context, raw []byte, note string, human func(
 		_, err := fmt.Fprintln(o.stdout, string(bytes.TrimSpace(raw)))
 		return err
 	}
-	if err := o.runJQ(ctx, raw); err != nil {
+	return o.jqResult(ctx, raw, note)
+}
+
+// jqResult runs --jq, then writes the trailer and the note. An output_limit
+// still writes them: the printed lines are a valid partial result.
+func (o output) jqResult(ctx context.Context, raw []byte, note string) error {
+	err := o.runJQ(ctx, raw)
+	var cliErr *cliError
+	if err != nil && !(errors.As(err, &cliErr) && cliErr.Code == "output_limit") {
 		return o.fail(err)
 	}
 	if line := trailer(raw); line != "" {
@@ -51,6 +77,9 @@ func (o output) result(ctx context.Context, raw []byte, note string, human func(
 	}
 	if note != "" {
 		fmt.Fprintln(o.stderr, "note: "+note)
+	}
+	if err != nil {
+		return o.fail(err)
 	}
 	return nil
 }
@@ -97,16 +126,33 @@ func (o output) runJQ(ctx context.Context, raw []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	var buf bytes.Buffer
 	iter := code.RunWithContext(ctx, input)
 	for v, ok := iter.Next(); ok; v, ok = iter.Next() {
 		if err, isErr := v.(error); isErr {
 			return &cliError{Code: "jq_error", Message: err.Error(), Next: "rudder-cli dev --help"}
 		}
-		if err := printJQValue(o.stdout, v); err != nil {
+		if err := printJQValue(&buf, v); err != nil {
 			return err
 		}
 	}
-	return nil
+	return o.writeCapped(buf.Bytes())
+}
+
+// writeCapped writes the whole lines that fit in jqCap, then fails with
+// output_limit when some did not.
+func (o output) writeCapped(b []byte) error {
+	if o.jqCap <= 0 || len(b) <= o.jqCap {
+		_, err := o.stdout.Write(b)
+		return err
+	}
+	cut := bytes.LastIndexByte(b[:o.jqCap], '\n') + 1
+	if _, err := o.stdout.Write(b[:cut]); err != nil {
+		return err
+	}
+	return &cliError{Code: "output_limit",
+		Message: fmt.Sprintf("the --jq output is %d bytes, above --max-bytes %d; %d bytes were printed", len(b), o.jqCap, cut),
+		Next:    o.jqRetry}
 }
 
 // compileJQ compiles without an environ or module loader: $ENV is empty
@@ -171,7 +217,7 @@ func (o output) page(ctx context.Context, raw []byte, items int, timedOut bool, 
 	if t != nil && t.RequestBytes > 0 && items == 0 {
 		return o.outputLimit(ctx, raw, t, human)
 	}
-	return o.result(ctx, raw, pageNote(timedOut, t), human)
+	return o.result(ctx, raw, pageNote(timedOut, t, o.flags.jq != ""), human)
 }
 
 // outputLimit handles a page whose first request alone is larger than
@@ -185,12 +231,16 @@ func (o output) outputLimit(ctx context.Context, raw []byte, t *devlisten.Trunca
 		Next:    t.Next})
 }
 
-func pageNote(timedOut bool, t *devlisten.Truncated) string {
+func pageNote(timedOut bool, t *devlisten.Truncated, jq bool) string {
 	var notes []string
 	if timedOut {
 		notes = append(notes, "timedOut: the wait ended before --min matches arrived")
 	}
-	if t != nil {
+	switch {
+	case t != nil && jq:
+		notes = append(notes, fmt.Sprintf("truncated: --jq read the page up to its %d-byte ceiling; next: %s",
+			jqCeiling, t.Next))
+	case t != nil:
 		notes = append(notes, "truncated: the page hit --max-bytes; next: "+t.Next)
 	}
 	return strings.Join(notes, "; ")

@@ -143,6 +143,10 @@ func runEventsList(cmd *cobra.Command, deps Deps, o eventsListOptions) error {
 	if err != nil {
 		return out.fail(err)
 	}
+	if o.jq != "" {
+		q.MaxBytes = jqCeiling
+		out = out.withJQCap(cmd, nil, o.maxBytes)
+	}
 	client, err := resolve(cmd.Context(), deps, o.clientFlags, o.wait)
 	if err != nil {
 		return out.fail(err)

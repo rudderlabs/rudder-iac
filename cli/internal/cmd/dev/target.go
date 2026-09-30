@@ -34,7 +34,8 @@ func (f *clientFlags) register(fs *pflag.FlagSet, withServerID bool) {
 	}
 	fs.DurationVar(&f.timeout, "timeout", 0, "HTTP `DURATION` for the call; default --wait plus 5s")
 	fs.BoolVarP(&f.json, "json", "j", false, "Output the server response as JSON")
-	fs.StringVar(&f.jq, "jq", "", "Filter the JSON output with a jq `EXPR`; needs --json")
+	fs.StringVar(&f.jq, "jq", "", "Filter the JSON output with a jq `EXPR`; needs --json. A page is read whole\n"+
+		"(up to 4 MiB) and --max-bytes caps the jq output; stderr gets cursor=N serverId=X hasMore=B timedOut=B")
 }
 
 // check refuses --jq without --json; next is the same command with --json.

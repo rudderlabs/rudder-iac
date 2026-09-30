@@ -90,10 +90,15 @@ func rebuild(from, target *cobra.Command, add *pflag.Flag) string {
 	return strings.Join(parts, " ")
 }
 
-// commandLine rebuilds the command the caller ran from its set flags.
-func commandLine(cmd *cobra.Command, args []string) string {
+// commandLine rebuilds the command the caller ran from its set flags,
+// without the skip flags.
+func commandLine(cmd *cobra.Command, args []string, skip ...string) string {
 	parts := append([]string{cliPath(cmd)}, args...)
-	cmd.Flags().Visit(func(f *pflag.Flag) { parts = append(parts, flagArgs(f)...) })
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		if !slices.Contains(skip, f.Name) {
+			parts = append(parts, flagArgs(f)...)
+		}
+	})
 	return strings.Join(parts, " ")
 }
 

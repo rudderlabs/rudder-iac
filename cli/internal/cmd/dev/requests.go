@@ -92,6 +92,10 @@ func runRequestsList(cmd *cobra.Command, deps Deps, o requestsListOptions) error
 	if err != nil {
 		return out.fail(err)
 	}
+	if o.jq != "" {
+		q.MaxBytes = jqCeiling
+		out = out.withJQCap(cmd, nil, o.maxBytes)
+	}
 	client, err := resolve(cmd.Context(), deps, o.clientFlags, o.wait)
 	if err != nil {
 		return out.fail(err)
@@ -181,12 +185,9 @@ func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args 
 	if err != nil {
 		return out.fail(err)
 	}
-	q := devlisten.RecordQuery{Fields: o.fields}
-	if cmd.Flags().Changed("view") {
-		q.View = devlisten.View(o.view)
-	}
-	if cmd.Flags().Changed("max-bytes") {
-		q.MaxBytes = maxBytes(o.maxBytes)
+	q := o.query(cmd.Flags())
+	if o.jq != "" {
+		out = out.withJQCap(cmd, args, o.maxBytes)
 	}
 	client, err := resolve(cmd.Context(), deps, o.clientFlags, 0)
 	if err != nil {
@@ -201,6 +202,20 @@ func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args 
 		return out.outputLimit(cmd.Context(), rec.Raw, rec.Truncated, human)
 	}
 	return out.result(cmd.Context(), rec.Raw, "", human)
+}
+
+func (o requestsShowOptions) query(f *pflag.FlagSet) devlisten.RecordQuery {
+	q := devlisten.RecordQuery{Fields: o.fields}
+	if f.Changed("view") {
+		q.View = devlisten.View(o.view)
+	}
+	switch {
+	case o.jq != "":
+		q.MaxBytes = jqCeiling
+	case f.Changed("max-bytes"):
+		q.MaxBytes = maxBytes(o.maxBytes)
+	}
+	return q
 }
 
 func parseSeq(args []string) (uint64, error) {
