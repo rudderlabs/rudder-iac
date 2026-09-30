@@ -125,12 +125,14 @@ func transportOf(path string) string {
 	return "http"
 }
 
+// readBody reads at most maxReqSize+1 bytes, so a body of any length costs
+// bounded memory. complete is false after a read error or a cut.
 func readBody(r *http.Request) ([]byte, bool) {
 	if r.Body == nil {
 		return nil, true
 	}
-	raw, err := io.ReadAll(r.Body)
-	return raw, err == nil
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxReqSize+1))
+	return raw, err == nil && len(raw) <= maxReqSize
 }
 
 func writeReply(w http.ResponseWriter, rep reply) {
@@ -168,7 +170,10 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 		Response: store.Response{StatusCode: rep.status, Headers: rep.header.Clone(), Body: string(rep.body)},
 		Events:   rep.events,
 	}
-	if rec.Request.BodyEncoding != "" {
+	switch {
+	case len(raw) > maxReqSize:
+		rec.Request.Body = ""
+	case rec.Request.BodyEncoding != "":
 		rec.Request.Body = string(rep.decoded)
 		rec.Request.BodyBase64 = raw
 	}

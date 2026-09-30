@@ -3,6 +3,8 @@ package ingest
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/binary"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,7 +84,7 @@ func TestCorruptGzipFailsBeforeAuth(t *testing.T) {
 
 func TestBrokenGzipStreamFailsAtBodyReadAfterAuth(t *testing.T) {
 	t.Parallel()
-	g, _ := newTestGateway()
+	g, st := newTestGateway()
 	compressed := gz(t, `{"userId":"u1","event":"A"}`)
 	compressed[12] ^= 0xff
 
@@ -94,6 +96,9 @@ func TestBrokenGzipStreamFailsAtBodyReadAfterAuth(t *testing.T) {
 	r.Header.Set("Content-Encoding", "gzip")
 	r.SetBasicAuth("dev", "")
 	require.Equal(t, "failed to read body from request\n", send(t, g, r).body)
+	last := st.Since(1).Records[0]
+	require.Empty(t, last.Request.Body, "the partial output is not stored")
+	require.Equal(t, compressed, last.Request.BodyBase64)
 }
 
 // A truncated stream ends in bytes that are not ISIZE; the oracle reads them
@@ -328,4 +333,52 @@ func TestHealthRoutesAreNotCaptured(t *testing.T) {
 	got := send(t, g, httptest.NewRequest(http.MethodGet, "/health", nil))
 	require.Equal(t, http.StatusServiceUnavailable, got.status)
 	require.JSONEq(t, `{"status":"stopping"}`, got.body)
+}
+
+// A sender controls ISIZE. A forged small ISIZE must not let the decoded
+// stream grow past the body limit, and the partial output is not stored.
+func TestGzipBombWithForgedISizeIsCappedAndNotStored(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	compressed := gz(t, `{"userId":"u1","event":"`+strings.Repeat("A", maxReqSize+1)+`"}`)
+	binary.LittleEndian.PutUint32(compressed[len(compressed)-4:], 10)
+	r := httptest.NewRequest(http.MethodPost, "/v1/track", bytes.NewReader(compressed))
+	r.Header.Set("Content-Encoding", "gzip")
+	r.SetBasicAuth("dev", "")
+
+	got := send(t, g, r)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, got.status)
+	require.Equal(t, "request size exceeds max limit\n", got.body)
+	rec := onlyRecord(t, st)
+	require.Empty(t, rec.Request.Body)
+	require.Equal(t, compressed, rec.Request.BodyBase64)
+	require.Equal(t, "size", rec.Rejection.Stage)
+}
+
+// The raw body is read through a limit, so an endless body cannot pin
+// memory. The oversized body is not stored.
+func TestOversizedRawBodyIsCutAtTheLimitAndNotStored(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	body := io.MultiReader(strings.NewReader(`{"userId":"u1","event":"`), neverEnding('A'))
+	r := httptest.NewRequest(http.MethodPost, "/v1/track", body)
+	r.SetBasicAuth("dev", "")
+
+	got := send(t, g, r)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, got.status)
+	rec := onlyRecord(t, st)
+	require.Empty(t, rec.Request.Body)
+	require.False(t, rec.Request.BodyComplete)
+	require.Equal(t, maxReqSize+1, rec.Request.BodyBytes)
+}
+
+type neverEnding byte
+
+func (b neverEnding) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = byte(b)
+	}
+	return len(p), nil
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -181,7 +180,7 @@ func startServer(stderr io.Writer, opts listenOptions, stats *captureStats) (*de
 func publishReady(stdout, stderr io.Writer, srv *devlisten.Server, opts listenOptions, statePath string) devlisten.Ready {
 	ready := srv.Ready()
 	log.Info("started", "port", ready.Port, "bind", ready.Bind, "serverId", ready.ServerID, "stateFile", statePath)
-	if !isLoopback(opts.bind) {
+	if !devlisten.IsLoopback(opts.bind) {
 		fmt.Fprintln(stderr, bindWarning(opts.bind, ready.Port))
 	}
 	if statePath != "" {
@@ -247,12 +246,4 @@ func quoteOrDash(s string) string {
 
 func bindWarning(bind string, port int) string {
 	return fmt.Sprintf("warning: listening on %s:%d. The query API has no authentication.", bind, port)
-}
-
-func isLoopback(bind string) bool {
-	if bind == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(bind)
-	return ip != nil && ip.IsLoopback()
 }

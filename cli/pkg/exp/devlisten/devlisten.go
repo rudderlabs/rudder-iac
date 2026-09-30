@@ -180,7 +180,7 @@ func Start(ctx context.Context, opts ...Option) (*Server, error) {
 	s.touch()
 	s.setCaptureHook(cfg.onCapture)
 	queryAPI := api.New(st, id, api.Config{
-		CheckHost: isLoopback(cfg.bind),
+		CheckHost: api.IsLoopback(cfg.bind),
 		Shutdown:  func() { s.stop(StopReasonStop) },
 	})
 	s.http = &http.Server{
@@ -297,13 +297,8 @@ func common(i int, acc string, v *string) string {
 	return val
 }
 
-func isLoopback(bind string) bool {
-	if bind == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(bind)
-	return ip != nil && ip.IsLoopback()
-}
+// IsLoopback reports whether a bind address only accepts local connections.
+func IsLoopback(bind string) bool { return api.IsLoopback(bind) }
 
 // urlHost keeps the URL reachable from this host: a wildcard bind is
 // reported as 127.0.0.1.

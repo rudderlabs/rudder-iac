@@ -26,13 +26,9 @@ func (g *Gateway) ingest(r *http.Request, reqType, transport string, raw []byte,
 	rep := reply{kind: "ingestion", transport: transport, header: http.Header{}, decoded: raw}
 
 	gzipped := r.Header.Get("Content-Encoding") == "gzip"
-	var streamErr bool
-	if gzipped {
-		var headerErr *gwError
-		rep.decoded, headerErr, streamErr = gunzip(raw)
-		if headerErr != nil {
-			return rep.reject(*headerErr)
-		}
+	streamErr, early := rep.decode(raw, gzipped)
+	if early != nil {
+		return rep.reject(*early)
 	}
 
 	writeKey, rejection := authenticate(r, transport)
@@ -50,8 +46,29 @@ func (g *Gateway) ingest(r *http.Request, reqType, transport string, raw []byte,
 	return g.process(r, rep, reqType, receivedAt)
 }
 
+// decode gunzips when asked and applies the size limit to the raw and the
+// decoded body. early is a rejection that comes before auth; streamErr is a
+// broken stream, which the oracle rejects after auth.
+func (rep *reply) decode(raw []byte, gzipped bool) (streamErr bool, early *gwError) {
+	if gzipped {
+		var headerErr *gwError
+		rep.decoded, headerErr, streamErr = gunzip(raw)
+		if headerErr != nil {
+			return false, headerErr
+		}
+	}
+	if len(raw) > maxReqSize || len(rep.decoded) > maxReqSize {
+		rep.decoded = nil
+		return false, &errRequestBodyTooLarge
+	}
+	return streamErr, nil
+}
+
 // gunzip copies SVC internal/middleware/uncompress.go: a bad gzip header
 // fails before auth; a stream that breaks later fails at body read, after auth.
+// ISIZE is sender-controlled, so it only rejects early: the decoded stream is
+// read through a limit of maxReqSize+1 bytes, and the caller rejects a longer
+// one. A broken stream returns no partial output.
 func gunzip(raw []byte) ([]byte, *gwError, bool) {
 	zr, err := gzip.NewReader(bytes.NewReader(raw))
 	if err != nil {
@@ -60,8 +77,14 @@ func gunzip(raw []byte) ([]byte, *gwError, bool) {
 	if isize := binary.LittleEndian.Uint32(raw[len(raw)-4:]); isize > maxReqSize {
 		return nil, &errRequestBodyTooLarge, false
 	}
-	decoded, err := io.ReadAll(zr)
-	return decoded, nil, err != nil
+	decoded, err := io.ReadAll(io.LimitReader(zr, maxReqSize+1))
+	switch {
+	case len(decoded) > maxReqSize:
+		return decoded, nil, false
+	case err != nil:
+		return nil, nil, true
+	}
+	return decoded, nil, false
 }
 
 // authenticate copies the beacon interceptor (SVC handler_beacon.go) and

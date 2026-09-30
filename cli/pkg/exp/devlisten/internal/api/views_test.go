@@ -247,3 +247,22 @@ func jsonNumber(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
 }
+
+// When maxBytes keeps fewer events than min, the page still moves the
+// cursor past what it kept, so a client that follows it makes progress.
+func TestMinAboveKeptMovesTheCursor(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	for range 3 {
+		st.Append(ingestion(browserTrack(0, "A")))
+	}
+
+	_, page := get(t, srv.URL+"/_dev/v1/events?maxBytes=1500&min=3&wait=5s")
+
+	events := page["events"].([]any)
+	require.Less(t, len(events), 3)
+	require.NotEmpty(t, events)
+	require.Equal(t, false, page["timedOut"])
+	require.Equal(t, true, page["hasMore"])
+	require.Equal(t, events[len(events)-1].(map[string]any)["seq"], page["cursor"])
+}

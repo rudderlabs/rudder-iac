@@ -4,12 +4,20 @@ package store
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sort"
 	"sync"
 	"time"
 )
 
 const RecordVersion = 1
+
+// Default capacity (contract section 3): the store keeps at most this many
+// requests and this many bytes, and evicts the oldest whole requests first.
+const (
+	DefaultMaxRecords = 10000
+	DefaultMaxBytes   = 64 << 20
+)
 
 // Record is one captured HTTP request (contract section 3).
 type Record struct {
@@ -74,21 +82,58 @@ type Event struct {
 // Store holds records in seq order. Records are immutable once appended, so
 // readers get shared slices without copying.
 type Store struct {
-	serverID  string
-	done      chan struct{}
-	closeOnce sync.Once
+	serverID   string
+	maxRecords int
+	maxBytes   int
+	done       chan struct{}
+	closeOnce  sync.Once
 
 	mu      sync.Mutex
 	records []Record
+	sizes   []int
+	bytes   int
+	evicted int
+	through uint64
 	cursor  uint64
 	changed chan struct{}
 }
 
-func New(serverID string) *Store {
-	return &Store{serverID: serverID, changed: make(chan struct{}), done: make(chan struct{})}
+// Option configures New.
+type Option func(*Store)
+
+// WithLimits replaces the default capacity.
+func WithLimits(maxRecords, maxBytes int) Option {
+	return func(s *Store) { s.maxRecords, s.maxBytes = maxRecords, maxBytes }
 }
 
-// Append stamps the record with the next seq and stores it.
+func New(serverID string, opts ...Option) *Store {
+	s := &Store{serverID: serverID, maxRecords: DefaultMaxRecords, maxBytes: DefaultMaxBytes,
+		changed: make(chan struct{}), done: make(chan struct{})}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Stats is the store occupancy. EvictedThrough is the highest evicted seq.
+type Stats struct {
+	Requests       int    `json:"requests"`
+	Bytes          int    `json:"bytes"`
+	Evicted        int    `json:"evicted"`
+	EvictedThrough uint64 `json:"evictedThrough"`
+}
+
+func (s *Store) Stats() Stats {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return Stats{Requests: len(s.records), Bytes: s.bytes, Evicted: s.evicted, EvictedThrough: s.through}
+}
+
+// Limits returns the capacity: records, then bytes.
+func (s *Store) Limits() (int, int) { return s.maxRecords, s.maxBytes }
+
+// Append stamps the record with the next seq, stores it and evicts the
+// oldest records past the capacity.
 func (s *Store) Append(r Record) Record {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -97,10 +142,52 @@ func (s *Store) Append(r Record) Record {
 	r.RecordVersion = RecordVersion
 	r.ServerID = s.serverID
 	r.Seq = s.cursor
+	size := recordBytes(r)
 	s.records = append(s.records, r)
+	s.sizes = append(s.sizes, size)
+	s.bytes += size
+	s.evict()
 	close(s.changed)
 	s.changed = make(chan struct{})
 	return r
+}
+
+// evict drops the oldest records until both limits hold. The newest record
+// always stays. Views share the backing array, so evicted slots are not
+// cleared; the array is copied once it is mostly dead.
+func (s *Store) evict() {
+	n := 0
+	for len(s.records)-n > 1 && (len(s.records)-n > s.maxRecords || s.bytes > s.maxBytes) {
+		s.bytes -= s.sizes[n]
+		s.through = s.records[n].Seq
+		n++
+	}
+	if n == 0 {
+		return
+	}
+	s.evicted += n
+	s.records, s.sizes = s.records[n:], s.sizes[n:]
+	if cap(s.records) > 2*len(s.records)+64 {
+		s.records, s.sizes = slices.Clone(s.records), slices.Clone(s.sizes)
+	}
+}
+
+// recordBytes estimates the memory a record holds: bodies, messages and
+// header values.
+func recordBytes(r Record) int {
+	n := len(r.Request.Body) + len(r.Request.BodyBase64) + len(r.Request.Target) + len(r.Response.Body)
+	for _, ev := range r.Events {
+		n += len(ev.Message) + len(ev.EnrichedMessage)
+	}
+	for _, h := range []http.Header{r.Request.Headers, r.Response.Headers} {
+		for k, vs := range h {
+			n += len(k)
+			for _, v := range vs {
+				n += len(v)
+			}
+		}
+	}
+	return n
 }
 
 // Cursor is the highest seq assigned so far, 0 on an empty store.
@@ -156,6 +243,6 @@ func (s *Store) Reset() []Record {
 	defer s.mu.Unlock()
 
 	removed := s.records
-	s.records = nil
+	s.records, s.sizes, s.bytes = nil, nil, 0
 	return removed
 }

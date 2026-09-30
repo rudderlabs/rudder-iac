@@ -15,8 +15,13 @@ import (
 	"time"
 )
 
-// clientPollWait is the per-request wait WaitForEvents uses while it loops.
-const clientPollWait = 10 * time.Second
+const (
+	// clientPollWait is the per-request wait WaitForEvents uses while it loops.
+	clientPollWait = 10 * time.Second
+	// clientRetryDelay is the least time between two polls that returned no
+	// event, so WaitForEvents never spins.
+	clientRetryDelay = 200 * time.Millisecond
+)
 
 var (
 	// ErrServerChanged matches a 409 server_changed: the serverId the client
@@ -27,6 +32,9 @@ var (
 	ErrCaptureGap = errors.New("capture gap")
 	// ErrNotFound matches a 404 not_found, such as an unknown request seq.
 	ErrNotFound = errors.New("not found")
+	// ErrOutputLimit is returned by WaitForEvents when one request is larger
+	// than Query.MaxBytes, so no page can hold it.
+	ErrOutputLimit = errors.New("output limit")
 )
 
 // View selects the shape of an /events item.
@@ -146,9 +154,9 @@ func (r *raw) setRaw(b []byte) { r.Raw = append(json.RawMessage(nil), bytes.Trim
 // Info is the /info object (contract section 4.1).
 type Info struct {
 	Ready
-	WriteKeys     []string   `json:"writeKeys"`
-	RecordVersion int        `json:"recordVersion"`
-	Store         StoreStats `json:"store"`
+	WriteKeys     []string  `json:"writeKeys"`
+	RecordVersion int       `json:"recordVersion"`
+	Store         InfoStore `json:"store"`
 	raw
 }
 
@@ -156,6 +164,18 @@ type StoreStats struct {
 	Requests int `json:"requests"`
 	Events   int `json:"events"`
 	Control  int `json:"control"`
+}
+
+// InfoStore is the /info store object: counts, occupancy and evictions. The
+// store keeps MaxRequests requests and MaxBytes bytes and drops the oldest
+// whole requests first; EvictedThrough is the highest dropped seq.
+type InfoStore struct {
+	StoreStats
+	Bytes          int    `json:"bytes"`
+	Evicted        int    `json:"evicted"`
+	EvictedThrough uint64 `json:"evictedThrough"`
+	MaxRequests    int    `json:"maxRequests"`
+	MaxBytes       int    `json:"maxBytes"`
 }
 
 // Info reads /info. The first successful call pins the serverId unless
@@ -417,22 +437,74 @@ func (c *Client) Events(ctx context.Context, q Query) (Page, error) {
 	return page, nil
 }
 
-// WaitForEvents loops 10 s long-polls until a page holds at least q.Min
-// events (default 1) or ctx ends. q.Wait is ignored.
+// WaitForEvents loops 10 s long-polls until it holds at least q.Min events
+// (default 1) or ctx ends. q.Wait is ignored. A page that MaxBytes cut short
+// moves the cursor, so the events are collected across pages and a page is
+// never asked for twice. The result spans pages when needed: Events holds
+// every match, Cursor is the last page's, and Raw is nil then.
 func (c *Client) WaitForEvents(ctx context.Context, q Query) (Page, error) {
-	q.Min = max(q.Min, 1)
+	want, since := max(q.Min, 1), q.Since
+	var (
+		last   Page
+		events []Event
+		pages  int
+	)
 	for {
+		q.Min = want - len(events)
 		q.Wait = pollWait(ctx)
+		start := time.Now()
 		page, err := c.Events(ctx, q)
 		switch {
 		case ctx.Err() != nil:
-			return page, fmt.Errorf("waiting for %v since seq %d: %w (unfiltered: %d requests, %d events, %d control)",
-				q.Event, q.Since, ctx.Err(), page.Unfiltered.Requests, page.Unfiltered.Events, page.Unfiltered.Control)
+			return collected(last, events, pages), fmt.Errorf(
+				"waiting for %v since seq %d: %w (collected %d of %d events up to seq %d; "+
+					"unfiltered after it: %d requests, %d events, %d control)",
+				q.Event, since, ctx.Err(), len(events), want, q.Since,
+				last.Unfiltered.Requests, last.Unfiltered.Events, last.Unfiltered.Control)
 		case err != nil:
 			return Page{}, err
-		case len(page.Events) >= q.Min:
-			return page, nil
+		case oversized(page):
+			return Page{}, fmt.Errorf("the request after seq %d is %d bytes, above MaxBytes: %w", page.Since,
+				page.Truncated.RequestBytes, ErrOutputLimit)
 		}
+		last, events, pages = page, append(events, page.Events...), pages+1
+		if len(events) >= want {
+			return collected(last, events, pages), nil
+		}
+		if len(page.Events) == 0 {
+			// No progress: space the polls, whatever made the server return.
+			_ = sleepCtx(ctx, clientRetryDelay-time.Since(start))
+		}
+		q.Since = max(q.Since, page.Cursor)
+	}
+}
+
+// oversized is a page whose first request alone is above MaxBytes: it holds
+// no event and does not move the cursor.
+func oversized(p Page) bool {
+	return p.Truncated != nil && p.Truncated.RequestBytes > 0 && len(p.Events) == 0
+}
+
+func collected(last Page, events []Event, pages int) Page {
+	if pages > 1 {
+		last.Raw, last.Truncated = nil, nil
+	}
+	last.Events = events
+	return last
+}
+
+// sleepCtx sleeps d, or less when ctx ends first; d <= 0 returns at once.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
 	}
 }
 

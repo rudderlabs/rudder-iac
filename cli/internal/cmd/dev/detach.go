@@ -156,7 +156,7 @@ func printDetached(stdout, stderr io.Writer, opts listenOptions, line string) er
 	if err := json.Unmarshal([]byte(line), &ready); err != nil {
 		return fmt.Errorf("decoding ready line: %w", err)
 	}
-	if !isLoopback(ready.Bind) {
+	if !devlisten.IsLoopback(ready.Bind) {
 		fmt.Fprintln(stderr, bindWarning(ready.Bind, ready.Port))
 	}
 	if opts.progress {

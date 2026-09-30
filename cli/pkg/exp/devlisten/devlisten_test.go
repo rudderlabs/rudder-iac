@@ -162,7 +162,7 @@ func TestClientWaitReportsDeadline(t *testing.T) {
 	_, err := s.Client().WaitForEvents(ctx, devlisten.Query{Event: []string{"never"}, Min: 1})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Contains(t, err.Error(), "unfiltered: 0 requests, 0 events, 0 control")
+	require.Contains(t, err.Error(), "collected 0 of 1 events up to seq 0; unfiltered after it: 0 requests, 0 events, 0 control")
 }
 
 func TestClientPinsServerID(t *testing.T) {

@@ -35,7 +35,7 @@ func track(idx int, name string) store.Event {
 func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
 	t.Helper()
 	st := store.New(testIdentity.ServerID)
-	srv := httptest.NewServer(New(st, testIdentity))
+	srv := httptest.NewServer(New(st, testIdentity, Config{}))
 	t.Cleanup(srv.Close)
 	return srv, st
 }
@@ -170,16 +170,38 @@ func TestServerIDMismatchIs409(t *testing.T) {
 	require.Equal(t, "server_changed", body["error"].(map[string]any)["code"])
 }
 
+// newWaitingServer reports on waiting each time a long-poll starts to wait,
+// so a test appends only after the poll is registered.
+func newWaitingServer(t *testing.T) (*httptest.Server, *store.Store, <-chan struct{}) {
+	t.Helper()
+	st := store.New(testIdentity.ServerID)
+	h := New(st, testIdentity, Config{})
+	waiting := make(chan struct{}, 8)
+	h.waiting = func() { waiting <- struct{}{} }
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv, st, waiting
+}
+
+func awaitSignal(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the long-poll never started to wait")
+	}
+}
+
 func TestLongPollWakesOnCapture(t *testing.T) {
 	t.Parallel()
-	srv, st := newTestServer(t)
+	srv, st, waiting := newWaitingServer(t)
 
 	done := make(chan fetched, 1)
 	go func() { done <- fetch(srv.URL + "/_dev/v1/events?event=B&wait=10s") }()
 
-	time.Sleep(100 * time.Millisecond)
+	awaitSignal(t, waiting)
 	st.Append(ingestion(track(0, "A")))
-	time.Sleep(50 * time.Millisecond)
+	awaitSignal(t, waiting) // A woke the poll, did not match, and it waits again
 	st.Append(ingestion(track(0, "B")))
 
 	select {
@@ -211,11 +233,11 @@ func TestLongPollTimesOutWith200(t *testing.T) {
 
 func TestShutdownWakesLongPollWith503(t *testing.T) {
 	t.Parallel()
-	srv, st := newTestServer(t)
+	srv, st, waiting := newWaitingServer(t)
 
 	done := make(chan fetched, 1)
 	go func() { done <- fetch(srv.URL + "/_dev/v1/events?wait=10s") }()
-	time.Sleep(100 * time.Millisecond)
+	awaitSignal(t, waiting)
 	st.Close()
 
 	select {
@@ -270,7 +292,9 @@ func TestInfo(t *testing.T) {
 		"ready": true, "apiVersion": "v1", "serverId": "9f3ac1d2b7e4c601", "url": "http://127.0.0.1:4321",
 		"port": float64(4321), "bind": "127.0.0.1", "pid": float64(42), "startedAt": "2026-09-29T12:00:00Z",
 		"writeKey": "dev", "writeKeyPolicy": "any", "writeKeys": []any{}, "recordVersion": float64(1),
-		"cursor": float64(2), "store": map[string]any{"requests": float64(1), "events": float64(1), "control": float64(1)},
+		"cursor": float64(2), "store": map[string]any{"requests": float64(1), "events": float64(1), "control": float64(1),
+			"bytes": float64(st.Stats().Bytes), "evicted": float64(0), "evictedThrough": float64(0),
+			"maxRequests": float64(store.DefaultMaxRecords), "maxBytes": float64(store.DefaultMaxBytes)},
 	}, info)
 }
 

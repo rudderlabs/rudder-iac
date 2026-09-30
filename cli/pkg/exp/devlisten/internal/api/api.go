@@ -43,16 +43,27 @@ type Config struct {
 }
 
 type Handler struct {
-	store *store.Store
-	id    Identity
-	cfg   Config
-	now   func() time.Time
+	store  *store.Store
+	id     Identity
+	cfg    Config
+	now    func() time.Time
+	routes map[string]route
+	// waiting, when set, is called each time a long-poll starts to wait.
+	// Tests use it to append only after the poll is registered.
+	waiting func()
 }
 
-func New(st *store.Store, id Identity, cfg ...Config) *Handler {
-	h := &Handler{store: st, id: id, now: time.Now}
-	if len(cfg) > 0 {
-		h.cfg = cfg[0]
+func New(st *store.Store, id Identity, cfg Config) *Handler {
+	h := &Handler{store: st, id: id, cfg: cfg, now: time.Now}
+	h.routes = map[string]route{
+		base:                          {http.MethodGet, h.index},
+		strings.TrimSuffix(base, "/"): {http.MethodGet, h.index},
+		base + "info":                 {http.MethodGet, h.info},
+		base + "events":               {http.MethodGet, h.events},
+		base + "requests":             {http.MethodGet, h.requests},
+		base + "summary":              {http.MethodGet, h.summary},
+		base + "reset":                {http.MethodPost, h.reset},
+		base + "shutdown":             {http.MethodPost, h.shutdown},
 	}
 	return h
 }
@@ -63,17 +74,7 @@ type route struct {
 }
 
 func (h *Handler) route(path string) (route, bool) {
-	routes := map[string]route{
-		base:                          {http.MethodGet, h.index},
-		strings.TrimSuffix(base, "/"): {http.MethodGet, h.index},
-		base + "info":                 {http.MethodGet, h.info},
-		base + "events":               {http.MethodGet, h.events},
-		base + "requests":             {http.MethodGet, h.requests},
-		base + "summary":              {http.MethodGet, h.summary},
-		base + "reset":                {http.MethodPost, h.reset},
-		base + "shutdown":             {http.MethodPost, h.shutdown},
-	}
-	if rt, ok := routes[path]; ok {
+	if rt, ok := h.routes[path]; ok {
 		return rt, true
 	}
 	if strings.HasPrefix(path, base+"requests/") {
@@ -172,16 +173,26 @@ func (h *Handler) index(w http.ResponseWriter, _ *http.Request) {
 type info struct {
 	Ready bool `json:"ready"`
 	Identity
-	WriteKeys     []string   `json:"writeKeys"`
-	RecordVersion int        `json:"recordVersion"`
-	Cursor        uint64     `json:"cursor"`
-	Store         storeStats `json:"store"`
+	WriteKeys     []string  `json:"writeKeys"`
+	RecordVersion int       `json:"recordVersion"`
+	Cursor        uint64    `json:"cursor"`
+	Store         infoStore `json:"store"`
 }
 
 type storeStats struct {
 	Requests int `json:"requests"`
 	Events   int `json:"events"`
 	Control  int `json:"control"`
+}
+
+// infoStore adds the capacity and eviction counts to the /info store object.
+type infoStore struct {
+	storeStats
+	Bytes          int    `json:"bytes"`
+	Evicted        int    `json:"evicted"`
+	EvictedThrough uint64 `json:"evictedThrough"`
+	MaxRequests    int    `json:"maxRequests"`
+	MaxBytes       int    `json:"maxBytes"`
 }
 
 func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
@@ -191,13 +202,19 @@ func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
 	}
 	view := h.store.Since(0)
 	counts := countRecords(view.Records)
+	stats := h.store.Stats()
+	maxRecords, maxBytes := h.store.Limits()
 	writeJSON(w, http.StatusOK, info{
 		Ready:         true,
 		Identity:      h.id,
 		WriteKeys:     []string{},
 		RecordVersion: store.RecordVersion,
 		Cursor:        view.Cursor,
-		Store:         storeStats{Requests: counts.Requests, Events: counts.Events, Control: counts.Control},
+		Store: infoStore{
+			storeStats: storeStats{Requests: counts.Requests, Events: counts.Events, Control: counts.Control},
+			Bytes:      stats.Bytes, Evicted: stats.Evicted, EvictedThrough: stats.EvictedThrough,
+			MaxRequests: maxRecords, MaxBytes: maxBytes,
+		},
 	})
 }
 
@@ -217,7 +234,7 @@ func (h *Handler) reset(w http.ResponseWriter, _ *http.Request) {
 // shutdown answers 202 and then calls the hook, so the caller gets the
 // answer before the server drains. A non-loopback bind refuses it.
 func (h *Handler) shutdown(w http.ResponseWriter, _ *http.Request) {
-	if !isLoopback(h.id.Bind) {
+	if !IsLoopback(h.id.Bind) {
 		writeError(w, apiError{status: http.StatusForbidden, Code: "stop_disabled",
 			Message: "shutdown is refused on a non-loopback bind; stop the process or container instead",
 			Next:    strp("rudder-cli dev listen --help")})
@@ -229,7 +246,9 @@ func (h *Handler) shutdown(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func isLoopback(bind string) bool {
+// IsLoopback reports whether a bind address only accepts local
+// connections. It is the one loopback rule of the server and the CLI.
+func IsLoopback(bind string) bool {
 	if bind == "localhost" {
 		return true
 	}

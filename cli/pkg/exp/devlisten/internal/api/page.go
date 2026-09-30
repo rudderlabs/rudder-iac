@@ -104,6 +104,9 @@ func (h *Handler) poll(ctx context.Context, f filters, scanFn func(store.View) s
 		if f.wait == 0 || res.count >= f.min {
 			return res, false, true, nil
 		}
+		if h.waiting != nil {
+			h.waiting()
+		}
 		switch h.waitChange(ctx, view.Changed, timer.C) {
 		case waitTimedOut:
 			res = scanFn(h.store.Since(f.since))
