@@ -62,7 +62,8 @@ func newCmdListen(deps Deps) *cobra.Command {
 			"     /sourceConfig and preflights (method OPTIONS) when it did.\n" +
 			"  4. The action that sends the event ran. Map each action to the event and count you expect,\n" +
 			"     then check with dev summary --expect NAME=COUNT.\n" +
-			"  5. dev send --json proves the listener works; if the probe arrives, the app config is wrong.\n\n" +
+			"  5. dev send --json proves the listener works; dev probe --browser proves a browser SDK\n" +
+			"     reaches it. If a probe arrives and the app's events do not, the app config is wrong.\n\n" +
 			"Security: the default bind is 127.0.0.1. With --bind 0.0.0.0 (a container) the server has no\n" +
 			"Host check, /info reports exposed: true, and a warning prints on every start: other hosts can\n" +
 			"read the capture, and because CORS reflects every origin with credentials, any web page can\n" +

@@ -133,3 +133,16 @@ func TestBatchCapturesEachEventWithoutTouchingType(t *testing.T) {
 	require.Equal(t, str("a1"), rec.Events[1].AnonymousID)
 	require.JSONEq(t, `{"type":"track","event":"A","anonymousId":"a1"}`, string(rec.Events[1].Message))
 }
+
+// A browser cannot set User-Agent, so the probe page marks its requests by
+// being their referrer.
+func TestRequestsFromTheProbePageAreProbes(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	r := post("/v1/track", `{"event":"dev probe","anonymousId":"a1","properties":{"probe":true}}`)
+	r.Header.Set("Referer", "http://127.0.0.1:4321/_dev/v1/probe.html")
+
+	send(t, g, r)
+
+	require.True(t, onlyRecord(t, st).Probe)
+}

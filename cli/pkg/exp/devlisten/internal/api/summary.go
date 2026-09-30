@@ -231,7 +231,8 @@ func (d *diagnosis) transport(req requestCounts, ctl controlCounts, probes int) 
 // noBrowserChecklist is the next of no_browser_traffic: the app settings to
 // check, in the order that most often explains a silent browser SDK.
 const noBrowserChecklist = "Check in order: 1. the browser SDK configUrl is the listener URL; " +
-	"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on."
+	"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on. " +
+	"Then run rudder-cli dev probe --browser: if its probe arrives, the app wiring is at fault."
 
 // browser covers a browser SDK that never reached the listener while a
 // server SDK did.

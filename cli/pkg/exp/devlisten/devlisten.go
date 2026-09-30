@@ -23,6 +23,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/api"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/ingest"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/probe"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
 
@@ -38,6 +39,14 @@ const (
 	StopReasonClose = "close"
 	StopReasonStop  = "stop"
 	StopReasonIdle  = "idle"
+)
+
+// The browser probe: a page on the listener that loads the embedded
+// @rudderstack/analytics-js bundle and sends one track named ProbeEvent.
+const (
+	ProbePagePath = api.Prefix + "v1/" + probe.PagePath
+	ProbeEvent    = probe.Event
+	ProbeSDK      = probe.SDKVersion
 )
 
 // ErrPortInUse is returned by Start when a fixed port is taken.

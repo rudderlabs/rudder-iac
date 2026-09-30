@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/probe"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
 
@@ -33,6 +34,20 @@ var ingestRoutes = map[string]string{
 }
 
 const probeUserAgentPrefix = "rudder-cli dev send/"
+
+// probePage is the page of rudder-cli dev probe --browser.
+const probePage = "/_dev/v1/" + probe.PagePath
+
+// isProbe marks dev send by its User-Agent, and the browser probe by its
+// referrer: a browser cannot set User-Agent, and a same-origin request
+// carries the full page URL.
+func isProbe(r *http.Request) bool {
+	if strings.HasPrefix(r.UserAgent(), probeUserAgentPrefix) {
+		return true
+	}
+	ref, err := url.Parse(r.Referer())
+	return err == nil && ref.Path == probePage
+}
 
 type Gateway struct {
 	store     *store.Store
@@ -149,7 +164,7 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 	headers, redacted := redact(r.Header)
 	rec := store.Record{
 		Kind:       rep.kind,
-		Probe:      strings.HasPrefix(r.UserAgent(), probeUserAgentPrefix),
+		Probe:      isProbe(r),
 		ReceivedAt: receivedAt,
 		Route:      routeOf(r.URL.Path),
 		Transport:  rep.transport,

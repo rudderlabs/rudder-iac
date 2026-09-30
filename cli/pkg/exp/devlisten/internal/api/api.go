@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/probe"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
 
@@ -64,6 +65,9 @@ func New(st *store.Store, id Identity, cfg Config) *Handler {
 		base + "summary":              {http.MethodGet, h.summary},
 		base + "reset":                {http.MethodPost, h.reset},
 		base + "shutdown":             {http.MethodPost, h.shutdown},
+		base + probe.PagePath:         {http.MethodGet, static("text/html; charset=utf-8", probe.Page())},
+		base + probe.SDKPath:          {http.MethodGet, static("text/javascript; charset=utf-8", probe.SDK())},
+		base + probe.LicensePath:      {http.MethodGet, static("text/markdown; charset=utf-8", probe.License())},
 	}
 	return h
 }
@@ -271,4 +275,12 @@ func writeRaw(w http.ResponseWriter, status int, body []byte) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write(append(body, '\n'))
+}
+
+// static serves fixed bytes, such as the probe page and its SDK bundle.
+func static(contentType string, body []byte) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", contentType)
+		_, _ = w.Write(body)
+	}
 }
