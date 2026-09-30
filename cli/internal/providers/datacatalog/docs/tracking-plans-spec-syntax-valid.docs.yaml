@@ -9,7 +9,7 @@ match_behavior:
         version: "rudder/v0.1"
     valid:
       - example_id: "tp-spec-legacy-valid"
-        title: "Valid legacy tracking plan spec"
+        title: "Valid legacy Tracking Plan spec"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -29,7 +29,7 @@ match_behavior:
                       required: true
     invalid:
       - example_id: "tp-spec-legacy-missing-event"
-        title: "Legacy tracking plan rule missing the event field"
+        title: "Legacy Tracking Plan rule missing event field"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -56,7 +56,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "tp-spec-v1-valid"
-        title: "Valid v1 tracking plan spec"
+        title: "Valid Tracking Plan spec"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -75,7 +75,7 @@ match_behavior:
                       required: true
     invalid:
       - example_id: "tp-spec-v1-missing-event"
-        title: "v1 tracking plan rule missing the event field"
+        title: "Tracking Plan rule missing event field"
         files:
           spec.yaml: |
             version: rudder/v1

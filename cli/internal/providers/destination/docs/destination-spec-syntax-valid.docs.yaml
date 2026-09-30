@@ -15,7 +15,7 @@ match_behavior:
             spec:
               id: webhook-prod
               display_name: Production Webhook
-              type: WEBHOOK
+              type: webhook
               enabled: true
               definition_version: 1
               config:
@@ -32,14 +32,14 @@ match_behavior:
             spec:
               id: webhook-prod
               display_name: Production Webhook
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               unexpected_field: true
               config:
                 webhook_url: "https://example.com/hook"
         expected_diagnostics:
           - file: "destination.yaml"
-            reference: "/unexpected_field"
+            reference: "/spec/unexpected_field"
             severity: "error"
             message_contains: "unknown field"
       - example_id: "destination-spec-syntax-unsupported-type"
@@ -58,7 +58,7 @@ match_behavior:
               config: {}
         expected_diagnostics:
           - file: "destination.yaml"
-            reference: "/type"
+            reference: "/spec/type"
             severity: "error"
             message_contains: "is not supported"
       - example_id: "destination-spec-syntax-bad-transformation-ref"
@@ -72,13 +72,13 @@ match_behavior:
             spec:
               id: webhook-prod
               display_name: Production Webhook
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               transformation: "transformation/my-transformation"
               config:
                 webhook_url: "https://example.com/hook"
         expected_diagnostics:
           - file: "destination.yaml"
-            reference: "/transformation"
+            reference: "/spec/transformation"
             severity: "error"
             message_contains: "must be of pattern #transformation:<id>"

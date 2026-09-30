@@ -24,7 +24,7 @@ match_behavior:
                   name: System Events
     invalid:
       - example_id: "categories-legacy-missing-name"
-        title: "Legacy category missing the required name field"
+        title: "Legacy category missing required name field"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -45,7 +45,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "categories-v1-valid"
-        title: "Valid v1 categories spec"
+        title: "Valid categories spec"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -60,7 +60,7 @@ match_behavior:
                   name: System Events
     invalid:
       - example_id: "categories-v1-missing-name"
-        title: "v1 category missing the required name field"
+        title: "Category missing required name field"
         files:
           spec.yaml: |
             version: rudder/v1
