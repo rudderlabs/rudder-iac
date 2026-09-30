@@ -21,7 +21,7 @@ func TestRequestsListIsCompactByDefault(t *testing.T) {
 	require.Equal(t, "compact", page["view"])
 	require.Equal(t, []any{map[string]any{
 		"seq": float64(1), "receivedAt": "2026-09-30T12:00:00Z", "method": "POST", "route": "/v1/batch",
-		"statusCode": float64(200), "outcome": "accepted", "kind": "ingestion", "rejection": nil,
+		"statusCode": float64(200), "outcome": "accepted", "kind": "ingestion",
 		"events": []any{map[string]any{"idx": float64(0), "type": "track", "event": "A"}},
 	}}, page["requests"])
 }
@@ -87,7 +87,7 @@ func TestRequestShowLeavesOutTheMessageCopies(t *testing.T) {
 	}}, got["events"])
 	require.Equal(t, map[string]any{
 		"fields": []any{"events.message", "events.enrichedMessage"}, "context": []any{},
-		"next": "rudder-cli dev requests show 1 --view full --json",
+		"next": "rudder-cli dev requests show 1 --fields request.body --json",
 	}, got["omitted"])
 
 	_, full := get(t, srv.URL+"/_dev/v1/requests/1?view=full")

@@ -81,6 +81,17 @@ func withStatus(expected []expectation, status string) []string {
 	return names
 }
 
+// withoutStatus names the expected events whose status differs.
+func withoutStatus(expected []expectation, status string) []string {
+	var names []string
+	for _, e := range expected {
+		if e.Status != status {
+			names = append(names, e.Event)
+		}
+	}
+	return names
+}
+
 // expectations adds one diagnosis for missing events and one for counts
 // that differ. The names are caller values; they go in events, never next.
 func (d *diagnosis) expectations(expected []expectation, since uint64) {

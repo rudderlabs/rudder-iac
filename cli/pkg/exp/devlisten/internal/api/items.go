@@ -264,3 +264,31 @@ func groupByHead(paths [][]string) map[string][][]string {
 	}
 	return groups
 }
+
+// dropNulls removes the top-level keys whose value is null and keeps the key
+// order. Compact lists such keys as optional, so a null says nothing.
+func dropNulls(obj []byte) []byte {
+	dec := json.NewDecoder(bytes.NewReader(obj))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return obj
+	}
+	out := []byte{'{'}
+	for dec.More() {
+		key, err := dec.Token()
+		if err != nil {
+			return obj
+		}
+		var val json.RawMessage
+		if err := dec.Decode(&val); err != nil {
+			return obj
+		}
+		if isNull(val) {
+			continue
+		}
+		if len(out) > 1 {
+			out = append(out, ',')
+		}
+		out = append(append(append(out, encode(key)...), ':'), val...)
+	}
+	return append(out, '}')
+}

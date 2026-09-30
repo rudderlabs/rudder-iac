@@ -120,7 +120,7 @@ func TestRequestsListFiltersAndOmitted(t *testing.T) {
 	require.Equal(t, map[string]any{
 		"fields":  []any{"request.headers", "request.body", "response", "events.message", "events.enrichedMessage"},
 		"context": []any{},
-		"next":    "rudder-cli dev requests show 1 --json",
+		"next":    "rudder-cli dev requests show 1 --fields request.body --json",
 	}, page["omitted"])
 
 	for query, want := range map[string]int{

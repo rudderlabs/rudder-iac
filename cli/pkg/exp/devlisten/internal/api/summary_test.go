@@ -116,3 +116,21 @@ func TestSummaryAllAcceptedNamesTheListCall(t *testing.T) {
 	diagnosis := summary["diagnosis"].([]any)[0].(map[string]any)
 	require.Equal(t, "rudder-cli dev events list --since 1 --view summary --json", diagnosis["next"])
 }
+
+func TestSummaryNothingReceivedSaysTheProbeArrived(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	probe := ingestion(track(0, "probe"))
+	probe.Probe = true
+	st.Append(probe)
+
+	_, summary := get(t, srv.URL+"/_dev/v1/summary")
+
+	require.Equal(t, float64(1), summary["requests"].(map[string]any)["probes"])
+	d := summary["diagnosis"].([]any)[0].(map[string]any)
+	require.Equal(t, "nothing_received", d["code"])
+	require.Equal(t, "No SDK request reached the listener, but 1 probe did, so the listener works. "+
+		"Check the app's dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
+		d["message"])
+	require.Equal(t, "rudder-cli dev listen --help", d["next"])
+}

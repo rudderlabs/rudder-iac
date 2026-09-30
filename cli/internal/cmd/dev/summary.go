@@ -29,7 +29,8 @@ func newCmdSummary(deps Deps) *cobra.Command {
 			"and pass --expect NAME=COUNT (=0 asserts absence). expected then lists want, got and status\n" +
 			"(present, missing, count_mismatch). A plain --expect NAME only checks presence: expected\n" +
 			"still reports got, and note names the NAME=COUNT to pass. expected_missing names the\n" +
-			"missing events.\n" +
+			"missing events; all_accepted is left out then. expected_all_present means every count\n" +
+			"matched and nothing failed: its next is dev stop. Types are not checked.\n" +
 			"bySource splits traffic by channel and by SDK family (browser, node, go, mobile, other), and\n" +
 			"no_browser_traffic flags server events with no browser request.",
 		Example: "  rudder-cli dev summary --since 0 --json\n" +

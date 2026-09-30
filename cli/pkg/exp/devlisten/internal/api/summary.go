@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -74,7 +75,7 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, summary{
 		APIVersion: APIVersion, ServerID: h.id.ServerID, Since: since, Cursor: max(since, view.Cursor),
 		Requests: all.requests, Events: all.events, Control: all.control, BySource: all.sources,
-		Expected: expected, Diagnosis: diagnose(countSummary(view.Records, false), expected, since),
+		Expected: expected, Diagnosis: diagnose(countSummary(view.Records, false), all.requests.Probes, expected, since),
 	})
 }
 
@@ -163,13 +164,23 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose applies the contract section 4.7 rules in order. Every rule that
 // holds appears. A next never carries a captured value.
-func diagnose(c counts, expected []expectation, since uint64) []diagnosisItem {
+func diagnose(c counts, probes int, expected []expectation, since uint64) []diagnosisItem {
 	var d diagnosis
-	d.transport(c.requests, c.control)
+	d.transport(c.requests, c.control, probes)
 	d.browser(c.sources, c.control)
 	d.rejections(c.requests)
 	d.expectations(expected, since)
-	d.add(c.requests.Total > 0 && c.requests.Failed == 0, "all_accepted", c.requests.Total,
+	failed := c.requests.Failed > 0 || c.control.SourceConfigFailed > 0
+	unmet := len(withoutStatus(expected, expectPresent)) > 0
+	allPresent := len(expected) > 0 && !unmet && !failed
+	d.add(allPresent, "expected_all_present", len(expected),
+		"Every expected event arrived with the requested count and no request failed. "+
+			"Types are not checked: read events list --fields properties for them, or stop.",
+		"rudder-cli dev stop")
+	// all_accepted next to an unmet expectation reads as a pass, and next to
+	// expected_all_present it repeats it.
+	d.add(c.requests.Total > 0 && c.requests.Failed == 0 && !unmet && !allPresent, "all_accepted",
+		c.requests.Total,
 		"Every request was accepted. List the events to check names and properties.",
 		newCommand(routeCommands["events"]).num("since", since).bare("view", viewSummary).flag("json").String())
 	return d.items
@@ -193,11 +204,18 @@ func (d *diagnosis) add(ok bool, code string, count int, message, next string) {
 	}
 }
 
-// transport covers requests that never became events.
-func (d *diagnosis) transport(req requestCounts, ctl controlCounts) {
-	d.add(req.Total == 0 && ctl.Total == 0, "nothing_received", 0,
+// transport covers requests that never became events. req leaves out the
+// probes; probes counts them, so nothing_received never denies a probe.
+func (d *diagnosis) transport(req requestCounts, ctl controlCounts, probes int) {
+	nothing := req.Total == 0 && ctl.Total == 0
+	d.add(nothing && probes == 0, "nothing_received", 0,
 		"No request reached the listener. Send a probe; if it arrives, check the SDK dataPlaneUrl, configUrl and write key.",
 		"rudder-cli dev send --json")
+	d.add(nothing && probes > 0, "nothing_received", 0,
+		fmt.Sprintf("No SDK request reached the listener, but %d %s did, so the listener works. "+
+			"Check the app's dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
+			probes, plural(probes, "probe", "probes")),
+		"rudder-cli dev listen --help")
 	d.add(ctl.Preflight > 0 && ctl.SourceConfig == 0 && req.Total == 0, "preflight_only", ctl.Preflight,
 		"Only CORS preflights arrived. Read response.headers of the control requests.",
 		"rudder-cli dev requests list --kind control --json")
@@ -210,6 +228,11 @@ func (d *diagnosis) transport(req requestCounts, ctl controlCounts) {
 		"rudder-cli dev requests list --kind control --json")
 }
 
+// noBrowserChecklist is the next of no_browser_traffic: the app settings to
+// check, in the order that most often explains a silent browser SDK.
+const noBrowserChecklist = "Check in order: 1. the browser SDK configUrl is the listener URL; " +
+	"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on."
+
 // browser covers a browser SDK that never reached the listener while a
 // server SDK did.
 func (d *diagnosis) browser(src sourceCounts, ctl controlCounts) {
@@ -218,7 +241,7 @@ func (d *diagnosis) browser(src sourceCounts, ctl controlCounts) {
 		"Server SDK requests arrived, but no browser request, no /sourceConfig and no preflight. "+
 			"If the app also runs a browser SDK, it did not load or sends elsewhere: "+
 			"follow the app checklist in rudder-cli dev listen --help.",
-		"rudder-cli dev requests list --kind control --json")
+		noBrowserChecklist)
 }
 
 func (d *diagnosis) rejections(req requestCounts) {
@@ -229,4 +252,11 @@ func (d *diagnosis) rejections(req requestCounts) {
 	d.add(bodyRejected > 0, "body_rejected", bodyRejected,
 		"Requests were rejected because of their body. Read rejection.reason on each.",
 		"rudder-cli dev requests list --failed --json")
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }

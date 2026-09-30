@@ -99,23 +99,14 @@ func (q eventsQuery) includeAsFields() []fieldArg {
 
 // fixed is the caller's command with fields as the only shape.
 func (q eventsQuery) fixed(fields []fieldArg) string {
-	c := newCommand(routeCommands["events"]).num("since", q.since)
-	q.filters.args(c)
-	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("route", q.route...).
-		quoted("status-code", intStrings(q.statusCode)...)
-	if q.userID != "" {
-		c.quoted("user-id", q.userID)
-	}
-	if q.anonID != "" {
-		c.quoted("anonymous-id", q.anonID)
-	}
+	c := q.filterArgs(newCommand(routeCommands["events"]).num("since", q.since))
 	return c.fields(fields).flag("json").String()
 }
 
 func (q eventsQuery) includes(name string) bool { return slices.Contains(q.include, name) }
 
-// args adds the caller's filters and output shape to a next command.
-func (q eventsQuery) args(c *command, withShape bool) *command {
+// filterArgs adds the caller's filters to a next command.
+func (q eventsQuery) filterArgs(c *command) *command {
 	q.filters.args(c)
 	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("route", q.route...).
 		quoted("status-code", intStrings(q.statusCode)...)
@@ -125,6 +116,12 @@ func (q eventsQuery) args(c *command, withShape bool) *command {
 	if q.anonID != "" {
 		c.quoted("anonymous-id", q.anonID)
 	}
+	return c
+}
+
+// args adds the caller's filters and output shape to a next command.
+func (q eventsQuery) args(c *command, withShape bool) *command {
+	q.filterArgs(c)
 	if withShape {
 		if q.sentView != "" {
 			c.quoted("view", q.sentView)
@@ -230,13 +227,10 @@ func (q eventsQuery) omitted(groups []group) *omitted {
 	case viewFields:
 		return &omitted{Fields: []string{}, Context: []string{}, Next: c.bare("view", viewFull).flag("json").String()}
 	}
-	stripped := strippedKeys(groups)
-	if len(stripped) > 0 {
-		c.bare("include", includeContext)
-	} else {
-		c.bare("view", viewFull)
-	}
-	return &omitted{Fields: []string{"message", "enrichedMessage"}, Context: stripped, Next: c.flag("json").String()}
+	// The cheapest step after compact is the properties alone.
+	next := q.filterArgs(newCommand(routeCommands["events"]).num("since", q.since)).
+		bare("fields", "properties").flag("json").String()
+	return &omitted{Fields: []string{"message", "enrichedMessage"}, Context: strippedKeys(groups), Next: next}
 }
 
 func strippedKeys(groups []group) []string {
@@ -310,5 +304,5 @@ func renderEvent(rec store.Record, ev store.Event, q eventsQuery) (json.RawMessa
 	if q.includes(includeEnrichment) {
 		item.RequestIP, item.RudderID = enrichment(ev.EnrichedMessage)
 	}
-	return encode(item), stripped
+	return dropNulls(encode(item)), stripped
 }

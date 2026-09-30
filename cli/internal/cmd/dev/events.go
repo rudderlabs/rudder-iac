@@ -18,8 +18,8 @@ func newCmdEvents(deps Deps) *cobra.Command {
 		Use:   "events",
 		Short: "Inspect captured events",
 		Long: "Inspect the events inside captured requests.\n\n" +
-			"Start with rudder-cli dev summary, then events list --view summary, then the default compact\n" +
-			"view, then --fields or --view full, then rudder-cli dev requests show SEQ.",
+			"Start with rudder-cli dev summary, then events list --view summary, then --fields properties,\n" +
+			"then the default compact view, then rudder-cli dev requests show SEQ --fields request.body.",
 		Example: "  rudder-cli dev events list --since 0 --view summary --json\n" +
 			"  rudder-cli dev events list --since 41 --event 'Order Completed' --wait 30s --json",
 	}
@@ -58,10 +58,11 @@ func newCmdEventsList(deps Deps) *cobra.Command {
 			"seq counts every request, so gaps are control requests (sourceConfig, preflight).\n" +
 			"Views: summary (one short line per event), compact (the default; context keys that SDKs\n" +
 			"collect are left out and listed in omitted.context; --include context restores them as the\n" +
-			"item's context) and full (message and enrichedMessage). Properties pass through unchanged.\n" +
+			"item's context; null keys are left out) and full (message and enrichedMessage). Properties\n" +
+			"pass through unchanged.\n" +
 			"Server lookup: --url, RUDDERSTACK_DEV_URL, then the state file of rudder-cli dev listen.",
 		Example: "  rudder-cli dev events list --since 0 --view summary --json\n" +
-			"  rudder-cli dev events list --since 41 --event 'Suggestion Sent' --include context --json\n" +
+			"  rudder-cli dev events list --since 41 --event 'Suggestion Sent' --fields properties --json\n" +
 			"  rudder-cli dev events list --since 41 --fields properties --json --jq '.events[].properties'",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {

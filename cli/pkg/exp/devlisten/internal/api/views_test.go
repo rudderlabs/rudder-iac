@@ -46,12 +46,12 @@ func TestCompactIsTheDefaultView(t *testing.T) {
 	require.Equal(t, map[string]any{
 		"fields":  []any{"message", "enrichedMessage"},
 		"context": []any{"app", "library", "page", "sessionId", "traits"},
-		"next":    "rudder-cli dev events list --since 0 --event 'A' --include context --json",
+		"next":    "rudder-cli dev events list --since 0 --event 'A' --fields properties --json",
 	}, page["omitted"])
 	require.Nil(t, page["truncated"])
 }
 
-func TestCompactNamesViewFullWhenNothingWasStripped(t *testing.T) {
+func TestCompactNamesFieldsPropertiesWhenNothingWasStripped(t *testing.T) {
 	t.Parallel()
 	srv, st := newTestServer(t)
 	st.Append(ingestion(track(0, "A")))
@@ -61,8 +61,12 @@ func TestCompactNamesViewFullWhenNothingWasStripped(t *testing.T) {
 
 	omitted := page["omitted"].(map[string]any)
 	require.Equal(t, []any{}, omitted["context"])
-	require.Equal(t, "rudder-cli dev events list --since 1 --view full --json", omitted["next"])
-	require.Nil(t, firstItem(t, page)["context"], "an empty residual is null")
+	require.Equal(t, "rudder-cli dev events list --since 1 --fields properties --json", omitted["next"])
+	item := firstItem(t, page)
+	require.NotContains(t, item, "context", "compact drops null keys")
+	for key, v := range item {
+		require.NotNil(t, v, "compact item key %s", key)
+	}
 }
 
 func TestIncludeContextRestoresTheStrippedKeys(t *testing.T) {
@@ -79,7 +83,8 @@ func TestIncludeContextRestoresTheStrippedKeys(t *testing.T) {
 	require.Contains(t, ctx, "appEnvironment")
 	omitted := page["omitted"].(map[string]any)
 	require.Equal(t, []any{}, omitted["context"])
-	require.Equal(t, "rudder-cli dev events list --since 0 --include 'context' --view full --json", omitted["next"])
+	require.Equal(t, "rudder-cli dev events list --since 0 --fields properties --json", omitted["next"],
+		"fields cannot combine with include, so next drops it")
 }
 
 func TestIncludeEnrichmentAddsServerValues(t *testing.T) {
@@ -257,7 +262,7 @@ func TestMinAboveKeptMovesTheCursor(t *testing.T) {
 		st.Append(ingestion(browserTrack(0, "A")))
 	}
 
-	_, page := get(t, srv.URL+"/_dev/v1/events?maxBytes=1500&min=3&wait=5s")
+	_, page := get(t, srv.URL+"/_dev/v1/events?maxBytes=1200&min=3&wait=5s")
 
 	events := page["events"].([]any)
 	require.Less(t, len(events), 3)

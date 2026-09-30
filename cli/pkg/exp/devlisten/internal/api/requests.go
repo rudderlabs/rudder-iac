@@ -152,7 +152,7 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 func (q requestsQuery) omitted(groups []group) *omitted {
 	show := nextSummary
 	if len(groups) > 0 {
-		show = showCommand(groups[0].seq).flag("json").String()
+		show = showCommand(groups[0].seq).bare("fields", "request.body").flag("json").String()
 	}
 	switch q.view {
 	case viewFull:
@@ -222,7 +222,7 @@ func renderRecord(rec store.Record, view string, fields []string) json.RawMessag
 	for i, ev := range rec.Events {
 		item.Events[i] = eventName{Idx: ev.Idx, Type: ev.Type, Event: ev.Event}
 	}
-	return encode(item)
+	return dropNulls(encode(item))
 }
 
 // recordTruncated replaces a record larger than maxBytes.
@@ -287,7 +287,7 @@ func renderShow(rec store.Record, q recordQuery) []byte {
 	}
 	show := recordShow{Record: rec, Events: make([]eventScalars, len(rec.Events)), Omitted: &omitted{
 		Fields: []string{"events.message", "events.enrichedMessage"}, Context: []string{},
-		Next: showCommand(rec.Seq).bare("view", viewFull).flag("json").String(),
+		Next: showCommand(rec.Seq).bare("fields", "request.body").flag("json").String(),
 	}}
 	for i, ev := range rec.Events {
 		show.Events[i] = eventScalars{Idx: ev.Idx, Type: ev.Type, Event: ev.Event, UserID: ev.UserID,
