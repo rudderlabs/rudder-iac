@@ -173,7 +173,8 @@ func Execute() {
 		var silent *cmderrors.SilentError
 		if !errors.As(err, &silent) {
 			ui.PrintError(err)
+			os.Exit(1)
 		}
-		os.Exit(1)
+		os.Exit(max(silent.Code, 1))
 	}
 }

@@ -7,6 +7,8 @@ package cmderrors
 // to machine-readable output.
 type SilentError struct {
 	Err error
+	// Code is the process exit code; 0 means 1.
+	Code int
 }
 
 func (e *SilentError) Error() string {

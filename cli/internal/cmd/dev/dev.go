@@ -56,5 +56,6 @@ func NewCmdDev(deps Deps) *cobra.Command {
 	cmd.AddCommand(newCmdReset(deps))
 	cmd.AddCommand(newCmdStop(deps))
 	cmd.AddCommand(newCmdSend(deps))
+	cmd.AddCommand(newCmdExec())
 	return cmd
 }
