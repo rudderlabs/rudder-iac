@@ -1,6 +1,6 @@
 // Package dev holds the hidden, experimental `dev` commands (DEX-1017). The
 // server and client live in cli/pkg/exp/devlisten; this package is flag
-// glue, discovery and printing.
+// glue and printing.
 package dev
 
 import (
@@ -8,10 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 )
 
-var log = logger.New("dev")
+var log = logger.New("root", logger.Attr{Key: "cmd", Value: "dev"})
 
 var errDisabled = errors.New("dev commands are experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_DEV_LISTEN=true")
 
@@ -21,22 +22,21 @@ type Deps struct {
 	Enabled func() bool
 	// DevURL is RUDDERSTACK_DEV_URL, bound in config.InitConfig.
 	DevURL func() string
-	// ConfigDir holds the state file; it follows -c.
-	ConfigDir func() string
+	// Track records one command run, as telemetry.TrackCommand does.
+	Track func(command string, err error, extras ...telemetry.KV)
 }
 
 func NewCmdDev(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dev",
 		Short: "Capture and inspect local SDK requests (experimental)",
-		Long: "Run a local endpoint that accepts RudderStack SDK requests and keeps them for inspection.\n\n" +
-			"Start with dev listen, point the SDK at its URL, then read what arrived with dev summary,\n" +
-			"dev events list and dev requests show.",
-		Example: "  rudder-cli dev listen --detach\n" +
-			"  rudder-cli dev cursor\n" +
-			"  rudder-cli dev summary --since 0 --expect 'Order Completed=1' --json\n" +
-			"  rudder-cli dev stop\n" +
-			"  rudder-cli dev exec --expect 'Order Completed=1' --json -- node app.mjs",
+		Long: "Run a local endpoint that accepts RudderStack SDK requests and keeps them in memory for inspection.\n\n" +
+			"Start dev listen in the background, point the SDK at the url of its ready line, then read what\n" +
+			"arrived with dev events (counts first, then events) and dev requests. A human can open the ui\n" +
+			"of the ready line. Stop the listener with kill PID; the ready line carries the pid.",
+		Example: "  rudder-cli dev listen --port 4321 > ready.json &\n" +
+			"  rudder-cli dev events --url http://127.0.0.1:4321 --json\n" +
+			"  rudder-cli dev events --url http://127.0.0.1:4321 --event 'Order Completed' --fields properties --json",
 		Hidden: true,
 		// Machine mode owns stdout and stderr; each command prints its errors.
 		SilenceUsage:  true,
@@ -52,13 +52,5 @@ func NewCmdDev(deps Deps) *cobra.Command {
 	cmd.AddCommand(newCmdListen(deps))
 	cmd.AddCommand(newCmdEvents(deps))
 	cmd.AddCommand(newCmdRequests(deps))
-	cmd.AddCommand(newCmdSummary(deps))
-	cmd.AddCommand(newCmdInfo(deps))
-	cmd.AddCommand(newCmdCursor(deps))
-	cmd.AddCommand(newCmdReset(deps))
-	cmd.AddCommand(newCmdStop(deps))
-	cmd.AddCommand(newCmdSend(deps))
-	cmd.AddCommand(newCmdProbe(deps))
-	cmd.AddCommand(newCmdExec())
 	return cmd
 }

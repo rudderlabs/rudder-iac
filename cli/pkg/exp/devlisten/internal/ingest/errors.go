@@ -21,6 +21,7 @@ var (
 	errRequestBodyTooLarge   = gwError{http.StatusRequestEntityTooLarge, "request size exceeds max limit", "size"}
 	errNoWriteKeyInBasicAuth = gwError{http.StatusUnauthorized, "failed to read writekey from header", "auth"}
 	errNoWriteKeyInQuery     = gwError{http.StatusUnauthorized, "failed to read writekey from query params", "auth"}
+	errInvalidWriteKey       = gwError{http.StatusUnauthorized, "invalid write key", "auth"}
 	errRequestBodyNil        = gwError{http.StatusBadRequest, "request body is nil", "body"}
 	errRequestBodyReadFailed = gwError{http.StatusBadRequest, "failed to read body from request", "body"}
 	errInvalidJSON           = gwError{http.StatusBadRequest, "invalid json", "parse"}

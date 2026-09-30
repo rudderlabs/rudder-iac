@@ -17,9 +17,10 @@ type apiError struct {
 }
 
 const (
-	nextInfo   = "rudder-cli dev info --json"
-	nextListen = "rudder-cli dev listen --detach"
-	nextShell  = "rudder-cli dev summary --json"
+	// nextFresh reads a fresh cursor and serverId from the running server.
+	nextFresh  = "rudder-cli dev events list --json"
+	nextListen = "rudder-cli dev listen"
+	nextShell  = "rudder-cli dev events list --json"
 )
 
 func strp(s string) *string { return &s }
@@ -32,8 +33,6 @@ var routeCommands = map[string]string{
 	"events":         "rudder-cli dev events list",
 	"requests":       "rudder-cli dev requests list",
 	"requests/{seq}": "rudder-cli dev requests show",
-	"summary":        "rudder-cli dev summary",
-	"info":           "rudder-cli dev info",
 }
 
 func helpNext(route string) *string {

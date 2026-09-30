@@ -23,7 +23,7 @@ func usageError(next, format string, args ...any) error {
 	return &cliError{Code: "usage", Message: fmt.Sprintf(format, args...), Next: next}
 }
 
-const nextListen = "rudder-cli dev listen --detach"
+const nextListen = "rudder-cli dev listen --help"
 
 // asAPIError maps any error to the section 4.8 object.
 func asAPIError(err error) *devlisten.APIError {

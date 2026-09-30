@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,10 +40,10 @@ func TestIndexNamesTheFirstCall(t *testing.T) {
 	status, index := get(t, srv.URL+"/_dev/v1/")
 
 	require.Equal(t, http.StatusOK, status)
-	require.Equal(t, "rudder-cli dev summary --since 0 --json", index["next"])
-	require.Equal(t, "curl -fsS 'http://127.0.0.1:4321/_dev/v1/summary?serverId=9f3ac1d2b7e4c601'", index["curl"])
+	require.Equal(t, "rudder-cli dev events list --since 0 --json", index["next"])
+	require.Equal(t, "curl -fsS 'http://127.0.0.1:4321/_dev/v1/events?serverId=9f3ac1d2b7e4c601'", index["curl"])
 	require.Equal(t, "rudder-cli dev --help", index["help"])
-	require.Contains(t, index["links"], "summary")
+	require.Contains(t, index["links"], "events")
 	raw, err := json.Marshal(index)
 	require.NoError(t, err)
 	require.Less(t, len(raw), 1024)
@@ -94,7 +93,7 @@ func TestRequestBySeq(t *testing.T) {
 
 	status, body := get(t, srv.URL+"/_dev/v1/requests/9")
 	require.Equal(t, http.StatusNotFound, status)
-	require.Equal(t, "rudder-cli dev info --json", body["error"].(map[string]any)["next"])
+	require.Equal(t, "rudder-cli dev events list --json", body["error"].(map[string]any)["next"])
 
 	status, _ = get(t, srv.URL+"/_dev/v1/requests/x")
 	require.Equal(t, http.StatusBadRequest, status)
@@ -116,7 +115,7 @@ func TestRequestsListFiltersAndOmitted(t *testing.T) {
 	bad.Rejection = &store.Rejection{Stage: "auth", Reason: "no write key"}
 	st.Append(bad)
 
-	_, page := get(t, srv.URL+"/_dev/v1/requests")
+	_, page := get(t, srv.URL+"/_dev/v1/requests?view=compact")
 	require.Equal(t, map[string]any{
 		"fields":  []any{"request.headers", "request.body", "response", "events.message", "events.enrichedMessage"},
 		"context": []any{},
@@ -124,12 +123,10 @@ func TestRequestsListFiltersAndOmitted(t *testing.T) {
 	}, page["omitted"])
 
 	for query, want := range map[string]int{
-		"failed=true":            1,
-		"failed=false":           1,
-		"stage=auth":             1,
-		"statusCode=401":         1,
-		"route=/v1/batch":        2,
-		"failed=true&stage=body": 0,
+		"failed=true":                1,
+		"failed=false":               1,
+		"statusCode=401":             1,
+		"failed=true&statusCode=200": 0,
 	} {
 		_, page := get(t, srv.URL+"/_dev/v1/requests?"+query)
 		require.Len(t, page["requests"], want, query)
@@ -138,43 +135,14 @@ func TestRequestsListFiltersAndOmitted(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, status)
 }
 
-func TestResetKeepsCounting(t *testing.T) {
+func TestResetAndShutdownRoutesAreGone(t *testing.T) {
 	t.Parallel()
-	srv, st := newTestServer(t)
-	st.Append(ingestion(track(0, "A")))
-	st.Append(store.Record{Kind: "control"})
+	srv, _ := newTestServer(t)
 
-	status, body := do(t, http.MethodPost, srv.URL+"/_dev/v1/reset", "application/json")
-	require.Equal(t, http.StatusOK, status)
-	require.Equal(t, map[string]any{
-		"cursor":  float64(2),
-		"removed": map[string]any{"requests": float64(1), "events": float64(1), "control": float64(1)},
-	}, body)
-
-	require.Equal(t, uint64(3), st.Append(ingestion()).Seq)
-	status, _ = do(t, http.MethodPost, srv.URL+"/_dev/v1/reset", "text/plain")
-	require.Equal(t, http.StatusUnsupportedMediaType, status)
-}
-
-func TestShutdownCallsTheHookOnLoopbackOnly(t *testing.T) {
-	t.Parallel()
-	var called atomic.Int32
-	st := store.New(testIdentity.ServerID)
-	srv := httptest.NewServer(New(st, testIdentity, Config{Shutdown: func() { called.Add(1) }}))
-	t.Cleanup(srv.Close)
-
-	status, body := do(t, http.MethodPost, srv.URL+"/_dev/v1/shutdown", "application/json")
-	require.Equal(t, http.StatusAccepted, status)
-	require.Equal(t, map[string]any{"stopping": true, "serverId": testIdentity.ServerID}, body)
-	require.Eventually(t, func() bool { return called.Load() == 1 }, timeoutShort, tick)
-
-	remote := testIdentity
-	remote.Bind = "0.0.0.0"
-	srv2 := httptest.NewServer(New(st, remote, Config{Shutdown: func() { called.Add(1) }}))
-	t.Cleanup(srv2.Close)
-	status, body = do(t, http.MethodPost, srv2.URL+"/_dev/v1/shutdown", "application/json")
-	require.Equal(t, http.StatusForbidden, status)
-	require.Equal(t, "stop_disabled", body["error"].(map[string]any)["code"])
+	for _, path := range []string{"/_dev/v1/reset", "/_dev/v1/shutdown", "/_dev/v1/summary"} {
+		status, _ := do(t, http.MethodPost, srv.URL+path, "application/json")
+		require.Equal(t, http.StatusNotFound, status, path)
+	}
 }
 
 func TestEveryErrorCarriesNext(t *testing.T) {
@@ -186,8 +154,7 @@ func TestEveryErrorCarriesNext(t *testing.T) {
 		{http.MethodGet, "/_dev/v1/events?serverId=other", ""},
 		{http.MethodGet, "/_dev/v1/nope", ""},
 		{http.MethodPut, "/_dev/v1/events", ""},
-		{http.MethodPost, "/_dev/v1/reset", "text/plain"},
-		{http.MethodGet, "/_dev/v1/summary?limit=1", ""},
+		{http.MethodGet, "/_dev/v1/requests?wait=1s", ""},
 	} {
 		_, body := do(t, tc.method, srv.URL+tc.path, tc.ct)
 		errObj := body["error"].(map[string]any)
@@ -206,11 +173,11 @@ func TestRequestsTruncatedNextKeepsTheFilters(t *testing.T) {
 		st.Append(rec)
 	}
 
-	_, page := get(t, srv.URL+"/_dev/v1/requests?serverId=9f3ac1d2b7e4c601&kind=all&route=/v1/batch&statusCode=400"+
-		"&failed=true&stage=body&fields=events&maxBytes=1500")
+	_, page := get(t, srv.URL+"/_dev/v1/requests?serverId=9f3ac1d2b7e4c601&kind=all&statusCode=400"+
+		"&failed=true&fields=events&maxBytes=1500")
 	truncated := page["truncated"].(map[string]any)
 	require.Equal(t, "rudder-cli dev requests list --since "+jsonNumber(page["cursor"])+" --server-id '9f3ac1d2b7e4c601'"+
-		" --kind 'all' --route '/v1/batch' --status-code '400' --failed=true --stage 'body' --fields 'events'"+
+		" --kind 'all' --status-code '400' --failed=true --fields 'events'"+
 		" --max-bytes '1500' --json", truncated["next"])
 
 	_, page = get(t, srv.URL+"/_dev/v1/requests?maxBytes=100")

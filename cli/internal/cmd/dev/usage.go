@@ -15,8 +15,7 @@ import (
 // flag, or the sibling command that has the flag.
 func flagError(cmd *cobra.Command, err error) error {
 	jsonFlag := cmd.Flags().Lookup("json")
-	machine := jsonFlag != nil && jsonFlag.Changed || !isTerminal(cmd.ErrOrStderr())
-	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: clientFlags{json: machine}}
+	out := newOutput(cmd.OutOrStdout(), cmd.ErrOrStderr(), jsonFlag != nil && jsonFlag.Changed)
 	return out.fail(usageFor(cmd, err))
 }
 

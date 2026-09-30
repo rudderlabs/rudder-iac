@@ -12,7 +12,7 @@ import (
 
 // recordRoots are the record keys a requests fields path may start with.
 var recordRoots = []string{
-	"recordVersion", "serverId", "seq", "kind", "probe", "receivedAt", "route", "transport", "statusCode",
+	"recordVersion", "serverId", "seq", "kind", "receivedAt", "route", "transport", "statusCode",
 	"failed", "outcome", "writeKey", "writeKeyPrefix", "writeKeySuffix", "writeKeySha256", "sourceId", "rejection", "hint", "request", "response", "events",
 }
 
@@ -38,7 +38,6 @@ type requestsQuery struct {
 	filters
 	kind     string
 	failed   *bool
-	stage    string
 	view     string
 	sentView string
 	fields   []string
@@ -53,8 +52,7 @@ func parseRequestsQuery(values map[string][]string) (requestsQuery, *apiError) {
 		filters:  parseFilters(p),
 		kind:     p.oneOf("kind", "ingestion", "ingestion", "control", "all"),
 		failed:   p.optBool("failed"),
-		stage:    p.single("stage"),
-		view:     p.oneOf("view", viewCompact, viewSummary, viewCompact, viewFull),
+		view:     p.oneOf("view", viewList, viewList, viewCompact, viewFull),
 		sentView: p.single("view"),
 		fields:   p.list("fields"),
 	}
@@ -75,11 +73,7 @@ func parseRequestsQuery(values map[string][]string) (requestsQuery, *apiError) {
 
 func (q requestsQuery) matches(rec store.Record) bool {
 	return (q.kind == "all" || rec.Kind == q.kind) && q.filters.matchesRecord(rec) &&
-		(q.failed == nil || rec.Failed == *q.failed) && q.matchesStage(rec)
-}
-
-func (q requestsQuery) matchesStage(rec store.Record) bool {
-	return q.stage == "" || rec.Rejection != nil && rec.Rejection.Stage == q.stage
+		(q.failed == nil || rec.Failed == *q.failed)
 }
 
 // args adds the caller's filters and, withShape, the output shape.
@@ -88,12 +82,9 @@ func (q requestsQuery) args(c *command, withShape bool) *command {
 	if q.kind != "ingestion" {
 		c.quoted("kind", q.kind)
 	}
-	c.quoted("route", q.route...).quoted("status-code", intStrings(q.statusCode)...)
+	c.quoted("status-code", intStrings(q.statusCode)...)
 	if q.failed != nil {
 		c.parts = append(c.parts, "--failed="+strconv.FormatBool(*q.failed))
-	}
-	if q.stage != "" {
-		c.quoted("stage", q.stage)
 	}
 	if withShape {
 		if q.sentView != "" {
@@ -157,17 +148,17 @@ func (q requestsQuery) omitted(groups []group) *omitted {
 	switch q.view {
 	case viewFull:
 		return nil
-	case viewSummary:
+	case viewList:
 		c := q.args(newCommand(routeCommands["requests"]).num("since", q.since), false)
 		return &omitted{Fields: []string{"receivedAt", "rejection", "events"}, Context: []string{},
-			Next: c.flag("json").String()}
+			Next: c.bare("view", viewCompact).flag("json").String()}
 	case viewFields:
 		return &omitted{Fields: []string{}, Context: []string{}, Next: show}
 	}
 	return &omitted{Fields: compactOmitted, Context: []string{}, Next: show}
 }
 
-const nextSummary = "rudder-cli dev summary --json"
+const nextSummary = "rudder-cli dev events list --json"
 
 func showCommand(seq uint64) *command {
 	return newCommand(routeCommands["requests/{seq}"] + " " + strconv.FormatUint(seq, 10))
@@ -193,7 +184,7 @@ type eventName struct {
 	Event *string `json:"event"`
 }
 
-type requestSummary struct {
+type requestListItem struct {
 	Seq        uint64 `json:"seq"`
 	Kind       string `json:"kind"`
 	Method     string `json:"method"`
@@ -212,8 +203,8 @@ func renderRecord(rec store.Record, view string, fields []string) json.RawMessag
 		return encode(projectJSON(encode(rec), fields, recordKeep))
 	case viewFull:
 		return encode(rec)
-	case viewSummary:
-		return encode(requestSummary{Seq: rec.Seq, Kind: rec.Kind, Method: rec.Request.Method, Route: rec.Route,
+	case viewList:
+		return encode(requestListItem{Seq: rec.Seq, Kind: rec.Kind, Method: rec.Request.Method, Route: rec.Route,
 			StatusCode: rec.StatusCode, Outcome: rec.Outcome, EventCount: len(rec.Events)})
 	}
 	item := requestCompact{Seq: rec.Seq, ReceivedAt: rec.ReceivedAt, Method: rec.Request.Method, Route: rec.Route,
@@ -242,8 +233,8 @@ func (h *Handler) request(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		writeError(w, apiError{status: http.StatusNotFound, Code: "not_found",
 			Message: "no request with seq " + strconv.FormatUint(q.seq, 10) +
-				"; it was never captured or was removed by reset",
-			Next: strp(nextInfo)})
+				"; it was never captured or the store evicted it",
+			Next: strp(nextSummary)})
 		return
 	}
 	body := renderShow(rec, q)

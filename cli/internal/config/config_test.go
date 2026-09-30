@@ -62,13 +62,10 @@ func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 	assert.Equal(t, 7, GetConfig().Concurrency.Syncer)
 }
 
-// dev clients read the server URL from RUDDERSTACK_DEV_URL (DEX-1017), and
-// the state file follows -c through GetConfigDir.
-func TestInitConfig_BindsDevURLAndConfigDirFollowsFlag(t *testing.T) {
+// dev clients read the server URL from RUDDERSTACK_DEV_URL (DEX-1017).
+func TestInitConfig_BindsDevURL(t *testing.T) {
 	t.Setenv("RUDDERSTACK_DEV_URL", "http://127.0.0.1:4321")
-	dir := t.TempDir()
-	InitConfig(filepath.Join(dir, "config.json"))
+	InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
 	assert.Equal(t, "http://127.0.0.1:4321", viper.GetString("devUrl"))
-	assert.Equal(t, dir, GetConfigDir())
 }

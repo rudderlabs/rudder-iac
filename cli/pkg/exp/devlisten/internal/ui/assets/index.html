@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev listen</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="dot" id="live" title="Polling"></span>
+    <h1>rudder-cli dev listen</h1>
+    <span class="muted mono" id="server"></span>
+  </div>
+  <nav class="links">
+    <a href="/_dev/v1/" target="_blank" rel="noopener">API index</a>
+  </nav>
+</header>
+
+<section class="summary" aria-label="Summary">
+  <div class="stats">
+    <div class="stat"><span class="label">Requests</span><span class="value" id="stat-requests">0</span><span class="sub" id="stat-failed"></span></div>
+    <div class="stat"><span class="label">Events</span><span class="value" id="stat-events">0</span><span class="sub" id="stat-types"></span></div>
+    <div class="stat"><span class="label">Control</span><span class="value" id="stat-control">0</span><span class="sub" id="stat-control-sub"></span></div>
+    <div class="stat"><span class="label">Sources</span><span class="value" id="stat-keys">0</span><span class="sub" id="stat-sdks"></span></div>
+  </div>
+  <ul class="diagnosis" id="diagnosis"></ul>
+</section>
+
+<section class="toolbar" aria-label="Filters">
+  <label class="search">
+    <span class="visually-hidden">Search</span>
+    <input id="search" type="search" placeholder="Search event names and payload values" autocomplete="off" spellcheck="false">
+  </label>
+  <label class="toggle"><input id="failed-only" type="checkbox"> Failed only</label>
+  <label class="select">Source
+    <select id="source"><option value="">All write keys</option></select>
+  </label>
+  <span class="muted" id="count"></span>
+</section>
+
+<main class="split">
+  <section class="list" aria-label="Events">
+    <table>
+      <thead><tr><th>Time</th><th>Type</th><th>Event</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="empty" id="empty">No events yet. Point the SDK at this listener and send one.</p>
+  </section>
+  <section class="detail" aria-label="Event detail" id="detail">
+    <p class="empty" id="detail-empty">Select an event to see its properties and the request that carried it.</p>
+    <div id="detail-body" hidden>
+      <div class="detail-head">
+        <h2 id="detail-title"></h2>
+        <span class="pill" id="detail-status"></span>
+      </div>
+      <dl class="facts" id="detail-facts"></dl>
+      <div class="block">
+        <div class="block-head"><h3>Properties</h3><button type="button" class="copy" data-copy="properties">Copy</button></div>
+        <pre id="detail-properties"></pre>
+      </div>
+      <div class="block">
+        <div class="block-head"><h3>Request JSON</h3><button type="button" class="copy" data-copy="request">Copy</button></div>
+        <pre id="detail-request"></pre>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

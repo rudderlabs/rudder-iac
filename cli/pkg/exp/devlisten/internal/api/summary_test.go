@@ -1,7 +1,9 @@
 package api
 
 import (
+	"maps"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -27,6 +29,14 @@ func rejected(stage string) store.Record {
 	return rec
 }
 
+// summaryOf reads the summary block of one /events answer.
+func summaryOf(t *testing.T, url string) map[string]any {
+	t.Helper()
+	status, page := get(t, url)
+	require.Equal(t, http.StatusOK, status, page)
+	return page["summary"].(map[string]any)
+}
+
 func diagnosisCodes(t *testing.T, summary map[string]any) []string {
 	t.Helper()
 	var codes []string
@@ -38,6 +48,41 @@ func diagnosisCodes(t *testing.T, summary map[string]any) []string {
 	return codes
 }
 
+func TestListIsTheDefaultViewAndCountsHasAnEmptyEventList(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A")))
+
+	_, list := get(t, srv.URL+"/_dev/v1/events")
+	_, page := get(t, srv.URL+"/_dev/v1/events?view=counts")
+
+	require.Equal(t, "list", list["view"])
+	require.Len(t, list["events"], 1)
+	require.Equal(t, list["summary"], page["summary"], "every view fills the summary")
+	require.Equal(t, "counts", page["view"])
+	require.Equal(t, []any{}, page["events"])
+	require.Equal(t, float64(1), page["cursor"])
+	require.Equal(t, map[string]any{"fields": []any{"events"}, "context": []any{},
+		"next": "rudder-cli dev events list --since 0 --json"}, page["omitted"])
+	require.NotContains(t, page, "unfiltered", "summary replaces unfiltered")
+}
+
+func TestEveryViewCarriesTheSameEnvelope(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A")))
+
+	var keys [][]string
+	for _, query := range []string{"", "?view=list", "?view=compact", "?view=full", "?fields=properties"} {
+		_, page := get(t, srv.URL+"/_dev/v1/events"+query)
+		keys = append(keys, sortedKeys(page))
+	}
+
+	for _, k := range keys[1:] {
+		require.Equal(t, keys[0], k)
+	}
+}
+
 func TestSummaryCounts(t *testing.T) {
 	t.Parallel()
 	srv, st := newTestServer(t)
@@ -46,20 +91,18 @@ func TestSummaryCounts(t *testing.T) {
 	st.Append(ingestion(track(0, "A"), track(1, "B")))
 	st.Append(rejected("auth"))
 
-	status, summary := get(t, srv.URL+"/_dev/v1/summary?since=0")
+	summary := summaryOf(t, srv.URL+"/_dev/v1/events?since=0")
 
-	require.Equal(t, http.StatusOK, status)
 	require.Equal(t, map[string]any{
-		"total": float64(2), "failed": float64(1), "probes": float64(0),
+		"total": float64(2), "failed": float64(1),
 		"byRoute":      map[string]any{"/v1/batch": float64(2)},
 		"byStatusCode": map[string]any{"200": float64(1), "400": float64(1)},
 		"byOutcome":    map[string]any{"accepted": float64(1), "rejected": float64(1)},
 		"byStage":      map[string]any{"auth": float64(1)},
 	}, summary["requests"])
-	require.Equal(t, map[string]any{
-		"total": float64(2), "byType": map[string]any{"track": float64(2)},
-		"byEvent": map[string]any{"A": float64(1), "B": float64(1)},
-	}, summary["events"])
+	require.Equal(t, map[string]any{"total": float64(2), "byType": map[string]any{"track": float64(2)}},
+		summary["events"])
+	require.Equal(t, map[string]any{"A": float64(1), "B": float64(1)}, summary["byEvent"])
 	require.Equal(t, map[string]any{
 		"total": float64(2), "sourceConfig": float64(1), "sourceConfigFailed": float64(0),
 		"preflight": float64(1), "pluginPath": float64(0), "other": float64(0),
@@ -67,22 +110,54 @@ func TestSummaryCounts(t *testing.T) {
 	require.Equal(t, []any{map[string]any{
 		"code": "auth_rejected", "count": float64(1),
 		"message": "Requests were rejected at the auth stage. Compare their writeKey with the SDK configuration.",
-		"next":    "rudder-cli dev requests list --failed --stage auth --json",
+		"next":    "rudder-cli dev requests list --failed --json",
 	}}, summary["diagnosis"])
+}
+
+func TestByEventShowsEveryRequestedNameAtZero(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A"), track(1, "B")))
+
+	summary := summaryOf(t, srv.URL+"/_dev/v1/events?event=A&event=Missing")
+
+	require.Equal(t, map[string]any{"A": float64(1), "Missing": float64(0)}, summary["byEvent"])
+	require.Equal(t, float64(1), summary["events"].(map[string]any)["total"], "event filters narrow the counts")
+	require.Equal(t, float64(1), summary["requests"].(map[string]any)["total"], "requests stay whole")
+}
+
+func TestStatusCodeNarrowsRequestCounts(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A")))
+	st.Append(rejected("auth"))
+
+	summary := summaryOf(t, srv.URL+"/_dev/v1/events?statusCode=400")
+
+	require.Equal(t, float64(1), summary["requests"].(map[string]any)["total"])
+	require.Equal(t, map[string]any{}, summary["byEvent"])
+}
+
+func TestFieldsFillEventsWithoutAView(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(track(0, "A")))
+
+	_, page := get(t, srv.URL+"/_dev/v1/events?event=A&fields=properties")
+
+	require.Equal(t, "fields", page["view"])
+	require.Equal(t, []any{map[string]any{"seq": float64(1), "idx": float64(0), "type": "track", "event": "A",
+		"properties": map[string]any{"n": float64(1)}}}, page["events"])
 }
 
 func TestSummaryDiagnosis(t *testing.T) {
 	t.Parallel()
-
-	probe := ingestion(track(0, "probe"))
-	probe.Probe = true
 
 	for name, tc := range map[string]struct {
 		records []store.Record
 		want    []string
 	}{
 		"empty":           {nil, []string{"nothing_received"}},
-		"probe only":      {[]store.Record{probe}, []string{"nothing_received"}},
 		"preflight only":  {[]store.Record{control("/v1/track", http.MethodOptions, 204)}, []string{"preflight_only"}},
 		"config rejected": {[]store.Record{control("/sourceConfig", http.MethodGet, 401)}, []string{"sdk_config_rejected"}},
 		"config, no events": {[]store.Record{control("/sourceConfig", http.MethodGet, 200)},
@@ -97,40 +172,36 @@ func TestSummaryDiagnosis(t *testing.T) {
 			for _, rec := range tc.records {
 				st.Append(rec)
 			}
-			_, summary := get(t, srv.URL+"/_dev/v1/summary")
-			require.Equal(t, tc.want, diagnosisCodes(t, summary))
+			require.Equal(t, tc.want, diagnosisCodes(t, summaryOf(t, srv.URL+"/_dev/v1/events")))
 		})
 	}
 }
 
-func TestSummaryAllAcceptedNamesTheListCall(t *testing.T) {
+func TestAllAcceptedNamesTheListCallAndItsCaveat(t *testing.T) {
 	t.Parallel()
 	srv, st := newTestServer(t)
 	st.Append(ingestion(track(0, "A")))
 	st.Append(ingestion(track(0, "B")))
 
-	_, summary := get(t, srv.URL+"/_dev/v1/summary?since=1")
+	_, page := get(t, srv.URL+"/_dev/v1/events?since=1&event=B")
 
-	require.Equal(t, float64(1), summary["since"])
-	require.Equal(t, float64(2), summary["cursor"])
-	diagnosis := summary["diagnosis"].([]any)[0].(map[string]any)
-	require.Equal(t, "rudder-cli dev events list --since 1 --view summary --json", diagnosis["next"])
+	require.Equal(t, float64(1), page["since"])
+	require.Equal(t, float64(2), page["cursor"])
+	d := page["summary"].(map[string]any)["diagnosis"].([]any)[0].(map[string]any)
+	require.Equal(t, "rudder-cli dev events list --since 1 --event 'B' --json", d["next"])
+	require.Contains(t, d["message"], "says nothing about events that never arrived")
 }
 
-func TestSummaryNothingReceivedSaysTheProbeArrived(t *testing.T) {
+func TestNothingReceivedNamesACurlTrack(t *testing.T) {
 	t.Parallel()
-	srv, st := newTestServer(t)
-	probe := ingestion(track(0, "probe"))
-	probe.Probe = true
-	st.Append(probe)
+	srv, _ := newTestServer(t)
 
-	_, summary := get(t, srv.URL+"/_dev/v1/summary")
+	d := summaryOf(t, srv.URL+"/_dev/v1/events")["diagnosis"].([]any)[0].(map[string]any)
 
-	require.Equal(t, float64(1), summary["requests"].(map[string]any)["probes"])
-	d := summary["diagnosis"].([]any)[0].(map[string]any)
-	require.Equal(t, "nothing_received", d["code"])
-	require.Equal(t, "No SDK request reached the listener, but 1 probe did, so the listener works. "+
-		"Check the app's dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
-		d["message"])
-	require.Equal(t, "rudder-cli dev listen --help", d["next"])
+	require.Equal(t, "curl -fsS -u 'dev:' -H 'Content-Type: application/json' "+
+		`-d '{"event":"dev check","userId":"dev"}' 'http://127.0.0.1:4321/v1/track'`, d["next"])
+}
+
+func sortedKeys(m map[string]any) []string {
+	return slices.Sorted(maps.Keys(m))
 }

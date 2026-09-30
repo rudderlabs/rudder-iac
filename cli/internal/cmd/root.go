@@ -101,9 +101,9 @@ func init() {
 	rootCmd.AddCommand(experimentalCmd)
 
 	devCmd = devcmd.NewCmdDev(devcmd.Deps{
-		Enabled:   func() bool { return config.GetConfig().ExperimentalFlags.DevListen },
-		DevURL:    func() string { return viper.GetString("devUrl") },
-		ConfigDir: config.GetConfigDir,
+		Enabled: func() bool { return config.GetConfig().ExperimentalFlags.DevListen },
+		DevURL:  func() string { return viper.GetString("devUrl") },
+		Track:   telemetryCmd.TrackCommand,
 	})
 	rootCmd.AddCommand(devCmd)
 

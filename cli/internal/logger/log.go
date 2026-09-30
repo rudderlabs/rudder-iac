@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,29 +17,29 @@ type Attr struct {
 	Value string
 }
 
-var logFile *os.File
+var logFile io.Writer
 var levelVar = new(slog.LevelVar)
 
 func init() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Printf("Error getting home directory: %v\n", err)
-		os.Exit(1)
-	}
+	homeDir, _ := os.UserHomeDir()
+	logFile = openLog(homeDir)
+}
 
+// openLog opens ~/.rudder/cli.log for append. When HOME is unset or not
+// writable it returns io.Discard: help and usage errors must still work.
+func openLog(homeDir string) io.Writer {
+	if homeDir == "" {
+		return io.Discard
+	}
 	logPath := filepath.Join(homeDir, ".rudder", "cli.log")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
-		fmt.Printf("Error creating log directory: %v\n", err)
-		os.Exit(1)
+		return io.Discard
 	}
-
 	lf, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Error opening log file: %v\n", err)
-		os.Exit(1)
+		return io.Discard
 	}
-
-	logFile = lf
+	return lf
 }
 
 type Logger struct {

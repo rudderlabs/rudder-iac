@@ -33,6 +33,9 @@ func (g *Gateway) ingest(r *http.Request, reqType, transport string, raw []byte,
 
 	writeKey, rejection := authenticate(r, transport)
 	rep.writeKey = writeKey
+	if rejection == nil && !g.admits(writeKey) {
+		rejection = &errInvalidWriteKey
+	}
 	if rejection != nil {
 		return rep.reject(*rejection)
 	}

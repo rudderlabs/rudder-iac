@@ -41,7 +41,7 @@ func TestParametersListEveryQueryRoute(t *testing.T) {
 	require.Contains(t, params["events"], devlisten.Parameter{Name: "statusCode", Repeatable: true})
 }
 
-func TestRequestsRequestSummaryAndReset(t *testing.T) {
+func TestRequestsRequestAndTheSummaryBlock(t *testing.T) {
 	t.Parallel()
 	s := startServer(t)
 	client := s.Client()
@@ -62,94 +62,18 @@ func TestRequestsRequestSummaryAndReset(t *testing.T) {
 	require.Equal(t, "accepted", rec.Outcome)
 	require.Contains(t, string(rec.Raw), `"body":"{\"event\":\"A\",\"userId\":\"u1\"}"`)
 
-	summary, err := client.Summary(ctx, devlisten.SummaryQuery{})
+	counts, err := client.Events(ctx, devlisten.Query{Event: []string{"A", "B"}, View: devlisten.ViewCounts})
 	require.NoError(t, err)
+	require.Empty(t, counts.Events, "counts leaves the events out")
+	summary := counts.Summary
+	require.Equal(t, map[string]int{"A": 1, "B": 0}, summary.ByEvent)
 	require.Len(t, summary.Diagnosis, 2, "a Go client with no browser traffic adds no_browser_traffic")
 	require.Equal(t, "no_browser_traffic", summary.Diagnosis[0].Code)
-	require.Equal(t, devlisten.Diagnosis{Code: "all_accepted", Count: 1,
-		Message: "Every request was accepted. List the events to check names and properties.",
-		Next:    "rudder-cli dev events list --since 0 --view summary --json"}, summary.Diagnosis[1])
+	require.Equal(t, "all_accepted", summary.Diagnosis[1].Code)
 	require.Equal(t, devlisten.SDKCounts{Requests: 1, Events: 1}, summary.BySource.BySdk["go"])
 
-	reset, err := client.Reset(ctx)
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), reset.Cursor)
-	require.Equal(t, 1, reset.Removed.Requests)
-	_, err = client.Request(ctx, 1, devlisten.RecordQuery{})
+	_, err = client.Request(ctx, 9, devlisten.RecordQuery{})
 	require.ErrorIs(t, err, devlisten.ErrNotFound)
-}
-
-func TestSendPostsAProbeAndFindsItsSeq(t *testing.T) {
-	t.Parallel()
-	s := startServer(t)
-	postTrack(t, s.URL(), `{"event":"A","userId":"u1"}`)
-
-	res, err := s.Client().Send(context.Background(), devlisten.Probe{WriteKey: devlisten.DefaultWriteKey, UserAgent: "rudder-cli dev send/test"})
-
-	require.NoError(t, err)
-	require.Equal(t, devlisten.SendResult{StatusCode: 200, Body: "ok", Seq: 2, Route: "/v1/track"}, res)
-	summary, err := s.Client().Summary(context.Background(), devlisten.SummaryQuery{Since: 1})
-	require.NoError(t, err)
-	require.Equal(t, 1, summary.Requests.Probes)
-}
-
-func TestShutdownRouteStopsTheServer(t *testing.T) {
-	t.Parallel()
-	s, err := devlisten.Start(context.Background())
-	require.NoError(t, err)
-
-	res, err := s.Client().Shutdown(context.Background())
-	require.NoError(t, err)
-	require.True(t, res.Stopping)
-
-	select {
-	case <-s.Done():
-	case <-time.After(5 * time.Second):
-		t.Fatal("server did not stop after /shutdown")
-	}
-	require.Equal(t, devlisten.StopReasonStop, s.StopReason())
-}
-
-func TestIdleExitStopsAQuietServer(t *testing.T) {
-	t.Parallel()
-	s, err := devlisten.Start(context.Background(), devlisten.WithIdleExit(300*time.Millisecond))
-	require.NoError(t, err)
-
-	start := time.Now()
-	for time.Since(start) < 500*time.Millisecond {
-		_, err := s.Client().Info(context.Background())
-		require.NoError(t, err, "info does not reset the idle timer, but the server is still up")
-		if time.Since(start) > 250*time.Millisecond {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-
-	select {
-	case <-s.Done():
-	case <-time.After(5 * time.Second):
-		t.Fatal("idle server did not stop")
-	}
-	require.Equal(t, devlisten.StopReasonIdle, s.StopReason())
-	require.Less(t, time.Since(start), 2*time.Second)
-}
-
-func TestIdleExitWaitsForCaptures(t *testing.T) {
-	t.Parallel()
-	s, err := devlisten.Start(context.Background(), devlisten.WithIdleExit(400*time.Millisecond))
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = s.Close(context.Background()) })
-
-	for range 6 {
-		postTrack(t, s.URL(), `{"event":"A","userId":"u1"}`)
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	select {
-	case <-s.Done():
-		t.Fatal("a server that keeps capturing is not idle")
-	default:
-	}
 }
 
 func TestCaptureHookSeesEveryRecord(t *testing.T) {

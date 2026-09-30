@@ -7,96 +7,83 @@ import (
 	"io"
 	"strconv"
 	"text/tabwriter"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten"
 )
+
+type requestsOptions struct {
+	clientFlags
+	since      uint64
+	limit      int
+	kind       string
+	statusCode []string
+	writeKey   []string
+	failed     bool
+	view       string
+	fields     []string
+	maxBytes   int
+}
 
 func newCmdRequests(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "requests",
-		Short: "Inspect captured requests",
-		Long: "Inspect whole captured requests: headers, body, response and rejection.\n\n" +
-			"A request is the unit of failure; use requests list --failed to find rejected ones.",
-		Example: "  rudder-cli dev requests list --failed --json\n" +
-			"  rudder-cli dev requests show 42 --json",
+		Short: "Inspect whole captured requests",
+		Args:  cobra.NoArgs,
 	}
 	cmd.AddCommand(newCmdRequestsList(deps))
 	cmd.AddCommand(newCmdRequestsShow(deps))
 	return cmd
 }
 
-type requestsListOptions struct {
-	clientFlags
-	since      uint64
-	limit      int
-	order      string
-	kind       string
-	route      []string
-	statusCode []string
-	failed     bool
-	stage      string
-	view       string
-	fields     []string
-	maxBytes   int
-	wait       time.Duration
-	min        int
-}
-
 func newCmdRequestsList(deps Deps) *cobra.Command {
-	var o requestsListOptions
+	var o requestsOptions
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List captured requests (GET /_dev/v1/requests)",
-		Long: "List captured requests after a cursor. Each flag is the query parameter of the same name.\n\n" +
-			"Views: summary (one short line), compact (the default: seq, receivedAt, method, route,\n" +
+		Long: "List whole captured requests after a cursor: the unit of failure, and the only view of rejected\n" +
+			"and control requests. Each flag is the query parameter of the same name.\n\n" +
+			"Views: list (one short line), compact (the default: seq, receivedAt, method, route,\n" +
 			"statusCode, outcome, kind, rejection and event names) and full (the whole record).\n" +
 			"--fields replaces the view and always keeps seq and request.method.\n" +
 			"--kind control shows /sourceConfig, preflights (method OPTIONS) and unknown paths.\n" +
-			"omitted.next names the rudder-cli dev requests show call for one whole request.",
-		Example: "  rudder-cli dev requests list --since 0 --json\n" +
-			"  rudder-cli dev requests list --failed --stage auth --json\n" +
-			"  rudder-cli dev requests list --kind control --view summary --json",
+			"--write-key filters by the key a request was sent with; on dev listen it is the allowlist.\n" +
+			"omitted.next names the dev requests show call for one whole request.",
+		Example: "  rudder-cli dev requests --url \"$url\" --failed --json\n" +
+			"  rudder-cli dev requests --url \"$url\" --kind control --view list --json\n" +
+			"  rudder-cli dev requests show 42 --url \"$url\" --fields request.body --json",
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRequestsList(cmd, deps, o)
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer func() {
+				deps.Track("dev requests list", err, telemetry.KV{K: "view", V: o.view}, telemetry.KV{K: "json", V: o.json})
+			}()
+			return runRequests(cmd, deps, o)
 		},
 	}
 	f := cmd.Flags()
-	o.register(f, true)
+	o.register(f)
 	f.Uint64Var(&o.since, "since", 0, "Filter by cursor: requests with seq above this")
 	f.IntVar(&o.limit, "limit", 100, "Output at most this many requests")
-	f.StringVar(&o.order, "order", "asc", "Output order; asc only in this phase")
 	f.StringVar(&o.kind, "kind", "ingestion", "Filter by kind: ingestion, control or all")
-	f.StringArrayVar(&o.route, "route", nil, "Filter by route, such as /v1/track; repeatable")
-	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code; repeatable")
+	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status `CODE`; repeatable")
+	f.StringArrayVar(&o.writeKey, "write-key", nil, "Filter by the write `KEY` a request was sent with; repeatable")
 	f.BoolVar(&o.failed, "failed", false, "Filter by failure; --failed=false selects accepted requests")
-	f.StringVar(&o.stage, "stage", "", "Filter by rejection stage, such as auth or body")
-	f.StringVar(&o.view, "view", "compact", "Output view: summary, compact or full (events list has the same three)")
+	f.StringVar(&o.view, "view", "list", "Output view: list, compact or full")
 	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.headers; repeatable")
 	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes per page; 0 turns the cap off")
-	f.DurationVar(&o.wait, "wait", 0, "Wait up to `DURATION` for --min matches (at most 110s)")
-	f.IntVar(&o.min, "min", 1, "Return once this many matches exist")
 	return cmd
 }
 
-func runRequestsList(cmd *cobra.Command, deps Deps, o requestsListOptions) error {
-	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check(cmd, nil); err != nil {
-		return out.fail(err)
-	}
+func runRequests(cmd *cobra.Command, deps Deps, o requestsOptions) error {
+	out := newOutput(cmd.OutOrStdout(), cmd.ErrOrStderr(), o.json)
 	q, err := o.query(cmd.Flags())
 	if err != nil {
 		return out.fail(err)
 	}
-	if o.jq != "" {
-		q.MaxBytes = jqCeiling
-		out = out.withJQCap(cmd, nil, o.maxBytes)
-	}
-	client, err := resolve(cmd.Context(), deps, o.clientFlags, o.wait)
+	client, err := resolve(cmd, nil, deps, o.clientFlags, 0)
 	if err != nil {
 		return out.fail(err)
 	}
@@ -104,29 +91,26 @@ func runRequestsList(cmd *cobra.Command, deps Deps, o requestsListOptions) error
 	if err != nil {
 		return out.fail(err)
 	}
-	err = out.page(cmd.Context(), page.Raw, len(page.Requests), page.TimedOut, page.Truncated,
-		func(w io.Writer) { printRequestsTable(w, page) })
+	err = out.page(page.Raw, len(page.Requests), page.Truncated, func(w io.Writer) { printRequestsTable(w, page) })
 	if err == nil && len(page.Requests) == 0 {
-		out.hint("No matching requests. Next: rudder-cli dev summary --since %d", page.Since)
+		out.hint("No matching requests. Next: rudder-cli dev events list --since %d", page.Since)
 	}
 	return err
 }
 
-func (o requestsListOptions) query(f *pflag.FlagSet) (devlisten.RequestQuery, error) {
+func (o requestsOptions) query(f *pflag.FlagSet) (devlisten.RequestQuery, error) {
 	codes, err := parseCodes(o.statusCode)
 	if err != nil {
 		return devlisten.RequestQuery{}, err
 	}
-	q := devlisten.RequestQuery{Route: o.route, StatusCode: codes, Stage: o.stage, Fields: o.fields, Wait: o.wait}
+	q := devlisten.RequestQuery{StatusCode: codes, WriteKey: o.writeKey, Fields: o.fields}
 	whenSet(f, map[string]func(){
 		"since":     func() { q.Since = o.since },
 		"limit":     func() { q.Limit = o.limit },
-		"order":     func() { q.Order = devlisten.Order(o.order) },
 		"kind":      func() { q.Kind = o.kind },
 		"view":      func() { q.View = devlisten.View(o.view) },
 		"failed":    func() { q.Failed = &o.failed },
 		"max-bytes": func() { q.MaxBytes = maxBytes(o.maxBytes) },
-		"min":       func() { q.Min = o.min },
 	})
 	return q, nil
 }
@@ -162,14 +146,17 @@ func newCmdRequestsShow(deps Deps) *cobra.Command {
 			"request.body already holds them as sent; full restores both. --fields picks paths.\n" +
 			"Credential headers are redacted and listed in request.redactedHeaders.",
 		Example: "  rudder-cli dev requests show 42 --fields request.body --json\n" +
-			"  rudder-cli dev requests show 42 --json\n" +
-			"  rudder-cli dev requests show 42 --view full --json",
-		RunE: func(cmd *cobra.Command, args []string) error {
+			"  rudder-cli dev requests show 42 --url \"$url\" --json\n" +
+			"  rudder-cli dev requests show 42 --url \"$url\" --view full --json",
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			defer func() {
+				deps.Track("dev requests show", err, telemetry.KV{K: "view", V: o.view}, telemetry.KV{K: "json", V: o.json})
+			}()
 			return runRequestsShow(cmd, deps, o, args)
 		},
 	}
 	f := cmd.Flags()
-	o.register(f, true)
+	o.register(f)
 	f.StringVar(&o.view, "view", "compact", "Output view: compact or full")
 	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.body; repeatable")
 	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes; 0 turns the cap off")
@@ -177,19 +164,13 @@ func newCmdRequestsShow(deps Deps) *cobra.Command {
 }
 
 func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args []string) error {
-	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check(cmd, args); err != nil {
-		return out.fail(err)
-	}
+	out := newOutput(cmd.OutOrStdout(), cmd.ErrOrStderr(), o.json)
 	seq, err := parseSeq(args)
 	if err != nil {
 		return out.fail(err)
 	}
 	q := o.query(cmd.Flags())
-	if o.jq != "" {
-		out = out.withJQCap(cmd, args, o.maxBytes)
-	}
-	client, err := resolve(cmd.Context(), deps, o.clientFlags, 0)
+	client, err := resolve(cmd, args, deps, o.clientFlags, 0)
 	if err != nil {
 		return out.fail(err)
 	}
@@ -199,9 +180,9 @@ func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args 
 	}
 	human := func(w io.Writer) { printIndented(w, rec.Raw) }
 	if rec.Truncated != nil {
-		return out.outputLimit(cmd.Context(), rec.Raw, rec.Truncated, human)
+		return out.outputLimit(rec.Raw, rec.Truncated, human)
 	}
-	return out.result(cmd.Context(), rec.Raw, "", human)
+	return out.result(rec.Raw, human)
 }
 
 func (o requestsShowOptions) query(f *pflag.FlagSet) devlisten.RecordQuery {
@@ -209,10 +190,7 @@ func (o requestsShowOptions) query(f *pflag.FlagSet) devlisten.RecordQuery {
 	if f.Changed("view") {
 		q.View = devlisten.View(o.view)
 	}
-	switch {
-	case o.jq != "":
-		q.MaxBytes = jqCeiling
-	case f.Changed("max-bytes"):
+	if f.Changed("max-bytes") {
 		q.MaxBytes = maxBytes(o.maxBytes)
 	}
 	return q
@@ -220,12 +198,12 @@ func (o requestsShowOptions) query(f *pflag.FlagSet) devlisten.RecordQuery {
 
 func parseSeq(args []string) (uint64, error) {
 	if len(args) != 1 {
-		return 0, usageError("rudder-cli dev requests list --json",
+		return 0, usageError("rudder-cli dev requests list --view list --json",
 			"requests show takes one SEQ; list the requests to find it")
 	}
 	seq, err := strconv.ParseUint(args[0], 10, 64)
 	if err != nil {
-		return 0, usageError("rudder-cli dev requests list --json", "SEQ %q is not a request seq", args[0])
+		return 0, usageError("rudder-cli dev requests list --view list --json", "SEQ %q is not a request seq", args[0])
 	}
 	return seq, nil
 }

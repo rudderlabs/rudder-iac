@@ -17,14 +17,20 @@ import (
 )
 
 // cliOnlyFlags are the client flags with no query parameter behind them.
-var cliOnlyFlags = []string{"url", "timeout", "json", "jq", "help"}
+var cliOnlyFlags = []string{"url", "timeout", "json", "help"}
 
-// routeCommands maps each query route to the command path that calls it.
+// routeCommands maps each query route to the command path that calls it
+// with every parameter.
 var routeCommands = map[string][]string{
 	"events":         {"events", "list"},
 	"requests":       {"requests", "list"},
 	"requests/{seq}": {"requests", "show"},
-	"summary":        {"summary"},
+}
+
+// subsetCommands call a route with some of its parameters: dev events
+// always asks for view=counts.
+var subsetCommands = map[string][]string{
+	"events": {"events"},
 }
 
 func kebab(name string) string {
@@ -82,16 +88,33 @@ func TestEveryFlagIsAParameterOrCLIOnly(t *testing.T) {
 	t.Parallel()
 	params := devlisten.Parameters()
 
-	for route, path := range routeCommands {
+	for _, rc := range allRouteCommands() {
+		route, path := rc.route, rc.path
 		cmd := findCommand(t, path)
 		cmd.Flags().VisitAll(func(f *pflag.Flag) {
 			if slices.Contains(cliOnlyFlags, f.Name) {
 				return
 			}
-			found := slices.ContainsFunc(params[route], func(p devlisten.Parameter) bool { return p.Name == camel(f.Name) })
-			require.True(t, found, "%s: flag --%s has no parameter %s", route, f.Name, camel(f.Name))
+			i := slices.IndexFunc(params[route], func(p devlisten.Parameter) bool { return p.Name == camel(f.Name) })
+			require.GreaterOrEqual(t, i, 0, "%s: flag --%s has no parameter %s", route, f.Name, camel(f.Name))
+			require.Equal(t, expectedDefValue(params[route][i], f), f.DefValue, "%v: --%s default", path, f.Name)
 		})
 	}
+}
+
+type routeCommand struct {
+	route string
+	path  []string
+}
+
+func allRouteCommands() []routeCommand {
+	var out []routeCommand
+	for _, m := range []map[string][]string{routeCommands, subsetCommands} {
+		for route, path := range m {
+			out = append(out, routeCommand{route, path})
+		}
+	}
+	return out
 }
 
 func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
@@ -104,32 +127,28 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		mu.Lock()
 		query = append(query, r.URL.RawQuery)
 		mu.Unlock()
-		if r.URL.Path == "/_dev/v1/summary" {
-			_, _ = w.Write([]byte(`{"diagnosis":[]}`))
-			return
-		}
 		_, _ = w.Write([]byte(`{"events":[],"requests":[]}`))
 	}))
 	t.Cleanup(srv.Close)
 
 	for _, args := range [][]string{
-		{"events", "list", "--since", "3", "--limit", "5", "--view", "summary", "--include", "context", "--status-code", "200"},
+		{"events", "list", "--since", "3", "--limit", "5", "--view", "compact", "--status-code", "200"},
 		{"events", "list"},
-		{"requests", "list", "--failed=false", "--max-bytes", "0", "--route", "/v1/track", "--route", "/v1/page"},
+		{"events", "--event", "A", "--write-key", "k"},
+		{"requests", "list", "--failed=false", "--max-bytes", "0", "--write-key", "k"},
 		{"requests", "list", "--failed"},
-		{"requests", "list", "--view", "summary"},
-		{"summary", "--expect", "A=1", "--expect", "B"},
+		{"requests", "list", "--view", "full"},
 	} {
 		_, _, err := runDev(t, append(args, "--url", srv.URL, "--json")...)
 		require.NoError(t, err, args)
 	}
 
 	require.Equal(t, []string{
-		"include=context&limit=5&since=3&statusCode=200&view=summary",
+		"limit=5&since=3&statusCode=200&view=compact",
 		"",
-		"failed=false&maxBytes=0&route=%2Fv1%2Ftrack&route=%2Fv1%2Fpage",
+		"event=A&view=counts&writeKey=k",
+		"failed=false&maxBytes=0&writeKey=k",
 		"failed=true",
-		"view=summary",
-		"expect=A%3D1&expect=B",
+		"view=full",
 	}, query)
 }

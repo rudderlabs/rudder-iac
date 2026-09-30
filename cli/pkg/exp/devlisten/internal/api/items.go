@@ -49,18 +49,18 @@ type fullItem struct {
 
 type compactItem struct {
 	baseItem
-	Context   json.RawMessage `json:"context"`
-	RequestIP json.RawMessage `json:"request_ip,omitempty"`
-	RudderID  json.RawMessage `json:"rudderId,omitempty"`
+	Context json.RawMessage `json:"context"`
 }
 
-type summaryItem struct {
-	Seq        uint64  `json:"seq"`
-	Idx        int     `json:"idx"`
-	Type       *string `json:"type"`
-	Event      *string `json:"event"`
-	UserID     *string `json:"userId"`
-	StatusCode int     `json:"statusCode"`
+type listItem struct {
+	Seq        uint64    `json:"seq"`
+	Idx        int       `json:"idx"`
+	ReceivedAt time.Time `json:"receivedAt"`
+	Type       *string   `json:"type"`
+	Event      *string   `json:"event"`
+	UserID     *string   `json:"userId"`
+	WriteKey   string    `json:"writeKey"`
+	StatusCode int       `json:"statusCode"`
 }
 
 func newBaseItem(rec store.Record, ev store.Event) baseItem {
@@ -95,14 +95,14 @@ func newBaseItem(rec store.Record, ev store.Event) baseItem {
 	}
 }
 
-// compactContext returns message.context without the stripped keys, or the
-// whole context when all is set, and the keys it removed.
-func compactContext(message json.RawMessage, all bool) (json.RawMessage, []string) {
+// compactContext returns message.context without the stripped keys, and the
+// keys it removed. --fields message.context reads the whole context.
+func compactContext(message json.RawMessage) (json.RawMessage, []string) {
 	var msg struct {
 		Context json.RawMessage `json:"context"`
 	}
 	_ = json.Unmarshal(message, &msg)
-	if isNull(msg.Context) || all {
+	if isNull(msg.Context) {
 		return nullIfEmpty(msg.Context), nil
 	}
 	var ctx map[string]json.RawMessage
@@ -120,23 +120,6 @@ func compactContext(message json.RawMessage, all bool) (json.RawMessage, []strin
 		return nil, stripped
 	}
 	return encode(ctx), stripped
-}
-
-// enrichment returns the ingestion-added values compact leaves out.
-func enrichment(enriched json.RawMessage) (json.RawMessage, json.RawMessage) {
-	var v struct {
-		RequestIP json.RawMessage `json:"request_ip"`
-		RudderID  json.RawMessage `json:"rudderId"`
-	}
-	_ = json.Unmarshal(enriched, &v)
-	return orNull(v.RequestIP), orNull(v.RudderID)
-}
-
-func orNull(raw json.RawMessage) json.RawMessage {
-	if len(raw) == 0 {
-		return json.RawMessage("null")
-	}
-	return raw
 }
 
 // batchSentAt reads the batch-level sentAt that the Node SDK sends instead

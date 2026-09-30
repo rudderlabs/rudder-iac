@@ -3,7 +3,6 @@ package devlisten
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,20 +40,10 @@ var (
 type View string
 
 const (
-	ViewSummary View = "summary"
+	ViewCounts  View = "counts"
+	ViewList    View = "list"
 	ViewCompact View = "compact"
 	ViewFull    View = "full"
-)
-
-// Order is the page order. Only OrderAsc is served in this phase.
-type Order string
-
-const OrderAsc Order = "asc"
-
-// Values of Query.Include.
-const (
-	IncludeContext    = "context"
-	IncludeEnrichment = "enrichment"
 )
 
 // MaxBytesOff turns the server's page cap off (maxBytes=0). A zero
@@ -198,15 +187,13 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 type Query struct {
 	Since       uint64
 	Limit       int
-	Order       Order
 	View        View
 	Event       []string
 	Type        []string
-	Route       []string
 	StatusCode  []int
+	WriteKey    []string
 	UserID      string
 	AnonymousID string
-	Include     []string
 	Fields      []string
 	MaxBytes    int
 	Min         int
@@ -218,13 +205,12 @@ func (q Query) Values() url.Values {
 	v := url.Values{}
 	setUint(v, "since", q.Since)
 	setInt(v, "limit", q.Limit)
-	setString(v, "order", string(q.Order))
 	setString(v, "view", string(q.View))
-	v["event"], v["type"], v["route"] = q.Event, q.Type, q.Route
+	v["event"], v["type"], v["writeKey"] = q.Event, q.Type, q.WriteKey
 	v["statusCode"] = intStrings(q.StatusCode)
 	setString(v, "userId", q.UserID)
 	setString(v, "anonymousId", q.AnonymousID)
-	v["include"], v["fields"] = q.Include, q.Fields
+	v["fields"] = q.Fields
 	setMaxBytes(v, q.MaxBytes)
 	setInt(v, "min", q.Min)
 	setWait(v, q.Wait)
@@ -236,35 +222,27 @@ func (q Query) Values() url.Values {
 type RequestQuery struct {
 	Since      uint64
 	Limit      int
-	Order      Order
 	Kind       string
-	Route      []string
 	StatusCode []int
+	WriteKey   []string
 	Failed     *bool
-	Stage      string
 	View       View
 	Fields     []string
 	MaxBytes   int
-	Min        int
-	Wait       time.Duration
 }
 
 func (q RequestQuery) Values() url.Values {
 	v := url.Values{}
 	setUint(v, "since", q.Since)
 	setInt(v, "limit", q.Limit)
-	setString(v, "order", string(q.Order))
 	setString(v, "kind", q.Kind)
-	v["route"], v["statusCode"] = q.Route, intStrings(q.StatusCode)
+	v["statusCode"], v["writeKey"] = intStrings(q.StatusCode), q.WriteKey
 	if q.Failed != nil {
 		v.Set("failed", strconv.FormatBool(*q.Failed))
 	}
-	setString(v, "stage", q.Stage)
 	setString(v, "view", string(q.View))
 	v["fields"] = q.Fields
 	setMaxBytes(v, q.MaxBytes)
-	setInt(v, "min", q.Min)
-	setWait(v, q.Wait)
 	return compact(v)
 }
 
@@ -280,19 +258,6 @@ func (q RecordQuery) Values() url.Values {
 	v := url.Values{"fields": q.Fields}
 	setString(v, "view", string(q.View))
 	setMaxBytes(v, q.MaxBytes)
-	return compact(v)
-}
-
-// SummaryQuery selects the records /summary counts. Each Expect value is
-// NAME or NAME=COUNT; the answer then carries Expected.
-type SummaryQuery struct {
-	Since  uint64
-	Expect []string
-}
-
-func (q SummaryQuery) Values() url.Values {
-	v := url.Values{"expect": q.Expect}
-	setUint(v, "since", q.Since)
 	return compact(v)
 }
 
@@ -372,7 +337,7 @@ type Page struct {
 	HasMore    bool       `json:"hasMore"`
 	TimedOut   bool       `json:"timedOut"`
 	WaitedMs   int64      `json:"waitedMs"`
-	Unfiltered Unfiltered `json:"unfiltered"`
+	Summary    Summary    `json:"summary"`
 	View       View       `json:"view"`
 	Omitted    *Omitted   `json:"omitted"`
 	Truncated  *Truncated `json:"truncated"`
@@ -449,9 +414,11 @@ func (c *Client) Events(ctx context.Context, q Query) (Page, error) {
 // (default 1) or ctx ends. q.Wait is ignored. A page that MaxBytes cut short
 // moves the cursor, so the events are collected across pages and a page is
 // never asked for twice. The result spans pages when needed: Events holds
-// every match, Cursor is the last page's, and Raw is nil then.
+// every match, Cursor is the last page's, and Raw is nil then. An unset
+// View with no Fields reads compact events, not the counts view.
 func (c *Client) WaitForEvents(ctx context.Context, q Query) (Page, error) {
 	want, since := max(q.Min, 1), q.Since
+	q = withEventView(q)
 	var (
 		last   Page
 		events []Event
@@ -466,9 +433,9 @@ func (c *Client) WaitForEvents(ctx context.Context, q Query) (Page, error) {
 		case ctx.Err() != nil:
 			return collected(last, events, pages), fmt.Errorf(
 				"waiting for %v since seq %d: %w (collected %d of %d events up to seq %d; "+
-					"unfiltered after it: %d requests, %d events, %d control)",
+					"after it: %d requests, %d events, %d control)",
 				q.Event, since, ctx.Err(), len(events), want, q.Since,
-				last.Unfiltered.Requests, last.Unfiltered.Events, last.Unfiltered.Control)
+				last.Summary.Requests.Total, last.Summary.Events.Total, last.Summary.Control.Total)
 		case err != nil:
 			return Page{}, err
 		case oversized(page):
@@ -489,6 +456,14 @@ func (c *Client) WaitForEvents(ctx context.Context, q Query) (Page, error) {
 
 // oversized is a page whose first request alone is above MaxBytes: it holds
 // no event and does not move the cursor.
+// withEventView reads compact events when the query names no shape.
+func withEventView(q Query) Query {
+	if q.View == "" && len(q.Fields) == 0 {
+		q.View = ViewCompact
+	}
+	return q
+}
+
 func oversized(p Page) bool {
 	return p.Truncated != nil && p.Truncated.RequestBytes > 0 && len(p.Events) == 0
 }
@@ -530,7 +505,6 @@ func pollWait(ctx context.Context) time.Duration {
 type Record struct {
 	Seq        uint64     `json:"seq"`
 	Kind       string     `json:"kind"`
-	Probe      bool       `json:"probe"`
 	ReceivedAt time.Time  `json:"receivedAt"`
 	Route      string     `json:"route"`
 	Transport  string     `json:"transport"`
@@ -602,25 +576,21 @@ func (c *Client) Request(ctx context.Context, seq uint64, q RecordQuery) (Record
 
 // Summary is the /summary object (contract section 4.7).
 type Summary struct {
-	APIVersion string `json:"apiVersion"`
-	ServerID   string `json:"serverId"`
-	Since      uint64 `json:"since"`
-	Cursor     uint64 `json:"cursor"`
-	Requests   struct {
+	Requests struct {
 		Total        int            `json:"total"`
 		Failed       int            `json:"failed"`
-		Probes       int            `json:"probes"`
 		ByRoute      map[string]int `json:"byRoute"`
 		ByStatusCode map[string]int `json:"byStatusCode"`
 		ByOutcome    map[string]int `json:"byOutcome"`
 		ByStage      map[string]int `json:"byStage"`
 	} `json:"requests"`
 	Events struct {
-		Total   int            `json:"total"`
-		ByType  map[string]int `json:"byType"`
-		ByEvent map[string]int `json:"byEvent"`
+		Total  int            `json:"total"`
+		ByType map[string]int `json:"byType"`
 	} `json:"events"`
-	Control struct {
+	ByEvent    map[string]int       `json:"byEvent"`
+	ByWriteKey map[string]KeyCounts `json:"byWriteKey"`
+	Control    struct {
 		Total              int `json:"total"`
 		SourceConfig       int `json:"sourceConfig"`
 		SourceConfigFailed int `json:"sourceConfigFailed"`
@@ -632,9 +602,7 @@ type Summary struct {
 		ByChannel map[string]int       `json:"byChannel"`
 		BySdk     map[string]SDKCounts `json:"bySdk"`
 	} `json:"bySource"`
-	Expected  []Expected  `json:"expected"`
 	Diagnosis []Diagnosis `json:"diagnosis"`
-	raw
 }
 
 // SDKCounts are the requests, events and control requests of one SDK
@@ -645,158 +613,23 @@ type SDKCounts struct {
 	Control  int `json:"control"`
 }
 
-// Expected is the check of one SummaryQuery.Expect value. Want is nil when
-// no count was given. Status is present, missing or count_mismatch.
-type Expected struct {
-	Event  string `json:"event"`
-	Want   *int   `json:"want"`
-	Got    int    `json:"got"`
-	Status string `json:"status"`
-	// Note names the count to pass; empty when the count was asserted and
-	// matched, or when nothing arrived.
-	Note string `json:"note"`
+// KeyCounts are the requests and matching events sent with one write key.
+type KeyCounts struct {
+	Requests int `json:"requests"`
+	Events   int `json:"events"`
 }
 
 type Diagnosis struct {
-	Code    string   `json:"code"`
-	Count   int      `json:"count"`
-	Message string   `json:"message"`
-	Events  []string `json:"events"`
-	Next    string   `json:"next"`
-}
-
-func (c *Client) Summary(ctx context.Context, q SummaryQuery) (Summary, error) {
-	var s Summary
-	if err := c.do(ctx, http.MethodGet, "/_dev/v1/summary", q.Values(), &s); err != nil {
-		return Summary{}, err
-	}
-	return s, nil
-}
-
-type ResetResult struct {
-	Cursor  uint64     `json:"cursor"`
-	Removed StoreStats `json:"removed"`
-	raw
-}
-
-// Reset clears the store. seq keeps counting.
-func (c *Client) Reset(ctx context.Context) (ResetResult, error) {
-	var res ResetResult
-	if err := c.do(ctx, http.MethodPost, "/_dev/v1/reset", nil, &res); err != nil {
-		return ResetResult{}, err
-	}
-	return res, nil
-}
-
-type ShutdownResult struct {
-	Stopping bool   `json:"stopping"`
-	ServerID string `json:"serverId"`
-	raw
-}
-
-// Shutdown asks the server to stop. It returns once the server accepted;
-// the server drains after that.
-func (c *Client) Shutdown(ctx context.Context) (ShutdownResult, error) {
-	var res ShutdownResult
-	if err := c.do(ctx, http.MethodPost, "/_dev/v1/shutdown", nil, &res); err != nil {
-		return ShutdownResult{}, err
-	}
-	return res, nil
-}
-
-// Probe is the event Send posts. Zero fields take the defaults: event
-// "probe", type "track", userId "dev-send". WriteKey is sent as given, so
-// an empty key tests the auth rejection; use DefaultWriteKey otherwise.
-type Probe struct {
-	Event     string
-	Type      string
-	UserID    string
-	WriteKey  string
-	UserAgent string
-}
-
-type SendResult struct {
-	StatusCode int    `json:"statusCode"`
-	Body       string `json:"body"`
-	Seq        uint64 `json:"seq"`
-	Route      string `json:"route"`
-}
-
-// Send posts one probe event through the ingestion path, like an SDK, and
-// finds the seq it was captured under. A non-2xx answer is not an error;
-// the caller reads StatusCode.
-func (c *Client) Send(ctx context.Context, p Probe) (SendResult, error) {
-	p = p.withDefaults()
-	info, err := c.Info(ctx)
-	if err != nil {
-		return SendResult{}, err
-	}
-	route := "/v1/" + p.Type
-	body, _ := json.Marshal(map[string]any{
-		"type": p.Type, "event": p.Event, "userId": p.UserID, "messageId": newMessageID(),
-		"properties": map[string]any{"sentBy": "rudder-cli"},
-	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+route, bytes.NewReader(body))
-	if err != nil {
-		return SendResult{}, fmt.Errorf("building probe: %w", err)
-	}
-	req.SetBasicAuth(p.WriteKey, "")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", p.UserAgent)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return SendResult{}, fmt.Errorf("sending probe: %w", err)
-	}
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
-
-	res := SendResult{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(respBody)), Route: route}
-	page, err := c.Requests(ctx, RequestQuery{Since: info.Cursor, Kind: "all", Route: []string{route}, View: ViewFull,
-		MaxBytes: MaxBytesOff})
-	if err != nil {
-		return res, err
-	}
-	for _, rec := range page.Requests {
-		if rec.Probe {
-			res.Seq = rec.Seq
-			break
-		}
-	}
-	return res, nil
-}
-
-func (p Probe) withDefaults() Probe {
-	def := func(s *string, v string) {
-		if *s == "" {
-			*s = v
-		}
-	}
-	def(&p.Event, "probe")
-	def(&p.Type, "track")
-	def(&p.UserID, "dev-send")
-	def(&p.UserAgent, "rudder-cli dev send/dev")
-	return p
-}
-
-func newMessageID() string {
-	var b [16]byte
-	_, _ = rand.Read(b[:])
-	b[6] = b[6]&0x0f | 0x40
-	b[8] = b[8]&0x3f | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	Code    string `json:"code"`
+	Count   int    `json:"count"`
+	Message string `json:"message"`
+	Next    string `json:"next"`
 }
 
 func (c *Client) do(ctx context.Context, method, path string, values url.Values, out any) error {
-	var body io.Reader
-	if method == http.MethodPost {
-		body = strings.NewReader("{}")
-	}
-	req, err := http.NewRequestWithContext(ctx, method, c.endpoint(path, values), body)
+	req, err := http.NewRequestWithContext(ctx, method, c.endpoint(path, values), nil)
 	if err != nil {
 		return fmt.Errorf("building request: %w", err)
-	}
-	if method == http.MethodPost {
-		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -807,7 +640,7 @@ func (c *Client) do(ctx context.Context, method, path string, values url.Values,
 }
 
 // endpoint adds the pinned serverId to every query except /info, which is
-// how a client learns the serverId in the first place, and the POST routes.
+// how a client learns the serverId in the first place.
 func (c *Client) endpoint(path string, values url.Values) string {
 	if values == nil {
 		values = url.Values{}
@@ -823,7 +656,7 @@ func (c *Client) endpoint(path string, values url.Values) string {
 
 func takesServerID(path string) bool {
 	switch path {
-	case "/_dev/v1/info", "/_dev/v1/reset", "/_dev/v1/shutdown":
+	case "/_dev/v1/info":
 		return false
 	}
 	return strings.HasPrefix(path, "/_dev/v1/")

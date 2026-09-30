@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRequestsListIsCompactByDefault(t *testing.T) {
+func TestRequestsCompactView(t *testing.T) {
 	t.Parallel()
 	srv, st := newTestServer(t)
 	rec := ingestion(track(0, "A"))
@@ -16,7 +16,7 @@ func TestRequestsListIsCompactByDefault(t *testing.T) {
 	rec.Request.Method = http.MethodPost
 	st.Append(rec)
 
-	_, page := get(t, srv.URL+"/_dev/v1/requests")
+	_, page := get(t, srv.URL+"/_dev/v1/requests?view=compact")
 
 	require.Equal(t, "compact", page["view"])
 	require.Equal(t, []any{map[string]any{
@@ -26,19 +26,19 @@ func TestRequestsListIsCompactByDefault(t *testing.T) {
 	}}, page["requests"])
 }
 
-func TestRequestsListSummaryAndFullViews(t *testing.T) {
+func TestRequestsListAndFullViews(t *testing.T) {
 	t.Parallel()
 	srv, st := newTestServer(t)
 	rec := ingestion(track(0, "A"))
 	rec.Request.Method = http.MethodPost
 	st.Append(rec)
 
-	_, page := get(t, srv.URL+"/_dev/v1/requests?view=summary")
+	_, page := get(t, srv.URL+"/_dev/v1/requests?view=list")
 	require.Equal(t, []any{map[string]any{
 		"seq": float64(1), "kind": "ingestion", "method": "POST", "route": "/v1/batch",
 		"statusCode": float64(200), "outcome": "accepted", "eventCount": float64(1),
 	}}, page["requests"])
-	require.Equal(t, "rudder-cli dev requests list --since 0 --json", page["omitted"].(map[string]any)["next"])
+	require.Equal(t, "rudder-cli dev requests list --since 0 --view compact --json", page["omitted"].(map[string]any)["next"])
 
 	_, page = get(t, srv.URL+"/_dev/v1/requests?view=full")
 	full := page["requests"].([]any)[0].(map[string]any)
@@ -64,7 +64,7 @@ func TestRequestsFieldsWithViewNamesTheCorrectedCommand(t *testing.T) {
 	t.Parallel()
 	srv, _ := newTestServer(t)
 
-	status, body := get(t, srv.URL+"/_dev/v1/requests?view=summary&fields=route&kind=control")
+	status, body := get(t, srv.URL+"/_dev/v1/requests?view=list&fields=route&kind=control")
 
 	require.Equal(t, http.StatusBadRequest, status)
 	require.Equal(t, "rudder-cli dev requests list --since 0 --kind 'control' --fields 'route' --json",

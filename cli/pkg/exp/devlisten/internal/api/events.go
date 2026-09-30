@@ -9,13 +9,11 @@ import (
 )
 
 const (
-	viewSummary = "summary"
+	viewCounts  = "counts"
+	viewList    = "list"
 	viewCompact = "compact"
 	viewFull    = "full"
 	viewFields  = "fields"
-
-	includeContext    = "context"
-	includeEnrichment = "enrichment"
 )
 
 // eventRoots are the item keys a fields path may start with.
@@ -29,7 +27,6 @@ type eventsQuery struct {
 	filters
 	view     string
 	fields   []string
-	include  []string
 	sentView string
 	event    []string
 	typ      []string
@@ -45,9 +42,8 @@ func parseEventsQuery(values map[string][]string) (eventsQuery, *apiError) {
 	q := eventsQuery{
 		filters:  parseFilters(p),
 		sentView: p.single("view"),
-		view:     p.oneOf("view", viewCompact, viewSummary, viewCompact, viewFull),
+		view:     p.oneOf("view", viewList, viewCounts, viewList, viewCompact, viewFull),
 		fields:   p.list("fields"),
-		include:  p.list("include"),
 		event:    p.list("event"),
 		typ:      p.list("type"),
 		userID:   p.single("userId"),
@@ -57,20 +53,9 @@ func parseEventsQuery(values map[string][]string) (eventsQuery, *apiError) {
 	return q, p.err
 }
 
-// includeFields are the fields paths that replace an include value.
-var includeFields = map[string][]string{
-	includeContext:    {"message.context"},
-	includeEnrichment: {"enrichedMessage.request_ip", "enrichedMessage.rudderId"},
-}
-
-// checkShape validates include and fields; fields replaces the view. A
-// conflict names the corrected command in next.
+// checkShape validates fields; fields replaces the view. A conflict names
+// the corrected command in next.
 func (q *eventsQuery) checkShape(p *params) {
-	for _, inc := range q.include {
-		if includeFields[inc] == nil {
-			p.fail("include", "%q is not context or enrichment", inc)
-		}
-	}
 	if len(q.fields) == 0 {
 		return
 	}
@@ -80,21 +65,8 @@ func (q *eventsQuery) checkShape(p *params) {
 		failFields(p, bad, eventRoots, q.fixed(kept))
 	case q.sentView != "":
 		p.failWith("fields", q.fixed(kept), nil, "cannot combine with view; fields replaces the view")
-	case len(q.include) > 0:
-		p.failWith("include", q.fixed(append(kept, q.includeAsFields()...)), nil,
-			"cannot combine with fields; the paths go in fields")
 	}
 	q.view = viewFields
-}
-
-func (q eventsQuery) includeAsFields() []fieldArg {
-	var out []fieldArg
-	for _, inc := range q.include {
-		for _, f := range includeFields[inc] {
-			out = append(out, fieldArg{value: f, generated: true})
-		}
-	}
-	return out
 }
 
 // fixed is the caller's command with fields as the only shape.
@@ -103,13 +75,10 @@ func (q eventsQuery) fixed(fields []fieldArg) string {
 	return c.fields(fields).flag("json").String()
 }
 
-func (q eventsQuery) includes(name string) bool { return slices.Contains(q.include, name) }
-
 // filterArgs adds the caller's filters to a next command.
 func (q eventsQuery) filterArgs(c *command) *command {
 	q.filters.args(c)
-	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("route", q.route...).
-		quoted("status-code", intStrings(q.statusCode)...)
+	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("status-code", intStrings(q.statusCode)...)
 	if q.userID != "" {
 		c.quoted("user-id", q.userID)
 	}
@@ -129,12 +98,17 @@ func (q eventsQuery) args(c *command, withShape bool) *command {
 		c.quoted("fields", q.fields...)
 		q.filters.maxBytesArg(c)
 	}
-	return c.quoted("include", q.include...)
+	return c
+}
+
+// matchesEvent applies the event-level filters.
+func (q eventsQuery) matchesEvent(ev store.Event) bool {
+	return matches(ev.Event, q.event) && matches(ev.Type, q.typ) &&
+		equals(ev.UserID, q.userID) && equals(ev.AnonymousID, q.anonID)
 }
 
 func (q eventsQuery) matches(rec store.Record, ev store.Event) bool {
-	return matches(ev.Event, q.event) && matches(ev.Type, q.typ) && q.filters.matchesRecord(rec) &&
-		equals(ev.UserID, q.userID) && equals(ev.AnonymousID, q.anonID)
+	return q.filters.matchesRecord(rec) && q.matchesEvent(ev)
 }
 
 // matches ORs the values of one repeatable filter; no values match all.
@@ -159,6 +133,8 @@ type omitted struct {
 	Next    string   `json:"next"`
 }
 
+// eventsPage is the one /events envelope. Its keys never change with the
+// view: counts leaves events empty, the other views fill it.
 type eventsPage struct {
 	APIVersion string            `json:"apiVersion"`
 	ServerID   string            `json:"serverId"`
@@ -167,7 +143,7 @@ type eventsPage struct {
 	HasMore    bool              `json:"hasMore"`
 	TimedOut   bool              `json:"timedOut"`
 	WaitedMs   int64             `json:"waitedMs"`
-	Unfiltered unfiltered        `json:"unfiltered"`
+	Summary    summary           `json:"summary"`
 	View       string            `json:"view"`
 	Omitted    *omitted          `json:"omitted"`
 	Truncated  *truncated        `json:"truncated"`
@@ -187,7 +163,9 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := h.now()
+	var window store.View
 	scanned, timedOut, ok, err := h.poll(r.Context(), q.filters, func(view store.View) scanResult {
+		window = view
 		return scan(view, q.since, q.limit, func(rec store.Record) group { return h.eventGroup(rec, q) })
 	})
 	switch {
@@ -196,8 +174,14 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	case ok:
 		page := eventsPage{
 			APIVersion: APIVersion, ServerID: h.id.ServerID, Since: q.since, TimedOut: timedOut,
-			WaitedMs: h.now().Sub(start).Milliseconds(), Unfiltered: scanned.unfiltered, View: q.view,
+			WaitedMs: h.now().Sub(start).Milliseconds(), Summary: h.summarize(window.Records, q), View: q.view,
 			Events: []json.RawMessage{},
+		}
+		if q.view == viewCounts {
+			page.Cursor = max(q.since, window.Cursor)
+			page.Omitted = q.omitted(nil)
+			writeRaw(w, http.StatusOK, encode(page))
+			return
 		}
 		writeRaw(w, http.StatusOK, fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
 			page.Cursor, page.HasMore, page.Truncated = cursor, hasMore, t
@@ -216,21 +200,27 @@ func (q eventsQuery) truncatedNext(cursor uint64, oversized bool) string {
 	return q.args(c.num("since", cursor), true).flag("json").String()
 }
 
+// omitted names what the view left out and the next rung of the ladder:
+// counts, list, compact, fields, then one whole request.
 func (q eventsQuery) omitted(groups []group) *omitted {
 	c := q.args(newCommand(routeCommands["events"]).num("since", q.since), false)
 	switch q.view {
 	case viewFull:
 		return nil
-	case viewSummary:
+	case viewCounts:
+		return &omitted{Fields: []string{"events"}, Context: []string{}, Next: c.flag("json").String()}
+	case viewList:
 		return &omitted{Fields: []string{"properties", "traits", "context", "message", "enrichedMessage"},
-			Context: []string{}, Next: c.flag("json").String()}
+			Context: []string{}, Next: c.bare("view", viewCompact).flag("json").String()}
 	case viewFields:
-		return &omitted{Fields: []string{}, Context: []string{}, Next: c.bare("view", viewFull).flag("json").String()}
+		next := c.bare("view", viewFull).flag("json").String()
+		if len(groups) > 0 {
+			next = showCommand(groups[0].seq).bare("fields", "request.body").flag("json").String()
+		}
+		return &omitted{Fields: []string{}, Context: []string{}, Next: next}
 	}
-	// The cheapest step after compact is the properties alone.
-	next := q.filterArgs(newCommand(routeCommands["events"]).num("since", q.since)).
-		bare("fields", "properties").flag("json").String()
-	return &omitted{Fields: []string{"message", "enrichedMessage"}, Context: strippedKeys(groups), Next: next}
+	return &omitted{Fields: []string{"message", "enrichedMessage"}, Context: strippedKeys(groups),
+		Next: c.bare("fields", "properties").flag("json").String()}
 }
 
 func strippedKeys(groups []group) []string {
@@ -253,7 +243,7 @@ func (h *Handler) checkServerID(serverID string) *apiError {
 	return &apiError{status: http.StatusConflict, Code: "server_changed",
 		Message: "serverId " + serverID + " is not the running server; repeat the action with a fresh cursor",
 		Details: map[string]any{"serverId": h.id.ServerID, "startedAt": h.id.StartedAt},
-		Next:    strp(nextInfo)}
+		Next:    strp(nextFresh)}
 }
 
 func countRecords(records []store.Record) unfiltered {
@@ -289,9 +279,9 @@ func (h *Handler) eventGroup(rec store.Record, q eventsQuery) group {
 func renderEvent(rec store.Record, ev store.Event, q eventsQuery) (json.RawMessage, []string) {
 	base := newBaseItem(rec, ev)
 	switch q.view {
-	case viewSummary:
-		return encode(summaryItem{Seq: base.Seq, Idx: base.Idx, Type: base.Type, Event: base.Event,
-			UserID: base.UserID, StatusCode: base.StatusCode}), nil
+	case viewCounts, viewList:
+		return encode(listItem{Seq: base.Seq, Idx: base.Idx, ReceivedAt: base.ReceivedAt, Type: base.Type,
+			Event: base.Event, UserID: base.UserID, WriteKey: base.WriteKey, StatusCode: base.StatusCode}), nil
 	case viewFull:
 		return encode(fullItem{baseItem: base, Message: ev.Message, EnrichedMessage: ev.EnrichedMessage}), nil
 	case viewFields:
@@ -300,9 +290,6 @@ func renderEvent(rec store.Record, ev store.Event, q eventsQuery) (json.RawMessa
 	}
 	item := compactItem{baseItem: base}
 	var stripped []string
-	item.Context, stripped = compactContext(ev.Message, q.includes(includeContext))
-	if q.includes(includeEnrichment) {
-		item.RequestIP, item.RudderID = enrichment(ev.EnrichedMessage)
-	}
+	item.Context, stripped = compactContext(ev.Message)
 	return dropNulls(encode(item)), stripped
 }

@@ -19,12 +19,11 @@ type filters struct {
 	wait         time.Duration
 	maxBytes     int
 	sentMaxBytes string
-	route        []string
 	statusCode   []int
+	writeKey     []string
 }
 
 func parseFilters(p *params) filters {
-	p.order()
 	f := filters{
 		since:        p.uint("since", 0),
 		serverID:     p.single("serverId"),
@@ -32,22 +31,23 @@ func parseFilters(p *params) filters {
 		wait:         p.wait(),
 		maxBytes:     p.maxBytes(),
 		sentMaxBytes: p.single("maxBytes"),
-		route:        p.list("route"),
 		statusCode:   p.ints("statusCode"),
+		writeKey:     p.list("writeKey"),
 	}
 	f.min = p.intIn("min", 1, 1, f.limit)
 	return f
 }
 
 func (f filters) matchesRecord(rec store.Record) bool {
-	return (len(f.route) == 0 || slices.Contains(f.route, rec.Route)) &&
-		(len(f.statusCode) == 0 || slices.Contains(f.statusCode, rec.StatusCode))
+	return (len(f.statusCode) == 0 || slices.Contains(f.statusCode, rec.StatusCode)) &&
+		(len(f.writeKey) == 0 || slices.ContainsFunc(f.writeKey, func(k string) bool { return store.MatchesWriteKey(rec, k) }))
 }
 
 func (f filters) args(c *command) {
 	if f.serverID != "" {
 		c.quoted("server-id", f.serverID)
 	}
+	c.quoted("write-key", f.writeKey...)
 }
 
 func (f filters) maxBytesArg(c *command) {

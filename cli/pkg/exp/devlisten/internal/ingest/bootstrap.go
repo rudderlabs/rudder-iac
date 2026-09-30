@@ -23,6 +23,11 @@ func (g *Gateway) sourceConfig(r *http.Request) reply {
 		return rep
 	}
 	rep.writeKey = writeKey
+	if !g.admits(writeKey) {
+		rep.status = http.StatusUnauthorized
+		rep.body = []byte(`{"message":"Invalid write key"}`)
+		return rep
+	}
 
 	updatedAt := g.startedAt.UTC().Format("2006-01-02T15:04:05.000Z")
 	body, _ := json.Marshal(map[string]any{

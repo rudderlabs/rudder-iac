@@ -65,11 +65,11 @@ func TestReadyObject(t *testing.T) {
 	require.Equal(t, "dev", ready.WriteKey)
 	require.Equal(t, "any", ready.WriteKeyPolicy)
 	require.Equal(t, uint64(0), ready.Cursor)
-	require.Nil(t, ready.StateFile)
+	require.Equal(t, s.URL()+"/_dev/ui/", ready.UI)
 
 	line, err := json.Marshal(ready)
 	require.NoError(t, err)
-	require.Contains(t, string(line), `"stateFile":null`)
+	require.NotContains(t, string(line), "stateFile")
 }
 
 func TestPostBatchThenReadItBackWithSinceAndWait(t *testing.T) {
@@ -110,7 +110,8 @@ func TestPostBatchThenReadItBackWithSinceAndWait(t *testing.T) {
 	page := res.page
 	require.False(t, page.TimedOut)
 	require.Equal(t, uint64(2), page.Cursor)
-	require.Equal(t, devlisten.Unfiltered{Requests: 1, Events: 2}, page.Unfiltered)
+	require.Equal(t, 1, page.Summary.Requests.Total)
+	require.Equal(t, 1, page.Summary.Events.Total, "the event filter narrows the event counts")
 	require.Len(t, page.Events, 1)
 
 	ev := page.Events[0]
@@ -162,7 +163,7 @@ func TestClientWaitReportsDeadline(t *testing.T) {
 	_, err := s.Client().WaitForEvents(ctx, devlisten.Query{Event: []string{"never"}, Min: 1})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Contains(t, err.Error(), "collected 0 of 1 events up to seq 0; unfiltered after it: 0 requests, 0 events, 0 control")
+	require.Contains(t, err.Error(), "collected 0 of 1 events up to seq 0; after it: 0 requests, 0 events, 0 control")
 }
 
 func TestClientPinsServerID(t *testing.T) {
@@ -205,14 +206,14 @@ func TestQueryValues(t *testing.T) {
 	t.Parallel()
 
 	q := devlisten.Query{
-		Since: 57, Limit: 10, Order: devlisten.OrderAsc, View: devlisten.ViewSummary,
-		Event: []string{"A", "B"}, Type: []string{"track"}, Route: []string{"/v1/track"}, StatusCode: []int{200, 400},
-		UserID: "u1", AnonymousID: "a1", Include: []string{"context"}, Fields: []string{"properties"},
+		Since: 57, Limit: 10, View: devlisten.ViewList,
+		Event: []string{"A", "B"}, Type: []string{"track"}, StatusCode: []int{200, 400},
+		UserID: "u1", AnonymousID: "a1", Fields: []string{"properties"},
 		MaxBytes: devlisten.MaxBytesOff, Min: 2, Wait: 30 * time.Second,
 	}
 
-	require.Equal(t, "anonymousId=a1&event=A&event=B&fields=properties&include=context&limit=10&maxBytes=0&min=2"+
-		"&order=asc&route=%2Fv1%2Ftrack&since=57&statusCode=200&statusCode=400&type=track&userId=u1&view=summary&wait=30s",
+	require.Equal(t, "anonymousId=a1&event=A&event=B&fields=properties&limit=10&maxBytes=0&min=2"+
+		"&since=57&statusCode=200&statusCode=400&type=track&userId=u1&view=list&wait=30s",
 		q.Values().Encode())
 	require.Equal(t, "maxBytes=500", devlisten.Query{MaxBytes: 500}.Values().Encode())
 	require.Equal(t, "", devlisten.Query{}.Values().Encode())

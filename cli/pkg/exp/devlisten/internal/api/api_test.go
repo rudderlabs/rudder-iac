@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -88,13 +89,13 @@ func TestEventsEnvelope(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	events := page["events"].([]any)
 	require.Less(t, page["waitedMs"], float64(1000))
+	require.Contains(t, page, "summary")
 	delete(page, "events")
 	delete(page, "waitedMs")
 	require.Equal(t, map[string]any{
 		"apiVersion": "v1", "serverId": "9f3ac1d2b7e4c601", "since": float64(0), "cursor": float64(2),
 		"hasMore": false, "timedOut": false, "view": "full", "omitted": nil, "truncated": nil,
-		"unfiltered": map[string]any{"requests": float64(1), "failedRequests": float64(0), "events": float64(2), "control": float64(1)},
-	}, page)
+	}, withoutKey(page, "summary"))
 	require.Len(t, events, 1)
 	item := events[0].(map[string]any)
 	delete(item, "receivedAt")
@@ -116,12 +117,12 @@ func TestEventsPagesAtRequestBoundaries(t *testing.T) {
 	st.Append(ingestion(track(0, "A")))
 	st.Append(ingestion(track(0, "X")))
 
-	_, first := get(t, srv.URL+"/_dev/v1/events?limit=1&event=A")
+	_, first := get(t, srv.URL+"/_dev/v1/events?view=list&limit=1&event=A")
 	require.Len(t, first["events"], 2, "a request is never split")
 	require.Equal(t, true, first["hasMore"])
 	require.Equal(t, float64(1), first["cursor"])
 
-	_, second := get(t, srv.URL+"/_dev/v1/events?limit=1&event=A&since=1")
+	_, second := get(t, srv.URL+"/_dev/v1/events?view=list&limit=1&event=A&since=1")
 	require.Len(t, second["events"], 1)
 	require.Equal(t, false, second["hasMore"])
 	require.Equal(t, float64(3), second["cursor"], "the cursor covers unmatched requests scanned")
@@ -197,7 +198,7 @@ func TestLongPollWakesOnCapture(t *testing.T) {
 	srv, st, waiting := newWaitingServer(t)
 
 	done := make(chan fetched, 1)
-	go func() { done <- fetch(srv.URL + "/_dev/v1/events?event=B&wait=10s") }()
+	go func() { done <- fetch(srv.URL + "/_dev/v1/events?view=list&event=B&wait=10s") }()
 
 	awaitSignal(t, waiting)
 	st.Append(ingestion(track(0, "A")))
@@ -228,7 +229,7 @@ func TestLongPollTimesOutWith200(t *testing.T) {
 	require.Empty(t, page["events"])
 	require.GreaterOrEqual(t, page["waitedMs"], float64(200))
 	require.Equal(t, float64(1), page["cursor"])
-	require.Equal(t, float64(1), page["unfiltered"].(map[string]any)["events"])
+	require.Equal(t, map[string]any{"B": float64(0)}, page["summary"].(map[string]any)["byEvent"])
 }
 
 func TestShutdownWakesLongPollWith503(t *testing.T) {
@@ -304,7 +305,7 @@ func TestRequestsFiltersByKindAndHidesBodies(t *testing.T) {
 	st.Append(ingestion(track(0, "A")))
 	st.Append(store.Record{Kind: "control", Route: "/sourceConfig"})
 
-	_, page := get(t, srv.URL+"/_dev/v1/requests")
+	_, page := get(t, srv.URL+"/_dev/v1/requests?view=compact")
 	requests := page["requests"].([]any)
 	require.Len(t, requests, 1)
 	rec := requests[0].(map[string]any)
@@ -321,4 +322,16 @@ func TestRequestsFiltersByKindAndHidesBodies(t *testing.T) {
 
 	status, _ := get(t, srv.URL+"/_dev/v1/requests?kind=nope")
 	require.Equal(t, http.StatusBadRequest, status)
+}
+
+func withoutKey(m map[string]any, key string) map[string]any {
+	out := maps.Clone(m)
+	delete(out, key)
+	return out
+}
+
+// withWriteKey stores key the way the gateway does.
+func withWriteKey(rec store.Record, key string) store.Record {
+	store.SetWriteKey(&rec, key)
+	return rec
 }

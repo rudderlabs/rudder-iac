@@ -25,7 +25,6 @@ type Record struct {
 	ServerID      string    `json:"serverId"`
 	Seq           uint64    `json:"seq"`
 	Kind          string    `json:"kind"`
-	Probe         bool      `json:"probe"`
 	ReceivedAt    time.Time `json:"receivedAt"`
 	Route         string    `json:"route"`
 	Transport     string    `json:"transport"`

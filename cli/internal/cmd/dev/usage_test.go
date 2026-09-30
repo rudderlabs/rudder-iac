@@ -25,18 +25,18 @@ func usageObject(t *testing.T, args ...string) map[string]any {
 func TestUnknownFlagOnASiblingNamesTheSibling(t *testing.T) {
 	t.Parallel()
 
-	obj := usageObject(t, "requests", "list", "--since", "0", "--event", "A", "--json")
+	obj := usageObject(t, "requests", "list", "--json", "--since", "0", "--event", "A")
 
-	require.Equal(t, "rudder-cli dev events list --since 0 --event NAME --json", obj["next"])
+	require.Equal(t, "rudder-cli dev events --since 0 --event VALUE --json", obj["next"])
 	require.Equal(t, "event", obj["param"])
 }
 
 func TestMistypedFlagNamesTheCloseOne(t *testing.T) {
 	t.Parallel()
 
-	obj := usageObject(t, "events", "list", "--events", "A", "--json")
+	obj := usageObject(t, "events", "list", "--json", "--events", "A")
 
-	require.Equal(t, "rudder-cli dev events list --event NAME --json", obj["next"])
+	require.Equal(t, "rudder-cli dev events list --event VALUE --json", obj["next"])
 	require.Contains(t, obj["message"], "did you mean --event?")
 	require.Contains(t, obj["details"].(map[string]any)["validFlags"], "--event")
 }
@@ -44,35 +44,20 @@ func TestMistypedFlagNamesTheCloseOne(t *testing.T) {
 func TestBadFlagValueNamesTheFlag(t *testing.T) {
 	t.Parallel()
 
-	obj := usageObject(t, "events", "list", "--view", "summary", "--since", "abc")
+	obj := usageObject(t, "events", "list", "--json", "--view", "compact", "--since", "abc")
 
 	require.Equal(t, "since", obj["param"])
-	require.Equal(t, "rudder-cli dev events list --view summary --since N --json", obj["next"])
+	require.Equal(t, "rudder-cli dev events list --view compact --since N --json", obj["next"])
 }
 
 func TestOtherParseErrorsNameTheFirstExample(t *testing.T) {
 	t.Parallel()
-	cmd := findCommand(t, []string{"summary"})
+	cmd := findCommand(t, []string{"events", "list"})
 
 	err := usageFor(cmd, errBoom)
 
-	require.Equal(t, &cliError{Code: "usage", Message: "boom", Next: "rudder-cli dev summary --since 0 --json"}, err)
-}
-
-func TestJQWithoutJSONNamesTheCorrectedCommand(t *testing.T) {
-	t.Parallel()
-
-	stdout, stderr, err := runDev(t, "requests", "show", "7", "--fields", "request.body", "--jq", ".request")
-
-	require.Error(t, err)
-	require.Empty(t, stdout)
-	require.Contains(t, stderr, "Next: rudder-cli dev requests show 7 --fields request.body --jq .request --json")
+	require.Equal(t, &cliError{Code: "usage", Message: "boom", Next: firstExample(cmd)}, err)
+	require.Contains(t, err.Next, "rudder-cli dev events list")
 }
 
 var errBoom = errors.New("boom")
-
-func TestRequestsShowLeadsWithTheBodyExample(t *testing.T) {
-	t.Parallel()
-	require.Equal(t, "rudder-cli dev requests show 42 --fields request.body --json",
-		firstExample(findCommand(t, []string{"requests", "show"})))
-}

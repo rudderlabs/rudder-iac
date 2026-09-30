@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/probe"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
 
@@ -33,22 +32,6 @@ var ingestRoutes = map[string]string{
 	"/beacon/v1/batch": "batch",
 }
 
-const probeUserAgentPrefix = "rudder-cli dev send/"
-
-// probePage is the page of rudder-cli dev probe --browser.
-const probePage = "/_dev/v1/" + probe.PagePath
-
-// isProbe marks dev send by its User-Agent, and the browser probe by its
-// referrer: a browser cannot set User-Agent, and a same-origin request
-// carries the full page URL.
-func isProbe(r *http.Request) bool {
-	if strings.HasPrefix(r.UserAgent(), probeUserAgentPrefix) {
-		return true
-	}
-	ref, err := url.Parse(r.Referer())
-	return err == nil && ref.Path == probePage
-}
-
 type Gateway struct {
 	store     *store.Store
 	startedAt time.Time
@@ -56,6 +39,7 @@ type Gateway struct {
 	newUUID   func() string
 	stopping  atomic.Bool
 	onCapture func(store.Record)
+	allowed   []string
 }
 
 func New(st *store.Store, startedAt time.Time) *Gateway {
@@ -164,7 +148,6 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 	headers, redacted := redact(r.Header)
 	rec := store.Record{
 		Kind:       rep.kind,
-		Probe:      isProbe(r),
 		ReceivedAt: receivedAt,
 		Route:      routeOf(r.URL.Path),
 		Transport:  rep.transport,
@@ -234,23 +217,14 @@ func redact(h http.Header) (http.Header, []string) {
 	return out, names
 }
 
-// clearWriteKeys are the keys a record keeps in clear: the listener's own.
-var clearWriteKeys = []string{"dev"}
-
-// fingerprintWriteKey replaces a key that may be real with its first and
-// last 4 characters and its sha256, and scrubs it from the target and the
-// response body (/sourceConfig echoes it). Keys under 12 characters keep no
-// characters at all.
+// fingerprintWriteKey stores key the way store.SetWriteKey does, and
+// scrubs a key that may be real from the target and the response body
+// (/sourceConfig echoes it).
 func fingerprintWriteKey(rec *store.Record, key string) {
-	if key == "" || slices.Contains(clearWriteKeys, key) {
+	store.SetWriteKey(rec, key)
+	if rec.WriteKeySha256 == "" {
 		return
 	}
-	sum := sha256.Sum256([]byte(key))
-	rec.WriteKeySha256 = hex.EncodeToString(sum[:])
-	if len(key) >= 12 {
-		rec.WriteKeyPrefix, rec.WriteKeySuffix = key[:4], key[len(key)-4:]
-	}
-	rec.WriteKey = rec.WriteKeyPrefix + "..." + rec.WriteKeySuffix
 	rec.Request.Target = scrub(rec.Request.Target, key)
 	rec.Response.Body = scrub(rec.Response.Body, key)
 }
@@ -268,4 +242,13 @@ func SourceID(writeKey string) string {
 	}
 	sum := sha256.Sum256([]byte(writeKey))
 	return "dev-" + hex.EncodeToString(sum[:])[:12]
+}
+
+// AllowWriteKeys limits ingestion to keys; empty accepts every non-empty
+// key. Call it before serving.
+func (g *Gateway) AllowWriteKeys(keys []string) { g.allowed = slices.Clone(keys) }
+
+// admits applies the allowlist to a key that passed authenticate.
+func (g *Gateway) admits(key string) bool {
+	return len(g.allowed) == 0 || slices.Contains(g.allowed, key)
 }

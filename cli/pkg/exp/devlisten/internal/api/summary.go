@@ -1,30 +1,32 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
 
+// summary is the counts block of every /events envelope. Request-level
+// filters (since, statusCode, writeKey) narrow every count; event-level
+// filters (event, type, userId, anonymousId) narrow the event counts. Each
+// event name and write key the caller filtered on is listed, at 0 when
+// nothing arrived, so a `jq -e` check sees absence without an assertion
+// flag.
 type summary struct {
-	APIVersion string          `json:"apiVersion"`
-	ServerID   string          `json:"serverId"`
-	Since      uint64          `json:"since"`
-	Cursor     uint64          `json:"cursor"`
-	Requests   requestCounts   `json:"requests"`
-	Events     eventCounts     `json:"events"`
-	Control    controlCounts   `json:"control"`
-	BySource   sourceCounts    `json:"bySource"`
-	Expected   []expectation   `json:"expected,omitempty"`
-	Diagnosis  []diagnosisItem `json:"diagnosis"`
+	Requests requestCounts  `json:"requests"`
+	Events   eventCounts    `json:"events"`
+	ByEvent  map[string]int `json:"byEvent"`
+	// ByWriteKey is keyed by the stored, masked form of each key.
+	ByWriteKey map[string]*keyCounts `json:"byWriteKey"`
+	Control    controlCounts         `json:"control"`
+	BySource   sourceCounts          `json:"bySource"`
+	Diagnosis  []diagnosisItem       `json:"diagnosis"`
 }
 
 type requestCounts struct {
 	Total        int            `json:"total"`
 	Failed       int            `json:"failed"`
-	Probes       int            `json:"probes"`
 	ByRoute      map[string]int `json:"byRoute"`
 	ByStatusCode map[string]int `json:"byStatusCode"`
 	ByOutcome    map[string]int `json:"byOutcome"`
@@ -32,9 +34,10 @@ type requestCounts struct {
 }
 
 type eventCounts struct {
-	Total   int            `json:"total"`
-	ByType  map[string]int `json:"byType"`
-	ByEvent map[string]int `json:"byEvent"`
+	Total  int            `json:"total"`
+	ByType map[string]int `json:"byType"`
+	// byEvent is lifted to the summary level.
+	byEvent map[string]int
 }
 
 type controlCounts struct {
@@ -47,36 +50,25 @@ type controlCounts struct {
 }
 
 type diagnosisItem struct {
-	Code    string   `json:"code"`
-	Count   int      `json:"count"`
-	Message string   `json:"message"`
-	Events  []string `json:"events,omitempty"`
-	Next    string   `json:"next"`
+	Code    string `json:"code"`
+	Count   int    `json:"count"`
+	Message string `json:"message"`
+	Next    string `json:"next"`
 }
 
-func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
-	p, err := parseParams(r.URL.Query(), "summary")
-	if err != nil {
-		writeError(w, *err)
-		return
+// summarize counts the window for the summary block.
+func (h *Handler) summarize(records []store.Record, q eventsQuery) summary {
+	c := countSummary(records, q)
+	for _, name := range q.event {
+		c.events.byEvent[name] += 0
 	}
-	since := p.uint("since", 0)
-	expected := parseExpect(p)
-	if p.err == nil {
-		p.err = h.checkServerID(p.single("serverId"))
+	for _, key := range q.writeKey {
+		c.keys.of(store.MaskWriteKey(key))
 	}
-	if p.err != nil {
-		writeError(w, *p.err)
-		return
+	return summary{
+		Requests: c.requests, Events: c.events, ByEvent: c.events.byEvent, ByWriteKey: c.keys, Control: c.control,
+		BySource: c.sources, Diagnosis: h.diagnose(c, q),
 	}
-	view := h.store.Since(since)
-	all := countSummary(view.Records, true)
-	expected = checkExpected(expected, all.events.ByEvent)
-	writeJSON(w, http.StatusOK, summary{
-		APIVersion: APIVersion, ServerID: h.id.ServerID, Since: since, Cursor: max(since, view.Cursor),
-		Requests: all.requests, Events: all.events, Control: all.control, BySource: all.sources,
-		Expected: expected, Diagnosis: diagnose(countSummary(view.Records, false), all.requests.Probes, expected, since),
-	})
 }
 
 type counts struct {
@@ -84,18 +76,36 @@ type counts struct {
 	events   eventCounts
 	control  controlCounts
 	sources  sourceCounts
+	keys     keyTable
 }
 
-// countSummary counts records; probes are skipped unless withProbes is set.
-func countSummary(records []store.Record, withProbes bool) counts {
+// keyCounts are the ingestion requests and matching events of one key.
+type keyCounts struct {
+	Requests int `json:"requests"`
+	Events   int `json:"events"`
+}
+
+type keyTable map[string]*keyCounts
+
+func (t keyTable) of(key string) *keyCounts {
+	if t[key] == nil {
+		t[key] = &keyCounts{}
+	}
+	return t[key]
+}
+
+// countSummary counts the records that pass the request filters, and in
+// events only the events that pass the event filters.
+func countSummary(records []store.Record, q eventsQuery) counts {
 	c := counts{
 		requests: requestCounts{ByRoute: map[string]int{}, ByStatusCode: map[string]int{}, ByOutcome: map[string]int{},
 			ByStage: map[string]int{}},
-		events:  eventCounts{ByType: map[string]int{}, ByEvent: map[string]int{}},
+		events:  eventCounts{ByType: map[string]int{}, byEvent: map[string]int{}},
 		sources: newSourceCounts(),
+		keys:    keyTable{},
 	}
 	for _, rec := range records {
-		if rec.Probe && !withProbes {
+		if !q.matchesRecord(rec) {
 			continue
 		}
 		c.sources.add(rec)
@@ -104,7 +114,12 @@ func countSummary(records []store.Record, withProbes bool) counts {
 			continue
 		}
 		c.requests.add(rec)
-		c.events.add(rec)
+		matched := c.events.add(rec, q.matchesEvent)
+		if rec.WriteKey != "" {
+			k := c.keys.of(rec.WriteKey)
+			k.Requests++
+			k.Events += matched
+		}
 	}
 	return c
 }
@@ -114,9 +129,6 @@ func (c *requestCounts) add(rec store.Record) {
 	if rec.Failed {
 		c.Failed++
 	}
-	if rec.Probe {
-		c.Probes++
-	}
 	c.ByRoute[rec.Route]++
 	c.ByStatusCode[strconv.Itoa(rec.StatusCode)]++
 	c.ByOutcome[rec.Outcome]++
@@ -125,16 +137,23 @@ func (c *requestCounts) add(rec store.Record) {
 	}
 }
 
-func (c *eventCounts) add(rec store.Record) {
+// add counts the events of rec that match and returns how many did.
+func (c *eventCounts) add(rec store.Record, match func(store.Event) bool) int {
+	n := 0
 	for _, ev := range rec.Events {
+		if !match(ev) {
+			continue
+		}
+		n++
 		c.Total++
 		if ev.Type != nil {
 			c.ByType[*ev.Type]++
 		}
 		if ev.Event != nil {
-			c.ByEvent[*ev.Event]++
+			c.byEvent[*ev.Event]++
 		}
 	}
+	return n
 }
 
 func (c *controlCounts) add(rec store.Record) {
@@ -164,36 +183,25 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose applies the contract section 4.7 rules in order. Every rule that
 // holds appears. A next never carries a captured value.
-func diagnose(c counts, probes int, expected []expectation, since uint64) []diagnosisItem {
+func (h *Handler) diagnose(c counts, q eventsQuery) []diagnosisItem {
 	var d diagnosis
-	d.transport(c.requests, c.control, probes)
+	d.transport(c.requests, c.control, h.curlTrack())
 	d.browser(c.sources, c.control)
 	d.rejections(c.requests)
-	d.expectations(expected, since)
-	failed := c.requests.Failed > 0 || c.control.SourceConfigFailed > 0
-	unmet := len(withoutStatus(expected, expectPresent)) > 0
-	allPresent := len(expected) > 0 && !unmet && !failed
-	d.add(allPresent, "expected_all_present", len(expected),
-		"Every expected event arrived with the requested count and no request failed. "+
-			"Types are not checked: read events list --fields properties for them, or stop.",
-		"rudder-cli dev stop")
-	// all_accepted next to an unmet expectation reads as a pass, and next to
-	// expected_all_present it repeats it.
-	d.add(c.requests.Total > 0 && c.requests.Failed == 0 && !unmet && !allPresent, "all_accepted",
-		c.requests.Total,
-		"Every request was accepted. List the events to check names and properties.",
-		newCommand(routeCommands["events"]).num("since", since).bare("view", viewSummary).flag("json").String())
+	d.add(c.requests.Total > 0 && c.requests.Failed == 0, "all_accepted", c.requests.Total,
+		"Every received request was accepted. This says nothing about events that never arrived: "+
+			"compare summary.byEvent with the events you expect, then list them.",
+		q.filterArgs(newCommand(routeCommands["events"]).num("since", q.since)).flag("json").String())
 	return d.items
 }
 
-type diagnosis struct{ items []diagnosisItem }
-
-func (d *diagnosis) addEvents(ok bool, code string, events []string, message, next string) {
-	d.add(ok, code, len(events), message, next)
-	if ok {
-		d.items[len(d.items)-1].Events = events
-	}
+// curlTrack is a shell command that sends one test track to this server.
+func (h *Handler) curlTrack() string {
+	return "curl -fsS -u " + shellQuote(h.id.WriteKey+":") + " -H 'Content-Type: application/json' " + // gitleaks:allow the listener key "dev" is not a secret
+		`-d '{"event":"dev check","userId":"dev"}' ` + shellQuote(h.id.URL+"/v1/track")
 }
+
+type diagnosis struct{ items []diagnosisItem }
 
 func (d *diagnosis) add(ok bool, code string, count int, message, next string) {
 	if d.items == nil {
@@ -204,18 +212,12 @@ func (d *diagnosis) add(ok bool, code string, count int, message, next string) {
 	}
 }
 
-// transport covers requests that never became events. req leaves out the
-// probes; probes counts them, so nothing_received never denies a probe.
-func (d *diagnosis) transport(req requestCounts, ctl controlCounts, probes int) {
-	nothing := req.Total == 0 && ctl.Total == 0
-	d.add(nothing && probes == 0, "nothing_received", 0,
-		"No request reached the listener. Send a probe; if it arrives, check the SDK dataPlaneUrl, configUrl and write key.",
-		"rudder-cli dev send --json")
-	d.add(nothing && probes > 0, "nothing_received", 0,
-		fmt.Sprintf("No SDK request reached the listener, but %d %s did, so the listener works. "+
-			"Check the app's dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
-			probes, plural(probes, "probe", "probes")),
-		"rudder-cli dev listen --help")
+// transport covers requests that never became events.
+func (d *diagnosis) transport(req requestCounts, ctl controlCounts, curlTrack string) {
+	d.add(req.Total == 0 && ctl.Total == 0, "nothing_received", 0,
+		"No request reached the listener. Send a test track with next; if it arrives, check the SDK "+
+			"dataPlaneUrl, configUrl and write key (app checklist in rudder-cli dev listen --help).",
+		curlTrack)
 	d.add(ctl.Preflight > 0 && ctl.SourceConfig == 0 && req.Total == 0, "preflight_only", ctl.Preflight,
 		"Only CORS preflights arrived. Read response.headers of the control requests.",
 		"rudder-cli dev requests list --kind control --json")
@@ -228,36 +230,23 @@ func (d *diagnosis) transport(req requestCounts, ctl controlCounts, probes int) 
 		"rudder-cli dev requests list --kind control --json")
 }
 
-// noBrowserChecklist is the next of no_browser_traffic: the app settings to
-// check, in the order that most often explains a silent browser SDK.
-const noBrowserChecklist = "Check in order: 1. the browser SDK configUrl is the listener URL; " +
-	"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on. " +
-	"Then run rudder-cli dev probe --browser: if its probe arrives, the app wiring is at fault."
-
 // browser covers a browser SDK that never reached the listener while a
 // server SDK did.
 func (d *diagnosis) browser(src sourceCounts, ctl controlCounts) {
 	d.add(src.sdkRequests() > 0 && src.browser().Requests == 0 && ctl.SourceConfig == 0 && ctl.Preflight == 0,
 		"no_browser_traffic", src.sdkRequests(),
 		"Server SDK requests arrived, but no browser request, no /sourceConfig and no preflight. "+
-			"If the app also runs a browser SDK, it did not load or sends elsewhere: "+
-			"follow the app checklist in rudder-cli dev listen --help.",
-		noBrowserChecklist)
+			"If the app also runs a browser SDK, check in order: 1. its configUrl is the listener URL; "+
+			"2. its dataPlaneUrl is the listener URL; 3. the app's analytics gate (consent, env flag) is on.",
+		"rudder-cli dev requests list --kind control --json")
 }
 
 func (d *diagnosis) rejections(req requestCounts) {
 	d.add(req.ByStage["auth"] > 0, "auth_rejected", req.ByStage["auth"],
 		"Requests were rejected at the auth stage. Compare their writeKey with the SDK configuration.",
-		"rudder-cli dev requests list --failed --stage auth --json")
+		"rudder-cli dev requests list --failed --json")
 	bodyRejected := sumStages(req.ByStage, bodyStages)
 	d.add(bodyRejected > 0, "body_rejected", bodyRejected,
 		"Requests were rejected because of their body. Read rejection.reason on each.",
 		"rudder-cli dev requests list --failed --json")
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return one
-	}
-	return many
 }

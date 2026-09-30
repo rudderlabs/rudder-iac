@@ -25,31 +25,28 @@ var (
 	pSince      = Param{Name: "since", Default: "0"}
 	pServerID   = Param{Name: "serverId"}
 	pLimit      = Param{Name: "limit", Default: strconv.Itoa(defaultLimit)}
-	pOrder      = Param{Name: "order", Default: "asc"}
 	pFields     = Param{Name: "fields", Repeatable: true}
 	pMaxBytes   = Param{Name: "maxBytes", Default: strconv.Itoa(defaultMaxBytes)}
-	pRoute      = Param{Name: "route", Repeatable: true}
 	pStatusCode = Param{Name: "statusCode", Repeatable: true}
+	pWriteKey   = Param{Name: "writeKey", Repeatable: true}
 	pWait       = Param{Name: "wait", Default: "0s"}
 	pMin        = Param{Name: "min", Default: "1"}
 	pView       = Param{Name: "view", Default: "compact"}
+	pListView   = Param{Name: "view", Default: "list"}
 )
 
 // Params lists the parameters of each query route, keyed by route name.
 var Params = map[string][]Param{
 	"events": {
-		pSince, pServerID, pLimit, pOrder,
-		pView, pFields, {Name: "include", Repeatable: true}, pMaxBytes,
-		{Name: "event", Repeatable: true}, {Name: "type", Repeatable: true}, pRoute, pStatusCode,
+		pSince, pServerID, pLimit, pListView, pFields, pMaxBytes,
+		{Name: "event", Repeatable: true}, {Name: "type", Repeatable: true}, pStatusCode, pWriteKey,
 		{Name: "userId"}, {Name: "anonymousId"}, pWait, pMin,
 	},
 	"requests": {
-		pSince, pServerID, pLimit, pOrder,
-		{Name: "kind", Default: "ingestion"}, pRoute, pStatusCode, {Name: "failed"}, {Name: "stage"},
-		pView, pFields, pMaxBytes, pWait, pMin,
+		pSince, pServerID, pLimit, {Name: "kind", Default: "ingestion"}, pStatusCode, pWriteKey, {Name: "failed"},
+		pListView, pFields, pMaxBytes,
 	},
 	"requests/{seq}": {pServerID, pView, pFields, pMaxBytes},
-	"summary":        {pSince, pServerID, {Name: "expect", Repeatable: true}},
 	"info":           {},
 }
 
@@ -171,11 +168,6 @@ func (p *params) wait() time.Duration {
 		p.fail("wait", "%s exceeds the maximum of 110s", raw)
 	}
 	return d
-}
-
-// order accepts asc only; desc is a later phase (contract 4.2).
-func (p *params) order() {
-	p.oneOf("order", "asc", "asc")
 }
 
 // maxBytes returns the page cap; 0 turns it off.

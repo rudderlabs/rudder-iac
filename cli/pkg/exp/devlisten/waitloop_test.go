@@ -40,7 +40,7 @@ func TestWaitForEventsAccumulatesAcrossTruncatedPages(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	page, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, Min: 3, MaxBytes: 2500})
+	page, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, Min: 3, MaxBytes: 3800})
 
 	require.NoError(t, err)
 	require.Len(t, page.Events, 3)
@@ -59,7 +59,7 @@ func TestWaitForEventsStopsOnAnOversizedRequest(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, MaxBytes: 800})
+	_, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, MaxBytes: 1800})
 
 	require.ErrorIs(t, err, devlisten.ErrOutputLimit)
 	require.Equal(t, int64(1), transport.n.Load())
@@ -75,7 +75,7 @@ func TestWaitForEventsDeadlineReportsTheLastPage(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	page, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, Min: 3, MaxBytes: 2500})
+	page, err := client.WaitForEvents(ctx, devlisten.Query{Event: []string{"Big"}, Min: 3, MaxBytes: 3800})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Contains(t, err.Error(), "collected 2 of 3 events up to seq 2")
