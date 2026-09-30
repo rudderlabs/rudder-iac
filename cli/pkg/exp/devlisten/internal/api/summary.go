@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -97,8 +98,9 @@ func (t keyTable) of(key string) *keyCounts {
 	return t[key]
 }
 
-// countSummary counts the records that pass the request filters, and in
-// events only the events that pass the event filters.
+// countSummary counts the records that pass the filters. With an event
+// filter, only requests that carry a matching event count, so every number
+// follows the filters.
 func countSummary(records []store.Record, q eventsQuery) counts {
 	c := counts{
 		requests: requestCounts{ByRoute: map[string]int{}, ByStatusCode: map[string]int{}, ByOutcome: map[string]int{},
@@ -107,8 +109,9 @@ func countSummary(records []store.Record, q eventsQuery) counts {
 		sources: newSourceCounts(),
 		keys:    keyTable{},
 	}
+	eventFilter := q.hasEventFilter()
 	for _, rec := range records {
-		if !q.matchesRecord(rec) {
+		if !q.matchesRecord(rec) || eventFilter && !slices.ContainsFunc(rec.Events, q.matchesEvent) {
 			continue
 		}
 		c.sources.add(rec)
@@ -199,7 +202,11 @@ func (h *Handler) diagnose(c counts, q eventsQuery) []diagnosisItem {
 
 // curlTrack is a shell command that sends one test track to this server.
 func (h *Handler) curlTrack() string {
-	return "curl -fsS -u " + shellQuote(h.id.WriteKey+":") + " -H 'Content-Type: application/json' " + // gitleaks:allow the listener key "dev" is not a secret
+	key := h.id.WriteKey
+	if h.id.WriteKeyPolicy == "allowlist" {
+		key = "KEY" // the ready line shows allowlisted keys masked
+	}
+	return "curl -fsS -u " + shellQuote(key+":") + " -H 'Content-Type: application/json' " + // gitleaks:allow the listener key "dev" is not a secret
 		`-d '{"event":"dev check","userId":"dev"}' ` + shellQuote(h.id.URL+"/v1/track")
 }
 
@@ -256,7 +263,7 @@ func (d *diagnosis) missingKey(keys keyTable, since uint64) {
 		return
 	}
 	d.add(true, "missing_write_key", missing.Requests,
-		strconv.Itoa(missing.Requests)+" requests had no write key; RudderStack rejects these with 401.",
+		plural(missing.Requests, "request")+" had no write key; RudderStack rejects these with 401.",
 		newCommand(routeCommands["requests"]).num("since", since).quoted("write-key", "").flag("json").String())
 }
 
@@ -268,4 +275,12 @@ func (d *diagnosis) rejections(req requestCounts, since uint64) {
 	d.add(bodyRejected > 0, "body_rejected", bodyRejected,
 		"Requests were rejected because of their body. Read rejection.reason on each.",
 		requestsCmd(since).flag("failed").bare("status-code", "400").bare("status-code", "413").flag("json").String())
+}
+
+// plural is "1 request" or "N requests".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

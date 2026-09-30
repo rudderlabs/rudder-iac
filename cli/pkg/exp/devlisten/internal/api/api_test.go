@@ -89,13 +89,14 @@ func TestEventsEnvelope(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	events := page["events"].([]any)
 	require.Less(t, page["waitedMs"], float64(1000))
-	require.Contains(t, page, "summary")
+	require.Nil(t, page["summary"], "a list view leaves the summary to view=counts")
 	delete(page, "events")
 	delete(page, "waitedMs")
 	require.Equal(t, map[string]any{
 		"apiVersion": "v1", "serverId": "9f3ac1d2b7e4c601", "since": float64(0), "cursor": float64(2),
 		"hasMore": false, "timedOut": false, "view": "full", "omitted": nil, "truncated": nil, "evictedThrough": float64(0),
-		"next":  "rudder-cli dev events list --since 2 --event 'B' --view 'full' --json",
+		"total": float64(1), "returned": float64(1),
+		"next":  "rudder-cli dev events list --since 2 --event B --view full --json",
 		"links": map[string]any{"next": "events?event=B&since=2&view=full"},
 	}, withoutKey(page, "summary"))
 	require.Len(t, events, 1)
@@ -151,7 +152,7 @@ func TestParameterBounds(t *testing.T) {
 		"wait=5m":         "wait",
 		"wait=x":          "wait",
 		"since=-1":        "since",
-		"limit=0":         "limit",
+		"limit=1001":      "limit",
 		"limit=5&min=6":   "min",
 		"since=1&since=2": "since",
 	} {
@@ -231,7 +232,7 @@ func TestLongPollTimesOutWith200(t *testing.T) {
 	require.Empty(t, page["events"])
 	require.GreaterOrEqual(t, page["waitedMs"], float64(200))
 	require.Equal(t, float64(1), page["cursor"])
-	require.Equal(t, map[string]any{"B": float64(0)}, page["summary"].(map[string]any)["byEvent"])
+	require.Equal(t, float64(0), page["total"])
 }
 
 func TestShutdownWakesLongPollWith503(t *testing.T) {

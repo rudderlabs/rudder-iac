@@ -191,10 +191,13 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 // nothing, so the server defaults apply.
 type Query struct {
 	Since uint64
-	Limit int
-	View  View
-	Event []string
-	Type  []string
+	// SinceWindow, when set, replaces Since: a duration back from now such
+	// as 5m, or an RFC 3339 time.
+	SinceWindow string
+	Limit       int
+	View        View
+	Event       []string
+	Type        []string
 	// StatusCode values are codes such as 401 or classes such as 4xx.
 	StatusCode  []string
 	WriteKey    []string
@@ -210,6 +213,7 @@ type Query struct {
 func (q Query) Values() url.Values {
 	v := url.Values{}
 	setUint(v, "since", q.Since)
+	setString(v, "since", q.SinceWindow)
 	setInt(v, "limit", q.Limit)
 	setString(v, "view", string(q.View))
 	v["event"], v["type"], v["writeKey"] = q.Event, q.Type, q.WriteKey
@@ -226,20 +230,23 @@ func (q Query) Values() url.Values {
 // RequestQuery selects requests; see Query for the zero-value rule.
 // Failed is sent only when set, so false selects accepted requests.
 type RequestQuery struct {
-	Since      uint64
-	Limit      int
-	Kind       string
-	StatusCode []string
-	WriteKey   []string
-	Failed     *bool
-	View       View
-	Fields     []string
-	MaxBytes   int
+	// SinceWindow is as in Query.
+	SinceWindow string
+	Since       uint64
+	Limit       int
+	Kind        string
+	StatusCode  []string
+	WriteKey    []string
+	Failed      *bool
+	View        View
+	Fields      []string
+	MaxBytes    int
 }
 
 func (q RequestQuery) Values() url.Values {
 	v := url.Values{}
 	setUint(v, "since", q.Since)
+	setString(v, "since", q.SinceWindow)
 	setInt(v, "limit", q.Limit)
 	setString(v, "kind", q.Kind)
 	v["statusCode"], v["writeKey"] = q.StatusCode, q.WriteKey
@@ -328,18 +335,22 @@ type Truncated struct {
 
 // Page is the /events envelope (contract section 4.3).
 type Page struct {
-	APIVersion string     `json:"apiVersion"`
-	ServerID   string     `json:"serverId"`
-	Since      uint64     `json:"since"`
-	Cursor     uint64     `json:"cursor"`
-	HasMore    bool       `json:"hasMore"`
-	TimedOut   bool       `json:"timedOut"`
-	WaitedMs   int64      `json:"waitedMs"`
-	Summary    Summary    `json:"summary"`
-	View       View       `json:"view"`
-	Omitted    *Omitted   `json:"omitted"`
-	Truncated  *Truncated `json:"truncated"`
-	Events     []Event    `json:"events"`
+	APIVersion string `json:"apiVersion"`
+	ServerID   string `json:"serverId"`
+	Since      uint64 `json:"since"`
+	Cursor     uint64 `json:"cursor"`
+	HasMore    bool   `json:"hasMore"`
+	TimedOut   bool   `json:"timedOut"`
+	WaitedMs   int64  `json:"waitedMs"`
+	// Total is the matching events in the window; Returned is len(Events).
+	Total    int `json:"total"`
+	Returned int `json:"returned"`
+	// Summary is filled when View is ViewCounts.
+	Summary   Summary    `json:"summary"`
+	View      View       `json:"view"`
+	Omitted   *Omitted   `json:"omitted"`
+	Truncated *Truncated `json:"truncated"`
+	Events    []Event    `json:"events"`
 	raw
 }
 
@@ -354,16 +365,18 @@ type Unfiltered struct {
 // null; Raw keeps the item bytes when that difference matters. Message and
 // EnrichedMessage are set under ViewFull only.
 type Event struct {
-	Seq               uint64          `json:"seq"`
-	Idx               int             `json:"idx"`
-	ReceivedAt        time.Time       `json:"receivedAt"`
-	Route             string          `json:"route"`
-	Transport         string          `json:"transport"`
-	StatusCode        int             `json:"statusCode"`
-	Outcome           string          `json:"outcome"`
-	WriteKey          string          `json:"writeKey"`
-	Type              string          `json:"type"`
-	Name              string          `json:"event"`
+	Seq        uint64    `json:"seq"`
+	Idx        int       `json:"idx"`
+	ReceivedAt time.Time `json:"receivedAt"`
+	Route      string    `json:"route"`
+	Transport  string    `json:"transport"`
+	StatusCode int       `json:"statusCode"`
+	Outcome    string    `json:"outcome"`
+	WriteKey   string    `json:"writeKey"`
+	Type       string    `json:"type"`
+	Name       string    `json:"event"`
+	// Label names an event without an event name in the list view.
+	Label             string          `json:"name"`
 	UserID            string          `json:"userId"`
 	AnonymousID       string          `json:"anonymousId"`
 	MessageID         string          `json:"messageId"`
@@ -431,9 +444,9 @@ func (c *Client) WaitForEvents(ctx context.Context, q Query) (Page, error) {
 		case ctx.Err() != nil:
 			return collected(last, events, pages), fmt.Errorf(
 				"waiting for %v since seq %d: %w (collected %d of %d events up to seq %d; "+
-					"after it: %d requests, %d events, %d control)",
+					"%d matching after it)",
 				q.Event, since, ctx.Err(), len(events), want, q.Since,
-				last.Summary.Requests.Total, last.Summary.Events.Total, last.Summary.Control.Total)
+				last.Total)
 		case err != nil:
 			return Page{}, err
 		case oversized(page):

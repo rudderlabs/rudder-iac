@@ -17,7 +17,7 @@ import (
 
 type requestsOptions struct {
 	clientFlags
-	since      uint64
+	since      string
 	limit      int
 	kind       string
 	statusCode []string
@@ -65,7 +65,7 @@ func newCmdRequestsList(deps Deps) *cobra.Command {
 	}
 	f := cmd.Flags()
 	o.register(f)
-	f.Uint64Var(&o.since, "since", 0, "Filter by cursor: requests with seq above this")
+	f.StringVar(&o.since, "since", "0", "Filter by cursor (requests after seq N), a duration back from now (5m) or an RFC 3339 time")
 	f.IntVar(&o.limit, "limit", 100, "Output at most this many requests")
 	f.StringVar(&o.kind, "kind", "ingestion", "Filter by kind: ingestion, control or all")
 	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status `CODE`; repeatable")
@@ -105,7 +105,7 @@ func (o requestsOptions) query(f *pflag.FlagSet) (devlisten.RequestQuery, error)
 	}
 	q := devlisten.RequestQuery{StatusCode: codes, WriteKey: o.writeKey, Fields: o.fields}
 	whenSet(f, map[string]func(){
-		"since":     func() { q.Since = o.since },
+		"since":     func() { q.Since, q.SinceWindow = splitSince(o.since) },
 		"limit":     func() { q.Limit = o.limit },
 		"kind":      func() { q.Kind = o.kind },
 		"view":      func() { q.View = devlisten.View(o.view) },

@@ -28,7 +28,8 @@
     <div class="stat"><span class="label">Requests</span><span class="value" id="stat-requests">0</span><span class="sub" id="stat-failed"></span></div>
     <div class="stat"><span class="label">Events</span><span class="value" id="stat-events">0</span><span class="sub" id="stat-types"></span></div>
     <div class="stat"><span class="label">Control requests</span><span class="value" id="stat-control">0</span><span class="sub" id="stat-control-sub"></span></div>
-    <div class="stat"><span class="label">SDKs</span><span class="value" id="stat-sdks">0</span><span class="sub" id="stat-keys"></span></div>
+    <div class="stat"><span class="label">SDKs</span><span class="value" id="stat-sdks">0</span><span class="sub" id="stat-sdk-names"></span></div>
+    <div class="stat"><span class="label">Write keys</span><span class="value" id="stat-keys">0</span><span class="sub" id="stat-key-names"></span></div>
   </div>
   <ul class="diagnosis" id="diagnosis"></ul>
   <details class="breakdown" id="breakdown">
@@ -55,7 +56,7 @@
   </label>
   <label class="field" data-tab="events">User ID <input id="f-user" autocomplete="off"></label>
   <label class="field" data-tab="events">Anonymous ID <input id="f-anon" autocomplete="off"></label>
-  <label class="field">Status <input id="f-status" placeholder="401 or 4xx" size="7" autocomplete="off"></label>
+  <label class="field">Status <input id="f-status" class="status-input" placeholder="401 or 4xx" autocomplete="off"></label>
   <label class="field">Write key <select id="f-key"><option value="">Any</option></select></label>
   <label class="field" data-tab="requests">Kind
     <select id="f-kind"><option value="all">All</option><option value="ingestion">Ingestion</option><option value="control">Control</option></select>

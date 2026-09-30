@@ -67,7 +67,7 @@ func TestRequestsFieldsWithViewNamesTheCorrectedCommand(t *testing.T) {
 	status, body := get(t, srv.URL+"/_dev/v1/requests?view=list&fields=route&kind=control")
 
 	require.Equal(t, http.StatusBadRequest, status)
-	require.Equal(t, "rudder-cli dev requests list --since 0 --kind 'control' --fields 'route' --json",
+	require.Equal(t, "rudder-cli dev requests list --since 0 --kind control --fields route --json",
 		body["error"].(map[string]any)["next"])
 }
 

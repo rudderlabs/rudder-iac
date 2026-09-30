@@ -95,9 +95,31 @@ func (p *params) single(name string) string { return p.values.Get(name) }
 
 func (p *params) list(name string) []string { return p.values[name] }
 
+// sinceTime reads a since given as a duration back from now (5m) or an
+// RFC 3339 time. A cursor gives the zero time.
+func (p *params) sinceTime() time.Time {
+	raw := p.single("since")
+	if raw == "" || isUint(raw) {
+		return time.Time{}
+	}
+	if d, err := time.ParseDuration(raw); err == nil && d >= 0 {
+		return time.Now().Add(-d)
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t
+	}
+	p.fail("since", "%q is not a cursor, a duration such as 5m or an RFC 3339 time", raw)
+	return time.Time{}
+}
+
+func isUint(s string) bool {
+	_, err := strconv.ParseUint(s, 10, 64)
+	return err == nil
+}
+
 func (p *params) uint(name string, def uint64) uint64 {
 	raw := p.single(name)
-	if raw == "" {
+	if raw == "" || name == "since" && !isUint(raw) && !strings.HasPrefix(raw, "-") {
 		return def
 	}
 	n, err := strconv.ParseUint(raw, 10, 64)

@@ -110,8 +110,7 @@ func TestPostBatchThenReadItBackWithSinceAndWait(t *testing.T) {
 	page := res.page
 	require.False(t, page.TimedOut)
 	require.Equal(t, uint64(2), page.Cursor)
-	require.Equal(t, 1, page.Summary.Requests.Total)
-	require.Equal(t, 1, page.Summary.Events.Total, "the event filter narrows the event counts")
+	require.Equal(t, 1, page.Total, "the event filter narrows the total")
 	require.Len(t, page.Events, 1)
 
 	ev := page.Events[0]
@@ -163,7 +162,7 @@ func TestClientWaitReportsDeadline(t *testing.T) {
 	_, err := s.Client().WaitForEvents(ctx, devlisten.Query{Event: []string{"never"}, Min: 1})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Contains(t, err.Error(), "collected 0 of 1 events up to seq 0; after it: 0 requests, 0 events, 0 control")
+	require.Contains(t, err.Error(), "collected 0 of 1 events up to seq 0; 0 matching after it")
 }
 
 func TestClientPinsServerID(t *testing.T) {

@@ -49,8 +49,7 @@ func TestBeaconTakesWriteKeyFromQuery(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, got.status)
 	rec := onlyRecord(t, st)
-	require.Equal(t, "...", rec.WriteKey, "a short foreign key keeps no characters")
-	require.NotEmpty(t, rec.WriteKeySha256)
+	require.Equal(t, "wk", rec.WriteKey, "a short key is a label and stays readable")
 	require.Len(t, rec.Events, 1)
 }
 

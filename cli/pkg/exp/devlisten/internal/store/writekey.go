@@ -5,20 +5,22 @@ import (
 	"encoding/hex"
 )
 
-// clearWriteKey is the listener's own key; a record keeps it in clear.
-const clearWriteKey = "dev"
+// clearKeyLen is the longest key a record keeps in clear: short keys are
+// labels such as dev or api, not credentials.
+const clearKeyLen = 8
 
-// SetWriteKey stores key on rec. A key that may be real is kept as its
-// first and last 4 characters and its sha256; keys under 12 characters keep
-// no characters at all.
+// SetWriteKey stores key on rec. A key longer than 8 characters may be real:
+// it is kept as its first 4 characters, its last 4 from 12 characters on,
+// and its sha256.
 func SetWriteKey(rec *Record, key string) {
 	rec.WriteKey = key
-	if key == "" || key == clearWriteKey {
+	if len(key) <= clearKeyLen {
 		return
 	}
 	rec.WriteKeySha256 = keySha256(key)
+	rec.WriteKeyPrefix = key[:4]
 	if len(key) >= 12 {
-		rec.WriteKeyPrefix, rec.WriteKeySuffix = key[:4], key[len(key)-4:]
+		rec.WriteKeySuffix = key[len(key)-4:]
 	}
 	rec.WriteKey = rec.WriteKeyPrefix + "..." + rec.WriteKeySuffix
 }

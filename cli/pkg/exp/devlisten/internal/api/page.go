@@ -16,7 +16,10 @@ import (
 
 // filters are the parameters /events and /requests share.
 type filters struct {
-	since        uint64
+	since uint64
+	// sinceTime, when set, replaces since: the handler resolves it to the
+	// cursor before the first request received at or after it.
+	sinceTime    time.Time
 	serverID     string
 	limit        int
 	min          int
@@ -30,15 +33,16 @@ type filters struct {
 func parseFilters(p *params) filters {
 	f := filters{
 		since:        p.uint("since", 0),
+		sinceTime:    p.sinceTime(),
 		serverID:     p.single("serverId"),
-		limit:        p.intIn("limit", defaultLimit, 1, 1000),
+		limit:        p.intIn("limit", defaultLimit, 0, 1000),
 		wait:         p.wait(),
 		maxBytes:     p.maxBytes(),
 		sentMaxBytes: p.single("maxBytes"),
 		statusCode:   p.statusCodes(),
 		writeKey:     p.list("writeKey"),
 	}
-	f.min = p.intIn("min", 1, 1, f.limit)
+	f.min = p.intIn("min", 1, 1, max(f.limit, 1))
 	return f
 }
 
@@ -84,6 +88,10 @@ func scan(view store.View, since uint64, limit int, render func(store.Record) gr
 	for i, rec := range view.Records {
 		g := render(rec)
 		if len(g.items) == 0 {
+			continue
+		}
+		if limit == 0 {
+			res.count += len(g.items) // a cursor read counts matches and keeps none
 			continue
 		}
 		if res.count >= limit {
@@ -236,5 +244,20 @@ func nextURL(route string, values url.Values, cursor uint64) string {
 func linkNext(w http.ResponseWriter, hasMore bool, next string) {
 	if hasMore {
 		w.Header().Set("Link", "<"+base+next+`>; rel="next"`)
+	}
+}
+
+// resolveSince turns a time window into the cursor before its first
+// request, so paging and the envelope keep working on seq.
+func (f *filters) resolveSince(st *store.Store) {
+	if f.sinceTime.IsZero() {
+		return
+	}
+	for _, rec := range st.Since(0).Records {
+		if !rec.ReceivedAt.Before(f.sinceTime) {
+			f.since = rec.Seq - 1
+			return
+		}
+		f.since = rec.Seq
 	}
 }

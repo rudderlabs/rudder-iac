@@ -106,6 +106,7 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 	q, err := parseRequestsQuery(r.URL.Query())
 	if err == nil {
 		err = h.checkServerID(q.serverID)
+		q.resolveSince(h.store)
 	}
 	if err != nil {
 		writeError(w, *err)

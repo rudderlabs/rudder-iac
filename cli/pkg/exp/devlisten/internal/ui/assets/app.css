@@ -73,7 +73,8 @@ body {
 .links a:hover { text-decoration: underline; }
 
 .summary { padding: 12px 16px 0; }
-.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.field input.status-input { width: 11ch; }
 .stat {
   background: var(--panel);
   border: 1px solid var(--border);

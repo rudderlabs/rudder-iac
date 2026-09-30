@@ -1,11 +1,14 @@
 package dev
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -19,7 +22,7 @@ import (
 // eventFilters are the flags dev events and dev events list share.
 type eventFilters struct {
 	clientFlags
-	since      uint64
+	since      string
 	event      []string
 	typ        []string
 	statusCode []string
@@ -32,7 +35,7 @@ type eventFilters struct {
 
 func (o *eventFilters) register(f *pflag.FlagSet) {
 	o.clientFlags.register(f)
-	f.Uint64Var(&o.since, "since", 0, "Filter by cursor: requests with seq above this (default 0, everything)")
+	f.StringVar(&o.since, "since", "0", "Filter by cursor (requests after seq N), a duration back from now (5m) or an RFC 3339 time")
 	f.StringArrayVar(&o.event, "event", nil, "Filter by event name; repeat to match any of several")
 	f.StringArrayVar(&o.typ, "type", nil, "Filter by event type, such as track; repeatable")
 	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code; repeatable")
@@ -111,7 +114,7 @@ func (o eventsOptions) query(f *pflag.FlagSet, sendView bool) (devlisten.Query, 
 	// A flag reaches the wire only when set, so the server default applies
 	// otherwise and --fields does not collide with a default --view.
 	whenSet(f, map[string]func(){
-		"since":     func() { q.Since = o.since },
+		"since":     func() { q.Since, q.SinceWindow = splitSince(o.since) },
 		"limit":     func() { q.Limit = o.limit },
 		"max-bytes": func() { q.MaxBytes = maxBytes(o.maxBytes) },
 		"min":       func() { q.Min = o.min },
@@ -166,7 +169,11 @@ func runEvents(cmd *cobra.Command, deps Deps, o eventsOptions, sendView bool) er
 	if err != nil {
 		return out.fail(err)
 	}
-	if err := out.page(page.Raw, len(page.Events), page.Truncated, func(w io.Writer) { printEvents(w, page) }); err != nil {
+	human := func(w io.Writer) { printEventList(w, page, o.fields) }
+	if o.view == string(devlisten.ViewCounts) {
+		human = func(w io.Writer) { printSummary(w, page) }
+	}
+	if err := out.page(page.Raw, len(page.Events), page.Truncated, human); err != nil {
 		return err
 	}
 	if page.HasMore {
@@ -175,9 +182,8 @@ func runEvents(cmd *cobra.Command, deps Deps, o eventsOptions, sendView bool) er
 	return nil
 }
 
-// printEvents is the human form: the summary block, then the event table
-// when the view filled it.
-func printEvents(w io.Writer, page devlisten.Page) {
+// printSummary is the table form of dev events: counts and diagnosis.
+func printSummary(w io.Writer, page devlisten.Page) {
 	s := page.Summary
 	fmt.Fprintf(w, "since %d, cursor %d\n", page.Since, page.Cursor)
 	fmt.Fprintf(w, "requests: %d (%d failed)   events: %d   control: %d\n", s.Requests.Total, s.Requests.Failed,
@@ -187,7 +193,7 @@ func printEvents(w io.Writer, page devlisten.Page) {
 	}
 	for _, key := range slices.Sorted(maps.Keys(s.ByWriteKey)) {
 		c := s.ByWriteKey[key]
-		fmt.Fprintf(w, "  key %-20s %d requests, %d events\n", clean(key, 20), c.Requests, c.Events)
+		fmt.Fprintf(w, "  key %-20s %d requests, %d events\n", clean(keyName(key), 20), c.Requests, c.Events)
 	}
 	for _, d := range s.Diagnosis {
 		fmt.Fprintf(w, "%s (%d): %s\n  Next: %s\n", d.Code, d.Count, d.Message, d.Next)
@@ -195,17 +201,85 @@ func printEvents(w io.Writer, page devlisten.Page) {
 	if page.TimedOut {
 		fmt.Fprintln(w, "timedOut: the wait ended before --min events arrived")
 	}
+}
+
+// printEventList is the table form of dev events list: one header line,
+// then one row per event. With --fields the chosen paths are the columns.
+func printEventList(w io.Writer, page devlisten.Page, fields []string) {
+	fmt.Fprintf(w, "%d of %d matching events, cursor %d", page.Returned, page.Total, page.Cursor)
+	if page.HasMore {
+		fmt.Fprint(w, ", more after it")
+	}
+	fmt.Fprintln(w)
 	if len(page.Events) == 0 {
 		return
 	}
-	fmt.Fprintln(w)
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	defer func() { _ = tw.Flush() }()
+	perSeq := map[uint64]int{}
+	for _, ev := range page.Events {
+		perSeq[ev.Seq]++
+	}
+	if len(fields) > 0 {
+		fmt.Fprintln(tw, "SEQ\tTYPE\tEVENT\t"+strings.Join(fields, "\t"))
+		for _, ev := range page.Events {
+			fmt.Fprintf(tw, "%s\t%s\t%s", seqLabel(ev, perSeq), dash(clean(ev.Type, 16)), dash(clean(eventLabel(ev), 48)))
+			for _, path := range fields {
+				fmt.Fprint(tw, "\t"+clean(pathValue(ev.Raw, path), 60))
+			}
+			fmt.Fprintln(tw)
+		}
+		return
+	}
 	fmt.Fprintln(tw, "SEQ\tTIME\tTYPE\tEVENT\tWRITE KEY\tSTATUS")
 	for _, ev := range page.Events {
-		fmt.Fprintf(tw, "%d.%d\t%s\t%s\t%s\t%s\t%d\n", ev.Seq, ev.Idx, clock(ev.ReceivedAt),
-			dash(clean(ev.Type, 16)), dash(clean(ev.Name, 64)), dash(clean(ev.WriteKey, 24)), ev.StatusCode)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\n", seqLabel(ev, perSeq), clock(ev.ReceivedAt),
+			dash(clean(ev.Type, 16)), dash(clean(eventLabel(ev), 64)), clean(keyName(ev.WriteKey), 24), ev.StatusCode)
 	}
-	_ = tw.Flush()
+}
+
+// seqLabel is the request seq, with /idx when the request carried more than
+// one of the listed events.
+func seqLabel(ev devlisten.Event, perSeq map[uint64]int) string {
+	if perSeq[ev.Seq] > 1 {
+		return fmt.Sprintf("%d/%d", ev.Seq, ev.Idx)
+	}
+	return strconv.FormatUint(ev.Seq, 10)
+}
+
+func eventLabel(ev devlisten.Event) string {
+	if ev.Name != "" {
+		return ev.Name
+	}
+	return ev.Label
+}
+
+func keyName(key string) string {
+	if key == "" {
+		return "(none)"
+	}
+	return key
+}
+
+// pathValue is the JSON of one dotted path of an event item, "-" when absent.
+func pathValue(raw json.RawMessage, path string) string {
+	var v any
+	if json.Unmarshal(raw, &v) != nil {
+		return "-"
+	}
+	path = strings.TrimPrefix(path, "message.")
+	if m, ok := v.(map[string]any); ok && strings.HasPrefix(path, "context") {
+		v = m["message"]
+	}
+	for _, part := range strings.Split(path, ".") {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return "-"
+		}
+		v = m[part]
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
 }
 
 func clock(t time.Time) string {
@@ -220,4 +294,13 @@ func dash(s string) string {
 		return "-"
 	}
 	return s
+}
+
+// splitSince sends a cursor as a number and anything else as a window for
+// the server to parse, so the CLI and HTTP accept the same forms.
+func splitSince(raw string) (uint64, string) {
+	if n, err := strconv.ParseUint(raw, 10, 64); err == nil {
+		return n, ""
+	}
+	return 0, raw
 }

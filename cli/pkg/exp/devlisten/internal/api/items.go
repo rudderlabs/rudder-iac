@@ -58,9 +58,12 @@ type listItem struct {
 	ReceivedAt time.Time `json:"receivedAt"`
 	Type       *string   `json:"type"`
 	Event      *string   `json:"event"`
-	UserID     *string   `json:"userId"`
-	WriteKey   string    `json:"writeKey"`
-	StatusCode int       `json:"statusCode"`
+	// Name labels an event without an event name: the page or screen name
+	// (or path), else the userId.
+	Name       string  `json:"name,omitempty"`
+	UserID     *string `json:"userId"`
+	WriteKey   string  `json:"writeKey"`
+	StatusCode int     `json:"statusCode"`
 }
 
 func newBaseItem(rec store.Record, ev store.Event) baseItem {
@@ -274,4 +277,30 @@ func dropNulls(obj []byte) []byte {
 		out = append(append(append(out, encode(key)...), ':'), val...)
 	}
 	return append(out, '}')
+}
+
+// listName labels a page, screen, identify, group or alias for a list.
+func listName(ev store.Event) string {
+	if ev.Event != nil {
+		return ""
+	}
+	var msg struct {
+		Name       string `json:"name"`
+		Properties struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"properties"`
+	}
+	_ = json.Unmarshal(ev.Message, &msg)
+	switch {
+	case msg.Name != "":
+		return msg.Name
+	case msg.Properties.Name != "":
+		return msg.Properties.Name
+	case msg.Properties.Path != "":
+		return msg.Properties.Path
+	case ev.UserID != nil:
+		return *ev.UserID
+	}
+	return ""
 }

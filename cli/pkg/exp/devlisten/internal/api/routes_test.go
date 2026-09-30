@@ -176,9 +176,9 @@ func TestRequestsTruncatedNextKeepsTheFilters(t *testing.T) {
 	_, page := get(t, srv.URL+"/_dev/v1/requests?serverId=9f3ac1d2b7e4c601&kind=all&statusCode=400"+
 		"&failed=true&fields=events&maxBytes=1500")
 	truncated := page["truncated"].(map[string]any)
-	require.Equal(t, "rudder-cli dev requests list --since "+jsonNumber(page["cursor"])+" --server-id '9f3ac1d2b7e4c601'"+
-		" --kind 'all' --status-code '400' --failed=true --fields 'events'"+
-		" --max-bytes '1500' --json", truncated["next"])
+	require.Equal(t, "rudder-cli dev requests list --since "+jsonNumber(page["cursor"])+" --server-id 9f3ac1d2b7e4c601"+
+		" --kind all --status-code 400 --failed=true --fields events"+
+		" --max-bytes 1500 --json", truncated["next"])
 
 	_, page = get(t, srv.URL+"/_dev/v1/requests?maxBytes=100")
 	require.Equal(t, "rudder-cli dev requests list --since 0 --fields request.headers --json",

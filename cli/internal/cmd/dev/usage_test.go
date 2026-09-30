@@ -44,10 +44,10 @@ func TestMistypedFlagNamesTheCloseOne(t *testing.T) {
 func TestBadFlagValueNamesTheFlag(t *testing.T) {
 	t.Parallel()
 
-	obj := usageObject(t, "events", "list", "--json", "--view", "compact", "--since", "abc")
+	obj := usageObject(t, "events", "list", "--json", "--view", "compact", "--limit", "abc")
 
-	require.Equal(t, "since", obj["param"])
-	require.Equal(t, "rudder-cli dev events list --view compact --since N --json", obj["next"])
+	require.Equal(t, "limit", obj["param"])
+	require.Equal(t, "rudder-cli dev events list --view compact --limit N --json", obj["next"])
 }
 
 func TestOtherParseErrorsNameTheFirstExample(t *testing.T) {

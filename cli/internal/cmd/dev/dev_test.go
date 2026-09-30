@@ -238,7 +238,7 @@ func TestEventsIsTheSummary(t *testing.T) {
 	require.Equal(t, map[string]any{"A": float64(1), "Missing": float64(0)}, page["summary"].(map[string]any)["byEvent"])
 }
 
-func TestEventsListFillsEventsAndTheSummary(t *testing.T) {
+func TestEventsListFillsEventsAndTotals(t *testing.T) {
 	t.Parallel()
 	s := devlistentest.Start(t)
 	track(t, s, `{"event":"A","userId":"u1"}`)
@@ -249,7 +249,8 @@ func TestEventsListFillsEventsAndTheSummary(t *testing.T) {
 	page := decode(t, stdout)
 	require.Equal(t, "list", page["view"])
 	require.Len(t, page["events"], 1)
-	require.Equal(t, float64(1), page["summary"].(map[string]any)["events"].(map[string]any)["total"])
+	require.Equal(t, float64(1), page["total"])
+	require.Nil(t, page["summary"], "dev events is the summary")
 	require.True(t, strings.HasSuffix(stdout, "}\n"))
 }
 
@@ -272,7 +273,7 @@ func TestEventsListFieldsWithViewNamesTheCommandWithoutView(t *testing.T) {
 	_, stderr, err := runDev(t, "events", "list", "--url", s.URL(), "--fields", "properties", "--view", "full", "--json")
 
 	require.Error(t, err)
-	require.Equal(t, "rudder-cli dev events list --since 0 --fields 'properties' --json", errorObject(t, stderr)["next"])
+	require.Equal(t, "rudder-cli dev events list --since 0 --fields properties --json", errorObject(t, stderr)["next"])
 }
 
 // A --wait that runs out is an answer, not an error: exit 0, timedOut true.
@@ -332,7 +333,8 @@ func TestTableUnlessJSON(t *testing.T) {
 
 	stdout, _, err := runDev(t, "events", "list", "--url", s.URL())
 	require.NoError(t, err)
-	require.Contains(t, stdout, "requests: 1 (0 failed)")
+	require.Contains(t, stdout, "1 of 1 matching events, cursor 1")
+	require.NotContains(t, stdout, "requests:")
 	require.Contains(t, stdout, "SEQ")
 	require.Contains(t, stdout, "WRITE KEY")
 	require.Contains(t, stdout, "Order Completed")
@@ -440,4 +442,28 @@ func (b *syncBuffer) String() string {
 func lastLine(s string) string {
 	lines := strings.Split(strings.TrimSpace(s), "\n")
 	return lines[len(lines)-1]
+}
+
+func TestEventsListTableShowsIntegerSeqAndFieldColumns(t *testing.T) {
+	t.Parallel()
+	s := devlistentest.Start(t)
+	track(t, s, `{"event":"A","userId":"u1","properties":{"total":42}}`)
+
+	stdout, _, err := runDev(t, "events", "list", "--url", s.URL(), "--fields", "properties.total")
+
+	require.NoError(t, err)
+	require.Contains(t, stdout, "SEQ  TYPE   EVENT  properties.total")
+	require.Contains(t, stdout, "1    track  A      42")
+	require.NotContains(t, stdout, "1.0")
+}
+
+func TestSinceTakesADuration(t *testing.T) {
+	t.Parallel()
+	s := devlistentest.Start(t)
+	track(t, s, `{"event":"A","userId":"u1"}`)
+
+	stdout, _, err := runDev(t, "events", "list", "--url", s.URL(), "--since", "5m", "--json")
+
+	require.NoError(t, err)
+	require.Len(t, decode(t, stdout)["events"], 1)
 }

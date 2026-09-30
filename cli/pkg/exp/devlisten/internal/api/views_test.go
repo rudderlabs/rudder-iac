@@ -46,7 +46,7 @@ func TestCompactView(t *testing.T) {
 	require.Equal(t, map[string]any{
 		"fields":  []any{"message", "enrichedMessage"},
 		"context": []any{"app", "library", "page", "sessionId", "traits"},
-		"next":    "rudder-cli dev events list --since 0 --event 'A' --fields properties --json",
+		"next":    "rudder-cli dev events list --since 0 --event A --fields properties --json",
 	}, page["omitted"])
 	require.Nil(t, page["truncated"])
 }
@@ -184,7 +184,7 @@ func TestMaxBytesDropsWholeTrailingRequests(t *testing.T) {
 	require.Equal(t, "maxBytes", truncated["by"])
 	require.Equal(t, float64(len(events)), truncated["kept"])
 	require.Equal(t, float64(10-len(events)), truncated["matchedAfter"])
-	require.Equal(t, "rudder-cli dev events list --since "+jsonNumber(page["cursor"])+" --event 'A' --view 'compact' --max-bytes '3500' --json",
+	require.Equal(t, "rudder-cli dev events list --since "+jsonNumber(page["cursor"])+" --event A --view compact --max-bytes 3500 --json",
 		truncated["next"], "the next page keeps the caller's cap")
 }
 
@@ -193,7 +193,7 @@ func TestMaxBytesWithOneOversizedRequest(t *testing.T) {
 	srv, st := newTestServer(t)
 	st.Append(ingestion(browserTrack(0, "A"), browserTrack(1, "A")))
 
-	_, page := get(t, srv.URL+"/_dev/v1/events?view=compact&maxBytes=1200&since=0")
+	_, page := get(t, srv.URL+"/_dev/v1/events?view=compact&maxBytes=700&since=0")
 
 	require.Equal(t, []any{}, page["events"])
 	require.Equal(t, float64(0), page["cursor"], "the cursor does not pass the request that did not fit")
@@ -230,7 +230,7 @@ func TestMinAboveKeptMovesTheCursor(t *testing.T) {
 		st.Append(ingestion(browserTrack(0, "A")))
 	}
 
-	_, page := get(t, srv.URL+"/_dev/v1/events?view=compact&maxBytes=1700&min=3&wait=5s")
+	_, page := get(t, srv.URL+"/_dev/v1/events?view=compact&maxBytes=1150&min=3&wait=5s")
 
 	events := page["events"].([]any)
 	require.Less(t, len(events), 3)
@@ -246,10 +246,9 @@ func TestShapeConflictsNameTheCorrectedCommand(t *testing.T) {
 	srv, _ := newTestServer(t)
 
 	for query, next := range map[string]string{
-		"since=4&event=A&fields=properties&view=full": "rudder-cli dev events list --since 4 --event 'A' --fields 'properties' --json",
-		"fields=properties&view=list":                 "rudder-cli dev events list --since 0 --fields 'properties' --json",
-		"fields=context.page":                         "rudder-cli dev events list --since 0 --fields message.context.page --json",
-		"fields=nope.x&fields=properties":             "rudder-cli dev events list --since 0 --fields 'properties' --json",
+		"since=4&event=A&fields=properties&view=full": "rudder-cli dev events list --since 4 --event A --fields properties --json",
+		"fields=properties&view=list":                 "rudder-cli dev events list --since 0 --fields properties --json",
+		"fields=nope.x&fields=properties":             "rudder-cli dev events list --since 0 --fields properties --json",
 	} {
 		_, body := get(t, srv.URL+"/_dev/v1/events?"+query)
 		errObj := body["error"].(map[string]any)
@@ -266,4 +265,32 @@ func TestRejectedFieldsListTheValidRoots(t *testing.T) {
 	errObj := body["error"].(map[string]any)
 	require.Contains(t, errObj["details"].(map[string]any)["validRoots"], "request")
 	require.Equal(t, "rudder-cli dev requests list --since 0 --fields request.body --json", errObj["next"])
+}
+
+func TestFieldsContextIsMessageContext(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(browserTrack(0, "A")))
+
+	status, page := get(t, srv.URL+"/_dev/v1/events?fields=context.page.path")
+
+	require.Equal(t, 200, status)
+	require.Equal(t, map[string]any{"context": map[string]any{"page": map[string]any{"path": "/chat"}}},
+		firstItem(t, page)["message"])
+}
+
+// A page or identify has no event name; the list names it anyway.
+func TestListNamesEventsWithoutAnEventName(t *testing.T) {
+	t.Parallel()
+	srv, st := newTestServer(t)
+	st.Append(ingestion(store.Event{Idx: 0, Type: sp("page"), UserID: sp("u1"),
+		Message: json.RawMessage(`{"type":"page","name":"Home","properties":{"path":"/"}}`)}))
+	st.Append(ingestion(store.Event{Idx: 0, Type: sp("identify"), UserID: sp("u1"),
+		Message: json.RawMessage(`{"type":"identify","userId":"u1"}`)}))
+
+	_, page := get(t, srv.URL+"/_dev/v1/events")
+
+	events := page["events"].([]any)
+	require.Equal(t, "Home", events[0].(map[string]any)["name"])
+	require.Equal(t, "u1", events[1].(map[string]any)["name"])
 }

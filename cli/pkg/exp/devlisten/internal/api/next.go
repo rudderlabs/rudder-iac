@@ -1,6 +1,7 @@
 package api
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -27,24 +28,27 @@ func (c *command) num(name string, n uint64) *command {
 	return c.bare(name, strconv.FormatUint(n, 10))
 }
 
-// quoted adds one caller value per occurrence.
+// quoted adds one caller value per occurrence, single-quoted when it is not
+// a plain word, the same rule the CLI uses for its own next lines.
 func (c *command) quoted(name string, values ...string) *command {
 	for _, v := range values {
-		c.parts = append(c.parts, "--"+name, shellQuote(v))
+		c.parts = append(c.parts, "--"+name, shellWord(v))
 	}
 	return c
 }
 
 func (c *command) String() string { return strings.Join(c.parts, " ") }
 
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+var plainWord = regexp.MustCompile(`^[A-Za-z0-9._/:=@%+-]+$`)
+
+// shellWord leaves a plain word bare and single-quotes anything else.
+func shellWord(s string) string {
+	if plainWord.MatchString(s) {
+		return s
+	}
+	return shellQuote(s)
 }
 
-func intStrings(ns []int) []string {
-	out := make([]string, len(ns))
-	for i, n := range ns {
-		out[i] = strconv.Itoa(n)
-	}
-	return out
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

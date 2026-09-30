@@ -36,7 +36,7 @@ func TestWriteKeyFilterNarrowsRequestsAndEvents(t *testing.T) {
 	require.Equal(t, float64(1), requests["requests"].([]any)[0].(map[string]any)["seq"])
 	require.Len(t, events["events"], 1)
 	require.Equal(t, "B", events["events"].([]any)[0].(map[string]any)["event"])
-	require.Equal(t, "rudder-cli dev events list --since 0 --write-key 'backendKey123456' --view compact --json",
+	require.Equal(t, "rudder-cli dev events list --since 0 --write-key backendKey123456 --view compact --json",
 		events["omitted"].(map[string]any)["next"])
 }
 
@@ -51,6 +51,6 @@ func TestMissingWriteKeyIsAWarning(t *testing.T) {
 		summary["byWriteKey"].(map[string]any)[""])
 	require.Equal(t, []string{"missing_write_key", "all_accepted"}, diagnosisCodes(t, summary))
 	d := summary["diagnosis"].([]any)[0].(map[string]any)
-	require.Equal(t, "1 requests had no write key; RudderStack rejects these with 401.", d["message"])
+	require.Equal(t, "1 request had no write key; RudderStack rejects these with 401.", d["message"])
 	require.Equal(t, "rudder-cli dev requests list --since 0 --write-key '' --json", d["next"])
 }

@@ -95,8 +95,8 @@ function sharedParams(p) {
   if (state.serverId) p.set("serverId", state.serverId);
 }
 
-function eventsQuery(since, wait) {
-  const p = new URLSearchParams({ view: "full", maxBytes: "0", limit: String(PAGE_LIMIT), since: String(since) });
+function eventsQuery(since, wait, view) {
+  const p = new URLSearchParams({ view: view || "full", maxBytes: "0", limit: String(PAGE_LIMIT), since: String(since) });
   for (const name of listValues(state.event)) p.append("event", name);
   if (state.type) p.set("type", state.type);
   if (state.userId) p.set("userId", state.userId);
@@ -240,7 +240,8 @@ const DIAGNOSIS = {
     "track or page.",
   auth_rejected: () => "Some requests were refused because of their write key.",
   body_rejected: () => "Some requests were refused because of their body: bad JSON, batch shape, size or identity.",
-  missing_write_key: (d) => d.count + " requests had no write key. RudderStack refuses these.",
+  missing_write_key: (d) => (d.count === 1 ? "1 request has" : d.count + " requests had") +
+    " no write key. RudderStack refuses these.",
   all_accepted: () => "Every request that arrived was accepted. Events that never arrived are not listed: " +
     "type their names in the Event filter to see them at 0.",
 };
@@ -282,7 +283,9 @@ function renderSummary() {
   const keys = Object.keys(s.byWriteKey || {}).sort();
   const sdks = Object.keys(s.bySource.bySdk || {});
   $("stat-sdks").textContent = sdks.length;
-  $("stat-keys").textContent = sdks.join(", ") + (keys.length ? " · write keys: " + keys.map(keyName).join(", ") : "");
+  $("stat-sdk-names").textContent = sdks.join(", ");
+  $("stat-keys").textContent = keys.length;
+  $("stat-key-names").textContent = keys.map(keyName).join(", ");
 
   $("diagnosis").replaceChildren(...s.diagnosis.map((d) => {
     const li = el("li", null, d.code === "all_accepted" ? "good" : "");
@@ -512,18 +515,20 @@ async function loadOnce(gen, wait) {
     const page = await getJSON(eventsQuery(state.cursor, wait), ctl.signal);
     if (gen !== state.generation) return;
     state.serverId = page.serverId;
-    state.envelope = page;
+    state.listEnvelope = page;
     state.events.push(...page.events);
     state.cursor = page.cursor;
     more = page.hasMore;
     wait = null;
   }
   if (state.events.length > MAX_EVENTS) state.events.splice(0, state.events.length - MAX_EVENTS);
-  const [rejected, requests] = await Promise.all([
+  const [counts, rejected, requests] = await Promise.all([
+    getJSON(eventsQuery(state.since, null, "counts"), ctl.signal),
     getJSON(requestsQuery("all", true), ctl.signal),
     getJSON(requestsQuery(state.kind, state.failed), ctl.signal),
   ]);
   if (gen !== state.generation) return;
+  state.envelope = counts;
   state.rejected = rejected.requests;
   state.requests = requests.requests;
   state.requestsEnvelope = requests;
@@ -654,7 +659,7 @@ $("copy-fields").addEventListener("click", (e) => {
 // this page.
 $("export").addEventListener("click", () => {
   const isEvents = state.tab === "events";
-  const base = isEvents ? state.envelope : state.requestsEnvelope;
+  const base = isEvents ? { ...state.listEnvelope, summary: state.envelope?.summary } : state.requestsEnvelope;
   const doc = isEvents ?
     { ...base, events: eventRows().filter((ev) => ev.kind !== "rejected") } :
     { ...base, requests: requestRows() };

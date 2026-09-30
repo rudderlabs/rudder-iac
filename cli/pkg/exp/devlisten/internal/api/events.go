@@ -44,7 +44,7 @@ func parseEventsQuery(values map[string][]string) (eventsQuery, *apiError) {
 		filters:  parseFilters(p),
 		sentView: p.single("view"),
 		view:     p.oneOf("view", viewList, viewCounts, viewList, viewCompact, viewFull),
-		fields:   p.list("fields"),
+		fields:   contextAlias(p.list("fields")),
 		event:    p.list("event"),
 		typ:      p.list("type"),
 		userID:   p.single("userId"),
@@ -52,6 +52,19 @@ func parseEventsQuery(values map[string][]string) (eventsQuery, *apiError) {
 	}
 	q.checkShape(p)
 	return q, p.err
+}
+
+// contextAlias reads context.X as message.context.X: the context lives in
+// the message, and callers name it the SDK way.
+func contextAlias(fields []string) []string {
+	out := make([]string, len(fields))
+	for i, f := range fields {
+		if f == "context" || strings.HasPrefix(f, "context.") {
+			f = "message." + f
+		}
+		out[i] = f
+	}
+	return out
 }
 
 // checkShape validates fields; fields replaces the view. A conflict names
@@ -102,6 +115,10 @@ func (q eventsQuery) args(c *command, withShape bool) *command {
 	return c
 }
 
+func (q eventsQuery) hasEventFilter() bool {
+	return len(q.event) > 0 || len(q.typ) > 0 || q.userID != "" || q.anonID != ""
+}
+
 // matchesEvent applies the event-level filters.
 func (q eventsQuery) matchesEvent(ev store.Event) bool {
 	return matches(ev.Event, q.event) && matches(ev.Type, q.typ) &&
@@ -148,14 +165,18 @@ type eventsPage struct {
 	Since      uint64 `json:"since"`
 	Cursor     uint64 `json:"cursor"`
 	// EvictedThrough above since means the store dropped part of the window.
-	EvictedThrough uint64     `json:"evictedThrough"`
-	HasMore        bool       `json:"hasMore"`
-	TimedOut       bool       `json:"timedOut"`
-	WaitedMs       int64      `json:"waitedMs"`
-	Summary        summary    `json:"summary"`
-	View           string     `json:"view"`
-	Omitted        *omitted   `json:"omitted"`
-	Truncated      *truncated `json:"truncated"`
+	EvictedThrough uint64 `json:"evictedThrough"`
+	HasMore        bool   `json:"hasMore"`
+	TimedOut       bool   `json:"timedOut"`
+	WaitedMs       int64  `json:"waitedMs"`
+	// Total is the matching events in the window; Returned is len(events).
+	Total    int `json:"total"`
+	Returned int `json:"returned"`
+	// Summary is filled by view=counts only: dev events is the summary.
+	Summary   *summary   `json:"summary"`
+	View      string     `json:"view"`
+	Omitted   *omitted   `json:"omitted"`
+	Truncated *truncated `json:"truncated"`
 	// Next is the CLI command that continues after this answer; Links.Next
 	// is the same call as a URL.
 	Next   string            `json:"next"`
@@ -169,6 +190,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	q, err := parseEventsQuery(r.URL.Query())
 	if err == nil {
 		err = h.checkServerID(q.serverID)
+		q.resolveSince(h.store)
 	}
 	if err != nil {
 		writeError(w, *err)
@@ -187,14 +209,19 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	case ok:
 		page := eventsPage{
 			APIVersion: APIVersion, ServerID: h.id.ServerID, Since: q.since, TimedOut: timedOut,
-			WaitedMs: h.now().Sub(start).Milliseconds(), Summary: h.summarize(window.Records, q), View: q.view,
+			WaitedMs: h.now().Sub(start).Milliseconds(), View: q.view,
 			EvictedThrough: scanned.evictedThrough, Events: []json.RawMessage{},
 		}
 		continueAt := func(cursor uint64) {
 			page.Next = q.args(newCommand(routeCommands["events"]).num("since", cursor), true).flag("json").String()
 			page.Links = pageLinks{Next: nextURL("events", r.URL.Query(), cursor)}
 		}
-		if q.view == viewCounts {
+		sum := h.summarize(window.Records, q)
+		page.Total = sum.Events.Total
+		if q.view == viewCounts || q.limit == 0 {
+			if q.view == viewCounts {
+				page.Summary = &sum
+			}
 			page.Cursor = max(q.since, window.Cursor)
 			page.Omitted = q.omitted(nil)
 			continueAt(page.Cursor)
@@ -204,6 +231,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		body := fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
 			page.Cursor, page.HasMore, page.Truncated = cursor, hasMore, t
 			page.Events = flatten(groups)
+			page.Returned = len(page.Events)
 			page.Omitted = q.omitted(groups)
 			continueAt(cursor)
 			return encode(page)
@@ -302,7 +330,8 @@ func renderEvent(rec store.Record, ev store.Event, q eventsQuery) (json.RawMessa
 	switch q.view {
 	case viewCounts, viewList:
 		return encode(listItem{Seq: base.Seq, Idx: base.Idx, ReceivedAt: base.ReceivedAt, Type: base.Type,
-			Event: base.Event, UserID: base.UserID, WriteKey: base.WriteKey, StatusCode: base.StatusCode}), nil
+			Event: base.Event, Name: listName(ev), UserID: base.UserID, WriteKey: base.WriteKey,
+			StatusCode: base.StatusCode}), nil
 	case viewFull:
 		return encode(fullItem{baseItem: base, Message: ev.Message, EnrichedMessage: ev.EnrichedMessage}), nil
 	case viewFields:

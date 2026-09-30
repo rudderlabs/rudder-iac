@@ -4,6 +4,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,10 +30,14 @@ func rejected(stage string) store.Record {
 	return rec
 }
 
-// summaryOf reads the summary block of one /events answer.
+// summaryOf reads the summary block of one /events?view=counts answer.
 func summaryOf(t *testing.T, url string) map[string]any {
 	t.Helper()
-	status, page := get(t, url)
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	status, page := get(t, url+sep+"view=counts")
 	require.Equal(t, http.StatusOK, status, page)
 	return page["summary"].(map[string]any)
 }
@@ -58,7 +63,8 @@ func TestListIsTheDefaultViewAndCountsHasAnEmptyEventList(t *testing.T) {
 
 	require.Equal(t, "list", list["view"])
 	require.Len(t, list["events"], 1)
-	require.Equal(t, list["summary"], page["summary"], "every view fills the summary")
+	require.Nil(t, list["summary"], "the list leaves the summary to view=counts")
+	require.NotNil(t, page["summary"])
 	require.Equal(t, "counts", page["view"])
 	require.Equal(t, []any{}, page["events"])
 	require.Equal(t, float64(1), page["cursor"])
@@ -123,7 +129,10 @@ func TestByEventShowsEveryRequestedNameAtZero(t *testing.T) {
 
 	require.Equal(t, map[string]any{"A": float64(1), "Missing": float64(0)}, summary["byEvent"])
 	require.Equal(t, float64(1), summary["events"].(map[string]any)["total"], "event filters narrow the counts")
-	require.Equal(t, float64(1), summary["requests"].(map[string]any)["total"], "requests stay whole")
+	require.Equal(t, float64(1), summary["requests"].(map[string]any)["total"])
+
+	other := summaryOf(t, srv.URL+"/_dev/v1/events?event=Missing")
+	require.Equal(t, float64(0), other["requests"].(map[string]any)["total"], "every count follows the filters")
 }
 
 func TestStatusCodeNarrowsRequestCounts(t *testing.T) {
@@ -183,12 +192,12 @@ func TestAllAcceptedNamesTheListCallAndItsCaveat(t *testing.T) {
 	st.Append(ingestion(track(0, "A")))
 	st.Append(ingestion(track(0, "B")))
 
-	_, page := get(t, srv.URL+"/_dev/v1/events?since=1&event=B")
+	_, page := get(t, srv.URL+"/_dev/v1/events?since=1&event=B&view=counts")
 
 	require.Equal(t, float64(1), page["since"])
 	require.Equal(t, float64(2), page["cursor"])
 	d := page["summary"].(map[string]any)["diagnosis"].([]any)[0].(map[string]any)
-	require.Equal(t, "rudder-cli dev events list --since 1 --event 'B' --json", d["next"])
+	require.Equal(t, "rudder-cli dev events list --since 1 --event B --json", d["next"])
 	require.Contains(t, d["message"], "says nothing about events that never arrived")
 }
 
@@ -236,11 +245,12 @@ func TestStatusCodeClassAndEventPrefix(t *testing.T) {
 
 	_, byClass := get(t, srv.URL+"/_dev/v1/events?statusCode=4xx")
 	_, byPrefix := get(t, srv.URL+"/_dev/v1/events?event=Order*")
+	_, prefixCounts := get(t, srv.URL+"/_dev/v1/events?event=Order*&view=counts")
 	status, _ := get(t, srv.URL+"/_dev/v1/events?statusCode=9xx")
 
 	require.Len(t, byClass["events"], 1)
 	require.Len(t, byPrefix["events"], 3)
 	require.Equal(t, map[string]any{"Order Completed": float64(1), "Order Refunded": float64(1),
-		"Order Failed": float64(1)}, byPrefix["summary"].(map[string]any)["byEvent"], "a pattern adds no zero entry")
+		"Order Failed": float64(1)}, prefixCounts["summary"].(map[string]any)["byEvent"], "a pattern adds no zero entry")
 	require.Equal(t, 400, status)
 }
