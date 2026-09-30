@@ -282,15 +282,17 @@ func (q RecordQuery) Values() url.Values {
 	return compact(v)
 }
 
-// SummaryQuery selects the records /summary counts.
+// SummaryQuery selects the records /summary counts. Each Expect value is
+// NAME or NAME=COUNT; the answer then carries Expected.
 type SummaryQuery struct {
-	Since uint64
+	Since  uint64
+	Expect []string
 }
 
 func (q SummaryQuery) Values() url.Values {
-	v := url.Values{}
+	v := url.Values{"expect": q.Expect}
 	setUint(v, "since", q.Since)
-	return v
+	return compact(v)
 }
 
 func setUint(v url.Values, key string, n uint64) {
@@ -625,15 +627,38 @@ type Summary struct {
 		PluginPath         int `json:"pluginPath"`
 		Other              int `json:"other"`
 	} `json:"control"`
+	BySource struct {
+		ByChannel map[string]int       `json:"byChannel"`
+		BySdk     map[string]SDKCounts `json:"bySdk"`
+	} `json:"bySource"`
+	Expected  []Expected  `json:"expected"`
 	Diagnosis []Diagnosis `json:"diagnosis"`
 	raw
 }
 
+// SDKCounts are the requests, events and control requests of one SDK
+// family: browser, node, go, mobile or other.
+type SDKCounts struct {
+	Requests int `json:"requests"`
+	Events   int `json:"events"`
+	Control  int `json:"control"`
+}
+
+// Expected is the check of one SummaryQuery.Expect value. Want is nil when
+// no count was given. Status is present, missing or count_mismatch.
+type Expected struct {
+	Event  string `json:"event"`
+	Want   *int   `json:"want"`
+	Got    int    `json:"got"`
+	Status string `json:"status"`
+}
+
 type Diagnosis struct {
-	Code    string `json:"code"`
-	Count   int    `json:"count"`
-	Message string `json:"message"`
-	Next    string `json:"next"`
+	Code    string   `json:"code"`
+	Count   int      `json:"count"`
+	Message string   `json:"message"`
+	Events  []string `json:"events"`
+	Next    string   `json:"next"`
 }
 
 func (c *Client) Summary(ctx context.Context, q SummaryQuery) (Summary, error) {

@@ -64,9 +64,12 @@ func TestRequestsRequestSummaryAndReset(t *testing.T) {
 
 	summary, err := client.Summary(ctx, devlisten.SummaryQuery{})
 	require.NoError(t, err)
-	require.Equal(t, []devlisten.Diagnosis{{Code: "all_accepted", Count: 1,
+	require.Len(t, summary.Diagnosis, 2, "a Go client with no browser traffic adds no_browser_traffic")
+	require.Equal(t, "no_browser_traffic", summary.Diagnosis[0].Code)
+	require.Equal(t, devlisten.Diagnosis{Code: "all_accepted", Count: 1,
 		Message: "Every request was accepted. List the events to check names and properties.",
-		Next:    "rudder-cli dev events list --since 0 --view summary --json"}}, summary.Diagnosis)
+		Next:    "rudder-cli dev events list --since 0 --view summary --json"}, summary.Diagnosis[1])
+	require.Equal(t, devlisten.SDKCounts{Requests: 1, Events: 1}, summary.BySource.BySdk["go"])
 
 	reset, err := client.Reset(ctx)
 	require.NoError(t, err)

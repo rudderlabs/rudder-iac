@@ -15,6 +15,8 @@ type summary struct {
 	Requests   requestCounts   `json:"requests"`
 	Events     eventCounts     `json:"events"`
 	Control    controlCounts   `json:"control"`
+	BySource   sourceCounts    `json:"bySource"`
+	Expected   []expectation   `json:"expected,omitempty"`
 	Diagnosis  []diagnosisItem `json:"diagnosis"`
 }
 
@@ -44,10 +46,11 @@ type controlCounts struct {
 }
 
 type diagnosisItem struct {
-	Code    string `json:"code"`
-	Count   int    `json:"count"`
-	Message string `json:"message"`
-	Next    string `json:"next"`
+	Code    string   `json:"code"`
+	Count   int      `json:"count"`
+	Message string   `json:"message"`
+	Events  []string `json:"events,omitempty"`
+	Next    string   `json:"next"`
 }
 
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +60,7 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	since := p.uint("since", 0)
+	expected := parseExpect(p)
 	if p.err == nil {
 		p.err = h.checkServerID(p.single("serverId"))
 	}
@@ -66,10 +70,11 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request) {
 	}
 	view := h.store.Since(since)
 	all := countSummary(view.Records, true)
+	expected = checkExpected(expected, all.events.ByEvent)
 	writeJSON(w, http.StatusOK, summary{
 		APIVersion: APIVersion, ServerID: h.id.ServerID, Since: since, Cursor: max(since, view.Cursor),
-		Requests: all.requests, Events: all.events, Control: all.control,
-		Diagnosis: diagnose(countSummary(view.Records, false), since),
+		Requests: all.requests, Events: all.events, Control: all.control, BySource: all.sources,
+		Expected: expected, Diagnosis: diagnose(countSummary(view.Records, false), expected, since),
 	})
 }
 
@@ -77,6 +82,7 @@ type counts struct {
 	requests requestCounts
 	events   eventCounts
 	control  controlCounts
+	sources  sourceCounts
 }
 
 // countSummary counts records; probes are skipped unless withProbes is set.
@@ -84,12 +90,14 @@ func countSummary(records []store.Record, withProbes bool) counts {
 	c := counts{
 		requests: requestCounts{ByRoute: map[string]int{}, ByStatusCode: map[string]int{}, ByOutcome: map[string]int{},
 			ByStage: map[string]int{}},
-		events: eventCounts{ByType: map[string]int{}, ByEvent: map[string]int{}},
+		events:  eventCounts{ByType: map[string]int{}, ByEvent: map[string]int{}},
+		sources: newSourceCounts(),
 	}
 	for _, rec := range records {
 		if rec.Probe && !withProbes {
 			continue
 		}
+		c.sources.add(rec)
 		if rec.Kind == "control" {
 			c.control.add(rec)
 			continue
@@ -155,10 +163,12 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose applies the contract section 4.7 rules in order. Every rule that
 // holds appears. A next never carries a captured value.
-func diagnose(c counts, since uint64) []diagnosisItem {
+func diagnose(c counts, expected []expectation, since uint64) []diagnosisItem {
 	var d diagnosis
 	d.transport(c.requests, c.control)
+	d.browser(c.sources, c.control)
 	d.rejections(c.requests)
+	d.expectations(expected, since)
 	d.add(c.requests.Total > 0 && c.requests.Failed == 0, "all_accepted", c.requests.Total,
 		"Every request was accepted. List the events to check names and properties.",
 		newCommand(routeCommands["events"]).num("since", since).bare("view", viewSummary).flag("json").String())
@@ -166,6 +176,13 @@ func diagnose(c counts, since uint64) []diagnosisItem {
 }
 
 type diagnosis struct{ items []diagnosisItem }
+
+func (d *diagnosis) addEvents(ok bool, code string, events []string, message, next string) {
+	d.add(ok, code, len(events), message, next)
+	if ok {
+		d.items[len(d.items)-1].Events = events
+	}
+}
 
 func (d *diagnosis) add(ok bool, code string, count int, message, next string) {
 	if d.items == nil {
@@ -190,6 +207,17 @@ func (d *diagnosis) transport(req requestCounts, ctl controlCounts) {
 	d.add(ctl.SourceConfig > 0 && ctl.SourceConfigFailed == 0 && req.Total == 0, "sdk_loaded_no_events",
 		ctl.SourceConfig,
 		"The SDK loaded its configuration but sent no events. Check that the app calls track or page, and that the SDK does not wait on CDN plugins.",
+		"rudder-cli dev requests list --kind control --json")
+}
+
+// browser covers a browser SDK that never reached the listener while a
+// server SDK did.
+func (d *diagnosis) browser(src sourceCounts, ctl controlCounts) {
+	d.add(src.sdkRequests() > 0 && src.browser().Requests == 0 && ctl.SourceConfig == 0 && ctl.Preflight == 0,
+		"no_browser_traffic", src.sdkRequests(),
+		"Server SDK requests arrived, but no browser request, no /sourceConfig and no preflight. "+
+			"If the app also runs a browser SDK, it did not load or sends elsewhere: "+
+			"follow the app checklist in rudder-cli dev listen --help.",
 		"rudder-cli dev requests list --kind control --json")
 }
 

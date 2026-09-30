@@ -104,6 +104,10 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		mu.Lock()
 		query = append(query, r.URL.RawQuery)
 		mu.Unlock()
+		if r.URL.Path == "/_dev/v1/summary" {
+			_, _ = w.Write([]byte(`{"diagnosis":[]}`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"events":[],"requests":[]}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -114,6 +118,7 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		{"requests", "list", "--failed=false", "--max-bytes", "0", "--route", "/v1/track", "--route", "/v1/page"},
 		{"requests", "list", "--failed"},
 		{"requests", "list", "--view", "summary"},
+		{"summary", "--expect", "A=1", "--expect", "B"},
 	} {
 		_, _, err := runDev(t, append(args, "--url", srv.URL, "--json")...)
 		require.NoError(t, err, args)
@@ -125,5 +130,6 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		"failed=false&maxBytes=0&route=%2Fv1%2Ftrack&route=%2Fv1%2Fpage",
 		"failed=true",
 		"view=summary",
+		"expect=A%3D1&expect=B",
 	}, query)
 }

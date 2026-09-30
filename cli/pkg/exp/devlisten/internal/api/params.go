@@ -49,7 +49,7 @@ var Params = map[string][]Param{
 		pView, pFields, pMaxBytes, pWait, pMin,
 	},
 	"requests/{seq}": {pServerID, pView, pFields, pMaxBytes},
-	"summary":        {pSince, pServerID},
+	"summary":        {pSince, pServerID, {Name: "expect", Repeatable: true}},
 	"info":           {},
 }
 

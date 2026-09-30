@@ -13,7 +13,8 @@ import (
 
 type summaryOptions struct {
 	clientFlags
-	since uint64
+	since  uint64
+	expect []string
 }
 
 func newCmdSummary(deps Deps) *cobra.Command {
@@ -22,8 +23,15 @@ func newCmdSummary(deps Deps) *cobra.Command {
 		Use:   "summary",
 		Short: "Count captured requests and diagnose them (GET /_dev/v1/summary)",
 		Long: "Count the requests and events captured after a cursor and diagnose what went wrong.\n" +
-			"It is the cheapest call. Each diagnosis carries next, the command to run next.",
+			"It is the cheapest call. Each diagnosis carries next, the command to run next.\n\n" +
+			"all_accepted means every received request was accepted; it says nothing about events that\n" +
+			"never arrived. To prove presence or absence in one call, pass --expect NAME, or\n" +
+			"--expect NAME=COUNT for an exact count (=0 asserts absence). expected then lists want, got\n" +
+			"and status (present, missing, count_mismatch), and the diagnosis expected_missing names\n" +
+			"the missing events. bySource splits traffic by channel and by SDK family (browser, node,\n" +
+			"go, mobile, other), and no_browser_traffic flags server events with no browser request.",
 		Example: "  rudder-cli dev summary --since 0 --json\n" +
+			"  rudder-cli dev summary --since 41 --expect 'Order Completed' --expect 'Suggestion Sent=1' --json\n" +
 			"  rudder-cli dev summary --since 0 --json --jq '.diagnosis[].next'",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,6 +40,8 @@ func newCmdSummary(deps Deps) *cobra.Command {
 	}
 	o.register(cmd.Flags(), true)
 	cmd.Flags().Uint64Var(&o.since, "since", 0, "Filter by cursor: requests with seq above this")
+	cmd.Flags().StringArrayVar(&o.expect, "expect", nil,
+		"Check that event `NAME[=COUNT]` arrived; repeat for more (see expected in the output)")
 	return cmd
 }
 
@@ -44,7 +54,7 @@ func runSummary(cmd *cobra.Command, deps Deps, o summaryOptions) error {
 	if err != nil {
 		return out.fail(err)
 	}
-	s, err := client.Summary(cmd.Context(), devlisten.SummaryQuery{Since: o.since})
+	s, err := client.Summary(cmd.Context(), devlisten.SummaryQuery{Since: o.since, Expect: o.expect})
 	if err != nil {
 		return out.fail(err)
 	}
@@ -60,6 +70,13 @@ func printSummary(w io.Writer, s devlisten.Summary) {
 	}
 	fmt.Fprintf(w, "control:  %d (%d sourceConfig, %d preflight)\n", s.Control.Total, s.Control.SourceConfig,
 		s.Control.Preflight)
+	for _, family := range slices.Sorted(maps.Keys(s.BySource.BySdk)) {
+		c := s.BySource.BySdk[family]
+		fmt.Fprintf(w, "  sdk %-8s %d requests, %d events, %d control\n", family, c.Requests, c.Events, c.Control)
+	}
+	for _, e := range s.Expected {
+		fmt.Fprintf(w, "expect %-40s got %d: %s\n", clean(e.Event, 40), e.Got, e.Status)
+	}
 	for _, d := range s.Diagnosis {
 		fmt.Fprintf(w, "\n%s (%d): %s\nNext: %s\n", d.Code, d.Count, d.Message, d.Next)
 	}
