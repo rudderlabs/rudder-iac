@@ -136,7 +136,7 @@ func parseCodes(raw []string) ([]int, error) {
 
 func runEventsList(cmd *cobra.Command, deps Deps, o eventsListOptions) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check("rudder-cli dev events list --help"); err != nil {
+	if err := o.check(cmd, nil); err != nil {
 		return out.fail(err)
 	}
 	q, err := o.query(cmd.Flags())

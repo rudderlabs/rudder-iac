@@ -81,6 +81,15 @@ func (p *params) fail(name, format string, args ...any) {
 	}
 }
 
+// failWith records an error whose next is a corrected command.
+func (p *params) failWith(name, next string, details map[string]any, format string, args ...any) {
+	if p.err == nil {
+		p.err = invalidParam(p.route, name, format, args...)
+		p.err.Next = strp(next)
+		p.err.Details = details
+	}
+}
+
 // single returns the value of a singleton parameter, or "".
 func (p *params) single(name string) string { return p.values.Get(name) }
 

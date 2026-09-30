@@ -12,6 +12,8 @@ import (
 type cliError struct {
 	Code    string
 	Message string
+	Param   string
+	Details map[string]any
 	Next    string
 }
 
@@ -31,7 +33,8 @@ func asAPIError(err error) *devlisten.APIError {
 	}
 	var cliErr *cliError
 	if errors.As(err, &cliErr) {
-		return &devlisten.APIError{Code: cliErr.Code, Message: cliErr.Message, Next: cliErr.Next}
+		return &devlisten.APIError{Code: cliErr.Code, Message: cliErr.Message, Param: cliErr.Param,
+			Details: cliErr.Details, Next: cliErr.Next}
 	}
 	return &devlisten.APIError{Code: "server_unreachable", Message: err.Error(), Next: nextListen}
 }

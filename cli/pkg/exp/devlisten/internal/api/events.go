@@ -57,24 +57,59 @@ func parseEventsQuery(values map[string][]string) (eventsQuery, *apiError) {
 	return q, p.err
 }
 
-// checkShape validates include and fields; fields replaces the view.
+// includeFields are the fields paths that replace an include value.
+var includeFields = map[string][]string{
+	includeContext:    {"message.context"},
+	includeEnrichment: {"enrichedMessage.request_ip", "enrichedMessage.rudderId"},
+}
+
+// checkShape validates include and fields; fields replaces the view. A
+// conflict names the corrected command in next.
 func (q *eventsQuery) checkShape(p *params) {
 	for _, inc := range q.include {
-		if inc != includeContext && inc != includeEnrichment {
+		if includeFields[inc] == nil {
 			p.fail("include", "%q is not context or enrichment", inc)
 		}
 	}
 	if len(q.fields) == 0 {
 		return
 	}
-	checkFields(p, q.fields, eventRoots)
+	kept, bad := checkFields(q.fields, eventRoots, "properties")
 	switch {
+	case bad != "":
+		failFields(p, bad, eventRoots, q.fixed(kept))
 	case q.sentView != "":
-		p.fail("fields", "cannot combine with view; use one of them")
+		p.failWith("fields", q.fixed(kept), nil, "cannot combine with view; fields replaces the view")
 	case len(q.include) > 0:
-		p.fail("include", "cannot combine with fields; name the paths in fields")
+		p.failWith("include", q.fixed(append(kept, q.includeAsFields()...)), nil,
+			"cannot combine with fields; the paths go in fields")
 	}
 	q.view = viewFields
+}
+
+func (q eventsQuery) includeAsFields() []fieldArg {
+	var out []fieldArg
+	for _, inc := range q.include {
+		for _, f := range includeFields[inc] {
+			out = append(out, fieldArg{value: f, generated: true})
+		}
+	}
+	return out
+}
+
+// fixed is the caller's command with fields as the only shape.
+func (q eventsQuery) fixed(fields []fieldArg) string {
+	c := newCommand(routeCommands["events"]).num("since", q.since)
+	q.filters.args(c)
+	c.quoted("event", q.event...).quoted("type", q.typ...).quoted("route", q.route...).
+		quoted("status-code", intStrings(q.statusCode)...)
+	if q.userID != "" {
+		c.quoted("user-id", q.userID)
+	}
+	if q.anonID != "" {
+		c.quoted("anonymous-id", q.anonID)
+	}
+	return c.fields(fields).flag("json").String()
 }
 
 func (q eventsQuery) includes(name string) bool { return slices.Contains(q.include, name) }

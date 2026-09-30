@@ -266,3 +266,31 @@ func TestMinAboveKeptMovesTheCursor(t *testing.T) {
 	require.Equal(t, true, page["hasMore"])
 	require.Equal(t, events[len(events)-1].(map[string]any)["seq"], page["cursor"])
 }
+
+// A shape conflict answers with the corrected command, not --help.
+func TestShapeConflictsNameTheCorrectedCommand(t *testing.T) {
+	t.Parallel()
+	srv, _ := newTestServer(t)
+
+	for query, next := range map[string]string{
+		"since=4&event=A&fields=properties&view=full": "rudder-cli dev events list --since 4 --event 'A' --fields 'properties' --json",
+		"fields=properties&include=context":           "rudder-cli dev events list --since 0 --fields 'properties' --fields message.context --json",
+		"fields=context.page":                         "rudder-cli dev events list --since 0 --fields message.context.page --json",
+		"fields=nope.x&fields=properties":             "rudder-cli dev events list --since 0 --fields 'properties' --json",
+	} {
+		_, body := get(t, srv.URL+"/_dev/v1/events?"+query)
+		errObj := body["error"].(map[string]any)
+		require.Equal(t, next, errObj["next"], query)
+	}
+}
+
+func TestRejectedFieldsListTheValidRoots(t *testing.T) {
+	t.Parallel()
+	srv, _ := newTestServer(t)
+
+	_, body := get(t, srv.URL+"/_dev/v1/requests?fields=body")
+
+	errObj := body["error"].(map[string]any)
+	require.Contains(t, errObj["details"].(map[string]any)["validRoots"], "request")
+	require.Equal(t, "rudder-cli dev requests list --since 0 --fields request.body --json", errObj["next"])
+}

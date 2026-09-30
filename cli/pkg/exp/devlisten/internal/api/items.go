@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -170,15 +171,49 @@ func rawString(raw json.RawMessage) *string {
 	return &s
 }
 
-// checkFields validates dotted paths against the allowed roots.
-func checkFields(p *params, fields, roots []string) {
+// fieldArg is one --fields value of a corrected command. Caller values are
+// quoted; generated ones are bare.
+type fieldArg struct {
+	value     string
+	generated bool
+}
+
+// checkFields validates dotted paths against the allowed roots. It returns
+// the paths to keep: valid ones as given, a context path moved under
+// message, and fallback when nothing valid is left.
+func checkFields(fields, roots []string, fallback string) (kept []fieldArg, bad string) {
 	for _, f := range fields {
 		segments := strings.Split(f, ".")
-		if slices.Contains(segments, "") || !slices.Contains(roots, segments[0]) {
-			p.fail("fields", "%q does not start with one of %s", f, strings.Join(roots, ", "))
-			return
+		switch {
+		case !slices.Contains(segments, "") && slices.Contains(roots, segments[0]):
+			kept = append(kept, fieldArg{value: f})
+		case segments[0] == "context" && slices.Contains(roots, "message") && !slices.Contains(segments, ""):
+			kept = append(kept, fieldArg{value: "message." + f, generated: true})
+			bad = cmp.Or(bad, f)
+		default:
+			bad = cmp.Or(bad, f)
 		}
 	}
+	if len(kept) == 0 {
+		kept = []fieldArg{{value: fallback, generated: true}}
+	}
+	return kept, bad
+}
+
+func failFields(p *params, bad string, roots []string, next string) {
+	p.failWith("fields", next, map[string]any{"validRoots": roots},
+		"%q does not start with one of %s", bad, strings.Join(roots, ", "))
+}
+
+func (c *command) fields(args []fieldArg) *command {
+	for _, a := range args {
+		if a.generated {
+			c.bare("fields", a.value)
+			continue
+		}
+		c.quoted("fields", a.value)
+	}
+	return c
 }
 
 // projectJSON keeps the named dotted paths of a JSON object plus the keep

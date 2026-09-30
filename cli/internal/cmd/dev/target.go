@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten"
@@ -36,9 +37,10 @@ func (f *clientFlags) register(fs *pflag.FlagSet, withServerID bool) {
 	fs.StringVar(&f.jq, "jq", "", "Filter the JSON output with a jq `EXPR`; needs --json")
 }
 
-func (f clientFlags) check(help string) error {
+// check refuses --jq without --json; next is the same command with --json.
+func (f clientFlags) check(cmd *cobra.Command, args []string) error {
 	if f.jq != "" && !f.json {
-		return usageError(help, "--jq needs --json")
+		return usageError(commandLine(cmd, args)+" --json", "--jq needs --json")
 	}
 	return nil
 }

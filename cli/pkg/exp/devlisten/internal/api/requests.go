@@ -52,7 +52,10 @@ func parseRequestsQuery(values map[string][]string) (requestsQuery, *apiError) {
 		stage:   p.single("stage"),
 		fields:  p.list("fields"),
 	}
-	checkFields(p, q.fields, recordRoots)
+	if kept, bad := checkFields(q.fields, recordRoots, "request.body"); bad != "" {
+		c := q.args(newCommand(routeCommands["requests"]).num("since", q.since), false)
+		failFields(p, bad, recordRoots, c.fields(kept).flag("json").String())
+	}
 	return q, p.err
 }
 
@@ -241,7 +244,9 @@ func (h *Handler) parseRecordQuery(r *http.Request) (recordQuery, *apiError) {
 		p.fail("seq", "%q is not a request seq", raw)
 	}
 	q := recordQuery{seq: seq, fields: p.list("fields"), maxBytes: p.maxBytes()}
-	checkFields(p, q.fields, recordRoots)
+	if kept, bad := checkFields(q.fields, recordRoots, "request.body"); bad != "" {
+		failFields(p, bad, recordRoots, showCommand(seq).fields(kept).flag("json").String())
+	}
 	if p.err != nil {
 		return q, p.err
 	}

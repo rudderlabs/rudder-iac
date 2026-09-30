@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
@@ -92,14 +91,6 @@ func TestEveryDevCommandHasHelp(t *testing.T) {
 		require.NotEmpty(t, c.Example, c.CommandPath())
 		require.NotContains(t, c.Long+c.Example, "rudder-cli docs", "help points to --help until DEX-1011")
 	}
-}
-
-func allCommands(root *cobra.Command) []*cobra.Command {
-	out := []*cobra.Command{root}
-	for _, c := range root.Commands() {
-		out = append(out, allCommands(c)...)
-	}
-	return out
 }
 
 // listenOnce runs dev listen in the background and returns its ready line.

@@ -79,7 +79,7 @@ func newCmdRequestsList(deps Deps) *cobra.Command {
 
 func runRequestsList(cmd *cobra.Command, deps Deps, o requestsListOptions) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check("rudder-cli dev requests list --help"); err != nil {
+	if err := o.check(cmd, nil); err != nil {
 		return out.fail(err)
 	}
 	q, err := o.query(cmd.Flags())
@@ -162,8 +162,7 @@ func newCmdRequestsShow(deps Deps) *cobra.Command {
 
 func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args []string) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	const help = "rudder-cli dev requests show --help"
-	if err := o.check(help); err != nil {
+	if err := o.check(cmd, args); err != nil {
 		return out.fail(err)
 	}
 	seq, err := parseSeq(args)
@@ -196,7 +195,7 @@ func parseSeq(args []string) (uint64, error) {
 	}
 	seq, err := strconv.ParseUint(args[0], 10, 64)
 	if err != nil {
-		return 0, usageError("rudder-cli dev requests show --help", "SEQ %q is not a request seq", args[0])
+		return 0, usageError("rudder-cli dev requests list --json", "SEQ %q is not a request seq", args[0])
 	}
 	return seq, nil
 }

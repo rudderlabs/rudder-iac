@@ -29,7 +29,7 @@ func newCmdInfo(deps Deps) *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o}
-			if err := o.check("rudder-cli dev info --help"); err != nil {
+			if err := o.check(cmd, nil); err != nil {
 				return out.fail(err)
 			}
 			client, err := resolve(cmd.Context(), deps, o, 0)
@@ -61,7 +61,7 @@ func newCmdReset(deps Deps) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o}
-			if err := o.check("rudder-cli dev reset --help"); err != nil {
+			if err := o.check(cmd, nil); err != nil {
 				return out.fail(err)
 			}
 			client, err := resolve(cmd.Context(), deps, o, 0)
@@ -109,7 +109,7 @@ func newCmdStop(deps Deps) *cobra.Command {
 
 func runStop(cmd *cobra.Command, deps Deps, o clientFlags) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o}
-	if err := o.check("rudder-cli dev stop --help"); err != nil {
+	if err := o.check(cmd, nil); err != nil {
 		return out.fail(err)
 	}
 	timeout := o.timeout
@@ -224,7 +224,7 @@ func newCmdSend(deps Deps) *cobra.Command {
 
 func runSend(cmd *cobra.Command, deps Deps, o sendOptions) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check("rudder-cli dev send --help"); err != nil {
+	if err := o.check(cmd, nil); err != nil {
 		return out.fail(err)
 	}
 	client, err := resolve(cmd.Context(), deps, o.clientFlags, 0)

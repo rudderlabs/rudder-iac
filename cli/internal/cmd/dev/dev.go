@@ -46,6 +46,7 @@ func NewCmdDev(deps Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.SetFlagErrorFunc(flagError)
 	cmd.AddCommand(newCmdListen(deps))
 	cmd.AddCommand(newCmdEvents(deps))
 	cmd.AddCommand(newCmdRequests(deps))

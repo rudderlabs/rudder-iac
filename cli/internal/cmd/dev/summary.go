@@ -37,7 +37,7 @@ func newCmdSummary(deps Deps) *cobra.Command {
 
 func runSummary(cmd *cobra.Command, deps Deps, o summaryOptions) error {
 	out := output{stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), flags: o.clientFlags}
-	if err := o.check("rudder-cli dev summary --help"); err != nil {
+	if err := o.check(cmd, nil); err != nil {
 		return out.fail(err)
 	}
 	client, err := resolve(cmd.Context(), deps, o.clientFlags, 0)
