@@ -1,0 +1,11 @@
+{
+  "yaml.schemas": {
+    "./schemas/event-stream-source.schema.json": [
+      "samples/settings-associated.yaml"
+    ],
+    "./schemas/rudder-spec.schema.json": [
+      "samples/root-comparison/*.yaml"
+    ]
+  },
+  "yaml.schemaStore.enable": true
+}

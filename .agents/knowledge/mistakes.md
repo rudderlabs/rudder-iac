@@ -98,3 +98,8 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## DEX-1012 — Semantic Documentation Commit Type
+<!-- ticket:DEX-1012 -->
+- The semantic pull-request workflow rejects the conventional commit type `docs`; this repository's accepted documentation type is singular `doc`.
+- Because the workflow can require a single commit and PR title to match, documentation commits and PR titles should use `doc(scope): subject` consistently.
