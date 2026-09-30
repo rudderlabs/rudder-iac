@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -12,7 +13,11 @@ func NewCmdAccounts() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "accounts",
 		Short: "Manage accounts in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Inspect source and destination accounts available in the authenticated workspace.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace accounts list --json
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListAccounts())
@@ -24,7 +29,12 @@ func newCmdListAccounts() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List accounts in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "List workspace accounts, optionally filtering by category or account type and emitting JSON.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace accounts list
+			rudder-cli workspace accounts list --category source --json
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			category, _ := cmd.Flags().GetString("category")
 			accountType, _ := cmd.Flags().GetString("type")

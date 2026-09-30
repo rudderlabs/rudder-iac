@@ -44,9 +44,9 @@ func NewCmdApply() *cobra.Command {
 			the differences between local configuration and the workspace resources.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli apply --location </path/to/dir or file>
-			$ rudder-cli apply --location </path/to/dir or file> --dry-run
-			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
+			rudder-cli apply --location ./project
+			rudder-cli apply --location ./project --dry-run
+			rudder-cli apply --location ./project --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			deps, err = app.NewDeps()

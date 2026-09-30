@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
+
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -28,7 +30,12 @@ func NewCmdInfo() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show information about the authenticated workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Display identifying and environment information for the workspace associated with the current access token.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace info
+			rudder-cli workspace info --json
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			defer func() {

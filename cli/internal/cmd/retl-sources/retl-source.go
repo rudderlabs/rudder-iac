@@ -3,6 +3,7 @@ package retlsource
 import (
 	"fmt"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -36,8 +37,11 @@ func NewCmdRetlSources() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retl-sources",
 		Short: "Manage RETL sources",
-		Long:  "Manage RETL sources in your RudderStack workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Preview or validate reverse ETL SQL model resources declared in a local project.",
+		Example: heredoc.Doc(`
+			rudder-cli retl-sources validate my-model --location ./project
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdPreview())

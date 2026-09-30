@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -12,7 +13,11 @@ func NewCmdTrackingPlans() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tracking-plans",
 		Short: "Manage tracking plans in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Inspect tracking plans available in the authenticated workspace.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace tracking-plans list --json
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListTrackingPlans())
@@ -24,7 +29,12 @@ func newCmdListTrackingPlans() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tracking plans in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "List tracking plans in the authenticated workspace, as a table or JSON.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace tracking-plans list
+			rudder-cli workspace tracking-plans list --json
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

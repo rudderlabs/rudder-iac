@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +15,11 @@ func newCmdStacktrace() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stacktrace",
 		Short: "Display the last panic stacktrace from the log file",
-		Args:  cobra.NoArgs,
+		Long:  "Read the CLI log and display the most recent recorded panic stack trace.",
+		Example: heredoc.Doc(`
+			RUDDERSTACK_CLI_DEBUG=true rudder-cli debug stacktrace
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
