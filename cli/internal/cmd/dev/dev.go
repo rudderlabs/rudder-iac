@@ -34,9 +34,9 @@ func NewCmdDev(deps Deps) *cobra.Command {
 			"dev events list and dev requests show.",
 		Example: "  rudder-cli dev listen --detach\n" +
 			"  rudder-cli dev cursor\n" +
-			"  rudder-cli dev summary --since 0 --expect 'Order Completed' --json\n" +
+			"  rudder-cli dev summary --since 0 --expect 'Order Completed=1' --json\n" +
 			"  rudder-cli dev stop\n" +
-			"  rudder-cli dev exec --expect 'Order Completed' --json -- node app.mjs",
+			"  rudder-cli dev exec --expect 'Order Completed=1' --json -- node app.mjs",
 		Hidden: true,
 		// Machine mode owns stdout and stderr; each command prints its errors.
 		SilenceUsage:  true,

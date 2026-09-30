@@ -18,8 +18,10 @@ func TestSummaryExpectProvesPresenceAndAbsence(t *testing.T) {
 	_, summary := get(t, srv.URL+"/_dev/v1/summary?"+query.Encode())
 
 	require.Equal(t, []any{
-		map[string]any{"event": "Shown", "want": nil, "got": float64(1), "status": "present"},
-		map[string]any{"event": "Clicked", "want": float64(1), "got": float64(2), "status": "count_mismatch"},
+		map[string]any{"event": "Shown", "want": nil, "got": float64(1), "status": "present",
+			"note": "got 1; pass 'Shown=1' to assert a count"},
+		map[string]any{"event": "Clicked", "want": float64(1), "got": float64(2), "status": "count_mismatch",
+			"note": "got 2; pass 'Clicked=2' to assert a count"},
 		map[string]any{"event": "Sent", "want": nil, "got": float64(0), "status": "missing"},
 		map[string]any{"event": "a=b", "want": float64(2), "got": float64(0), "status": "missing"},
 	}, summary["expected"])

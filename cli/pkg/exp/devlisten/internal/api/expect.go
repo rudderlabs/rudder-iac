@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -19,6 +20,9 @@ type expectation struct {
 	Want   *int   `json:"want"`
 	Got    int    `json:"got"`
 	Status string `json:"status"`
+	// Note names the count to pass when the caller gave none or got
+	// several of a different count, so a plain NAME never hides a count.
+	Note string `json:"note,omitempty"`
 }
 
 func parseExpect(p *params) []expectation {
@@ -51,8 +55,20 @@ func checkExpected(expected []expectation, byEvent map[string]int) []expectation
 		default:
 			e.Status = expectCountMismatch
 		}
+		e.Note = countNote(*e)
 	}
 	return expected
+}
+
+// countNote is empty when the count was asserted and matched, or when
+// nothing arrived: missing already says that.
+func countNote(e expectation) string {
+	uncounted := e.Want == nil && e.Got > 0
+	otherCount := e.Want != nil && e.Got > 1 && e.Got != *e.Want
+	if !uncounted && !otherCount {
+		return ""
+	}
+	return fmt.Sprintf("got %d; pass %s to assert a count", e.Got, shellQuote(e.Event+"="+strconv.Itoa(e.Got)))
 }
 
 func withStatus(expected []expectation, status string) []string {

@@ -25,13 +25,15 @@ func newCmdSummary(deps Deps) *cobra.Command {
 		Long: "Count the requests and events captured after a cursor and diagnose what went wrong.\n" +
 			"It is the cheapest call. Each diagnosis carries next, the command to run next.\n\n" +
 			"all_accepted means every received request was accepted; it says nothing about events that\n" +
-			"never arrived. To prove presence or absence in one call, pass --expect NAME, or\n" +
-			"--expect NAME=COUNT for an exact count (=0 asserts absence). expected then lists want, got\n" +
-			"and status (present, missing, count_mismatch), and the diagnosis expected_missing names\n" +
-			"the missing events. bySource splits traffic by channel and by SDK family (browser, node,\n" +
-			"go, mobile, other), and no_browser_traffic flags server events with no browser request.",
+			"never arrived. To prove presence and count in one call, map each user action to its event\n" +
+			"and pass --expect NAME=COUNT (=0 asserts absence). expected then lists want, got and status\n" +
+			"(present, missing, count_mismatch). A plain --expect NAME only checks presence: expected\n" +
+			"still reports got, and note names the NAME=COUNT to pass. expected_missing names the\n" +
+			"missing events.\n" +
+			"bySource splits traffic by channel and by SDK family (browser, node, go, mobile, other), and\n" +
+			"no_browser_traffic flags server events with no browser request.",
 		Example: "  rudder-cli dev summary --since 0 --json\n" +
-			"  rudder-cli dev summary --since 41 --expect 'Order Completed' --expect 'Suggestion Sent=1' --json\n" +
+			"  rudder-cli dev summary --since 41 --expect 'Order Completed=1' --expect 'Suggestion Sent=1' --json\n" +
 			"  rudder-cli dev summary --since 0 --json --jq '.diagnosis[].next'",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +43,7 @@ func newCmdSummary(deps Deps) *cobra.Command {
 	o.register(cmd.Flags(), true)
 	cmd.Flags().Uint64Var(&o.since, "since", 0, "Filter by cursor: requests with seq above this")
 	cmd.Flags().StringArrayVar(&o.expect, "expect", nil,
-		"Check that event `NAME[=COUNT]` arrived; repeat for more (see expected in the output)")
+		"Check that event `NAME=COUNT` arrived COUNT times (NAME alone: at least once); repeat for more")
 	return cmd
 }
 
@@ -76,6 +78,9 @@ func printSummary(w io.Writer, s devlisten.Summary) {
 	}
 	for _, e := range s.Expected {
 		fmt.Fprintf(w, "expect %-40s got %d: %s\n", clean(e.Event, 40), e.Got, e.Status)
+		if e.Note != "" {
+			fmt.Fprintf(w, "  note: %s\n", clean(e.Note, 0))
+		}
 	}
 	for _, d := range s.Diagnosis {
 		fmt.Fprintf(w, "\n%s (%d): %s\nNext: %s\n", d.Code, d.Count, d.Message, d.Next)

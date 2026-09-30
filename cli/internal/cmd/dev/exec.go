@@ -54,7 +54,7 @@ func newCmdExec() *cobra.Command {
 	f := cmd.Flags()
 	f.IntVar(&o.port, "port", 0, "Port to listen on; 0 lets the OS pick a free one")
 	f.DurationVar(&o.settle, "settle", 2*time.Second, "Wait `DURATION` after COMMAND exits for late requests")
-	f.StringArrayVar(&o.expect, "expect", nil, "Check that event `NAME[=COUNT]` arrived; repeat for more")
+	f.StringArrayVar(&o.expect, "expect", nil, "Check that event `NAME=COUNT` arrived COUNT times (NAME alone: at least once); repeat for more")
 	f.StringArrayVar(&o.fields, "fields", nil,
 		"Show only these `PATH`s of each matched event, such as properties; repeat for more")
 	f.IntVar(&o.maxBytes, "max-bytes", defaultEvidenceBytes,

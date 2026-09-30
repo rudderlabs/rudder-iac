@@ -652,6 +652,9 @@ type Expected struct {
 	Want   *int   `json:"want"`
 	Got    int    `json:"got"`
 	Status string `json:"status"`
+	// Note names the count to pass; empty when the count was asserted and
+	// matched, or when nothing arrived.
+	Note string `json:"note"`
 }
 
 type Diagnosis struct {
