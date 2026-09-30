@@ -43,13 +43,17 @@ listener warns when it is not on loopback.
 
 ## Point your app at it
 
-The url is the data plane URL and, for the browser SDK, the config URL too. By default any
-non-empty write key works. dev listen --write-key KEY accepts only the keys you list and
-rejects every other key with 401; that is an allowlist, not a filter.
+The url is the data plane URL and, for the browser SDK, the config URL too. By default the
+listener accepts every request, whatever its write key, a missing key included; the diagnosis
+missing_write_key warns about requests without one, because RudderStack refuses them.
+dev listen --write-key KEY accepts only the keys you list and rejects every other key, and a
+missing key, with 401. On dev listen --write-key is that allowlist; on the read commands it is
+a filter.
 
   Browser SDK: load('dev', URL, { configUrl: URL }). Without configUrl the SDK asks
   api.rudderstack.com and never reaches the listener.
-  Server SDKs (Node, Go, Python): set dataPlaneUrl to URL and flush before the process exits.
+  Server SDKs (Node, Go, Python): set dataPlaneUrl to URL. In development set them to flush
+  after 1 event, and flush before the process exits.
 
 When events do not arrive, check that the data plane URL points at the listener on the same
 port, that the config URL points at it too, and that the app's own analytics switch is on.
@@ -60,9 +64,9 @@ Build-time settings (Vite, Next.js) need a restart after a change, and a fixed -
 Start cheap and ask for more only when the cheaper answer does not settle the question.
 
   0  rudder-cli dev events --since 0 --json
-     Counts by event, write key and source, and a diagnosis. events is empty. About 0.7 KB.
+     The summary: counts by event, write key and source, and a diagnosis. About 1 KB.
   1  rudder-cli dev events list --since 0 --json
-     Adds one line per event: seq, time, type, name, write key, status. About 120 bytes each.
+     One line per event: seq, time, type, name, write key, status. About 150 bytes each.
   2  rudder-cli dev events list --since 0 --event 'Order Completed' --view compact --json
      The payload without the SDK context keys. About 0.5 KB per event.
   3  rudder-cli dev events list --since 0 --event 'Order Completed' --fields properties --json
@@ -70,12 +74,16 @@ Start cheap and ask for more only when the cheaper answer does not settle the qu
   4  rudder-cli dev requests show 8 --json
      One request in full: headers, raw body, response. About 3 KB.
 
-Every dev events answer has the same keys: apiVersion, serverId, since, cursor, hasMore,
-timedOut, summary, view, omitted, truncated and events. summary holds requests, events,
-byEvent, byWriteKey, control, bySource and diagnosis. Each name you pass with --event and each
-key you pass with --write-key is in byEvent or byWriteKey, with 0 when nothing arrived. When a
-view hides something, omitted.next is the command that shows it. A page is capped at 24000
-bytes; --max-bytes 0 lifts the cap.
+dev events and dev events list answer with the same envelope: apiVersion, serverId, since,
+cursor, evictedThrough, hasMore, timedOut, total, returned, summary, view, omitted, truncated,
+next, links and events. dev events fills summary (requests, events, byEvent, byWriteKey,
+control, bySource and diagnosis) and leaves events empty; dev events list fills events and
+leaves summary null. Every count follows the filters. Each name you pass with --event and
+each key you pass with --write-key is in byEvent or byWriteKey, with 0 when nothing arrived.
+next is the command that reads on from cursor; omitted.next shows what the view left out. A
+page is capped at 24000 bytes; --max-bytes 0 lifts the cap, and --limit 0 returns only the
+cursor. evictedThrough above your cursor means the listener dropped old requests to stay
+within its memory cap. The next commands leave out --url: set RUDDERSTACK_DEV_URL.
 
 seq counts every request, so gaps in seq are control requests (source config, CORS preflight),
 not lost events. Property values are shown exactly as the app sent them.
@@ -85,10 +93,11 @@ not lost events. Property values are shown exactly as the app sent them.
 Filters run on the listener, before the cap, and narrow the summary and the events alike.
 
   --since N                  Only requests after cursor N. Read the cursor before you act
-  --event NAME               Exact event name; repeat for any of several
+  --since 5m                 Only requests received in the last 5 minutes, or since an RFC 3339 time
+  --event NAME               Exact event name, or a prefix such as 'Order*'; repeat for any of several
   --type TYPE                track, identify, page, screen, group or alias
   --user-id ID               One user's events; --anonymous-id ID likewise
-  --status-code CODE         The HTTP status the listener answered
+  --status-code CODE         The HTTP status the listener answered, or a class such as 4xx
   --write-key KEY            One service, by the key it sent; repeat for any of several
   --wait 30s --min 1         Hold the call until enough events match, up to 110s
   --kind KIND                dev requests list only: ingestion, control or all
@@ -128,7 +137,9 @@ Give each service its own write key, as each RudderStack source has one, then sl
 
   rudder-cli dev events --since "$cur" --write-key api-key --write-key worker-key --json | jq '.summary.byWriteKey'
 
-A key other than dev is stored masked (first and last 4 characters) and reported that way.
+Keys of 8 characters or fewer, such as dev or api, are shown as they are. Longer keys may be
+real: the listener keeps only their first and last 4 characters and a hash, and filters by the
+full key you pass.
 
 ## Runs in parallel
 
@@ -147,6 +158,7 @@ Run dev events and read summary.diagnosis. Each entry names the next command.
   sdk_config_rejected   The browser SDK could not load its config
   sdk_loaded_no_events  The SDK loaded its config but sent no events
   auth_rejected         A write key was missing or not on the allowlist
+  missing_write_key     Requests arrived without a write key; RudderStack refuses them
   body_rejected         Bad JSON, batch shape, size or identity
   all_accepted          Everything that arrived was accepted. It says nothing about events
                         that never came: name them with --event and look for a 0
@@ -156,9 +168,11 @@ The control requests behind a diagnosis: rudder-cli dev requests list --kind con
 ## Review in a browser
 
 dev listen serves a read-only review page on the same port, at the ui url of the ready line.
-It shows the counts and the diagnosis, a live list of events newest first (time, type, event,
-status, write key), a search over event names and payload values, a failed-only switch, a
-write key filter, and a detail pane with the properties and the full request JSON.
+It reads the same API and offers the same reads: the counts and the diagnosis, a live list of
+events newest first (time, type, event, status, write key) and of requests, filters for every
+flag above, a search over event names and payload values, a failed-only switch that also
+shows rejected requests, a fields picker, a detail pane with the compact, full and request
+JSON, pause, export as JSON, and filters kept in the page URL so a view can be shared.
 
 ## Output and exit codes
 
@@ -167,7 +181,8 @@ stderr; with --json an error is one JSON object with code, message and next. Not
 
   0  Any successful read, including an empty result or a --wait that ran out (timedOut is
      true). Help. A clean stop on SIGINT or SIGTERM.
-  1  An error: a bad flag, no URL, no server at the URL, or server_changed.
+  1  An error: a bad flag, no URL, no server at the URL, server_changed, or a page whose first
+     request alone is larger than --max-bytes (output_limit).
 
 ## Agent and CI loop
 

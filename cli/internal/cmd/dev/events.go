@@ -34,16 +34,16 @@ type eventFilters struct {
 }
 
 func (o *eventFilters) register(f *pflag.FlagSet) {
-	o.clientFlags.register(f)
-	f.StringVar(&o.since, "since", "0", "Filter by cursor (requests after seq N), a duration back from now (5m) or an RFC 3339 time")
-	f.StringArrayVar(&o.event, "event", nil, "Filter by event name; repeat to match any of several")
-	f.StringArrayVar(&o.typ, "type", nil, "Filter by event type, such as track; repeatable")
-	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code; repeatable")
-	f.StringArrayVar(&o.writeKey, "write-key", nil, "Filter by the write key a request was sent with; repeatable")
+	o.clientFlags.register(f, true)
+	f.StringVar(&o.since, "since", "0", "Only requests after this cursor, or received within this duration (5m) or since this RFC 3339 time")
+	f.StringArrayVar(&o.event, "event", nil, "Filter by event name, or a prefix ending in *, repeat for any of several")
+	f.StringArrayVar(&o.typ, "type", nil, "Filter by event type: track, identify, page, screen, group or alias, repeat for any of several")
+	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code, such as 401, or class, such as 4xx, repeat for any of several")
+	f.StringArrayVar(&o.writeKey, "write-key", nil, "Filter by the write key a request was sent with, repeat for any of several")
 	f.StringVar(&o.userID, "user-id", "", "Filter by userId")
 	f.StringVar(&o.anonID, "anonymous-id", "", "Filter by anonymousId")
-	f.DurationVar(&o.wait, "wait", 0, "Wait up to this long for --min matching events, at most 110s")
-	f.IntVar(&o.min, "min", 1, "Return once this many matching events exist")
+	f.DurationVar(&o.wait, "wait", 0, "Wait up to this duration, at most 110s, for --min matching events (default 0, answer at once)")
+	f.IntVar(&o.min, "min", 1, "Number of matching events that ends a --wait")
 }
 
 type eventsOptions struct {
@@ -57,13 +57,11 @@ type eventsOptions struct {
 func newCmdEvents(deps Deps) *cobra.Command {
 	var o eventFilters
 	cmd := &cobra.Command{
-		Use:   "events",
-		Short: "Count and diagnose captured events",
-		Long: "Print the summary of the captured events: counts by event name, type and write key,\n" +
-			"control requests, SDK families and a diagnosis with the next command to run.",
-		Example: "  rudder-cli dev events --url http://127.0.0.1:4321\n" +
-			"  rudder-cli dev events --url http://127.0.0.1:4321 --event 'Order Completed' --json",
-		Args: cobra.NoArgs,
+		Use:     "events",
+		Short:   "Count and diagnose captured events",
+		Long:    eventsLong,
+		Example: eventsExample,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() { deps.Track("dev events", err, telemetry.KV{K: "json", V: o.json}) }()
 			opts := eventsOptions{eventFilters: o, view: string(devlisten.ViewCounts)}
@@ -78,12 +76,11 @@ func newCmdEvents(deps Deps) *cobra.Command {
 func newCmdEventsList(deps Deps) *cobra.Command {
 	var o eventsOptions
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List captured events with their summary",
-		Long:  "List the captured events, one line each by default, with the summary block.",
-		Example: "  rudder-cli dev events list --url http://127.0.0.1:4321\n" +
-			"  rudder-cli dev events list --url http://127.0.0.1:4321 --event 'Order Completed' --fields properties --json",
-		Args: cobra.NoArgs,
+		Use:     "list",
+		Short:   "List captured events, one line each by default",
+		Long:    eventsListLong,
+		Example: eventsListExample,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				deps.Track("dev events list", err, telemetry.KV{K: "view", V: o.view}, telemetry.KV{K: "json", V: o.json})
@@ -93,10 +90,10 @@ func newCmdEventsList(deps Deps) *cobra.Command {
 	}
 	f := cmd.Flags()
 	o.eventFilters.register(f)
-	f.IntVar(&o.limit, "limit", 100, "Output at most this many events, at a request boundary")
+	f.IntVar(&o.limit, "limit", 100, "Maximum events per page, from 0 (cursor only) to 1000, never splitting a request")
 	f.StringVar(&o.view, "view", "list", "Output view: list, compact or full")
-	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted path of each event, such as properties; repeatable")
-	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes per page; 0 turns the cap off")
+	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted path of each event, such as properties, replaces --view, repeat for more")
+	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Maximum bytes per page, 0 for no cap")
 	return cmd
 }
 

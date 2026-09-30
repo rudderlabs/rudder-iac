@@ -23,10 +23,16 @@ type clientFlags struct {
 	json     bool
 }
 
-func (f *clientFlags) register(fs *pflag.FlagSet) {
-	fs.StringVar(&f.url, "url", "", "Server `URL` from the ready line; default RUDDERSTACK_DEV_URL")
-	fs.StringVar(&f.serverID, "server-id", "", "Filter by server: another or a restarted server answers server_changed")
-	fs.DurationVar(&f.timeout, "timeout", 0, "HTTP `DURATION` for the call; default --wait plus 5s")
+// register adds the shared flags. waits is true for a command with --wait,
+// whose default timeout grows with it.
+func (f *clientFlags) register(fs *pflag.FlagSet, waits bool) {
+	timeout := "HTTP timeout of the call (default 5s)"
+	if waits {
+		timeout = "HTTP timeout of the call (default --wait plus 5s)"
+	}
+	fs.StringVar(&f.url, "url", "", "Listener URL from the ready line (default RUDDERSTACK_DEV_URL)")
+	fs.StringVar(&f.serverID, "server-id", "", "serverId from the ready line, so another or a restarted listener answers server_changed")
+	fs.DurationVar(&f.timeout, "timeout", 0, timeout)
 	fs.BoolVarP(&f.json, "json", "j", false, "Output as JSON")
 }
 

@@ -34,8 +34,8 @@ func newCmdListen(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "listen",
 		Short:   "Capture SDK requests on a local endpoint",
-		Long:    "Capture the requests your app sends to a local RudderStack endpoint. It runs in the foreground.",
-		Example: "  rudder-cli dev listen --port 4321 > ready.json &",
+		Long:    listenLong,
+		Example: listenExample,
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
@@ -49,10 +49,10 @@ func newCmdListen(deps Deps) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.IntVar(&opts.port, "port", 0, "TCP port; 0 lets the OS pick a free one")
-	f.StringVar(&opts.bind, "bind", devlisten.DefaultBind, "Address to bind; 0.0.0.0 in a container")
+	f.IntVar(&opts.port, "port", 0, "TCP port to listen on, 0 for a free port the system picks")
+	f.StringVar(&opts.bind, "bind", devlisten.DefaultBind, "Address to bind, 0.0.0.0 inside a container only")
 	f.StringArrayVar(&opts.writeKeys, "write-key", nil,
-		"Accept only this write `KEY` and reject every other key with 401; repeatable (default: accept any key)")
+		"Allowlist: accept only this write key and reject every other key with 401, repeat for more (default any key)")
 	return cmd
 }
 

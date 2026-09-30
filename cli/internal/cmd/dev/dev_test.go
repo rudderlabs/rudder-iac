@@ -40,6 +40,9 @@ func runDevWith(t *testing.T, deps Deps, args ...string) (string, string, error)
 	t.Helper()
 	var stdout, stderr bytes.Buffer
 	cmd := NewCmdDev(deps)
+	// The root command silences cobra's own printing; each dev command prints
+	// its errors.
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	cmd.SetArgs(args)
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)

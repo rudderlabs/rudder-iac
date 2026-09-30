@@ -2,6 +2,7 @@ package devlisten_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -36,4 +37,17 @@ func TestWriteKeyAllowlistRejectsTheDevKey(t *testing.T) {
 	resp.Body.Close()
 
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestListenerServesTheGuide(t *testing.T) {
+	t.Parallel()
+	s := startServer(t)
+
+	resp, err := testClient.Get(s.URL() + "/_dev/v1/guide") //nolint:noctx // test
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	require.Equal(t, devlisten.Guide(), string(body))
 }

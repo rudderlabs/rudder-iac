@@ -171,7 +171,7 @@ func Start(ctx context.Context, opts ...Option) (*Server, error) {
 	}
 	s.setCaptureHook(cfg.onCapture)
 	s.gateway.AllowWriteKeys(cfg.writeKeys)
-	queryAPI := api.New(st, id, api.Config{CheckHost: api.IsLoopback(cfg.bind), WriteKeys: masked})
+	queryAPI := api.New(st, id, api.Config{CheckHost: api.IsLoopback(cfg.bind), WriteKeys: masked, Guide: guide})
 	s.http = &http.Server{
 		Handler:           s.handler(queryAPI),
 		ReadHeaderTimeout: 10 * time.Second,

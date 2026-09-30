@@ -14,7 +14,8 @@ import (
 
 var log = logger.New("root", logger.Attr{Key: "cmd", Value: "dev"})
 
-var errDisabled = errors.New("dev commands are experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_DEV_LISTEN=true")
+var errDisabled = errors.New("dev commands are experimental: run rudder-cli experimental enable devListen " +
+	"(needs RUDDERSTACK_CLI_EXPERIMENTAL=true), or set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_DEV_LISTEN=true")
 
 // Deps are read at run time, after the root command loaded the config.
 type Deps struct {
@@ -28,19 +29,12 @@ type Deps struct {
 
 func NewCmdDev(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dev",
-		Short: "Capture and inspect local SDK requests (experimental)",
-		Long: "Run a local endpoint that accepts RudderStack SDK requests and keeps them in memory for inspection.\n\n" +
-			"Start dev listen in the background, point the SDK at the url of its ready line, then read what\n" +
-			"arrived with dev events (counts first, then events) and dev requests. A human can open the ui\n" +
-			"of the ready line. Stop the listener with kill PID; the ready line carries the pid.",
-		Example: "  rudder-cli dev listen --port 4321 > ready.json &\n" +
-			"  rudder-cli dev events --url http://127.0.0.1:4321 --json\n" +
-			"  rudder-cli dev events --url http://127.0.0.1:4321 --event 'Order Completed' --fields properties --json",
-		Hidden: true,
-		// Machine mode owns stdout and stderr; each command prints its errors.
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:     "dev <command>",
+		Short:   "Capture and inspect local SDK requests (experimental)",
+		Long:    devLong,
+		Example: devExample,
+		Args:    cobra.NoArgs,
+		Hidden:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !deps.Enabled() {
 				return errDisabled

@@ -214,7 +214,7 @@ func flagNames(cmd *cobra.Command) []string {
 // firstExample is the first example line of cmd, or its path with --help.
 func firstExample(cmd *cobra.Command) string {
 	for _, line := range strings.Split(cmd.Example, "\n") {
-		line = strings.TrimSpace(line)
+		line = strings.TrimPrefix(strings.TrimSpace(line), "$ ")
 		if strings.HasPrefix(line, "rudder-cli ") {
 			return line
 		}

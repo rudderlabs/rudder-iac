@@ -30,8 +30,9 @@ type requestsOptions struct {
 
 func newCmdRequests(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "requests",
+		Use:   "requests <command>",
 		Short: "Inspect whole captured requests",
+		Long:  requestsLong,
 		Args:  cobra.NoArgs,
 	}
 	cmd.AddCommand(newCmdRequestsList(deps))
@@ -42,20 +43,11 @@ func newCmdRequests(deps Deps) *cobra.Command {
 func newCmdRequestsList(deps Deps) *cobra.Command {
 	var o requestsOptions
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List captured requests (GET /_dev/v1/requests)",
-		Long: "List whole captured requests after a cursor: the unit of failure, and the only view of rejected\n" +
-			"and control requests. Each flag is the query parameter of the same name.\n\n" +
-			"Views: list (one short line), compact (the default: seq, receivedAt, method, route,\n" +
-			"statusCode, outcome, kind, rejection and event names) and full (the whole record).\n" +
-			"--fields replaces the view and always keeps seq and request.method.\n" +
-			"--kind control shows /sourceConfig, preflights (method OPTIONS) and unknown paths.\n" +
-			"--write-key filters by the key a request was sent with; on dev listen it is the allowlist.\n" +
-			"omitted.next names the dev requests show call for one whole request.",
-		Example: "  rudder-cli dev requests --url \"$url\" --failed --json\n" +
-			"  rudder-cli dev requests --url \"$url\" --kind control --view list --json\n" +
-			"  rudder-cli dev requests show 42 --url \"$url\" --fields request.body --json",
-		Args: cobra.NoArgs,
+		Use:     "list",
+		Short:   "List captured requests, including rejected and control requests",
+		Long:    requestsListLong,
+		Example: requestsListExample,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				deps.Track("dev requests list", err, telemetry.KV{K: "view", V: o.view}, telemetry.KV{K: "json", V: o.json})
@@ -64,16 +56,16 @@ func newCmdRequestsList(deps Deps) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	o.register(f)
-	f.StringVar(&o.since, "since", "0", "Filter by cursor (requests after seq N), a duration back from now (5m) or an RFC 3339 time")
-	f.IntVar(&o.limit, "limit", 100, "Output at most this many requests")
+	o.register(f, false)
+	f.StringVar(&o.since, "since", "0", "Only requests after this cursor, or received within this duration (5m) or since this RFC 3339 time")
+	f.IntVar(&o.limit, "limit", 100, "Maximum requests per page, from 0 (cursor only) to 1000")
 	f.StringVar(&o.kind, "kind", "ingestion", "Filter by kind: ingestion, control or all")
-	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status `CODE`; repeatable")
-	f.StringArrayVar(&o.writeKey, "write-key", nil, "Filter by the write `KEY` a request was sent with; repeatable")
-	f.BoolVar(&o.failed, "failed", false, "Filter by failure; --failed=false selects accepted requests")
+	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code, such as 401, or class, such as 4xx, repeat for any of several")
+	f.StringArrayVar(&o.writeKey, "write-key", nil, "Filter by the write key a request was sent with, repeat for any of several")
+	f.BoolVar(&o.failed, "failed", false, "Only rejected requests, or accepted ones with --failed=false")
 	f.StringVar(&o.view, "view", "list", "Output view: list, compact or full")
-	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.headers; repeatable")
-	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes per page; 0 turns the cap off")
+	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted path of each request, such as request.headers, repeat for more")
+	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Maximum bytes per page, 0 for no cap")
 	return cmd
 }
 
@@ -139,15 +131,11 @@ type requestsShowOptions struct {
 func newCmdRequestsShow(deps Deps) *cobra.Command {
 	var o requestsShowOptions
 	cmd := &cobra.Command{
-		Use:   "show SEQ",
-		Short: "Show one whole captured request (GET /_dev/v1/requests/{seq})",
-		Long: "Show one captured request: headers, body, response, rejection and the scalars of each event.\n\n" +
-			"Views: compact (the default) leaves out each event's message and enrichedMessage, because\n" +
-			"request.body already holds them as sent; full restores both. --fields picks paths.\n" +
-			"Credential headers are redacted and listed in request.redactedHeaders.",
-		Example: "  rudder-cli dev requests show 42 --fields request.body --json\n" +
-			"  rudder-cli dev requests show 42 --url \"$url\" --json\n" +
-			"  rudder-cli dev requests show 42 --url \"$url\" --view full --json",
+		Use:     "show <seq>",
+		Short:   "Show one whole captured request",
+		Args:    seqArgs,
+		Long:    requestsShowLong,
+		Example: requestsShowExample,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				deps.Track("dev requests show", err, telemetry.KV{K: "view", V: o.view}, telemetry.KV{K: "json", V: o.json})
@@ -156,10 +144,10 @@ func newCmdRequestsShow(deps Deps) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	o.register(f)
+	o.register(f, false)
 	f.StringVar(&o.view, "view", "compact", "Output view: compact or full")
-	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.body; repeatable")
-	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes; 0 turns the cap off")
+	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted path, such as request.body, repeat for more")
+	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Maximum bytes of the answer, 0 for no cap")
 	return cmd
 }
 
@@ -214,4 +202,15 @@ func printIndented(w io.Writer, raw []byte) {
 		buf.Write(raw)
 	}
 	fmt.Fprintln(w, buf.String())
+}
+
+// seqArgs requires one SEQ and reports a missing one as a usage error.
+func seqArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 1 {
+		return nil
+	}
+	jsonFlag := cmd.Flags().Lookup("json")
+	out := newOutput(cmd.OutOrStdout(), cmd.ErrOrStderr(), jsonFlag != nil && jsonFlag.Changed)
+	return out.fail(usageError("rudder-cli dev requests list --view list --json",
+		"requests show takes one SEQ; list the requests to find it"))
 }
