@@ -3,6 +3,7 @@ package accounts
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -18,6 +19,17 @@ func NewProvider(store AccountStore) *Provider {
 		BaseProvider: provider.NewBaseProvider([]provider.Handler{
 			NewHandler(store),
 		}),
+	}
+}
+
+// SpecSchemas returns the account spec envelope.
+func (p *Provider) SpecSchemas() schema.Set {
+	return schema.Set{
+		AccountSpecKind: schema.MustForKindVersions(
+			AccountSpecKind,
+			AccountSpec{},
+			schema.VersionsForKind(AccountSpecKind, p.SupportedMatchPatterns())...,
+		),
 	}
 }
 

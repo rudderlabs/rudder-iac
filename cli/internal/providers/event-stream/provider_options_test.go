@@ -4,10 +4,21 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	connection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSpecSchemasCoverSupportedKinds(t *testing.T) {
+	t.Parallel()
+
+	p := New(source.NewMockSourceClient())
+
+	assert.ElementsMatch(t, []string{source.ResourceKind, connection.EventStreamConnectionResourceKind}, p.SupportedKinds())
+	assert.ElementsMatch(t, p.SupportedKinds(), schema.Kinds(p.SpecSchemas()))
+}
 
 // Connection rules are registered unconditionally now that connection support
 // is GA, so NewConnectionSemanticValidRule always captures destinationRegistry.

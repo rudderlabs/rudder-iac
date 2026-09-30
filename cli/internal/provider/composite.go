@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -56,6 +57,21 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
 	}, nil
+}
+
+// SpecSchemas aggregates schemas from the same provider instances used for kind routing.
+func (p *CompositeProvider) SpecSchemas() schema.Set {
+	schemas := make(schema.Set)
+	for _, candidate := range p.Providers {
+		provider, ok := candidate.(SchemaProvider)
+		if !ok {
+			continue
+		}
+		for kind, specSchema := range provider.SpecSchemas() {
+			schemas[kind] = specSchema
+		}
+	}
+	return schemas
 }
 
 // ResourceMatchers aggregates import --merge matchers from all providers.

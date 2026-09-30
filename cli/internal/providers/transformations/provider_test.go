@@ -19,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -34,6 +35,7 @@ func TestProvider(t *testing.T) {
 		assert.Len(t, kinds, 2)
 		assert.Contains(t, kinds, "transformation-library")
 		assert.Contains(t, kinds, "transformation")
+		assert.ElementsMatch(t, kinds, schema.Kinds(provider.SpecSchemas()))
 	})
 
 	t.Run("SupportedTypes", func(t *testing.T) {

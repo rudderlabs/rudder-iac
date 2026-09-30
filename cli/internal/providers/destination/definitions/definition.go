@@ -91,6 +91,11 @@ func (d *RegisteredDefinition) APIToLocal(api map[string]any) (map[string]any, e
 	return converter.APIToLocal(d.Properties, api)
 }
 
+// NewConfigSchema returns a fresh typed config value for schema reflection.
+func (d *RegisteredDefinition) NewConfigSchema() any {
+	return d.NewConfig()
+}
+
 // SelectedKeyRoots returns the top-level config keys holding the discriminator-
 // selected member of an exclusive group. Callers that prune empty values use it
 // to leave those blocks alone: an empty selected member is a real setting, since

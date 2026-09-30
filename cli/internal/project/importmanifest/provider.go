@@ -14,6 +14,7 @@ import (
 	mrules "github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -45,6 +46,19 @@ func (p *Provider) SupportedTypes() []string {
 func (p *Provider) SupportedMatchPatterns() []rules.MatchPattern {
 	return []rules.MatchPattern{
 		rules.MatchKindVersion(KindImportManifest, specs.SpecVersionV1),
+	}
+}
+
+// SpecSchemas returns the import-manifest envelope. Import manifests are
+// project specs handled before resource-provider dispatch, so their schema is
+// owned here rather than by the composite resource provider.
+func (p *Provider) SpecSchemas() schema.Set {
+	return schema.Set{
+		KindImportManifest: schema.MustForKindVersions(
+			KindImportManifest,
+			specs.WorkspacesImportMetadata{},
+			specs.SpecVersionV1,
+		),
 	}
 }
 

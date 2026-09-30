@@ -51,6 +51,13 @@ func TestGetConfig_ClampsSyncerConcurrency(t *testing.T) {
 	}
 }
 
+func TestGetConfigSchemaBaseURLFromEnvironment(t *testing.T) {
+	t.Setenv("RUDDERSTACK_CLI_SCHEMA_BASE_URL", "https://schemas.example.test/rudder/v1")
+	InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	assert.Equal(t, "https://schemas.example.test/rudder/v1", GetConfig().SchemaBaseURL)
+}
+
 // Removing the flag took RUDDERSTACK_X_CONCURRENT_SYNCS with it, leaving no way
 // to tune sync parallelism per run; concurrency.syncer had no env binding of its
 // own. (concurrency.dataGraph is still unbound — out of scope here.)

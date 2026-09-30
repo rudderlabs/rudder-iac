@@ -12,18 +12,21 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 func NewCmdWorkspaceImport() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		merge    bool
-		varFiles []string
+		deps           app.Deps
+		p              project.Project
+		err            error
+		location       string
+		merge          bool
+		varFiles       []string
+		schemaModeline bool
+		schemaURLBase  string
 	)
 
 	cmd := &cobra.Command{
@@ -37,6 +40,16 @@ func NewCmdWorkspaceImport() *cobra.Command {
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if merge && !config.GetConfig().ExperimentalFlags.ImportMerge {
 				return fmt.Errorf("--merge requires the %q experimental flag to be enabled", "importMerge")
+			}
+			configuredSchemaURLBase := config.GetConfig().SchemaBaseURL
+			if !cmd.Flags().Changed("schema-url-base") && configuredSchemaURLBase != "" {
+				schemaURLBase = configuredSchemaURLBase
+			}
+			if cmd.Flags().Changed("schema-url-base") || configuredSchemaURLBase != "" {
+				schemaModeline = true
+			}
+			if schemaModeline {
+				schemaURLBase = editor.URLBase(schemaURLBase)
 			}
 
 			deps, err = app.NewDeps()
@@ -80,7 +93,11 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			}()
 
 			ui.StartSpinner("Importing ...")
-			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
+			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{
+				Merge:                 merge,
+				SchemaModeline:        schemaModeline,
+				SchemaModelineBaseURL: schemaURLBase,
+			})
 			ui.StopSpinner()
 			if err == nil {
 				// Continuation lines are indented to align under the text after "Warning: ".
@@ -98,5 +115,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files")
 	cmd.Flags().BoolVar(&merge, "merge", false, "Allow import on a diverged project, linking remote resources that match existing local resources (experimental)")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
+	cmd.Flags().BoolVar(&schemaModeline, "schema-modeline", false, "Add yaml-language-server schema modelines to imported specs")
+	cmd.Flags().StringVar(&schemaURLBase, "schema-url-base", "", "URL root for schemas (implies --schema-modeline)")
 	return cmd
 }

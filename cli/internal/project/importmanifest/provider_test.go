@@ -41,6 +41,7 @@ func TestProvider_TypeSurfaces(t *testing.T) {
 	assert.Equal(t, []rules.MatchPattern{
 		rules.MatchKindVersion(KindImportManifest, specs.SpecVersionV1),
 	}, p.SupportedMatchPatterns())
+	assert.Contains(t, p.SpecSchemas(), KindImportManifest)
 }
 
 func TestProvider_LoadSpec_RejectsMalformed(t *testing.T) {

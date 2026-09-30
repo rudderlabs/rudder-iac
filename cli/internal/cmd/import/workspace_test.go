@@ -17,3 +17,16 @@ func TestWorkspaceImportAcceptsVarFile(t *testing.T) {
 	require.NotNil(t, flag, "import workspace must accept --var-file")
 	assert.Equal(t, "stringArray", flag.Value.Type())
 }
+
+func TestWorkspaceImportSchemaModelineFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCmdWorkspaceImport()
+	modeline := cmd.Flags().Lookup("schema-modeline")
+	require.NotNil(t, modeline)
+	assert.Equal(t, "false", modeline.DefValue)
+
+	base := cmd.Flags().Lookup("schema-url-base")
+	require.NotNil(t, base)
+	assert.Empty(t, base.DefValue)
+}

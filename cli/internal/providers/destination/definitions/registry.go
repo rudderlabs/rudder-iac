@@ -1,9 +1,11 @@
 package definitions
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 )
@@ -162,6 +164,22 @@ func (r *Registry) GetByAPIType(apiType string, version int64) (*RegisteredDefin
 		return nil, fmt.Errorf("destination definition for apiType %s version %d not found", apiType, version)
 	}
 	return registered, nil
+}
+
+// Definitions returns every registered definition in deterministic type and
+// version order so generated schema variants are stable.
+func (r *Registry) Definitions() []*RegisteredDefinition {
+	definitions := make([]*RegisteredDefinition, 0, len(r.byTypeVersion))
+	for _, definition := range r.byTypeVersion {
+		definitions = append(definitions, definition)
+	}
+	slices.SortFunc(definitions, func(a, b *RegisteredDefinition) int {
+		if a.Type != b.Type {
+			return strings.Compare(a.Type, b.Type)
+		}
+		return cmp.Compare(a.Version, b.Version)
+	})
+	return definitions
 }
 
 func (r *Registry) SupportedTypes() []string {

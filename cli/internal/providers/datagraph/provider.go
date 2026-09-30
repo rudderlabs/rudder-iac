@@ -23,6 +23,7 @@ import (
 	dgRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -88,6 +89,16 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 	// For other specs, use base implementation
 	return p.BaseProvider.LoadSpec(path, s)
+}
+
+// SpecSchemas returns the aggregate data-graph schema. Models and relationships
+// are inline and therefore reflected through DataGraphSpec rather than exposed as
+// standalone kinds.
+func (p *Provider) SpecSchemas() schema.Set {
+	kind := datagraph.HandlerMetadata.SpecKind
+	return schema.Set{
+		kind: schema.MustForKindVersions(kind, dgModel.DataGraphSpec{}, schema.VersionsForKind(kind, p.SupportedMatchPatterns())...),
+	}
 }
 
 // SupportedMatchPatterns declares the (kind, version) pairs this provider fully handles.

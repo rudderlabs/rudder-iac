@@ -17,6 +17,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -181,6 +182,7 @@ func TestTableSupportEnabled(t *testing.T) {
 		p := retl.New(newDefaultMockClient(), retl.WithTableSupport())
 
 		assert.ElementsMatch(t, []string{sqlmodel.ResourceKind, table.ResourceKind}, p.SupportedKinds())
+		assert.ElementsMatch(t, p.SupportedKinds(), schema.Kinds(p.SpecSchemas()))
 		assert.ElementsMatch(t, []string{sqlmodel.ResourceType, table.ResourceType}, p.SupportedTypes())
 
 		// The SQL model kind keeps its legacy patterns; the table kind was
