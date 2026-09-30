@@ -65,8 +65,13 @@ func InitConfig(cfgFile string) {
 		cfgFile = DefaultConfigFile()
 	}
 
-	err := createConfigFileIfNotExists(cfgFile)
-	cobra.CheckErr(err)
+	// A read-only HOME leaves the CLI without a config file: commands that
+	// need none (help, dev) still run, and saving settings is skipped.
+	configWritable = true
+	if err := createConfigFileIfNotExists(cfgFile); err != nil {
+		configWritable = false
+		log.Warn("config file unavailable; settings will not be saved", "location", cfgFile, "error", err)
+	}
 
 	viper.SetConfigFile(cfgFile)
 
@@ -159,7 +164,14 @@ func ResetExperimentalFlags() {
 	})
 }
 
+// configWritable is false when InitConfig could not create the config file.
+var configWritable = true
+
 func updateConfig(f func(data []byte) ([]byte, error)) {
+	if !configWritable {
+		log.Warn("config file cannot be written; setting not saved")
+		return
+	}
 	configFile := viper.ConfigFileUsed()
 	data, err := os.ReadFile(configFile)
 	cobra.CheckErr(err)

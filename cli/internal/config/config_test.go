@@ -69,3 +69,17 @@ func TestInitConfig_BindsDevURL(t *testing.T) {
 
 	assert.Equal(t, "http://127.0.0.1:4321", viper.GetString("devUrl"))
 }
+
+// A read-only HOME must not stop a command that needs no saved config:
+// dev commands read their URL from the environment (DEX-1017).
+func TestInitConfig_ToleratesAnUnwritableConfigDir(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	t.Setenv("RUDDERSTACK_DEV_URL", "http://127.0.0.1:4321")
+
+	InitConfig(filepath.Join(dir, ".rudder", "config.json"))
+	SetTelemetryAnonymousID("a1")
+
+	assert.Equal(t, "http://127.0.0.1:4321", viper.GetString("devUrl"))
+}
