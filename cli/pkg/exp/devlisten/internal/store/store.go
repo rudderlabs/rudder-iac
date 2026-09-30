@@ -40,15 +40,16 @@ type Rejection struct {
 }
 
 type Request struct {
-	Method       string      `json:"method"`
-	Target       string      `json:"target"`
-	Headers      http.Header `json:"headers"`
-	RemoteAddr   string      `json:"remoteAddr"`
-	BodyEncoding string      `json:"bodyEncoding"`
-	BodyBytes    int         `json:"bodyBytes"`
-	Body         string      `json:"body"`
-	BodyBase64   []byte      `json:"bodyBase64"`
-	BodyComplete bool        `json:"bodyComplete"`
+	Method          string      `json:"method"`
+	Target          string      `json:"target"`
+	Headers         http.Header `json:"headers"`
+	RedactedHeaders []string    `json:"redactedHeaders"`
+	RemoteAddr      string      `json:"remoteAddr"`
+	BodyEncoding    string      `json:"bodyEncoding"`
+	BodyBytes       int         `json:"bodyBytes"`
+	Body            string      `json:"body"`
+	BodyBase64      []byte      `json:"bodyBase64"`
+	BodyComplete    bool        `json:"bodyComplete"`
 }
 
 type Response struct {
@@ -134,4 +135,27 @@ func (s *Store) Done() <-chan struct{} { return s.done }
 
 func (s *Store) Close() {
 	s.closeOnce.Do(func() { close(s.done) })
+}
+
+// Get returns the record with this seq, if the store still holds it.
+func (s *Store) Get(seq uint64) (Record, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	i := sort.Search(len(s.records), func(i int) bool { return s.records[i].Seq >= seq })
+	if i == len(s.records) || s.records[i].Seq != seq {
+		return Record{}, false
+	}
+	return s.records[i], true
+}
+
+// Reset removes every record and returns them. seq keeps counting, and
+// waiters are not woken: a reset adds no match.
+func (s *Store) Reset() []Record {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	removed := s.records
+	s.records = nil
+	return removed
 }

@@ -82,3 +82,23 @@ func TestCloseSignalsDone(t *testing.T) {
 		t.Fatal("done not closed after Close")
 	}
 }
+
+func TestGetAndReset(t *testing.T) {
+	t.Parallel()
+	s := store.New("id")
+	s.Append(store.Record{Kind: "control"})
+	s.Append(store.Record{Kind: "ingestion"})
+
+	got, ok := s.Get(2)
+	require.True(t, ok)
+	require.Equal(t, "ingestion", got.Kind)
+	_, ok = s.Get(3)
+	require.False(t, ok)
+
+	require.Len(t, s.Reset(), 2)
+	_, ok = s.Get(1)
+	require.False(t, ok)
+	require.Equal(t, uint64(2), s.Cursor())
+	require.Equal(t, uint64(3), s.Append(store.Record{}).Seq, "seq keeps counting after reset")
+	require.Empty(t, s.Since(0).Records[:0])
+}

@@ -85,6 +85,8 @@ func InitConfig(cfgFile string) {
 
 	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	// RUDDERSTACK_X_* gates a feature; RUDDERSTACK_DEV_* configures dev listen.
+	viper.BindEnv("devUrl", "RUDDERSTACK_DEV_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")

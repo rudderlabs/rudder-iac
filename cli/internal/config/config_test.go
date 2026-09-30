@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,4 +60,15 @@ func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 	initConfigWithSyncerConcurrency(t, 3)
 
 	assert.Equal(t, 7, GetConfig().Concurrency.Syncer)
+}
+
+// dev clients read the server URL from RUDDERSTACK_DEV_URL (DEX-1017), and
+// the state file follows -c through GetConfigDir.
+func TestInitConfig_BindsDevURLAndConfigDirFollowsFlag(t *testing.T) {
+	t.Setenv("RUDDERSTACK_DEV_URL", "http://127.0.0.1:4321")
+	dir := t.TempDir()
+	InitConfig(filepath.Join(dir, "config.json"))
+
+	assert.Equal(t, "http://127.0.0.1:4321", viper.GetString("devUrl"))
+	assert.Equal(t, dir, GetConfigDir())
 }

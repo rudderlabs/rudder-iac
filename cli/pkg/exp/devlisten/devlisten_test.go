@@ -94,7 +94,7 @@ func TestPostBatchThenReadItBackWithSinceAndWait(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		page, err := client.Events(ctx, devlisten.Query{Since: since, Event: []string{"Order Completed"}, Wait: 10 * time.Second, Min: 1})
+		page, err := client.Events(ctx, devlisten.Query{Since: since, View: devlisten.ViewFull, Event: []string{"Order Completed"}, Wait: 10 * time.Second, Min: 1})
 		done <- result{page, err}
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -147,7 +147,7 @@ func TestClientWaitLoopsUntilMin(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	page, err := s.Client().Wait(ctx, devlisten.Query{Event: []string{"Late"}, Min: 1})
+	page, err := s.Client().WaitForEvents(ctx, devlisten.Query{Event: []string{"Late"}, Min: 1})
 
 	require.NoError(t, err)
 	require.Len(t, page.Events, 1)
@@ -159,7 +159,7 @@ func TestClientWaitReportsDeadline(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	_, err := s.Client().Wait(ctx, devlisten.Query{Event: []string{"never"}, Min: 1})
+	_, err := s.Client().WaitForEvents(ctx, devlisten.Query{Event: []string{"never"}, Min: 1})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Contains(t, err.Error(), "unfiltered: 0 requests, 0 events, 0 control")
@@ -204,8 +204,16 @@ func TestCloseStopsServing(t *testing.T) {
 func TestQueryValues(t *testing.T) {
 	t.Parallel()
 
-	q := devlisten.Query{Since: 57, Limit: 10, Event: []string{"A", "B"}, Type: []string{"track"}, Min: 2, Wait: 30 * time.Second}
+	q := devlisten.Query{
+		Since: 57, Limit: 10, Order: devlisten.OrderAsc, View: devlisten.ViewSummary,
+		Event: []string{"A", "B"}, Type: []string{"track"}, Route: []string{"/v1/track"}, StatusCode: []int{200, 400},
+		UserID: "u1", AnonymousID: "a1", Include: []string{"context"}, Fields: []string{"properties"},
+		MaxBytes: devlisten.MaxBytesOff, Min: 2, Wait: 30 * time.Second,
+	}
 
-	require.Equal(t, "event=A&event=B&limit=10&min=2&since=57&type=track&wait=30s", q.Values().Encode())
+	require.Equal(t, "anonymousId=a1&event=A&event=B&fields=properties&include=context&limit=10&maxBytes=0&min=2"+
+		"&order=asc&route=%2Fv1%2Ftrack&since=57&statusCode=200&statusCode=400&type=track&userId=u1&view=summary&wait=30s",
+		q.Values().Encode())
+	require.Equal(t, "maxBytes=500", devlisten.Query{MaxBytes: 500}.Values().Encode())
 	require.Equal(t, "", devlisten.Query{}.Values().Encode())
 }

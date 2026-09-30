@@ -100,7 +100,11 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
 
-	devCmd = devcmd.NewCmdDev(func() bool { return config.GetConfig().ExperimentalFlags.DevListen })
+	devCmd = devcmd.NewCmdDev(devcmd.Deps{
+		Enabled:   func() bool { return config.GetConfig().ExperimentalFlags.DevListen },
+		DevURL:    func() string { return viper.GetString("devUrl") },
+		ConfigDir: config.GetConfigDir,
+	})
 	rootCmd.AddCommand(devCmd)
 
 	rootCmd.AddCommand(typer.NewCmdTyper())

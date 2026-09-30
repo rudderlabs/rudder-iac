@@ -87,14 +87,14 @@ func TestTrackIsAcceptedAndCaptured(t *testing.T) {
 	var enriched map[string]any
 	require.NoError(t, json.Unmarshal(ev.EnrichedMessage, &enriched))
 	require.Equal(t, map[string]any{
-		"type":        "track",
-		"event":       "Order Completed",
-		"userId":      "u1",
-		"properties":  map[string]any{"total": float64(42)},
-		"messageId":   "11111111-2222-4333-8444-555555555555",
-		"receivedAt":  "2026-09-29T12:00:00.123456Z",
-		"request_ip":  "127.0.0.1",
-		"rudderId":    "5eff0fc3-0944-48fa-9c04-38f62e3890ca",
+		"type":       "track",
+		"event":      "Order Completed",
+		"userId":     "u1",
+		"properties": map[string]any{"total": float64(42)},
+		"messageId":  "11111111-2222-4333-8444-555555555555",
+		"receivedAt": "2026-09-29T12:00:00.123456Z",
+		"request_ip": "127.0.0.1",
+		"rudderId":   "5eff0fc3-0944-48fa-9c04-38f62e3890ca",
 	}, enriched)
 }
 

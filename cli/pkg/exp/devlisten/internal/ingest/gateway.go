@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -36,11 +38,16 @@ type Gateway struct {
 	now       func() time.Time
 	newUUID   func() string
 	stopping  atomic.Bool
+	onCapture func(store.Record)
 }
 
 func New(st *store.Store, startedAt time.Time) *Gateway {
 	return &Gateway{store: st, startedAt: startedAt, now: time.Now, newUUID: newUUIDv4}
 }
+
+// OnCapture sets a function called with every stored record, after the
+// response is written. Call it before serving.
+func (g *Gateway) OnCapture(f func(store.Record)) { g.onCapture = f }
 
 // Stop makes the health routes answer 503 while the server drains.
 func (g *Gateway) Stop() { g.stopping.Store(true) }
@@ -76,8 +83,11 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// The record is stored before the response is written, so a sender that
 	// has read the response always finds its request in the store.
-	g.store.Append(g.record(r, rep, raw, complete, receivedAt))
+	rec := g.store.Append(g.record(r, rep, raw, complete, receivedAt))
 	writeReply(w, rep)
+	if g.onCapture != nil {
+		g.onCapture(rec)
+	}
 }
 
 func (g *Gateway) route(r *http.Request, raw []byte, receivedAt time.Time) reply {
@@ -132,11 +142,12 @@ func writeReply(w http.ResponseWriter, rep reply) {
 }
 
 func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, receivedAt time.Time) store.Record {
+	headers, redacted := redact(r.Header)
 	rec := store.Record{
 		Kind:       rep.kind,
 		Probe:      strings.HasPrefix(r.UserAgent(), probeUserAgentPrefix),
 		ReceivedAt: receivedAt,
-		Route:      r.URL.Path,
+		Route:      routeOf(r.URL.Path),
 		Transport:  rep.transport,
 		StatusCode: rep.status,
 		Outcome:    "accepted",
@@ -144,14 +155,15 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 		SourceID:   SourceID(rep.writeKey),
 		Rejection:  rep.rejection,
 		Request: store.Request{
-			Method:       r.Method,
-			Target:       r.RequestURI,
-			Headers:      redact(r.Header),
-			RemoteAddr:   r.RemoteAddr,
-			BodyEncoding: r.Header.Get("Content-Encoding"),
-			BodyBytes:    len(raw),
-			Body:         string(raw),
-			BodyComplete: complete,
+			Method:          r.Method,
+			Target:          r.RequestURI,
+			Headers:         headers,
+			RedactedHeaders: redacted,
+			RemoteAddr:      r.RemoteAddr,
+			BodyEncoding:    r.Header.Get("Content-Encoding"),
+			BodyBytes:       len(raw),
+			Body:            string(raw),
+			BodyComplete:    complete,
 		},
 		Response: store.Response{StatusCode: rep.status, Headers: rep.header.Clone(), Body: string(rep.body)},
 		Events:   rep.events,
@@ -170,12 +182,33 @@ func (g *Gateway) record(r *http.Request, rep reply, raw []byte, complete bool, 
 	return rec
 }
 
-func redact(h http.Header) http.Header {
-	out := h.Clone()
-	if _, ok := out["Authorization"]; ok {
-		out["Authorization"] = []string{"REDACTED"}
+// credentialHeader matches header names that carry credentials. Cookies are
+// not scoped by port, so a browser sends the session cookies of other
+// localhost apps too.
+var credentialHeader = regexp.MustCompile(`(?i)(token|secret|api-?key|auth)`)
+
+// routeOf is the path without a trailing slash; request.target keeps it.
+// Summary counts and route filters use this form.
+func routeOf(path string) string {
+	if len(path) > 1 {
+		return strings.TrimSuffix(path, "/")
 	}
-	return out
+	return path
+}
+
+// redact replaces credential header values and returns the redacted names,
+// sorted.
+func redact(h http.Header) (http.Header, []string) {
+	out := h.Clone()
+	names := []string{}
+	for name := range out {
+		if name == "Cookie" || credentialHeader.MatchString(name) {
+			out[name] = []string{"REDACTED"}
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return out, names
 }
 
 // SourceID is the source id the server reports for a write key: "dev-" plus

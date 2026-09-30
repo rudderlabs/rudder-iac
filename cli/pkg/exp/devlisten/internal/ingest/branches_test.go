@@ -180,6 +180,28 @@ func TestAuthorizationIsRedactedInTheRecord(t *testing.T) {
 	require.Equal(t, []string{"REDACTED"}, onlyRecord(t, st).Request.Headers["Authorization"])
 }
 
+func TestCredentialHeadersAreRedactedAndListed(t *testing.T) {
+	t.Parallel()
+	g, st := newTestGateway()
+	req := post("/v1/track", `{"userId":"u1"}`)
+	req.Header.Set("Cookie", "session=abc")
+	req.Header.Set("Proxy-Authorization", "Basic x")
+	req.Header.Set("X-Api-Key", "k")
+	req.Header.Set("X-Session-Token", "t")
+	req.Header.Set("X-Client-Secret", "s")
+	req.Header.Set("User-Agent", "analytics-node/3.0.9")
+
+	send(t, g, req)
+
+	rec := onlyRecord(t, st).Request
+	require.Equal(t, []string{"Authorization", "Cookie", "Proxy-Authorization", "X-Api-Key", "X-Client-Secret",
+		"X-Session-Token"}, rec.RedactedHeaders)
+	for _, name := range rec.RedactedHeaders {
+		require.Equal(t, []string{"REDACTED"}, rec.Headers[name], name)
+	}
+	require.Equal(t, []string{"analytics-node/3.0.9"}, rec.Headers["User-Agent"])
+}
+
 func TestPreflightCopiesRSCors(t *testing.T) {
 	t.Parallel()
 	g, st := newTestGateway()
@@ -234,6 +256,8 @@ func TestSourceConfig(t *testing.T) {
 	rec := onlyRecord(t, st)
 	require.Equal(t, "control", rec.Kind)
 	require.Equal(t, "dev", rec.WriteKey)
+	require.Equal(t, "/sourceConfig", rec.Route, "route drops the trailing slash; target keeps it")
+	require.Equal(t, "/sourceConfig/?p=npm&v=3.0.0", rec.Request.Target)
 }
 
 func TestSourceConfigWithoutWriteKey(t *testing.T) {
