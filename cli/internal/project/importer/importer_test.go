@@ -264,7 +264,9 @@ func TestImportSummary(t *testing.T) {
 		location   string
 		varFiles   []string
 		importable map[string]map[string]*resources.RemoteResource
-		expected   string
+		// exported are the URNs FormatForExport emitted entries for.
+		exported []string
+		expected string
 	}{
 		{
 			name:     "plain import omits the merged section",
@@ -273,6 +275,7 @@ func TestImportSummary(t *testing.T) {
 				"source":              {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 				"event-stream-source": {"rid-2": {ID: "rid-2", ExternalID: "web"}},
 			},
+			exported: []string{"source:my-src", "event-stream-source:web"},
 			expected: `Resources imported into imported/: 2
   event-stream-source  1
   source               1
@@ -290,6 +293,7 @@ func TestImportSummary(t *testing.T) {
 				},
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
+			exported: []string{"source:my-src", "event-stream-source:web", "event-stream-source:ios", "event-stream-source:android", "tracking-plan:checkout"},
 			expected: `Resources imported into imported/: 3
   event-stream-source  2
   source               1
@@ -304,10 +308,37 @@ Remote resources merged into existing local resources: 2
 			importable: map[string]map[string]*resources.RemoteResource{
 				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
 			},
+			exported: []string{"tracking-plan:checkout"},
 			expected: `Resources imported into imported/: 0
 Remote resources merged into existing local resources: 1
   tracking-plan:checkout  <- remote tp-1
 ` + applyHint,
+		},
+		{
+			name:     "resources the exporter skipped are not counted",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"data-graph":       {"dg-1": {ID: "dg-1", ExternalID: "warehouse", MatchedWith: resources.NewResource("warehouse", "data-graph", nil, nil)}},
+				"data-graph-model": {"m-1": {ID: "m-1", ExternalID: "remote-only-model"}},
+				"source":           {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-connection": {
+					"c-1": {ID: "c-1", ExternalID: "unresolvable"},
+				},
+			},
+			exported: []string{"data-graph:warehouse", "source:my-src"},
+			expected: `Resources imported into imported/: 1
+  source  1
+Remote resources merged into existing local resources: 1
+  data-graph:warehouse  <- remote dg-1
+` + applyHint,
+		},
+		{
+			name:     "nothing exported prints no apply hint",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"event-stream-connection": {"c-1": {ID: "c-1", ExternalID: "unresolvable"}},
+			},
+			expected: "No resources to import\n",
 		},
 		{
 			name:     "non-default location shows the real path and passes it to apply",
@@ -315,6 +346,7 @@ Remote resources merged into existing local resources: 1
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 			},
+			exported: []string{"source:my-src"},
 			expected: `Resources imported into myproj/imported/: 1
   source  1
 
@@ -328,6 +360,7 @@ The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli appl
 			importable: map[string]map[string]*resources.RemoteResource{
 				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
 			},
+			exported: []string{"source:my-src"},
 			expected: `Resources imported into my proj/imported/: 1
   source  1
 
@@ -342,8 +375,12 @@ The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli appl
 			for resourceType, rs := range tt.importable {
 				importable.Set(resourceType, rs)
 			}
+			entries := make([]importmanifest.ImportEntry, len(tt.exported))
+			for i, urn := range tt.exported {
+				entries[i] = importmanifest.ImportEntry{URN: urn}
+			}
 
-			assert.Equal(t, tt.expected, importSummary(importable, tt.location, tt.varFiles))
+			assert.Equal(t, tt.expected, importSummary(importable, entries, tt.location, tt.varFiles))
 		})
 	}
 }

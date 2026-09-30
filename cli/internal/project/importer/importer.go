@@ -157,12 +157,21 @@ func WorkspaceImport(
 	if varFile != "" {
 		varFiles = append(slices.Clip(varFiles), varFile)
 	}
-	return importSummary(importable, location, varFiles), nil
+	return importSummary(importable, importEntries, location, varFiles), nil
 }
 
 // importSummary shows what landed on disk and that apply is still needed:
 // imported specs are not managed by the CLI until they are applied.
-func importSummary(importable *resources.RemoteResources, location string, varFiles []string) string {
+//
+// Only resources with an export entry count: exporters skip some importable
+// resources (unresolvable connections, remote-only children of a merged data
+// graph), and those are neither written nor adopted.
+func importSummary(importable *resources.RemoteResources, entries []importmanifest.ImportEntry, location string, varFiles []string) string {
+	exported := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		exported[e.URN] = true
+	}
+
 	var (
 		importedRows []string
 		merged       []string
@@ -171,6 +180,9 @@ func importSummary(importable *resources.RemoteResources, location string, varFi
 	for _, t := range importable.Types() {
 		imported := 0
 		for _, r := range importable.GetAll(t) {
+			if !exported[resources.URN(r.ExternalID, t)] {
+				continue
+			}
 			if r.MatchedWith != nil {
 				merged = append(merged, fmt.Sprintf("  %s\t<- remote %s\n", r.MatchedWith.URN(), r.ID))
 				continue
@@ -182,6 +194,9 @@ func importSummary(importable *resources.RemoteResources, location string, varFi
 		}
 		importedRows = append(importedRows, fmt.Sprintf("  %s\t%d\n", t, imported))
 		total += imported
+	}
+	if total == 0 && len(merged) == 0 {
+		return "No resources to import\n"
 	}
 	// Merged lines start with the local URN, so sorting the lines sorts by URN.
 	slices.Sort(merged)
