@@ -47,7 +47,7 @@ func TestExampleImport(t *testing.T) {
 	_, err = b.CreateBook("Book B", wB.ID, "", "")
 	require.NoError(t, err)
 
-	err = importer.WorkspaceImport(context.Background(), proj, provider, importer.ImportOptions{})
+	_, err = importer.WorkspaceImport(context.Background(), proj, provider, importer.ImportOptions{})
 	require.NoError(t, err, "Failed to import workspace")
 
 	assertDirContents(t, testDir)
@@ -110,12 +110,13 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 	importProvider := example.NewProvider(b)
 	proj := project.New(importProvider)
 	require.NoError(t, proj.Load(testDir))
-	require.NoError(t, importer.WorkspaceImport(
+	_, err = importer.WorkspaceImport(
 		context.Background(),
 		proj,
 		importProvider,
 		importer.ImportOptions{},
-	))
+	)
+	require.NoError(t, err)
 
 	// The generated spec carries an unquoted variable reference, not a mask.
 	// The handler names the variable from the resource's identity
@@ -229,12 +230,13 @@ spec:
 
 	// Without substitution the local graph still holds the literal token.
 	noVarsProvider, noVarsProject := loadProject(t, false)
-	err = importer.WorkspaceImport(context.Background(), noVarsProject, noVarsProvider, importer.ImportOptions{})
+	_, err = importer.WorkspaceImport(context.Background(), noVarsProject, noVarsProvider, importer.ImportOptions{})
 	require.ErrorIs(t, err, importer.ErrProjectNotSynced)
 
 	// With substitution both sides agree and the import proceeds.
 	varsProvider, varsProject := loadProject(t, true)
-	require.NoError(t, importer.WorkspaceImport(context.Background(), varsProject, varsProvider, importer.ImportOptions{}))
+	_, err = importer.WorkspaceImport(context.Background(), varsProject, varsProvider, importer.ImportOptions{})
+	require.NoError(t, err)
 	assert.DirExists(t, filepath.Join(testDir, importer.ImportedDir))
 }
 

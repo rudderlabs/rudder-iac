@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+	"text/tabwriter"
+	"unicode"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -47,64 +50,70 @@ type Project interface {
 // resources instead of writing duplicate specs).
 type ImportOptions struct {
 	Merge bool
+	// VarFiles are the --var-file paths given to import, repeated in the apply
+	// hint so the printed command resolves the same {{ .VAR }} references.
+	VarFiles []string
 }
 
+// WorkspaceImport returns the import summary instead of printing it, so the
+// caller can print it after its own output (spinner, warnings) and the apply
+// hint comes last.
 func WorkspaceImport(
 	ctx context.Context,
 	project Project,
 	p ImportProvider,
-	opts ImportOptions) error {
+	opts ImportOptions) (string, error) {
 
 	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
 	if err != nil {
-		return fmt.Errorf("loading remote resources: %w", err)
+		return "", fmt.Errorf("loading remote resources: %w", err)
 	}
 
 	pstate, err := p.MapRemoteToState(remoteCollection)
 	if err != nil {
-		return fmt.Errorf("loading state from resources: %w", err)
+		return "", fmt.Errorf("loading state from resources: %w", err)
 	}
 
 	sourceGraph := syncer.StateToGraph(pstate)
 	targetGraph, err := project.ResourceGraph()
 	if err != nil {
-		return fmt.Errorf("getting resource graph: %w", err)
+		return "", fmt.Errorf("getting resource graph: %w", err)
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
 	if err := checkSyncStatus(diff, opts.Merge); err != nil {
-		return err
+		return "", err
 	}
 
 	idNamer, err := initNamer(targetGraph)
 	if err != nil {
-		return fmt.Errorf("initializing namer: %w", err)
+		return "", fmt.Errorf("initializing namer: %w", err)
 	}
 
 	importable, err := p.LoadImportable(ctx, idNamer)
 	if err != nil {
-		return fmt.Errorf("loading importable resources: %w", err)
+		return "", fmt.Errorf("loading importable resources: %w", err)
 	}
 
 	if importable.Len() == 0 {
 		fmt.Println("No resources to import")
-		return nil
+		return "", nil
 	}
 
 	if opts.Merge {
 		if err := markMatchedWith(p, sourceGraph, targetGraph, importable); err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	resolver, err := initResolver(remoteCollection, importable, targetGraph)
 	if err != nil {
-		return fmt.Errorf("setting up import ref resolver: %w", err)
+		return "", fmt.Errorf("setting up import ref resolver: %w", err)
 	}
 
 	entities, importEntries, err := p.FormatForExport(importable, idNamer, resolver)
 	if err != nil {
-		return fmt.Errorf("normalizing for import: %w", err)
+		return "", fmt.Errorf("normalizing for import: %w", err)
 	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
@@ -112,7 +121,7 @@ func WorkspaceImport(
 	location := project.Location()
 	importDir := filepath.Join(location, ImportedDir)
 	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
-		return fmt.Errorf("writing files for formattable entities: %w", err)
+		return "", fmt.Errorf("writing files for formattable entities: %w", err)
 	}
 
 	// Only emit the import-manifest when the importMerge experimental flag is
@@ -120,7 +129,7 @@ func WorkspaceImport(
 	if config.GetConfig().ExperimentalFlags.ImportMerge {
 		manifestNode, err := importmanifest.BuildNode(importEntries)
 		if err != nil {
-			return fmt.Errorf("building import manifest: %w", err)
+			return "", fmt.Errorf("building import manifest: %w", err)
 		}
 
 		if manifestNode != nil {
@@ -129,21 +138,100 @@ func WorkspaceImport(
 				RelativePath: importmanifest.FileName,
 			}
 			if err := writer.Write(ctx, importDir, formatters, []writer.FormattableEntity{manifestEntity}); err != nil {
-				return fmt.Errorf("writing import manifest: %w", err)
+				return "", fmt.Errorf("writing import manifest: %w", err)
 			}
 		}
 	}
 
 	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
 	if err != nil {
-		return fmt.Errorf("scaffolding secrets var file: %w", err)
+		return "", fmt.Errorf("scaffolding secrets var file: %w", err)
 	}
 	if varFile != "" {
 		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
 	}
 
-	return nil
+	varFiles := opts.VarFiles
+	if varFile != "" {
+		varFiles = append(slices.Clip(varFiles), varFile)
+	}
+	return importSummary(importable, importEntries, location, varFiles), nil
+}
+
+// importSummary shows what landed on disk and that apply is still needed:
+// imported specs are not managed by the CLI until they are applied.
+//
+// Only resources with an export entry count: exporters skip some importable
+// resources (unresolvable connections, remote-only children of a merged data
+// graph), and those are neither written nor adopted.
+func importSummary(importable *resources.RemoteResources, entries []importmanifest.ImportEntry, location string, varFiles []string) string {
+	exported := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		exported[e.URN] = true
+	}
+
+	var (
+		importedRows []string
+		merged       []string
+		total        int
+	)
+	for _, t := range importable.Types() {
+		imported := 0
+		for _, r := range importable.GetAll(t) {
+			if !exported[resources.URN(r.ExternalID, t)] {
+				continue
+			}
+			if r.MatchedWith != nil {
+				merged = append(merged, fmt.Sprintf("  %s\t<- remote %s\n", r.MatchedWith.URN(), r.ID))
+				continue
+			}
+			imported++
+		}
+		if imported == 0 {
+			continue
+		}
+		importedRows = append(importedRows, fmt.Sprintf("  %s\t%d\n", t, imported))
+		total += imported
+	}
+	if total == 0 && len(merged) == 0 {
+		return "No resources to import\n"
+	}
+	// Merged lines start with the local URN, so sorting the lines sorts by URN.
+	slices.Sort(merged)
+
+	var (
+		b strings.Builder
+		w = tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	)
+	fmt.Fprintf(w, "Resources imported into %s/: %d\n%s", filepath.Join(location, ImportedDir), total, strings.Join(importedRows, ""))
+	if len(merged) > 0 {
+		fmt.Fprintf(w, "Remote resources merged into existing local resources: %d\n%s", len(merged), strings.Join(merged, ""))
+	}
+
+	applyCmd := "rudder-cli apply"
+	if filepath.Clean(location) != "." {
+		applyCmd += " -l " + quoteArg(location)
+	}
+	for _, f := range varFiles {
+		applyCmd += " --var-file " + quoteArg(f)
+	}
+	fmt.Fprintf(w, "\nThe imported resources are not managed by the CLI yet. Run `%s` to start managing them.\n", applyCmd)
+	_ = w.Flush()
+	return b.String()
+}
+
+// quoteArg makes a path safe to paste into a POSIX shell. Single quotes, not
+// double, because nothing inside them expands ($HOME, $(cmd), backticks); an
+// embedded ' has to close the quote, add an escaped ', and reopen it.
+func quoteArg(s string) string {
+	unsafe := func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("-_./:@+=,", r)
+	}
+	if !strings.ContainsFunc(s, unsafe) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,

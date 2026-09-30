@@ -449,3 +449,15 @@ func TestRemoteResources_GetURNByID(t *testing.T) {
 		assert.Equal(t, URN(externalID, resourceType), urn)
 	})
 }
+
+func TestRemoteResources_Types(t *testing.T) {
+	t.Parallel()
+
+	collection := NewRemoteResources()
+	assert.Empty(t, collection.Types())
+
+	collection.Set("tracking-plan", map[string]*RemoteResource{"tp-1": {ID: "tp-1"}})
+	collection.Set("event", map[string]*RemoteResource{"ev-1": {ID: "ev-1"}})
+	collection.Set("property", map[string]*RemoteResource{"p-1": {ID: "p-1"}})
+	assert.Equal(t, []string{"event", "property", "tracking-plan"}, collection.Types())
+}

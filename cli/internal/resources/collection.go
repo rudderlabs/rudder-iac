@@ -3,6 +3,8 @@ package resources
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 )
 
 // RemoteResource represents a resource that is fetched from the remote catalog
@@ -46,6 +48,11 @@ func (rc *RemoteResources) Len() int {
 		count += len(resources)
 	}
 	return count
+}
+
+// Types returns the resource types in the collection, sorted.
+func (rc *RemoteResources) Types() []string {
+	return slices.Sorted(maps.Keys(rc.resources))
 }
 
 // Set stores a resource map for the given resource type
