@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 	"unicode"
@@ -222,13 +221,17 @@ func importSummary(importable *resources.RemoteResources, entries []importmanife
 	return b.String()
 }
 
-// quoteArg keeps a copied path with spaces from splitting into several shell
-// arguments.
+// quoteArg makes a path safe to paste into a POSIX shell. Single quotes, not
+// double, because nothing inside them expands ($HOME, $(cmd), backticks); an
+// embedded ' has to close the quote, add an escaped ', and reopen it.
 func quoteArg(s string) string {
-	if strings.ContainsFunc(s, unicode.IsSpace) {
-		return strconv.Quote(s)
+	unsafe := func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("-_./:@+=,", r)
 	}
-	return s
+	if !strings.ContainsFunc(s, unsafe) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,

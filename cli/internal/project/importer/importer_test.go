@@ -354,7 +354,7 @@ The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli appl
 `,
 		},
 		{
-			name:     "var files are passed to apply and paths with spaces are quoted",
+			name:     "var files are passed to apply and paths with spaces are single-quoted",
 			location: "my proj",
 			varFiles: []string{"prod.vars.yaml", "my proj/imported/secrets.vars.yaml"},
 			importable: map[string]map[string]*resources.RemoteResource{
@@ -364,7 +364,34 @@ The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli appl
 			expected: `Resources imported into my proj/imported/: 1
   source  1
 
-The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l \"my proj\" --var-file prod.vars.yaml --var-file \"my proj/imported/secrets.vars.yaml\"`" + ` to start managing them.
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l 'my proj' --var-file prod.vars.yaml --var-file 'my proj/imported/secrets.vars.yaml'`" + ` to start managing them.
+`,
+		},
+		{
+			name:     "a single quote in a path is escaped inside single quotes",
+			location: "O'Brien",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into O'Brien/imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l 'O'\\''Brien'`" + ` to start managing them.
+`,
+		},
+		{
+			name:     "a dollar sign in a path is single-quoted so it does not expand",
+			location: ".",
+			varFiles: []string{"$HOME/prod.vars.yaml"},
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply --var-file '$HOME/prod.vars.yaml'`" + ` to start managing them.
 `,
 		},
 	}
