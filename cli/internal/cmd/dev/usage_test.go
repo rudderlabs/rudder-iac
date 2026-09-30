@@ -70,3 +70,9 @@ func TestJQWithoutJSONNamesTheCorrectedCommand(t *testing.T) {
 }
 
 var errBoom = errors.New("boom")
+
+func TestRequestsShowLeadsWithTheBodyExample(t *testing.T) {
+	t.Parallel()
+	require.Equal(t, "rudder-cli dev requests show 42 --fields request.body --json",
+		firstExample(findCommand(t, []string{"requests", "show"})))
+}

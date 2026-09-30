@@ -241,6 +241,7 @@ type RequestQuery struct {
 	StatusCode []int
 	Failed     *bool
 	Stage      string
+	View       View
 	Fields     []string
 	MaxBytes   int
 	Min        int
@@ -258,6 +259,7 @@ func (q RequestQuery) Values() url.Values {
 		v.Set("failed", strconv.FormatBool(*q.Failed))
 	}
 	setString(v, "stage", q.Stage)
+	setString(v, "view", string(q.View))
 	v["fields"] = q.Fields
 	setMaxBytes(v, q.MaxBytes)
 	setInt(v, "min", q.Min)
@@ -265,14 +267,17 @@ func (q RequestQuery) Values() url.Values {
 	return compact(v)
 }
 
-// RecordQuery shapes one /requests/{seq} record.
+// RecordQuery shapes one /requests/{seq} record. View is ViewCompact (the
+// default: events without their message copies) or ViewFull.
 type RecordQuery struct {
+	View     View
 	Fields   []string
 	MaxBytes int
 }
 
 func (q RecordQuery) Values() url.Values {
 	v := url.Values{"fields": q.Fields}
+	setString(v, "view", string(q.View))
 	setMaxBytes(v, q.MaxBytes)
 	return compact(v)
 }
@@ -566,6 +571,7 @@ type RequestPage struct {
 	HasMore    bool       `json:"hasMore"`
 	TimedOut   bool       `json:"timedOut"`
 	Unfiltered Unfiltered `json:"unfiltered"`
+	View       View       `json:"view"`
 	Omitted    *Omitted   `json:"omitted"`
 	Truncated  *Truncated `json:"truncated"`
 	Requests   []Record   `json:"requests"`
@@ -716,7 +722,8 @@ func (c *Client) Send(ctx context.Context, p Probe) (SendResult, error) {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	res := SendResult{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(respBody)), Route: route}
-	page, err := c.Requests(ctx, RequestQuery{Since: info.Cursor, Kind: "all", Route: []string{route}, MaxBytes: MaxBytesOff})
+	page, err := c.Requests(ctx, RequestQuery{Since: info.Cursor, Kind: "all", Route: []string{route}, View: ViewFull,
+		MaxBytes: MaxBytesOff})
 	if err != nil {
 		return res, err
 	}

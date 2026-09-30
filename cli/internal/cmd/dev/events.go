@@ -69,7 +69,7 @@ func newCmdEventsList(deps Deps) *cobra.Command {
 	f.Uint64Var(&o.since, "since", 0, "Filter by cursor: events of requests with seq above this")
 	f.IntVar(&o.limit, "limit", 100, "Output at most this many events, at a request boundary")
 	f.StringVar(&o.order, "order", "asc", "Output order; asc only in this phase")
-	f.StringVar(&o.view, "view", "compact", "Output view: summary, compact or full")
+	f.StringVar(&o.view, "view", "compact", "Output view: summary, compact or full (requests list has the same three)")
 	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as properties; repeat for more")
 	f.StringArrayVar(&o.include, "include", nil, "Output more in compact: context or enrichment; repeatable")
 	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes per page; 0 turns the cap off")

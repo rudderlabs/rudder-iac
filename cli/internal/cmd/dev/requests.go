@@ -39,6 +39,7 @@ type requestsListOptions struct {
 	statusCode []string
 	failed     bool
 	stage      string
+	view       string
 	fields     []string
 	maxBytes   int
 	wait       time.Duration
@@ -50,11 +51,15 @@ func newCmdRequestsList(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List captured requests (GET /_dev/v1/requests)",
-		Long: "List captured requests after a cursor, without bodies. Each flag is the query parameter of\n" +
-			"the same name. --kind control shows /sourceConfig, preflights and unknown paths.\n" +
+		Long: "List captured requests after a cursor. Each flag is the query parameter of the same name.\n\n" +
+			"Views: summary (one short line), compact (the default: seq, receivedAt, method, route,\n" +
+			"statusCode, outcome, kind, rejection and event names) and full (the whole record).\n" +
+			"--fields replaces the view and always keeps seq and request.method.\n" +
+			"--kind control shows /sourceConfig, preflights (method OPTIONS) and unknown paths.\n" +
 			"omitted.next names the rudder-cli dev requests show call for one whole request.",
-		Example: "  rudder-cli dev requests list --failed --stage auth --json\n" +
-			"  rudder-cli dev requests list --kind control --json",
+		Example: "  rudder-cli dev requests list --since 0 --json\n" +
+			"  rudder-cli dev requests list --failed --stage auth --json\n" +
+			"  rudder-cli dev requests list --kind control --view summary --json",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRequestsList(cmd, deps, o)
@@ -70,6 +75,7 @@ func newCmdRequestsList(deps Deps) *cobra.Command {
 	f.StringArrayVar(&o.statusCode, "status-code", nil, "Filter by HTTP status code; repeatable")
 	f.BoolVar(&o.failed, "failed", false, "Filter by failure; --failed=false selects accepted requests")
 	f.StringVar(&o.stage, "stage", "", "Filter by rejection stage, such as auth or body")
+	f.StringVar(&o.view, "view", "compact", "Output view: summary, compact or full (events list has the same three)")
 	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.headers; repeatable")
 	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes per page; 0 turns the cap off")
 	f.DurationVar(&o.wait, "wait", 0, "Wait up to `DURATION` for --min matches (at most 110s)")
@@ -113,6 +119,7 @@ func (o requestsListOptions) query(f *pflag.FlagSet) (devlisten.RequestQuery, er
 		"limit":     func() { q.Limit = o.limit },
 		"order":     func() { q.Order = devlisten.Order(o.order) },
 		"kind":      func() { q.Kind = o.kind },
+		"view":      func() { q.View = devlisten.View(o.view) },
 		"failed":    func() { q.Failed = &o.failed },
 		"max-bytes": func() { q.MaxBytes = maxBytes(o.maxBytes) },
 		"min":       func() { q.Min = o.min },
@@ -136,6 +143,7 @@ func printRequestsTable(w io.Writer, page devlisten.RequestPage) {
 
 type requestsShowOptions struct {
 	clientFlags
+	view     string
 	fields   []string
 	maxBytes int
 }
@@ -145,17 +153,21 @@ func newCmdRequestsShow(deps Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show SEQ",
 		Short: "Show one whole captured request (GET /_dev/v1/requests/{seq})",
-		Long: "Show one captured request with headers, body, response and every event, enriched.\n" +
+		Long: "Show one captured request: headers, body, response, rejection and the scalars of each event.\n\n" +
+			"Views: compact (the default) leaves out each event's message and enrichedMessage, because\n" +
+			"request.body already holds them as sent; full restores both. --fields picks paths.\n" +
 			"Credential headers are redacted and listed in request.redactedHeaders.",
-		Example: "  rudder-cli dev requests show 42 --json\n" +
-			"  rudder-cli dev requests show 42 --fields request.headers --fields response --json",
+		Example: "  rudder-cli dev requests show 42 --fields request.body --json\n" +
+			"  rudder-cli dev requests show 42 --json\n" +
+			"  rudder-cli dev requests show 42 --view full --json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRequestsShow(cmd, deps, o, args)
 		},
 	}
 	f := cmd.Flags()
 	o.register(f, true)
-	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.headers; repeatable")
+	f.StringVar(&o.view, "view", "compact", "Output view: compact or full")
+	f.StringArrayVar(&o.fields, "fields", nil, "Output only this dotted `PATH`, such as request.body; repeatable")
 	f.IntVar(&o.maxBytes, "max-bytes", 24000, "Output at most this many bytes; 0 turns the cap off")
 	return cmd
 }
@@ -170,6 +182,9 @@ func runRequestsShow(cmd *cobra.Command, deps Deps, o requestsShowOptions, args 
 		return out.fail(err)
 	}
 	q := devlisten.RecordQuery{Fields: o.fields}
+	if cmd.Flags().Changed("view") {
+		q.View = devlisten.View(o.view)
+	}
 	if cmd.Flags().Changed("max-bytes") {
 		q.MaxBytes = maxBytes(o.maxBytes)
 	}

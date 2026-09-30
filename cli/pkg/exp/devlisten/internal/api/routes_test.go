@@ -79,7 +79,7 @@ func TestRequestBySeq(t *testing.T) {
 	rec.Request.Body = "hello"
 	st.Append(rec)
 
-	status, got := get(t, srv.URL+"/_dev/v1/requests/1")
+	status, got := get(t, srv.URL+"/_dev/v1/requests/1?view=full")
 	require.Equal(t, http.StatusOK, status)
 	require.Equal(t, float64(1), got["seq"])
 	require.Equal(t, "hello", got["request"].(map[string]any)["body"], "the single record is whole")
@@ -88,7 +88,7 @@ func TestRequestBySeq(t *testing.T) {
 	_, fields := get(t, srv.URL+"/_dev/v1/requests/1?fields=request.body&fields=events.idx")
 	require.Equal(t, map[string]any{
 		"seq":     float64(1),
-		"request": map[string]any{"body": "hello"},
+		"request": map[string]any{"body": "hello", "method": ""},
 		"events":  []any{map[string]any{"idx": float64(0)}},
 	}, fields)
 
@@ -118,7 +118,7 @@ func TestRequestsListFiltersAndOmitted(t *testing.T) {
 
 	_, page := get(t, srv.URL+"/_dev/v1/requests")
 	require.Equal(t, map[string]any{
-		"fields":  []any{"request.body", "request.bodyBase64", "events.enrichedMessage"},
+		"fields":  []any{"request.headers", "request.body", "response", "events.message", "events.enrichedMessage"},
 		"context": []any{},
 		"next":    "rudder-cli dev requests show 1 --json",
 	}, page["omitted"])

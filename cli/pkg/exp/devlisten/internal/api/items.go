@@ -226,7 +226,7 @@ func projectJSON(raw json.RawMessage, fields, keep []string) any {
 	_ = dec.Decode(&src)
 	paths := make([][]string, 0, len(keep)+len(fields))
 	for _, k := range keep {
-		paths = append(paths, []string{k})
+		paths = append(paths, strings.Split(k, "."))
 	}
 	for _, f := range fields {
 		paths = append(paths, strings.Split(f, "."))

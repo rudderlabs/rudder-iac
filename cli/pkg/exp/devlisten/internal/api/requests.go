@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/devlisten/internal/store"
 )
@@ -15,8 +16,8 @@ var recordRoots = []string{
 	"failed", "outcome", "writeKey", "sourceId", "rejection", "hint", "request", "response", "events",
 }
 
-// heavyFields are left out of a /requests item unless fields names them.
-var heavyFields = []string{"request.body", "request.bodyBase64", "events.enrichedMessage"}
+// compactOmitted are the record parts the compact view leaves out.
+var compactOmitted = []string{"request.headers", "request.body", "response", "events.message", "events.enrichedMessage"}
 
 type requestsPage struct {
 	APIVersion string            `json:"apiVersion"`
@@ -27,6 +28,7 @@ type requestsPage struct {
 	TimedOut   bool              `json:"timedOut"`
 	WaitedMs   int64             `json:"waitedMs"`
 	Unfiltered unfiltered        `json:"unfiltered"`
+	View       string            `json:"view"`
 	Omitted    *omitted          `json:"omitted"`
 	Truncated  *truncated        `json:"truncated"`
 	Requests   []json.RawMessage `json:"requests"`
@@ -34,10 +36,12 @@ type requestsPage struct {
 
 type requestsQuery struct {
 	filters
-	kind   string
-	failed *bool
-	stage  string
-	fields []string
+	kind     string
+	failed   *bool
+	stage    string
+	view     string
+	sentView string
+	fields   []string
 }
 
 func parseRequestsQuery(values map[string][]string) (requestsQuery, *apiError) {
@@ -46,16 +50,26 @@ func parseRequestsQuery(values map[string][]string) (requestsQuery, *apiError) {
 		return requestsQuery{}, err
 	}
 	q := requestsQuery{
-		filters: parseFilters(p),
-		kind:    p.oneOf("kind", "ingestion", "ingestion", "control", "all"),
-		failed:  p.optBool("failed"),
-		stage:   p.single("stage"),
-		fields:  p.list("fields"),
+		filters:  parseFilters(p),
+		kind:     p.oneOf("kind", "ingestion", "ingestion", "control", "all"),
+		failed:   p.optBool("failed"),
+		stage:    p.single("stage"),
+		view:     p.oneOf("view", viewCompact, viewSummary, viewCompact, viewFull),
+		sentView: p.single("view"),
+		fields:   p.list("fields"),
 	}
-	if kept, bad := checkFields(q.fields, recordRoots, "request.body"); bad != "" {
-		c := q.args(newCommand(routeCommands["requests"]).num("since", q.since), false)
-		failFields(p, bad, recordRoots, c.fields(kept).flag("json").String())
+	if len(q.fields) == 0 {
+		return q, p.err
 	}
+	kept, bad := checkFields(q.fields, recordRoots, "request.body")
+	fixed := q.args(newCommand(routeCommands["requests"]).num("since", q.since), false).fields(kept).flag("json")
+	switch {
+	case bad != "":
+		failFields(p, bad, recordRoots, fixed.String())
+	case q.sentView != "":
+		p.failWith("fields", fixed.String(), nil, "cannot combine with view; fields replaces the view")
+	}
+	q.view = viewFields
 	return q, p.err
 }
 
@@ -82,6 +96,9 @@ func (q requestsQuery) args(c *command, withShape bool) *command {
 		c.quoted("stage", q.stage)
 	}
 	if withShape {
+		if q.sentView != "" {
+			c.quoted("view", q.sentView)
+		}
 		c.quoted("fields", q.fields...)
 		q.filters.maxBytesArg(c)
 	}
@@ -106,7 +123,7 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 			if !q.matches(rec) {
 				return group{}
 			}
-			return group{seq: rec.Seq, items: []json.RawMessage{renderRecord(rec, q.fields)}}
+			return group{seq: rec.Seq, items: []json.RawMessage{renderRecord(rec, q.view, q.fields)}}
 		})
 	})
 	switch {
@@ -115,7 +132,7 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 	case ok:
 		page := requestsPage{
 			APIVersion: APIVersion, ServerID: h.id.ServerID, Since: q.since, TimedOut: timedOut,
-			WaitedMs: h.now().Sub(start).Milliseconds(), Unfiltered: scanned.unfiltered,
+			WaitedMs: h.now().Sub(start).Milliseconds(), Unfiltered: scanned.unfiltered, View: q.view,
 		}
 		writeRaw(w, http.StatusOK, fit(scanned, q.filters, func(groups []group, cursor uint64, hasMore bool, t *truncated) []byte {
 			page.Cursor, page.HasMore, page.Truncated = cursor, hasMore, t
@@ -133,15 +150,21 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 }
 
 func (q requestsQuery) omitted(groups []group) *omitted {
-	next := nextSummary
+	show := nextSummary
 	if len(groups) > 0 {
-		next = showCommand(groups[0].seq).flag("json").String()
+		show = showCommand(groups[0].seq).flag("json").String()
 	}
-	fields := heavyFields
-	if len(q.fields) > 0 {
-		fields = []string{}
+	switch q.view {
+	case viewFull:
+		return nil
+	case viewSummary:
+		c := q.args(newCommand(routeCommands["requests"]).num("since", q.since), false)
+		return &omitted{Fields: []string{"receivedAt", "rejection", "events"}, Context: []string{},
+			Next: c.flag("json").String()}
+	case viewFields:
+		return &omitted{Fields: []string{}, Context: []string{}, Next: show}
 	}
-	return &omitted{Fields: fields, Context: []string{}, Next: next}
+	return &omitted{Fields: compactOmitted, Context: []string{}, Next: show}
 }
 
 const nextSummary = "rudder-cli dev summary --json"
@@ -150,47 +173,54 @@ func showCommand(seq uint64) *command {
 	return newCommand(routeCommands["requests/{seq}"] + " " + strconv.FormatUint(seq, 10))
 }
 
-// requestItem is a record without its heavy attributes.
-type requestItem struct {
-	store.Record
-	Request requestHead     `json:"request"`
-	Events  []eventNoEnrich `json:"events"`
+// requestCompact is one line per request: what happened, and the names of
+// its events. method tells a preflight from the request it precedes.
+type requestCompact struct {
+	Seq        uint64           `json:"seq"`
+	ReceivedAt time.Time        `json:"receivedAt"`
+	Method     string           `json:"method"`
+	Route      string           `json:"route"`
+	StatusCode int              `json:"statusCode"`
+	Outcome    string           `json:"outcome"`
+	Kind       string           `json:"kind"`
+	Rejection  *store.Rejection `json:"rejection"`
+	Events     []eventName      `json:"events"`
 }
 
-type requestHead struct {
-	Method          string      `json:"method"`
-	Target          string      `json:"target"`
-	Headers         http.Header `json:"headers"`
-	RedactedHeaders []string    `json:"redactedHeaders"`
-	RemoteAddr      string      `json:"remoteAddr"`
-	BodyEncoding    string      `json:"bodyEncoding"`
-	BodyBytes       int         `json:"bodyBytes"`
-	BodyComplete    bool        `json:"bodyComplete"`
+type eventName struct {
+	Idx   int     `json:"idx"`
+	Type  *string `json:"type"`
+	Event *string `json:"event"`
 }
 
-type eventNoEnrich struct {
-	Idx         int             `json:"idx"`
-	Type        *string         `json:"type"`
-	Event       *string         `json:"event"`
-	UserID      *string         `json:"userId"`
-	AnonymousID *string         `json:"anonymousId"`
-	MessageID   *string         `json:"messageId"`
-	Message     json.RawMessage `json:"message"`
+type requestSummary struct {
+	Seq        uint64 `json:"seq"`
+	Kind       string `json:"kind"`
+	Method     string `json:"method"`
+	Route      string `json:"route"`
+	StatusCode int    `json:"statusCode"`
+	Outcome    string `json:"outcome"`
+	EventCount int    `json:"eventCount"`
 }
 
-func renderRecord(rec store.Record, fields []string) json.RawMessage {
-	if len(fields) > 0 {
-		return encode(projectJSON(encode(rec), fields, []string{"seq"}))
+// recordKeep are the paths every requests projection keeps.
+var recordKeep = []string{"seq", "request.method"}
+
+func renderRecord(rec store.Record, view string, fields []string) json.RawMessage {
+	switch view {
+	case viewFields:
+		return encode(projectJSON(encode(rec), fields, recordKeep))
+	case viewFull:
+		return encode(rec)
+	case viewSummary:
+		return encode(requestSummary{Seq: rec.Seq, Kind: rec.Kind, Method: rec.Request.Method, Route: rec.Route,
+			StatusCode: rec.StatusCode, Outcome: rec.Outcome, EventCount: len(rec.Events)})
 	}
-	req := rec.Request
-	item := requestItem{Record: rec, Request: requestHead{
-		Method: req.Method, Target: req.Target, Headers: req.Headers, RedactedHeaders: req.RedactedHeaders,
-		RemoteAddr: req.RemoteAddr, BodyEncoding: req.BodyEncoding, BodyBytes: req.BodyBytes,
-		BodyComplete: req.BodyComplete,
-	}, Events: make([]eventNoEnrich, len(rec.Events))}
+	item := requestCompact{Seq: rec.Seq, ReceivedAt: rec.ReceivedAt, Method: rec.Request.Method, Route: rec.Route,
+		StatusCode: rec.StatusCode, Outcome: rec.Outcome, Kind: rec.Kind, Rejection: rec.Rejection,
+		Events: make([]eventName, len(rec.Events))}
 	for i, ev := range rec.Events {
-		item.Events[i] = eventNoEnrich{Idx: ev.Idx, Type: ev.Type, Event: ev.Event, UserID: ev.UserID,
-			AnonymousID: ev.AnonymousID, MessageID: ev.MessageID, Message: ev.Message}
+		item.Events[i] = eventName{Idx: ev.Idx, Type: ev.Type, Event: ev.Event}
 	}
 	return encode(item)
 }
@@ -216,10 +246,7 @@ func (h *Handler) request(w http.ResponseWriter, r *http.Request) {
 			Next: strp(nextInfo)})
 		return
 	}
-	body := encode(rec)
-	if len(q.fields) > 0 {
-		body = encode(projectJSON(body, q.fields, []string{"seq"}))
-	}
+	body := renderShow(rec, q)
 	if q.maxBytes > 0 && len(body) > q.maxBytes {
 		body = encode(recordTruncated{Seq: q.seq, Truncated: &truncated{By: "maxBytes", RequestBytes: len(body),
 			Next: showCommand(q.seq).bare("fields", "request.headers").bare("fields", "response").flag("json").String()}})
@@ -229,8 +256,44 @@ func (h *Handler) request(w http.ResponseWriter, r *http.Request) {
 
 type recordQuery struct {
 	seq      uint64
+	view     string
 	fields   []string
 	maxBytes int
+}
+
+// recordShow is a record whose events carry their scalars only: the body
+// already holds each message.
+type recordShow struct {
+	store.Record
+	Events  []eventScalars `json:"events"`
+	Omitted *omitted       `json:"omitted"`
+}
+
+type eventScalars struct {
+	Idx         int     `json:"idx"`
+	Type        *string `json:"type"`
+	Event       *string `json:"event"`
+	UserID      *string `json:"userId"`
+	AnonymousID *string `json:"anonymousId"`
+	MessageID   *string `json:"messageId"`
+}
+
+func renderShow(rec store.Record, q recordQuery) []byte {
+	switch {
+	case len(q.fields) > 0:
+		return encode(projectJSON(encode(rec), q.fields, recordKeep))
+	case q.view == viewFull:
+		return encode(rec)
+	}
+	show := recordShow{Record: rec, Events: make([]eventScalars, len(rec.Events)), Omitted: &omitted{
+		Fields: []string{"events.message", "events.enrichedMessage"}, Context: []string{},
+		Next: showCommand(rec.Seq).bare("view", viewFull).flag("json").String(),
+	}}
+	for i, ev := range rec.Events {
+		show.Events[i] = eventScalars{Idx: ev.Idx, Type: ev.Type, Event: ev.Event, UserID: ev.UserID,
+			AnonymousID: ev.AnonymousID, MessageID: ev.MessageID}
+	}
+	return encode(show)
 }
 
 func (h *Handler) parseRecordQuery(r *http.Request) (recordQuery, *apiError) {
@@ -243,7 +306,8 @@ func (h *Handler) parseRecordQuery(r *http.Request) (recordQuery, *apiError) {
 	if convErr != nil {
 		p.fail("seq", "%q is not a request seq", raw)
 	}
-	q := recordQuery{seq: seq, fields: p.list("fields"), maxBytes: p.maxBytes()}
+	q := recordQuery{seq: seq, fields: p.list("fields"), maxBytes: p.maxBytes(),
+		view: p.oneOf("view", viewCompact, viewCompact, viewFull)}
 	if kept, bad := checkFields(q.fields, recordRoots, "request.body"); bad != "" {
 		failFields(p, bad, recordRoots, showCommand(seq).fields(kept).flag("json").String())
 	}

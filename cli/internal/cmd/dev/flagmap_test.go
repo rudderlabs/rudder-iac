@@ -113,6 +113,7 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		{"events", "list"},
 		{"requests", "list", "--failed=false", "--max-bytes", "0", "--route", "/v1/track", "--route", "/v1/page"},
 		{"requests", "list", "--failed"},
+		{"requests", "list", "--view", "summary"},
 	} {
 		_, _, err := runDev(t, append(args, "--url", srv.URL, "--json")...)
 		require.NoError(t, err, args)
@@ -123,5 +124,6 @@ func TestFlagsReachTheWireOnlyWhenSet(t *testing.T) {
 		"",
 		"failed=false&maxBytes=0&route=%2Fv1%2Ftrack&route=%2Fv1%2Fpage",
 		"failed=true",
+		"view=summary",
 	}, query)
 }

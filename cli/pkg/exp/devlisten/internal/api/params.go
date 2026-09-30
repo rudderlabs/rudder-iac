@@ -32,22 +32,23 @@ var (
 	pStatusCode = Param{Name: "statusCode", Repeatable: true}
 	pWait       = Param{Name: "wait", Default: "0s"}
 	pMin        = Param{Name: "min", Default: "1"}
+	pView       = Param{Name: "view", Default: "compact"}
 )
 
 // Params lists the parameters of each query route, keyed by route name.
 var Params = map[string][]Param{
 	"events": {
 		pSince, pServerID, pLimit, pOrder,
-		{Name: "view", Default: "compact"}, pFields, {Name: "include", Repeatable: true}, pMaxBytes,
+		pView, pFields, {Name: "include", Repeatable: true}, pMaxBytes,
 		{Name: "event", Repeatable: true}, {Name: "type", Repeatable: true}, pRoute, pStatusCode,
 		{Name: "userId"}, {Name: "anonymousId"}, pWait, pMin,
 	},
 	"requests": {
 		pSince, pServerID, pLimit, pOrder,
 		{Name: "kind", Default: "ingestion"}, pRoute, pStatusCode, {Name: "failed"}, {Name: "stage"},
-		pFields, pMaxBytes, pWait, pMin,
+		pView, pFields, pMaxBytes, pWait, pMin,
 	},
-	"requests/{seq}": {pServerID, pFields, pMaxBytes},
+	"requests/{seq}": {pServerID, pView, pFields, pMaxBytes},
 	"summary":        {pSince, pServerID},
 	"info":           {},
 }

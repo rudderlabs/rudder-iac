@@ -308,8 +308,8 @@ func TestRequestsFiltersByKindAndHidesBodies(t *testing.T) {
 	requests := page["requests"].([]any)
 	require.Len(t, requests, 1)
 	rec := requests[0].(map[string]any)
-	require.NotContains(t, rec["request"], "body")
-	require.NotContains(t, rec["request"], "bodyBase64")
+	require.NotContains(t, rec, "request")
+	require.NotContains(t, rec["events"].([]any)[0], "message")
 	require.NotContains(t, rec["events"].([]any)[0], "enrichedMessage")
 
 	_, page = get(t, srv.URL+"/_dev/v1/requests?kind=control&since=0")
