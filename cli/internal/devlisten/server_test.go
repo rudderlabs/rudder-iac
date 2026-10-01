@@ -159,6 +159,67 @@ func TestServerRoutesIngestionAndTheQueryAPI(t *testing.T) {
 	require.Equal(t, uint64(1), s.Ready().Cursor)
 }
 
+// The page and its files pass the guards of the query API, carry the page
+// policy, and never land in the capture store.
+func TestServerServesTheReviewPage(t *testing.T) {
+	t.Parallel()
+	s := start(t, Config{})
+	ready := s.Ready()
+	pageSite := http.Header{"Sec-Fetch-Site": {"same-origin"}, "Sec-Fetch-Mode": {"no-cors"}}
+	navigation := http.Header{"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"}}
+	crossScript := http.Header{"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"no-cors"}, "Sec-Fetch-Dest": {"script"}}
+
+	for _, tc := range []struct {
+		name        string
+		target      string
+		host        string
+		header      http.Header
+		status      int
+		contentType string
+	}{
+		{name: "page", target: ready.UI, status: 200, contentType: "text/html; charset=utf-8"},
+		{name: "page by link from another site", target: ready.UI, header: navigation, status: 200, contentType: "text/html; charset=utf-8"},
+		{name: "script", target: ready.UI + "app.js", header: pageSite, status: 200, contentType: "text/javascript; charset=utf-8"},
+		{name: "style", target: ready.UI + "app.css", header: pageSite, status: 200, contentType: "text/css; charset=utf-8"},
+		{name: "icon", target: ready.UI + "icon.svg", header: pageSite, status: 200, contentType: "image/svg+xml"},
+		{name: "unknown file", target: ready.UI + "nope.js", status: 404, contentType: "text/plain; charset=utf-8"},
+		{name: "script for another site", target: ready.UI + "app.js", header: crossScript, status: 403, contentType: "application/json; charset=utf-8"},
+		{name: "rebound host", target: ready.UI, host: "evil.example", status: 403, contentType: "application/json; charset=utf-8"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			req, err := http.NewRequest(http.MethodGet, tc.target, nil)
+			require.NoError(t, err)
+			if tc.host != "" {
+				req.Host = tc.host
+			}
+			for k, v := range tc.header {
+				req.Header[k] = v
+			}
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+
+			require.Equal(t, tc.status, resp.StatusCode)
+			require.Equal(t, tc.contentType, resp.Header.Get("Content-Type"))
+			require.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+			if tc.status != http.StatusForbidden {
+				require.Equal(t, "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+					resp.Header.Get("Content-Security-Policy"))
+			}
+		})
+	}
+	// Browsers ask for /favicon.ico when a page names no icon. That request
+	// would reach the ingestion handler and count as a request the app sent.
+	var info struct {
+		Cursor uint64 `json:"cursor"`
+	}
+	getJSON(t, ready.URL+"/_dev/v1/info", &info)
+	require.Zero(t, info.Cursor)
+}
+
 // A request line and headers above the rudder-server gateway default get
 // 431 before any handler sees them.
 func TestServerLimitsHeaderBytes(t *testing.T) {
