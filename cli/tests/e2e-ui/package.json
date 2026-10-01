@@ -1,0 +1,15 @@
+{
+  "name": "dev-listen-page-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser tests of the dev listen review page at /_dev/ui/, run against a built rudder-cli binary.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

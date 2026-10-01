@@ -60,3 +60,12 @@ func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 
 	assert.Equal(t, 7, GetConfig().Concurrency.Syncer)
 }
+
+func TestInitConfig_DevListenBindsEnv(t *testing.T) {
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	t.Setenv("RUDDERSTACK_X_DEV_LISTEN", "true")
+
+	InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	require.True(t, GetConfig().ExperimentalFlags.DevListen)
+}
