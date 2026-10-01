@@ -24,6 +24,10 @@ func getCIExecutionContext() map[string]interface{} {
 	envMap := map[string]string{
 		"RUDDERSTACK_CLI_WORKFLOW_VERSION": "cli_workflow_version",
 		"RUDDERSTACK_CLI_CI_PLATFORM":      "ci_platform",
+		// Who drove the run: a human shell, a coding agent, an installer. The
+		// init wizard is meant to be run by agents as much as by people, and
+		// without this every run is indistinguishable in telemetry.
+		"RUDDERSTACK_CLI_CLIENT": "cli_client",
 	}
 
 	for envVar, key := range envMap {
