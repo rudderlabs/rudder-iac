@@ -298,6 +298,20 @@ func TestEveryAnswerIsPrivate(t *testing.T) {
 	}
 }
 
+// The CLI tells a listener from any other server that answers 200 by this
+// header, so every answer carries it, an error included.
+func TestEveryAnswerNamesTheServer(t *testing.T) {
+	t.Parallel()
+	h, _ := newTestHandler("127.0.0.1")
+	for _, target := range []string{
+		"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/events", "/_dev/v1/events?view=counts", "/_dev/v1/nope", "/_dev/v1/events?bogus=1",
+	} {
+		w := get(h, target, nil)
+
+		require.Equal(t, "9f3ac1d2b7e4c601", w.Header().Get("X-Dev-Server-Id"), target)
+	}
+}
+
 func TestHeadAnswersLikeGet(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestHandler("127.0.0.1")
@@ -387,7 +401,9 @@ func TestIndexListsEveryRoute(t *testing.T) {
 		require.Equal(t, "rudder-cli dev --help", idx.Help)
 		require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/info'", idx.Next)
 		require.Equal(t, idx.Next, idx.Curl)
-		require.Equal(t, map[string]string{"info": "info", "ui": "/_dev/ui/"}, idx.Links)
+		require.Equal(t, map[string]string{
+			"events": "events", "counts": "events?view=counts", "info": "info", "ui": "/_dev/ui/",
+		}, idx.Links)
 
 		var paths []string
 		for _, ep := range idx.Endpoints {
@@ -428,7 +444,9 @@ func TestStopWakesEveryWaiter(t *testing.T) {
 		}()
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	// Stop only after every waiter has registered for the wake, so the test
+	// takes the wake path, not the stopped-before-start path.
+	require.Eventually(t, func() bool { return h.waiters.Load() == 3 }, 5*time.Second, time.Millisecond)
 	h.Stop()
 
 	for range 3 {

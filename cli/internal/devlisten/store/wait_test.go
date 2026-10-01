@@ -95,7 +95,33 @@ func TestStoreWaitStopsWithTheContext(t *testing.T) {
 	require.Equal(t, 1, found)
 }
 
+// A match that eviction removed during the wait no longer counts, so the
+// summary that follows the wait never shows fewer matches than the wait saw.
+func TestStoreWaitCountsOnlyStoredMatches(t *testing.T) {
+	t.Parallel()
+	s := &Store{maxRequests: 1, maxBytes: maxBytes}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	parked := 0
+	s.onWait = func() {
+		parked++
+		switch parked {
+		case 1, 2:
+			go s.Capture(capture("dev", "/v1/track", `{"userId":"u1"}`))
+		default:
+			cancel()
+		}
+	}
+
+	found, err := s.Wait(ctx, 0, 2, one)
+
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, 1, found)
+	require.Equal(t, 3, parked)
+}
+
 // A waiter keeps its scan position, so a wake costs the new records only.
+// The one recount when the sum is reached adds a second pass.
 func TestStoreWaitScansEachRecordOnce(t *testing.T) {
 	t.Parallel()
 	s := &Store{maxRequests: 100, maxBytes: maxBytes}
@@ -120,7 +146,7 @@ func TestStoreWaitScansEachRecordOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, scanned, 13)
 	for seq, n := range scanned {
-		require.Equal(t, 1, n, "seq %d", seq)
+		require.Equal(t, 2, n, "seq %d", seq)
 	}
 }
 

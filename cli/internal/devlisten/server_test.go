@@ -244,22 +244,57 @@ func TestCloseDrainsAStalledUploadAtOnce(t *testing.T) {
 	}
 }
 
-// With no time left to drain, Close still frees every connection instead of
-// leaving goroutines behind.
-func TestCloseWithAnEndedContextFreesEveryConnection(t *testing.T) {
+// A long-poll ends with 503 when the server stops, so a wait of 60 s does not
+// hold the drain.
+func TestCloseAnswersALongPollAtOnce(t *testing.T) {
 	t.Parallel()
 	s := start(t, Config{})
-	upload := stalledUpload(t, s)
+	answered := make(chan int, 1)
+	go func() {
+		resp, err := http.Get(s.Ready().URL + "/_dev/v1/events?view=counts&wait=60s")
+		if err != nil {
+			answered <- 0
+			return
+		}
+		_ = resp.Body.Close()
+		answered <- resp.StatusCode
+	}()
+	require.Eventually(t, func() bool { return s.api.Waiters() == 1 }, 5*time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	began := time.Now()
+	require.NoError(t, s.Close(ctx))
+
+	require.Less(t, time.Since(began), 2*time.Second)
+	require.Equal(t, http.StatusServiceUnavailable, <-answered)
+}
+
+// With no time left to drain, Close drops a handler that has not ended
+// instead of leaving its connection behind.
+func TestCloseWithAnEndedContextFreesEveryConnection(t *testing.T) {
+	t.Parallel()
+	held, release := make(chan struct{}), make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	s := start(t, Config{beforeServe: func(r *http.Request) {
+		if r.URL.Path == "/_dev/v1/events" {
+			close(held)
+			<-release
+		}
+	}})
+	conn, err := net.Dial("tcp", strings.TrimPrefix(s.Ready().URL, "http://"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	_, err = io.WriteString(conn, "GET /_dev/v1/events?view=counts&wait=60s HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+	require.NoError(t, err)
+	<-held
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := s.Close(ctx)
+	err = s.Close(ctx)
 
-	if err != nil {
-		require.ErrorIs(t, err, context.Canceled)
-	}
-	require.True(t, readsUntilClosed(upload, time.Second), "the upload connection stayed open")
-	require.Eventually(t, func() bool { return s.activeConns() == 0 }, time.Second, time.Millisecond)
+	require.ErrorIs(t, err, context.Canceled)
+	require.True(t, readsUntilClosed(conn, time.Second), "the held connection stayed open")
 }
 
 func TestCloseIsIdempotent(t *testing.T) {
