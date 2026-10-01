@@ -243,11 +243,68 @@ rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" --event 'Or
 rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" --json | jq -e --argjson cur "$cur" '.summary.requests.failed == 0 and .evictedThrough <= $cur'
 ```
 
-Run it with `set -euo pipefail`, or as a GitHub Actions `run:` step with
-`shell: bash`. A test file can ask the listener directly over HTTP:
+Put `set -euo pipefail` on the first line of the script, or paste it inline in
+a `run:` step with `shell: bash`. A child script does not inherit the options of
+the shell that calls it, so without that line a failed check still exits 0. A
+test file can ask the listener directly over HTTP:
 `GET URL/_dev/v1/events?view=counts&since=N` is the summary, and
 `GET URL/_dev/v1/events?since=N` is the stream. Call it from the test process,
 never from inside the page: a request from the app's origin gets 403.
+
+### GitHub Actions
+
+Set the gate on the job, install a pinned CLI release, and run the script above
+with `bash -euo pipefail`. This recipe is for Linux x86-64 runners. Set
+`RUDDER_CLI_VERSION` to a release that has dev listen.
+
+```yaml
+jobs:
+  tracking:
+    runs-on: ubuntu-latest
+    env:
+      RUDDERSTACK_CLI_EXPERIMENTAL: "true"
+      RUDDERSTACK_X_DEV_LISTEN: "true"
+      RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
+      RUDDER_CLI_VERSION: "<version>"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install rudder-cli
+        run: |
+          curl -fsSL "https://github.com/rudderlabs/rudder-iac/releases/download/v${RUDDER_CLI_VERSION}/rudder-cli_Linux_x86_64.tar.gz" | tar -xz rudder-cli
+          sudo mv rudder-cli /usr/local/bin/
+      - name: Capture, act, assert
+        run: bash -euo pipefail ci/check-tracking.sh # the script above
+```
+
+Pin every action to a commit SHA, as the checkout step does.
+
+### In a container
+
+The `rudderlabs/rudder-cli` image runs the listener when you pass the command.
+Set the gate with `-e`, bind to `0.0.0.0` inside the container, and publish the
+port on the host's loopback only:
+
+```sh
+docker run -d --name dev-listen -p 127.0.0.1:4321:4321 \
+  -e RUDDERSTACK_CLI_EXPERIMENTAL=true -e RUDDERSTACK_X_DEV_LISTEN=true \
+  -e RUDDERSTACK_CLI_TELEMETRY_DISABLED=true \
+  rudderlabs/rudder-cli:<version> dev listen --bind 0.0.0.0 --port 4321
+for i in $(seq 100); do curl -fsS http://127.0.0.1:4321/_dev/v1/info >/dev/null && break; [ "$(docker inspect -f '{{.State.Running}}' dev-listen)" = true ] || { docker logs dev-listen >&2; exit 1; }; sleep 0.2; done
+```
+
+The loop stops when the container exits, for example when the image has no dev
+listen or a gate variable is misspelled. Use a tag that has dev listen.
+
+The ready line goes to `docker logs dev-listen`. The URL from the host is
+`http://127.0.0.1:4321`: a client on the host sends `127.0.0.1` or `localhost`
+in `Host`, and the Host check accepts both on any port. For a peer container,
+start the listener on a user-defined network: run `docker network create devnet`,
+then add `--network devnet` to `docker run`. A peer on that network reaches the
+listener at `http://dev-listen:4321`. Add `--allow-host dev-listen`, or the peer
+gets 403 on `/_dev/v1/`. `docker stop dev-listen` exits 0, and the
+captures go with the container. The image has no `curl` or `jq`: run them on the
+host. GitHub Actions `services:` cannot pass a command to the image, so start
+the container in a `run:` step.
 
 ## Several services and parallel runs
 
