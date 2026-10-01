@@ -66,7 +66,8 @@ type WriteKey struct {
 	Sha256 string `json:"sha256,omitempty"`
 }
 
-func maskWriteKey(key string) WriteKey {
+// MaskWriteKey is the only form of a key that leaves the listener.
+func MaskWriteKey(key string) WriteKey {
 	if len(key) <= 8 {
 		// The key may be a slice of the whole decoded Authorization header.
 		return WriteKey{Key: strings.Clone(key)}
@@ -104,7 +105,7 @@ func maskQuery(target string) string {
 					// A stray % fails the unescape, but the raw value still holds the key.
 					key = v
 				}
-				pair = k + "=" + url.QueryEscape(maskWriteKey(key).Key)
+				pair = k + "=" + url.QueryEscape(MaskWriteKey(key).Key)
 			}
 		}
 		b.WriteString(pair)
@@ -143,7 +144,7 @@ func firstValues(h http.Header, names []string) (map[string]string, int) {
 }
 
 func newRecord(c *ingest.Capture) *Record {
-	key := maskWriteKey(c.WriteKey)
+	key := MaskWriteKey(c.WriteKey)
 	body := c.Decoded
 	if body == nil {
 		body = c.Body

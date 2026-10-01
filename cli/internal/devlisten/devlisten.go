@@ -3,6 +3,7 @@
 package devlisten
 
 import (
+	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/api"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
 )
@@ -13,4 +14,9 @@ import (
 func NewHandler(writeKeys []string, version string) (*ingest.Handler, *store.Store) {
 	s := store.New()
 	return ingest.New(s, writeKeys, version), s
+}
+
+// IsLoopback reports whether a bind address takes local connections only.
+func IsLoopback(bind string) bool {
+	return api.IsLoopback(bind)
 }

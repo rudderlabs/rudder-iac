@@ -23,6 +23,7 @@ func TestMain(m *testing.M) {
 	}
 	_ = os.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	_ = os.Setenv("RUDDERSTACK_X_DEV_LISTEN", "true")
+	_ = os.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", "true")
 	config.InitConfig(filepath.Join(dir, "config.json"))
 
 	code := m.Run()
@@ -91,4 +92,20 @@ func TestDevUsageErrors(t *testing.T) {
 			require.Equal(t, tc.want+"\nNext: rudder-cli dev --help\n", stderr)
 		})
 	}
+}
+
+// Cobra runs only the nearest PersistentPreRunE, so a child with its own
+// would skip the experimental gate.
+func TestNoChildReplacesTheGate(t *testing.T) {
+	t.Parallel()
+
+	var walk func(*cobra.Command)
+	walk = func(c *cobra.Command) {
+		for _, child := range c.Commands() {
+			require.Nil(t, child.PersistentPreRunE, child.CommandPath())
+			require.Nil(t, child.PersistentPreRun, child.CommandPath())
+			walk(child)
+		}
+	}
+	walk(NewCmdDev())
 }

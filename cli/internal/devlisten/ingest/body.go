@@ -14,7 +14,13 @@ import (
 // JSON is not accepted. early answers come before auth, late ones after.
 func (h *Handler) readBody(w http.ResponseWriter, r *http.Request, c *Capture) (early, late *gwError) {
 	// A test ResponseRecorder has no connection, so this can fail there.
-	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(h.readTimeout))
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(h.readTimeout))
+	// Shutdown expires every read before it drains. A request that gets here
+	// after that must not undo it, or a stalled body holds the drain.
+	if h.stopping.Load() {
+		_ = rc.SetReadDeadline(time.Now())
+	}
 
 	raw, err := readAll(http.MaxBytesReader(w, r.Body, maxReqSize), r.ContentLength)
 	c.Body, c.BodyComplete = raw, err == nil

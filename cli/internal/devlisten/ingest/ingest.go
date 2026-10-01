@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,6 +120,7 @@ type Handler struct {
 	newUUID     func() string
 	startedAt   time.Time
 	version     string
+	stopping    atomic.Bool
 }
 
 // New returns a handler that captures into sink. An empty writeKeys accepts
@@ -135,6 +137,12 @@ func New(sink Sink, writeKeys []string, version string) *Handler {
 		startedAt:   time.Now(),
 		version:     version,
 	}
+}
+
+// Stop makes the readiness routes answer 503, so a supervisor stops sending
+// while the server drains.
+func (h *Handler) Stop() {
+	h.stopping.Store(true)
 }
 
 // ServeHTTP checks a request in the order that gives each failure the answer

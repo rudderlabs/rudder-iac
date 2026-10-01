@@ -33,6 +33,9 @@ func (h *Handler) healthReply(r *http.Request) (reply, bool) {
 	switch r.URL.Path {
 	case "/", "/health", "/internal/readiness":
 		rep = jsonReply(http.StatusOK, `{"status":"ready"}`)
+		if h.stopping.Load() {
+			rep = jsonReply(http.StatusServiceUnavailable, `{"status":"stopping"}`)
+		}
 	case "/internal/liveness":
 		rep = reply{status: http.StatusOK}
 	case "/robots.txt":
