@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,4 +66,28 @@ func TestDevListenGate(t *testing.T) {
 			require.Contains(t, string(dev), "Usage:")
 		})
 	}
+}
+
+// An agent or a CI job meets the gate first, so its JSON error has a code of
+// its own.
+func TestDevListenGateOffJSON(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", "true")
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "")
+	t.Setenv("RUDDERSTACK_X_DEV_LISTEN", "")
+	executor, err := NewCmdExecutor("")
+	require.NoError(t, err)
+
+	out, err := executor.Execute(cliBinPath, "dev", "events", "--json")
+
+	require.Error(t, err)
+	var got struct {
+		Error struct {
+			Code string `json:"code"`
+			Next string `json:"next"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(out, &got), "%s", out)
+	require.Equal(t, "experimental_disabled", got.Error.Code)
+	require.Equal(t, "rudder-cli experimental enable devListen", got.Error.Next)
 }

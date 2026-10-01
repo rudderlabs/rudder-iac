@@ -98,6 +98,22 @@ func TestStoreSinceReturnsTheRecordsAfterASeq(t *testing.T) {
 	}
 }
 
+func TestStoreGetFindsAStoredRecordOnly(t *testing.T) {
+	t.Parallel()
+	s := &Store{maxRequests: 4, maxBytes: maxBytes}
+	for range 6 {
+		s.Capture(capture("dev", "/v1/track", `{"userId":"u1"}`))
+	}
+
+	for seq, found := range map[uint64]bool{0: false, 2: false, 3: true, 6: true, 7: false, math.MaxUint64: false} {
+		r := s.Get(seq)
+		require.Equal(t, found, r != nil, "seq %d", seq)
+		if found {
+			require.Equal(t, seq, r.Seq)
+		}
+	}
+}
+
 func TestRecordKeepsTheFirstValueOfKnownHeaders(t *testing.T) {
 	t.Parallel()
 	c := capture("dev", "/v1/track", `{"userId":"u1"}`)

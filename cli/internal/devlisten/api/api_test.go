@@ -305,6 +305,7 @@ func TestEveryAnswerNamesTheServer(t *testing.T) {
 	h, _ := newTestHandler("127.0.0.1")
 	for _, target := range []string{
 		"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/events", "/_dev/v1/events?view=counts", "/_dev/v1/nope", "/_dev/v1/events?bogus=1",
+		"/_dev/v1/requests", "/_dev/v1/requests/1", "/_dev/v1/guide",
 	} {
 		w := get(h, target, nil)
 
@@ -318,7 +319,7 @@ func TestHeadAnswersLikeGet(t *testing.T) {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
-	for _, path := range []string{"/_dev/v1/", "/_dev/v1/info"} {
+	for _, path := range []string{"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/requests", "/_dev/v1/guide"} {
 		resp, err := http.Head(srv.URL + path)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
@@ -326,7 +327,7 @@ func TestHeadAnswersLikeGet(t *testing.T) {
 		require.NoError(t, resp.Body.Close())
 
 		require.Equal(t, http.StatusOK, resp.StatusCode, path)
-		require.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+		require.NotEmpty(t, resp.Header.Get("Content-Type"))
 		require.Empty(t, body)
 	}
 }
@@ -375,7 +376,8 @@ func TestInfoOnAnExposedBind(t *testing.T) {
 
 func TestIndexListsEveryRoute(t *testing.T) {
 	t.Parallel()
-	h, _ := newTestHandler("127.0.0.1")
+	h, st := newTestHandler("127.0.0.1")
+	track(t, st, `{"userId":"u","event":"e"}`)
 
 	for _, target := range []string{"/_dev/v1/", "/_dev/v1"} {
 		w := get(h, target, nil)
@@ -402,7 +404,8 @@ func TestIndexListsEveryRoute(t *testing.T) {
 		require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/info'", idx.Next)
 		require.Equal(t, idx.Next, idx.Curl)
 		require.Equal(t, map[string]string{
-			"events": "events", "counts": "events?view=counts", "info": "info", "ui": "/_dev/ui/",
+			"events": "events", "counts": "events?view=counts", "requests": "requests", "request": "requests/{seq}",
+			"info": "info", "guide": "guide", "ui": "/_dev/ui/",
 		}, idx.Links)
 
 		var paths []string
@@ -418,6 +421,30 @@ func TestIndexListsEveryRoute(t *testing.T) {
 			}
 			require.Contains(t, paths, path)
 		}
+		require.Contains(t, paths, base+"requests/{seq}")
+		// The index serves the curl user, so each example runs.
+		for _, ep := range idx.Endpoints {
+			target := strings.TrimSuffix(strings.TrimPrefix(ep.Example, "curl -fsS '"+testURL), "'")
+			require.Equal(t, http.StatusOK, get(h, target, nil).Code, ep.Example)
+		}
+	}
+}
+
+// The first call of a new user hits an empty store, so each example runs there too.
+func TestIndexExamplesRunOnAnEmptyStore(t *testing.T) {
+	t.Parallel()
+	h, _ := newTestHandler("127.0.0.1")
+
+	var idx struct {
+		Endpoints []struct {
+			Example string `json:"example"`
+		} `json:"endpoints"`
+	}
+	require.NoError(t, json.Unmarshal(get(h, "/_dev/v1/", nil).Body.Bytes(), &idx))
+	require.NotEmpty(t, idx.Endpoints)
+	for _, ep := range idx.Endpoints {
+		target := strings.TrimSuffix(strings.TrimPrefix(ep.Example, "curl -fsS '"+testURL), "'")
+		require.Equal(t, http.StatusOK, get(h, target, nil).Code, ep.Example)
 	}
 }
 

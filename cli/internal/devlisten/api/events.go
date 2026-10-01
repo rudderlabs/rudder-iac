@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/tidwall/gjson"
 )
@@ -20,7 +21,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	}
 	q, perr := parseEventsQuery(query, h.now())
 	if perr != nil {
-		h.failParam(w, http.StatusBadRequest, perr.code, perr.param, perr.message, eventsHelp(query))
+		h.failParam(w, perr, eventsHelp(query))
 		return
 	}
 	if q.serverID != "" && q.serverID != h.cfg.Identity.ServerID {
@@ -84,17 +85,22 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 	header.Set("X-Dev-Cursor", strconv.FormatUint(cursor, 10))
 	header.Set("X-Dev-Has-More", strconv.FormatBool(hasMore))
 	if hasMore {
-		next := url.Values{}
-		for k, v := range q.raw {
-			next[k] = v
-		}
-		next.Set("since", strconv.FormatUint(cursor, 10))
-		header.Set("Link", "<"+base+"events?"+next.Encode()+`>; rel="next"`)
+		header.Set("Link", "<"+base+"events?"+nextQuery(q.raw, cursor)+`>; rel="next"`)
 	}
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
 		_, _ = w.Write(body.Bytes())
 	}
+}
+
+// nextQuery repeats a read's parameters from the cursor on.
+func nextQuery(raw url.Values, cursor uint64) string {
+	next := url.Values{}
+	for k, v := range raw {
+		next[k] = v
+	}
+	next.Set("since", strconv.FormatUint(cursor, 10))
+	return next.Encode()
 }
 
 // line is one event on one line. Selection only drops keys; compaction only
@@ -199,14 +205,27 @@ func selectFields(event gjson.Result, fields []*field) []byte {
 			continue
 		}
 		raw := value.Raw
-		if !f.all {
-			if !value.IsObject() {
-				continue
-			}
+		switch {
+		case f.all:
+		case value.IsObject():
 			raw = string(selectFields(value, f.children))
 			if raw == "{}" {
 				continue
 			}
+		case value.IsArray():
+			// A path through a list applies to each element.
+			var items []string
+			for _, item := range value.Array() {
+				// Other elements stay as sent, so the list keeps its length and values.
+				if !item.IsObject() {
+					items = append(items, item.Raw)
+					continue
+				}
+				items = append(items, string(selectFields(item, f.children)))
+			}
+			raw = "[" + strings.Join(items, ",") + "]"
+		default:
+			continue
 		}
 		if b.Len() > 1 {
 			b.WriteByte(',')

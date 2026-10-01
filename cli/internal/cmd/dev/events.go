@@ -44,7 +44,6 @@ type readOptions struct {
 func addReadFlags(f *pflag.FlagSet, o *readOptions) {
 	f.StringVar(&o.url, "url", "", "URL of the listener, from its ready line (default $"+urlEnv+")")
 	f.StringVar(&o.serverID, "server-id", "", "Answer 409 server_changed unless the listener has this serverId")
-	f.DurationVar(&o.timeout, "timeout", 0, "Give up on the listener after this long (default --wait plus 5s)")
 	f.BoolVarP(&o.json, "json", "j", false, "Print the listener's JSON instead of a table")
 	f.StringVar(&o.since, "since", "0", "Read after this cursor, or since a duration such as 5m or an RFC 3339 time")
 	f.StringArrayVar(&o.events, "event", nil, "Only events with this name, or a prefix ending in *; repeat for more")
@@ -118,15 +117,19 @@ func newCmdEvents() *cobra.Command {
 		Use:   "events",
 		Short: "Count and diagnose captured events",
 		Long: heredoc.Doc(`
-			Print the summary of what arrived: accepted events by name (byEvent), events in
-			rejected requests (rejected), requests, write keys, control requests, a
-			diagnosis, and the cursor. Filters narrow every count; the diagnosis covers the
-			whole window. Each --event NAME and --write-key KEY you pass is listed with 0
-			when nothing arrived, so a check is one jq -e call.
+			Print the summary of what arrived: accepted events by name (byEvent), events in rejected
+			requests (rejected), requests, write keys, control requests, SDK families, a diagnosis, and
+			the cursor. Filters narrow every count; the diagnosis covers the whole window. Each --event
+			NAME and --write-key KEY you pass is listed with 0 when nothing arrived, so a check is one
+			jq -e call. all_accepted describes what arrived, not what did not.
 
-			--wait holds the call until --min matching accepted events exist, at most 110s.
-			Every successful read exits 0, also when --wait runs out (timedOut is true in
-			the JSON); errors exit 1.
+			nothing_received: the listener never received a request. nothing_new: no request after
+			your cursor. filtered_empty: requests arrived, your filters match none.
+
+			--wait holds the call until --min matching accepted events exist, at most 110s. Every
+			successful read exits 0, also when --wait runs out (timedOut is true in the JSON); errors
+			exit 1. A request's reason, headers and body are on URL/_dev/v1/requests and on the review
+			page.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli dev events --url http://127.0.0.1:4321
@@ -136,6 +139,9 @@ func newCmdEvents() *cobra.Command {
 
 			# Wait up to 30s for an event the app sends later
 			$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
+
+			# A fresh cursor
+			$ rudder-cli dev events --url "$url" --json | jq .cursor
 		`),
 		Args: groupArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
@@ -173,6 +179,7 @@ func newCmdEvents() *cobra.Command {
 	}
 	f := cmd.Flags()
 	addReadFlags(f, &opts)
+	f.DurationVar(&opts.timeout, "timeout", 0, "Give up on the listener after this long (default --wait plus 5s)")
 	f.StringVar(&wait, "wait", "0s", "Hold the call until --min matching accepted events exist, at most 110s")
 	f.IntVar(&atLeast, "min", 1, "The number of matching accepted events --wait waits for")
 
@@ -191,21 +198,23 @@ func newCmdEventsList() *cobra.Command {
 		Use:   "list",
 		Short: "Print captured events as the SDK sent them",
 		Long: heredoc.Doc(`
-			Print the accepted events after a cursor. With --json the output is NDJSON: one
-			event per line, as the SDK sent it, with nothing added. Without --json it is a
-			table. --view compact drops the SDK's auto-collected context; --fields PATH keeps
-			only that dotted path (repeat it; it cannot be combined with --view).
+			Print the accepted events after a cursor. With --json the output is NDJSON: one event per
+			line, exactly as the SDK sent it, with nothing added. Without --json it is a table.
+			--view compact drops the SDK's auto-collected context; --fields PATH keeps only that dotted
+			path (repeat it; it cannot be combined with --view).
 
-			The stream carries no cursor. Take it from the ready line or from dev events
-			--json. At most --limit events per page; when more are left, stderr names the
-			--since to continue from. Events of rejected requests are not in the stream:
-			dev events counts them.
+			The stream carries no cursor. Take it from the ready line or from dev events --json. At
+			most --limit events per page; when more are left, stderr names the --since to continue
+			from. Events of rejected requests are not in the stream: dev events counts them.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli dev events list --url http://127.0.0.1:4321 --since 5m
 
 			# The properties of one event
 			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
+
+			# Check a property type (guard the empty stream)
+			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
 
 			# How many events
 			$ rudder-cli dev events list --url "$url" --since "$cur" --json | wc -l
@@ -244,6 +253,7 @@ func newCmdEventsList() *cobra.Command {
 	}
 	f := cmd.Flags()
 	addReadFlags(f, &opts)
+	f.DurationVar(&opts.timeout, "timeout", 0, "Give up on the listener after this long (default 5s)")
 	f.IntVar(&limit, "limit", 100, "Print at most this many events, 1 to 1000; a request is never split")
 	f.StringVar(&view, "view", "list", "list (a table of the whole events), compact (without the auto-collected context) or full")
 	f.StringArrayVar(&fields, "fields", nil, "Keep only this dotted path of each event, such as properties; repeat for more")

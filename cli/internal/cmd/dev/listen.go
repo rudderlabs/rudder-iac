@@ -43,23 +43,35 @@ func newCmdListen() *cobra.Command {
 	var opts listenOptions
 	cmd := &cobra.Command{
 		Use:   "listen",
-		Short: "Capture the requests an app sends, on a local port",
+		Short: "Capture SDK requests on a local endpoint",
 		Long: heredoc.Doc(`
-			Run a local listener that answers RudderStack SDKs as RudderStack does and
-			keeps every request in memory until it stops.
+			Run a local server that answers RudderStack SDK requests like RudderStack ingestion and keeps
+			every request in memory. It runs in the foreground until Ctrl-C or kill PID, and exits 0.
 
-			It prints one JSON line on stdout when it is ready: url, serverId, cursor and
-			pid. Stop it with Ctrl-C or kill <pid>. The captures go with it.
+			When the port is bound it prints one JSON ready line on stdout and nothing more there:
+			ready, url, port, bind, pid, serverId, cursor, writeKey, writeKeyPolicy and ui. Point the
+			SDK data plane URL at url. Web SDKs also need configUrl, and mobile SDKs controlPlaneUrl,
+			set to url. Server SDKs must flush before the process exits. Open ui in a browser to review
+			events and requests.
+
+			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that
+			is taken fails at start with port_in_use and exit 1. Use --bind 0.0.0.0 only in a
+			container. By default any write key is accepted, a missing one included. --write-key is an
+			allowlist: it rejects every other key and a missing key with 401. On dev events and dev
+			events list, --write-key filters instead.
+
+			Listeners share nothing: captures stay in memory, and there is no state or lock file.
+			rudder-cli dev --help has the whole guide.
 		`),
 		Example: heredoc.Doc(`
 			# Foreground, on a fixed port
 			$ rudder-cli dev listen --port 4321
 
 			# Background for an agent or CI job; read url and pid from the ready line
-			$ rudder-cli dev listen > ready.json &
+			$ rudder-cli dev listen --port 0 > ready.json 2> listen.log &
 
 			# Accept only two write keys
-			$ rudder-cli dev listen --write-key web --write-key api
+			$ rudder-cli dev listen --port 4321 --write-key web-key --write-key api-key
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {

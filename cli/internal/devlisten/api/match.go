@@ -123,11 +123,11 @@ func (h *Handler) records(w window) []*store.Record {
 
 // keyMatches matches a literal write key by its masked form, so a caller
 // never types the mask.
-func (q *eventsQuery) keyMatches(r *store.Record) bool {
-	if len(q.writeKeys) == 0 {
+func keyMatches(keys []string, r *store.Record) bool {
+	if len(keys) == 0 {
 		return true
 	}
-	for _, key := range q.writeKeys {
+	for _, key := range keys {
 		if store.MaskWriteKey(key) == r.WriteKey {
 			return true
 		}
@@ -156,7 +156,7 @@ func (q *eventsQuery) eventMatches(k eventKeys) bool {
 
 // matches returns the indexes of the events in r that the filters select.
 func (q *eventsQuery) matches(r *store.Record) []int {
-	if !q.keyMatches(r) {
+	if !keyMatches(q.writeKeys, r) {
 		return nil
 	}
 	var out []int

@@ -125,7 +125,9 @@ func Start(cfg Config) (*Server, error) {
 		id:     id,
 		store:  st,
 		ingest: ingestHandler,
-		api:    api.New(st, api.Config{Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version}),
+		api: api.New(st, api.Config{
+			Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version, Guide: Guide,
+		}),
 		served: make(chan error, 1),
 		conns:  map[net.Conn]http.ConnState{},
 
