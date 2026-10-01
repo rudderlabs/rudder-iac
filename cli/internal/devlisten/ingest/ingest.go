@@ -1,5 +1,5 @@
-// Package ingest answers SDK requests the way RudderStack ingestion does, and
-// hands every request to a Sink.
+// Package ingest answers SDK requests the way RudderStack ingestion and the
+// control plane do, and hands every request except health checks to a Sink.
 package ingest
 
 import (
@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -69,19 +71,21 @@ type Capture struct {
 type Event struct {
 	// Message is a slice of Capture.Decoded, never re-encoded, so a developer
 	// sees exactly what the SDK sent.
-	Message json.RawMessage
+	Message json.RawMessage `json:"message"`
 	// FromQuery is true on a pixel request, whose Message the handler built
 	// from the query string.
-	FromQuery bool
+	FromQuery bool `json:"fromQuery,omitempty"`
+	// Enrichment is set on an accepted request only.
+	Enrichment *Enrichment `json:"enrichment,omitempty"`
 }
 
 // Rejection names the stage that refused a request and the message
 // RudderStack answers, without the trailing newline.
 type Rejection struct {
-	Stage  string
-	Reason string
+	Stage  string `json:"stage"`
+	Reason string `json:"reason"`
 	// Idx is the index of the event that failed, or nil.
-	Idx *int
+	Idx *int `json:"idx,omitempty"`
 }
 
 type endpoint struct {
@@ -112,17 +116,24 @@ type Handler struct {
 	slots       chan struct{}
 	readTimeout time.Duration
 	now         func() time.Time
+	newUUID     func() string
+	startedAt   time.Time
+	version     string
 }
 
 // New returns a handler that captures into sink. An empty writeKeys accepts
 // every request, a missing key included; otherwise only those keys pass.
-func New(sink Sink, writeKeys []string) *Handler {
+// version is what /version reports.
+func New(sink Sink, writeKeys []string, version string) *Handler {
 	return &Handler{
 		sink:        sink,
 		writeKeys:   writeKeys,
 		slots:       make(chan struct{}, MaxInFlight),
 		readTimeout: BodyReadTimeout,
 		now:         time.Now,
+		newUUID:     uuid.NewString,
+		startedAt:   time.Now(),
+		version:     version,
 	}
 }
 
@@ -147,12 +158,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.Transport = "pixel"
 	}
 
+	if rep, ok := proxyReply(path); ok {
+		h.respond(w, c, rep)
+		return
+	}
 	if isPreflight(r) {
 		preflight(w.Header(), r)
 		h.respond(w, c, reply{status: http.StatusNoContent})
 		return
 	}
 	actualCORS(w.Header(), r)
+	if rep, ok := h.healthReply(r); ok {
+		h.respond(w, nil, rep)
+		return
+	}
 	// A preflight stays control on any route: it carries no event.
 	if _, ok := endpoints[path]; ok {
 		c.Kind = "ingestion"
@@ -193,7 +212,7 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request, c *Capture) repl
 	ep, ok := endpoints[r.URL.Path]
 	switch {
 	case !ok:
-		return reject(errUnknownPath)
+		return h.control(r, c)
 	case r.Method != ep.method:
 		return methodNotAllowed(ep.method)
 	case c.Transport == "pixel":
@@ -219,7 +238,7 @@ func (h *Handler) ingest(r *http.Request, c *Capture, reqType string, late *gwEr
 	case r.Header.Get("Content-Encoding") != "gzip" && r.Body == http.NoBody:
 		return reject(errRequestBodyNil)
 	}
-	return process(c, c.Decoded, reqType)
+	return h.process(c, c.Decoded, reqType)
 }
 
 // pixel answers the GIF whatever the inner request gets, as RudderStack
@@ -247,7 +266,7 @@ func (h *Handler) pixel(r *http.Request, c *Capture, reqType string) reply {
 		gif.rejection = &Rejection{Stage: "parse", Reason: err.Error()}
 		return gif
 	}
-	gif.rejection = process(c, payload, reqType).rejection
+	gif.rejection = h.process(c, payload, reqType).rejection
 	for i := range c.Events {
 		c.Events[i].FromQuery = true
 	}
@@ -268,14 +287,15 @@ func (h *Handler) checkKey(key string, missing gwError) *gwError {
 	return nil
 }
 
-func process(c *Capture, payload []byte, reqType string) reply {
-	events, e, idx := parseEvents(payload, reqType)
+func (h *Handler) process(c *Capture, payload []byte, reqType string) reply {
+	events, sanitized, e, idx := parseEvents(payload, reqType)
 	c.Events = events
 	if e != nil {
 		rep := reject(*e)
 		rep.rejection.Idx = idx
 		return rep
 	}
+	h.enrich(c, sanitized, reqType)
 	return reply{status: http.StatusOK, body: []byte("ok")}
 }
 

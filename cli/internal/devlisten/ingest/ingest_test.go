@@ -46,9 +46,13 @@ type discardSink struct{}
 
 func (discardSink) Capture(*Capture) {}
 
+// testVersion differs from the "dev" of a local build, so a test sees that
+// /version reports the version it was given.
+const testVersion = "1.12.0"
+
 func newTestHandler(writeKeys ...string) (*Handler, *recordingSink) {
 	sink := &recordingSink{}
-	return New(sink, writeKeys), sink
+	return New(sink, writeKeys, testVersion), sink
 }
 
 // fillSlots takes every in-flight slot, so the next request gets 503.
@@ -68,6 +72,14 @@ func serve(h *Handler, r *http.Request) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
 	return rec
+}
+
+func messages(events []Event) []string {
+	var out []string
+	for _, e := range events {
+		out = append(out, string(e.Message))
+	}
+	return out
 }
 
 func gz(t testing.TB, s string) []byte {
@@ -102,10 +114,10 @@ func TestAcceptedBatchIsCapturedWithDecodedEvents(t *testing.T) {
 	require.Equal(t, body, string(c.Decoded))
 	require.True(t, c.BodyComplete)
 	require.Nil(t, c.Rejection)
-	require.Equal(t, []Event{
-		{Message: []byte(`{"type":"identify","userId":"u1"}`)},
-		{Message: []byte(`{"type":"track","event":"A","anonymousId":"a1","properties":{"n":1}}`)},
-	}, c.Events)
+	require.Equal(t, []string{
+		`{"type":"identify","userId":"u1"}`,
+		`{"type":"track","event":"A","anonymousId":"a1","properties":{"n":1}}`,
+	}, messages(c.Events))
 	require.Equal(t, rec.Result().Header, c.Header, "the capture holds the headers sent")
 }
 
@@ -217,11 +229,7 @@ func TestEventsKeepTheSentBytes(t *testing.T) {
 			rec := serve(h, tc.r)
 
 			require.Equal(t, tc.status, rec.Code, rec.Body.String())
-			var want []Event
-			for _, e := range tc.events {
-				want = append(want, Event{Message: []byte(e)})
-			}
-			require.Equal(t, want, sink.only(t).Events)
+			require.Equal(t, tc.events, messages(sink.only(t).Events))
 		})
 	}
 }
@@ -346,7 +354,7 @@ func TestBurstOfLargePostsStaysUnder128MiB(t *testing.T) {
 	if testing.Short() {
 		t.Skip("sends 970 MB through loopback")
 	}
-	srv := httptest.NewServer(New(discardSink{}, nil))
+	srv := httptest.NewServer(New(discardSink{}, nil, testVersion))
 	t.Cleanup(srv.Close)
 	// Collect often, so the peak follows live memory and not garbage.
 	defer debug.SetGCPercent(debug.SetGCPercent(10))
@@ -397,7 +405,7 @@ func TestBurstOfLongQueriesStaysUnder128MiB(t *testing.T) {
 	if testing.Short() {
 		t.Skip("sends 48 MB of request lines through loopback")
 	}
-	srv := httptest.NewServer(New(discardSink{}, nil))
+	srv := httptest.NewServer(New(discardSink{}, nil, testVersion))
 	t.Cleanup(srv.Close)
 	// Collect often, so the peak follows live memory and not garbage.
 	defer debug.SetGCPercent(debug.SetGCPercent(10))
@@ -483,7 +491,7 @@ func heapBytes() uint64 {
 
 // A request past the cap reads only its write key, so it costs no memory.
 func TestRequestPastTheCapDoesNotParseItsQuery(t *testing.T) {
-	h := New(discardSink{}, nil)
+	h := New(discardSink{}, nil, testVersion)
 	fillSlots(h)
 	var query strings.Builder
 	query.WriteString("writeKey=dev")
@@ -653,6 +661,44 @@ func TestUnknownPathIsControl(t *testing.T) {
 			c := sink.only(t)
 			require.Equal(t, "control", c.Kind)
 			require.Equal(t, transport, c.Transport)
+		})
+	}
+}
+
+// Health checks are not captured, so a supervisor cannot fill the store.
+func TestCaptureKindByRoute(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		method, target string
+		// kind is empty when the request is not captured.
+		kind string
+	}{
+		{"GET", "/", ""},
+		{"GET", "/health", ""},
+		{"POST", "/health", ""},
+		{"GET", "/internal/readiness", ""},
+		{"GET", "/internal/liveness", ""},
+		{"GET", "/robots.txt", ""},
+		{"GET", "/version", ""},
+		{"GET", "/sourceConfig/?p=cdn", "control"},
+		{"HEAD", "/sourceConfig/?view=ad", "control"},
+		{"POST", "/rsaMetrics", "control"},
+		{"GET", "/cluster-info", "control"},
+		{"POST", "/v1/webhook", "control"},
+		{"GET", "/favicon.ico", "control"},
+		{"POST", "/v1/track", "ingestion"},
+	} {
+		t.Run(tc.method+" "+tc.target, func(t *testing.T) {
+			t.Parallel()
+			h, sink := newTestHandler()
+
+			serve(h, httptest.NewRequest(tc.method, tc.target, strings.NewReader(`{"userId":"u1"}`)))
+
+			if tc.kind == "" {
+				require.Empty(t, sink.captures)
+				return
+			}
+			require.Equal(t, tc.kind, sink.only(t).Kind)
 		})
 	}
 }
