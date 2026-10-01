@@ -124,6 +124,17 @@ func (s *Store) Since(seq uint64) ([]*Record, uint64) {
 	return s.after(seq), s.evictedThrough
 }
 
+// Get returns the record with seq, or nil when the store does not hold it.
+func (s *Store) Get(seq uint64) *Record {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := sort.Search(len(s.records), func(i int) bool { return s.records[i].Seq >= seq })
+	if i == len(s.records) || s.records[i].Seq != seq {
+		return nil
+	}
+	return s.records[i]
+}
+
 // after needs s.mu. It returns a copy, because eviction clears the slots of
 // the shared array.
 func (s *Store) after(seq uint64) []*Record {

@@ -614,7 +614,17 @@ func TestDiagnosis(t *testing.T) {
 			h := New(st, cfg)
 			tc.send(t, st, tc.allow)
 
-			require.Equal(t, tc.want, summaryOf(t, h, tc.query).Summary.Diagnosis)
+			got := summaryOf(t, h, tc.query).Summary.Diagnosis
+			require.Equal(t, tc.want, got)
+			// A curl next on the query API runs and finds what it names.
+			for _, d := range got {
+				target, ok := strings.CutPrefix(d.Next, "curl -fsS '"+testURL+"/_dev/")
+				if !ok {
+					continue
+				}
+				env, _ := requestsOf(t, h, strings.TrimSuffix(strings.TrimPrefix(target, "v1/requests?"), "'"))
+				require.Positive(t, env.Total, d.Next)
+			}
 		})
 	}
 }
@@ -697,4 +707,17 @@ func TestSummaryWait(t *testing.T) {
 			t.Fatal("the long-poll did not end on Stop")
 		}
 	})
+}
+
+// A fields path through a list applies to each element, so
+// fields=properties.products.sku lists every sku.
+func TestStreamFieldsThroughAList(t *testing.T) {
+	t.Parallel()
+	h, st := newTestHandler("127.0.0.1")
+	track(t, st, `{"userId":"u","event":"Cart","properties":{"products":[{"sku":"a","n":1},{"n":2},"x",null,3]}}`)
+
+	w := get(h, "/_dev/v1/events?fields=properties.products.sku", nil)
+
+	require.Equal(t, `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`+"\n", w.Body.String(),
+		"an element that is not an object stays as sent")
 }

@@ -4,13 +4,14 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"io"
 	"maps"
 	"net"
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -54,6 +55,8 @@ type Config struct {
 	AllowHosts []string
 	// Version is the CLI version.
 	Version string
+	// Guide is the Markdown guide that rudder-cli dev --help prints.
+	Guide string
 }
 
 type Handler struct {
@@ -80,6 +83,8 @@ func New(st *store.Store, cfg Config) *Handler {
 		strings.TrimSuffix(base, "/"): h.index,
 		base + "info":                 h.info,
 		base + "events":               h.events,
+		base + "requests":             h.requests,
+		base + "guide":                h.guide,
 	}
 	return h
 }
@@ -114,6 +119,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handle, ok := h.routes[r.URL.Path]
+	if seq, found := strings.CutPrefix(r.URL.Path, base+"requests/"); found {
+		_, err := strconv.ParseUint(seq, 10, 64)
+		handle, ok = h.request, err == nil
+	}
 	if !ok {
 		h.fail(w, http.StatusNotFound, "not_found", "No route "+r.URL.Path+".", h.curl("requests"))
 		return
@@ -197,8 +206,8 @@ func (h *Handler) noParams(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	name := slices.Min(slices.Collect(maps.Keys(query)))
-	h.failParam(w, http.StatusBadRequest, "unknown_parameter", name,
-		r.URL.Path+" takes no parameter "+name+".", h.curl(""))
+	h.failParam(w, &paramError{code: "unknown_parameter", param: name, message: r.URL.Path + " takes no parameter " + name + "."},
+		h.curl(""))
 	return false
 }
 
@@ -229,7 +238,10 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 		Description: "The query API of rudder-cli dev listen. It reads what the listener captured.",
 		Next:        h.curl("info"),
 		Curl:        h.curl("info"),
-		Links:       map[string]string{"events": "events", "counts": "events?view=counts", "info": "info", "ui": UIPath},
+		Links: map[string]string{
+			"events": "events", "counts": "events?view=counts", "requests": "requests", "request": "requests/{seq}",
+			"info": "info", "guide": "guide", "ui": UIPath,
+		},
 		Endpoints: []endpoint{
 			{http.MethodGet, base, []string{}, "This index.", h.curl("")},
 			{
@@ -238,10 +250,31 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 					"view=counts answers the summary: counts, rejected events, a diagnosis and the cursor.",
 				h.curl("events?view=counts"),
 			},
+			{
+				http.MethodGet, base + "requests", requestsParams,
+				"The request records after the cursor, refused and control requests included: status, rejection, " +
+					"headers, body, response and the enrichment of each event. messageId finds the request of an event.",
+				h.curl("requests?failed=true&view=compact"),
+			},
+			{
+				http.MethodGet, base + "requests/{seq}", recordParams,
+				"One request record. view=full adds each event as sent; fields=request.body&maxBytes=0 reads a large body.",
+				h.recordExample(),
+			},
 			{http.MethodGet, base + "info", []string{}, "The listener identity, the cursor and the store counts.", h.curl("info")},
+			{http.MethodGet, base + "guide", []string{}, "The guide that rudder-cli dev --help prints, as Markdown.", h.curl("guide")},
 		},
 		Help: "rudder-cli dev --help",
 	})
+}
+
+// recordExample reads the newest record. An empty store has none, so the
+// example then lists the first record.
+func (h *Handler) recordExample() string {
+	if seq := h.store.Cursor(); seq > 0 {
+		return h.curl("requests/" + strconv.FormatUint(seq, 10))
+	}
+	return h.curl("requests?limit=1")
 }
 
 func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
@@ -274,6 +307,15 @@ func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) guide(w http.ResponseWriter, r *http.Request) {
+	if !h.noParams(w, r) {
+		return
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(w, h.cfg.Guide)
+}
+
 // IsLoopback reports whether a bind address takes local connections only.
 // The bind is always an IP address, because dev listen rejects names.
 func IsLoopback(bind string) bool {
@@ -299,17 +341,23 @@ func (h *Handler) fail(w http.ResponseWriter, status int, code, message, next st
 	writeJSON(w, status, map[string]apiError{"error": {Status: status, Code: code, Message: message, Next: next}})
 }
 
-func (h *Handler) failParam(w http.ResponseWriter, status int, code, param, message, next string) {
-	writeJSON(w, status, map[string]apiError{
-		"error": {Status: status, Code: code, Message: message, Param: &param, Next: next},
-	})
+func (h *Handler) failParam(w http.ResponseWriter, e *paramError, next string) {
+	writeJSON(w, http.StatusBadRequest, map[string]apiError{"error": {
+		Status: http.StatusBadRequest, Code: e.code, Message: e.message, Param: &e.param, Details: e.details, Next: next,
+	}})
 }
 
+// writeJSON encodes before it writes the status, so a value it cannot
+// encode answers 500 and never an empty 200.
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	out, err := encode(v)
+	if err != nil {
+		status = http.StatusInternalServerError
+		out, _ = encode(map[string]apiError{"error": {
+			Status: status, Code: "encode_failed", Message: "The listener could not encode its answer: " + err.Error() + ".",
+		}})
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	enc := json.NewEncoder(w)
-	// Curl lines hold & and must paste as they print.
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(v)
+	_, _ = w.Write(append(out, '\n'))
 }

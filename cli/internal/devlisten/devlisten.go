@@ -3,12 +3,19 @@
 package devlisten
 
 import (
+	_ "embed"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/api"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
 )
+
+// Guide is the user guide. rudder-cli dev --help prints it, and the
+// listener serves it at /_dev/v1/guide.
+//
+//go:embed guide.md
+var Guide string
 
 // NewHandler returns the handler that answers SDKs and the store it captures
 // into. An empty writeKeys accepts every key. version is what /version

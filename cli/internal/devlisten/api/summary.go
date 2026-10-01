@@ -136,7 +136,7 @@ func tally(records []*store.Record, q *eventsQuery) counts {
 	}
 
 	for _, r := range records {
-		if !q.keyMatches(r) {
+		if !keyMatches(q.writeKeys, r) {
 			continue
 		}
 		if r.Kind != "ingestion" {

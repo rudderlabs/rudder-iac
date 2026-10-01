@@ -92,27 +92,75 @@ type paramError struct {
 	code    string
 	param   string
 	message string
+	details any
+}
+
+func invalid(param, format string, args ...any) *paramError {
+	return &paramError{code: "invalid_parameter", param: param, message: param + ": " + fmt.Sprintf(format, args...)}
+}
+
+// checkNames rejects a parameter the route does not take and a singleton
+// given twice, so a typo never reads as a filter that matched.
+func checkNames(query url.Values, route string, allowed, repeatable []string) *paramError {
+	for _, name := range slices.Sorted(maps.Keys(query)) {
+		if !slices.Contains(allowed, name) {
+			return &paramError{code: "unknown_parameter", param: name, message: route + " takes no parameter " + name + "."}
+		}
+		if len(query[name]) > 1 && !slices.Contains(repeatable, name) {
+			return invalid(name, "repeated; give it once")
+		}
+	}
+	return nil
+}
+
+func parseSinceParam(query url.Values, now time.Time) (Since, *paramError) {
+	if !query.Has("since") {
+		return Since{}, nil
+	}
+	since, err := ParseSince(query.Get("since"), now)
+	if err != nil {
+		return Since{}, invalid("since", "%s", err)
+	}
+	return since, nil
+}
+
+// parseFields reads the repeated fields paths. They replace a view.
+func parseFields(query url.Values) ([][]string, *paramError) {
+	if !query.Has("fields") {
+		return nil, nil
+	}
+	if query.Has("view") {
+		return nil, invalid("fields", "cannot combine with view")
+	}
+	var out [][]string
+	for _, path := range query["fields"] {
+		if err := CheckFieldPath(path); err != nil {
+			return nil, invalid("fields", "%s", err)
+		}
+		out = append(out, strings.Split(path, "."))
+	}
+	return out, nil
+}
+
+// parseCount reads a number from lo to hi, or of lo or more when hi is 0.
+func parseCount(query url.Values, name string, lo, hi int) (int, *paramError) {
+	n, err := strconv.Atoi(query.Get(name))
+	switch {
+	case hi == 0 && (err != nil || n < lo):
+		return 0, invalid(name, "%q is not a number of %d or more", query.Get(name), lo)
+	case hi > 0 && (err != nil || n < lo || n > hi):
+		return 0, invalid(name, "%q is not a number from %d to %d", query.Get(name), lo, hi)
+	}
+	return n, nil
 }
 
 var eventsParams = []string{
 	"since", "serverId", "view", "fields", "limit", "event", "type", "writeKey", "userId", "anonymousId", "wait", "min",
 }
 
-// repeatable parameters OR their values; the others are singletons.
-var repeatable = []string{"fields", "event", "type", "writeKey"}
-
 func parseEventsQuery(query url.Values, now time.Time) (*eventsQuery, *paramError) {
-	invalid := func(param, format string, args ...any) *paramError {
-		return &paramError{code: "invalid_parameter", param: param, message: param + ": " + fmt.Sprintf(format, args...)}
-	}
-
-	for _, name := range slices.Sorted(maps.Keys(query)) {
-		if !slices.Contains(eventsParams, name) {
-			return nil, &paramError{code: "unknown_parameter", param: name, message: "/_dev/v1/events takes no parameter " + name + "."}
-		}
-		if len(query[name]) > 1 && !slices.Contains(repeatable, name) {
-			return nil, invalid(name, "repeated; give it once")
-		}
+	if err := checkNames(query, base+"events", eventsParams, []string{"fields", "event", "type", "writeKey"}); err != nil {
+		return nil, err
 	}
 
 	q := &eventsQuery{
@@ -131,12 +179,9 @@ func parseEventsQuery(query url.Values, now time.Time) (*eventsQuery, *paramErro
 	if v, ok := query["anonymousId"]; ok {
 		q.anonymousID = &v[0]
 	}
-	if query.Has("since") {
-		since, err := ParseSince(query.Get("since"), now)
-		if err != nil {
-			return nil, invalid("since", "%s", err)
-		}
-		q.since = since
+	var err *paramError
+	if q.since, err = parseSinceParam(query, now); err != nil {
+		return nil, err
 	}
 	if query.Has("view") {
 		q.view = query.Get("view")
@@ -146,26 +191,16 @@ func parseEventsQuery(query url.Values, now time.Time) (*eventsQuery, *paramErro
 	}
 	counts := q.view == "counts"
 
-	if query.Has("fields") {
-		if query.Has("view") {
-			return nil, invalid("fields", "cannot combine with view")
-		}
-		for _, path := range query["fields"] {
-			if err := CheckFieldPath(path); err != nil {
-				return nil, invalid("fields", "%s", err)
-			}
-			q.fields = append(q.fields, strings.Split(path, "."))
-		}
+	if q.fields, err = parseFields(query); err != nil {
+		return nil, err
 	}
 	if query.Has("limit") {
 		if counts {
 			return nil, invalid("limit", "applies to the stream, not to view=counts")
 		}
-		n, err := strconv.Atoi(query.Get("limit"))
-		if err != nil || n < 1 || n > MaxLimit {
-			return nil, invalid("limit", "%q is not a number from 1 to %d", query.Get("limit"), MaxLimit)
+		if q.limit, err = parseCount(query, "limit", 1, MaxLimit); err != nil {
+			return nil, err
 		}
-		q.limit = n
 	}
 	if query.Has("wait") {
 		if !counts {
@@ -181,11 +216,9 @@ func parseEventsQuery(query url.Values, now time.Time) (*eventsQuery, *paramErro
 		if !counts {
 			return nil, invalid("min", "applies to view=counts only")
 		}
-		n, err := strconv.Atoi(query.Get("min"))
-		if err != nil || n < 1 {
-			return nil, invalid("min", "%q is not a number of 1 or more", query.Get("min"))
+		if q.min, err = parseCount(query, "min", 1, 0); err != nil {
+			return nil, err
 		}
-		q.min = n
 	}
 	return q, nil
 }

@@ -5,10 +5,10 @@ package dev
 import (
 	"strings"
 
-	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten"
 )
 
 const disabledMessage = "dev is experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_DEV_LISTEN=true, " +
@@ -16,12 +16,9 @@ const disabledMessage = "dev is experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=t
 
 func NewCmdDev() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dev",
-		Short: "Capture and inspect the events an app sends (experimental)",
-		Long: heredoc.Doc(`
-			Capture the requests a RudderStack SDK sends to a local listener, and read
-			them back as tables or JSON.
-		`),
+		Use:    "dev",
+		Short:  "Capture and inspect the events an app sends (experimental)",
+		Long:   devlisten.Guide,
 		Hidden: true,
 		Args:   groupArgs,
 		// A child with its own PersistentPreRunE would replace this check.
@@ -29,7 +26,9 @@ func NewCmdDev() *cobra.Command {
 			if config.GetConfig().ExperimentalFlags.DevListen {
 				return nil
 			}
-			return fail(cmd, &usageError{message: disabledMessage, next: "rudder-cli experimental enable devListen"})
+			return fail(cmd, &usageError{
+				code: "experimental_disabled", message: disabledMessage, next: "rudder-cli experimental enable devListen",
+			})
 		},
 		RunE: showHelp,
 	}
