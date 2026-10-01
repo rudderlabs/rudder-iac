@@ -26,6 +26,7 @@ var (
 	errEmptyBatch            = gwError{http.StatusBadRequest, "empty batch payload", "batch"}
 	errNonIdentifiable       = gwError{http.StatusBadRequest, "request neither has anonymousId nor userId", "identity"}
 	errUnknownPath           = gwError{http.StatusNotFound, "unknown path", "route"}
+	errProxyDisabled         = gwError{http.StatusNotImplemented, "Proxy is disabled", "route"}
 
 	// These are dev listen's own memory caps. The pixel answers replace the
 	// GIF, so the sender sees why dev listen refused a pixel query.
@@ -68,7 +69,7 @@ func methodNotAllowed(allow string) reply {
 }
 
 // respond sets every header net/http would add itself, so the capture holds
-// the headers sent.
+// the headers sent. A nil c answers without a capture.
 func (h *Handler) respond(w http.ResponseWriter, c *Capture, rep reply) {
 	header := w.Header()
 	switch {
@@ -85,11 +86,13 @@ func (h *Handler) respond(w http.ResponseWriter, c *Capture, rep reply) {
 		header.Set("Allow", rep.allow)
 	}
 
-	c.StatusCode = rep.status
-	c.Header = header.Clone()
-	c.ResponseBody = rep.body
-	c.Rejection = rep.rejection
-	h.sink.Capture(c)
+	if c != nil {
+		c.StatusCode = rep.status
+		c.Header = header.Clone()
+		c.ResponseBody = rep.body
+		c.Rejection = rep.rejection
+		h.sink.Capture(c)
+	}
 
 	w.WriteHeader(rep.status)
 	_, _ = w.Write(rep.body)

@@ -16,32 +16,42 @@ import (
 )
 
 // parseEvents never decodes the payload into Go values, because the
-// in-flight cap bounds bytes, not values.
-func parseEvents(payload []byte, reqType string) ([]Event, *gwError, *int) {
+// in-flight cap bounds bytes, not values. It also returns each message without
+// \u0000 escapes, for the checks and the enrichment to read, because
+// RudderStack ignores them (rudder-server misc.SanitizeJSON).
+func parseEvents(payload []byte, reqType string) ([]Event, [][]byte, *gwError, *int) {
 	// gjson.Valid recurses without a depth limit; encoding/json.Valid does not.
 	if !json.Valid(payload) {
-		return nil, &errInvalidJSON, nil
+		return nil, nil, &errInvalidJSON, nil
 	}
 
 	var events []Event
 	if reqType == "batch" || reqType == "import" {
 		var e *gwError
 		if events, e = batchEvents(payload); e != nil {
-			return nil, e, nil
+			return nil, nil, e, nil
 		}
 	} else {
 		if bytes.TrimLeft(payload, " \t\r\n")[0] != '{' {
-			return nil, &errNotRudderEvent, nil
+			return nil, nil, &errNotRudderEvent, nil
 		}
 		events = []Event{{Message: payload}}
 	}
 
+	sanitized := make([][]byte, len(events))
 	for i, ev := range events {
-		if e := checkEvent(ev.Message); e != nil {
-			return events, e, &i
+		sanitized[i] = ev.Message
+		if bytes.Contains(ev.Message, nullEscape) {
+			sanitized[i] = bytes.ReplaceAll(ev.Message, nullEscape, nil)
+			if !json.Valid(sanitized[i]) {
+				return events, nil, &errInvalidJSON, &i
+			}
+		}
+		if e := checkEvent(sanitized[i]); e != nil {
+			return events, nil, e, &i
 		}
 	}
-	return events, nil, nil
+	return events, sanitized, nil, nil
 }
 
 func batchEvents(payload []byte) ([]Event, *gwError) {
@@ -78,14 +88,6 @@ func batchEvents(payload []byte) ([]Event, *gwError) {
 }
 
 func checkEvent(message []byte) *gwError {
-	// RudderStack ignores each \u0000 escape (rudder-server misc.SanitizeJSON),
-	// so the checks read a copy without them.
-	if bytes.Contains(message, nullEscape) {
-		message = bytes.ReplaceAll(message, nullEscape, nil)
-		if !json.Valid(message) {
-			return &errInvalidJSON
-		}
-	}
 	event := gjson.ParseBytes(message)
 	switch {
 	case !numbersFit(event.Raw):
@@ -123,25 +125,25 @@ func numbersFit(raw string) bool {
 	return true
 }
 
-// nonIdentifiable lets the last of duplicate keys win, as RudderStack does.
-func nonIdentifiable(event gjson.Result) bool {
-	var eventType, userID, anonymousID string
+// topLevel lets the last of duplicate keys win, as RudderStack does.
+func topLevel(event gjson.Result, keys ...string) map[string]gjson.Result {
+	values := make(map[string]gjson.Result, len(keys))
 	event.ForEach(func(key, value gjson.Result) bool {
-		switch key.Str {
-		case "type":
-			eventType = value.String()
-		case "userId":
-			userID = value.String()
-		case "anonymousId":
-			anonymousID = value.String()
+		if slices.Contains(keys, key.Str) {
+			values[key.Str] = value
 		}
 		return true
 	})
-	switch eventType {
+	return values
+}
+
+func nonIdentifiable(event gjson.Result) bool {
+	v := topLevel(event, "type", "userId", "anonymousId")
+	switch v["type"].String() {
 	case "extract", "record":
 		return false
 	}
-	return sanitizeAndTrim(userID) == "" && sanitizeAndTrim(anonymousID) == ""
+	return sanitizeAndTrim(v["userId"].String()) == "" && sanitizeAndTrim(v["anonymousId"].String()) == ""
 }
 
 // invisibleRunes is rudder-go-kit sanitize's list (v0.80.0). An identifier of

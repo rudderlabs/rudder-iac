@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -46,12 +47,15 @@ func TestConformance(t *testing.T) {
 		"gzip":       gzipCases(t),
 		"boundary":   boundaryCases(t),
 		"sdk shapes": sdkShapeCases(t),
+		"bootstrap":  bootstrapCases(),
+		"health":     healthCases(),
 	}
 	for group, cases := range groups {
 		for _, tc := range cases {
 			t.Run(group+"/"+tc.name, func(t *testing.T) {
 				t.Parallel()
 				h, _ := newTestHandler(tc.writeKeys...)
+				h.startedAt = startedAt
 
 				rec := serve(h, tc.request)
 
@@ -398,5 +402,130 @@ func sdkShapeCases(t *testing.T) []conformanceCase {
 				"Access-Control-Allow-Credentials": "true",
 			},
 		},
+	}
+}
+
+var (
+	// startedAt is not UTC, so the rows show that updatedAt is.
+	startedAt = time.Date(2026, 9, 30, 15, 4, 5, 123_000_000, time.FixedZone("UTC+3", 3*3600))
+
+	// sourceConfigDev is the /sourceConfig answer for the key dev, byte for byte.
+	sourceConfigDev = `{"source":{"config":{"statsCollection":{"errors":{"enabled":false},"metrics":{"enabled":false}}},` +
+		`"dataplanes":{},"destinations":[],"enabled":true,"id":"dev-ef260e9aa3c6","name":"rudder-cli dev listen",` +
+		`"updatedAt":"2026-09-30T12:04:05.123Z","workspaceId":"dev-workspace","writeKey":"dev"},"updatedAt":"2026-09-30T12:04:05.123Z"}`
+
+	jsonHeaders = map[string]string{"Content-Type": "application/json; charset=utf-8", "Vary": "Origin"}
+)
+
+// Browser and mobile SDKs fetch /sourceConfig before they send, so they
+// start only on these answers.
+func bootstrapCases() []conformanceCase {
+	return []conformanceCase{
+		{
+			name:    "sourceConfig",
+			request: req("GET", "/sourceConfig", "", basic("dev")),
+			status:  200, body: sourceConfigDev, headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig with a trailing slash and a query, as analytics-js sends it",
+			request: req("GET", "/sourceConfig/?p=npm&v=3.31.4&build=modern&writeKey=dev&lockIntegrationsVersion=true", "", basic("dev")),
+			status:  200, body: sourceConfigDev, headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig with a double slash",
+			request: req("GET", "//sourceConfig?p=android&v=1.28.1", "", basic("dev")),
+			status:  200, body: sourceConfigDev, headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig with a listed key",
+			request: req("GET", "/sourceConfig?p=swift", "", basic("dev")), writeKeys: onlyDev,
+			status: 200, body: sourceConfigDev, headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig without a key",
+			request: req("GET", "/sourceConfig", ""), writeKeys: onlyDev,
+			status: 401, body: `{"message":"Writekey not found in basic auth"}`, headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig with a key outside the allowlist",
+			request: req("GET", "/sourceConfig", "", basic("other")), writeKeys: onlyDev,
+			status: 400, body: `{"message":"Invalid write key"}`, headers: jsonHeaders,
+		},
+		{
+			name:    "ad-block probe",
+			request: req("HEAD", "/sourceConfig/?view=ad", ""), writeKeys: onlyDev,
+			status: 204, body: "", headers: map[string]string{"Vary": "Origin"},
+		},
+		{
+			name:    "HEAD sourceConfig",
+			request: req("HEAD", "/sourceConfig", "", basic("dev")),
+			status:  200, body: "", headers: jsonHeaders,
+		},
+		{
+			name:    "sourceConfig wrong method",
+			request: req("POST", "/sourceConfig", "", basic("dev")),
+			status:  405, body: "", headers: map[string]string{"Allow": "GET, HEAD", "Vary": "Origin"},
+		},
+		{
+			name: "sourceConfig preflight",
+			request: req("OPTIONS", "/sourceConfig/?p=cdn", "",
+				header("Origin", "http://localhost:3000"),
+				header("Access-Control-Request-Method", "GET"),
+				header("Access-Control-Request-Headers", "authorization")),
+			status: 204, body: "",
+			headers: map[string]string{
+				"Vary":                             "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+				"Access-Control-Allow-Origin":      "http://localhost:3000",
+				"Access-Control-Allow-Methods":     "GET",
+				"Access-Control-Allow-Headers":     "authorization",
+				"Access-Control-Allow-Credentials": "true",
+				"Access-Control-Max-Age":           "900",
+			},
+		},
+		{
+			name:    "rsaMetrics",
+			request: req("POST", "/rsaMetrics", `{"errors":[]}`, header("Origin", "http://localhost:3000")),
+			status:  200, body: "{}",
+			headers: map[string]string{
+				"Content-Type":                     "application/json; charset=utf-8",
+				"Vary":                             "Origin",
+				"Access-Control-Allow-Origin":      "http://localhost:3000",
+				"Access-Control-Allow-Credentials": "true",
+			},
+		},
+		{
+			name:    "cluster-info skips CORS",
+			request: req("GET", "/cluster-info", "", header("Origin", "http://localhost:3000")),
+			status:  200, body: `{"nodeCount":1}`, headers: map[string]string{"Content-Type": "application/json; charset=utf-8"},
+		},
+		{
+			name:    "webhook with the proxy disabled",
+			request: req("POST", "/v1/webhook?writeKey=dev", `{}`),
+			status:  501, body: "Proxy is disabled\n",
+			headers: map[string]string{"Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff"},
+		},
+		{
+			name: "webhook preflight reaches the proxy",
+			request: req("OPTIONS", "/v1/webhook", "",
+				header("Origin", "http://localhost:3000"),
+				header("Access-Control-Request-Method", "POST")),
+			status: 501, body: "Proxy is disabled\n",
+			headers: map[string]string{"Content-Type": "text/plain; charset=utf-8", "X-Content-Type-Options": "nosniff"},
+		},
+	}
+}
+
+func healthCases() []conformanceCase {
+	return []conformanceCase{
+		{name: "root", request: req("GET", "/", ""), status: 200, body: `{"status":"ready"}`, headers: jsonHeaders},
+		{name: "health", request: req("GET", "/health", ""), status: 200, body: `{"status":"ready"}`, headers: jsonHeaders},
+		{name: "readiness", request: req("GET", "/internal/readiness", ""), status: 200, body: `{"status":"ready"}`, headers: jsonHeaders},
+		{name: "liveness", request: req("GET", "/internal/liveness", ""), status: 200, body: "", headers: map[string]string{"Vary": "Origin"}},
+		{
+			name: "robots", request: req("GET", "/robots.txt", ""),
+			status: 200, body: "User-agent: * \nDisallow: / \n", headers: map[string]string{"Content-Type": "text/plain; charset=utf-8", "Vary": "Origin"},
+		},
+		{name: "version", request: req("GET", "/version", ""), status: 200, body: `{"Version":"` + testVersion + `"}`, headers: jsonHeaders},
+		{name: "wrong method", request: req("POST", "/health", ""), status: 405, body: "", headers: map[string]string{"Allow": "GET", "Vary": "Origin"}},
 	}
 }
