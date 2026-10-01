@@ -702,3 +702,38 @@ func TestCaptureKindByRoute(t *testing.T) {
 		})
 	}
 }
+
+// A supervisor stops routing to a listener that drains, while liveness still
+// reports the process as alive.
+func TestHealthReportsStoppingAfterStop(t *testing.T) {
+	t.Parallel()
+	h, _ := newTestHandler()
+	h.Stop()
+
+	for _, tc := range []struct {
+		path   string
+		status int
+		body   string
+	}{
+		{path: "/", status: http.StatusServiceUnavailable, body: `{"status":"stopping"}`},
+		{path: "/health", status: http.StatusServiceUnavailable, body: `{"status":"stopping"}`},
+		{path: "/internal/readiness", status: http.StatusServiceUnavailable, body: `{"status":"stopping"}`},
+		{path: "/internal/liveness", status: http.StatusOK},
+	} {
+		w := serve(h, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		require.Equal(t, tc.status, w.Code, tc.path)
+		require.Equal(t, tc.body, w.Body.String(), tc.path)
+	}
+}
+
+// A request that reaches the body read after Stop must not set a fresh
+// deadline over the one that shutdown expired, or it holds the drain.
+func TestStalledBodyAfterStopFailsAtOnce(t *testing.T) {
+	t.Parallel()
+	h, _ := newTestHandler()
+	h.Stop()
+
+	resp := sendStalledBody(t, h, 2*time.Second)
+
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}

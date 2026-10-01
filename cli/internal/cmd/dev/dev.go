@@ -32,6 +32,8 @@ func NewCmdDev() *cobra.Command {
 		RunE: showHelp,
 	}
 
+	cmd.AddCommand(newCmdListen())
+
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return fail(c, &usageError{message: err.Error(), next: c.CommandPath() + " --help"})
 	})
