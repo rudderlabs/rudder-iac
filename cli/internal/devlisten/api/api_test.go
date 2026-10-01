@@ -34,6 +34,9 @@ func testConfig(bind string, allowHosts ...string) Config {
 		WriteKeys:  []string{},
 		AllowHosts: allowHosts,
 		Version:    "1.2.3",
+		UI: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = io.WriteString(w, "page "+r.URL.Path)
+		}),
 	}
 }
 
@@ -149,8 +152,15 @@ func TestBrowserOriginCheck(t *testing.T) {
 			header: http.Header{
 				"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"},
 			},
-			// The page is not served yet; the guard lets the request through.
-			code: "not_found",
+		},
+		{name: "same-origin script of the page", path: "/_dev/ui/app.js", header: http.Header{"Sec-Fetch-Site": {"same-origin"}}},
+		{
+			name: "cross-site script of the page",
+			path: "/_dev/ui/app.js",
+			header: http.Header{
+				"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"no-cors"}, "Sec-Fetch-Dest": {"script"},
+			},
+			code: "browser_origin",
 		},
 		{
 			name:   "cross-site fetch of the page",
@@ -213,6 +223,18 @@ func TestErrors(t *testing.T) {
 		{
 			name: "route before method", method: "POST", target: "/_dev/v1/nope",
 			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_dev/v1/requests'",
+		},
+		{
+			name: "write method on the page", method: "POST", target: "/_dev/ui/",
+			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+		},
+		{
+			name: "page host check", method: "GET", target: "/_dev/ui/", host: "evil.example",
+			status: 403, code: "host_not_allowed", next: "rudder-cli dev events --json",
+		},
+		{
+			name: "page shutdown", method: "GET", target: "/_dev/ui/", stopped: true,
+			status: 503, code: "shutting_down", next: "rudder-cli dev listen --help",
 		},
 		{
 			name: "write method", method: "POST", target: "/_dev/v1/info",
@@ -330,6 +352,22 @@ func TestHeadAnswersLikeGet(t *testing.T) {
 		require.NotEmpty(t, resp.Header.Get("Content-Type"))
 		require.Empty(t, body)
 	}
+}
+
+// The page path without its slash opens the page with the same view.
+func TestPagePathWithoutSlashRedirects(t *testing.T) {
+	t.Parallel()
+	h, _ := newTestHandler("127.0.0.1")
+	for target, location := range map[string]string{
+		"/_dev/ui":                    "/_dev/ui/",
+		"/_dev/ui?event=Order*&tab=x": "/_dev/ui/?event=Order*&tab=x",
+	} {
+		w := get(h, target, nil)
+
+		require.Equal(t, http.StatusFound, w.Code, target)
+		require.Equal(t, location, w.Header().Get("Location"), target)
+	}
+	require.Equal(t, "page /_dev/ui/app.js", get(h, "/_dev/ui/app.js", nil).Body.String())
 }
 
 func TestInfo(t *testing.T) {

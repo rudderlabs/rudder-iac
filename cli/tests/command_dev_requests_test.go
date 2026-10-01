@@ -35,6 +35,22 @@ func TestDevListenRequests(t *testing.T) {
 		gjson.Get(record, "requests.0.events.0.message").Raw)
 }
 
+// The ready line links the review page, and the page loads with its policy.
+func TestDevListenServesTheReviewPage(t *testing.T) {
+	t.Parallel()
+	p := startListen(t)
+	ui := p.ready["ui"].(string)
+	require.Equal(t, p.url()+"/_dev/ui/", ui)
+
+	for _, file := range []string{"", "app.js", "app.css", "icon.svg"} {
+		resp, err := http.Get(ui + file)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode, file)
+		require.Contains(t, resp.Header.Get("Content-Security-Policy"), "default-src 'self'", file)
+	}
+}
+
 // dev --help prints the guide that the listener serves, so an agent reads
 // the same text from either.
 func TestDevListenHelpIsTheGuide(t *testing.T) {

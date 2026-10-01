@@ -18,6 +18,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/api"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
+	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ui"
 )
 
 const (
@@ -127,6 +128,7 @@ func Start(cfg Config) (*Server, error) {
 		ingest: ingestHandler,
 		api: api.New(st, api.Config{
 			Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version, Guide: Guide,
+			UI: ui.Handler(api.UIPath),
 		}),
 		served: make(chan error, 1),
 		conns:  map[net.Conn]http.ConnState{},

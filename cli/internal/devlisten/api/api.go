@@ -57,6 +57,9 @@ type Config struct {
 	Version string
 	// Guide is the Markdown guide that rudder-cli dev --help prints.
 	Guide string
+	// UI serves the review page under UIPath, after the same guards as the
+	// query API.
+	UI http.Handler
 }
 
 type Handler struct {
@@ -119,6 +122,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handle, ok := h.routes[r.URL.Path]
+	switch {
+	case r.URL.Path == strings.TrimSuffix(UIPath, "/"):
+		handle, ok = h.toUI, true
+	case strings.HasPrefix(r.URL.Path, UIPath) && h.cfg.UI != nil:
+		handle, ok = h.cfg.UI.ServeHTTP, true
+	}
 	if seq, found := strings.CutPrefix(r.URL.Path, base+"requests/"); found {
 		_, err := strconv.ParseUint(seq, 10, 64)
 		handle, ok = h.request, err == nil
@@ -305,6 +314,15 @@ func (h *Handler) info(w http.ResponseWriter, r *http.Request) {
 		UI:            h.cfg.Identity.URL + UIPath,
 		Store:         h.store.Stats(),
 	})
+}
+
+// toUI keeps the query string, so a shared view opens with its filters.
+func (h *Handler) toUI(w http.ResponseWriter, r *http.Request) {
+	target := UIPath
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 func (h *Handler) guide(w http.ResponseWriter, r *http.Request) {
