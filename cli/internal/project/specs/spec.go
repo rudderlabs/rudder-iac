@@ -124,8 +124,6 @@ type SpecReference struct {
 // which includes the kind, group, id, and URN. URNs are constructed using the provided kindMap.
 // to associate kinds with the corresponding resource types.
 func ParseSpecReference(ref string, kindMap map[string]string) (SpecReference, error) {
-	fmt.Printf("ref: %s\n kindMap: %v\n", ref, kindMap)
-
 	parts := strings.Split(strings.TrimPrefix(ref, "#"), ":")
 	if len(parts) != 2 {
 		return SpecReference{}, fmt.Errorf("reference must have format #{kind}:{id}, got: %s", ref)
