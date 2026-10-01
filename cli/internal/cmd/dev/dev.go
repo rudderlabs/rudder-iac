@@ -3,6 +3,8 @@
 package dev
 
 import (
+	"strings"
+
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
@@ -33,8 +35,18 @@ func NewCmdDev() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdListen())
+	cmd.AddCommand(newCmdEvents())
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		// dev events list reads what is there; only the summary waits.
+		if c.Name() == "list" {
+			if flag, ok := strings.CutPrefix(err.Error(), "unknown flag: --"); ok && (flag == "wait" || flag == "min") {
+				return fail(c, &usageError{
+					message: "--wait and --min belong to dev events: dev events list reads what is there",
+					next:    withURL("rudder-cli dev events --wait 30s --json", knownURL()),
+				})
+			}
+		}
 		return fail(c, &usageError{message: err.Error(), next: c.CommandPath() + " --help"})
 	})
 

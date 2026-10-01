@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
@@ -64,10 +65,12 @@ type Handler struct {
 	// stopped ends when Stop runs; it wakes every long-poll.
 	stopped context.Context
 	stop    context.CancelFunc
+	waiters atomic.Int64
+	now     func() time.Time
 }
 
 func New(st *store.Store, cfg Config) *Handler {
-	h := &Handler{store: st, cfg: cfg, hosts: map[string]bool{}}
+	h := &Handler{store: st, cfg: cfg, hosts: map[string]bool{}, now: time.Now}
 	h.stopped, h.stop = context.WithCancel(context.Background())
 	for _, name := range append([]string{cfg.Identity.Bind}, cfg.AllowHosts...) {
 		h.hosts[canonicalHost(name)] = true
@@ -76,6 +79,7 @@ func New(st *store.Store, cfg Config) *Handler {
 		base:                          h.index,
 		strings.TrimSuffix(base, "/"): h.index,
 		base + "info":                 h.info,
+		base + "events":               h.events,
 	}
 	return h
 }
@@ -89,6 +93,9 @@ func (h *Handler) Stop() {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// The read commands trust a 200 only with this header: a dev server
+	// with an HTML fallback also answers 200 on /_dev/v1/events.
+	w.Header().Set("X-Dev-Server-Id", h.cfg.Identity.ServerID)
 
 	switch {
 	case !h.hostAllowed(r.Host):
@@ -157,11 +164,18 @@ func crossSite(r *http.Request) bool {
 	return !navigation
 }
 
+// Waiters returns the number of long-polls in progress.
+func (h *Handler) Waiters() int {
+	return int(h.waiters.Load())
+}
+
 // wait runs the store's long-poll until ctx ends or the server stops.
 func (h *Handler) wait(ctx context.Context, since uint64, atLeast int, count func(*store.Record) int) (int, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer context.AfterFunc(h.stopped, cancel)()
+	h.waiters.Add(1)
+	defer h.waiters.Add(-1)
 
 	found, err := h.store.Wait(ctx, since, atLeast, count)
 	if err != nil && h.stopped.Err() != nil {
@@ -215,9 +229,15 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 		Description: "The query API of rudder-cli dev listen. It reads what the listener captured.",
 		Next:        h.curl("info"),
 		Curl:        h.curl("info"),
-		Links:       map[string]string{"info": "info", "ui": UIPath},
+		Links:       map[string]string{"events": "events", "counts": "events?view=counts", "info": "info", "ui": UIPath},
 		Endpoints: []endpoint{
 			{http.MethodGet, base, []string{}, "This index.", h.curl("")},
+			{
+				http.MethodGet, base + "events", eventsParams,
+				"The accepted events as NDJSON, one per line, as the SDK sent them; the cursor is in X-Dev-Cursor. " +
+					"view=counts answers the summary: counts, rejected events, a diagnosis and the cursor.",
+				h.curl("events?view=counts"),
+			},
 			{http.MethodGet, base + "info", []string{}, "The listener identity, the cursor and the store counts.", h.curl("info")},
 		},
 		Help: "rudder-cli dev --help",

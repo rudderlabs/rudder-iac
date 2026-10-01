@@ -132,15 +132,17 @@ func (s *Store) after(seq uint64) []*Record {
 }
 
 // Wait sums count over the records after since until the sum reaches
-// atLeast, then returns it. The sum counts arrivals, so a record that
-// eviction removed during the wait still counts. It returns the sum so far and ctx.Err() when ctx ends
-// first. Each wake scans only the records stored since the last scan, so
-// many waiters on a full store cost little per request.
+// atLeast, then returns it. Each wake scans only the records stored since
+// the last scan, so many waiters on a full store cost little per request.
+// Once the sum is reached it counts again over the records still stored,
+// because eviction may have removed a counted one, and waits on when the
+// stored sum falls short. It returns the sum so far and ctx.Err() when ctx
+// ends first.
 func (s *Store) Wait(ctx context.Context, since uint64, atLeast int, count func(*Record) int) (int, error) {
-	found := 0
+	found, scanned := 0, since
 	for {
 		s.mu.Lock()
-		records := s.after(since)
+		records := s.after(scanned)
 		// Taken under the same lock as the scan, so no Capture falls between.
 		if s.changed == nil {
 			s.changed = make(chan struct{})
@@ -150,10 +152,13 @@ func (s *Store) Wait(ctx context.Context, since uint64, atLeast int, count func(
 
 		for _, r := range records {
 			found += count(r)
-			since = r.Seq
+			scanned = r.Seq
 		}
 		if found >= atLeast {
-			return found, nil
+			found = s.recount(since, scanned, count)
+			if found >= atLeast {
+				return found, nil
+			}
 		}
 		if s.onWait != nil {
 			s.onWait()
@@ -164,4 +169,17 @@ func (s *Store) Wait(ctx context.Context, since uint64, atLeast int, count func(
 			return found, ctx.Err()
 		}
 	}
+}
+
+// recount sums count over the stored records after since, up to through.
+func (s *Store) recount(since, through uint64, count func(*Record) int) int {
+	records, _ := s.Since(since)
+	n := 0
+	for _, r := range records {
+		if r.Seq > through {
+			break
+		}
+		n += count(r)
+	}
+	return n
 }

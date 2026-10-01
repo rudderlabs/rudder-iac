@@ -51,6 +51,8 @@ type Config struct {
 
 	// readTimeout lets a test shorten the request read limit.
 	readTimeout time.Duration
+	// beforeServe lets a test hold a handler past the drain deadline.
+	beforeServe func(*http.Request)
 }
 
 // Ready is the line dev listen prints once it accepts connections. A script
@@ -69,6 +71,8 @@ type Server struct {
 	api    *api.Handler
 	http   *http.Server
 	served chan error
+
+	beforeServe func(*http.Request)
 
 	closeOnce sync.Once
 	closeErr  error
@@ -124,6 +128,8 @@ func Start(cfg Config) (*Server, error) {
 		api:    api.New(st, api.Config{Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version}),
 		served: make(chan error, 1),
 		conns:  map[net.Conn]http.ConnState{},
+
+		beforeServe: cfg.beforeServe,
 	}
 	s.http = &http.Server{
 		Handler:           s,
@@ -144,6 +150,9 @@ func Start(cfg Config) (*Server, error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if s.beforeServe != nil {
+		s.beforeServe(r)
+	}
 	if strings.HasPrefix(r.URL.Path, api.Prefix) {
 		s.api.ServeHTTP(w, r)
 		return

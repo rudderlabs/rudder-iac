@@ -66,7 +66,12 @@ func newCmdListen() *cobra.Command {
 			if e := opts.validate(); e != nil {
 				return fail(cmd, e)
 			}
-			defer func() { track(err, opts) }()
+			defer func() {
+				track("dev listen", err,
+					telemetry.KV{K: "loopbackBind", V: devlisten.IsLoopback(opts.bind)},
+					telemetry.KV{K: "fixedPort", V: opts.port != 0},
+				)
+			}()
 
 			ctx, release := stopOnSignal(cmd.Context())
 			defer release()
@@ -212,15 +217,13 @@ func stopOnSignal(parent context.Context) (context.Context, func()) {
 	}
 }
 
-// track sends no flag values: only whether the bind is loopback and the port fixed.
-func track(err error, opts listenOptions) {
+// track sends no flag values, and waits at most trackTimeout, so an offline
+// machine does not hold the exit.
+func track(command string, err error, extras ...telemetry.KV) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		telemetry.TrackCommand("dev listen", err,
-			telemetry.KV{K: "loopbackBind", V: devlisten.IsLoopback(opts.bind)},
-			telemetry.KV{K: "fixedPort", V: opts.port != 0},
-		)
+		telemetry.TrackCommand(command, err, extras...)
 	}()
 	select {
 	case <-done:

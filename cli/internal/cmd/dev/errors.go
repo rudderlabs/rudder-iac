@@ -1,7 +1,9 @@
 package dev
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -12,21 +14,53 @@ import (
 )
 
 // usageError carries next, a command that runs as typed, so a user or an
-// agent always has a step that parses.
+// agent always has a step that parses. code defaults to usage.
 type usageError struct {
+	code    string
 	message string
 	next    string
 }
 
 func (e *usageError) Error() string { return e.message }
 
-// fail prints e with its next command and returns a SilentError, so the
-// root prints nothing more and exits 1.
+// fail prints e with its next command, as one JSON object when the caller
+// asked for JSON, and returns a SilentError, so the root prints nothing more
+// and exits 1.
 func fail(cmd *cobra.Command, e *usageError) error {
 	w := cmd.ErrOrStderr()
+	if wantsJSON(cmd) {
+		code := e.code
+		if code == "" {
+			code = "usage"
+		}
+		line, _ := json.Marshal(map[string]cliError{"error": {Code: code, Message: e.message, Next: e.next}})
+		fmt.Fprintln(w, string(line))
+		return &cmderrors.SilentError{Err: e}
+	}
 	fmt.Fprintln(w, ui.Error(e))
 	fmt.Fprintln(w, "Next: "+e.next)
 	return &cmderrors.SilentError{Err: e}
+}
+
+// wantsJSON finds --json also after a bad flag, where parsing stopped
+// before it. Only commands with a --json flag answer in JSON.
+func wantsJSON(cmd *cobra.Command) bool {
+	f := cmd.Flags().Lookup("json")
+	if f == nil {
+		return false
+	}
+	if f.Changed {
+		return f.Value.String() == "true"
+	}
+	for _, arg := range os.Args[1:] {
+		if arg == "--" {
+			break
+		}
+		if arg == "--json" || arg == "-j" || arg == "--json=true" {
+			return true
+		}
+	}
+	return false
 }
 
 // groupArgs rejects any argument to a command group, because a group only
