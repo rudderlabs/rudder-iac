@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -46,6 +47,12 @@ var HandlerMetadata = handler.HandlerMetadata{
 type accountDefinition struct {
 	Type       string
 	SecretKeys []string
+	// RequiredOptions and RequiredSecrets are the keys the account schema marks
+	// required, so validate can flag a missing one before apply reaches the API
+	// (DEX-994). A discriminated definition's mode-specific secrets live in
+	// authModeRequiredSecrets instead.
+	RequiredOptions []string
+	RequiredSecrets []string
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -56,9 +63,55 @@ type accountDefinition struct {
 // account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
 // here stays a one-line map entry because the split logic below is definition-driven.
 var registeredAccounts = map[string]accountDefinition{
-	"SOURCE_BIGQUERY":  {Type: "bigquery", SecretKeys: []string{"credentials"}},
-	"SOURCE_POSTGRES":  {Type: "postgres", SecretKeys: []string{"password"}},
-	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
+	"SOURCE_BIGQUERY": {
+		Type: "bigquery", SecretKeys: []string{"credentials"},
+		RequiredOptions: []string{"project"}, RequiredSecrets: []string{"credentials"},
+	},
+	"SOURCE_POSTGRES": {
+		Type: "postgres", SecretKeys: []string{"password"},
+		RequiredOptions: []string{"host", "dbname", "user", "port", "sslMode"}, RequiredSecrets: []string{"password"},
+	},
+	"SOURCE_SNOWFLAKE": {
+		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
+		RequiredOptions: []string{"account", "dbname", "warehouse", "user", "authenticationType"},
+	},
+}
+
+// authModeRequiredSecrets is the required subset of authModeSecrets: the
+// passphrase is optional, the key itself is not.
+var authModeRequiredSecrets = map[string]map[string][]string{
+	"SOURCE_SNOWFLAKE": {
+		"keyPair":  {"privateKey"},
+		"password": {"password"},
+	},
+}
+
+// missingRequiredConfig lists the required config keys an account of this
+// definition leaves out, options first. A definition the CLI does not register
+// has no known requirements, so it reports nothing.
+func missingRequiredConfig(definitionName string, config map[string]any) []string {
+	def, ok := registeredAccounts[definitionName]
+	if !ok {
+		return nil
+	}
+
+	required := slices.Clone(def.RequiredOptions)
+	if modeSecrets, discriminated := authModeRequiredSecrets[definitionName]; discriminated {
+		// Without a mode there is no telling which secret is required; the
+		// missing authenticationType is reported on its own.
+		mode, _ := config["authenticationType"].(string)
+		required = append(required, modeSecrets[mode]...)
+	} else {
+		required = append(required, def.RequiredSecrets...)
+	}
+
+	var missing []string
+	for _, key := range required {
+		if _, present := config[key]; !present {
+			missing = append(missing, key)
+		}
+	}
+	return missing
 }
 
 // authModeSecrets maps each auth mode of a discriminated definition to the
