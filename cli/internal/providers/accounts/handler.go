@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -12,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -45,6 +47,12 @@ var HandlerMetadata = handler.HandlerMetadata{
 type accountDefinition struct {
 	Type       string
 	SecretKeys []string
+	// RequiredOptions and RequiredSecrets are the keys the account schema marks
+	// required, so validate can flag a missing one before apply reaches the API
+	// (DEX-994). A discriminated definition's mode-specific secrets live in
+	// authModeRequiredSecrets instead.
+	RequiredOptions []string
+	RequiredSecrets []string
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -55,9 +63,55 @@ type accountDefinition struct {
 // account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
 // here stays a one-line map entry because the split logic below is definition-driven.
 var registeredAccounts = map[string]accountDefinition{
-	"SOURCE_BIGQUERY":  {Type: "bigquery", SecretKeys: []string{"credentials"}},
-	"SOURCE_POSTGRES":  {Type: "postgres", SecretKeys: []string{"password"}},
-	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
+	"SOURCE_BIGQUERY": {
+		Type: "bigquery", SecretKeys: []string{"credentials"},
+		RequiredOptions: []string{"project"}, RequiredSecrets: []string{"credentials"},
+	},
+	"SOURCE_POSTGRES": {
+		Type: "postgres", SecretKeys: []string{"password"},
+		RequiredOptions: []string{"host", "dbname", "user", "port", "sslMode"}, RequiredSecrets: []string{"password"},
+	},
+	"SOURCE_SNOWFLAKE": {
+		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
+		RequiredOptions: []string{"account", "dbname", "warehouse", "user", "authenticationType"},
+	},
+}
+
+// authModeRequiredSecrets is the required subset of authModeSecrets: the
+// passphrase is optional, the key itself is not.
+var authModeRequiredSecrets = map[string]map[string][]string{
+	"SOURCE_SNOWFLAKE": {
+		"keyPair":  {"privateKey"},
+		"password": {"password"},
+	},
+}
+
+// missingRequiredConfig lists the required config keys an account of this
+// definition leaves out, options first. A definition the CLI does not register
+// has no known requirements, so it reports nothing.
+func missingRequiredConfig(definitionName string, config map[string]any) []string {
+	def, ok := registeredAccounts[definitionName]
+	if !ok {
+		return nil
+	}
+
+	required := slices.Clone(def.RequiredOptions)
+	if modeSecrets, discriminated := authModeRequiredSecrets[definitionName]; discriminated {
+		// Without a mode there is no telling which secret is required; the
+		// missing authenticationType is reported on its own.
+		mode, _ := config["authenticationType"].(string)
+		required = append(required, modeSecrets[mode]...)
+	} else {
+		required = append(required, def.RequiredSecrets...)
+	}
+
+	var missing []string
+	for _, key := range required {
+		if _, present := config[key]; !present {
+			missing = append(missing, key)
+		}
+	}
+	return missing
 }
 
 // authModeSecrets maps each auth mode of a discriminated definition to the
@@ -211,9 +265,12 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldD
 	return &AccountState{ID: updated.ID}, nil
 }
 
+// Delete annotates the one refusal the CLI knows more about than the API: an
+// account still in use, where the resource using it is often one this run never
+// loaded (DEX-959). Every other failure passes through untouched.
 func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *AccountResource, oldState *AccountState) error {
 	if err := h.store.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting account %q: %w", oldState.ID, err)
+		return fmt.Errorf("deleting account %q: %w", oldState.ID, provider.ExplainBlockingAccountUsage(err))
 	}
 	return nil
 }
