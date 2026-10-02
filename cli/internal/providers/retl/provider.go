@@ -25,6 +25,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
@@ -222,6 +223,15 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	}
 
 	return s, nil
+}
+
+// CheckPlan refuses a connection update that changes config the API cannot
+// update in place, which Update would otherwise refuse mid-apply.
+func (p *Provider) CheckPlan(plan *planner.Plan) error {
+	if _, ok := p.handlers[connection.ResourceType]; !ok {
+		return nil
+	}
+	return connection.CheckImmutableChanges(plan.Diff)
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
