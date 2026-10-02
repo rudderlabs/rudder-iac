@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -31,6 +32,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // facebookConversionsConfig is the local YAML config model. Field set mirrors
@@ -95,7 +97,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "FACEBOOK_CONVERSIONS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "dataset_id"},
 		NewConfig: func() any {
 			return &facebookConversionsConfig{}
 		},

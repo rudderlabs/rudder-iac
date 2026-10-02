@@ -441,6 +441,55 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 	}
 }
 
+// A spec that selects a list but names no events discards every event, so it
+// has to survive a round trip. It used to convert to nothing outbound — no list
+// and no discriminator — so the next plan saw local config the remote state
+// never carried, and the destination showed a pending update on every apply.
+func TestAdjustEmptySelectedListRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		filter   map[string]any
+		wantWire map[string]any
+	}{
+		{
+			name:     "empty whitelist discards every event",
+			filter:   map[string]any{"whitelist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "whitelistedEvents"},
+		},
+		{
+			name:     "empty blacklist filters nothing",
+			filter:   map[string]any{"blacklist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "blacklistedEvents"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			local := map[string]any{"app_token": "app-token", "event_filtering": tt.filter}
+
+			api, err := registered.LocalToAPI(local)
+			require.NoError(t, err)
+			for key, want := range tt.wantWire {
+				assert.Equal(t, want, api[key], "the selector must reach the API")
+			}
+
+			back, err := registered.APIToLocal(api)
+			require.NoError(t, err)
+			assert.Equal(t, tt.filter, back["event_filtering"], "apply then plan must converge")
+		})
+	}
+}
+
 func TestAdjustConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 

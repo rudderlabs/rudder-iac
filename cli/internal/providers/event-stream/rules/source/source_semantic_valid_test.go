@@ -145,6 +145,27 @@ func TestSourceSemanticValid_NameUniqueness(t *testing.T) {
 		assert.Contains(t, results[0].Message, "duplicate name 'Same Name' within kind 'event-stream-source'")
 	})
 
+	// The control plane compares source names case-insensitively.
+	t.Run("source name differing only in case detected", func(t *testing.T) {
+		t.Parallel()
+
+		graph := resources.NewGraph()
+		graph.AddResource(sourceResource("src-1", "web app"))
+		graph.AddResource(sourceResource("src-2", "Web App"))
+
+		spec := esSource.SourceSpec{
+			LocalID:          "src-1",
+			Name:             "web app",
+			SourceDefinition: "javascript",
+		}
+
+		results := validateSourceSemantic("", "", nil, spec, graph)
+		assert.Equal(t, []rules.ValidationResult{{
+			Reference: "/name",
+			Message:   "duplicate name 'web app' (case-insensitive match with 'Web App') within kind 'event-stream-source'",
+		}}, results)
+	})
+
 	t.Run("single source in graph — no false positive", func(t *testing.T) {
 		t.Parallel()
 

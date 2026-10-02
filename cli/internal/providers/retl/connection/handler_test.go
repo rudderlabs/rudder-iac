@@ -15,7 +15,7 @@ import (
 // newHandler builds a spec-side handler: loading and the graph never reach the
 // client, so it stays nil and any accidental call panics.
 func newHandler() *Handler {
-	return NewHandler(nil)
+	return NewHandler(nil, importDir, nil)
 }
 
 func connectionsSpec(body map[string]any) *specs.Spec {

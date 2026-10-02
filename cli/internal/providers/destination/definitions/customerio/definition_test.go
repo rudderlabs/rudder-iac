@@ -29,17 +29,21 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "customerio", registered.Type)
 	assert.Equal(t, "CUSTOMERIO", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"api_key", "site_id"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json narrows syncBehaviours to upsert and mirror and declares no
+	// visual mapper.
+	assert.Equal(t, []string{"upsert", "mirror"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -52,6 +56,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -404,6 +409,7 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
@@ -435,7 +441,9 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 
 	resource := extracted["customerio-production"]
 	require.NotNil(t, resource)
-	assert.Equal(t, "site-id-1", resource.Config["site_id"])
+	siteID, ok := resource.Config["site_id"].(*secret.String)
+	require.True(t, ok, "site_id must be wrapped as a secret")
+	assert.Equal(t, "site-id-1", siteID.Reveal())
 
 	wrapped, ok := resource.Config["api_key"].(*secret.String)
 	require.True(t, ok, "api_key must be wrapped as a secret")
@@ -459,7 +467,10 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, remoteKey.IsUnknown(),
 		"a returned value wrapped as a secret reads back unknown, so every plan re-applies it")
-	assert.Equal(t, "site-id-1", remoteResource.Config["site_id"])
+	remoteSiteID, ok := remoteResource.Config["site_id"].(*secret.String)
+	require.True(t, ok)
+	assert.True(t, remoteSiteID.IsUnknown(),
+		"the API returns siteID, but marking it secret makes it read back unknown — so it re-applies on every plan")
 
 	entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
 		"customerio-production": {Destination: &client.Destination{
@@ -479,7 +490,7 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 	config, ok := spec.Spec["config"].(map[string]any)
 	require.True(t, ok)
 	assert.NotEqual(t, "customerio-api-key", config["api_key"], "export must not leak the raw key")
-	assert.Equal(t, "site-id-1", config["site_id"])
+	assert.NotEqual(t, "site-id-1", config["site_id"], "export must not leak the raw site id")
 }
 
 func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinition {
@@ -494,9 +505,10 @@ func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinit
 
 func minimalConfig() map[string]any {
 	return map[string]any{
-		"site_id":    "site-id-1",
-		"api_key":    "api-key-1",
-		"datacenter": "US",
+		"site_id":                 "site-id-1",
+		"api_key":                 "api-key-1",
+		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 	}
 }
 
@@ -506,6 +518,7 @@ func fullConfig() map[string]any {
 		"api_key":                              "api-key-1",
 		"device_token_event_name":              "Device Token Registered",
 		"datacenter":                           "EU",
+		"user_id_identifier_type":              "email",
 		"send_page_name_in_sdk":                map[string]any{"web": true},
 		"data_use_in_app":                      map[string]any{"web": false},
 		"auto_track_device_attributes":         map[string]any{"android": true, "ios": true},
@@ -537,6 +550,7 @@ func exampleConfig() map[string]any {
 		"site_id":                 "cio-site-id",
 		"api_key":                 "cio-api-key",
 		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 		"device_token_event_name": "Device Token Registered",
 		"send_page_name_in_sdk":   map[string]any{"web": true},
 		"data_use_in_app":         map[string]any{"web": false},
@@ -622,9 +636,12 @@ func TestCustomerioAPIVersionKeys(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(base(map[string]any{"api_version": "v1"})))
 	})
 
-	t.Run("both keys are optional when api_version is unset", func(t *testing.T) {
+	t.Run("omitted api_version defaults to v2", func(t *testing.T) {
 		t.Parallel()
-		assert.Empty(t, registered.ValidateConfig(base(nil)))
+		errors := registered.ValidateConfig(base(nil))
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/user_id_identifier_type", errors[0].Path)
 	})
 
 	t.Run("invalid enum values rejected", func(t *testing.T) {

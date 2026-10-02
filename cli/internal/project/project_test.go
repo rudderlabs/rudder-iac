@@ -1,8 +1,10 @@
 package project_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -11,8 +13,10 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	provrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
@@ -171,6 +175,56 @@ func TestProject_Load_Success(t *testing.T) {
 	assert.True(t, foundSpec2, "Spec2 should have been loaded")
 }
 
+// syntaxWarningProvider registers a syntactic rule that only ever warns, so a
+// spec can pass syntax validation while still carrying a syntax diagnostic.
+type syntaxWarningProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *syntaxWarningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/source/syntax-warning",
+		rules.Warning,
+		"source specs always warn",
+		rules.Examples{},
+		provrules.NewPatternValidator(
+			fixtureMatchPatterns,
+			func(_ string, _ string, _ map[string]any, _ map[string]any) []rules.ValidationResult {
+				return []rules.ValidationResult{{Reference: "/k", Message: "k could not be checked"}}
+			},
+		),
+	)}
+}
+
+func TestProject_Load_RendersSyntaxWarningsWithoutSyntaxErrors(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(&syntaxWarningProvider{mockProvider},
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewTextRenderer(&out)),
+	)
+
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Equal(t, `
+warning[test/source/syntax-warning]: k could not be checked
+  --> spec.yaml:6:3
+     |
+   6 | k: v
+     | ^^^^
+
+Found 0 error(s), 1 warning(s)
+`, out.String())
+}
+
 func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	t.Parallel()
 
@@ -196,7 +250,6 @@ func TestProject_Load_ProviderLoadSpecError(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading spec path/to/spec.yaml")
 	assert.True(t, errors.Is(err, expectedErr))
 }
-
 
 func TestProject_GetResourceGraph_Success(t *testing.T) {
 	t.Parallel()
@@ -439,6 +492,110 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.wantSpecs, proj.Specs())
+		})
+	}
+}
+
+// warningProvider adds a syntactic and a semantic rule, each warning on the
+// fixture spec named after it, so a test can place the two phases' diagnostics
+// in different files.
+type warningProvider struct {
+	*testutils.MockProvider
+}
+
+func warnOnSpecNamed(name string) func(string, string, map[string]any, map[string]any) []rules.ValidationResult {
+	return func(_ string, _ string, metadata map[string]any, _ map[string]any) []rules.ValidationResult {
+		if metadata["name"] != name {
+			return nil
+		}
+		return []rules.ValidationResult{{Message: "check this spec"}}
+	}
+}
+
+func (p *warningProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/syntactic-warning",
+		rules.Warning,
+		"the syntactic fixture spec always warns",
+		rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, warnOnSpecNamed("syntactic_source")),
+	)}
+}
+
+func (p *warningProvider) SemanticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/semantic-warning",
+		rules.Warning,
+		"the semantic fixture spec always warns",
+		rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, warnOnSpecNamed("semantic_source")),
+	)}
+}
+
+func fixtureSpec(name string) *specs.RawSpec {
+	return &specs.RawSpec{Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: " + name + "\nspec:\n  k: v")}
+}
+
+// TestProject_Load_RendersSyntacticWarnings covers what handleValidation does
+// with syntactic diagnostics that do not stop the load: they used to be dropped
+// on the way to the semantic phase, and on the error paths in between. The
+// two-file case also pins the ordering, since the merged set is sorted by file
+// rather than by phase.
+func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]*specs.RawSpec
+		graphErr  error
+		wantLines []string
+	}{
+		{
+			name:      "syntactic warning alone",
+			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
+		},
+		{
+			name:      "load fails after the syntax gate",
+			rawSpecs:  map[string]*specs.RawSpec{"b.yaml": fixtureSpec("syntactic_source")},
+			graphErr:  errors.New("graph is broken"),
+			wantLines: []string{"warning[test/syntactic-warning]: check this spec"},
+		},
+		{
+			name: "semantic file sorts ahead of the syntactic one",
+			rawSpecs: map[string]*specs.RawSpec{
+				"b.yaml": fixtureSpec("syntactic_source"),
+				"a.yaml": fixtureSpec("semantic_source"),
+			},
+			wantLines: []string{
+				"warning[test/semantic-warning]: check this spec",
+				"warning[test/syntactic-warning]: check this spec",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := &warningProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockProvider.GetResourceGraphErr = tc.graphErr
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				return tc.rawSpecs, nil
+			}}
+
+			var buf bytes.Buffer
+			proj := project.New(mockProvider, project.WithLoader(mockLoader), project.WithRenderer(renderer.NewTextRenderer(&buf)))
+
+			err := proj.Load("test_dir")
+			assert.Equal(t, tc.graphErr != nil, err != nil, "load error: %v", err)
+
+			var rendered []string
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if strings.Contains(line, "check this spec") {
+					rendered = append(rendered, strings.TrimSpace(line))
+				}
+			}
+			assert.Equal(t, tc.wantLines, rendered)
 		})
 	}
 }

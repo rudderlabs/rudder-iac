@@ -11,7 +11,7 @@ spec:
   config:
     api_version: newApi
     access_token: "{{ .HS_ACCESS_TOKEN }}"
-    hub_id: "12345678"
+    hub_id: "{{ .HS_HUB_ID }}"
     lookup_field: email
     do_association: true
     hubspot_events:

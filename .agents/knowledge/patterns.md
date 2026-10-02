@@ -130,7 +130,7 @@
 <!-- ticket:DEX-520 -->
 - S3 Datalake bucket names use destination-local named pattern `s3_datalake_bucket_name` with allow `^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$` and reject `(^xn--)|(^.*\.\..*$)|(^(\d+(\.|$)){4}$)` to approximate upstream negative lookaheads within RE2.
 - S3 Datalake namespace validation uses destination-local named pattern `s3_datalake_namespace` with allow `^(.{0,64})$` and reject `^(pg_|PG_|pG_|Pg_)`.
-- For S3 Datalake E2E coverage, do not add destination create/update fixture YAML without matching live-verified upstream snapshots; `TestDestinationsApply` count-checks expected snapshots, and hand-derived snapshots are unsafe for this backend because of warehouse/datalake defaults plus write-only or secret-only fields such as `password`.
+- For S3 Datalake E2E coverage, do not add destination create/update fixture YAML without matching live-verified upstream snapshots; `TestDestinationsApply` count-checks expected snapshots, and hand-derived snapshots are unsafe for this backend because of warehouse/datalake defaults plus write-only fields.
 
 ## DEX-690 — Redshift Config Preservation Guard
 <!-- ticket:DEX-690 -->

@@ -26,7 +26,7 @@
     "useIAMForAuth": false,
     "useRudderStorage": false,
     "useSSH": false,
-    "user": "rudder",
+    "user": "rudderCliE2eRsOwnStorageRoleUser",
     "useServerless": false
   },
   "createdAt": "<ignored>",

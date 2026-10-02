@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    api_key: rudderCliE2eAmFullKeyUpdated
+    api_key: "{{ .AM_API_KEY_UPDATED }}"
     residency_server: standard
     group_type_trait: org
     group_value_trait: orgId

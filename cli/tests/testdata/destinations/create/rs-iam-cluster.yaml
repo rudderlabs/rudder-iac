@@ -15,7 +15,7 @@ spec:
     use_serverless: false
     cluster_id: rudder-cli-e2e-cluster
     database: analytics
-    user: rudder
+    user: "{{ .RS_IAM_CLUSTER_USER }}"
     namespace: rudder_events_cluster
     sync_frequency: "180"
     use_rudder_storage: true

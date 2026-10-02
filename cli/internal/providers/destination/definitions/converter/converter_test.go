@@ -184,6 +184,64 @@ func TestAPIToLocalDropsUnselectedMembers(t *testing.T) {
 	assert.NotContains(t, local, "event_filtering")
 }
 
+// An empty selected list is a setting, not an absence, so it has to survive
+// both directions: the discriminator goes out on its own, and comes back as the
+// empty list it stands for.
+func TestAPIToLocalMaterializesSelectedKey(t *testing.T) {
+	t.Parallel()
+
+	props := []converter.ConfigProperty{
+		converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+		converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+		converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+			"event_filtering.whitelist": "whitelistedEvents",
+			"event_filtering.blacklist": "blacklistedEvents",
+		}),
+	}
+
+	// The API stores the selector but no list for it.
+	local, err := converter.APIToLocal(props, map[string]any{
+		"eventFilteringOption": "whitelistedEvents",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"whitelist": []any{}}, local["event_filtering"])
+
+	// A selector naming no member materializes nothing.
+	local, err = converter.APIToLocal(props, map[string]any{"eventFilteringOption": "disable"})
+	require.NoError(t, err)
+	assert.NotContains(t, local, "event_filtering")
+
+	// An absent selector materializes nothing either.
+	local, err = converter.APIToLocal(props, map[string]any{})
+	require.NoError(t, err)
+	assert.NotContains(t, local, "event_filtering")
+
+	// A list the API did carry is left as it is, not overwritten.
+	local, err = converter.APIToLocal(props, map[string]any{
+		"eventFilteringOption": "whitelistedEvents",
+		"whitelistedEvents":    []any{map[string]any{"eventName": "A"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"whitelist": []any{"A"}}, local["event_filtering"])
+
+	// Outbound, an empty list still selects its branch.
+	api, err := converter.LocalToAPI(props, map[string]any{
+		"event_filtering": map[string]any{"whitelist": []any{}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "whitelistedEvents", api["eventFilteringOption"])
+
+	// A null sibling selects nothing, so the choice stays deterministic even
+	// though the discriminator iterates a map.
+	for range 20 {
+		api, err := converter.LocalToAPI(props, map[string]any{
+			"event_filtering": map[string]any{"whitelist": []any{}, "blacklist": nil},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "whitelistedEvents", api["eventFilteringOption"])
+	}
+}
+
 func TestEquals(t *testing.T) {
 	t.Parallel()
 
