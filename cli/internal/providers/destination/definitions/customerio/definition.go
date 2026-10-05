@@ -5,21 +5,11 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
-
-func init() {
-	funcs.NewPatternWithReject(
-		"customerio_write_key",
-		`^(.{0,100})$`,
-		`^(?:\{\{.*\}\}|env[.].*)$`,
-		"must be at most 100 characters, must not contain line breaks, and must not be a template",
-	)
-}
 
 // Source types from integrations-config destinations/customerio/db-config.json.
 var sourceTypes = []string{
@@ -29,13 +19,11 @@ var sourceTypes = []string{
 	common.SourceTypeIOSSwift,
 	common.SourceTypeWeb,
 	common.SourceTypeUnity,
-	common.SourceTypeAMP,
 	common.SourceTypeCloud,
-	common.SourceTypeWarehouse,
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
-	common.SourceTypeShopify,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -45,13 +33,30 @@ var connectionModes = map[string][]string{
 	common.SourceTypeIOSSwift:      {"cloud"},
 	common.SourceTypeWeb:           {"cloud", "device"},
 	common.SourceTypeUnity:         {"cloud"},
-	common.SourceTypeAMP:           {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
-	common.SourceTypeWarehouse:     {"cloud"},
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
-	common.SourceTypeShopify:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
+}
+
+// Connect-time required keys, derived from schema.json's two negated
+// connectionMode branches: site_id and api_key are required unless web alone
+// runs in device mode, so every supported pair carries both except
+// (web, device), whose requirement also depends on sdk_version and is left to
+// the config validators.
+var connectionRequiredKeys = map[string]map[string][]string{
+	common.SourceTypeAndroid:       {"cloud": {"api_key", "site_id"}, "device": {"api_key", "site_id"}},
+	common.SourceTypeAndroidKotlin: {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeIOS:           {"cloud": {"api_key", "site_id"}, "device": {"api_key", "site_id"}},
+	common.SourceTypeIOSSwift:      {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeWeb:           {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeUnity:         {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeCloud:         {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeReactNative:   {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeFlutter:       {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeCordova:       {"cloud": {"api_key", "site_id"}},
+	common.SourceTypeWarehouse:     {"cloud": {"api_key", "site_id"}},
 }
 
 type customerioConfig struct {
@@ -79,11 +84,13 @@ type customerioConfig struct {
 }
 
 type webSDKVersion struct {
-	Web string `mapstructure:"web" validate:"omitempty,oneof=v1 v2" default:"v2"`
+	// No omitempty: the default fills any block the spec carries, so only an
+	// explicit "" reaches validation, and upstream's enum rejects it.
+	Web string `mapstructure:"web" validate:"oneof=v1 v2" default:"v2"`
 }
 
 type webString struct {
-	Web string `mapstructure:"web" validate:"customerio_write_key_required,omitempty,pattern=customerio_write_key"`
+	Web string `mapstructure:"web" validate:"customerio_write_key_required,omitempty,pattern=single_line_100"`
 }
 
 type webBool struct {
@@ -123,16 +130,12 @@ func customerioConfigFromField(fl validator.FieldLevel) (customerioConfig, bool)
 	return config, ok
 }
 
-func customerioSDKVersion(config customerioConfig) string {
-	if config.SDKVersion == nil || config.SDKVersion.Web == "" {
-		return "v2"
-	}
-	return config.SDKVersion.Web
-}
-
+// Only an explicit v2 counts. A nested default never creates an omitted
+// sdk_version block, so it is sent absent, which upstream's conditionals and
+// the web SDK both read as v1.
 func isWebDeviceV2(config customerioConfig) bool {
 	return config.ConnectionMode[common.SourceTypeWeb] == "device" &&
-		customerioSDKVersion(config) == "v2"
+		config.SDKVersion != nil && config.SDKVersion.Web == "v2"
 }
 
 func isWebDeviceOnly(config customerioConfig) bool {
@@ -238,8 +241,9 @@ func NewDefinition() *definitions.DestinationDefinition {
 			{Tag: "customerio_write_key_block_required", Func: customerioWriteKeyBlockRequired, CallEvenIfNull: true},
 			{Tag: "customerio_write_key_required", Func: customerioWriteKeyRequired, CallEvenIfNull: true},
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:            append([]string(nil), sourceTypes...),
+		ConnectionModes:        connectionModes,
+		ConnectionRequiredKeys: connectionRequiredKeys,
 		// Declared as upstream narrows it, though rETL still refuses Customer.io:
 		// its connections run the destination-specific flow (retl ClassifyFlow).
 		SyncBehaviours: []string{"upsert", "mirror"},

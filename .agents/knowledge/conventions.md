@@ -290,6 +290,6 @@
 
 ## RUD-3185 — Customer.io Device-Mode V2 Validation
 
-- Customer.io device-mode-v2 requiredness treats omitted or empty `sdk_version.web` as `v2`, matching the backend default even though nested defaults are only materialized when the parent `sdk_version` block exists.
+- Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
 - Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
-- Customer.io `write_key.web` uses a destination-local named pattern with the upstream 0–100 single-line allowance plus an explicit dynamic/template-syntax reject. Keep plain `pattern` validation rather than `dynamic_or_pattern`, because unresolved template text must not be sent as a write key.
+- Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
