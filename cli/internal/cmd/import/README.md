@@ -85,6 +85,7 @@ contents:
 | Event                                    | name and event type             |
 | Property                                 | name, type, and item types      |
 | Event stream source                      | name                            |
+| Destination                              | display name                    |
 | SQL model (RETL)                         | display name and account        |
 | Transformation                           | name                            |
 | Library                                  | import name                     |
