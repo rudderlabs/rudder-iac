@@ -8,9 +8,7 @@ import (
 
 // Matcher returns the import --merge matcher for rETL connections. The backend
 // allows one connection per source–destination pair, so a remote connection
-// links to the local connection wired to the same endpoints. Listed after the
-// source matchers so endpoint lookups can rely on source matches being recorded
-// already.
+// links to the local connection wired to the same endpoints.
 func Matcher() importmatcher.Matcher {
 	return importmatcher.Matcher{
 		ResourceType: ResourceType,

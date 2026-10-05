@@ -13,9 +13,8 @@ import (
 // --merge smart linking. A workspace holds at most one data graph per account,
 // so the parent matches on account_id alone. Children (models, relationships)
 // match by display_name — unique within a graph, enforced by the
-// unique-names rule — and only within a matched parent, so the parent matcher
-// is registered first and child matchers consult its match via the importable
-// collection.
+// unique-names rule — and only within a matched parent, which child matchers
+// look up through importmatcher.MatchedLocal.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 	return []importmatcher.Matcher{
 		{ResourceType: dghandler.HandlerMetadata.ResourceType, Match: matchDataGraph},
@@ -77,9 +76,9 @@ func matchRelationship(scope importmatcher.Scope, r *resources.RemoteResource) *
 // URN. Children only link within a matched parent — an unmatched or
 // non-importable parent means the child never matches.
 func matchedParentURN(scope importmatcher.Scope, dataGraphID string) (string, bool) {
-	parent, ok := scope.Importable.GetByID(dghandler.HandlerMetadata.ResourceType, dataGraphID)
-	if !ok || parent.MatchedWith == nil {
+	parent, _ := importmatcher.MatchedLocal(scope, dghandler.HandlerMetadata.ResourceType, dataGraphID)
+	if parent == nil {
 		return "", false
 	}
-	return parent.MatchedWith.URN(), true
+	return parent.URN(), true
 }

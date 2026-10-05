@@ -20,8 +20,8 @@ var log = logger.New("importmatcher")
 // "Context": in Go, ctx/Context signals context.Context (cancellation), which
 // this is not, and the name would clash if a matcher ever needs a real one.
 // A struct so the matcher signature never churns: RemoteGraph is included from
-// day one even where unused, and Importable lets ordered matchers consult
-// earlier matches (e.g. a child resource looking up its parent's match).
+// day one even where unused, and Importable lets a matcher consult other
+// remotes' matches (e.g. a child resource looking up its parent's match).
 type Scope struct {
 	// LocalGraph is the project's resource graph built from local specs.
 	LocalGraph *resources.Graph
@@ -29,15 +29,23 @@ type Scope struct {
 	RemoteGraph *resources.Graph
 	// Importable is the in-flight collection of unmanaged remote resources.
 	Importable *resources.RemoteResources
+
+	// resolver matches importable remotes on demand while Mark runs; nil
+	// outside Mark, where the recorded MatchedWith is the answer.
+	resolver *resolver
 }
 
 // Func reports which local project resource uniquely matches the given remote
-// resource, or nil when there is no match.
+// resource, or nil when there is no match. A Func that depends on another
+// remote's match reads it through MatchedLocal, ResolveLocalURN or
+// EndpointURN — never that remote's MatchedWith, which is only recorded once
+// its own matcher's turn comes — and returns nil when the dependency has no
+// local counterpart.
 type Func func(scope Scope, r *resources.RemoteResource) *resources.Resource
 
-// Matcher pairs a resource type with its uniqueness-match function. Providers
-// return matchers in resolution order — parents before children — so matchers
-// for child types can rely on parent matches being recorded already.
+// Matcher pairs a resource type with its uniqueness-match function, one per
+// resource type. Matcher order is immaterial: a matcher whose result depends
+// on another remote's match gets it resolved on demand.
 type Matcher struct {
 	ResourceType string
 	Match        Func
@@ -67,7 +75,13 @@ func (c MultipleClaimed) String() string {
 // same local is returned as a MultipleClaimed and keeps the namer identity it
 // already carries, so the caller can decide (fail fast) rather than silently
 // dropping it.
+//
+// Matches are resolved on demand, so a matcher may depend on any other
+// matcher's result — including another provider's — whatever their order.
 func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
+	// Set on the scope matchers receive, so their dependency lookups share it.
+	scope.resolver = newResolver(matchers)
+
 	var multipleClaimed []MultipleClaimed
 	for _, m := range matchers {
 		remotes := scope.Importable.GetAll(m.ResourceType)
@@ -87,7 +101,7 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 		claimedBy := make(map[string]string, len(remotes))
 		for _, id := range ids {
 			remote := remotes[id]
-			local := m.Match(scope, remote)
+			local := scope.resolver.match(scope, m.ResourceType, remote)
 			if local == nil {
 				continue
 			}
@@ -111,6 +125,43 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 		}
 	}
 	return multipleClaimed
+}
+
+// resolver memoizes each importable remote's match, so a remote is matched once
+// however many dependents ask for it before its own matcher's turn in Mark.
+type resolver struct {
+	byType  map[string]Matcher
+	matched map[*resources.RemoteResource]*resources.Resource
+}
+
+func newResolver(matchers []Matcher) *resolver {
+	r := &resolver{
+		byType:  make(map[string]Matcher, len(matchers)),
+		matched: make(map[*resources.RemoteResource]*resources.Resource),
+	}
+	for _, m := range matchers {
+		r.byType[m.ResourceType] = m
+	}
+	return r
+}
+
+// match returns the local resource the importable remote matches, running its
+// type's matcher at most once; a type without a matcher keeps its recorded mark.
+func (r *resolver) match(scope Scope, resourceType string, remote *resources.RemoteResource) *resources.Resource {
+	if local, done := r.matched[remote]; done {
+		return local
+	}
+	m, ok := r.byType[resourceType]
+	if !ok {
+		return remote.MatchedWith
+	}
+
+	// Recorded as unmatched up front, so a dependency cycle leading back to this
+	// remote resolves as unmatched instead of recursing forever.
+	r.matched[remote] = nil
+	local := m.Match(scope, remote)
+	r.matched[remote] = local
+	return local
 }
 
 // ByData finds the local resource of the given type whose Data() map satisfies
@@ -148,21 +199,37 @@ func bySorted(g *resources.Graph, resourceType string, matches func(*resources.R
 	return nil, false
 }
 
+// MatchedLocal reports what an importable remote matches: resolved on demand
+// inside Mark, the recorded MatchedWith outside it. importable is false when
+// remoteID is not an importable remote of that type.
+func MatchedLocal(scope Scope, resourceType, remoteID string) (local *resources.Resource, importable bool) {
+	if scope.Importable == nil {
+		return nil, false
+	}
+	remote, ok := scope.Importable.GetByID(resourceType, remoteID)
+	if !ok {
+		return nil, false
+	}
+	if scope.resolver != nil {
+		return scope.resolver.match(scope, resourceType, remote), true
+	}
+	return remote.MatchedWith, true
+}
+
 // ResolveLocalURN maps a remote resource ID of the given type to the local
-// resource URN it corresponds to: either the URN of the resource matched
-// earlier in this import, or of one already managed locally (found by its
-// import metadata's remote ID). ok is false when the ID has no local
+// resource URN it corresponds to: either the URN of the resource it matches in
+// this import (see MatchedLocal), or of one already managed locally (found by
+// its import metadata's remote ID). ok is false when the ID has no local
 // counterpart — an importable-but-unmatched remote, or an ID the project does
 // not know. For matchers whose remote resources reference other resources by
 // remote ID (datacatalog custom types, event stream connection endpoints).
 func ResolveLocalURN(scope Scope, resourceType string, remoteID string) (urn string, ok bool) {
-	if scope.Importable != nil {
-		if remote, found := scope.Importable.GetByID(resourceType, remoteID); found {
-			if remote.MatchedWith != nil {
-				return remote.MatchedWith.URN(), true
-			}
-			return "", false
-		}
+	local, importable := MatchedLocal(scope, resourceType, remoteID)
+	if local != nil {
+		return local.URN(), true
+	}
+	if importable {
+		return "", false
 	}
 	for _, local := range scope.LocalGraph.ResourcesByType(resourceType) {
 		if meta := local.ImportMetadata(); meta != nil && meta.RemoteId == remoteID {
@@ -173,8 +240,8 @@ func ResolveLocalURN(scope Scope, resourceType string, remoteID string) (urn str
 }
 
 // EndpointURN maps a resource referenced by remote ID to the local resource URN
-// it corresponds to: through ResolveLocalURN — matched earlier in this import,
-// or linked by local import metadata — or, for an already-managed resource,
+// it corresponds to: through ResolveLocalURN — matched in this import, or
+// linked by local import metadata — or, for an already-managed resource,
 // straight from its externalId, which is its local resource id. ok is false
 // when there is no local counterpart, so the referencing remote stays
 // unmatched.

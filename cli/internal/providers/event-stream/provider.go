@@ -146,9 +146,7 @@ func (p *Provider) SupportedTypes() []string {
 }
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking for event stream sources and connections. The
-// connection matcher is listed after the source matcher so its endpoint
-// lookups can rely on source matches being recorded already.
+// --merge smart linking for event stream sources and connections.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 	return []importmatcher.Matcher{sourceHandler.Matcher(), connectionHandler.Matcher()}
 }

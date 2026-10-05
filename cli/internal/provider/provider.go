@@ -225,10 +225,10 @@ type RuleProvider interface {
 // `import workspace --merge` to link unmanaged remote resources to existing
 // local project resources.
 //
-// Matchers are returned in resolution order — parents before children — so
-// matchers for child types can rely on parent matches being recorded already.
-// An empty or nil result means the provider does not support smart import:
-// its resources keep namer-generated identities.
+// Matchers may come in any order: importmatcher.Mark resolves a matcher's
+// dependency on another resource's match on demand. An empty or nil result
+// means the provider does not support smart import: its resources keep
+// namer-generated identities.
 type ResourceMatcherProvider interface {
 	ResourceMatchers() []importmatcher.Matcher
 }

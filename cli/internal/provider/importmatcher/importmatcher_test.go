@@ -254,6 +254,184 @@ func TestMark_RewritesReferenceShapes(t *testing.T) {
 	}
 }
 
+// importableOf builds an importable collection spanning several resource types.
+func importableOf(byType map[string][]*resources.RemoteResource) *resources.RemoteResources {
+	collection := resources.NewRemoteResources()
+	for resourceType, rs := range byType {
+		m := make(map[string]*resources.RemoteResource, len(rs))
+		for _, r := range rs {
+			m[r.ID] = r
+		}
+		collection.Set(resourceType, m)
+	}
+	return collection
+}
+
+// endpointRemote is a remote identified by what it points at, the way a
+// connection names its destination by remote ID.
+type endpointRemote struct {
+	name       string
+	endpointID string
+}
+
+// matchByEndpoint links a remote to the local resource of the same name whose
+// "endpoint" data holds the URN the remote's endpoint resolves to — the shape
+// of the connection matchers.
+func matchByEndpoint(resourceType, endpointType string) importmatcher.Matcher {
+	return importmatcher.Matcher{
+		ResourceType: resourceType,
+		Match: func(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
+			remote := r.Data.(endpointRemote)
+			endpointURN, ok := importmatcher.ResolveLocalURN(scope, endpointType, remote.endpointID)
+			if !ok {
+				return nil
+			}
+			local, _ := importmatcher.ByData(scope.LocalGraph, resourceType, func(data resources.ResourceData) bool {
+				return data["name"] == remote.name && data["endpoint"] == endpointURN
+			})
+			return local
+		},
+	}
+}
+
+func TestMark_DependentListedBeforeItsDependencyStillLinks(t *testing.T) {
+	t.Parallel()
+
+	var (
+		warehouse      = localResource("warehouse", "destination", resources.ResourceData{"name": "Warehouse"})
+		webToWarehouse = localResource("web-to-warehouse", "connection", resources.ResourceData{"name": "Web", "endpoint": "destination:warehouse"})
+		destination    = &resources.RemoteResource{ID: "dst_1", ExternalID: "warehouse-1", Reference: "#destination:warehouse-1", Data: "Warehouse"}
+		connection     = &resources.RemoteResource{ID: "conn_1", ExternalID: "web-to-warehouse-1", Reference: "#connection:web-to-warehouse-1", Data: endpointRemote{name: "Web", endpointID: "dst_1"}}
+	)
+
+	scope := importmatcher.Scope{
+		LocalGraph: graphWith(warehouse, webToWarehouse),
+		Importable: importableOf(map[string][]*resources.RemoteResource{
+			"destination": {destination},
+			"connection":  {connection},
+		}),
+	}
+
+	// Dependent first: aggregating matchers across providers can yield either
+	// order.
+	importmatcher.Mark(scope, []importmatcher.Matcher{
+		matchByEndpoint("connection", "destination"),
+		matchByName("destination"),
+	})
+
+	assert.Same(t, webToWarehouse, connection.MatchedWith)
+	assert.Same(t, warehouse, destination.MatchedWith)
+}
+
+func TestMark_MatchesADependencyOnceForAllDependents(t *testing.T) {
+	t.Parallel()
+
+	var (
+		webToWarehouse = localResource("web-to-warehouse", "connection", resources.ResourceData{"name": "Web", "endpoint": "destination:warehouse"})
+		iosToWarehouse = localResource("ios-to-warehouse", "connection", resources.ResourceData{"name": "iOS", "endpoint": "destination:warehouse"})
+		destination    = &resources.RemoteResource{ID: "dst_1", ExternalID: "warehouse-1", Reference: "#destination:warehouse-1", Data: "Warehouse"}
+		web            = &resources.RemoteResource{ID: "conn_1", ExternalID: "web-1", Reference: "#connection:web-1", Data: endpointRemote{name: "Web", endpointID: "dst_1"}}
+		ios            = &resources.RemoteResource{ID: "conn_2", ExternalID: "ios-1", Reference: "#connection:ios-1", Data: endpointRemote{name: "iOS", endpointID: "dst_1"}}
+
+		destinationMatches int
+	)
+
+	byName := matchByName("destination")
+	countingDestination := importmatcher.Matcher{
+		ResourceType: "destination",
+		Match: func(scope importmatcher.Scope, r *resources.RemoteResource) *resources.Resource {
+			destinationMatches++
+			return byName.Match(scope, r)
+		},
+	}
+
+	scope := importmatcher.Scope{
+		LocalGraph: graphWith(
+			localResource("warehouse", "destination", resources.ResourceData{"name": "Warehouse"}),
+			webToWarehouse,
+			iosToWarehouse,
+		),
+		Importable: importableOf(map[string][]*resources.RemoteResource{
+			"destination": {destination},
+			"connection":  {web, ios},
+		}),
+	}
+
+	importmatcher.Mark(scope, []importmatcher.Matcher{
+		matchByEndpoint("connection", "destination"),
+		countingDestination,
+	})
+
+	assert.Equal(t, 1, destinationMatches)
+	assert.Same(t, webToWarehouse, web.MatchedWith)
+	assert.Same(t, iosToWarehouse, ios.MatchedWith)
+}
+
+func TestMark_DependencyCycleLeavesRemotesUnmatched(t *testing.T) {
+	t.Parallel()
+
+	// Each remote matches only through the other's match, so neither can
+	// resolve first.
+	var (
+		left  = &resources.RemoteResource{ID: "l_1", ExternalID: "left-1", Reference: "#left:left-1", Data: endpointRemote{name: "L", endpointID: "r_1"}}
+		right = &resources.RemoteResource{ID: "r_1", ExternalID: "right-1", Reference: "#right:right-1", Data: endpointRemote{name: "R", endpointID: "l_1"}}
+	)
+
+	scope := importmatcher.Scope{
+		LocalGraph: graphWith(
+			localResource("left", "left", resources.ResourceData{"name": "L", "endpoint": "right:right"}),
+			localResource("right", "right", resources.ResourceData{"name": "R", "endpoint": "left:left"}),
+		),
+		Importable: importableOf(map[string][]*resources.RemoteResource{
+			"left":  {left},
+			"right": {right},
+		}),
+	}
+
+	importmatcher.Mark(scope, []importmatcher.Matcher{
+		matchByEndpoint("left", "right"),
+		matchByEndpoint("right", "left"),
+	})
+
+	assert.Nil(t, left.MatchedWith)
+	assert.Nil(t, right.MatchedWith)
+}
+
+func TestMark_DependencyWithoutMatcherResolvesToItsRecordedMark(t *testing.T) {
+	t.Parallel()
+
+	var (
+		warehouse   = localResource("warehouse", "destination", resources.ResourceData{"name": "Warehouse"})
+		web         = localResource("web", "connection", resources.ResourceData{"name": "Web", "endpoint": "destination:warehouse"})
+		destination = &resources.RemoteResource{ID: "dst_1", ExternalID: "warehouse", Reference: "#destination:warehouse", Data: "Warehouse", MatchedWith: warehouse}
+		connection  = &resources.RemoteResource{ID: "conn_1", ExternalID: "web-1", Reference: "#connection:web-1", Data: endpointRemote{name: "Web", endpointID: "dst_1"}}
+	)
+
+	scope := importmatcher.Scope{
+		LocalGraph: graphWith(warehouse, web),
+		Importable: importableOf(map[string][]*resources.RemoteResource{
+			"destination": {destination},
+			"connection":  {connection},
+		}),
+	}
+
+	// No destination matcher this pass: the destination's earlier mark stands.
+	importmatcher.Mark(scope, []importmatcher.Matcher{
+		matchByEndpoint("connection", "destination"),
+	})
+
+	assert.Same(t, web, connection.MatchedWith)
+}
+
+func TestMatchedLocal_WithoutImportableCollection(t *testing.T) {
+	t.Parallel()
+
+	local, importable := importmatcher.MatchedLocal(importmatcher.Scope{LocalGraph: graphWith()}, "destination", "dst_1")
+
+	assert.Nil(t, local)
+	assert.False(t, importable)
+}
+
 func TestByData_ReturnsDeterministicFirstMatch(t *testing.T) {
 	t.Parallel()
 

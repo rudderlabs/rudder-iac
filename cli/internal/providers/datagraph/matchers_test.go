@@ -212,6 +212,27 @@ func TestModelMatcher(t *testing.T) {
 
 		assert.Nil(t, matcher.Match(scope, remoteModel("mdl_1", "", "dg_1")))
 	})
+
+	t.Run("matches within a parent whose matcher runs later", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			users  = localModel("users", "Users", "main-graph")
+			parent = remoteDataGraph("dg_1", "acc_1")
+			model  = remoteModel("mdl_1", "Users", "dg_1")
+		)
+		scope := matcherScope(
+			[]*resources.Resource{localDataGraph("main-graph", "acc_1"), users},
+			map[string][]*resources.RemoteResource{
+				dghandler.HandlerMetadata.ResourceType:    {parent},
+				modelhandler.HandlerMetadata.ResourceType: {model},
+			},
+		)
+
+		importmatcher.Mark(scope, []importmatcher.Matcher{matcher, dgMatcher})
+
+		assert.Same(t, users, model.MatchedWith)
+	})
 }
 
 func TestRelationshipMatcher(t *testing.T) {

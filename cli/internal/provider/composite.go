@@ -59,10 +59,10 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 }
 
 // ResourceMatchers aggregates import --merge matchers from all providers.
-// Cross-provider order is immaterial — resource types are disjoint across
-// providers (enforced at construction) and no matcher reads another
-// provider's marks — so plain map iteration is fine; only the order within a
-// provider's own slice (parent-before-child) is meaningful and is preserved.
+// Order is immaterial — resource types are disjoint across providers
+// (enforced at construction) and importmatcher.Mark resolves dependencies
+// between matchers on demand, across providers too — so plain map iteration
+// is fine.
 func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
 	var all []importmatcher.Matcher
 	for _, provider := range p.Providers {

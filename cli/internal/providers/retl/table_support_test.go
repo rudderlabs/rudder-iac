@@ -213,9 +213,6 @@ func TestTableSupportEnabled(t *testing.T) {
 		assert.Equal(t, table.ResourceType, matchers[1].ResourceType)
 	})
 
-	// import --merge matches in this order, and a connection resolves its
-	// endpoints through source matches. retlOptions happens to pass the
-	// connection option first; the order must not depend on that.
 	t.Run("orders the connection matcher after every source matcher", func(t *testing.T) {
 		t.Parallel()
 		want := []string{sqlmodel.ResourceType, table.ResourceType, connection.ResourceType}

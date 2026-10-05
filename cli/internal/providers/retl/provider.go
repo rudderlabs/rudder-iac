@@ -62,10 +62,6 @@ type Option func(*Provider)
 //
 // A nil registry is replaced with an empty one: registry.Get indexes a map on
 // its receiver, so nil constructs fine and only panics later, mid remote load.
-//
-// Its matcher resolves endpoints through source matches, so New appends it
-// after every option rather than here — a source kind registered by a later
-// option would otherwise match after it and leave its connections unmatched.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
 		if registry == nil {
@@ -105,9 +101,7 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 			"retl-source-sql-model": sqlmodel.ResourceType,
 		},
 		syntacticRules: []rules.Rule{sqlmodelRules.NewSQLModelSpecSyntaxValidRule()},
-		// Source matchers must precede any matcher for a resource that
-		// references a source, so options append rather than prepend.
-		matchers: []importmatcher.Matcher{sqlmodel.Matcher()},
+		matchers:       []importmatcher.Matcher{sqlmodel.Matcher()},
 	}
 
 	// Register handlers

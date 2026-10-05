@@ -585,8 +585,6 @@ func TestProviderResourceMatchers(t *testing.T) {
 
 		matchers := p.ResourceMatchers()
 
-		// The connection matcher must come after the source matcher: its
-		// endpoint lookups rely on source matches being recorded already.
 		require.Len(t, matchers, 2)
 		assert.Equal(t, source.ResourceType, matchers[0].ResourceType)
 		assert.Equal(t, connection.EventStreamConnectionResourceType, matchers[1].ResourceType)
