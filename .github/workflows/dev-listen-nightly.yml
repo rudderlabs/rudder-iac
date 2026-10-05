@@ -1,0 +1,83 @@
+name: dev-listen-nightly
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
+
+# Runs that take too long or are too repetitive for every pull request. The
+# per-PR checks stay in dev-listen-e2e.yml.
+jobs:
+  soak:
+    name: dev listen soak, long fuzz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+      # Repeats expose slot leaks, port races and ordering bugs that one pass hides.
+      - name: hardening tests, 5 passes under the race detector
+        run: go test -race -count=5 ./cli/tests -run 'TestDevListen' -v
+      - name: fuzz the body reader, 10 minutes
+        run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzBody$' -fuzztime 10m
+      - name: fuzz the query scan, 10 minutes
+        run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzQueryValue$' -fuzztime 10m
+      - name: upload failing fuzz inputs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-failing-inputs
+          path: cli/internal/devlisten/ingest/testdata/fuzz
+          if-no-files-found: ignore
+
+  page:
+    name: dev listen review page, hostile events
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cli/tests/e2e-ui/package-lock.json
+      - run: make build
+      - name: install Chromium and its system libraries
+        working-directory: cli/tests/e2e-ui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # Firefox and WebKit catch CSP and Sec-Fetch-Site differences that Chromium hides.
+      - name: install Firefox and WebKit
+        working-directory: cli/tests/e2e-ui
+        run: npx playwright install --with-deps firefox webkit
+      - name: hostile event test in three engines
+        working-directory: cli/tests/e2e-ui
+        run: |
+          for engine in chromium firefox webkit; do
+            RUDDER_CLI_BIN="$GITHUB_WORKSPACE/bin/rudder-cli" npx playwright test tests/xss.spec.js --browser "$engine"
+          done
+      - name: upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-traces
+          path: cli/tests/e2e-ui/test-results
+          if-no-files-found: ignore
