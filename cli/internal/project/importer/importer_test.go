@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -221,7 +222,7 @@ func TestWorkspaceImport_SkipsManifestWhenFlagOff(t *testing.T) {
 	dir := t.TempDir()
 	entities, entries := exportFixture()
 
-	err := WorkspaceImport(context.Background(), &stubProject{
+	_, err := WorkspaceImport(context.Background(), &stubProject{
 		location: dir,
 		graph:    resources.NewGraph(),
 	}, &stubImportProvider{
@@ -241,7 +242,7 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 	dir := t.TempDir()
 	entities, entries := exportFixture()
 
-	err := WorkspaceImport(context.Background(), &stubProject{
+	_, err := WorkspaceImport(context.Background(), &stubProject{
 		location: dir,
 		graph:    resources.NewGraph(),
 	}, &stubImportProvider{
@@ -253,4 +254,182 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))
 	assert.NoError(t, err, "import-manifest.yaml must be written when importMerge is on")
+}
+
+func TestImportSummary(t *testing.T) {
+	const applyHint = "\nThe imported resources are not managed by the CLI yet. Run `rudder-cli apply` to start managing them.\n"
+
+	tests := []struct {
+		name       string
+		location   string
+		varFiles   []string
+		importable map[string]map[string]*resources.RemoteResource
+		// exported are the URNs FormatForExport emitted entries for.
+		exported []string
+		expected string
+	}{
+		{
+			name:     "plain import omits the merged section",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source":              {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-source": {"rid-2": {ID: "rid-2", ExternalID: "web"}},
+			},
+			exported: []string{"source:my-src", "event-stream-source:web"},
+			expected: `Resources imported into imported/: 2
+  event-stream-source  1
+  source               1
+` + applyHint,
+		},
+		{
+			name:     "merge lists merged resources by local URN",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-source": {
+					"rid-2": {ID: "rid-2", ExternalID: "web"},
+					"rid-3": {ID: "rid-3", ExternalID: "ios"},
+					"rid-4": {ID: "rid-4", ExternalID: "android", MatchedWith: resources.NewResource("android", "event-stream-source", nil, nil)},
+				},
+				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
+			},
+			exported: []string{"source:my-src", "event-stream-source:web", "event-stream-source:ios", "event-stream-source:android", "tracking-plan:checkout"},
+			expected: `Resources imported into imported/: 3
+  event-stream-source  2
+  source               1
+Remote resources merged into existing local resources: 2
+  event-stream-source:android  <- remote rid-4
+  tracking-plan:checkout       <- remote tp-1
+` + applyHint,
+		},
+		{
+			name:     "everything merged still prints the imported total",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"tracking-plan": {"tp-1": {ID: "tp-1", ExternalID: "checkout", MatchedWith: resources.NewResource("checkout", "tracking-plan", nil, nil)}},
+			},
+			exported: []string{"tracking-plan:checkout"},
+			expected: `Resources imported into imported/: 0
+Remote resources merged into existing local resources: 1
+  tracking-plan:checkout  <- remote tp-1
+` + applyHint,
+		},
+		{
+			name:     "resources the exporter skipped are not counted",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"data-graph":       {"dg-1": {ID: "dg-1", ExternalID: "warehouse", MatchedWith: resources.NewResource("warehouse", "data-graph", nil, nil)}},
+				"data-graph-model": {"m-1": {ID: "m-1", ExternalID: "remote-only-model"}},
+				"source":           {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+				"event-stream-connection": {
+					"c-1": {ID: "c-1", ExternalID: "unresolvable"},
+				},
+			},
+			exported: []string{"data-graph:warehouse", "source:my-src"},
+			expected: `Resources imported into imported/: 1
+  source  1
+Remote resources merged into existing local resources: 1
+  data-graph:warehouse  <- remote dg-1
+` + applyHint,
+		},
+		{
+			name:     "nothing exported prints no apply hint",
+			location: ".",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"event-stream-connection": {"c-1": {ID: "c-1", ExternalID: "unresolvable"}},
+			},
+			expected: "No resources to import\n",
+		},
+		{
+			name:     "non-default location shows the real path and passes it to apply",
+			location: "./myproj",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into myproj/imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l ./myproj`" + ` to start managing them.
+`,
+		},
+		{
+			name:     "var files are passed to apply and paths with spaces are single-quoted",
+			location: "my proj",
+			varFiles: []string{"prod.vars.yaml", "my proj/imported/secrets.vars.yaml"},
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into my proj/imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l 'my proj' --var-file prod.vars.yaml --var-file 'my proj/imported/secrets.vars.yaml'`" + ` to start managing them.
+`,
+		},
+		{
+			name:     "a single quote in a path is escaped inside single quotes",
+			location: "O'Brien",
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into O'Brien/imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply -l 'O'\\''Brien'`" + ` to start managing them.
+`,
+		},
+		{
+			name:     "a dollar sign in a path is single-quoted so it does not expand",
+			location: ".",
+			varFiles: []string{"$HOME/prod.vars.yaml"},
+			importable: map[string]map[string]*resources.RemoteResource{
+				"source": {"rid-1": {ID: "rid-1", ExternalID: "my-src"}},
+			},
+			exported: []string{"source:my-src"},
+			expected: `Resources imported into imported/: 1
+  source  1
+
+The imported resources are not managed by the CLI yet. Run ` + "`rudder-cli apply --var-file '$HOME/prod.vars.yaml'`" + ` to start managing them.
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			importable := resources.NewRemoteResources()
+			for resourceType, rs := range tt.importable {
+				importable.Set(resourceType, rs)
+			}
+			entries := make([]importmanifest.ImportEntry, len(tt.exported))
+			for i, urn := range tt.exported {
+				entries[i] = importmanifest.ImportEntry{URN: urn}
+			}
+
+			assert.Equal(t, tt.expected, importSummary(importable, entries, tt.location, tt.varFiles))
+		})
+	}
+}
+
+func TestWorkspaceImport_ApplyHintPassesVarFiles(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+	entities[0].Content.(*specs.Spec).Spec["token"] = "{{ .SRC_TOKEN }}"
+
+	summary, err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entities:   entities,
+		entries:    entries,
+	}, ImportOptions{VarFiles: []string{"prod.vars.yaml"}})
+	require.NoError(t, err)
+
+	importDir := filepath.Join(dir, ImportedDir)
+	expected := fmt.Sprintf("Resources imported into %s/: 1\n  source  1\n\n"+
+		"The imported resources are not managed by the CLI yet. Run `rudder-cli apply -l %s --var-file prod.vars.yaml --var-file %s` to start managing them.\n",
+		importDir, dir, filepath.Join(importDir, SecretsVarFileName))
+	assert.Equal(t, expected, summary)
 }
