@@ -97,6 +97,13 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 	go run ./typer/generator/platforms/typescript/testutils/empty_identity \
 	  > typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
 
+.PHONY: typer-go-validate
+typer-go-validate: ## Validate generated Go code against the RudderStack Go SDK
+	cd typer/generator/platforms/golang/testdata/validator && \
+	  go vet ./... && \
+	  test -z "$$(gofmt -l . | tee /dev/stderr)" && \
+	  go test -race -timeout 30s ./...
+
 .PHONY: typer-swift-validate
 typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
 	mkdir -p typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper
