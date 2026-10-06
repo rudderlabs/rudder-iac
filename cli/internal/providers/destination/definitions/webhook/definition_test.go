@@ -32,7 +32,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -42,13 +42,18 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
 
-	// Upstream lists amp, warehouse and shopify, but the CLI cannot produce those
-	// source tokens, so the definition does not advertise them.
-	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+	// Upstream lists amp and shopify, but the CLI cannot produce those source
+	// tokens, so the definition does not advertise them.
+	for _, sourceType := range []string{"amp", "shopify"} {
 		assert.NotContains(t, registered.SupportedSourceTypes(), sourceType)
 		_, err := registered.ConnectionModes(sourceType)
 		require.Error(t, err)
 	}
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, webhook.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("WEBHOOK", 1)
 	require.NoError(t, err)
@@ -334,6 +339,7 @@ func TestWebhookConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

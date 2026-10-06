@@ -60,5 +60,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:     append([]string(nil), sourceTypes...),
 		ConnectionModes: connectionModes,
+		// db-config.json config.syncBehaviours / config.supportsVisualMapper.
+		SyncBehaviours:       []string{"mirror"},
+		SupportsVisualMapper: true,
 	}
 }

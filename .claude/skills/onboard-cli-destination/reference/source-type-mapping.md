@@ -34,33 +34,87 @@ Current mapping (local → API):
   Upstream values with no row here (e.g. `tiktokAds`, `singer-*`): drop them
   and flag in the final report — `registry.Register` fails on any local source
   type missing from the mapping, so guessing breaks the build anyway.
-- The CLI intentionally supports a subset. Never declare `amp`, `shopify`,
-  `warehouse` or `cloud_source`, even when upstream lists them — the CLI cannot
-  produce those tokens, so a destination declaring one can never have a matching
-  connection validated. `SourceSpec`
+- The CLI intentionally supports a subset. Never declare `amp`, `shopify` or
+  `cloud_source`, even when upstream lists them — the CLI cannot produce those
+  tokens, so a destination declaring one can never have a matching connection
+  validated. `SourceSpec`
   (`cli/internal/providers/event-stream/source/model.go`) carries no category
   field and constrains `type` to the SDK definitions, and the sole
   `common.SourceTypeToken` call site
   (`event-stream/rules/connection/connection_semantic_valid.go`) passes an empty
-  category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` and
-  `SourceCategoryWarehouse` → `warehouse` branches dead. What remains is the ten
-  types S3 declares: `android`, `android_kotlin`, `ios`, `ios_swift`, `web`,
-  `unity`, `cloud`, `react_native`, `flutter`, `cordova`. `customerio_audience`
-  is the sole exception, since `warehouse` is its only source type (DEX-720).
-  When unsure about another mapped-but-unusual type, include what S3 includes
-  and flag the rest.
+  category, leaving the `SourceCategoryCloud`/`Singer` → `cloud_source` branch
+  dead. What remains is the eleven types S3 declares: `android`,
+  `android_kotlin`, `ios`, `ios_swift`, `web`, `unity`, `cloud`,
+  `react_native`, `flutter`, `cordova`, `warehouse`. When unsure about another
+  mapped-but-unusual type, include what S3 includes and flag the rest.
+- **Declare `warehouse` whenever db-config lists it.** rETL connections reach
+  destinations through that token, so it is no longer an exception —
+  warehouse-only destinations (`bingads_offline_conversions`,
+  `customerio_audience`) are just the extreme case. Copy
+  `supportedConnectionModes.warehouse` (always `["cloud"]`) into
+  `ConnectionModes` and derive the two rETL fields in the same pass — see
+  "rETL metadata" below.
 - `ConnectionModes` must be keyed by the same local types and cover every
   entry in `SourceTypes` — registration errors otherwise. Copy the modes per
   source type from db-config `supportedConnectionModes` (values are `cloud`,
   `device`, `hybrid`).
-- `ConnectionRequiredKeys` is derived from the **per-source-type key lists
-  inside `config.destConfig`** — see "Per-source-type config keys" below.
+- `ConnectionRequiredKeys` is derived from the **`schema.json`
+  `configSchema.allOf` branches conditioned on `connectionMode`**, never from
+  `config.destConfig` — see "Per-source-type connect-time required keys" below.
 - Consent management uses the same mapping automatically via
   `common.Properties(sourceTypes)` — no extra work per source type.
 - Connection mode uses the same mapping automatically via
   `common.ConnectionModeProperties(sourceTypes)` — no extra work per source
   type. Its values are validated against this destination's own
   `ConnectionModes` map, not a fixed enum.
+
+## rETL metadata
+
+`warehouse` support and the two rETL fields all come from the same
+`db-config.json`; derive them together, or the registry ends up claiming a
+destination rETL can reach without saying how it may sync.
+
+- Sync behaviours are the closed enum `upsert`, `mirror`, `full`; registration
+  rejects anything else.
+- Never write `SyncBehaviours: []string{}` to mean "unset". An explicitly empty
+  list declares that the destination accepts no behaviour at all — the backend
+  falls back on absence only. Omit the field instead.
+- Both fields require `warehouse` in `SourceTypes`; registration rejects them
+  otherwise.
+- `ConnectionRequiredKeys["warehouse"]["cloud"]` is derived exactly like every
+  other mode: from the `schema.json` `allOf` branches that name
+  `connectionMode.warehouse`, plus the negated branches whose exclusion does not
+  cover it — an `if.not` applies to every supported pair it does not exclude, so
+  declaring `warehouse` pulls `(warehouse, cloud)` into those branches too. The
+  known cases among already-registered destinations are Braze (`rest_api_key`,
+  named branch) and Facebook Pixel (`access_token`, via
+  `not(connectionMode.web == "device")`).
+
+To reproduce the values from upstream (`$TYPE` is the local type, except
+`linkedin_ads`, whose upstream directory is `linkedIn_ads`):
+
+```sh
+REF=develop
+raw() { gh api "repos/rudderlabs/rudder-integrations-config/contents/src/configurations/destinations/$1?ref=$REF" -H 'Accept: application/vnd.github.raw'; }
+
+# db-config: warehouse support, its modes and the two rETL fields.
+raw "$TYPE/db-config.json" | jq -c '{
+  warehouse: (.config.supportedSourceTypes | index("warehouse") != null),
+  modes: .config.supportedConnectionModes.warehouse,
+  syncBehaviours: (.config | if has("syncBehaviours") then .syncBehaviours else "absent" end),
+  supportsVisualMapper: .config.supportsVisualMapper}'
+
+# schema.json: the connectionMode-conditioned branches with required keys.
+raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?
+  | select((.if | tostring | test("connectionMode")) and .then.required != null)
+  | {if, required: .then.required}'
+
+# Verified vs unverified, from the repo root: the types listed before the
+# UnverifiedDestinations marker are verified, the rest unverified.
+sed -n '/^func newDestinationRegistry/,/^}/p' cli/internal/app/dependencies.go |
+  grep -oE 'UnverifiedDestinations|registering [a-z0-9_]+ destination' |
+  sed -E 's/^registering ([a-z0-9_]+) destination$/\1/'
+```
 
 ## Per-source-type connect-time required keys
 
@@ -131,7 +185,9 @@ requiredness" for the full writeup and the pointer-field caveat.
    `ConnectionModes` (db-config `supportedConnectionModes`).
 4. Translate each `then.required` API key to its snake_case local key. Every key
    must be a `mapstructure` tag on the config struct — one that is not means the
-   property was dropped or renamed; re-check before excluding it.
+   property was dropped or renamed; re-check before excluding it. Drop a key the
+   struct already tags `validate:"required"` outright: every config carries it,
+   so the entry could never fire (Customer.io's `site_id` and `api_key`).
 5. Union the key lists when several branches hit the same `(source type, mode)`;
    dedupe and keep each list sorted.
 6. Omit a mode with no keys, a source type with no modes, and the whole field

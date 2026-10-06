@@ -65,6 +65,14 @@ func assertHasPath(t *testing.T, errors []definitions.ConfigError, path string) 
 	assert.Failf(t, "missing validation path", "expected path %s in %#v", path, errors)
 }
 
+func errorPaths(errors []definitions.ConfigError) []string {
+	paths := make([]string, 0, len(errors))
+	for _, err := range errors {
+		paths = append(paths, err.Path)
+	}
+	return paths
+}
+
 func TestNewDefinitionMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -81,10 +89,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	// The full db-config secretKeys set. All eight are top-level, so none depend
 	// on nested secret-path support.
-	assert.Equal(t, []string{
-		"password", "private_key", "private_key_passphrase",
-		"s3.access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcp.credentials",
-	}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "private_key", "private_key_passphrase", "s3.access_key_id", "s3.access_key", "azure.account_key", "azure.sas_token", "gcp.credentials", "user"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -181,14 +186,13 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("cloud provider required when rudder storage is off", func(t *testing.T) {
+	t.Run("cloud provider defaults to AWS when rudder storage is off", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
 
 		errors := registered.ValidateConfig(cfg)
-		require.NotEmpty(t, errors)
-		assert.Equal(t, "/cloud_provider", errors[0].Path)
+		assert.ElementsMatch(t, []string{"/bucket_name", "/s3/role_based_auth"}, errorPaths(errors))
 	})
 
 	t.Run("cloud provider enum enforced", func(t *testing.T) {
@@ -211,6 +215,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 				setStorage(cfg, "azure", "container_name", "rudder-logs")
 				cfg["storage_integration"] = "RUDDER_AZURE"
 				setStorage(cfg, "azure", "account_name", "rudderaccount")
+				setStorage(cfg, "azure", "account_key", "azure-account-key")
 			}
 			assert.Empty(t, registered.ValidateConfig(cfg), provider)
 		}
@@ -383,7 +388,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		assertHasPath(t, errors, "/azure/account_name")
 	})
 
-	t.Run("azure omitted sas selector uses backend default", func(t *testing.T) {
+	t.Run("azure omitted sas selector defaults to account key auth", func(t *testing.T) {
 		t.Parallel()
 		cfg := copyConfig(minimalConfig())
 		cfg["use_rudder_storage"] = false
@@ -392,7 +397,7 @@ func TestSnowflakeConfigValidation(t *testing.T) {
 		cfg["storage_integration"] = "RUDDER_AZURE"
 		setStorage(cfg, "azure", "account_name", "rudderaccount")
 
-		assert.Empty(t, registered.ValidateConfig(cfg))
+		assert.Equal(t, []string{"/azure/account_key"}, errorPaths(registered.ValidateConfig(cfg)))
 	})
 
 	t.Run("azure explicit account key auth requires account key", func(t *testing.T) {

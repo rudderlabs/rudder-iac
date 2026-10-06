@@ -242,7 +242,7 @@ func TestRefID(t *testing.T) {
 }
 
 func TestDestinationRefResolve(t *testing.T) {
-	ref, err := parseDestinationRef("#destination:s3")
+	ref, err := ParseDestinationRef("#destination:s3")
 	require.NoError(t, err)
 
 	t.Run("resolves the remote id from the destination state", func(t *testing.T) {
@@ -444,6 +444,25 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		second := remotes["conn-remote-2"]
 		require.NotNil(t, second)
 		assert.Equal(t, "web-to-s3", second.ExternalID)
+	})
+
+	// Filtering this list would hide UI-created sources and misclassify their connections as rETL.
+	t.Run("lists sources unfiltered so UI-created sources still match", func(t *testing.T) {
+		mock := &MockConnectionClient{
+			ListFunc: func(_ client.ListConnectionsOptions) (*client.ConnectionsPage, error) {
+				return &client.ConnectionsPage{Connections: []client.Connection{
+					{ID: "conn-remote-1", ExternalID: "android-to-s3", SourceID: "src-ui", DestinationID: "dst-remote-1"},
+				}}, nil
+			},
+		}
+		eventStreamSources(mock, "src-ui")
+		h := NewHandler(mock, "event-stream")
+
+		collection, err := h.LoadResourcesFromRemote(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{}}, mock.GetSourcesCalls())
+		assert.Len(t, collection.GetAll(EventStreamConnectionResourceType), 1)
 	})
 
 	t.Run("skips rETL connections", func(t *testing.T) {

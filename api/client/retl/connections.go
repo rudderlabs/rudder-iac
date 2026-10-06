@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+
+	"github.com/rudderlabs/rudder-iac/api/client"
 )
 
 const retlConnectionsBasePath = "/v2/retl-connections"
@@ -167,4 +169,9 @@ func (r *RudderRETLStore) SetConnectionExternalId(ctx context.Context, req *SetR
 	}
 
 	return nil
+}
+
+// GetDestinations delegates to the shared destination client for its pagination.
+func (r *RudderRETLStore) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	return r.client.Destinations.GetAll(ctx)
 }

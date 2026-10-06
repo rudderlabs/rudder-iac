@@ -39,6 +39,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.NotContains(t, registered.SupportedSourceTypes(), "web")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "cloud")
 
+	assert.Equal(t, []string{"mirror"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
+
 	byAPI, err := registry.GetByAPIType("CUSTOMERIO_AUDIENCE", 1)
 	require.NoError(t, err)
 	assert.Equal(t, registered, byAPI)

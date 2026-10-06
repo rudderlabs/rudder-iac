@@ -98,7 +98,8 @@ func init() {
 }
 
 // Source types from integrations-config destinations/http/db-config.json
-// supportedSourceTypes, restricted to types the CLI event-stream provider owns.
+// supportedSourceTypes, restricted to types the CLI can reach: those the
+// event-stream provider owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -110,6 +111,8 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	// warehouse is declared upstream too; it is the rETL JSON-mapper target.
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -123,6 +126,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type httpConfig struct {
@@ -218,7 +222,14 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "HTTP",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"password", "bearer_token", "api_key_value"},
+		SecretKeys: []string{
+			"password",
+			"bearer_token",
+			"api_key_value",
+			"api_key_name",
+			"username",
+			"headers.from",
+		},
 		NewConfig: func() any {
 			return &httpConfig{}
 		},

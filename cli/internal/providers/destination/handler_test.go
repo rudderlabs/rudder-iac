@@ -44,7 +44,37 @@ func testRegistry(t *testing.T) *definitions.Registry {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(webhookTestDefinition()))
 	require.NoError(t, registry.Register(ga4TestDefinition()))
+	require.NoError(t, registry.Register(eventFilteringTestDefinition()))
 	return registry
+}
+
+func eventFilteringTestDefinition() *definitions.DestinationDefinition {
+	return &definitions.DestinationDefinition{
+		Type:    "FILTERED",
+		Version: 1,
+		Properties: []converter.ConfigProperty{
+			converter.Simple("trackingID", "tracking_id"),
+			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
+			converter.ArrayWithStrings("blacklistedEvents", "eventName", "event_filtering.blacklist"),
+			converter.Discriminator("eventFilteringOption", converter.DiscriminatorValues{
+				"event_filtering.whitelist": "whitelistedEvents",
+				"event_filtering.blacklist": "blacklistedEvents",
+			}),
+		},
+		NewConfig: func() any {
+			return &struct {
+				TrackingID     string `mapstructure:"tracking_id" validate:"required"`
+				EventFiltering *struct {
+					Whitelist []string `mapstructure:"whitelist" validate:"omitempty,excluded_with=Blacklist"`
+					Blacklist []string `mapstructure:"blacklist" validate:"omitempty,excluded_with=Whitelist"`
+				} `mapstructure:"event_filtering"`
+			}{}
+		},
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+	}
 }
 
 func webhookTestDefinition() *definitions.DestinationDefinition {
@@ -693,6 +723,58 @@ func TestHandlerImpl_Delete(t *testing.T) {
 		assert.True(t, deleteCalled)
 	})
 
+	// The backend refuses to delete a destination that still has connections, and
+	// says only that. When the blocking connection is a kind this run is not
+	// managing — rETL connections are behind an experimental flag — nothing in
+	// the plan mentions it, so the workspace becomes un-destroyable with no hint
+	// as to why. The wrapper adds the missing half.
+	t.Run("explains a delete blocked by connections", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"The destination has active connections, please delete those first"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The destination has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+			"the remedy must name the flags that let the CLI remove them")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	// Only the connections refusal earns the extra guidance; every other failure
+	// is passed through, so an unrelated 400 does not acquire advice about a flag
+	// that has nothing to do with it.
+	t.Run("leaves an unrelated delete failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"destination is referenced by a running job"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
+	})
+
 	t.Run("deletes destination when no transformation", func(t *testing.T) {
 		t.Parallel()
 
@@ -865,11 +947,12 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/v2/destinations", r.URL.Path)
+		require.Equal(t, "true", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","name":"Unmanaged","type":"GA4","version":1,"config":{}}
+				{"id":"dst-2","name":"UI S3","type":"S3","version":1,"config":{}}
 			],
 			"paging": {"total": 2}
 		}`))
@@ -879,6 +962,8 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	h := destination.NewHandler(c, registry)
 
+	// dst-2 simulates a control plane that ignores hasExternalId: it must be
+	// skipped rather than fail on its unregistered type.
 	remotes, err := h.Impl.LoadRemoteResources(ctx)
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
@@ -922,16 +1007,16 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	ctx := context.Background()
 	registry := testRegistry(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "false", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","name":"GA4-unmanaged","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","externalId":"ga4-managed","name":"GA4-managed","type":"GA4","version":1,"config":{}},
 				{"id":"dst-3","name":"S3-unmanaged","type":"S3","config":{}},
 				{"id":"dst-4","name":"GA4-unregistered-version","type":"GA4","version":2,"config":{}}
 			],
-			"paging": {"total": 4}
+			"paging": {"total": 3}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -941,7 +1026,7 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 
 	remotes, err := h.Impl.LoadImportableResources(ctx)
 	require.NoError(t, err)
-	require.Len(t, remotes, 1, "only unmanaged + registered (type, version) pairs pass")
+	require.Len(t, remotes, 1, "only registered (type, version) pairs pass")
 	assert.Equal(t, "dst-1", remotes[0].ID)
 	assert.Equal(t, "", remotes[0].ExternalID)
 }
@@ -1464,6 +1549,8 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 
+	// The managed-transformation case, with the real ImportRefResolver and the
+	// export/load round trip, is in export_ref_test.go.
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 
@@ -1663,6 +1750,80 @@ func TestHandlerImpl_Import_TranslatesAPITypeToLocal(t *testing.T) {
 	}, "dst-s3")
 	require.NoError(t, err)
 	assert.Equal(t, &destination.DestinationState{ID: "dst-s3", TransformationID: ""}, state)
+}
+
+// Dropping the unselected member can leave the selected one as the block's only
+// key. When that selected list is deliberately empty — whitelisting with no
+// events named, which discards everything — pruning would delete the block,
+// while MapRemoteToState keeps it: import would hand back a spec that diffs
+// against the state it was generated from, and applying it would erase the
+// setting upstream.
+func TestHandlerImpl_FormatForExport_KeepsEmptySelectedEventFilter(t *testing.T) {
+	t.Parallel()
+
+	registry := testRegistry(t)
+
+	tests := []struct {
+		name   string
+		config string
+		want   any
+	}{
+		{
+			name:   "empty selected list survives pruning",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"whitelistedEvents","whitelistedEvents":[{"eventName":""}],"blacklistedEvents":[{"eventName":"B"}]}`,
+			want:   map[string]any{"whitelist": []any{""}},
+		},
+		{
+			name:   "cleared unselected list never reaches the spec",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"whitelistedEvents","whitelistedEvents":[{"eventName":"Order Completed"}],"blacklistedEvents":[{"eventName":""}]}`,
+			want:   map[string]any{"whitelist": []any{"Order Completed"}},
+		},
+		{
+			name:   "filtering switched off leaves no block behind",
+			config: `{"trackingID":"UA-1","eventFilteringOption":"disable","whitelistedEvents":[{"eventName":""}],"blacklistedEvents":[{"eventName":""}]}`,
+			want:   nil,
+		},
+		{
+			// No discriminator means upstream applies no filtering, so a cleared
+			// list carries no setting to protect. Emitting it would hand back a
+			// spec whose next apply supplies the missing discriminator and turns
+			// filtering on — flipping the destination to discard every event.
+			name:   "cleared list with no discriminator is not protected",
+			config: `{"trackingID":"UA-1","whitelistedEvents":[{"eventName":""}]}`,
+			want:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := destination.NewHandler(nil, registry)
+			entities, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
+				"filtered-1": {Destination: &client.Destination{
+					ID:        "dst-f1",
+					Name:      "Filtered",
+					Type:      "FILTERED",
+					Version:   1,
+					IsEnabled: true,
+					Config:    []byte(tt.config),
+				}},
+			}, nil, stubResolver{})
+			require.NoError(t, err)
+			require.Len(t, entities, 1)
+
+			spec, ok := entities[0].Content.(*specs.Spec)
+			require.True(t, ok)
+			config, ok := spec.Spec["config"].(map[string]any)
+			require.True(t, ok)
+
+			if tt.want == nil {
+				assert.NotContains(t, config, "event_filtering")
+				return
+			}
+			assert.Equal(t, tt.want, config["event_filtering"])
+		})
+	}
 }
 
 func TestHandlerImpl_FormatForExport_EmitsLocalType(t *testing.T) {

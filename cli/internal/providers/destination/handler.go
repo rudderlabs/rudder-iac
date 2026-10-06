@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
@@ -200,7 +202,7 @@ func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *DestinationResour
 	}
 
 	if err := h.client.Destinations.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting destination: %w", err)
+		return fmt.Errorf("deleting destination: %w", provider.ExplainBlockingConnections(err))
 	}
 
 	return nil
@@ -288,7 +290,7 @@ func errUnregisteredManagedType(id, apiType string, version int64) error {
 // LoadRemoteResources returns only managed destinations (ExternalID set). An
 // unregistered type on a managed resource indicates corrupted state and errors.
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(true))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -296,12 +298,11 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
+		// Server-side hasExternalId is authoritative; this only stops an older
+		// control plane that ignores the param from failing every apply below.
 		if d.ExternalID == "" {
 			continue
 		}
-
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			return nil, errUnregisteredManagedType(d.ID, d.Type, d.Version)
 		}
@@ -314,7 +315,7 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 // silently skips destinations whose (Type, Version) pair isn't registered —
 // import can only target definitions the CLI knows how to convert.
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(false))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -322,11 +323,6 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
-		if d.ExternalID != "" {
-			continue
-		}
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			// Only destinations whose exact (apiType, version) is registered
 			// in the CLI are considered importable.
@@ -463,9 +459,16 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	if err != nil {
 		return nil, fmt.Errorf("converting destination %s config to local: %w", remote.ID, err)
 	}
+	// The discriminator of a mutually exclusive group lives in the API config, so
+	// decide what pruning must leave alone before dropping down to local keys.
+	var apiConfig map[string]any
+	if err := json.Unmarshal(remote.Config, &apiConfig); err != nil {
+		return nil, fmt.Errorf("unmarshalling destination %s config: %w", remote.ID, err)
+	}
+
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
-	pruneEmptyValues(localConfig)
+	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
@@ -496,9 +499,13 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 // pruneEmptyValues drops keys carrying no value. The webapp persists cleared
 // fields rather than unsetting them, so they reach export as noise the user has
-// to read past.
-func pruneEmptyValues(config map[string]any) {
+// to read past. Keys named in protected are left alone even when empty, for
+// values whose emptiness is itself the setting.
+func pruneEmptyValues(config map[string]any, protected ...string) {
 	for key, value := range config {
+		if slices.Contains(protected, key) {
+			continue
+		}
 		if isEmptyConfigValue(value) {
 			delete(config, key)
 		}

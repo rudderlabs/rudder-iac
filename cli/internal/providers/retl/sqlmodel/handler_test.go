@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -88,7 +90,7 @@ type mockRETLClient struct {
 	updateCalled               bool
 	deleteCalled               bool
 	sourceID                   string
-	deleteError                bool
+	deleteErr                  error
 	updateError                bool
 	createRetlSourceFunc       func(ctx context.Context, req *retlClient.RETLSourceCreateRequest) (*retlClient.RETLSource, error)
 	updateRetlSourceFunc       func(ctx context.Context, sourceID string, req *retlClient.RETLSourceUpdateRequest) (*retlClient.RETLSource, error)
@@ -154,10 +156,7 @@ func (m *mockRETLClient) UpdateRetlSource(ctx context.Context, sourceID string, 
 
 func (m *mockRETLClient) DeleteRetlSource(ctx context.Context, sourceID string) error {
 	m.deleteCalled = true
-	if m.deleteError {
-		return errors.New("deleting RETL source")
-	}
-	return nil
+	return m.deleteErr
 }
 
 func (m *mockRETLClient) ListRetlSources(ctx context.Context, opts ...retlClient.ListRetlSourcesOption) (*retlClient.RETLSources, error) {
@@ -235,6 +234,10 @@ func (m *mockRETLClient) ListConnections(ctx context.Context, req *retlClient.Li
 
 func (m *mockRETLClient) SetConnectionExternalId(ctx context.Context, req *retlClient.SetRETLConnectionExternalIDRequest) error {
 	return unexpectedConnectionCall("SetConnectionExternalId")
+}
+
+func (m *mockRETLClient) GetDestinations(ctx context.Context) ([]client.Destination, error) {
+	return nil, unexpectedConnectionCall("GetDestinations")
 }
 
 func TestSQLModelHandler(t *testing.T) {
@@ -369,7 +372,9 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1, s2)
-			entities, _, err := h.FormatForExport(collection, idNamer, nil)
+			// The postgres account is imported alongside; the mysql one is of a
+			// definition the accounts provider does not import.
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, map[string]string{"acc-1": "prod-pg"}, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 2)
 
@@ -385,15 +390,32 @@ func TestSQLModelHandler(t *testing.T) {
 			require.NotNil(t, ordersSpec)
 			assert.Equal(t, sqlmodel.ResourceKind, ordersSpec.Kind)
 			assert.Equal(t, specs.SpecVersionV1, ordersSpec.Version)
-			assert.Equal(t, "Orders Model", ordersSpec.Spec[sqlmodel.DisplayNameKey])
-			assert.Equal(t, "orders", ordersSpec.Spec[sqlmodel.DescriptionKey])
-			assert.Equal(t, "acc-1", ordersSpec.Spec[sqlmodel.AccountIDKey])
-			assert.Equal(t, "id", ordersSpec.Spec[sqlmodel.PrimaryKeyKey])
-			assert.Equal(t, "SELECT * FROM orders", ordersSpec.Spec[sqlmodel.SQLKey])
-			assert.Equal(t, "postgres", ordersSpec.Spec[sqlmodel.SourceDefinitionKey])
-			assert.Equal(t, true, ordersSpec.Spec[sqlmodel.EnabledKey])
-			assert.Equal(t, "orders-model", ordersSpec.Spec[sqlmodel.IDKey])
+			assert.Equal(t, map[string]any{
+				"id":                "orders-model",
+				"display_name":      "Orders Model",
+				"description":       "orders",
+				"account":           "#account:prod-pg",
+				"primary_key":       "id",
+				"sql":               "SELECT * FROM orders",
+				"source_definition": "postgres",
+				"enabled":           true,
+			}, ordersSpec.Spec)
 			assert.Equal(t, filepath.Join("retl", sqlmodel.ImportPath, "orders-model.yaml"), entities[idx].RelativePath)
+
+			idx, ok = byName["users-model.yaml"]
+			require.True(t, ok)
+			usersSpec, _ := entities[idx].Content.(*specs.Spec)
+			require.NotNil(t, usersSpec)
+			assert.Equal(t, map[string]any{
+				"id":                "users-model",
+				"display_name":      "Users Model",
+				"description":       "users",
+				"account_id":        "acc-2",
+				"primary_key":       "user_id",
+				"sql":               "SELECT * FROM users",
+				"source_definition": "mysql",
+				"enabled":           false,
+			}, usersSpec.Spec)
 
 			// Metadata checks: presence and name
 			assert.Equal(t, "orders-model", ordersSpec.Metadata["name"])
@@ -431,7 +453,7 @@ func TestSQLModelHandler(t *testing.T) {
 			mockClient := &mockRETLClient{}
 			h := sqlmodel.NewHandler(mockClient, "retl")
 			collection := mkCollection(s1)
-			entities, _, err := h.FormatForExport(collection, idNamer, nil)
+			entities, _, err := h.FormatForExport(collection, idNamer, importResolver(t, collection, nil, nil))
 			require.NoError(t, err)
 			require.Len(t, entities, 1)
 			spec, ok := entities[0].Content.(*specs.Spec)
@@ -1090,7 +1112,38 @@ func TestSQLModelHandler(t *testing.T) {
 				expectedError: true,
 				errorMessage:  "deleting RETL source",
 				mockSetup: func() *mockRETLClient {
-					return &mockRETLClient{sourceID: "error", deleteError: true}
+					return &mockRETLClient{sourceID: "error", deleteErr: errors.New("deleting RETL source")}
+				},
+			},
+			// The rETL service has its own wording for this refusal, so a case
+			// built on either "active connections" message would pass while this
+			// path stayed unannotated.
+			{
+				name: "Blocked by connections is explained",
+				state: resources.ResourceData{
+					sqlmodel.IDKey: "src123",
+				},
+				expectedError: true,
+				errorMessage:  "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+				mockSetup: func() *mockRETLClient {
+					return &mockRETLClient{sourceID: "src123", deleteErr: &client.APIError{
+						HTTPStatusCode: http.StatusBadRequest,
+						Message:        "The source is connected to some destinations.",
+					}}
+				},
+			},
+			{
+				name: "Unrelated failure keeps its own message",
+				state: resources.ResourceData{
+					sqlmodel.IDKey: "src123",
+				},
+				expectedError: true,
+				errorMessage:  "referenced by a running job",
+				mockSetup: func() *mockRETLClient {
+					return &mockRETLClient{sourceID: "src123", deleteErr: &client.APIError{
+						HTTPStatusCode: http.StatusBadRequest,
+						Message:        "source is referenced by a running job",
+					}}
 				},
 			},
 		}

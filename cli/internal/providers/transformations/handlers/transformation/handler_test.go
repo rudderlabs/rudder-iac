@@ -13,6 +13,7 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	providerhandler "github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
@@ -151,9 +152,12 @@ func TestHandlerMetadata(t *testing.T) {
 
 	metadata := handler.Impl.Metadata()
 
-	assert.Equal(t, "transformation", metadata.ResourceType)
-	assert.Equal(t, "transformation", metadata.SpecKind)
-	assert.Equal(t, "transformations", metadata.SpecMetadataName)
+	assert.Equal(t, providerhandler.HandlerMetadata{
+		ResourceType:     "transformation",
+		SpecKind:         "transformation",
+		SpecMetadataName: "transformations",
+		ReferencedByKind: true,
+	}, metadata)
 }
 
 func TestNewSpec(t *testing.T) {
@@ -1091,6 +1095,37 @@ func TestFormatForExport(t *testing.T) {
 		// Check code file
 		assert.Equal(t, "transformations/javascript/test-trans.js", result[1].RelativePath)
 		assert.Equal(t, "export function transformEvent(event, metadata) { return event; }", result[1].Content)
+	})
+
+	t.Run("code file follows the deduplicated spec file name", func(t *testing.T) {
+		t.Parallel()
+
+		mockStore := newMockTransformationStore()
+		handler := transformation.NewHandler(mockStore)
+
+		remotes := map[string]*model.RemoteTransformation{
+			"shared": {
+				Transformation: &transformations.Transformation{
+					ID:          "trans-123",
+					Name:        "Shared",
+					Code:        "export function transformEvent(event, metadata) { return event; }",
+					Language:    "javascript",
+					WorkspaceID: "ws-789",
+				},
+			},
+		}
+
+		// A library named "shared" already claimed the name in the transformations dir.
+		idNamer := namer.NewExternalIdNamer(namer.NewKebabCase())
+		require.NoError(t, idNamer.Load([]namer.ScopeName{{Name: "shared", Scope: "transformations"}}))
+
+		result, _, err := handler.Impl.FormatForExport(remotes, idNamer, &mockResolver{})
+
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		assert.Equal(t, "transformations/shared-1.yaml", result[0].RelativePath)
+		assert.Equal(t, "javascript/shared-1.js", result[0].Content.(*specs.Spec).Spec["file"])
+		assert.Equal(t, "transformations/javascript/shared-1.js", result[1].RelativePath)
 	})
 
 	t.Run("python transformation exports to python folder", func(t *testing.T) {

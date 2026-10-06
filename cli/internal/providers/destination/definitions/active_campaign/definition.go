@@ -33,6 +33,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -46,6 +47,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // activeCampaignConfig is the local YAML config model. Field set mirrors
@@ -76,7 +78,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "ACTIVE_CAMPAIGN",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"api_key", "event_key"},
+		SecretKeys: []string{"actid", "api_key", "event_key"},
 		NewConfig: func() any {
 			return &activeCampaignConfig{}
 		},

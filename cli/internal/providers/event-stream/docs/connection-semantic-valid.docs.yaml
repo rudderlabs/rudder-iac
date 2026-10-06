@@ -9,13 +9,11 @@ match_behavior:
   # depends on it) and, in connection_mode, an
   # entry for that type (V-C8 — skipped where the config surface has neither
   # block, or cannot name that source type in one), and a destination cannot
-  # receive from both
-  # event stream and rETL sources (V-E1 — cannot fire today: the edge scan
-  # covers only event stream connections, so it starts firing once the
-  # retl-connections kind lands and its connections are folded into
-  # projectConnectionEdges). Known limitation: these checks see only
-  # project-managed connections; a connection that exists remotely but is not
-  # in the project is invisible at validate time.
+  # receive from both event stream and rETL sources (V-E1 — the edge scan
+  # covers both connection kinds, so the clash is reported from whichever side
+  # declares it). Known limitation: these checks see only project-managed
+  # connections; a connection that exists remotely but is not in the project is
+  # invisible at validate time.
   - applies_to:
       - kind: "event-stream-connections"
         version: "rudder/v1"
