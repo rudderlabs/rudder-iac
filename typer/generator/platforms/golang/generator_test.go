@@ -3,6 +3,7 @@ package golang_test
 import (
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -67,6 +68,10 @@ func TestGenerateGoldens(t *testing.T) {
 		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
 		"testdata/validator/examples/ruddertyper.go":    nil,
 	}
+	runtimeFile, err := os.ReadFile("internal/runtime/runtime.go")
+	require.NoError(t, err)
+	_, runtimeSource, found := strings.Cut(string(runtimeFile), "\n)\n")
+	require.True(t, found, "runtime.go has no import block")
 
 	for _, golden := range testutils.Goldens {
 		t.Run(golden.Path, func(t *testing.T) {
@@ -82,6 +87,9 @@ func TestGenerateGoldens(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			// The runtime package's tests cover the generated runtime only
+			// while it is emitted unchanged.
+			assert.Contains(t, files[0].Content, runtimeSource)
 		})
 	}
 }

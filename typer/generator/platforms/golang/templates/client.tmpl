@@ -51,13 +51,16 @@ type callOptions struct {
 	messageID    string
 }
 
-// WithAnalyticsContext sets the event context. RudderTyper adds its metadata
-// under context.ruddertyper, replacing any "ruddertyper" key in ctx.Extra.
+// WithAnalyticsContext sets the event context. Everything reachable from ctx
+// is copied when the event method is called, so ctx can be reused or changed
+// afterwards. RudderTyper adds its metadata under context.ruddertyper,
+// replacing any "ruddertyper" key in ctx.Extra.
 func WithAnalyticsContext(ctx analytics.Context) Option {
 	return func(o *callOptions) { o.context = &ctx }
 }
 
-// WithIntegrations selects the destinations the event is sent to.
+// WithIntegrations selects the destinations the event is sent to. The map is
+// copied when the event method is called.
 func WithIntegrations(integrations analytics.Integrations) Option {
 	return func(o *callOptions) { o.integrations = integrations }
 }
