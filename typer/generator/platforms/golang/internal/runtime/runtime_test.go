@@ -6,6 +6,7 @@ import (
 	"maps"
 	"math"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,7 +44,16 @@ type testCase struct{ Kind string }
 func (v testCase) toMap() map[string]any { return map[string]any{"kind": v.Kind} }
 func (testCase) isTestVariant()          {}
 
-// testUnion stands in for a union, mixed enum, Nullable or Null.
+// testPayload is a generated struct whose MarshalJSON is marshal, as in
+// generated code, so encoding it starts a new walk.
+type testPayload struct{ AdditionalProperties map[string]any }
+
+func (v testPayload) toMap() map[string]any        { return maps.Clone(v.AdditionalProperties) }
+func (v testPayload) MarshalJSON() ([]byte, error) { return marshal(v) }
+
+// testUnion stands in for a union, mixed enum, Nullable or Null. Its
+// MarshalJSON differs from wireValue, so output built from wireValue shows
+// that the hook wins.
 type testUnion struct {
 	value any
 	set   bool
@@ -55,6 +65,8 @@ func (u testUnion) wireValue() (any, error) {
 	}
 	return u.value, nil
 }
+
+func (testUnion) MarshalJSON() ([]byte, error) { return []byte(`"from MarshalJSON"`), nil }
 
 type (
 	testEnum  string
@@ -68,7 +80,15 @@ type callerStruct struct {
 	hidden int
 }
 
-type callerNode struct{ Next *callerNode }
+type (
+	callerNode   struct{ Next *callerNode }
+	callerHolder struct{ Payload testPayload }
+)
+
+// upperText is encoded by its MarshalText, which differs from its value.
+type upperText string
+
+func (s upperText) MarshalText() ([]byte, error) { return []byte(strings.ToUpper(string(s))), nil }
 
 type testMarshalError struct{}
 
@@ -78,10 +98,10 @@ type failingMarshaler struct{}
 
 func (failingMarshaler) MarshalJSON() ([]byte, error) { return nil, testMarshalError{} }
 
-// nest wraps a string in n slices.
-func nest(n int) any {
-	var v any = "leaf"
-	for i := 0; i < n; i++ {
+// nest wraps leaf in n slices.
+func nest(n int, leaf any) any {
+	v := leaf
+	for range n {
 		v = []any{v}
 	}
 	return v
@@ -89,14 +109,19 @@ func nest(n int) any {
 
 func TestSnapshotAndMarshal(t *testing.T) {
 	var (
-		five       = 5
-		cyclicMap  = map[string]any{}
-		cyclicObj  = testObject{AdditionalProperties: map[string]any{}}
-		cyclicNode = &callerNode{}
+		five         = 5
+		leaf         = "leaf"
+		cyclicMap    = map[string]any{}
+		cyclicObj    = testObject{AdditionalProperties: map[string]any{}}
+		cyclicNode   = &callerNode{}
+		cyclicHolder = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicKeyed  = testPayload{AdditionalProperties: map[string]any{}}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
 	cyclicNode.Next = cyclicNode
+	cyclicHolder.AdditionalProperties["holder"] = callerHolder{Payload: cyclicHolder}
+	cyclicKeyed.AdditionalProperties["byID"] = map[int]testPayload{1: cyclicKeyed}
 
 	tests := []struct {
 		name    string
@@ -197,8 +222,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		},
 		{
 			name: "caller marshalers go through encoding/json",
-			in:   map[string]any{"time": time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), "raw": json.RawMessage(`{"a":1}`)},
-			want: map[string]any{"time": "2026-01-02T03:04:05Z", "raw": map[string]any{"a": json.Number("1")}},
+			in:   map[string]any{"time": time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), "raw": json.RawMessage(`{"a":1}`), "text": upperText("a")},
+			want: map[string]any{"time": "2026-01-02T03:04:05Z", "raw": map[string]any{"a": json.Number("1")}, "text": "A"},
 		},
 		{
 			name: "caller structs go through encoding/json with json.Number numbers",
@@ -226,15 +251,29 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			wantErr: ErrInvalidValue,
 		},
 		{
+			// encoding/json cannot see these cycles, because each MarshalJSON
+			// call starts a new walk; only the walk of the caller struct or
+			// map can.
+			name:    "generated value that contains itself through a caller struct",
+			in:      cyclicHolder,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "generated value that contains itself through a non-string-key map",
+			in:      cyclicKeyed,
+			wantErr: ErrInvalidValue,
+		},
+		{
 			// Each level is a slice and the interface holding it: 499 levels
 			// reach depth 1000 exactly.
 			name: "nesting at the depth bound",
-			in:   map[string]any{"v": nest(499)},
-			want: map[string]any{"v": nest(499)},
+			in:   map[string]any{"v": nest(499, "leaf")},
+			want: map[string]any{"v": nest(499, "leaf")},
 		},
 		{
+			// The pointer to the leaf is one level more.
 			name:    "nesting past the depth bound",
-			in:      map[string]any{"v": nest(500)},
+			in:      map[string]any{"v": nest(499, &leaf)},
 			wantErr: ErrInvalidValue,
 		},
 		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: ErrInvalidValue},
@@ -252,6 +291,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, ErrInvalidValue)
 				assert.ErrorIs(t, err, tt.wantErr)
+				assert.ErrorIs(t, marshalErr, ErrInvalidValue)
 				assert.ErrorIs(t, marshalErr, tt.wantErr)
 				return
 			}
@@ -264,14 +304,6 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			assert.Equal(t, string(want), string(b))
 		})
 	}
-}
-
-func TestSnapshotKeepsEncodingErrors(t *testing.T) {
-	_, err := snapshot(map[string]any{"m": failingMarshaler{}})
-
-	var original testMarshalError
-	assert.ErrorIs(t, err, ErrInvalidValue)
-	assert.ErrorAs(t, err, &original)
 }
 
 // These mirror the With* options of the generated client.
@@ -366,6 +398,8 @@ func TestAnalyticsContext(t *testing.T) {
 
 // fakeClient records the messages it is given instead of sending them.
 type fakeClient struct{ messages []analytics.Message }
+
+var _ analytics.Client = (*fakeClient)(nil)
 
 func (c *fakeClient) Enqueue(msg analytics.Message) error {
 	c.messages = append(c.messages, msg)
