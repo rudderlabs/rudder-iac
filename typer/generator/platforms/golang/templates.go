@@ -18,8 +18,15 @@ var runtimeFile string
 
 // runtimeSource is the plan-independent runtime, emitted in every file: the
 // runtime package's source after its import block, since the generated file
-// declares the same imports itself.
-var _, runtimeSource, _ = strings.Cut(runtimeFile, "\n)\n")
+// declares the same imports itself. A file without the runtime still formats
+// but does not compile, so a runtime.go it cannot cut fails at startup.
+var runtimeSource = func() string {
+	_, after, found := strings.Cut(runtimeFile, "\n)\n")
+	if !found {
+		panic("internal/runtime/runtime.go has no import block to cut")
+	}
+	return after
+}()
 
 // render lays out ctx and formats it with go/format, so a template that
 // produces invalid Go fails generation instead of shipping.
