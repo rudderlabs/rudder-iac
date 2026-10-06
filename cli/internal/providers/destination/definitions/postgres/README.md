@@ -1,57 +1,43 @@
 # PostgreSQL (`postgres`)
 
-Warehouse destination. RudderStack stages events as files in object storage, then
-loads them into a PostgreSQL database on a schedule. Every supported source type
-connects in cloud mode — there is no device-mode variant.
+PostgreSQL is a warehouse destination. RudderStack stages events as files in object storage, then loads them into a PostgreSQL database on a schedule.
 
-In a destination spec:
+In a PostgreSQL destination spec:
 
 - `type: postgres`
 - `definition_version: 1`
 
-## Choosing your setup
-
-Two independent switches decide which keys you need:
-
-| Switch | Options |
-| --- | --- |
-| `use_ssh` | connect directly, or through an SSH tunnel |
-| `use_rudder_storage` | RudderStack-hosted staging, or your own bucket via `bucket_provider` |
-
-When you bring your own storage, `bucket_provider` picks one of four blocks —
-`s3`, `gcs`, `azure` or `minio` — and only that block's keys are required. The
-other blocks are still accepted, so switching provider does not force you to
-delete the old values.
-
-## Example
-
-Direct connection over SSL, staging through your own S3 bucket with access keys:
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: postgres
+  name: postgres-prod
 spec:
-  id: postgres
-  display_name: PostgreSQL
+  id: postgres-prod
+  display_name: PostgreSQL Production
   type: postgres
   definition_version: 1
   enabled: true
   config:
-    host: warehouse.example.com
+    host: db.example.com
     port: "5432"
     database: analytics
-    user: rudderstack
-    password: "{{ .POSTGRES_PASSWORD }}"
+    user: "{{ .PG_USER }}"
+    password: "{{ .PG_PASSWORD }}"
     namespace: rudder_events
 
-    ssl_mode: verify-ca
-    client_key: "{{ .POSTGRES_CLIENT_KEY }}"
-    client_cert: "{{ .POSTGRES_CLIENT_CERT }}"
-    server_ca: "{{ .POSTGRES_SERVER_CA }}"
-
+    ssl_mode: require
     use_ssh: false
+
+    use_rudder_storage: false
+    bucket_provider: S3
+    bucket_name: acme-postgres-staging
+    s3:
+      role_based_auth: true
+      iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3"
+    cleanup_object_storage_files: false
 
     sync_frequency: "180"
     sync_start_at: "01:00"
@@ -59,25 +45,17 @@ spec:
       start_time: "02:00"
       end_time: "03:00"
 
-    skip_tracks_table: false
-    skip_users_table: true
     prefer_append: true
+    skip_users_table: true
+    skip_tracks_table: false
     json_paths: context.traits,properties.metadata
+
     underscore_divide_numbers: false
     allow_users_context_traits: false
 
-    use_rudder_storage: false
-    bucket_provider: S3
-    bucket_name: my-rudder-staging
-    access_key_id: "{{ .AWS_ACCESS_KEY_ID }}"
-    cleanup_object_storage_files: false
-    s3:
-      role_based_auth: false
-      access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
-
     connection_mode:
-      cloud: cloud
       web: cloud
+      cloud: cloud
     consent_management:
       web:
         - provider: oneTrust
@@ -85,220 +63,315 @@ spec:
             - analytics
 ```
 
+The above example stages files in your own S3 bucket through an IAM role, so it carries no access keys, and uses `require`, so it needs no certificates. Which keys apply depends on several switches — see [Key dependencies](#key-dependencies).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
+> [!NOTE]
+> PostgreSQL's string keys don't accept `{{ path || fallback }}` templates as a way around their constraints — a template is measured as literal text against the same rule. Use `{{ .VAR }}` substitution for the secret keys.
 
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+### Key dependencies
+
+`ssl_mode`, `use_ssh`, `use_rudder_storage`, and `bucket_provider` decide which other keys apply. Rudder CLI enforces every requirement below; a key outside its branch is accepted and ignored.
+
+| Key | Required when |
+| :-----| :-----|
+| `client_key`, `client_cert`, `server_ca` | `ssl_mode` is `verify-ca` |
+| `ssh` (all four fields) | `use_ssh` is `true` |
+| `bucket_provider` | `use_rudder_storage` is `false` |
+| `bucket_name` | `use_rudder_storage` is `false` and `bucket_provider` isn't `AZURE_BLOB` |
+| `s3.iam_role_arn` | `bucket_provider` is `S3` and `s3.role_based_auth` is `true` |
+| `access_key_id`, `s3.access_key` | `bucket_provider` is `S3` and `s3.role_based_auth` isn't `true` |
+| `gcs.credentials` | `bucket_provider` is `GCS` |
+| `azure.account_name`, `azure.container_name` | `bucket_provider` is `AZURE_BLOB` |
+| `azure.account_key` | `bucket_provider` is `AZURE_BLOB` and `azure.use_sas_tokens` isn't `true` |
+| `azure.sas_token` | `bucket_provider` is `AZURE_BLOB` and `azure.use_sas_tokens` is `true` |
+| `access_key_id`, `minio.end_point`, `minio.secret_access_key`, `minio.use_ssl` | `bucket_provider` is `MINIO` |
+
+Every storage requirement also assumes `use_rudder_storage` is `false`.
+
+> [!WARNING]
+> Three provider settings behave differently from the dashboard, which defaults them:
+>
+> - An omitted `s3.role_based_auth` counts as `false`, so Rudder CLI asks for access keys. Write `role_based_auth: true` to use `s3.iam_role_arn`.
+> - An omitted `azure.use_sas_tokens` counts as `false`, so Rudder CLI asks for `azure.account_key`.
+> - `minio.use_ssl` must be written out. The dashboard defaults it to `true`; a spec that omits it fails validation.
 
 ### Connection
 
 #### `host` — string, required
 
-The host name of your PostgreSQL database.
+Hostname of the PostgreSQL server.
+
+- 1 to 200 characters, and must not contain line breaks.
+- An `ngrok.io` host is rejected.
 
 #### `port` — string, required
 
-The port of your PostgreSQL database.
+Port of the PostgreSQL server, written as a string — `"5432"`, not `5432`.
+
+- At most 100 characters, and must not contain line breaks.
 
 #### `database` — string, required
 
-The name of your PostgreSQL database. At most 100 characters.
+Name of the database RudderStack loads data into.
 
-#### `user` — string, required
+- At most 100 characters, and must not contain line breaks.
 
-The username of your PostgreSQL database. At most 100 characters.
+#### `user` — string, required, secret
+
+Database user with the permissions RudderStack needs to create schemas and load tables.
+
+- At most 100 characters, and must not contain line breaks.
 
 #### `password` — string, required, secret
 
-The password for that user.
+Password for `user`.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `namespace` — string
 
-The schema name where RudderStack creates all its tables. Defaults to the source
-name when omitted.
+Schema RudderStack creates its tables in. Defaults to the source name when omitted.
+
+- At most 64 characters, and must not start with `pg_` in any capitalization.
+- The PostgreSQL setup guide says the namespace can't be changed later, so treat it as fixed. It isn't marked immutable in the API schema, so a change isn't rejected.
 
 ### TLS
 
 #### `ssl_mode` — string, required
 
-How the connection negotiates TLS.
+How RudderStack secures its connection to the server.
 
-#### `client_key` — string
+- `disable` — no encryption.
+- `require` — encrypted, without verifying the server.
+- `verify-ca` — encrypted, and the server's certificate is checked against `server_ca`. Needs all three certificate keys below.
 
-Client private key, used by the SSL modes that require client certificates.
+#### `client_key` — string, required, secret
 
-#### `client_cert` — string
+Contents of the client key PEM file.
 
-Client certificate, used by the SSL modes that require client certificates.
+- Required when `ssl_mode` is `verify-ca`. Leave it unset otherwise.
 
-#### `server_ca` — string
+#### `client_cert` — string, required, secret
 
-Server certificate authority, used to verify the database's certificate.
+Contents of the client certificate PEM file.
+
+- Required when `ssl_mode` is `verify-ca`. Leave it unset otherwise.
+
+#### `server_ca` — string, required
+
+Contents of the server CA PEM file.
+
+- Required when `ssl_mode` is `verify-ca`. Leave it unset otherwise.
 
 ### SSH tunnel
 
-#### `use_ssh` \* — boolean, default `false`
+> [!NOTE]
+> SSH tunneling is available on the Enterprise plan.
 
-Reach PostgreSQL through an SSH tunnel rather than connecting directly.
+#### `use_ssh` — boolean, default `false`
 
-#### `ssh` \* — object
+Connect to PostgreSQL through an SSH tunnel via a bastion host.
 
-SSH tunnel settings, grouped under one block. **All four fields are required when
-`use_ssh` is `true`**, including when the block itself is omitted:
+#### `ssh` — object, required
 
-- `host` — bastion host name, at most 100 characters
-- `port` — bastion port, at most 100 characters
-- `user` — SSH user, at most 100 characters
-- `public_key` — the SSH public key, at most 1000 characters
+Bastion host connection details.
+
+- Required when `use_ssh` is `true`, with all four fields. Leave it unset otherwise.
+- `host` — IP address or hostname of the bastion host. At most 100 characters.
+- `port` — SSH port of the bastion host, as a string. At most 100 characters.
+- `user` — user RudderStack logs in to the bastion host as. At most 100 characters. **Secret** — see [Secrets](#secrets).
+- `public_key` — the public key RudderStack generates for this destination. At most 1000 characters.
+
+```yaml
+use_ssh: true
+ssh:
+  host: 203.0.113.10
+  port: "22"
+  user: "{{ .PG_SSH_USER }}"
+  public_key: "ssh-rsa AAAA..."
+```
+
+RudderStack holds the private key; add `public_key` to the bastion host's `authorized_keys`. The key comes from RudderStack, so the practical route is to enable SSH on the destination in the dashboard, then import it to pick up the value.
+
+### Object storage
+
+`use_rudder_storage` decides whether RudderStack stages files in its own storage or in yours. With your own, `bucket_provider` picks the provider, and only that provider's block applies.
+
+#### `use_rudder_storage` — boolean, required
+
+Stage files in RudderStack-managed object storage instead of your own.
+
+- Available only on RudderStack-hosted data planes. Self-hosted data planes must set `false` and configure a provider.
+- The dashboard defaults this field to `false`. Rudder CLI requires it explicitly.
+
+#### `bucket_provider` — string, required
+
+Object storage provider for staging files.
+
+- Required when `use_rudder_storage` is `false`. Leave it unset otherwise.
+- One of `S3`, `GCS`, `AZURE_BLOB`, or `MINIO`.
+
+#### `bucket_name` — string, required
+
+Name of the staging bucket. The bucket must already exist. Azure uses `azure.container_name` instead.
+
+- Required when `use_rudder_storage` is `false` and `bucket_provider` isn't `AZURE_BLOB`. Leave it unset otherwise.
+- 3 to 63 characters, whichever provider you use, and must not contain line breaks.
+- For `S3`: lowercase letters, digits, dots, and hyphens; not starting with `xn--`, no consecutive dots, not an IP address.
+- For `GCS`: lowercase letters, digits, dots, hyphens, and underscores; not starting with `goog`, not containing `google`, no consecutive dots, not an IP address.
+- For `MINIO`: lowercase letters, digits, dots, and hyphens; not an IP address.
+
+#### `access_key_id` — string, required, secret
+
+Access key ID for S3 or MinIO. It sits at the top level because both providers use it.
+
+- Required when `bucket_provider` is `MINIO`, or `S3` with `s3.role_based_auth` not `true`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+
+#### `cleanup_object_storage_files` — boolean, default `false`
+
+Delete staged files after a sync completes successfully.
+
+- Applies when `use_rudder_storage` is `false`.
+
+#### `s3` — object, required
+
+Amazon S3 settings.
+
+- Required when `use_rudder_storage` is `false` and `bucket_provider` is `S3`. Leave it unset otherwise.
+- `role_based_auth` — boolean. `true` to use `iam_role_arn`; omitted or `false` to use `access_key_id` and `access_key`.
+- `iam_role_arn` — ARN of the IAM role RudderStack assumes. Required when `role_based_auth` is `true`. At most 100 characters.
+- `access_key` — AWS secret access key matching `access_key_id`. Required when `role_based_auth` isn't `true`. At most 100 characters. **Secret**.
+
+```yaml
+bucket_provider: S3
+bucket_name: acme-postgres-staging
+s3:
+  role_based_auth: true
+  iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3"
+```
+
+#### `gcs` — object, required
+
+Google Cloud Storage settings.
+
+- Required when `use_rudder_storage` is `false` and `bucket_provider` is `GCS`. Leave it unset otherwise.
+- `credentials` — contents of the JSON key file for a service account that can create objects in the bucket. Required. **Secret**.
+
+```yaml
+bucket_provider: GCS
+bucket_name: acme-postgres-staging
+gcs:
+  credentials: "{{ .PG_GCS_CREDENTIALS }}"
+```
+
+#### `azure` — object, required
+
+Azure Blob Storage settings.
+
+- Required when `use_rudder_storage` is `false` and `bucket_provider` is `AZURE_BLOB`. Leave it unset otherwise.
+- `account_name` — storage account name. Required. At most 100 characters.
+- `container_name` — staging container, which must already exist. Required. 3 to 63 characters of lowercase letters, digits, and single hyphens.
+- `use_sas_tokens` — boolean. `true` to authenticate with `sas_token`; omitted or `false` to use `account_key`.
+- `account_key` — storage account key. Required when `use_sas_tokens` isn't `true`. At most 100 characters. **Secret**.
+- `sas_token` — shared access signature token. Required when `use_sas_tokens` is `true`. **Secret**.
+
+```yaml
+bucket_provider: AZURE_BLOB
+azure:
+  account_name: acmestorage
+  container_name: rudder-staging
+  use_sas_tokens: true
+  sas_token: "{{ .PG_AZURE_SAS_TOKEN }}"
+```
+
+#### `minio` — object, required
+
+MinIO settings. The access key ID goes in the top-level `access_key_id`.
+
+- Required when `use_rudder_storage` is `false` and `bucket_provider` is `MINIO`. Leave it unset otherwise.
+- `end_point` — MinIO server endpoint. Required. 1 to 100 characters; an `ngrok.io` endpoint is rejected.
+- `secret_access_key` — MinIO secret access key. Required. At most 100 characters. **Secret**.
+- `use_ssl` — boolean. Connect to MinIO over TLS. Required, even when `true`.
+
+```yaml
+bucket_provider: MINIO
+bucket_name: rudder-staging
+access_key_id: "{{ .MINIO_ACCESS_KEY_ID }}"
+minio:
+  end_point: minio.example.com:9000
+  secret_access_key: "{{ .MINIO_SECRET_ACCESS_KEY }}"
+  use_ssl: true
+```
 
 ### Sync scheduling
 
 #### `sync_frequency` — string, required
 
-How often RudderStack syncs staged events into the database, in minutes. Written
-as a string. One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720` or `1440`.
+How often RudderStack syncs staged events into PostgreSQL, in minutes. Written as a string, not a number.
 
-#### `sync_start_at` \* — string
+- One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, or `1440`.
+- The dashboard defaults this field to `180`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-Time of day, in UTC, that anchors the sync schedule. Written as `HH:MM`. Not
-validated locally.
+#### `sync_start_at` — string
 
-#### `exclude_window` \* — object
+Time of day, in UTC, that anchors the sync schedule. Subsequent syncs are computed from it at `sync_frequency` intervals. Written as `HH:MM`.
 
-Daily window, in UTC, during which RudderStack does not sync. When present, both
-`start_time` and `end_time` are required. Neither format is validated locally.
+- Not validated locally: any string is accepted, and a value the scheduler can't parse silently yields no scheduled times.
 
-### Table behaviour
+#### `exclude_window` — object
 
-#### `skip_tracks_table` \* — boolean, default `false`
+Daily window, in UTC, during which RudderStack doesn't sync. Omit the block entirely to sync around the clock.
 
-Skip sending event data to the `tracks` table.
+- When present, both fields are required: `start_time` and `end_time`, each `HH:MM`.
+- Neither field's format is validated locally.
 
-#### `skip_users_table` \* — boolean, default `true`
+### Table behavior
 
-Skip the `users` table, sending identify events only to `identifies`.
+#### `prefer_append` — boolean, default `true`
 
-#### `prefer_append` \* — boolean, default `true`
+Append incoming events to existing tables. Set it to `false` to merge instead, which guarantees no duplicates at the cost of noticeably longer syncs. This is what the dashboard calls **Warehouse Append**.
 
-Append rows on each sync rather than merging.
+#### `skip_users_table` — boolean, default `true`
 
-#### `json_paths` \* — string
+Send `identify` events only to the `identifies` table, skipping the `users` table. The `users` table holds one row per unique user and is maintained with a merge, which can add significant time to each sync.
 
-Comma-separated dot-notation paths stored as JSON columns rather than flattened.
+#### `skip_tracks_table` — boolean, default `false`
 
-### Internal flags
+Skip sending events to the `tracks` table. Per-event tables are unaffected.
 
-Both keys below preserve the column naming of destinations created before the
-behaviour changed. Leave them at their defaults on a new destination.
+#### `json_paths` — string
 
-#### `underscore_divide_numbers` \* — boolean, default `false`
+Comma-separated dot-notation paths whose values are stored as JSON columns instead of being flattened. Applies to every `track` event sent to this destination.
 
-When `false`, numeric suffixes in column names are preserved: `v3` stays `v3`
-rather than being split into `v_3`.
+- Not validated locally.
 
-#### `allow_users_context_traits` \* — boolean, default `false`
+### Legacy column naming
 
-When `false`, `context.traits.*` fields are stored only as `context_traits_*`
-columns rather than promoted to top-level traits.
+Both keys below preserve the column naming of destinations created before the behavior changed. Leave them at their defaults on a new destination. Neither can be changed once the destination exists — the API rejects the update.
 
-### Staging storage
+#### `underscore_divide_numbers` — boolean, immutable, internal, default `false`
 
-#### `use_rudder_storage` — boolean, required
+When `false`, numeric suffixes in column names are preserved: `v3` stays `v3` rather than being split into `v_3`.
 
-Use RudderStack-managed buckets for object storage rather than your own.
+#### `allow_users_context_traits` — boolean, immutable, internal, default `false`
 
-#### `bucket_provider` \* — string
+When `false`, `context.traits.*` fields aren't promoted to top-level traits and are stored only as `context_traits_*` columns.
 
-Which provider hosts your staging bucket, and therefore which of the four blocks
-below applies. One of `S3`, `GCS`, `AZURE_BLOB` or `MINIO`. **Required when
-`use_rudder_storage` is `false`.**
+### Per-source keys
 
-#### `bucket_name` \* — string
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
-Name of the staging bucket RudderStack writes to before loading into PostgreSQL.
+#### `connection_mode` — object
 
-#### `access_key_id` \* — string, secret
+Maps each source type you connect to the mode its events reach PostgreSQL in, using the modes in [Source types](#source-types).
 
-Access key ID for the staging bucket. Unlike the other credentials, this one sits
-at the top level rather than inside a provider block, because two providers need
-it: **required when `bucket_provider` is `MINIO`, and when it is `S3` with
-`s3.role_based_auth` `false`.** At most 100 characters.
-
-#### `cleanup_object_storage_files` \* — boolean, default `false`
-
-Delete the staged files from object storage after a sync completes successfully.
-
-### Provider blocks
-
-Exactly one block applies, chosen by `bucket_provider`. Keys in the other three
-are accepted but ignored.
-
-#### `s3` \* — object
-
-Applies when `bucket_provider` is `S3`:
-
-- `role_based_auth` — boolean. Authenticate with an IAM role rather than access
-  keys
-- `iam_role_arn` — **required when `role_based_auth` is `true`**, at most 100
-  characters
-- `access_key` — **secret**, required when `role_based_auth` is `false`, at most
-  100 characters. Pairs with the top-level `access_key_id`
-
-#### `gcs` \* — object
-
-Applies when `bucket_provider` is `GCS`:
-
-- `credentials` — **secret**, **required** for this provider. GCP service account
-  credentials JSON
-
-#### `azure` \* — object
-
-Applies when `bucket_provider` is `AZURE_BLOB`:
-
-- `container_name` — **required** for this provider
-- `account_name` — **required** for this provider, at most 100 characters
-- `use_sas_tokens` — boolean. Authenticate with a SAS token rather than an
-  account key
-- `account_key` — **secret**, required when `use_sas_tokens` is `false`, at most
-  100 characters
-- `sas_token` — **secret**, required when `use_sas_tokens` is `true`
-
-#### `minio` \* — object
-
-Applies when `bucket_provider` is `MINIO`:
-
-- `end_point` — **required** for this provider. Address of your MinIO server
-- `secret_access_key` — **secret**, **required** for this provider
-- `use_ssl` — boolean. Connect to MinIO over HTTPS
-
-MinIO also requires the top-level `access_key_id`.
-
-## Source types
-
-Every supported source type connects in cloud mode only:
-
-`web` · `android` · `android_kotlin` · `ios` · `ios_swift` · `unity` ·
-`react_native` · `flutter` · `cordova` · `cloud`
-
-## Per-source keys
-
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
-
-#### `connection_mode` \* — object
-
-Selects the mode per source type. Every supported type accepts `cloud` only, so
-each entry's value is `cloud`:
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -306,76 +379,71 @@ connection_mode:
   cloud: cloud
 ```
 
-An entry is required for each source type you connect — see
-[Connecting a source](#connecting-a-source).
-
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+PostgreSQL accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
 
-```
-destination 'postgres' (type 'postgres') does not support source 'my-source':
+Every source type is `cloud` only — events reach the warehouse from RudderStack's servers, never in device mode.
+
+> [!NOTE]
+> The dashboard additionally offers PostgreSQL to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'postgres-prod' (type 'postgres') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'postgres' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'postgres-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-PostgreSQL requires no additional config keys to connect a source of any type.
+PostgreSQL needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-Which secrets apply depends on your storage provider:
-
-| Key | Applies when |
-| --- | --- |
-| `password` | always — the database password |
-| `access_key_id` | `bucket_provider` is `MINIO`, or `S3` without role-based auth |
-| `s3.access_key` | `bucket_provider` is `S3` without role-based auth |
-| `gcs.credentials` | `bucket_provider` is `GCS` |
-| `azure.account_key` | `bucket_provider` is `AZURE_BLOB` without SAS tokens |
-| `azure.sas_token` | `bucket_provider` is `AZURE_BLOB` with SAS tokens |
-| `minio.secret_access_key` | `bucket_provider` is `MINIO` |
-
-The four inside `s3`, `gcs`, `azure` and `minio` are nested secrets — masked
-independently, inside their provider block.
-
-Note that `client_key`, `client_cert` and `server_ca` are **not** registered as
-secrets, so they are stored and returned in the clear. `ssh.public_key` is not a
-secret either, since a public key is not sensitive.
-
-Write each secret as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats eleven keys as secrets: `user`, `password`, `client_key`, `client_cert`, `access_key_id`, `s3.access_key`, `gcs.credentials`, `azure.account_key`, `azure.sas_token`, `minio.secret_access_key`, and `ssh.user`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-password: "{{ .POSTGRES_PASSWORD }}"
-s3:
-  access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
+config:
+  user: "{{ .PG_USER }}"
+  password: "{{ .PG_PASSWORD }}"
 ```
 
-```sh
-export RUDDER_POSTGRES_PASSWORD=...
+```bash
+export RUDDER_PG_USER="rudder"
+export RUDDER_PG_PASSWORD="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes each back as a `{{ .VAR }}` placeholder rather than
-its value, since the API does not return secrets. Fill the placeholders in
-before the first apply.
+Note that:
+
+- `server_ca` isn't a secret — a CA certificate is public by design.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

@@ -1,187 +1,202 @@
 # Amazon S3 (`s3`)
 
-Object-storage destination. RudderStack writes event files to an S3 bucket from
-its own servers. Every supported source type connects in cloud mode — there is
-no device-mode variant.
+Amazon S3 is an object storage destination. RudderStack batches events and writes them as files into an S3 bucket you own.
 
-In a destination spec:
+In a S3 destination spec:
 
 - `type: s3`
 - `definition_version: 1`
 
-## Example
-
-Role-based authentication, which is the recommended setup:
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: s3
+  name: amazon-s3-prod
 spec:
-  id: s3
-  display_name: Amazon S3
+  id: amazon-s3-prod
+  display_name: Amazon S3 Production
   type: s3
   definition_version: 1
   enabled: true
   config:
-    bucket_name: my-rudder-events
+    bucket_name: rudder-events-prod
     prefix: rudder/events
     role_based_auth: true
-    iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3"
-    enable_sse: true
+    iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3Access"
+    enable_sse: false
 
     connection_mode:
-      cloud: cloud
       web: cloud
+      android_kotlin: cloud
     consent_management:
       web:
         - provider: oneTrust
           consents:
             - analytics
+            - marketing
 ```
 
-With access keys instead, replace the auth block:
-
-```yaml
-    role_based_auth: false
-    access_key_id: "{{ .AWS_ACCESS_KEY_ID }}"
-    access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
-```
+The above example uses role-based authentication, so it carries no access keys. Which of `iam_role_arn`, `access_key_id`, and `access_key` you set depends on `role_based_auth` — see [Authentication](#authentication).
 
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
-
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
 ### Bucket
 
 #### `bucket_name` — string, required
 
-The name of your S3 bucket. At most 100 characters.
+Name of the S3 bucket RudderStack writes event files to. The bucket must already exist.
+
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal, and isn't measured against the length limit.
 
 #### `prefix` — string
 
-A path prefix RudderStack applies to every file it stores in the bucket. At most
-100 characters.
+Folder prefix inside the bucket. RudderStack creates a folder with this name and writes all files beneath it, at `s3://<bucket_name>/<prefix>/`.
+
+- At most 100 characters, and must not contain line breaks.
+- Templates are accepted on the same terms as `bucket_name`.
 
 #### `enable_sse` — boolean, default `false`
 
-Enable server-side encryption on the objects RudderStack writes.
+Enable server-side encryption. When `true`, RudderStack adds the header `x-amz-server-side-encryption: AES256` to each `PutObject` request.
 
 ### Authentication
 
-`role_based_auth` selects between the two authentication paths, and decides which
-of the three keys below are required.
+`role_based_auth` selects the authentication method, and decides which of the remaining three keys are required.
 
-#### `role_based_auth` \* — boolean, required
+> [!WARNING]
+> Rudder CLI checks only that the keys the selected method needs are present. It doesn't reject the keys belonging to the other method, so a spec carrying both an `iam_role_arn` and an access key pair passes `validate` and applies.
+>
+> Leave the unused method's keys out — otherwise you store credentials the destination never reads.
 
-Authenticate with an IAM role rather than access keys. Required — there is no
-default, so every spec must state which path it uses.
+#### `role_based_auth` — boolean, required
 
-#### `iam_role_arn` \* — string
+Whether to authenticate with an IAM role. Set it to `true` to use `iam_role_arn`, or `false` to use the access key pair.
 
-ARN of the IAM role RudderStack assumes. **Required when `role_based_auth` is
-`true`.** At most 100 characters.
+- The dashboard defaults this field to `true`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation with `'role_based_auth' is required`.
 
-#### `access_key_id` — string, secret
+#### `iam_role_arn` — string, required
 
-Your AWS access key ID. **Required when `role_based_auth` is `false`.** At most
-100 characters.
+ARN of the IAM role RudderStack assumes to write to the bucket.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+- Required when `role_based_auth` is `true`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- Templates are accepted.
 
-#### `access_key` — string, secret
+#### `access_key_id` — string, required, secret
 
-Your AWS secret access key. **Required when `role_based_auth` is `false`.** At
-most 100 characters.
+AWS access key ID authorizing RudderStack to write to the bucket.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+- Required when `role_based_auth` is `false`. Leave it unset otherwise.
 
-## Source types
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
-Every supported source type connects in cloud mode only:
+#### `access_key` — string, required, secret
 
-`web` · `android` · `android_kotlin` · `ios` · `ios_swift` · `unity` ·
-`react_native` · `flutter` · `cordova` · `cloud`
+AWS secret access key matching `access_key_id`.
 
-## Per-source keys
+- Required when `role_based_auth` is `false`.
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+> [!WARNING]
+> RudderStack recommends role-based authentication. The access key method is deprecated and will be discontinued.
 
-#### `connection_mode` \* — object
+> [!NOTE]
+> Either method needs a bucket policy granting RudderStack write access. Role-based authentication on its own doesn't grant it.
 
-Selects the mode per source type. Every supported type accepts `cloud` only, so
-each entry's value is `cloud`:
+### Per-source keys
+
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
+
+#### `connection_mode` — object
+
+Maps each source type you connect to the mode its events reach S3 in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
   web: cloud
-  cloud: cloud
+  android_kotlin: cloud
 ```
-
-An entry is required for each source type you connect — see
-[Connecting a source](#connecting-a-source).
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Amazon S3 accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud` |
+| `unity` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 's3' (type 's3') does not support source 'my-source':
+Every source type is `cloud` only — events reach the bucket from RudderStack's servers, never in device mode.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers S3 to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'amazon-s3-prod' (type 's3') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 's3' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'amazon-s3-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-S3 requires no additional config keys to connect a source of any type.
+Amazon S3 needs no additional config keys to connect a source of any type.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`access_key_id` and `access_key` are the secret keys, and apply only when
-`role_based_auth` is `false`. Write each as a `{{ .VAR }}` reference and supply
-the value at apply time:
+`access_key_id` and `access_key` are the secret keys, and apply only when `role_based_auth` is `false`. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-access_key_id: "{{ .AWS_ACCESS_KEY_ID }}"
-access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
+config:
+  bucket_name: rudder-events-prod
+  role_based_auth: false
+  access_key_id: "{{ .AWS_ACCESS_KEY_ID }}"
+  access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
 ```
 
-```sh
-export RUDDER_AWS_ACCESS_KEY_ID=...
-export RUDDER_AWS_SECRET_ACCESS_KEY=...
+```bash
+export RUDDER_AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export RUDDER_AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes each back as a `{{ .VAR }}` placeholder rather than
-its value, since the API does not return secrets. Fill the placeholders in
-before the first apply.
+Note that:
+
+- A `{{ .VAR }}` reference satisfies the requirement check, so a spec using role-free authentication validates before the values are supplied.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- `iam_role_arn` isn't a secret — an ARN identifies a role but grants nothing on its own.

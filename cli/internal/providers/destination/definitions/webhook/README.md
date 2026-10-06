@@ -1,39 +1,37 @@
 # Webhook (`webhook`)
 
-Streaming destination. RudderStack forwards each event as an HTTP request to an
-endpoint you control. Every supported source type connects in cloud mode — there
-is no device-mode variant.
+Webhook sends each event, unmodified, to an endpoint you own. For request mapping, authentication modes, or batching, use [HTTP Webhook](../http/README.md) instead.
 
-In a destination spec:
+In a Webhook destination spec:
 
 - `type: webhook`
 - `definition_version: 1`
 
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: webhook
+  name: events-webhook-prod
 spec:
-  id: webhook
-  display_name: Order Service Webhook
+  id: events-webhook-prod
+  display_name: Events Webhook Production
   type: webhook
   definition_version: 1
   enabled: true
   config:
-    webhook_url: "https://hooks.example.com/rudderstack/events"
+    webhook_url: https://hooks.example.com/rudderstack
     webhook_method: POST
     headers:
-      - from: Authorization
-        to: "{{ .WEBHOOK_AUTH_HEADER }}"
-      - from: X-Source
-        to: rudderstack
+      - from: X-Signing-Key
+        to: "{{ .WEBHOOK_SIGNING_KEY }}"
+      - from: X-Environment
+        to: "{{ .WEBHOOK_ENVIRONMENT }}"
 
     connection_mode:
-      cloud: cloud
       web: cloud
+      cloud: cloud
     consent_management:
       web:
         - provider: oneTrust
@@ -41,58 +39,64 @@ spec:
             - analytics
 ```
 
+The above example sets two custom headers, and supplies both values through variables because every header value is a secret — see [Headers](#headers).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
-
-### Request
+### Endpoint
 
 #### `webhook_url` — string, required
 
-The endpoint RudderStack sends events to.
+Endpoint RudderStack sends events to.
 
-Must be a public `http(s)` domain URL. Localhost and ngrok addresses are
-rejected, so the endpoint has to be reachable from RudderStack's servers.
+- Must be a public domain URL: `http` or `https`, at least one dot-separated label followed by an alphabetic top-level domain, an optional port, and an optional path.
+- `localhost` addresses and `<name>.ngrok.io` addresses are rejected.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
+
+To change the path per event, use a transformation.
 
 #### `webhook_method` — string, default `POST`
 
-The HTTP method used for the request. One of `POST`, `PUT`, `PATCH`, `GET` or
-`DELETE`.
+HTTP method of the outgoing request.
+
+- One of `POST`, `PUT`, `PATCH`, `GET`, or `DELETE`.
+
+### Headers
+
+> [!WARNING]
+> In this destination, `from` is the header **name** and `to` is its **value**. That's the reverse of [HTTP Webhook's `headers`](../http/README.md#headers--array-of-objects), where `to` is the name.
+>
+> Swapping them doesn't fail validation — it sends a header named after your value.
 
 #### `headers` — array of objects
 
-Custom headers added to every request RudderStack makes to your endpoint. Each
-entry takes:
+Custom headers added to every request. Values that aren't strings are stringified before they're set.
 
-- `from` — the header name, at most 1000 characters
-- `to` — the header value, at most 1000 characters. **Treated as a secret** —
-  see [Secrets](#secrets)
+- `from` — header name, for example `content-type`.
+- `to` — header value, for example `application/json`. **Secret** — see [Secrets](#secrets).
+- Each is at most 1000 characters, and must not contain line breaks. A `{{ path || fallback }}` template is accepted in place of a literal.
 
-## Source types
+RudderStack adds `user-agent: RudderLabs` and `content-type: application/json` to `POST` and `PUT` requests on its own.
 
-Every supported source type connects in cloud mode only:
+```yaml
+headers:
+  - from: X-Signing-Key
+    to: "{{ .WEBHOOK_SIGNING_KEY }}"
+```
 
-`web` · `android` · `android_kotlin` · `ios` · `ios_swift` · `unity` ·
-`react_native` · `flutter` · `cordova` · `cloud`
+To set a header from the event itself, use a transformation.
 
-## Per-source keys
+### Per-source keys
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
-#### `connection_mode` \* — object
+#### `connection_mode` — object
 
-Selects the mode per source type. Every supported type accepts `cloud` only, so
-each entry's value is `cloud`:
+Maps each source type you connect to the mode its events reach the endpoint in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -100,64 +104,77 @@ connection_mode:
   cloud: cloud
 ```
 
-An entry is required for each source type you connect — see
-[Connecting a source](#connecting-a-source).
-
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Webhook accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'webhook' (type 'webhook') does not support source 'my-source':
+Every source type is `cloud` only — events reach the endpoint from RudderStack's servers, never in device mode.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers Webhook to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'events-webhook-prod' (type 'webhook') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'webhook' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'events-webhook-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-Webhook requires no additional config keys to connect a source of any type.
+Webhook needs no additional config keys to connect a source of any type.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`headers.to` is the secret key — that is, the **value** of every custom header,
-whatever its name. This is unusual: the secret is a field inside a repeated
-block rather than a top-level key, so each header's value is masked
-independently.
-
-Header names (`headers.from`) are not secret and are stored in the clear.
-
-Write header values as `{{ .VAR }}` references and supply them at apply time:
+Every `headers` entry's `to` value — the header value — is secret. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-headers:
-  - from: Authorization
-    to: "{{ .WEBHOOK_AUTH_HEADER }}"
+config:
+  headers:
+    - from: X-Signing-Key
+      to: "{{ .WEBHOOK_SIGNING_KEY }}"
 ```
 
-```sh
-export RUDDER_WEBHOOK_AUTH_HEADER="Bearer ..."
+```bash
+export RUDDER_WEBHOOK_SIGNING_KEY="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes each header value back as a `{{ .VAR }}` placeholder
-rather than its value, since the API does not return secrets. Fill the
-placeholders in before the first apply.
+Note that:
+
+- Header values are masked as a group, so even a constant like `application/json` is treated as a secret.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- Header names (`from`) aren't secret and are imported as-is.

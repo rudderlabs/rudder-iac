@@ -1,58 +1,42 @@
 # TikTok Ads (`tiktok_ads`)
 
-Streaming destination. TikTok Ads receives events either from RudderStack's
-servers via the Events API (cloud mode) or directly from the TikTok Pixel loaded
-on your site (device mode, web only).
+TikTok Ads is an advertising destination. RudderStack sends conversion events to TikTok's Events API from its servers, or loads the TikTok pixel in the browser in device mode.
 
-In a destination spec:
+In a TikTok Ads destination spec:
 
 - `type: tiktok_ads`
 - `definition_version: 1`
 
-## Modes
-
-The mode a source uses is set per source type in `config.connection_mode`. Only
-`web` accepts `device`; every other source type is cloud only — see
-[Source types](#source-types).
-
-Each key below is badged with where it applies:
-
-- `cloud` — events sent from RudderStack's servers
-- `device` — events sent by the TikTok Pixel
-
-A key is accepted by `validate` whatever your sources use; the badges tell you
-where the setting takes effect.
-
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: tiktok-ads
+  name: tiktok-ads-prod
 spec:
-  id: tiktok-ads
-  display_name: TikTok Ads
+  id: tiktok-ads-prod
+  display_name: TikTok Ads Production
   type: tiktok_ads
   definition_version: 1
   enabled: true
   config:
-    pixel_code: CJK3E2RC77UAAAABCDEF
-    access_token: "{{ .TIKTOK_ADS_ACCESS_TOKEN }}"
+    pixel_code: "{{ .TIKTOK_PIXEL_CODE }}"
+    access_token: "{{ .TIKTOK_ACCESS_TOKEN }}"
     version: v2
     hash_user_properties: true
-    send_custom_events: false
 
     events_to_standard:
       - from: Order Completed
         to: CompletePayment
-      - from: Product Viewed
-        to: ViewContent
+      - from: Product Added
+        to: AddToCart
+    send_custom_events: false
 
     event_filtering:
       whitelist:
         - Order Completed
-        - Product Viewed
+        - Product Added
 
     connection_mode:
       web: device
@@ -64,101 +48,96 @@ spec:
             - marketing
 ```
 
+The above example loads the TikTok pixel on web sources in `device` mode and sends server-side events in `cloud` mode. `event_filtering` affects only the device-mode web traffic — see [Event filtering](#event-filtering).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+> [!NOTE]
+> In `cloud` mode TikTok Ads accepts only `track` events. In `device` mode, web sources also send `identify` and `page`.
 
 ### Connection
 
-#### `pixel_code` — string, required
-`cloud` `device` · web
+#### `pixel_code` — string, required, secret
 
-Your TikTok Pixel code. At most 100 characters.
+Code of the TikTok pixel that receives the events. Used in both modes.
+
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
 #### `access_token` — string, secret
-`cloud`
 
-Your TikTok long-term access token, used by the Events API in cloud mode.
+TikTok long-term access token for the Events API. Cloud mode needs it; device mode doesn't.
 
-Not required by `validate`, since a device-mode-only destination does not need
-it — but cloud-mode delivery fails without it. Supply it as a `{{ .VAR }}`
-reference; see [Secrets](#secrets).
+- Rudder CLI doesn't require this key, even when a source connects in `cloud` mode. Without it, cloud-mode delivery fails at TikTok.
 
-### Event delivery
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `version` — string, default `v2`
-`cloud`
 
-The TikTok Events API version to send under. One of `v2` or `v1`.
+TikTok Events API version for cloud mode.
+
+- `v2` or `v1`. Use `v2` — TikTok announced the sunset of Events API 1.0.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
 #### `hash_user_properties` — boolean, default `true`
-`cloud`
 
-Hash contextual user properties with SHA-256 before sending.
+SHA-256 hash contextual user properties such as `external_id`, `email`, and `phone_number` before sending them.
 
-#### `send_custom_events` — boolean, default `false`
-`cloud` `device` · web
+- Applies to `cloud` mode only.
 
-Send events that do not map to a TikTok standard event, rather than dropping
-them.
+### Event mapping
 
 #### `events_to_standard` — array of objects
-`cloud` `device` · web
 
-Map RudderStack event names to TikTok standard events. Each entry takes:
+Maps RudderStack event names to TikTok standard events. Events without a mapping follow TikTok's default event mapping.
 
-- `from` — the RudderStack event name, at most 100 characters
-- `to` — the TikTok standard event, one of `AddPaymentInfo`, `AddToCart`,
-  `AddToWishlist`, `ClickButton`, `CompletePayment`, `CompleteRegistration`,
-  `Contact`, `Download`, `InitiateCheckout`, `PlaceAnOrder`, `Search`,
-  `SubmitForm`, `Subscribe`, `ViewContent`, `CustomizeProduct`, `FindLocation`,
-  `Schedule`, `Purchase`, `Lead`, `ApplicationApproval`, `SubmitApplication` or
-  `StartTrial`
+- `from` — RudderStack event name. At most 100 characters, and must not contain line breaks.
+- `to` — one of `AddPaymentInfo`, `AddToCart`, `AddToWishlist`, `ClickButton`, `CompletePayment`, `CompleteRegistration`, `Contact`, `Download`, `InitiateCheckout`, `PlaceAnOrder`, `Search`, `SubmitForm`, `Subscribe`, `ViewContent`, `CustomizeProduct`, `FindLocation`, `Schedule`, `Purchase`, `Lead`, `ApplicationApproval`, `SubmitApplication`, or `StartTrial`.
+- Both fields accept a `{{ path || fallback }}` template in place of a literal.
+
+```yaml
+events_to_standard:
+  - from: Order Completed
+    to: CompletePayment
+```
+
+#### `send_custom_events` — boolean, default `false`
+
+Send events that don't map to a standard event as TikTok custom events. For custom events, only TikTok's standard fields are sent; other fields are dropped.
+
+### Event filtering
+
+> [!WARNING]
+> Client-side event filtering is applied by the RudderStack SDK, so it affects only web sources connected in `device` mode. Events sent in `cloud` mode reach TikTok unfiltered, whatever this block says.
 
 #### `event_filtering` — object
-`device` · web
 
-Client-side event filtering, applied by the TikTok Pixel. Exactly one of the two
-lists may be set — declaring both fails validation.
+Restricts which `track` events the SDK passes to the TikTok pixel, by event name.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+- Omit the block entirely to filter nothing.
 
-Each entry is at most 100 characters. Omit the block to send every event.
+```yaml
+event_filtering:
+  blacklist:
+    - Product Viewed
+```
 
-## Source types
+### Per-source keys
 
-| Source type | Modes |
-| --- | --- |
-| `web` | cloud, device |
-| `android` | cloud |
-| `android_kotlin` | cloud |
-| `ios` | cloud |
-| `ios_swift` | cloud |
-| `unity` | cloud |
-| `react_native` | cloud |
-| `flutter` | cloud |
-| `cordova` | cloud |
-| `cloud` | cloud |
-
-## Per-source keys
-
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
 #### `connection_mode` — object
 
-Selects the mode per source type. Values are constrained to the modes that
-source type supports, so `device` is rejected for every type except `web`:
+Maps each source type you connect to the mode its events reach TikTok in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
+- A mode the source type doesn't support on this destination fails validation — for example `device` for `android`.
 
 ```yaml
 connection_mode:
@@ -168,51 +147,74 @@ connection_mode:
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+TikTok Ads accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud`, `device` |
+| `unity` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'tiktok-ads' (type 'tiktok_ads') does not support source 'my-source':
+Only `web` offers `device` mode, which loads the TikTok pixel in the browser.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers TikTok Ads to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'tiktok-ads-prod' (type 'tiktok_ads') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'tiktok-ads' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'tiktok-ads-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-TikTok Ads requires no additional config keys to connect a source of any type.
+TikTok Ads needs no additional config keys to connect a source of any type, in any mode.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`access_token` is the only secret key. Write it as a `{{ .VAR }}` reference and
-supply the value at apply time:
+`pixel_code` and `access_token` are the secret keys. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-access_token: "{{ .TIKTOK_ADS_ACCESS_TOKEN }}"
+config:
+  pixel_code: "{{ .TIKTOK_PIXEL_CODE }}"
+  access_token: "{{ .TIKTOK_ACCESS_TOKEN }}"
 ```
 
-```sh
-export RUDDER_TIKTOK_ADS_ACCESS_TOKEN=...
+```bash
+export RUDDER_TIKTOK_PIXEL_CODE="..."
+export RUDDER_TIKTOK_ACCESS_TOKEN="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes `access_token` back as a `{{ .VAR }}` placeholder
-rather than its value, since the API does not return secrets. Fill the
-placeholder in before the first apply.
+Note that:
+
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- In device mode the pixel code is embedded in the page's JavaScript, so treating it as a secret protects your YAML, not the value itself.

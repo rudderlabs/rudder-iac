@@ -1,32 +1,29 @@
 # BigQuery (`bq`)
 
-Warehouse destination. RudderStack stages events as files in a Google Cloud
-Storage bucket, then loads them into a BigQuery dataset on a schedule.
+Google BigQuery is a warehouse destination. RudderStack stages events as files in a Google Cloud Storage bucket, then loads them into a BigQuery dataset on a schedule.
 
-In a destination spec:
+In a BigQuery destination spec:
 
 - `type: bq`
-- `definition_version: 1` — the only registered version
+- `definition_version: 1`
 
-## Example
-
-Every config key this destination accepts:
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: bigquery
+  name: bigquery-prod
 spec:
-  id: bigquery
-  display_name: BigQuery
+  id: bigquery-prod
+  display_name: BigQuery Production
   type: bq
   definition_version: 1
   enabled: true
   config:
-    project: my-gcp-project
+    project: acme-analytics
     location: US
-    bucket_name: my-rudder-staging-bucket
+    bucket_name: rudder-bq-staging
     prefix: rudder/events
     namespace: rudder_events
     credentials: "{{ .BQ_CREDENTIALS }}"
@@ -59,15 +56,14 @@ spec:
             - marketing
 ```
 
+The above example uses a `{{ .VAR }}` reference for `credentials` — see [Secrets](#secrets).
+
 ## Config keys
 
-`config` accepts only the keys below — anything else fails validation with
-`unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, because the backend applies the same defaults when it stores the
-destination. Omitting one is equivalent to writing its default; it does not
-produce a permanent diff.
+> [!NOTE]
+> BigQuery's string keys don't accept `{{ path || fallback }}` templates as a way around their constraints. A template is measured as literal text against the same rule, so an over-long one fails, and a key constrained by shape rather than length — `bucket_name`, `partition_column`, `partition_type` — rejects a template outright. Use `{{ .VAR }}` substitution for `credentials`, which has no pattern constraint.
 
 ### Connection
 
@@ -75,87 +71,78 @@ produce a permanent diff.
 
 GCP project ID that holds the BigQuery dataset.
 
-At most 100 characters, and must not contain line breaks.
+- At most 100 characters, and must not contain line breaks.
 
 #### `location` — string
 
-GCP region the dataset lives in, for example `US`, `EU` or `asia-southeast1`.
+GCP region the dataset lives in, for example `US`, `EU`, or `asia-southeast1`.
 
-At most 100 characters, and must not contain line breaks.
+- At most 100 characters, and must not contain line breaks.
 
 #### `bucket_name` — string, required
 
-Staging GCS bucket RudderStack writes event files to before loading them into
-BigQuery. The bucket must already exist, and should be co-located with the
-dataset so loads do not cross regions.
+Staging GCS bucket RudderStack writes event files to before loading them into BigQuery. The bucket must already exist, and should be co-located with the dataset so loads don't cross regions.
 
-3 to 63 characters, matching `[a-z0-9][a-z0-9-._]{1,61}[a-z0-9]`. Must not start
-with `goog`, contain `google`, look like an IP address, or contain consecutive
-dots.
+- 3 to 63 characters, matching `[a-z0-9][a-z0-9-._]{1,61}[a-z0-9]`.
+- It must not start with `goog`, contain `google`, look like an IP address, or contain consecutive dots.
 
 #### `prefix` — string
 
-Folder prefix inside the staging bucket. RudderStack creates a folder with this
-prefix and writes all staged files beneath it.
+Folder prefix inside the staging bucket. RudderStack creates a folder with this prefix and writes all staged files beneath it.
 
-At most 100 characters, and must not contain line breaks.
+- At most 100 characters, and must not contain line breaks.
 
-#### `namespace` — string, rs-immutable
+#### `namespace` — string, immutable
 
-Dataset RudderStack creates its tables in. Defaults to the source name,
-snake-cased, when omitted.
+Dataset RudderStack creates its tables in. Defaults to the source name, snake-cased, when omitted.
 
-At most 64 characters, and must not start with `pg_` in any capitalisation.
-
-Cannot be changed once the destination exists — the API rejects the update. The
-CLI does not check this locally: `validate` accepts a change and `apply` sends
-it, failing at the API. Create a new destination instead.
+- At most 64 characters, and must not start with `pg_` in any capitalization.
+- Can't be changed once the destination exists — the API rejects the update. Create a new destination instead.
 
 #### `credentials` — string, required, secret
 
-GCP service-account JSON key. The account needs BigQuery dataset, table and job
-permissions plus read and write access to the staging bucket.
+GCP service account JSON key. The account needs BigQuery dataset, table, and job permissions, plus read and write access to the staging bucket.
 
-Supply it as a `{{ .VAR }}` reference rather than a literal — see
-[Secrets](#secrets).
+- The dashboard also offers Workload Identity Federation, which authenticates without a stored key. Rudder CLI doesn't support it, so `credentials` is always required.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Sync scheduling
 
 #### `sync_frequency` — string, required
 
-How often RudderStack syncs staged events into the dataset, in minutes. Written
-as a string, not a number.
+How often RudderStack syncs staged events into the dataset, in minutes. Written as a string, not a number.
 
-One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720` or `1440`.
+- One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, or `1440`.
+- The dashboard defaults this field to `180`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
 #### `sync_start_at` — string
 
-Time of day, in UTC, that anchors the sync schedule; subsequent syncs are
-computed from it at `sync_frequency` intervals. Written as `HH:MM` — the
-dashboard offers 15-minute steps.
+Time of day, in UTC, that anchors the sync schedule. Subsequent syncs are computed from it at `sync_frequency` intervals. Written as `HH:MM` — the dashboard offers 15-minute steps.
 
-Not validated locally: any string is accepted, and a value the warehouse
-scheduler cannot parse silently yields no scheduled times.
+- Not validated locally: any string is accepted, and a value the warehouse scheduler can't parse silently yields no scheduled times.
 
 #### `exclude_window` — object
 
-Daily window, in UTC, during which RudderStack does not sync. Omit the block
-entirely to sync around the clock.
+Daily window, in UTC, during which RudderStack doesn't sync. Omit the block entirely to sync around the clock.
 
-When present, both fields are required:
+- When present, both fields are required.
+- `start_time` — string, when the window opens, `HH:MM`
+- `end_time` — string, when the window closes, `HH:MM`
+- Neither field's format is validated locally.
 
-- `start_time` — string, window opens, `HH:MM`
-- `end_time` — string, window closes, `HH:MM`
+```yaml
+exclude_window:
+  start_time: "02:00"
+  end_time: "03:00"
+```
 
-Neither field's format is validated locally.
-
-### Table behaviour
+### Table behavior
 
 #### `skip_users_table` — boolean, default `true`
 
-Send `identify` events only to the `identifies` table, skipping the `users`
-table. The `users` table holds one row per unique user and is maintained with a
-merge, which can add significant time to each sync.
+Send `identify` events only to the `identifies` table, skipping the `users` table. The `users` table holds one row per unique user and is maintained with a merge, which can add significant time to each sync.
 
 Set it to `false` to populate both tables.
 
@@ -163,17 +150,13 @@ Set it to `false` to populate both tables.
 
 Skip sending events to the `tracks` table. Per-event tables are unaffected.
 
-#### `skip_views` — boolean, default `false`, rs-immutable
+#### `skip_views` — boolean, immutable, default `false`
 
-Skip creating the `<table_name>_view` de-duplication view alongside each table.
-The views cover the last 60 days and exist so queries do not return duplicate
-events; skip them only if you deduplicate another way.
+Skip creating the `<table_name>_view` deduplication view alongside each table. The views cover the last 60 days and exist so queries don't return duplicate events. Skip them only if you deduplicate another way.
 
-Cannot be changed once the destination exists — the API rejects the update. The
-CLI does not check this locally: `validate` accepts a change and `apply` sends
-it, failing at the API.
+- Can't be changed once the destination exists — the API rejects the update.
 
-#### `partition_column` — string, default `_PARTITIONTIME`, rs-immutable
+#### `partition_column` — string, immutable, default `_PARTITIONTIME`
 
 Column BigQuery partitions each table on:
 
@@ -183,58 +166,49 @@ Column BigQuery partitions each table on:
 - `timestamp` — event time corrected for client-side clock skew
 - `sent_at` — when the client sent the event to RudderStack
 - `original_timestamp` — when the event was generated at the source
+- Can't be changed once the destination exists — the API rejects the update. Create a new destination instead.
 
-Cannot be changed once the destination exists — the API rejects the update. The
-CLI does not check this locally: `validate` accepts a change and `apply` sends
-it, failing at the API. Create a new destination instead.
-
-#### `partition_type` — string, default `day`, rs-immutable
+#### `partition_type` — string, immutable, default `day`
 
 Granularity of the partition: `hour` or `day`.
 
-Cannot be changed once the destination exists, on the same terms as
-`partition_column`.
+- Can't be changed once the destination exists, on the same terms as `partition_column`.
 
 #### `json_paths` — string
 
-Comma-separated dot-notation paths whose values are stored as JSON columns
-instead of being flattened into separate columns — for example
-`context.traits,properties.metadata`. Applies to every `track` event sent to this
-destination.
+Comma-separated dot-notation paths whose values are stored as JSON columns instead of being flattened into separate columns. Applies to every `track` event sent to this destination.
 
-Not validated locally.
+- Not validated locally.
+
+```yaml
+json_paths: context.traits,properties.metadata
+```
 
 #### `cleanup_object_storage_files` — boolean, default `false`
 
 Delete staged files from the GCS bucket after a sync completes successfully.
 
-### Internal flags
+### Legacy column naming
 
-Both keys below exist to preserve the column naming of destinations created
-before the behaviour changed. Leave them at their defaults on a new destination.
-Neither can be changed once the destination exists — the API rejects the update,
-and the CLI does not check for it locally.
+Both keys below preserve the column naming of destinations created before the behavior changed. Leave them at their defaults on a new destination. Neither can be changed once the destination exists — the API rejects the update.
 
-#### `underscore_divide_numbers` — boolean, default `false`, rs-immutable
+#### `underscore_divide_numbers` — boolean, immutable, internal, default `false`
 
-When `false`, numeric suffixes in column names are preserved: `v3` stays `v3`
-rather than being split into `v_3`.
+When `false`, numeric suffixes in column names are preserved: `v3` stays `v3` rather than being split into `v_3`.
 
-#### `allow_users_context_traits` — boolean, default `false`, rs-immutable
+#### `allow_users_context_traits` — boolean, immutable, internal, default `false`
 
-When `false`, `context.traits.*` fields are not promoted to top-level traits and
-are stored only as `context_traits_*` columns.
+When `false`, `context.traits.*` fields aren't promoted to top-level traits and are stored only as `context_traits_*` columns.
 
 ### Per-source keys
 
-Both keys are objects keyed by the **local** source type — the snake_case names
-listed under [Source types](#source-types). A key naming a source type this
-destination does not support fails validation.
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
 #### `connection_mode` — object
 
-Maps a source type to the mode its events reach BigQuery in. Every source type
-supports exactly one mode, `cloud`, so every entry's value is `cloud`.
+Maps each source type you connect to the mode its events reach BigQuery in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -242,70 +216,61 @@ connection_mode:
   android_kotlin: cloud
 ```
 
-An entry is required for each source type you connect — see
-[Connecting a source](#connecting-a-source).
-
 #### `consent_management` — object
 
-Consent-provider configuration per source type. The entry shape, the accepted
-providers, and the rules on `resolution_strategy` and `consents` are shared
-across all destinations and documented in
-[../common/README.md](../common/README.md).
-
-```yaml
-consent_management:
-  web:
-    - provider: oneTrust
-      consents:
-        - analytics
-        - marketing
-```
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
 ## Source types
 
-BigQuery accepts events from these source types:
+BigQuery accepts events from these source types in the mentioned connection modes:
 
-`android` · `android_kotlin` · `ios` · `ios_swift` · `web` · `unity` · `cloud` ·
-`react_native` · `flutter` · `cordova`
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
 
-All of them connect in `cloud` mode only — events are sent from RudderStack's
-servers, never from the device SDK.
+Every source type is `cloud` only — events reach the dataset from RudderStack's servers, never in device mode.
 
-## Connecting a source
+> [!NOTE]
+> The dashboard additionally offers BigQuery to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here. `warehouse` isn't valid either — BigQuery doesn't accept it even in the dashboard.
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+## Connect a source
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above before the check — a JavaScript source resolves to `web`, and
-webhook and server-side SDK sources resolve to `cloud`. An unsupported type
-reports:
+An event stream connection to this destination is checked against two rules at `validate` time.
 
-```
-destination 'bigquery' (type 'bq') does not support source 'my-source':
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'bigquery-prod' (type 'bq') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The destination config must carry a** `connection_mode` **entry for that source
-type.** This lives on the destination spec, not on the connection spec. Without
-it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'bigquery' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'bigquery-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-BigQuery requires no additional config keys to connect a source of any type.
+BigQuery needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and
-supply the value at apply time, either from the environment or from a var file:
+`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-credentials: "{{ .BQ_CREDENTIALS }}"
+config:
+  credentials: "{{ .BQ_CREDENTIALS }}"
 ```
 
-```sh
+```bash
 export RUDDER_BQ_CREDENTIALS="$(cat service-account.json)"
 rudder-cli apply
 
@@ -313,6 +278,4 @@ rudder-cli apply
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes `credentials` back as a `{{ .VAR }}` placeholder
-rather than its value, since the API does not return secrets. Fill the
-placeholder in before the first apply.
+Note that the YAML `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure `credentials` is present and populated through variable substitution.

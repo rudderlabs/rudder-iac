@@ -1,70 +1,52 @@
 # Google Ads (`googleads`)
 
-Streaming destination. Google Ads receives events from the global site tag
-(`gtag.js`) loaded on your site. It is the one destination here that supports a
-single source type in a single mode: **`web` in `device` mode only**. There is no
-cloud-mode variant and no mobile support, so none of the keys below carry a mode
-badge.
+Google Ads is a web device mode destination. RudderStack's JavaScript SDK loads the Google tag (`gtag.js`) in the browser and sends page loads, clicks, and conversions to Google Ads from there.
 
-In a destination spec:
+In a Google Ads destination spec:
 
 - `type: googleads`
 - `definition_version: 1`
 
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: google-ads
+  name: google-ads-prod
 spec:
-  id: google-ads
-  display_name: Google Ads
+  id: google-ads-prod
+  display_name: Google Ads Production
   type: googleads
   definition_version: 1
   enabled: true
   config:
-    conversion_id: AW-123456789
+    conversion_id: "{{ .GOOGLE_ADS_CONVERSION_ID }}"
     v2: true
-    conversion_linker: true
-    send_page_view: true
-    disable_ad_personalization: false
     allow_identify: false
-    allow_enhanced_conversions: false
-
-    default_page_conversion: page_view_label
-    page_load_conversions:
-      - name: Home Page
-        label: AbCdEfGhIj
-    click_event_conversions:
-      - name: Order Completed
-        label: KlMnOpQrSt
+    event_mapping_from_config:
+      - from: Signed Up
+        to: Signup
 
     track_conversions: true
-    enable_conversion_label: true
     enable_conversion_events_filtering: true
     events_to_track_conversions:
       - Order Completed
-      - Signup
+    track_dynamic_remarketing: false
 
-    track_dynamic_remarketing: true
-    enable_dynamic_remarketing_events_filtering: true
-    events_to_track_dynamic_remarketing:
-      - Product Viewed
-    dynamic_remarketing:
-      web: true
+    page_load_conversions:
+      - label: AbC-D_efG-h12_34-567
+        name: Pricing
+    default_page_conversion: XyZ-a_BcD-e98_76-543
+    click_event_conversions:
+      - label: QrS-t_UvW-x45_67-890
+        name: Order Completed
 
-    event_mapping_from_config:
-      - from: Order Completed
-        to: purchase
-      - from: Product List Viewed
-        to: ViewCategory
-
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Product Viewed
+    send_page_view: true
+    conversion_linker: true
+    disable_ad_personalization: false
+    enable_conversion_label: false
+    allow_enhanced_conversions: false
 
     connection_mode:
       web: device
@@ -75,157 +57,176 @@ spec:
             - marketing
 ```
 
+The above example sends only `Order Completed` as a conversion event and leaves dynamic remarketing off, so it omits the remarketing event list — see [Conversion and remarketing tracking](#conversion-and-remarketing-tracking).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+> [!NOTE]
+> Google Ads runs only in web device mode, and receives `identify`, `track`, and `page` calls from the SDK. Every key on this page configures what the Google tag does in the browser.
 
 ### Connection
 
-#### `conversion_id` — string, required
+#### `conversion_id` — string, required, secret
 
-Your Google Ads conversion ID. Must start with `AW-`, and at most 103 characters
-in total.
+Your Google Ads conversion ID, which identifies the account the Google tag reports to.
 
-#### `v2` \* — boolean, default `true`
+- Must start with `AW-`, followed by at most 100 characters.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-Use the version 2 integration behaviour.
+#### `sdk_base_url` — string
 
-#### `sdk_base_url` \* — string
+Full URL that loads the Google tag script. RudderStack appends `?id=<conversion_id>` to it as-is, so it must resolve to `gtag.js`. When omitted, `https://www.googletagmanager.com/gtag/js` is used.
 
-Load `gtag.js` from an alternative domain rather than Google's own. Must be a
-domain URL, at most 500 characters. Leave unset to use the default.
+- Must be a domain URL, at most 500 characters. The scheme is optional.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-### Page and tag behaviour
+To serve the tag from your own domain, set up Google tag gateway for advertisers and enter the gateway URL that serves `gtag.js`.
 
-#### `conversion_linker` — boolean, default `true`
+#### `v2` — boolean, default `true`
 
-Let the global site tag set first-party cookies on your domain. Enabled by
-default; disable it if you do not want `gtag.js` setting cookies.
+Follow the Ecommerce Event Spec when sending `track` events. This is what the dashboard calls **Ecommerce event spec support for track events**.
 
-#### `send_page_view` — boolean, default `true`
+#### `allow_identify` — boolean, default `false`
 
-Have Google Ads automatically send your `page` events.
+Send `identify` calls to Google Ads, where they define the user data for enhanced conversions.
 
-#### `disable_ad_personalization` — boolean, default `false`
+#### `event_mapping_from_config` — array of objects
 
-Programmatically disable ad personalization.
+Maps RudderStack event names to standard Google Ads events.
 
-#### `allow_identify` \* — boolean, default `false`
+- `from` — RudderStack event name. At most 100 characters, or a `{{ path || fallback }}` template.
+- `to` — one of `Lead`, `PageVisit`, `ViewCategory`, `Signup`, `WatchVideo`, `Checkout`, `Search`, `AddToCart`, or `purchase`. Note the lowercase `purchase`. Templates aren't accepted here.
 
-Send `identify` calls to Google Ads in addition to `page` and `track`.
+```yaml
+event_mapping_from_config:
+  - from: Signed Up
+    to: Signup
+```
 
-#### `allow_enhanced_conversions` \* — boolean, default `false`
+### Conversion and remarketing tracking
 
-Send hashed first-party customer data alongside conversions, so Google can match
-conversions more accurately.
+Each tracking switch gates a filtering toggle, which gates an event list. Rudder CLI accepts every key regardless of the switches above it, so a list whose toggle is off is stored and ignored.
 
-### Conversions
+#### `track_conversions` — boolean, default `true`
 
-#### `default_page_conversion` — string
+Send conversion events to Google Ads.
 
-The conversion label used for page conversions when no specific one matches. At
-most 100 characters.
+#### `enable_conversion_events_filtering` — boolean, default `false`
+
+Treat only the events in `events_to_track_conversions` as conversions. When `false`, every event is a conversion event.
+
+- Applies when `track_conversions` is `true`. Leave it unset otherwise.
+
+#### `events_to_track_conversions` — array of strings
+
+Event names to send as conversion events.
+
+- Applies when `track_conversions` and `enable_conversion_events_filtering` are both `true`. Leave it unset otherwise.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+
+#### `track_dynamic_remarketing` — boolean, default `false`
+
+Send dynamic remarketing events.
+
+#### `enable_dynamic_remarketing_events_filtering` — boolean, default `false`
+
+Treat only the events in `events_to_track_dynamic_remarketing` as remarketing events. When `false`, every event is a remarketing event.
+
+- Applies when `track_dynamic_remarketing` is `true`. Leave it unset otherwise.
+
+#### `events_to_track_dynamic_remarketing` — array of strings
+
+Event names to send as dynamic remarketing events.
+
+- Applies when `track_dynamic_remarketing` and `enable_dynamic_remarketing_events_filtering` are both `true`. Leave it unset otherwise.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+
+#### `dynamic_remarketing` — object, internal
+
+Per-source dynamic remarketing flag, keyed by `web`. Remarketing is controlled by `track_dynamic_remarketing` instead.
+
+- `web` — boolean.
+
+Leave it unset on a new destination. An imported spec may carry it from older configurations.
+
+### Page and click conversions
+
+A conversion label identifies the conversion action in Google Ads.
 
 #### `page_load_conversions` — array of objects
 
-Page-load conversions, configurable for multiple pages. Each entry takes a
-`name` and a `label`, each at most 100 characters.
+Conversions fired when a named `page` event loads.
+
+- `label` — the conversion label from Google Ads.
+- `name` — name of the `page` event that fires the conversion.
+- Each is at most 100 characters, or a `{{ path || fallback }}` template.
+
+```yaml
+page_load_conversions:
+  - label: AbC-D_efG-h12_34-567
+    name: Pricing
+```
+
+#### `default_page_conversion` — string
+
+Conversion label used for `page` events that don't match an entry in `page_load_conversions`.
+
+- At most 100 characters, or a `{{ path || fallback }}` template.
 
 #### `click_event_conversions` — array of objects
 
-Conversions fired from `track` calls. Each entry takes a `name` and a `label`,
-each at most 100 characters.
+Conversions fired by named `track` events.
 
-#### `track_conversions` \* — boolean, default `true`
+- `label` — the conversion label from Google Ads.
+- `name` — name of the `track` event that fires the conversion.
+- Each is at most 100 characters, or a `{{ path || fallback }}` template.
 
-Track conversion events.
+### Tag behavior
 
-#### `enable_conversion_label` \* — boolean, default `false`
+#### `send_page_view` — boolean, default `true`
 
-Send a conversion label with each conversion event.
+Send `page` events to Google Ads automatically.
 
-#### `enable_conversion_events_filtering` \* — boolean, default `false`
+#### `conversion_linker` — boolean, default `true`
 
-Restrict conversion tracking to the events listed in
-`events_to_track_conversions` rather than tracking all of them.
+Let the Google tag set first-party cookies on your domain for conversion measurement. Turning it off can make conversion measurement less accurate.
 
-#### `events_to_track_conversions` \* — string array
+#### `disable_ad_personalization` — boolean, default `false`
 
-Event names to track as conversions, applied when
-`enable_conversion_events_filtering` is `true`. Each entry at most 100
-characters.
+Disable ad personalization for the events this tag sends.
 
-### Dynamic remarketing
+#### `enable_conversion_label` — boolean, default `false`
 
-#### `dynamic_remarketing` — object
+Label every conversion event `conversion`. When `false`, each conversion keeps its event name as the label.
 
-Enable Google Ads' Dynamic Remarketing feature for event tracking. Object with a
-single boolean `web` key.
+#### `allow_enhanced_conversions` — boolean, default `false`
 
-#### `track_dynamic_remarketing` \* — boolean, default `false`
+Send enhanced conversions programmatically. Pair it with `allow_identify` to supply the user data.
 
-Track dynamic remarketing events.
-
-#### `enable_dynamic_remarketing_events_filtering` \* — boolean, default `false`
-
-Restrict dynamic remarketing to the events listed in
-`events_to_track_dynamic_remarketing` rather than tracking all of them.
-
-#### `events_to_track_dynamic_remarketing` \* — string array
-
-Event names to track for dynamic remarketing, applied when
-`enable_dynamic_remarketing_events_filtering` is `true`. Each entry at most 100
-characters.
-
-### Event mapping and filtering
-
-#### `event_mapping_from_config` \* — array of objects
-
-Map RudderStack event names to Google Ads event names. Each entry takes:
-
-- `from` — the RudderStack event name, at most 100 characters
-- `to` — the Google Ads event, one of `Lead`, `PageVisit`, `ViewCategory`,
-  `Signup`, `WatchVideo`, `Checkout`, `Search`, `AddToCart` or `purchase`
+### Event filtering
 
 #### `event_filtering` — object
 
-Determine which events are blocked or allowed to flow through to Google Ads.
-Exactly one of the two lists may be set — declaring both fails validation.
+Restricts which events the SDK passes to Google Ads, by event name.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
 
-Each entry is at most 100 characters. Omit the block to send every event.
+This is separate from `events_to_track_conversions`: filtering decides whether an event reaches Google Ads at all, and the conversion list decides which of those count as conversions.
 
-## Source types
+### Per-source keys
 
-Google Ads supports one source type in one mode:
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
-| Source type | Modes |
-| --- | --- |
-| `web` | device |
+#### `connection_mode` — object
 
-A connection from any other source type fails validation.
+Maps each source type you connect to the mode its events reach Google Ads in. Google Ads accepts only `web: device`.
 
-## Per-source keys
-
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation — which for this
-destination means anything other than `web`.
-
-#### `connection_mode` \* — object
-
-Selects the mode per source type. `web` supports `device` only, so that is the
-only accepted entry:
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -234,36 +235,55 @@ connection_mode:
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Google Ads accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** Since `web` is the only supported type,
-connecting anything else — including a server-side or webhook source, which
-resolves to `cloud` — reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `web` | `device` |
 
-```
-destination 'google-ads' (type 'googleads') does not support source 'my-source':
+Google Ads accepts only web sources, and only in `device` mode — the SDK loads the Google tag in the browser, and no events pass through RudderStack's servers.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Any source other than a JavaScript source reports:
+
+```text
+destination 'google-ads-prod' (type 'googleads') does not support source 'my-source':
 source type 'cloud' is not among supported source types: web
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'google-ads' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'google-ads-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-Google Ads requires no additional config keys to connect a source.
+Google Ads needs no additional config keys to connect a web source.
 
 ## Secrets
 
-Google Ads registers no secret keys. Its conversion ID and labels are embedded in
-the page by the global site tag, so they are not treated as sensitive and are
-returned in full by the API.
+`conversion_id` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
+
+```yaml
+config:
+  conversion_id: "{{ .GOOGLE_ADS_CONVERSION_ID }}"
+```
+
+```bash
+export RUDDER_GOOGLE_ADS_CONVERSION_ID="AW-123456789"
+rudder-cli apply
+
+# or
+rudder-cli apply --var-file secrets.vars.yaml
+```
+
+Note that:
+
+- In device mode the conversion ID is embedded in the page's JavaScript, so treating it as a secret keeps it out of your YAML but doesn't hide it from the browser.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

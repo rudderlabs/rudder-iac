@@ -1,82 +1,49 @@
 # Braze (`braze`)
 
-Streaming destination. Braze receives events from RudderStack's servers (cloud
-mode), directly from the Braze SDK in your app (device mode), or both at once
-(hybrid mode).
+Braze is a customer engagement destination. RudderStack sends events to Braze's REST API from its servers, loads Braze's own SDKs in device mode, or combines the two in hybrid mode.
 
-In a destination spec:
+In a Braze destination spec:
 
 - `type: braze`
 - `definition_version: 1`
 
-## Modes
-
-The mode a source uses is set per source type in `config.connection_mode`. Braze
-is the one destination that supports a third mode:
-
-- `cloud` — events sent from RudderStack's servers
-- `device` — events sent by the Braze SDK in your app
-- `hybrid` — both, with some calls sent from the device and the rest from the
-  server
-
-Five source types accept all three modes; `react_native` and `flutter` accept
-cloud and device; the rest are cloud only — see [Source types](#source-types).
-
-Each key below is badged with where it applies. Platforms follow the badge where
-support is limited to some of them. A key is accepted by `validate` whatever your
-sources use; the badges tell you where the setting takes effect.
-
-**Which mode you choose decides which credentials are required.** See
-[Credentials](#credentials) below — this is the part of Braze's config most
-likely to fail validation.
-
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: braze
+  name: braze-prod
 spec:
-  id: braze
-  display_name: Braze
+  id: braze-prod
+  display_name: Braze Production
   type: braze
   definition_version: 1
   enabled: true
   config:
     data_center: US-03
     rest_api_key: "{{ .BRAZE_REST_API_KEY }}"
+    use_platform_specific_api_keys: false
+    app_key: "{{ .BRAZE_APP_KEY }}"
 
-    use_platform_specific_api_keys: true
-    web_api_key: "{{ .BRAZE_WEB_API_KEY }}"
-    android_api_key: "{{ .BRAZE_ANDROID_API_KEY }}"
-    ios_api_key: "{{ .BRAZE_IOS_API_KEY }}"
-
-    support_dedup: true
-    enable_subscription_group_in_group_call: true
+    enable_subscription_group_in_group_call: false
     enable_nested_array_operations: false
-    send_purchase_event_with_extra_properties: true
+    send_purchase_event_with_extra_properties: false
     use_ecommerce_recommended_events: true
+    support_dedup: true
 
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Product Viewed
-
-    # Device mode (web)
-    track_anonymous_user:
-      web: true
     enable_braze_logging:
       web: false
     enable_push_notification:
       web: true
     allow_user_supplied_javascript:
       web: false
+    track_anonymous_user:
+      web: true
 
     connection_mode:
       web: hybrid
-      android: device
-      ios: device
+      ios_swift: device
       cloud: cloud
     consent_management:
       web:
@@ -85,251 +52,259 @@ spec:
             - marketing
 ```
 
-## Credentials
-
-Which keys are required depends on the modes declared in `connection_mode`, and
-on whether you use one app key or platform-specific ones.
-
-| Situation | Required |
-| --- | --- |
-| Any source type in `cloud` or `hybrid` | `rest_api_key` |
-| Any source type in `device` or `hybrid`, with `use_platform_specific_api_keys` unset or `false` | `app_key` |
-| Any of `web` in `device` or `hybrid`, with `use_platform_specific_api_keys` `true` | `web_api_key` |
-| Any of `android`, `android_kotlin`, `react_native`, `flutter` in `device` or `hybrid`, with `use_platform_specific_api_keys` `true` | `android_api_key` |
-| Any of `ios`, `ios_swift`, `react_native`, `flutter` in `device` or `hybrid`, with `use_platform_specific_api_keys` `true` | `ios_api_key` |
-
-`react_native` and `flutter` appear in both the Android and iOS rows: a source of
-either type running in device mode needs both platform keys.
-
-Separately, connecting any source to this destination requires `rest_api_key` to
-be present — see [Connecting a source](#connecting-a-source).
+The above example uses one app identifier key for every platform. Because some sources connect in `device` or `hybrid` mode and others in `cloud` or `hybrid`, it needs both `app_key` and `rest_api_key` — see [Key dependencies](#key-dependencies).
 
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
+### Key dependencies
 
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+Which keys Braze needs depends on the modes your sources connect in. Rudder CLI enforces each requirement below.
+
+| Key | Required when |
+| :-----| :-----|
+| `rest_api_key` | Any source connects in `cloud` or `hybrid` mode. Also checked per connection — see [Connect a source](#connect-a-source). |
+| `app_key` | `use_platform_specific_api_keys` is `false` and any source connects in `device` or `hybrid` mode |
+| `android_api_key` | `use_platform_specific_api_keys` is `true` and `android`, `android_kotlin`, `react_native`, or `flutter` connects in `device` or `hybrid` mode |
+| `ios_api_key` | `use_platform_specific_api_keys` is `true` and `ios`, `ios_swift`, `react_native`, or `flutter` connects in `device` or `hybrid` mode |
+| `web_api_key` | `use_platform_specific_api_keys` is `true` and `web` connects in `device` or `hybrid` mode |
+
+> [!WARNING]
+> Write `use_platform_specific_api_keys` out whenever a source connects in `device` or `hybrid` mode. When it's omitted, neither Rudder CLI nor the API asks for `app_key` or any platform key — so the spec validates and applies, and device mode has no app identifier key to load Braze with.
 
 ### Connection
 
 #### `data_center` — string, required
-`cloud` `device`
 
-Your Braze data center. One of `US-01` through `US-08`, `EU-01` through `EU-03`,
-or `AU-01`.
+Braze data center of your account — visible in your Braze dashboard URL.
 
-#### `rest_api_key` — string, secret
-`cloud`
+- One of `US-01` to `US-08`, `EU-01` to `EU-03`, or `AU-01`.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
+- The dashboard defaults this field to `US-01`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-Your Braze REST API key. **Required when any source type runs in `cloud` or
-`hybrid` mode.** At most 100 characters.
+#### `rest_api_key` — string, required, secret
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+Braze REST API key, used whenever RudderStack calls Braze from its servers.
 
-#### `app_key` — string
-`cloud` `device`
+- Required when any source connects in `cloud` or `hybrid` mode. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-Your Braze app key. **Required when any source type runs in `device` or `hybrid`
-mode and `use_platform_specific_api_keys` is unset or `false`.** At most 100
-characters.
+The key needs the `users.track` permission, among others.
 
-#### `use_platform_specific_api_keys` \* — boolean
-`device`
+### App identifier keys
 
-Use a separate Braze app key per platform instead of the single `app_key`. When
-`true`, the three keys below replace it.
+Braze's SDKs need an app identifier key. Use `app_key` for every platform, or set `use_platform_specific_api_keys: true` and give each platform its own key for separate attribution in Braze.
 
-#### `web_api_key` \* — string
-`device` · web
+#### `use_platform_specific_api_keys` — boolean
 
-Braze app key for web. **Required when `use_platform_specific_api_keys` is `true`
-and `web` runs in `device` or `hybrid` mode.** At most 100 characters.
+Use a separate app identifier key per platform instead of the single `app_key`. The dashboard marks this setting as beta and defaults it to `false`.
 
-#### `android_api_key` \* — string
-`device` · android, android_kotlin, react_native, flutter
+- Applies when a source connects in `device` or `hybrid` mode.
+- Has no default in Rudder CLI — see [Key dependencies](#key-dependencies).
 
-Braze app key for Android. **Required when `use_platform_specific_api_keys` is
-`true` and any Android-family source type runs in `device` or `hybrid` mode.** At
-most 100 characters.
+#### `app_key` — string, required, secret
 
-#### `ios_api_key` \* — string
-`device` · ios, ios_swift, react_native, flutter
+Braze default app identifier key, used for every platform.
 
-Braze app key for iOS. **Required when `use_platform_specific_api_keys` is `true`
-and any iOS-family source type runs in `device` or `hybrid` mode.** At most 100
-characters.
+- Required when `use_platform_specific_api_keys` is `false` and any source connects in `device` or `hybrid` mode.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-### Event delivery
+#### `android_api_key` — string, required, secret
 
-#### `support_dedup` — boolean, default `false`
-`cloud` `device` · android
+App identifier key for Android. React Native and Flutter apps use it for their Android builds.
 
-Deduplicate traits on `identify` and `track` calls, sending only values that
-changed since the previous call.
+- Required when `use_platform_specific_api_keys` is `true` and `android`, `android_kotlin`, `react_native`, or `flutter` connects in `device` or `hybrid` mode.
+- At most 100 characters, and must not contain line breaks. A template is accepted.
+
+#### `ios_api_key` — string, required, secret
+
+App identifier key for iOS. React Native and Flutter apps use it for their iOS builds.
+
+- Required when `use_platform_specific_api_keys` is `true` and `ios`, `ios_swift`, `react_native`, or `flutter` connects in `device` or `hybrid` mode.
+- At most 100 characters, and must not contain line breaks. A template is accepted.
+
+#### `web_api_key` — string, required, secret
+
+App identifier key for the web SDK.
+
+- Required when `use_platform_specific_api_keys` is `true` and `web` connects in `device` or `hybrid` mode.
+- At most 100 characters, and must not contain line breaks. A template is accepted.
+
+The dashboard describes falling back to `app_key` when a platform key is blank, but Rudder CLI and the API both require each platform key whose condition is met.
+
+### Event settings
 
 #### `enable_subscription_group_in_group_call` — boolean, default `false`
-`cloud`
 
-Enable subscription groups in `group` calls.
+Send the subscription group status in `group` events.
+
+- Applies to `cloud` mode only.
 
 #### `enable_nested_array_operations` — boolean, default `false`
-`cloud`
 
-Enable Braze's custom attribute operations for nested arrays.
+Use Braze's nested custom attributes to update custom attribute objects. The dashboard calls this **Use Custom Attributes Operation**.
+
+- Applies to `cloud` mode only.
 
 #### `send_purchase_event_with_extra_properties` — boolean, default `false`
-`cloud`
 
-Send purchase events with their custom properties attached.
+Include custom properties in purchase events.
 
-#### `use_ecommerce_recommended_events` \* — boolean, default `true`
-`cloud` `device`
+- Applies to `cloud` mode only.
 
-Map ecommerce events to Braze's recommended event names rather than sending them
-under their original names.
+#### `use_ecommerce_recommended_events` — boolean, default `true`
 
-#### `event_filtering` — object
-`device`
+Map RudderStack ecommerce `track` events such as **Product Viewed** and **Order Completed** to Braze's `ecommerce.*` recommended events. When `false`, they're sent as legacy custom and purchase events. The dashboard marks this setting as beta.
 
-Filter which events are sent to Braze in device or hybrid mode connections.
-Client-side filtering is applied by the SDK, so it has no effect on a cloud mode
-connection. Exactly one of the two lists may be set — declaring both fails
-validation.
+- Applies to both `cloud` and `device` mode.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+#### `support_dedup` — boolean, default `false`
 
-Each entry is at most 100 characters. Omit the block to send every event.
+Deduplicate traits on `identify` and `track` calls, using Braze's `/users/export/ids` API to fetch existing attributes. If Braze's rate limit is hit, RudderStack sends all attributes without deduplicating.
 
-## Device mode only
+### Web SDK settings
 
-The keys below configure the Braze Web SDK and apply only to a web source in
-device or hybrid mode. Each is an object with a single boolean `web` key.
-
-`validate` accepts these keys whatever sources the project connects, so you can
-declare them ahead of connecting a web source.
-
-#### `track_anonymous_user` — object
-`device` · web
-
-Track events for users who have not been identified.
+These keys configure Braze's web SDK, so they apply only when `connection_mode.web` is `device` or `hybrid`. Each is an object keyed by `web`, with a boolean value.
 
 #### `enable_braze_logging` — object
-`device` · web
 
-Surface Braze SDK logs in the browser console.
+Show Braze SDK logs in the browser console.
+
+- `web` — boolean.
 
 #### `enable_push_notification` — object
-`device` · web
 
-Enable web push notifications. Requires a service worker set up in your
-application.
+Use Braze web push notifications. Requires a service worker on your site.
+
+- `web` — boolean.
 
 #### `allow_user_supplied_javascript` — object
-`device` · web
 
-Enable HTML in-app messages, which may contain user-supplied JavaScript.
+Enable HTML in-app messages, which can run JavaScript you supply in Braze.
 
-## Source types
+- `web` — boolean.
 
-| Source type | Modes |
-| --- | --- |
-| `web` | cloud, device, hybrid |
-| `android` | cloud, device, hybrid |
-| `android_kotlin` | cloud, device, hybrid |
-| `ios` | cloud, device, hybrid |
-| `ios_swift` | cloud, device, hybrid |
-| `react_native` | cloud, device |
-| `flutter` | cloud, device |
-| `unity` | cloud |
-| `cordova` | cloud |
-| `cloud` | cloud |
+#### `track_anonymous_user` — object
 
-## Per-source keys
+Track activity from anonymous users and send it to Braze.
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+- `web` — boolean.
+
+### Event filtering
+
+> [!WARNING]
+> Client-side event filtering applies only to sources connected in `device` mode — the dashboard shows these controls only then, and the SDK is what applies the filter. Rudder CLI accepts the block in any mode, but it has no effect on cloud-mode events, or on the events hybrid mode sends through the API.
+
+#### `event_filtering` — object
+
+Restricts which `track` events the SDK passes to Braze, by event name.
+
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+
+### Per-source keys
+
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
 #### `connection_mode` — object
 
-Selects the mode per source type. Values are constrained to the modes that source
-type supports, so `hybrid` is rejected for `react_native`, `flutter`, `unity`,
-`cordova` and `cloud`:
+Maps each source type you connect to the mode its events reach Braze in, using the modes in [Source types](#source-types). It also decides which API and app identifier keys are required.
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
+- A mode the source type doesn't support on this destination fails validation — for example `hybrid` for `react_native`.
 
 ```yaml
 connection_mode:
   web: hybrid
-  android: device
+  ios_swift: device
+  react_native: device
   cloud: cloud
 ```
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against three rules at
-`validate` time.
+Braze accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud`, `device`, `hybrid` |
+| `android_kotlin` | `cloud`, `device`, `hybrid` |
+| `ios` | `cloud`, `device`, `hybrid` |
+| `ios_swift` | `cloud`, `device`, `hybrid` |
+| `web` | `cloud`, `device`, `hybrid` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud`, `device` |
+| `flutter` | `cloud`, `device` |
+| `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'braze' (type 'braze') does not support source 'my-source':
+In `hybrid` mode, RudderStack sends every user-generated event — `identify`, `track`, `page`, `screen`, `group`, and `alias` — through Braze's REST API, and loads Braze's SDK only for what needs it, such as in-app messages and push notifications.
+
+`react_native` and `flutter` device mode covers their Android and iOS builds only. A Flutter app deployed to the web can reach Braze in `cloud` mode only.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers Braze to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against three rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'braze-prod' (type 'braze') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'braze' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'braze-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-**The config must carry `rest_api_key`.** Unlike most destinations, Braze
-declares a config key that a source needs in order to connect at all — every
-source type requires `rest_api_key` in `cloud` mode, and the five hybrid-capable
-types require it in `hybrid` mode too:
+**A source connecting in `cloud` or `hybrid` mode needs `rest_api_key`.** Device-mode connections don't. Without it:
 
+```text
+destination 'braze-prod' config is missing fields required to connect a 'cloud' source: rest_api_key
 ```
-destination 'braze' config is missing fields required to connect a 'web' source:
-rest_api_key
-```
+
+The app identifier keys aren't checked per connection — they're covered by the destination-level rules in [Key dependencies](#key-dependencies).
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it, and `rest_api_key`.
 
 ## Secrets
 
-`rest_api_key` is the only key registered as a secret. Write it as a `{{ .VAR }}`
-reference and supply the value at apply time:
+Rudder CLI treats five keys as secrets: `rest_api_key`, `app_key`, `android_api_key`, `ios_api_key`, and `web_api_key`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-rest_api_key: "{{ .BRAZE_REST_API_KEY }}"
+config:
+  rest_api_key: "{{ .BRAZE_REST_API_KEY }}"
+  app_key: "{{ .BRAZE_APP_KEY }}"
 ```
 
-```sh
-export RUDDER_BRAZE_REST_API_KEY=...
+```bash
+export RUDDER_BRAZE_REST_API_KEY="..."
+export RUDDER_BRAZE_APP_KEY="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes `rest_api_key` back as a `{{ .VAR }}` placeholder
-rather than its value, since the API does not return secrets. Fill the
-placeholder in before the first apply.
+Note that:
 
-The app keys — `app_key`, `web_api_key`, `android_api_key` and `ios_api_key` —
-are not registered as secrets, because they are embedded in client-side
-applications and returned by the API. They are shown above as `{{ .VAR }}`
-references for consistency, but that is a convention rather than a requirement.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- In device and hybrid mode the app identifier keys are embedded in the app or page, so masking them protects your YAML, not the values themselves.

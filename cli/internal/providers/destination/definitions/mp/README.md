@@ -1,39 +1,22 @@
 # Mixpanel (`mp`)
 
-Streaming destination. Mixpanel receives events either from RudderStack's
-servers (cloud mode) or directly from the Mixpanel SDK loaded on your site
-(device mode, web only).
+Mixpanel is a product analytics destination. RudderStack sends events to Mixpanel's APIs from its servers, or — for web sources — through Mixpanel's own SDK in device mode.
 
-In a destination spec:
+In a Mixpanel destination spec:
 
 - `type: mp`
 - `definition_version: 1`
 
-## Modes
-
-The mode a source uses is set per source type in `config.connection_mode`. Only
-`web` accepts `device`; every other source type is cloud only — see
-[Source types](#source-types).
-
-Each key below is badged with where it applies:
-
-- `cloud` — events sent from RudderStack's servers
-- `device` — events sent by the Mixpanel SDK; supported platforms follow the
-  badge where support is limited to some of them
-
-A key is accepted by `validate` whatever your sources use; the badges tell you
-where the setting takes effect.
-
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: mixpanel
+  name: mixpanel-prod
 spec:
-  id: mixpanel
-  display_name: Mixpanel
+  id: mixpanel-prod
+  display_name: Mixpanel Production
   type: mp
   definition_version: 1
   enabled: true
@@ -41,60 +24,29 @@ spec:
     token: "{{ .MIXPANEL_TOKEN }}"
     data_residency: us
     identity_merge_api: simplified
-    project_id: "2100000"
-    service_account_user_name: rudder-service-account
-    service_account_secret: "{{ .MIXPANEL_SERVICE_ACCOUNT_SECRET }}"
-
-    user_deletion_api: task
-    gdpr_api_token: "{{ .MIXPANEL_GDPR_API_TOKEN }}"
 
     use_user_defined_page_event_name: true
-    user_defined_page_event_template: "Viewed a Page"
+    user_defined_page_event_template: "Viewed {{ category }} {{ name }} page"
     use_user_defined_screen_event_name: false
-    user_defined_screen_event_template: "Viewed a Screen"
 
-    people: true
     set_once_properties:
       - signup_date
-    union_properties:
-      - viewed_categories
-    append_properties:
-      - recent_searches
     prop_increments:
-      - login_count
+      - purchase_count
     group_key_settings:
       - company_id
+
+    strict_mode: false
     drop_traits_in_track_event: false
-
-    strict_mode: true
-    use_new_mapping: false
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Product Viewed
-
-    # Device mode (web)
-    consolidated_page_calls: true
-    track_categorized_pages: false
-    track_named_pages: false
-    set_all_traits_by_default: false
-    super_properties:
-      - plan
-    people_properties:
-      - email
-    event_increments:
-      - Order Completed
-    persistence_type: localStorage
-    persistence_name: rudder_mp
-    cross_subdomain_cookie: false
-    secure_cookie: true
-    ignore_dnt: false
-    source_name: my-website
-    session_replay_percentage:
-      web: "10"
+    union_properties:
+      - interests
+    append_properties:
+      - viewed_plans
+    use_new_mapping: true
+    user_deletion_api: engage
 
     connection_mode:
-      web: device
+      web: cloud
       cloud: cloud
     consent_management:
       web:
@@ -103,270 +55,248 @@ spec:
             - analytics
 ```
 
+The above example connects everything in `cloud` mode, so it omits the web SDK settings, which apply only to web sources in `device` mode — see [Web device mode](#web-device-mode).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+> [!NOTE]
+> Mixpanel settings split by connection mode. The groups below say which mode each key affects. Rudder CLI accepts every key whatever the mode — a key for the other mode is stored and ignored.
 
 ### Connection
 
 #### `token` — string, required, secret
-`cloud` `device` · web
 
-Mixpanel API token. At most 100 characters.
+Your Mixpanel project token, from **Project Settings** > **Access Keys** in Mixpanel.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `data_residency` — string, required
-`cloud` `device` · web
 
-Mixpanel server region. One of `us`, `eu` or `in`.
+Region of the Mixpanel servers RudderStack sends data to.
+
+- One of `us`, `eu`, or `in`.
+- The dashboard defaults this field to `us`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
 #### `identity_merge_api` — string, required
-`cloud` `device` · web
 
-Mixpanel identity merge type. One of `simplified` or `original`.
+Mixpanel ID merge API used to tie user activity together across devices.
 
-#### `project_id` \* — string
-`cloud`
+- `simplified` or `original`. If you choose `simplified`, turn on Simplified ID Merge for your project in Mixpanel first.
+- The dashboard defaults this field to `original`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-Mixpanel project ID, used by the server-side user deletion API.
+### Event naming
 
-#### `service_account_user_name` \* — string
-`cloud`
-
-Username of the Mixpanel service account used for server-side API calls.
-
-#### `service_account_secret` \* — string, secret
-`cloud`
-
-Secret of the Mixpanel service account. Supply it as a `{{ .VAR }}` reference.
-
-### User deletion
-
-#### `user_deletion_api` \* — string, default `engage`
-`cloud`
-
-Which Mixpanel API handles user deletion requests. One of `engage` or `task`.
-
-#### `gdpr_api_token` \* — string, secret
-`cloud`
-
-Token for Mixpanel's GDPR deletion API. **Required when `user_deletion_api` is
-`task`.** At most 100 characters. Supply it as a `{{ .VAR }}` reference.
-
-### Page and screen tracking
+These keys apply in both modes.
 
 #### `use_user_defined_page_event_name` — boolean, default `false`
-`cloud` `device` · web
 
-Use a user-defined event name for `page` calls.
+Name `page` events from `user_defined_page_event_template` instead of the default name.
 
 #### `user_defined_page_event_template` — string, default `Viewed {{ category }} {{ name }} page`
-`cloud` `device` · web
 
-Template for the user-defined page event name. **Required when
-`use_user_defined_page_event_name` is `true`.** At most 200 characters.
+Template for `page` event names. Each `{{ field }}` is replaced with that field from the event — `category` from `properties.category`, and `name` from the event name.
+
+- Applies when `use_user_defined_page_event_name` is `true`. Omitting it uses the default template; an explicit empty string fails validation.
+- At most 200 characters, and must not contain line breaks.
+- `{{ category }}`-style fields have no leading dot, so Rudder CLI's variable substitution leaves them alone.
+
+With the default template, a `page` event named `Home` with `properties.category: Integration` becomes `Viewed Integration Home page`.
 
 #### `use_user_defined_screen_event_name` — boolean, default `false`
-`cloud`
 
-Use a user-defined event name for `screen` calls.
+Name `screen` events from `user_defined_screen_event_template` instead of the default name.
 
 #### `user_defined_screen_event_template` — string, default `Viewed {{ category }} {{ name }} screen`
-`cloud`
 
-Template for the user-defined screen event name. **Required when
-`use_user_defined_screen_event_name` is `true`.** At most 200 characters.
+Template for `screen` event names, on the same terms as `user_defined_page_event_template`.
 
-### Traits and properties
+- Applies when `use_user_defined_screen_event_name` is `true`. Omitting it uses the default template; an explicit empty string fails validation.
+- At most 200 characters, and must not contain line breaks.
 
-Each list below takes trait or property names, at most 100 characters per entry.
+### User profiles and groups
 
-#### `people` — boolean, default `false`
-`cloud` `device` · web
+These keys apply in both modes. Each takes an array of property or trait names, each at most 100 characters or a `{{ path || fallback }}` template.
 
-Send all `identify` calls to Mixpanel's People feature.
+#### `set_once_properties` — array of strings
 
-#### `set_once_properties` — string array
-`cloud` `device` · web
+`identify` traits Mixpanel sets on a user profile once and never overwrites.
 
-Properties to set only once.
+#### `prop_increments` — array of strings
 
-#### `union_properties` — string array
-`cloud`
+Numeric properties to increment on the user's Mixpanel People profile.
 
-Properties to union.
+#### `group_key_settings` — array of strings
 
-#### `append_properties` — string array
-`cloud`
+Group keys that identify groups in Mixpanel. RudderStack sends `group` calls only when at least one key is listed.
 
-Properties to append.
+### Cloud mode
 
-#### `prop_increments` — string array
-`cloud` `device` · web
-
-Properties to increment in People.
-
-#### `group_key_settings` — string array
-`cloud` `device` · web
-
-Group keys.
-
-#### `drop_traits_in_track_event` — boolean, default `false`
-`cloud`
-
-Drop traits from `track` event calls.
-
-### Other
+These keys apply to events sent in `cloud` mode. The dashboard shows them only when the destination has a cloud-mode connection.
 
 #### `strict_mode` — boolean, default `false`
-`cloud`
 
-Enable Mixpanel's strict mode, which rejects malformed events rather than
-accepting them silently.
+Have Mixpanel validate each request and return an error for every event that fails, rather than accepting what it can.
+
+#### `drop_traits_in_track_event` — boolean, default `false`
+
+Drop the persisted user traits (`context.traits`) from `track` events. When `false`, they're sent alongside the event properties.
+
+#### `union_properties` — array of strings
+
+`identify` traits whose values are added to a list property on the profile only if not already present.
+
+#### `append_properties` — array of strings
+
+`identify` traits whose values are appended to a list property on the profile.
 
 #### `use_new_mapping` — boolean, default `false`
-`cloud`
 
-Map camelCase fields to snake_case when sending to Mixpanel.
+Send name traits in snake case — `$first_name` and `$last_name` — instead of the older `$firstName` and `$lastName`. The old mapping is being deprecated, so turn this on.
 
-#### `event_filtering` — object
-`cloud` `device`
+#### `user_deletion_api` — string, default `engage`
 
-Determine which events are blocked or allowed to flow through to Mixpanel.
-Exactly one of the two lists may be set — declaring both fails validation.
+Mixpanel API RudderStack uses to delete a user.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+- `engage` — deletes the user profile but keeps its events.
+- `task` — deletes the profile and its events. Needs `gdpr_api_token`.
 
-Each entry is at most 100 characters. Omit the block to send every event.
+#### `gdpr_api_token` — string, required, secret
 
-## Device mode only
+Mixpanel GDPR API token, used to delete a user's profile and events.
 
-The keys below configure the Mixpanel SDK and apply only to a web source in
-device mode.
+- Required when `user_deletion_api` is `task`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-`validate` accepts these keys whatever sources the project connects, so you can
-declare them ahead of connecting a web source.
+#### `service_account_user_name` — string, secret, internal
 
-### Page tracking
+Username of a Mixpanel service account.
 
-#### `consolidated_page_calls` — boolean, default `true`
-`device` · web
+- Not validated locally.
 
-Track a `Loaded a Page` event for every `page` call. On by default, matching
-Mixpanel's own recommendation.
+This key, `service_account_secret`, and `project_id` are a Mixpanel service account credential, used together. `token` is required either way, so set these only if your destination already uses them.
 
-#### `track_categorized_pages` — boolean, default `false`
-`device` · web
+#### `service_account_secret` — string, secret, internal
 
-Track events for `page` calls that carry a category — `page('Docs', 'Index')`
-becomes `Viewed Docs Index Page`.
+Secret of the Mixpanel service account named in `service_account_user_name`.
 
-#### `track_named_pages` — boolean, default `false`
-`device` · web
+- Not validated locally.
 
-Track events for `page` calls that carry a name — `page('Signup')` becomes
-`Viewed Signup Page`.
+#### `project_id` — string, internal
 
-### Traits and properties
+Mixpanel project ID, sent with service account authentication.
+
+- Not validated locally.
+
+### Web device mode
+
+These keys configure Mixpanel's SDK in the browser, so they apply only to web sources connected in `device` mode.
+
+#### `people` — boolean, default `false`
+
+Send `identify` calls to Mixpanel People. This is what the dashboard calls **Use Mixpanel People**.
 
 #### `set_all_traits_by_default` — boolean, default `false`
-`device` · web
 
-Set all traits on `identify` calls as super properties, and as people properties
-when `people` is also enabled.
+Set every `identify` trait as a super property, and — when `people` is `true` — as a People property too.
 
-#### `super_properties` — string array
-`device` · web
+#### `super_properties` — array of strings
 
-Properties to send as super properties. Each entry at most 100 characters.
+Event properties to set as Mixpanel super properties.
 
-#### `people_properties` — string array
-`device` · web
+#### `people_properties` — array of strings
 
-Traits to set as People properties. Each entry at most 100 characters.
+`identify` traits to set as Mixpanel People properties.
 
-#### `event_increments` — string array
-`device` · web
+#### `event_increments` — array of strings
 
-Events to increment in People. Each entry at most 100 characters.
+Event names whose occurrences are counted on the user's People profile.
 
-### Cookies and persistence
+#### `consolidated_page_calls` — boolean, default `true`
 
-#### `persistence_type` — string, default `cookie`
-`device` · web
+Send every `page` call as a `Loaded a Page` event. Mixpanel recommends leaving this on.
 
-Where the Mixpanel SDK persists its state. One of `none`, `cookie` or
-`localStorage`.
+#### `track_categorized_pages` — boolean, default `false`
 
-#### `persistence_name` — string
-`device` · web
+Also send an event for each `page` call that has a category — `page("Docs", "Index")` becomes `Viewed Docs Index Page`.
 
-Name of the Mixpanel persistence store. At most 100 characters.
+#### `track_named_pages` — boolean, default `false`
 
-#### `cross_subdomain_cookie` — boolean, default `false`
-`device` · web
-
-Allow the Mixpanel cookie to persist across subdomains of your application.
-
-#### `secure_cookie` — boolean, default `false`
-`device` · web
-
-Mark the Mixpanel cookie as secure, so it is only transmitted over HTTPS.
-
-### Other
-
-#### `ignore_dnt` — boolean, default `false`
-`device` · web
-
-Ignore the browser's "Do Not Track" setting.
+Also send an event for each `page` call that has a name — `page("Signup")` becomes `Viewed Signup Page`.
 
 #### `source_name` — string
-`device` · web
 
-When set, sent as `rudderstack_source_name` on every event, page and screen
-call. At most 100 characters.
+Value sent as `rudderstack_source_name` with every event, `page`, and `screen` call.
+
+- At most 100 characters, or a `{{ path || fallback }}` template.
 
 #### `session_replay_percentage` — object
-`device` · web
 
-Percentage of SDK initialisations that qualify for session replay capture.
-Object with a single `web` key, written as a digit string.
+Percentage of SDK initializations that qualify for session replay, sent to Mixpanel as `record_sessions_percent`. When unset, no sessions are recorded.
 
-## Source types
+- Keyed by `web`, the only source type it applies to.
+- The value is a whole number from `0` to `100`, written as a string — `"20"`, not `20`. A template is accepted.
 
-| Source type | Modes |
-| --- | --- |
-| `web` | cloud, device |
-| `android` | cloud |
-| `android_kotlin` | cloud |
-| `ios` | cloud |
-| `ios_swift` | cloud |
-| `unity` | cloud |
-| `react_native` | cloud |
-| `flutter` | cloud |
-| `cordova` | cloud |
-| `cloud` | cloud |
+```yaml
+session_replay_percentage:
+  web: "20"
+```
 
-## Per-source keys
+#### `ignore_dnt` — boolean, default `false`
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+Have Mixpanel's SDK ignore the browser's **Do Not Track** setting.
 
-#### `connection_mode` \* — object
+#### `cross_subdomain_cookie` — boolean, default `false`
 
-Selects the mode per source type. Values are constrained to the modes that
-source type supports, so `device` is rejected for every type except `web`:
+Persist the Mixpanel cookie across subdomains of your site.
+
+#### `persistence_type` — string, default `cookie`
+
+Where Mixpanel's SDK persists its state.
+
+- `none`, `cookie`, or `localStorage`. With `localStorage`, an existing Mixpanel cookie of the same name is moved into local storage.
+
+#### `persistence_name` — string
+
+Suffix added to the Mixpanel cookie name.
+
+- At most 100 characters, or a `{{ path || fallback }}` template.
+
+#### `secure_cookie` — boolean, default `false`
+
+Mark the Mixpanel cookie as secure, so it's sent only over HTTPS.
+
+### Event filtering
+
+> [!WARNING]
+> Client-side event filtering is applied by the RudderStack SDK, so it affects only web sources connected in `device` mode. Events sent in `cloud` mode aren't filtered by it.
+
+#### `event_filtering` — object
+
+Restricts which `track` events the SDK passes to Mixpanel, by event name.
+
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+
+### Per-source keys
+
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
+
+#### `connection_mode` — object
+
+Maps each source type you connect to the mode its events reach Mixpanel in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
+- A mode the source type doesn't support on this destination fails validation — for example `device` for `android`.
 
 ```yaml
 connection_mode:
@@ -376,53 +306,74 @@ connection_mode:
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Mixpanel accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud`, `device` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'mixpanel' (type 'mp') does not support source 'my-source':
+Only `web` offers `device` mode, which loads Mixpanel's SDK in the browser. In `cloud` mode Mixpanel accepts `alias`, `group`, `identify`, `page`, `screen`, and `track`; in `device` mode, web sources send `alias`, `group`, `identify`, `page`, and `track`.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers Mixpanel to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'mixpanel-prod' (type 'mp') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'mixpanel' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'mixpanel-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-Mixpanel requires no additional config keys to connect a source of any type.
+Mixpanel needs no additional config keys to connect a source of any type, in any mode.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`token`, `service_account_secret` and `gdpr_api_token` are secret keys. Write
-each as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats four keys as secrets: `token`, `gdpr_api_token`, `service_account_user_name`, and `service_account_secret`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-token: "{{ .MIXPANEL_TOKEN }}"
-service_account_secret: "{{ .MIXPANEL_SERVICE_ACCOUNT_SECRET }}"
-gdpr_api_token: "{{ .MIXPANEL_GDPR_API_TOKEN }}"
+config:
+  token: "{{ .MIXPANEL_TOKEN }}"
+  gdpr_api_token: "{{ .MIXPANEL_GDPR_TOKEN }}"
 ```
 
-```sh
-export RUDDER_MIXPANEL_TOKEN=...
+```bash
+export RUDDER_MIXPANEL_TOKEN="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes each back as a `{{ .VAR }}` placeholder rather than
-its value, since the API does not return secrets. Fill the placeholders in
-before the first apply.
+Note that:
+
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- Like every secret key, these show as changed on each plan and are re-sent on apply, because Rudder CLI never compares secrets with the remote. That's expected, not drift.
+- In device mode the project token is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself.

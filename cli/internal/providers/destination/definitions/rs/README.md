@@ -1,44 +1,28 @@
 # Amazon Redshift (`rs`)
 
-Warehouse destination. RudderStack stages events as files in an S3 bucket, then
-loads them into a Redshift cluster or serverless workgroup on a schedule. Every
-supported source type connects in cloud mode — there is no device-mode variant.
+Amazon Redshift is a warehouse destination. RudderStack stages events as files in S3, then loads them into a Redshift cluster or Serverless workgroup on a schedule.
 
-In a destination spec:
+In an Amazon Redshift destination spec:
 
 - `type: rs`
 - `definition_version: 1`
 
-## Choosing your setup
-
-Three independent switches decide which keys you need. Each is required or
-defaulted, so every spec makes all three choices explicitly or by default.
-
-| Switch | Options |
-| --- | --- |
-| `use_iam_for_auth` | password-based connection, or IAM |
-| `use_serverless` (IAM only) | provisioned cluster, or serverless workgroup |
-| `use_rudder_storage` | RudderStack-hosted staging bucket, or your own S3 bucket |
-
-## Example
-
-IAM authentication against a provisioned cluster, staging through your own
-bucket with a role:
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: redshift
+  name: redshift-prod
 spec:
-  id: redshift
-  display_name: Amazon Redshift
+  id: redshift-prod
+  display_name: Redshift Production
   type: rs
   definition_version: 1
   enabled: true
   config:
     database: analytics
-    user: rudderstack
+    user: "{{ .REDSHIFT_USER }}"
     namespace: rudder_events
 
     use_iam_for_auth: true
@@ -47,12 +31,15 @@ spec:
     use_serverless: false
     cluster_id: analytics-cluster
 
-    use_ssh: true
-    ssh:
-      host: bastion.example.com
-      port: "22"
-      user: rudder
-      public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5rudder rudder@example"
+    use_ssh: false
+
+    use_rudder_storage: false
+    bucket_name: acme-redshift-staging
+    prefix: rudder
+    role_based_auth: true
+    iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3"
+    enable_sse: false
+    cleanup_object_storage_files: false
 
     sync_frequency: "180"
     sync_start_at: "01:00"
@@ -60,24 +47,17 @@ spec:
       start_time: "02:00"
       end_time: "03:00"
 
-    skip_tracks_table: false
-    skip_users_table: true
     prefer_append: true
+    skip_users_table: true
+    skip_tracks_table: false
     json_paths: context.traits,properties.metadata
+
     underscore_divide_numbers: false
     allow_users_context_traits: false
 
-    use_rudder_storage: false
-    bucket_name: my-rudder-staging
-    prefix: rudder/events
-    role_based_auth: true
-    iam_role_arn: "arn:aws:iam::123456789012:role/RudderStackS3"
-    enable_sse: true
-    cleanup_object_storage_files: false
-
     connection_mode:
-      cloud: cloud
       web: cloud
+      cloud: cloud
     consent_management:
       web:
         - provider: oneTrust
@@ -85,216 +65,302 @@ spec:
             - analytics
 ```
 
+The above example connects to a provisioned cluster with IAM authentication and stages files in your own bucket through an IAM role, so it carries no password or access keys. Which keys apply depends on several switches — see [Key dependencies](#key-dependencies).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
+### Key dependencies
 
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+`use_iam_for_auth`, `use_serverless`, `use_rudder_storage`, `role_based_auth`, and `use_ssh` decide which other keys apply. Rudder CLI enforces the requirements marked **Enforced**; the rest are accepted whatever the switch says, so a key that doesn't apply is stored and ignored.
+
+| Key | Applies when | Required then |
+| :-----| :-----| :-----|
+| `host`, `port`, `password` | `use_iam_for_auth` is `false` | Enforced |
+| `iam_role_arn_for_auth`, `cluster_region` | `use_iam_for_auth` is `true` | Enforced |
+| `cluster_id` | `use_iam_for_auth` is `true` and `use_serverless` is `false` | Enforced |
+| `workgroup_name` | `use_iam_for_auth` is `true` and `use_serverless` is `true` | Enforced |
+| `ssh` | `use_ssh` is `true` | Enforced, all four fields |
+| `bucket_name` | `use_rudder_storage` is `false` | Enforced |
+| `iam_role_arn` | `use_rudder_storage` is `false` and `role_based_auth` is `true`, which is the default | Enforced |
+| `prefix`, `role_based_auth`, `enable_sse`, `cleanup_object_storage_files` | `use_rudder_storage` is `false` | No |
+| `access_key_id`, `access_key` | `use_rudder_storage` is `false` and `role_based_auth` is `false` | No |
+
+> [!WARNING]
+> `validate` fills in defaults before it checks the spec, so an omitted key is checked as though you had written its default. Two keys are worth knowing about:
+>
+> - Omitting `use_serverless` selects a provisioned cluster, which makes `cluster_id` required.
+> - With your own storage, omitting `role_based_auth` selects role-based authentication, which makes `iam_role_arn` required.
 
 ### Connection
 
 #### `database` — string, required
 
-The database name in your Redshift instance where the data will be sent. At most
-100 characters.
+Name of the Redshift database RudderStack loads data into.
 
-#### `user` — string, required
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-The name of the user with read/write access to that database. At most 100
-characters.
+#### `user` — string, required, secret
+
+Database user with read and write access to `database`.
+
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
 #### `namespace` — string
 
-The schema name where RudderStack creates all its tables. Defaults to the source
-name when omitted.
+Schema RudderStack creates its tables in. Defaults to the source name when omitted.
+
+- At most 64 characters, and must not start with `pg_` in any capitalization.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
+- The Redshift setup guide says the namespace can't be changed later, so treat it as fixed. Unlike BigQuery's, it isn't marked immutable in the API schema, so a change isn't rejected.
 
 ### Authentication
 
-`use_iam_for_auth` selects between the two paths and decides which keys below are
-required.
+`use_iam_for_auth` selects between a database password and the RudderStack IAM role. With IAM, `use_serverless` then selects between a provisioned cluster and a Serverless workgroup.
 
-#### `use_iam_for_auth` \* — boolean, required
+#### `use_iam_for_auth` — boolean, required
 
-Authenticate with an IAM role rather than a host, port and password. Required —
-there is no default, so every spec states which path it uses.
+Authenticate with the RudderStack IAM role instead of a database password.
 
-#### `host` — string
+- The dashboard defaults this field to `false`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-The host name of your Redshift service. **Required when `use_iam_for_auth` is
-`false`.**
+#### `host` — string, required
 
-#### `port` — string
+Hostname of the Redshift cluster endpoint.
 
-The port associated with the Redshift database instance. **Required when
-`use_iam_for_auth` is `false`.** At most 100 characters.
+- Required when `use_iam_for_auth` is `false`. Leave it unset otherwise.
+- 1 to 255 characters, and must not contain line breaks. An `ngrok.io` host is rejected.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-#### `password` — string, secret
+#### `port` — string, required
 
-The password for the user above. **Required when `use_iam_for_auth` is `false`.**
+Port of the Redshift cluster endpoint, written as a string — `"5439"`, not `5439`.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+- Required when `use_iam_for_auth` is `false`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
 
-#### `iam_role_arn_for_auth` \* — string
+#### `password` — string, required, secret
 
-ARN of the IAM role RudderStack assumes to connect. **Required when
-`use_iam_for_auth` is `true`.** At most 100 characters.
+Password for `user`.
 
-#### `cluster_region` \* — string
+- Required when `use_iam_for_auth` is `false`. Leave it unset otherwise.
 
-AWS region your Redshift cluster or workgroup runs in. **Required when
-`use_iam_for_auth` is `true`.** At most 255 characters.
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
-#### `use_serverless` \* — boolean, default `false`
+#### `iam_role_arn_for_auth` — string, required
 
-Connect to a Redshift Serverless workgroup rather than a provisioned cluster.
-**Required when `use_iam_for_auth` is `true`.**
+ARN of the RudderStack IAM role used to obtain database credentials.
 
-#### `cluster_id` \* — string
+- Required when `use_iam_for_auth` is `true`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-Identifier of the provisioned Redshift cluster. **Required when
-`use_iam_for_auth` is `true` and `use_serverless` is `false`.** At most 255
-characters.
+#### `cluster_region` — string, required
 
-#### `workgroup_name` \* — string
+AWS region of the cluster or workgroup — for example `us-east-1`.
 
-Name of the Redshift Serverless workgroup. **Required when `use_iam_for_auth` is
-`true` and `use_serverless` is `true`.** At most 255 characters.
+- Required when `use_iam_for_auth` is `true`. Leave it unset otherwise.
+- 1 to 255 characters, and must not contain line breaks.
+
+#### `use_serverless` — boolean, default `false`
+
+Connect to a Redshift Serverless workgroup instead of a provisioned cluster.
+
+- Applies when `use_iam_for_auth` is `true`.
+
+See [Key dependencies](#key-dependencies) for what omitting it makes required.
+
+#### `cluster_id` — string, required
+
+Identifier of the provisioned Redshift cluster.
+
+- Required when `use_iam_for_auth` is `true` and `use_serverless` is `false`. Leave it unset otherwise.
+- 1 to 255 characters, and must not contain line breaks.
+
+#### `workgroup_name` — string, required
+
+Name of the Redshift Serverless workgroup.
+
+- Required when `use_iam_for_auth` is `true` and `use_serverless` is `true`. Leave it unset otherwise.
+- 1 to 255 characters, and must not contain line breaks.
 
 ### SSH tunnel
 
-#### `use_ssh` \* — boolean, default `false`
+> [!NOTE]
+> SSH tunneling is available on the Enterprise plan.
 
-Reach Redshift through an SSH tunnel rather than connecting directly.
+#### `use_ssh` — boolean, default `false`
 
-#### `ssh` \* — object
+Connect to Redshift through an SSH tunnel via a bastion host.
 
-SSH tunnel settings, grouped under one block. **All four fields are required when
-`use_ssh` is `true`**, including when the block itself is omitted:
+#### `ssh` — object, required
 
-- `host` — bastion host name, at most 100 characters
-- `port` — bastion port, at most 100 characters
-- `user` — SSH user, at most 100 characters
-- `public_key` — the SSH public key
+Bastion host connection details.
 
-### Sync scheduling
+- Required when `use_ssh` is `true`, with all four fields. Leave it unset otherwise.
+- `host` — IP address or hostname of the bastion host. At most 100 characters.
+- `port` — SSH port of the bastion host, as a string. At most 100 characters.
+- `user` — user RudderStack logs in to the bastion host as. **Secret** — see [Secrets](#secrets).
+- `public_key` — the public key RudderStack generates for this destination.
 
-#### `sync_frequency` \* — string, required
+```yaml
+use_ssh: true
+ssh:
+  host: 203.0.113.10
+  port: "22"
+  user: "{{ .REDSHIFT_SSH_USER }}"
+  public_key: "ssh-rsa AAAA..."
+```
 
-How often RudderStack syncs staged events into the warehouse, in minutes.
-Written as a string. One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720` or
-`1440`.
+RudderStack holds the private key; add `public_key` to the bastion host's `authorized_keys`. The key comes from RudderStack, so the practical route is to enable SSH on the destination in the dashboard, then import it to pick up the value.
 
-#### `sync_start_at` \* — string
+### Object storage
 
-Time of day, in UTC, that anchors the sync schedule. Written as `HH:MM`. Not
-validated locally.
-
-#### `exclude_window` \* — object
-
-Daily window, in UTC, during which RudderStack does not sync. When present, both
-`start_time` and `end_time` are required. Neither format is validated locally.
-
-### Table behaviour
-
-#### `skip_tracks_table` \* — boolean, default `false`
-
-Skip sending event data to the `tracks` table.
-
-#### `skip_users_table` \* — boolean, default `true`
-
-Skip the `users` table, sending identify events only to `identifies`.
-
-#### `prefer_append` \* — boolean, default `true`
-
-Append rows on each sync rather than merging.
-
-#### `json_paths` \* — string
-
-Comma-separated dot-notation paths stored as JSON columns rather than flattened.
-
-### Internal flags
-
-Both keys below preserve the column naming of destinations created before the
-behaviour changed. Leave them at their defaults on a new destination.
-
-#### `underscore_divide_numbers` \* — boolean, default `false`
-
-When `false`, numeric suffixes in column names are preserved: `v3` stays `v3`
-rather than being split into `v_3`.
-
-#### `allow_users_context_traits` \* — boolean, default `false`
-
-When `false`, `context.traits.*` fields are stored only as `context_traits_*`
-columns rather than promoted to top-level traits.
-
-### Staging storage
-
-RudderStack writes files to S3 before loading them into Redshift.
-`use_rudder_storage` decides whose bucket that is.
+`use_rudder_storage` decides whether RudderStack stages files in its own bucket or in yours. The keys below it apply only to your own bucket.
 
 #### `use_rudder_storage` — boolean, required
 
-Use the RudderStack-hosted object storage rather than your own bucket.
+Stage files in RudderStack-managed object storage instead of your own S3 bucket.
 
-#### `bucket_name` — string
+- Available only on RudderStack-hosted data planes. Self-hosted data planes must set `false` and configure a bucket.
+- The dashboard defaults this field to `false`. Rudder CLI requires it explicitly.
 
-The name of your S3 bucket. **Required when `use_rudder_storage` is `false`.**
+#### `bucket_name` — string, required
 
-#### `prefix` \* — string
+Name of the staging S3 bucket. The bucket must already exist.
 
-Path prefix applied to files RudderStack writes into the bucket.
+- Required when `use_rudder_storage` is `false`. Leave it unset otherwise.
+- 3 to 63 characters: lowercase letters, digits, dots, and hyphens, starting and ending with a letter or digit. Must not start with `xn--`, contain consecutive dots, or look like an IPv4 address.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-#### `role_based_auth` \* — boolean, default `true`
+#### `prefix` — string
 
-Authenticate to the bucket with an IAM role rather than access keys.
+Folder prefix inside the staging bucket, at `s3://<bucket_name>/<prefix>/`.
 
-#### `iam_role_arn` \* — string
+- Applies when `use_rudder_storage` is `false`. Leave it unset otherwise.
+- At most 100 characters, with no whitespace.
 
-ARN of the IAM role used for bucket access. **Required when
-`use_rudder_storage` is `false` and `role_based_auth` is `true`.** At most 100
-characters.
+#### `role_based_auth` — boolean, default `true`
+
+Access the staging bucket with an IAM role (`iam_role_arn`) rather than an access key pair.
+
+- Applies when `use_rudder_storage` is `false`. Leave it unset otherwise.
+
+See [Key dependencies](#key-dependencies) for what leaving it at its default makes required.
+
+#### `iam_role_arn` — string, required
+
+ARN of the IAM role RudderStack assumes to read and write the staging bucket.
+
+- Required when `use_rudder_storage` is `false` and `role_based_auth` is `true`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
 
 #### `access_key_id` — string, secret
 
-Your AWS access key ID, used when `role_based_auth` is `false`. At most 100
-characters.
+AWS access key ID for the staging bucket.
+
+- Applies when `use_rudder_storage` is `false` and `role_based_auth` is `false`. Leave it unset otherwise.
+- Not required even then — neither Rudder CLI nor the API asks for it.
+- At most 100 characters, and must not contain line breaks.
 
 #### `access_key` — string, secret
 
-Your AWS secret access key, used when `role_based_auth` is `false`. At most 100
-characters.
+AWS secret access key matching `access_key_id`.
+
+- Applies on the same terms as `access_key_id`, and is likewise not required.
+- At most 100 characters, and must not contain line breaks.
+
+> [!WARNING]
+> Access key authentication is deprecated. Use `role_based_auth: true` with `iam_role_arn`.
 
 #### `enable_sse` — boolean, default `false`
 
-Enable server-side encryption on the staged objects.
+Enable server-side encryption on the staging bucket.
 
-#### `cleanup_object_storage_files` \* — boolean, default `false`
+- Applies when `use_rudder_storage` is `false`.
 
-Delete the staged files from the bucket after a sync completes successfully.
+#### `cleanup_object_storage_files` — boolean, default `false`
 
-## Source types
+Delete staged files from the bucket after a sync completes successfully.
 
-Every supported source type connects in cloud mode only:
+- Applies when `use_rudder_storage` is `false`.
 
-`web` · `android` · `android_kotlin` · `ios` · `ios_swift` · `unity` ·
-`react_native` · `flutter` · `cordova` · `cloud`
+### Sync scheduling
 
-## Per-source keys
+#### `sync_frequency` — string, required
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+How often RudderStack syncs staged events into Redshift, in minutes. Written as a string, not a number.
 
-#### `connection_mode` \* — object
+- One of `5`, `10`, `15`, `30`, `60`, `180`, `360`, `720`, or `1440`.
+- The dashboard defaults this field to `180`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-Selects the mode per source type. Every supported type accepts `cloud` only, so
-each entry's value is `cloud`:
+#### `sync_start_at` — string
+
+Time of day, in UTC, that anchors the sync schedule. Subsequent syncs are computed from it at `sync_frequency` intervals. Written as `HH:MM`.
+
+- Not validated locally: any string is accepted, and a value the scheduler can't parse silently yields no scheduled times.
+
+#### `exclude_window` — object
+
+Daily window, in UTC, during which RudderStack doesn't sync. Omit the block entirely to sync around the clock.
+
+- When present, both fields are required: `start_time` and `end_time`, each `HH:MM`.
+- Neither field's format is validated locally.
+
+```yaml
+exclude_window:
+  start_time: "02:00"
+  end_time: "03:00"
+```
+
+### Table behavior
+
+#### `prefer_append` — boolean, default `true`
+
+Append incoming events to existing tables. Set it to `false` to merge instead, which guarantees no duplicates at the cost of noticeably longer syncs. This is what the dashboard calls **Warehouse Append**.
+
+Appending can let duplicates through — most often SDK retries, and especially against data older than 7 days.
+
+#### `skip_users_table` — boolean, default `true`
+
+Send `identify` events only to the `identifies` table, skipping the `users` table. The `users` table holds one row per unique user and is maintained with a merge, which can add significant time to each sync.
+
+#### `skip_tracks_table` — boolean, default `false`
+
+Skip sending events to the `tracks` table. Per-event tables are unaffected.
+
+#### `json_paths` — string
+
+Comma-separated dot-notation paths whose values are stored as JSON columns instead of being flattened. Applies to every `track` event sent to this destination.
+
+- Not validated locally.
+
+### Legacy column naming
+
+Both keys below preserve the column naming of destinations created before the behavior changed. Leave them at their defaults on a new destination. Neither can be changed once the destination exists — the API rejects the update.
+
+#### `underscore_divide_numbers` — boolean, immutable, internal, default `false`
+
+When `false`, numeric suffixes in column names are preserved: `v3` stays `v3` rather than being split into `v_3`.
+
+#### `allow_users_context_traits` — boolean, immutable, internal, default `false`
+
+When `false`, `context.traits.*` fields aren't promoted to top-level traits and are stored only as `context_traits_*` columns.
+
+### Per-source keys
+
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
+
+#### `connection_mode` — object
+
+Maps each source type you connect to the mode its events reach Redshift in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -302,62 +368,71 @@ connection_mode:
   cloud: cloud
 ```
 
-An entry is required for each source type you connect — see
-[Connecting a source](#connecting-a-source).
-
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Amazon Redshift accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
 
-```
-destination 'redshift' (type 'rs') does not support source 'my-source':
+Every source type is `cloud` only — events reach the warehouse from RudderStack's servers, never in device mode.
+
+> [!NOTE]
+> The dashboard additionally offers Amazon Redshift to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'redshift-prod' (type 'rs') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'redshift' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'redshift-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-Redshift requires no additional config keys to connect a source of any type.
+Amazon Redshift needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`password`, `access_key_id` and `access_key` are the secret keys. Which apply
-depends on your setup: `password` only with password-based authentication, the
-two AWS keys only when staging through your own bucket without a role.
-
-Write each as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats five keys as secrets: `user`, `password`, `access_key_id`, `access_key`, and `ssh.user`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-password: "{{ .REDSHIFT_PASSWORD }}"
+config:
+  user: "{{ .REDSHIFT_USER }}"
+  password: "{{ .REDSHIFT_PASSWORD }}"
 ```
 
-```sh
-export RUDDER_REDSHIFT_PASSWORD=...
+```bash
+export RUDDER_REDSHIFT_USER="rudder"
+export RUDDER_REDSHIFT_PASSWORD="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-Note that `ssh.public_key` is **not** a secret — a public key is not sensitive,
-and it is stored and returned in the clear.
+Note that:
 
-`rudder-cli import` writes each secret back as a `{{ .VAR }}` placeholder rather
-than its value, since the API does not return secrets. Fill the placeholders in
-before the first apply.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- `iam_role_arn_for_auth` and `iam_role_arn` aren't secrets — an ARN identifies a role but grants nothing on its own.

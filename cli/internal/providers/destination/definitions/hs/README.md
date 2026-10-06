@@ -1,64 +1,41 @@
 # HubSpot (`hs`)
 
-Streaming destination. HubSpot receives events either from RudderStack's servers
-(cloud mode) or directly from the HubSpot tracking script loaded on your site
-(device mode, web only).
+HubSpot is a CRM and marketing destination. RudderStack creates and updates contacts from `identify` calls and records `track` events, from its servers or — for web sources — through HubSpot's own script in device mode.
 
-In a destination spec:
+In a HubSpot destination spec:
 
 - `type: hs`
 - `definition_version: 1`
 
-## Modes
-
-The mode a source uses is set per source type in `config.connection_mode`. Only
-`web` accepts `device`; every other source type is cloud only — see
-[Source types](#source-types).
-
-Each key below is badged with where it applies:
-
-- `cloud` — events sent from RudderStack's servers
-- `device` — events sent by the HubSpot tracking script
-
-A key is accepted by `validate` whatever your sources use; the badges tell you
-where the setting takes effect.
-
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: hubspot
+  name: hubspot-prod
 spec:
-  id: hubspot
-  display_name: HubSpot
+  id: hubspot-prod
+  display_name: HubSpot Production
   type: hs
   definition_version: 1
   enabled: true
   config:
     api_version: newApi
     access_token: "{{ .HUBSPOT_ACCESS_TOKEN }}"
-    hub_id: "12345678"
+    hub_id: "{{ .HUBSPOT_HUB_ID }}"
     lookup_field: email
-    do_association: true
+    do_association: false
 
     hubspot_events:
       - rs_event_name: Order Completed
-        hubspot_event_name: pe12345678_order_completed
+        hubspot_event_name: pe12345_order_completed
         event_properties:
           - from: revenue
             to: order_value
-          - from: currency
-            to: order_currency
-
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Product Viewed
 
     connection_mode:
-      web: device
+      web: cloud
       cloud: cloud
     consent_management:
       web:
@@ -67,100 +44,114 @@ spec:
             - marketing
 ```
 
+The above example uses the new API with `email` as the upsert key, and connects web sources in `cloud` mode, so it omits `event_filtering` — see [Event filtering](#event-filtering).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+> [!NOTE]
+> In `cloud` mode HubSpot accepts `identify` and `track` events. In `device` mode, web sources also send `page`.
 
 ### Connection
 
 #### `api_version` — string, required
-`cloud`
 
-The HubSpot API version to use. One of `newApi` (v3) or `legacyApi`.
+HubSpot API that RudderStack writes through.
+
+- `newApi` — HubSpot's v3 API. Use this one.
+- `legacyApi` — HubSpot's v1 API, which HubSpot has deprecated. It updates contacts only by email.
+- The dashboard defaults this field to `newApi`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
 #### `access_token` — string, required, secret
-`cloud`
 
-Your HubSpot private app access token. At most 100 characters.
+Access token of your HubSpot private app. Used by both API versions.
 
-Unlike most string keys in this destination, this one does not accept a
-`{{ path || fallback }}` template. Supply it as a `{{ .VAR }}` reference, which
-is substituted before validation runs — see [Secrets](#secrets).
+- At most 100 characters, and must not contain line breaks.
+- Templates aren't accepted in place of a literal; a template is measured as text against the same limit.
 
-#### `hub_id` — string
-`cloud` `device` · web
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
-Your HubSpot Hub ID, shown under your account name. At most 100 characters.
+#### `hub_id` — string, secret
 
-#### `lookup_field` — string
-`cloud`
+Your HubSpot Hub ID, shown under your account name in HubSpot.
 
-The HubSpot property name used to look up an existing record when upserting.
-**Required when `api_version` is `newApi`.** At most 100 characters.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-### Objects and events
+### New API settings
+
+These keys apply when `api_version` is `newApi`.
+
+#### `lookup_field` — string, required
+
+HubSpot contact property RudderStack matches on to upsert contacts — for example `email`. Pass the same property, with the value to match, in the `identify` event's `traits`.
+
+- Required when `api_version` is `newApi`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Use a property that's unique in HubSpot. Unique properties enable batch upsert, which is much faster; non-unique ones fall back to a slower search-based flow.
 
 #### `do_association` — boolean, default `false`
 
-Create associations between object records.
+Create associations between object records. This is used with Reverse ETL sources.
+
+- Applies when `api_version` is `newApi`. Leave it unset otherwise.
 
 #### `hubspot_events` — array of objects
-`cloud`
 
-Map RudderStack event names to HubSpot custom behavioural events. Each entry
-takes:
+Maps RudderStack `track` events to HubSpot custom behavioral events, with optional property mappings.
 
-- `rs_event_name` — the RudderStack event name, at most 100 characters
-- `hubspot_event_name` — the HubSpot custom behavioural event name, at most 100
-  characters
-- `event_properties` — an optional array of `from` / `to` pairs mapping
-  RudderStack event property names to HubSpot event property names, each at most
-  100 characters
+- Applies when `api_version` is `newApi`. Leave it unset otherwise.
+- `rs_event_name` — RudderStack event name.
+- `hubspot_event_name` — internal name of the HubSpot custom behavioral event.
+- `event_properties` — array of `from` (RudderStack property) and `to` (HubSpot property) pairs.
+- Every string is at most 100 characters, or a `{{ path || fallback }}` template.
+
+```yaml
+hubspot_events:
+  - rs_event_name: Order Completed
+    hubspot_event_name: pe12345_order_completed
+    event_properties:
+      - from: revenue
+        to: order_value
+```
+
+### Event filtering
+
+> [!WARNING]
+> Client-side event filtering applies only when `connection_mode.web` is `device` — the dashboard shows these controls only then, and the SDK is what applies the filter. Rudder CLI accepts the block in any mode, but events sent in `cloud` mode reach HubSpot unfiltered.
 
 #### `event_filtering` — object
-`device` · web
 
-Client-side event filtering. Exactly one of the two lists may be set — declaring
-both fails validation.
+Restricts which `track` events the SDK passes to HubSpot's script, by event name.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+- Applies when `connection_mode.web` is `device`. Leave it unset otherwise.
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
 
-Each entry is at most 100 characters. Omit the block to send every event.
+```yaml
+connection_mode:
+  web: device
+event_filtering:
+  whitelist:
+    - Signed Up
+```
 
-## Source types
+### Per-source keys
 
-| Source type | Modes |
-| --- | --- |
-| `web` | cloud, device |
-| `android` | cloud |
-| `android_kotlin` | cloud |
-| `ios` | cloud |
-| `ios_swift` | cloud |
-| `unity` | cloud |
-| `react_native` | cloud |
-| `flutter` | cloud |
-| `cordova` | cloud |
-| `cloud` | cloud |
-
-## Per-source keys
-
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
 
 #### `connection_mode` — object
 
-Selects the mode per source type. Values are constrained to the modes that
-source type supports, so `device` is rejected for every type except `web`:
+Maps each source type you connect to the mode its events reach HubSpot in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
+- A mode the source type doesn't support on this destination fails validation — for example `device` for `android`.
 
 ```yaml
 connection_mode:
@@ -170,51 +161,73 @@ connection_mode:
 
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+HubSpot accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud`, `device` |
+| `unity` | `cloud` |
+| `cloud` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'hubspot' (type 'hs') does not support source 'my-source':
+Only `web` offers `device` mode, which loads HubSpot's native script in the browser.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers HubSpot to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'hubspot-prod' (type 'hs') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'hubspot' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'hubspot-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-HubSpot requires no additional config keys to connect a source of any type.
+HubSpot needs no additional config keys to connect a source of any type, in any mode.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`access_token` is the only secret key. Write it as a `{{ .VAR }}` reference and
-supply the value at apply time:
+`access_token` and `hub_id` are the secret keys. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-access_token: "{{ .HUBSPOT_ACCESS_TOKEN }}"
+config:
+  access_token: "{{ .HUBSPOT_ACCESS_TOKEN }}"
+  hub_id: "{{ .HUBSPOT_HUB_ID }}"
 ```
 
-```sh
-export RUDDER_HUBSPOT_ACCESS_TOKEN=...
+```bash
+export RUDDER_HUBSPOT_ACCESS_TOKEN="pat-na1-..."
+export RUDDER_HUBSPOT_HUB_ID="12345678"
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`rudder-cli import` writes `access_token` back as a `{{ .VAR }}` placeholder
-rather than its value, since the API does not return secrets. Fill the
-placeholder in before the first apply.
+Note that:
+
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

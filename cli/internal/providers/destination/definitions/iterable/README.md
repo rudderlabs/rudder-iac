@@ -1,108 +1,47 @@
 # Iterable (`iterable`)
 
-Streaming destination. Iterable receives events either from RudderStack's servers
-(cloud mode) or directly from the Iterable Web SDK loaded on your site (device
-mode, web only).
+Iterable is a cross-channel marketing destination. RudderStack sends events to Iterable's API from its servers, or — for web sources — through Iterable's web SDK in device mode, which also shows in-app messages.
 
-Device mode also brings Iterable's in-app messages, and most of this
-destination's config surface exists to position and style them.
-
-In a destination spec:
+In an Iterable destination spec:
 
 - `type: iterable`
 - `definition_version: 1`
 
-## Modes
-
-The mode a source uses is set per source type in `config.connection_mode`. Only
-`web` accepts `device`; every other source type is cloud only — see
-[Source types](#source-types).
-
-Each key below is badged with where it applies:
-
-- `cloud` — events sent from RudderStack's servers
-- `device` — events sent by the Iterable Web SDK
-
-A key is accepted by `validate` whatever your sources use; the badges tell you
-where the setting takes effect.
-
-## Example
+## Sample configuration
 
 ```yaml
 version: rudder/v1
 kind: destination
 metadata:
-  name: iterable
+  name: iterable-prod
 spec:
-  id: iterable
-  display_name: Iterable
+  id: iterable-prod
+  display_name: Iterable Production
   type: iterable
   definition_version: 1
   enabled: true
   config:
     api_key: "{{ .ITERABLE_API_KEY }}"
     data_center: USDC
-    register_device_or_browser_api_key: "{{ .ITERABLE_JWT_API_KEY }}"
 
+    register_device_or_browser_api_key: "{{ .ITERABLE_MOBILE_WEB_KEY }}"
     prefer_user_id: true
     merge_nested_objects: true
-
     map_to_single_event: true
     track_all_pages: false
     track_categorized_pages: true
     track_named_pages: true
 
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Product Viewed
-
-    # Device mode (web)
-    package_name: com.example.web
+    package_name: acme-web
     initialisation_identifier:
       web: email
     get_in_app_event_mapping:
       web:
-        - Product Viewed
-    purchase_event_mapping:
-      web:
-        - Order Completed
-    send_track_for_inapp:
-      web: true
-
+        - Viewed Pricing
     handle_links:
       web: open-all-new-tab
-    display_interval:
-      web: "30000"
-    animation_duration:
-      web: "400"
-    is_required_to_dismiss_message:
-      web: false
-
-    top_offset:
-      web: "10%"
-    right_offset:
-      web: "5%"
-    bottom_offset:
-      web: "0"
-    icon_path:
-      web: "/assets/iterable-icon.svg"
-
     close_button_position:
       web: top-right
-    close_button_color:
-      web: "#333333"
-    close_button_size:
-      web: "16px"
-    close_button_color_top_offset:
-      web: "8px"
-    close_button_color_side_offset:
-      web: "8px"
-
-    on_open_screen_reader_message:
-      web: "In-app message opened"
-    on_open_node_to_take_focus:
-      web: "#main"
 
     connection_mode:
       web: device
@@ -114,210 +53,241 @@ spec:
             - marketing
 ```
 
+The above example connects web sources in `device` mode, which is what makes `package_name` required, and sends server-side events in `cloud` mode, where the page settings apply — see [Web device mode](#web-device-mode).
+
 ## Config keys
 
-`config` accepts only the keys documented here — anything else fails validation
-with `unknown config field "<key>"`.
+`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
-Keys that declare a default are filled in before the spec enters the resource
-graph, matching what the backend stores, so omitting one is equivalent to
-writing its default and does not produce a permanent diff.
-
-A `*` after a key name marks a description written without a Terraform provider
-source to draw on. Those need a closer review pass; the markers come out once the
-wording is confirmed.
+> [!NOTE]
+> In `cloud` mode Iterable accepts `identify`, `page`, `screen`, `track`, and `alias` events. In `device` mode, web sources send `identify` and `track`.
 
 ### Connection
 
-#### `api_key` — string, required
-`cloud` `device` · web
+#### `api_key` — string, required, secret
 
-Your Iterable API key. At most 100 characters.
+Your Iterable API key, from **Integrations** > **API Keys** in Iterable.
 
-#### `data_center` \* — string, required
-`cloud` `device` · web
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-The Iterable data centre your project lives in. One of `USDC` or `EUDC`.
+#### `data_center` — string, required
 
-#### `register_device_or_browser_api_key` \* — string, secret
-`device` · web
+Region of your Iterable project.
 
-API key used to register a device or browser for push and in-app messages. At
-most 100 characters.
+- `USDC` or `EUDC`.
+- The dashboard defaults this field to `USDC`. Rudder CLI requires it explicitly.
+- A spec that omits this key fails validation.
 
-Supply it as a `{{ .VAR }}` reference — see [Secrets](#secrets).
+### Cloud mode
 
-### Identity and payload
+These keys apply to events sent in `cloud` mode. The dashboard shows them only when the destination has a cloud-mode connection.
 
-#### `prefer_user_id` \* — boolean, default `true`
-`cloud`
+#### `register_device_or_browser_api_key` — string, secret
 
-Identify users by `userId` in preference to `email` when both are present.
+Iterable mobile or web API key, used to register device and browser tokens. Needed when `identify` calls carry token information.
 
-#### `merge_nested_objects` \* — boolean, default `true`
-`cloud`
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-Merge nested objects into the existing user profile rather than replacing them
-wholesale.
+#### `prefer_user_id` — boolean, default `true`
 
-### Page tracking
+Create a new Iterable user when an event's `userId` doesn't match an existing one, using Iterable's `preferUserId` parameter. The dashboard calls this **Create new user if userID exists**.
+
+#### `merge_nested_objects` — boolean, default `true`
+
+Merge top-level objects on the user profile instead of overwriting them, using Iterable's `mergeNestedObjects` parameter. The dashboard calls this **Merge top-level objects**.
 
 #### `map_to_single_event` — boolean, default `true`
-`cloud` `device` · web
 
-Map all page calls to a single event name rather than deriving one per page.
+Send every page under one event name — `Loaded a Page` for `page` calls and `Loaded a Screen` for `screen` calls.
 
 #### `track_all_pages` — boolean, default `false`
-`cloud` `device` · web
 
-Track every `page` call.
+Send every `page` event to Iterable.
 
 #### `track_categorized_pages` — boolean, default `true`
-`cloud` `device` · web
 
-Track `page` calls that carry a category.
+Send `page` events that have a category.
 
 #### `track_named_pages` — boolean, default `true`
-`cloud` `device` · web
 
-Track `page` calls that carry a name.
+Send `page` events that have a name.
 
-#### `event_filtering` \* — object
-`device` · web
+### Web device mode
 
-Filter which events are sent to Iterable in device mode connections. Client-side
-filtering is applied by the SDK, so it has no effect on a cloud mode connection.
-Exactly one of the two lists may be set — declaring both fails validation.
+These keys configure Iterable's web SDK, so they apply only when `connection_mode.web` is `device`. Apart from `package_name`, each is keyed by `web`.
 
-- `whitelist` — event names to allowlist
-- `blacklist` — event names to denylist
+#### `package_name` — string, required
 
-Each entry is at most 100 characters. Omit the block to send every event.
+Name of the website Iterable shows in-app messages for.
 
-## Device mode only
+- Required when `connection_mode.web` is `device`. Leave it unset otherwise.
+- At most 100 characters, and must not contain line breaks.
+- A `{{ path || fallback }}` template is accepted in place of a literal.
 
-The keys below configure the Iterable Web SDK and apply only to a web source in
-device mode. Except `package_name`, each is an object with a single `web` key.
+#### `initialisation_identifier` — object
 
-`validate` accepts these keys whatever sources the project connects, so you can
-declare them ahead of connecting a web source.
+Identifier the SDK uses to recognize a user across a session.
 
-### Setup
-
-#### `package_name` — string
-`device` · web
-
-The package name the SDK registers under. **Required when `connection_mode.web`
-is `device`** — this is the one key here whose absence fails validation. At most
-100 characters.
-
-#### `initialisation_identifier` — object, default `{web: email}`
-`device` · web
-
-Which identifier identifies a user across a session. One of `email` or `userId`.
-
-### Event mapping
+- `web` — `email` (default) or `userId`.
 
 #### `get_in_app_event_mapping` — object
-`device` · web
 
-Event names that trigger a `getInApp` messages fetch. A list of event names under
-`web`, each at most 100 characters.
+Event names that trigger fetching and showing in-app messages.
+
+- `web` — array of event names, each at most 100 characters or a template.
+
+```yaml
+get_in_app_event_mapping:
+  web:
+    - Viewed Pricing
+    - Started Checkout
+```
 
 #### `purchase_event_mapping` — object
-`device` · web
 
-Event names treated as purchases. A list of event names under `web`, each at most
-100 characters.
+Event names sent to Iterable as purchase events.
+
+- `web` — array of event names, each at most 100 characters or a template.
 
 #### `send_track_for_inapp` — object
-`device` · web
 
-Fire a `track` event when a web in-app push is delivered.
+Send a `track` event each time an in-app message is shown.
 
-### In-app message behaviour
+- `web` — boolean.
 
-#### `handle_links` — object, default `{web: open-all-new-tab}`
-`device` · web
+### In-app message display
 
-How links inside in-app messages open. One of `open-all-new-tab`,
-`open-all-same-tab` or `external-new-tab`.
+These keys shape how in-app messages look and behave in the browser. They apply only when `connection_mode.web` is `device`, and each is keyed by `web`. Unless noted, the value is a string and isn't validated locally:
 
-#### `display_interval` — object
-`device` · web
-
-Wait time before the next message is shown, in milliseconds.
+```yaml
+animation_duration:
+  web: "400"
+top_offset:
+  web: "10%"
+handle_links:
+  web: open-all-new-tab
+close_button_position:
+  web: top-right
+is_required_to_dismiss_message:
+  web: false
+```
 
 #### `animation_duration` — object
-`device` · web
 
-Time for messages to animate in and out, in milliseconds.
+Time, in milliseconds, that messages take to animate in and out.
 
-#### `is_required_to_dismiss_message` — object
-`device` · web
+- `web` — string, for example `"400"`.
 
-Prevent the user dismissing an in-app message by clicking outside it.
+#### `display_interval` — object
 
-### In-app message layout
+Time, in milliseconds, to wait after a message closes before showing the next one.
 
-Each is an object with a single string `web` key. Offsets accept a pixel or
-percentage value.
+- `web` — string.
 
-- **`top_offset`** — space between the top of the screen and the message
-- **`right_offset`** — space between the right of the screen and the message
-- **`bottom_offset`** — space between the bottom of the screen and the message
-- **`icon_path`** — custom pathname for the message icon
+#### `top_offset` — object
 
-### Close button
+Space between the top of the screen and a message, in `px` or `%`. Doesn't apply to center, top, or full-screen messages.
 
-Each is an object with a single string `web` key, except `close_button_position`
-which takes `top-right` or `top-left`.
+- `web` — string, for example `"10%"`.
 
-- **`close_button_position`** — corner the button sits in, default
-  `{web: top-right}`
-- **`close_button_color`** — colour of the close button
-- **`close_button_size`** — size of the close button
-- **`close_button_color_top_offset`** — space between the button and the
-  container top
-- **`close_button_color_side_offset`** — space between the button and the
-  container side
+#### `right_offset` — object
 
-### Accessibility
+Space between the right edge of the screen and a message, in `px` or `%`. Doesn't apply to center, top, or full-screen messages.
+
+- `web` — string.
+
+#### `bottom_offset` — object
+
+Space between the bottom of the screen and a message, in `px` or `%`. Doesn't apply to center, top, or full-screen messages.
+
+- `web` — string.
+
+#### `handle_links` — object
+
+How links inside a message open.
+
+- `web` — `open-all-new-tab` (default), `open-all-same-tab`, or `external-new-tab`.
 
 #### `on_open_screen_reader_message` — object
-`device` · web
 
-Text read out by a screen reader when a message opens.
+Text a screen reader announces when a message opens.
+
+- `web` — string.
 
 #### `on_open_node_to_take_focus` — object
-`device` · web
 
-Selector for the element that takes focus when a message opens.
+DOM element that takes keyboard focus when a message opens.
 
-## Source types
+- `web` — string, for example a CSS selector.
 
-| Source type | Modes |
-| --- | --- |
-| `web` | cloud, device |
-| `android` | cloud |
-| `android_kotlin` | cloud |
-| `ios` | cloud |
-| `ios_swift` | cloud |
-| `unity` | cloud |
-| `react_native` | cloud |
-| `flutter` | cloud |
-| `cordova` | cloud |
-| `cloud` | cloud |
+#### `close_button_color` — object
 
-## Per-source keys
+Color of the close button.
 
-Both keys below are objects keyed by the local source type. A key naming a
-source type this destination does not support fails validation.
+- `web` — string.
 
-#### `connection_mode` \* — object
+#### `close_button_size` — object, internal
 
-Selects the mode per source type. Values are constrained to the modes that
-source type supports, so `device` is rejected for every type except `web`:
+Size of the close button.
+
+- `web` — string.
+
+#### `close_button_position` — object
+
+Position of the close button on the message.
+
+- `web` — `top-right` (default) or `top-left`.
+
+#### `close_button_color_top_offset` — object
+
+Space between the close button and the message's top border. Despite `color` in its name, this is an offset.
+
+- `web` — string.
+
+#### `close_button_color_side_offset` — object
+
+Space between the close button and the message's side borders. Despite `color` in its name, this is an offset.
+
+- `web` — string.
+
+#### `icon_path` — object
+
+Path to an image or SVG shown instead of the default close icon.
+
+- `web` — string.
+
+#### `is_required_to_dismiss_message` — object
+
+Stop users from dismissing a message by clicking outside it.
+
+- `web` — boolean.
+
+### Event filtering
+
+> [!WARNING]
+> Client-side event filtering applies only when `connection_mode.web` is `device` — the dashboard shows these controls only for device-mode connections, and the SDK is what applies the filter. Rudder CLI accepts the block in any mode, but it has no effect on cloud-mode events.
+
+#### `event_filtering` — object
+
+Restricts which `track` events the SDK passes to Iterable, by event name.
+
+- `whitelist` — array of event names to allow; every other `track` event is dropped.
+- `blacklist` — array of event names to drop; every other `track` event is allowed.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation.
+- Each name is at most 100 characters, or a `{{ path || fallback }}` template.
+
+### Per-source keys
+
+Both keys are objects keyed by the local source type — the tokens listed under [Source types](#source-types). A key naming a source type this destination doesn't support fails validation.
+
+#### `connection_mode` — object
+
+Maps each source type you connect to the mode its events reach Iterable in, using the modes in [Source types](#source-types).
+
+- An entry is required for each source type you connect — see [Connect a source](#connect-a-source).
+- A mode the source type doesn't support on this destination fails validation — for example `device` for `android`.
 
 ```yaml
 connection_mode:
@@ -325,58 +295,74 @@ connection_mode:
   cloud: cloud
 ```
 
-Setting `web` to `device` also makes `package_name` required.
-
 #### `consent_management` — object
 
-Specify consent configuration data for multiple providers, per source type. The
-entry shape, accepted providers, and the rules on `resolution_strategy` and
-`consents` are shared across all destinations and documented in
-[../common/README.md](../common/README.md).
+Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).
 
-## Connecting a source
+## Source types
 
-An event stream connection to this destination is checked against two rules at
-`validate` time.
+Iterable accepts events from these source types in the mentioned connection modes:
 
-**The source's type must be supported.** A source's type is mapped to one of the
-tokens above first — a JavaScript source resolves to `web`, and webhook and
-server-side SDK sources resolve to `cloud`. An unsupported type reports:
+| Source type | Connection mode |
+| :-----| :-----|
+| `android` | `cloud` |
+| `android_kotlin` | `cloud` |
+| `ios` | `cloud` |
+| `ios_swift` | `cloud` |
+| `web` | `cloud`, `device` |
+| `unity` | `cloud` |
+| `react_native` | `cloud` |
+| `flutter` | `cloud` |
+| `cordova` | `cloud` |
+| `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
-```
-destination 'iterable' (type 'iterable') does not support source 'my-source':
+Only `web` offers `device` mode, which loads Iterable's web SDK — recommended if you use Iterable's web push notifications.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
+
+> [!NOTE]
+> The dashboard additionally offers Iterable to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
+
+## Connect a source
+
+An event stream connection to this destination is checked against two rules at `validate` time.
+
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+
+```text
+destination 'iterable-prod' (type 'iterable') does not support source 'my-source':
 source type 'amp' is not among supported source types: android, android_kotlin, ...
 ```
 
-**The config must carry a `connection_mode` entry for that source type.** This
-lives on the destination spec, not the connection spec. Without it:
+**The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
-```
-destination 'iterable' config has no 'connection_mode' entry for source type 'web'
+```text
+destination 'iterable-prod' config has no 'connection_mode' entry for source type 'web'
 ```
 
-Iterable requires no additional config keys to connect a source of any type.
+Iterable needs no additional config keys to connect a source of any type, in any mode. `package_name` is checked on the destination instead — see [Web device mode](#web-device-mode).
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 
-`register_device_or_browser_api_key` is the only secret key. Write it as a
-`{{ .VAR }}` reference and supply the value at apply time:
+`api_key` and `register_device_or_browser_api_key` are the secret keys. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
 
 ```yaml
-register_device_or_browser_api_key: "{{ .ITERABLE_JWT_API_KEY }}"
+config:
+  api_key: "{{ .ITERABLE_API_KEY }}"
+  register_device_or_browser_api_key: "{{ .ITERABLE_MOBILE_WEB_KEY }}"
 ```
 
-```sh
-export RUDDER_ITERABLE_JWT_API_KEY=...
+```bash
+export RUDDER_ITERABLE_API_KEY="..."
 rudder-cli apply
 
 # or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-`api_key` is **not** registered as a secret, so it is stored and returned in the
-clear. Only the device/browser registration key is masked.
+Note that:
 
-`rudder-cli import` writes the secret back as a `{{ .VAR }}` placeholder rather
-than its value, since the API does not return secrets. Fill the placeholder in
-before the first apply.
+- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
