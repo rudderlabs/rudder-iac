@@ -97,6 +97,8 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 	go run ./typer/generator/platforms/typescript/testutils/empty_identity \
 	  > typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
 
+# The wire tests flush only on Close, so a short timeout fails a hung Close
+# fast instead of after go test's 10-minute default.
 .PHONY: typer-go-validate
 typer-go-validate: ## Validate generated Go code against the RudderStack Go SDK
 	cd typer/generator/platforms/golang/testdata/validator && \
