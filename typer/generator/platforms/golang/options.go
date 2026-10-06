@@ -44,6 +44,8 @@ func validatePackageName(name string) error {
 		return fmt.Errorf("must match %s", packageNameRegex)
 	case name == "main":
 		return fmt.Errorf("package main is a command and cannot be imported")
+	case name == "init":
+		return fmt.Errorf("init is reserved for initialization functions and cannot name an imported package")
 	case token.IsKeyword(name):
 		return fmt.Errorf("it is a Go keyword")
 	case types.Universe.Lookup(name) != nil:

@@ -46,6 +46,11 @@ func TestOptionsValidate(t *testing.T) {
 			`invalid packageName "main": package main is a command and cannot be imported`,
 		},
 		{
+			"init",
+			golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"},
+			`invalid packageName "init": init is reserved for initialization functions and cannot name an imported package`,
+		},
+		{
 			"keyword",
 			golang.GoOptions{PackageName: "func", OutputFileName: "ruddertyper.go"},
 			`invalid packageName "func": it is a Go keyword`,
