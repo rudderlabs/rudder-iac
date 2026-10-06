@@ -85,6 +85,38 @@ type (
 	callerHolder struct{ Payload testPayload }
 )
 
+// callerFields holds the field shapes the nil rule treats differently. Its
+// embedded struct has an unexported type, so encoding/json promotes its
+// exported fields.
+type callerFields struct {
+	Items  []string
+	Labels map[string]int
+	Bytes  []byte
+	ByID   map[int]string
+	Ptr    *int
+	embeddedFields
+}
+
+type embeddedFields struct{ Tags []string }
+
+type (
+	callerEmbedded    struct{ embeddedPayload }
+	callerEmbeddedPtr struct{ *embeddedPayload }
+	embeddedPayload   struct{ Payload testPayload }
+)
+
+// ptrText and ptrJSON marshal through pointer receivers, which encoding/json
+// calls only on addressable values, such as slice elements and values behind
+// a pointer.
+type (
+	ptrText       string
+	ptrJSON       struct{ N int }
+	callerPtrJSON struct{ J ptrJSON }
+)
+
+func (s *ptrText) MarshalText() ([]byte, error) { return []byte(strings.ToUpper(string(*s))), nil }
+func (*ptrJSON) MarshalJSON() ([]byte, error)   { return []byte(`"from MarshalJSON"`), nil }
+
 // upperText is encoded by its MarshalText, which differs from its value.
 type upperText string
 
@@ -116,12 +148,16 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		cyclicNode   = &callerNode{}
 		cyclicHolder = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicKeyed  = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicEmbed  = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicEmbedP = testPayload{AdditionalProperties: map[string]any{}}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
 	cyclicNode.Next = cyclicNode
 	cyclicHolder.AdditionalProperties["holder"] = callerHolder{Payload: cyclicHolder}
 	cyclicKeyed.AdditionalProperties["byID"] = map[int]testPayload{1: cyclicKeyed}
+	cyclicEmbed.AdditionalProperties["embedded"] = callerEmbedded{embeddedPayload{Payload: cyclicEmbed}}
+	cyclicEmbedP.AdditionalProperties["embedded"] = callerEmbeddedPtr{&embeddedPayload{Payload: cyclicEmbedP}}
 
 	tests := []struct {
 		name    string
@@ -232,6 +268,24 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			want: map[string]any{"s": map[string]any{"Count": json.Number("3"), "Price": json.Number("1.5")}},
 		},
 		{
+			name: "nil slices and maps inside caller data become [] and {}, except []byte and non-string keys",
+			in:   map[string]any{"s": &callerFields{}, "byID": map[int][]string{1: nil}},
+			want: map[string]any{
+				"s":    map[string]any{"Items": []any{}, "Labels": map[string]any{}, "Bytes": nil, "ByID": nil, "Ptr": nil, "Tags": []any{}},
+				"byID": map[string]any{"1": []any{}},
+			},
+		},
+		{
+			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
+			in:   map[string]any{"slice": []ptrText{"a"}, "map": map[string]ptrText{"k": "a"}, "pointer": &callerPtrJSON{}, "value": callerPtrJSON{}},
+			want: map[string]any{
+				"slice":   []any{"A"},
+				"map":     map[string]any{"k": "a"},
+				"pointer": map[string]any{"J": "from MarshalJSON"},
+				"value":   map[string]any{"J": map[string]any{"N": json.Number("0")}},
+			},
+		},
+		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
 			wantErr: ErrInvalidValue,
@@ -263,6 +317,16 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "generated value that contains itself through a non-string-key map",
 			in:      cyclicKeyed,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "generated value that contains itself through an embedded struct of an unexported type",
+			in:      cyclicEmbed,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "generated value that contains itself through an embedded pointer to an unexported type",
+			in:      cyclicEmbedP,
 			wantErr: ErrInvalidValue,
 		},
 		{
