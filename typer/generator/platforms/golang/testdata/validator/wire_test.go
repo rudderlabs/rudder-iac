@@ -20,10 +20,10 @@ import (
 
 // recorder is both the data plane and the Config.Callback of a capture.
 type recorder struct {
-	t        *testing.T
-	mu       sync.Mutex
-	batches  [][]map[string]any
-	callback []analytics.Message
+	t         *testing.T
+	mu        sync.Mutex
+	batches   [][]map[string]any
+	succeeded []analytics.Message
 }
 
 func (r *recorder) ServeHTTP(_ http.ResponseWriter, req *http.Request) {
@@ -39,7 +39,7 @@ func (r *recorder) ServeHTTP(_ http.ResponseWriter, req *http.Request) {
 func (r *recorder) Success(msg analytics.Message) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.callback = append(r.callback, msg)
+	r.succeeded = append(r.succeeded, msg)
 }
 
 func (r *recorder) Failure(msg analytics.Message, err error) {
@@ -51,8 +51,10 @@ func (r *recorder) Failure(msg analytics.Message, err error) {
 // Config.Callback.
 func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []analytics.Message) {
 	t.Helper()
-	rec := &recorder{t: t}
-	srv := httptest.NewServer(rec)
+	var (
+		rec = &recorder{t: t}
+		srv = httptest.NewServer(rec)
+	)
 	defer srv.Close()
 
 	client, err := analytics.NewWithConfig("write-key", analytics.Config{
@@ -71,32 +73,32 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	require.Len(t, rec.batches, 1)
-	return rec.batches[0], rec.callback
+	return rec.batches[0], rec.succeeded
 }
 
-// assertMessage compares got whole with want, a JSON object. The SDK-filled
+// assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
 // messageId, originalTimestamp, sentAt, anonymousId and context.library are
-// ignored unless want asserts them, so WithMessageID and WithTimestamp stay
+// ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
 // testable.
-func assertMessage(t *testing.T, want string, got map[string]any) {
+func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
-	var w map[string]any
-	require.NoError(t, decode(strings.NewReader(want), &w))
+	var want map[string]any
+	require.NoError(t, decode(strings.NewReader(wantJSON), &want))
 
 	got = maps.Clone(got)
 	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"} {
-		if _, ok := w[key]; !ok {
+		if _, ok := want[key]; !ok {
 			delete(got, key)
 		}
 	}
-	wantContext, _ := w["context"].(map[string]any)
+	wantContext, _ := want["context"].(map[string]any)
 	_, wantLibrary := wantContext["library"]
 	if gotContext, ok := got["context"].(map[string]any); ok && !wantLibrary {
 		gotContext = maps.Clone(gotContext)
 		delete(gotContext, "library")
 		got["context"] = gotContext
 	}
-	assert.Equal(t, w, got)
+	assert.Equal(t, want, got)
 }
 
 // decode keeps numbers as their JSON text, so an int64 beyond 2^53 cannot
@@ -108,14 +110,14 @@ func decode(r io.Reader, v any) error {
 }
 
 func TestTrackSmoke(t *testing.T) {
-	msgs, sent := capture(t, func(client analytics.Client) {
+	wire, succeeded := capture(t, func(client analytics.Client) {
 		require.NoError(t, examples.New(client).TrackSomeTrackEvent(
 			examples.Identity{UserID: "user-123"},
 			examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(true)},
 		))
 	})
 
-	require.Len(t, msgs, 1)
+	require.Len(t, wire, 1)
 	assertMessage(t, `{
 		"type": "track",
 		"channel": "server",
@@ -130,7 +132,10 @@ func TestTrackSmoke(t *testing.T) {
 				"trackingPlanVersion": 0
 			}
 		}
-	}`, msgs[0])
-	require.Len(t, sent, 1)
-	assert.Equal(t, analytics.Properties{"someString": "hello", "someInteger": int64(42), "someBoolean": true}, sent[0].(analytics.Track).Properties)
+	}`, wire[0])
+	// Callback receives the snapshot itself, so this checks its Go value types
+	// (int64(42)), which the wire JSON cannot show.
+	require.Len(t, succeeded, 1)
+	require.IsType(t, analytics.Track{}, succeeded[0])
+	assert.Equal(t, analytics.Properties{"someString": "hello", "someInteger": int64(42), "someBoolean": true}, succeeded[0].(analytics.Track).Properties)
 }
