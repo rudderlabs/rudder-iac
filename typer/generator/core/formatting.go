@@ -98,6 +98,24 @@ func SplitIntoWords(input string) []string {
 	return result
 }
 
+// SanitizeForIdentifier replaces every rune that is not a letter, a digit or a
+// separator SplitIntoWords recognizes ('_', '-', '.', ' ') with a space, so it
+// becomes a word boundary instead of reaching an identifier.
+func SanitizeForIdentifier(s string) string {
+	var result strings.Builder
+	result.Grow(len(s))
+
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
+			result.WriteRune(ch)
+		} else {
+			result.WriteRune(' ')
+		}
+	}
+
+	return result.String()
+}
+
 func ReplaceSpecialCharacters(input, replacement string) string {
 	// Match Unicode letters (L), numbers (N), underscores, and whitespace
 	// Replace everything else (punctuation, symbols, etc.) with the replacement
