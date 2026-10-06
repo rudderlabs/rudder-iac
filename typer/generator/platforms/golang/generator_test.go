@@ -89,7 +89,7 @@ func TestGenerateGoldens(t *testing.T) {
 	}
 }
 
-func TestGenerateRejectsUnnamedTrackEvents(t *testing.T) {
+func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
 			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
@@ -185,6 +185,7 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 
 	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
 	require.NoError(t, err)
+	require.Len(t, files, 1)
 
 	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
 	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)

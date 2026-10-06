@@ -61,7 +61,7 @@ func TestIdentifierConstructionRejectsNamesWithoutWords(t *testing.T) {
 			assert.EqualError(t, err, `name "`+input+`" has no letters or digits to build a Go identifier from`)
 
 			_, err = fieldName(input)
-			assert.Error(t, err)
+			assert.EqualError(t, err, `name "`+input+`" has no letters or digits to build a Go identifier from`)
 		})
 	}
 }

@@ -68,6 +68,7 @@ func TestEventNameLiterals(t *testing.T) {
 
 			files, err := (&Generator{}).Generate(p, core.GenerateOptions{}, nil)
 			require.NoError(t, err)
+			require.Len(t, files, 1)
 
 			assert.Contains(t, files[0].Content, "sends the track event "+tt.literal+", which has no properties.\n")
 			assert.Contains(t, files[0].Content, "\treturn r.track(identity, "+tt.literal+", nil, opts)\n")
