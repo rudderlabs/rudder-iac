@@ -1,0 +1,435 @@
+package runtime
+
+import (
+	"encoding/json"
+	"fmt"
+	"maps"
+	"math"
+	"net"
+	"testing"
+	"time"
+
+	analytics "github.com/rudderlabs/analytics-go/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// testObject stands in for a generated open struct. Its MarshalJSON differs
+// from toMap, so output built from toMap shows that the hook wins.
+type testObject struct {
+	Name                 string
+	Tags                 []string
+	AdditionalProperties map[string]any
+}
+
+func (v testObject) toMap() map[string]any {
+	m := make(map[string]any, len(v.AdditionalProperties)+2)
+	maps.Copy(m, v.AdditionalProperties)
+	m["name"] = v.Name
+	m["tags"] = v.Tags
+	return m
+}
+
+func (v testObject) MarshalJSON() ([]byte, error) { return []byte(`"from MarshalJSON"`), nil }
+
+// testVariant stands in for a generated variant interface, which lists toMap.
+type testVariant interface {
+	toMap() map[string]any
+	isTestVariant()
+}
+
+type testCase struct{ Kind string }
+
+func (v testCase) toMap() map[string]any { return map[string]any{"kind": v.Kind} }
+func (testCase) isTestVariant()          {}
+
+// testUnion stands in for a union, mixed enum, Nullable or Null.
+type testUnion struct {
+	value any
+	set   bool
+}
+
+func (u testUnion) wireValue() (any, error) {
+	if !u.set {
+		return nil, fmt.Errorf("%w: unset union", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+type (
+	testEnum  string
+	testLevel int8
+)
+
+type callerStruct struct {
+	Count  int
+	Price  float64
+	Skip   func() `json:"-"`
+	hidden int
+}
+
+type callerNode struct{ Next *callerNode }
+
+type testMarshalError struct{}
+
+func (testMarshalError) Error() string { return "marshal failed" }
+
+type failingMarshaler struct{}
+
+func (failingMarshaler) MarshalJSON() ([]byte, error) { return nil, testMarshalError{} }
+
+// nest wraps a string in n slices.
+func nest(n int) any {
+	var v any = "leaf"
+	for i := 0; i < n; i++ {
+		v = []any{v}
+	}
+	return v
+}
+
+func TestSnapshotAndMarshal(t *testing.T) {
+	var (
+		five       = 5
+		cyclicMap  = map[string]any{}
+		cyclicObj  = testObject{AdditionalProperties: map[string]any{}}
+		cyclicNode = &callerNode{}
+	)
+	cyclicMap["self"] = cyclicMap
+	cyclicObj.AdditionalProperties["self"] = cyclicObj
+	cyclicNode.Next = cyclicNode
+
+	tests := []struct {
+		name    string
+		in      any
+		want    map[string]any
+		wantErr error
+	}{
+		{
+			name: "integers become int64, unsigned integers uint64",
+			in:   map[string]any{"i": int8(-3), "n": 42, "u": uint16(7), "ptr": uintptr(1)},
+			want: map[string]any{"i": int64(-3), "n": int64(42), "u": uint64(7), "ptr": uint64(1)},
+		},
+		{
+			name: "float32 stays float32",
+			in:   map[string]any{"f": 1.5, "f32": float32(2.5)},
+			want: map[string]any{"f": 1.5, "f32": float32(2.5)},
+		},
+		{
+			name: "enums become their underlying type",
+			in:   map[string]any{"kind": testEnum("a"), "level": testLevel(2)},
+			want: map[string]any{"kind": "a", "level": int64(2)},
+		},
+		{
+			name: "nil pointers and interfaces become null",
+			in:   map[string]any{"field": map[string]*int{"p": nil}, "typedNil": (*int)(nil), "nil": nil, "set": &five},
+			want: map[string]any{"field": map[string]any{"p": nil}, "typedNil": nil, "nil": nil, "set": int64(5)},
+		},
+		{
+			name: "nil open payload becomes {}",
+			in:   map[string]any(nil),
+			want: map[string]any{},
+		},
+		{
+			name: "nil slices and maps become [] and {} at any depth",
+			in: map[string]any{
+				"slice":  []string(nil),
+				"map":    map[string]int(nil),
+				"nested": []any{map[string]any{"inner": []int(nil)}, [][]string{nil}},
+			},
+			want: map[string]any{
+				"slice":  []any{},
+				"map":    map[string]any{},
+				"nested": []any{map[string]any{"inner": []any{}}, []any{[]any{}}},
+			},
+		},
+		{
+			name: "nil slices and maps in AdditionalProperties become [] and {}",
+			in:   testObject{Name: "a", AdditionalProperties: map[string]any{"list": []string(nil), "deep": map[string]any{"m": map[string]bool(nil)}}},
+			want: map[string]any{"name": "a", "tags": []any{}, "list": []any{}, "deep": map[string]any{"m": map[string]any{}}},
+		},
+		{
+			name: "generated objects use toMap, not MarshalJSON, at any depth",
+			in:   map[string]any{"obj": testObject{Name: "a"}, "list": []testObject{{Name: "b", Tags: []string{"t"}}}},
+			want: map[string]any{
+				"obj":  map[string]any{"name": "a", "tags": []any{}},
+				"list": []any{map[string]any{"name": "b", "tags": []any{"t"}}},
+			},
+		},
+		{
+			name: "wireValue results are walked",
+			in:   map[string]any{"enum": testUnion{value: testEnum("a"), set: true}, "null": testUnion{set: true}, "empty": testUnion{value: []string(nil), set: true}},
+			want: map[string]any{"enum": "a", "null": nil, "empty": []any{}},
+		},
+		{
+			name:    "wireValue error",
+			in:      map[string]any{"union": testUnion{}},
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name: "variant items",
+			in:   map[string]any{"items": []testVariant{testCase{Kind: "a"}}},
+			want: map[string]any{"items": []any{map[string]any{"kind": "a"}}},
+		},
+		{
+			name:    "nil variant item",
+			in:      map[string]any{"items": []testVariant{nil}},
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "typed-nil variant item",
+			in:      map[string]any{"items": []testVariant{(*testCase)(nil)}},
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name: "[]byte becomes base64, a nil one null",
+			in:   map[string]any{"bytes": []byte("hi"), "nil": []byte(nil)},
+			want: map[string]any{"bytes": "aGk=", "nil": nil},
+		},
+		{
+			name: "maps with non-string keys go through encoding/json, a nil one as null",
+			in:   map[string]any{"map": map[int]float64{1: 2.5}, "nil": map[int]string(nil)},
+			want: map[string]any{"map": map[string]any{"1": json.Number("2.5")}, "nil": nil},
+		},
+		{
+			name: "json.Number",
+			in:   map[string]any{"n": json.Number("12.50")},
+			want: map[string]any{"n": json.Number("12.50")},
+		},
+		{
+			name: "caller marshalers go through encoding/json",
+			in:   map[string]any{"time": time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), "raw": json.RawMessage(`{"a":1}`)},
+			want: map[string]any{"time": "2026-01-02T03:04:05Z", "raw": map[string]any{"a": json.Number("1")}},
+		},
+		{
+			name: "caller structs go through encoding/json with json.Number numbers",
+			in:   map[string]any{"s": callerStruct{Count: 3, Price: 1.5, Skip: func() {}, hidden: 1}},
+			want: map[string]any{"s": map[string]any{"Count": json.Number("3"), "Price": json.Number("1.5")}},
+		},
+		{
+			name:    "caller MarshalJSON error",
+			in:      map[string]any{"m": failingMarshaler{}},
+			wantErr: testMarshalError{},
+		},
+		{
+			name:    "map that contains itself",
+			in:      cyclicMap,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "AdditionalProperties that contain their object",
+			in:      cyclicObj,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "caller struct that contains itself",
+			in:      map[string]any{"node": cyclicNode},
+			wantErr: ErrInvalidValue,
+		},
+		{
+			// Each level is a slice and the interface holding it: 499 levels
+			// reach depth 1000 exactly.
+			name: "nesting at the depth bound",
+			in:   map[string]any{"v": nest(499)},
+			want: map[string]any{"v": nest(499)},
+		},
+		{
+			name:    "nesting past the depth bound",
+			in:      map[string]any{"v": nest(500)},
+			wantErr: ErrInvalidValue,
+		},
+		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: ErrInvalidValue},
+		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: ErrInvalidValue},
+		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: ErrInvalidValue},
+		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: ErrInvalidValue},
+		{name: "function", in: map[string]any{"f": func() {}}, wantErr: ErrInvalidValue},
+		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: ErrInvalidValue},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := snapshot(tt.in)
+			b, marshalErr := marshal(tt.in)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, ErrInvalidValue)
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.ErrorIs(t, marshalErr, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NoError(t, marshalErr)
+			assert.Equal(t, tt.want, got)
+
+			want, err := json.Marshal(got)
+			require.NoError(t, err)
+			assert.Equal(t, string(want), string(b))
+		})
+	}
+}
+
+func TestSnapshotKeepsEncodingErrors(t *testing.T) {
+	_, err := snapshot(map[string]any{"m": failingMarshaler{}})
+
+	var original testMarshalError
+	assert.ErrorIs(t, err, ErrInvalidValue)
+	assert.ErrorAs(t, err, &original)
+}
+
+// These mirror the With* options of the generated client.
+func withContext(ctx analytics.Context) Option { return func(o *callOptions) { o.context = &ctx } }
+func withIntegrations(i analytics.Integrations) Option {
+	return func(o *callOptions) { o.integrations = i }
+}
+func withTimestamp(t time.Time) Option { return func(o *callOptions) { o.timestamp = t } }
+
+func TestApplyOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    []Option
+		want    callOptions
+		wantErr bool
+	}{
+		{
+			name: "no options",
+			want: callOptions{integrations: analytics.Integrations{}},
+		},
+		{
+			name:    "NaN location field",
+			opts:    []Option{withContext(analytics.Context{Location: analytics.LocationInfo{Latitude: math.NaN()}})},
+			wantErr: true,
+		},
+		{
+			name:    "NaN in Extra",
+			opts:    []Option{withContext(analytics.Context{Extra: map[string]any{"score": math.NaN()}})},
+			wantErr: true,
+		},
+		{
+			name:    "Inf in Traits",
+			opts:    []Option{withContext(analytics.Context{Traits: analytics.Traits{"score": math.Inf(-1)}})},
+			wantErr: true,
+		},
+		{
+			name:    "invalid IP",
+			opts:    []Option{withContext(analytics.Context{IP: net.IP{1, 2, 3}})},
+			wantErr: true,
+		},
+		{
+			name:    "NaN in integrations",
+			opts:    []Option{withIntegrations(analytics.Integrations{"Amplitude": map[string]any{"rate": math.NaN()}})},
+			wantErr: true,
+		},
+		{
+			name:    "timestamp after year 9999",
+			opts:    []Option{withTimestamp(time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC))},
+			wantErr: true,
+		},
+		{
+			name:    "timestamp before year 0",
+			opts:    []Option{withTimestamp(time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC))},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := applyOptions(tt.opts)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrInvalidValue)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestAnalyticsContext(t *testing.T) {
+	caller := analytics.Context{
+		Locale: "en-US",
+		Extra:  map[string]any{"ruddertyper": "overwritten", "custom": 1},
+		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
+	}
+
+	got := callOptions{context: &caller}.analyticsContext(analytics.Traits{"email": "typed@example.com"})
+
+	assert.Equal(t, &analytics.Context{
+		Locale: "en-US",
+		Extra:  map[string]any{"custom": 1, "ruddertyper": rudderTyperContext()},
+		Traits: analytics.Traits{"email": "typed@example.com", "name": "Caller"},
+	}, got)
+	assert.Equal(t, analytics.Context{
+		Locale: "en-US",
+		Extra:  map[string]any{"ruddertyper": "overwritten", "custom": 1},
+		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
+	}, caller)
+	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext(nil))
+}
+
+// fakeClient records the messages it is given instead of sending them.
+type fakeClient struct{ messages []analytics.Message }
+
+func (c *fakeClient) Enqueue(msg analytics.Message) error {
+	c.messages = append(c.messages, msg)
+	return nil
+}
+
+func (c *fakeClient) Close() error { return nil }
+
+func TestSendOwnsItsInputs(t *testing.T) {
+	var (
+		count = 1
+		props = testObject{
+			Name:                 "a",
+			Tags:                 []string{"t"},
+			AdditionalProperties: map[string]any{"count": &count, "nested": map[string]any{"list": []any{"x"}}},
+		}
+		ctx = analytics.Context{
+			IP:     net.IP{127, 0, 0, 1},
+			Extra:  map[string]any{"custom": map[string]any{"k": "v"}},
+			Traits: analytics.Traits{"plan": []any{"pro"}},
+		}
+		integrations = analytics.Integrations{"Amplitude": map[string]any{"key": "v"}}
+		client       = &fakeClient{}
+	)
+
+	// Mirrors a generated track method and its send helper, which live in the
+	// templates.
+	p, err := snapshot(props)
+	require.NoError(t, err)
+	o, err := applyOptions([]Option{nil, withContext(ctx), withIntegrations(integrations)})
+	require.NoError(t, err)
+	require.NoError(t, client.Enqueue(analytics.Track{
+		UserId:            "user-123",
+		Event:             "Some Event",
+		Properties:        p,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+	}))
+
+	count = 2
+	props.Tags[0] = "changed"
+	props.AdditionalProperties["nested"].(map[string]any)["list"].([]any)[0] = "changed"
+	props.AdditionalProperties["added"] = true
+	ctx.IP[0] = 10
+	ctx.Extra["custom"].(map[string]any)["k"] = "changed"
+	ctx.Traits["plan"].([]any)[0] = "changed"
+	integrations["Amplitude"].(map[string]any)["key"] = "changed"
+	integrations["All"] = false
+
+	assert.Equal(t, []analytics.Message{analytics.Track{
+		UserId: "user-123",
+		Event:  "Some Event",
+		Properties: analytics.Properties{
+			"name":   "a",
+			"tags":   []any{"t"},
+			"count":  int64(1),
+			"nested": map[string]any{"list": []any{"x"}},
+		},
+		Context: &analytics.Context{
+			IP:     net.IP{127, 0, 0, 1},
+			Extra:  map[string]any{"custom": map[string]any{"k": "v"}, "ruddertyper": rudderTyperContext()},
+			Traits: analytics.Traits{"plan": []any{"pro"}},
+		},
+		Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
+	}}, client.messages)
+}
