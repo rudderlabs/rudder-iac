@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testutils"
@@ -81,9 +80,7 @@ func TestGenerateGoldens(t *testing.T) {
 
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
-			if diff := cmp.Diff(string(want), files[0].Content); diff != "" {
-				t.Errorf("generated content does not match %s (-want +got):\n%s\nRun 'make typer-go-update-testdata' to update the goldens.", golden.Path, diff)
-			}
+			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
 		})
 	}
