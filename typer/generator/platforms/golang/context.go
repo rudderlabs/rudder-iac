@@ -36,8 +36,11 @@ type GoPayload struct {
 	Doc      string
 	MapAlias bool
 	// Open structs carry undeclared keys in AdditionalProperties.
-	Open   bool
-	Fields []GoField
+	Open bool
+	// DeclaredKeys are the wire keys the schema declares, which
+	// AdditionalProperties can never supply, including those of skipped fields.
+	DeclaredKeys []string
+	Fields       []GoField
 }
 
 // GoField is a payload struct field, in byte order of its wire key.

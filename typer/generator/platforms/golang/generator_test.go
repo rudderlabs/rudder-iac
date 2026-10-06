@@ -120,6 +120,28 @@ func TestGenerateRejectsUnnamedTrackEvents(t *testing.T) {
 	}
 }
 
+// A skipped property is still declared, so AdditionalProperties cannot supply it.
+func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
+	warnings := captureWarnings(t)
+	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{
+			AdditionalProperties: true,
+			Properties: map[string]plan.PropertySchema{
+				"name": {Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}},
+			},
+		},
+	}}}
+
+	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+
+	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
+	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)
+}
+
 func captureWarnings(t *testing.T) *[]string {
 	t.Helper()
 	var warnings []string

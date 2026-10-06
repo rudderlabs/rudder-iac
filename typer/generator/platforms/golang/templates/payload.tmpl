@@ -17,7 +17,7 @@ type {{ .Name }} struct {
 
 func (v {{ .Name }}) toMap() map[string]any {
 {{- if .Open }}
-	m := withAdditional(v.AdditionalProperties{{ range .Fields }}, {{ quote .Key }}{{ end }})
+	m := withAdditional(v.AdditionalProperties{{ range .DeclaredKeys }}, {{ quote . }}{{ end }})
 {{- range .Fields }}
 {{- if .Required }}
 	m[{{ quote .Key }}] = v.{{ .Name }}

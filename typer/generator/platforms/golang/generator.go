@@ -333,6 +333,7 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 			payload.Doc = fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name))
 		} else {
 			payload.Open = schema.AdditionalProperties
+			payload.DeclaredKeys = slices.Sorted(maps.Keys(schema.Properties))
 			payload.Doc = fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name))
 			if payload.Fields, err = structFields(r, payload, propertyTypes, registry); err != nil {
 				return err
