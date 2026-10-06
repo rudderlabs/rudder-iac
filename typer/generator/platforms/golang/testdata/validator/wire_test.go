@@ -74,20 +74,17 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 	return rec.batches[0], rec.callback
 }
 
-// sdkFilled are the top-level keys the SDK fills with values a test cannot
-// predict; context.library is the nested one.
-var sdkFilled = []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"}
-
 // assertMessage compares got whole with want, a JSON object. The SDK-filled
-// keys are ignored unless want asserts them, so WithMessageID and
-// WithTimestamp stay testable.
+// messageId, originalTimestamp, sentAt, anonymousId and context.library are
+// ignored unless want asserts them, so WithMessageID and WithTimestamp stay
+// testable.
 func assertMessage(t *testing.T, want string, got map[string]any) {
 	t.Helper()
 	var w map[string]any
 	require.NoError(t, decode(strings.NewReader(want), &w))
 
 	got = maps.Clone(got)
-	for _, key := range sdkFilled {
+	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"} {
 		if _, ok := w[key]; !ok {
 			delete(got, key)
 		}
