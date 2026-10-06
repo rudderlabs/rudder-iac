@@ -101,19 +101,17 @@ func SplitIntoWords(input string) []string {
 // SanitizeForIdentifier replaces every rune that is not a letter, a digit or a
 // separator SplitIntoWords recognizes ('_', '-', '.', ' ') with a space, so it
 // becomes a word boundary instead of reaching an identifier.
+//
+// Unlike ReplaceSpecialCharacters, which Kotlin enum constants use to keep
+// symbols as visible underscores, it keeps only decimal digits: identifiers
+// reject other numbers such as ² or Ⅻ.
 func SanitizeForIdentifier(s string) string {
-	var result strings.Builder
-	result.Grow(len(s))
-
-	for _, ch := range s {
-		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
-			result.WriteRune(ch)
-		} else {
-			result.WriteRune(' ')
+	return strings.Map(func(ch rune) rune {
+		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || strings.ContainsRune("_-. ", ch) {
+			return ch
 		}
-	}
-
-	return result.String()
+		return ' '
+	}, s)
 }
 
 func ReplaceSpecialCharacters(input, replacement string) string {
