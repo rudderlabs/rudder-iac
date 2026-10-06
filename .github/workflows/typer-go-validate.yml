@@ -61,12 +61,12 @@ jobs:
           fi
 
       # The validator module declares go 1.21, the oldest Go the generated code supports.
-      - name: run typer-go-validate against analytics-go v4.2.2
+      - name: run typer-go-validate against pinned analytics-go
         env:
           GOTOOLCHAIN: go1.21.0
         run: make typer-go-validate
 
-      # The upgrade stays in this job; the committed pin remains v4.2.2.
+      # The upgrade stays in this job; the committed pin is untouched.
       - name: run typer-go-validate against latest analytics-go v4
         env:
           GOTOOLCHAIN: go1.21.0
