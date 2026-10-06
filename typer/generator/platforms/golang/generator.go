@@ -36,7 +36,9 @@ func (g *Generator) Generate(p *plan.TrackingPlan, options core.GenerateOptions,
 	return []*core.File{{Path: opts.OutputFileName, Content: content}}, nil
 }
 
-// resolveOptions fills unset options with their defaults and validates them.
+// resolveOptions validates the given options as they are: the CLI decodes the
+// user's options onto the defaults, so an empty value was set explicitly and
+// is invalid. Without options the defaults apply.
 func resolveOptions(defaults GoOptions, platformOptions any) (GoOptions, error) {
 	if platformOptions == nil {
 		return defaults, nil
@@ -45,8 +47,6 @@ func resolveOptions(defaults GoOptions, platformOptions any) (GoOptions, error) 
 	if !ok {
 		return GoOptions{}, fmt.Errorf("unexpected platform options type %T", platformOptions)
 	}
-	opts.PackageName = cmp.Or(opts.PackageName, defaults.PackageName)
-	opts.OutputFileName = cmp.Or(opts.OutputFileName, defaults.OutputFileName)
 	if err := opts.Validate(); err != nil {
 		return GoOptions{}, err
 	}

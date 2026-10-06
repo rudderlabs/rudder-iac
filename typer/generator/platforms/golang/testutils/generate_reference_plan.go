@@ -16,7 +16,7 @@ import (
 func main() {
 	fm := core.NewFileManager("typer/generator/platforms/golang")
 	for _, g := range testutils.Goldens {
-		files, err := (&golang.Generator{}).Generate(g.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golang.GoOptions{PackageName: g.PackageName})
+		files, err := (&golang.Generator{}).Generate(g.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, g.Options)
 		if err != nil {
 			log.Fatalf("generating %s: %v", g.Path, err)
 		}

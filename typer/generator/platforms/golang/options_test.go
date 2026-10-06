@@ -20,6 +20,7 @@ func TestOptionsValidate(t *testing.T) {
 		{"digits after the first letter", golang.GoOptions{PackageName: "events2", OutputFileName: "events.go"}, ""},
 		{"file name with an OS-like stem", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "linux.go"}, ""},
 		{"file name with an underscore", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "rudder_typer.go"}, ""},
+		{"init, which callers import under an alias", golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"}, ""},
 		{
 			"upper-case package name",
 			golang.GoOptions{PackageName: "RudderTyper", OutputFileName: "ruddertyper.go"},
@@ -44,11 +45,6 @@ func TestOptionsValidate(t *testing.T) {
 			"main",
 			golang.GoOptions{PackageName: "main", OutputFileName: "ruddertyper.go"},
 			`validating packageName "main": package main is a command and cannot be imported`,
-		},
-		{
-			"init",
-			golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"},
-			`validating packageName "init": init is reserved for initialization functions and cannot name an imported package`,
 		},
 		{
 			"keyword",
@@ -131,16 +127,31 @@ func TestGenerateOptions(t *testing.T) {
 		assert.Equal(t, golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper.go"}, gen.DefaultOptions())
 	})
 
-	t.Run("unset options take their defaults", func(t *testing.T) {
-		files, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{PackageName: "events"})
+	t.Run("no options take the defaults", func(t *testing.T) {
+		files, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, nil)
 		require.NoError(t, err)
 		require.Len(t, files, 1)
 		assert.Equal(t, "ruddertyper.go", files[0].Path)
+		assert.Contains(t, files[0].Content, "\npackage ruddertyper\n")
+	})
+
+	t.Run("given options are used", func(t *testing.T) {
+		files, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{PackageName: "events", OutputFileName: "events.go"})
+		require.NoError(t, err)
+		require.Len(t, files, 1)
+		assert.Equal(t, "events.go", files[0].Path)
 		assert.Contains(t, files[0].Content, "\npackage events\n")
 	})
 
+	// The CLI decodes the user's options onto the defaults, so an empty value
+	// was set explicitly.
+	t.Run("empty options fail generation", func(t *testing.T) {
+		_, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{PackageName: "ruddertyper"})
+		assert.EqualError(t, err, `validating outputFileName "": must end in .go`)
+	})
+
 	t.Run("invalid options fail generation", func(t *testing.T) {
-		_, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{OutputFileName: "events_test.go"})
+		_, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "events_test.go"})
 		assert.EqualError(t, err, `validating outputFileName "events_test.go": go build ignores _test.go files`)
 	})
 }

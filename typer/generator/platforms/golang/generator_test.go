@@ -73,7 +73,7 @@ func TestGenerateGoldens(t *testing.T) {
 		t.Run(golden.Path, func(t *testing.T) {
 			warnings := captureWarnings(t)
 
-			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golang.GoOptions{PackageName: golden.PackageName})
+			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golden.Options)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 			assert.Equal(t, "ruddertyper.go", files[0].Path)

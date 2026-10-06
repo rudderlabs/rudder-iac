@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 	plantestutils "github.com/rudderlabs/rudder-iac/typer/plan/testutils"
 )
@@ -8,8 +9,8 @@ import (
 // Golden is a plan whose generated output is committed under
 // testdata/validator, each golden in its own package directory.
 type Golden struct {
-	Plan        func() *plan.TrackingPlan
-	PackageName string
+	Plan    func() *plan.TrackingPlan
+	Options golang.GoOptions
 	// Path is relative to the Go platform's package directory.
 	Path string
 }
@@ -18,13 +19,13 @@ type Golden struct {
 // (make typer-go-update-testdata) run.
 var Goldens = []Golden{
 	{
-		Plan:        plantestutils.GetReferenceTrackingPlan,
-		PackageName: "ruddertyper",
-		Path:        "testdata/validator/ruddertyper/ruddertyper.go",
+		Plan:    plantestutils.GetReferenceTrackingPlan,
+		Options: golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper.go"},
+		Path:    "testdata/validator/ruddertyper/ruddertyper.go",
 	},
 	{
-		Plan:        GetExamplesTrackingPlan,
-		PackageName: "examples",
-		Path:        "testdata/validator/examples/ruddertyper.go",
+		Plan:    GetExamplesTrackingPlan,
+		Options: golang.GoOptions{PackageName: "examples", OutputFileName: "ruddertyper.go"},
+		Path:    "testdata/validator/examples/ruddertyper.go",
 	},
 }
