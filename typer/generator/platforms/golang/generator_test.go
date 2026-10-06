@@ -139,9 +139,9 @@ func TestGenerateQuickStart(t *testing.T) {
 		want  string
 	}{
 		{
-			"payload with an emitted field before one whose fields were all skipped",
+			"payload that declares only skipped properties before one with an emitted field",
 			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": enumProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
-			"//\terr := rt.TrackB(\n",
+			"//\terr := rt.TrackA(\n",
 		},
 		{
 			"payload that declares a property before one without properties",

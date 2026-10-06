@@ -13,9 +13,9 @@
 //	defer client.Close()
 //
 //	rt := ruddertyper.New(client)
-//	err := rt.TrackProductPremiumClicked(
+//	err := rt.TrackVariableString(
 //		ruddertyper.Identity{UserID: "user-123"},
-//		ruddertyper.TrackProductPremiumClickedProperties{ /* ... */ },
+//		ruddertyper.TrackVariableStringProperties{ /* ... */ },
 //	)
 package ruddertyper
 

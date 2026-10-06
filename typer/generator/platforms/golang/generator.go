@@ -132,20 +132,15 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 }
 
 // quickStart picks the method the package doc calls: the first whose payload
-// declares a property, else the first method. While the skip check drops
-// fields, a payload can declare properties and still be an empty struct, so a
-// payload with an emitted field comes first.
+// declares a property, else the first method.
 func quickStart(methods []GoMethod) *GoMethod {
-	for _, pick := range []func(GoMethod) bool{
-		func(m GoMethod) bool { return m.Payload != nil && len(m.Payload.Fields) > 0 },
-		func(m GoMethod) bool { return m.Payload != nil && !m.Payload.MapAlias },
-		func(GoMethod) bool { return true },
-	} {
-		if i := slices.IndexFunc(methods, pick); i >= 0 {
-			return &methods[i]
-		}
+	if len(methods) == 0 {
+		return nil
 	}
-	return nil
+	if i := slices.IndexFunc(methods, func(m GoMethod) bool { return m.Payload != nil && !m.Payload.MapAlias }); i >= 0 {
+		return &methods[i]
+	}
+	return &methods[0]
 }
 
 // trackRules returns the plan's track rules in rule-key order. Rules, variants
