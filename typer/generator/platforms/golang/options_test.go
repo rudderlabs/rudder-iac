@@ -23,92 +23,92 @@ func TestOptionsValidate(t *testing.T) {
 		{
 			"upper-case package name",
 			golang.GoOptions{PackageName: "RudderTyper", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "RudderTyper": must match ^[a-z][a-z0-9]*$`,
+			`validating packageName "RudderTyper": must match ^[a-z][a-z0-9]*$`,
 		},
 		{
 			"underscore in package name",
 			golang.GoOptions{PackageName: "rudder_typer", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "rudder_typer": must match ^[a-z][a-z0-9]*$`,
+			`validating packageName "rudder_typer": must match ^[a-z][a-z0-9]*$`,
 		},
 		{
 			"package name starting with a digit",
 			golang.GoOptions{PackageName: "1typer", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "1typer": must match ^[a-z][a-z0-9]*$`,
+			`validating packageName "1typer": must match ^[a-z][a-z0-9]*$`,
 		},
 		{
 			"empty package name",
 			golang.GoOptions{PackageName: "", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "": must match ^[a-z][a-z0-9]*$`,
+			`validating packageName "": must match ^[a-z][a-z0-9]*$`,
 		},
 		{
 			"main",
 			golang.GoOptions{PackageName: "main", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "main": package main is a command and cannot be imported`,
+			`validating packageName "main": package main is a command and cannot be imported`,
 		},
 		{
 			"init",
 			golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "init": init is reserved for initialization functions and cannot name an imported package`,
+			`validating packageName "init": init is reserved for initialization functions and cannot name an imported package`,
 		},
 		{
 			"keyword",
 			golang.GoOptions{PackageName: "func", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "func": it is a Go keyword`,
+			`validating packageName "func": it is a Go keyword`,
 		},
 		{
 			"predeclared type",
 			golang.GoOptions{PackageName: "string", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "string": it is a predeclared Go identifier`,
+			`validating packageName "string": it is a predeclared Go identifier`,
 		},
 		{
 			"predeclared function",
 			golang.GoOptions{PackageName: "len", OutputFileName: "ruddertyper.go"},
-			`invalid packageName "len": it is a predeclared Go identifier`,
+			`validating packageName "len": it is a predeclared Go identifier`,
 		},
 		{
 			"not a Go file",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper.txt"},
-			`invalid outputFileName "ruddertyper.txt": must end in .go`,
+			`validating outputFileName "ruddertyper.txt": must end in .go`,
 		},
 		{
 			"test file",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper_test.go"},
-			`invalid outputFileName "ruddertyper_test.go": go build ignores _test.go files`,
+			`validating outputFileName "ruddertyper_test.go": go build ignores _test.go files`,
 		},
 		{
 			"path",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "gen/ruddertyper.go"},
-			`invalid outputFileName "gen/ruddertyper.go": must be a file name, not a path`,
+			`validating outputFileName "gen/ruddertyper.go": must be a file name, not a path`,
 		},
 		{
 			"windows path",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: `gen\ruddertyper.go`},
-			`invalid outputFileName "gen\\ruddertyper.go": must be a file name, not a path`,
+			`validating outputFileName "gen\\ruddertyper.go": must be a file name, not a path`,
 		},
 		{
 			"leading underscore",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "_ruddertyper.go"},
-			`invalid outputFileName "_ruddertyper.go": go build ignores files starting with _ or .`,
+			`validating outputFileName "_ruddertyper.go": go build ignores files starting with _ or .`,
 		},
 		{
 			"leading dot",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: ".ruddertyper.go"},
-			`invalid outputFileName ".ruddertyper.go": go build ignores files starting with _ or .`,
+			`validating outputFileName ".ruddertyper.go": go build ignores files starting with _ or .`,
 		},
 		{
 			"GOOS suffix",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper_linux.go"},
-			`invalid outputFileName "ruddertyper_linux.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
+			`validating outputFileName "ruddertyper_linux.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
 		},
 		{
 			"GOARCH suffix",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper_arm64.go"},
-			`invalid outputFileName "ruddertyper_arm64.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
+			`validating outputFileName "ruddertyper_arm64.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
 		},
 		{
 			"GOOS and GOARCH suffix",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper_windows_amd64.go"},
-			`invalid outputFileName "ruddertyper_windows_amd64.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
+			`validating outputFileName "ruddertyper_windows_amd64.go": a _GOOS or _GOARCH suffix restricts the file to one platform`,
 		},
 	}
 
@@ -141,6 +141,6 @@ func TestGenerateOptions(t *testing.T) {
 
 	t.Run("invalid options fail generation", func(t *testing.T) {
 		_, err := gen.Generate(&plan.TrackingPlan{}, core.GenerateOptions{}, golang.GoOptions{OutputFileName: "events_test.go"})
-		assert.EqualError(t, err, `invalid outputFileName "events_test.go": go build ignores _test.go files`)
+		assert.EqualError(t, err, `validating outputFileName "events_test.go": go build ignores _test.go files`)
 	})
 }
