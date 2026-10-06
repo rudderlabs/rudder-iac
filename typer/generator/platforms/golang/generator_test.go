@@ -89,8 +89,8 @@ func TestGenerateGoldens(t *testing.T) {
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
-			// Nothing compiles the goldens, so only this catches a runtime
-			// import that the template does not declare.
+			// Only the validator module compiles the goldens, so this is what
+			// catches a runtime import the template does not declare here.
 			for _, imp := range runtimeFile.Imports {
 				assert.Contains(t, files[0].Content, imp.Path.Value)
 			}
