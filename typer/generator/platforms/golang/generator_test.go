@@ -1,6 +1,8 @@
 package golang_test
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"regexp"
 	"testing"
@@ -67,6 +69,8 @@ func TestGenerateGoldens(t *testing.T) {
 		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
 		"testdata/validator/examples/ruddertyper.go":    nil,
 	}
+	runtimeFile, err := parser.ParseFile(token.NewFileSet(), "internal/runtime/runtime.go", nil, parser.ImportsOnly)
+	require.NoError(t, err)
 
 	for _, golden := range testutils.Goldens {
 		t.Run(golden.Path, func(t *testing.T) {
@@ -85,6 +89,11 @@ func TestGenerateGoldens(t *testing.T) {
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
+			// Nothing compiles the goldens, so only this catches a runtime
+			// import that the template does not declare.
+			for _, imp := range runtimeFile.Imports {
+				assert.Contains(t, files[0].Content, imp.Path.Value)
+			}
 		})
 	}
 }
