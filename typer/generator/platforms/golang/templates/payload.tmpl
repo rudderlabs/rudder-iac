@@ -18,26 +18,22 @@ type {{ .Name }} struct {
 func (v {{ .Name }}) toMap() map[string]any {
 {{- if .Open }}
 	m := withAdditional(v.AdditionalProperties{{ range .DeclaredKeys }}, {{ quote . }}{{ end }})
-{{- range .Fields }}
-{{- if .Required }}
-	m[{{ quote .Key }}] = v.{{ .Name }}
-{{- else }}
-	if v.{{ .Name }} != nil {
-		m[{{ quote .Key }}] = {{ if .Pointer }}*{{ end }}v.{{ .Name }}
-	}
-{{- end }}
-{{- end }}
 {{- else }}
 	m := map[string]any{
 {{- range .Fields }}{{ if .Required }}
 		{{ quote .Key }}: v.{{ .Name }},
 {{- end }}{{ end }}
 	}
-{{- range .Fields }}{{ if not .Required }}
+{{- end }}
+{{- /* A closed struct's literal already holds its required fields. */}}
+{{- range .Fields }}
+{{- if not .Required }}
 	if v.{{ .Name }} != nil {
 		m[{{ quote .Key }}] = {{ if .Pointer }}*{{ end }}v.{{ .Name }}
 	}
-{{- end }}{{ end }}
+{{- else if $.Open }}
+	m[{{ quote .Key }}] = v.{{ .Name }}
+{{- end }}
 {{- end }}
 	return m
 }
