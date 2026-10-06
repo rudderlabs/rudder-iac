@@ -62,9 +62,12 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 		DisableGzip:  true,
 		// Only Close flushes, so every call lands in one batch in send order;
 		// smaller batches are sent concurrently and can arrive in any order.
-		BatchSize: 1000,
-		Interval:  time.Hour,
-		Callback:  rec,
+		// The SDK also flushes early once a batch passes MaxBatchBytes
+		// (~500 KB by default), so that limit is lifted too.
+		BatchSize:     1000,
+		MaxBatchBytes: 1 << 30,
+		Interval:      time.Hour,
+		Callback:      rec,
 	})
 	require.NoError(t, err)
 	send(client)
