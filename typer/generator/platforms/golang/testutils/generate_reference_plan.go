@@ -6,9 +6,7 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"log"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
@@ -16,25 +14,14 @@ import (
 )
 
 func main() {
-	root := "typer/generator/platforms/golang"
-	if len(os.Args) > 1 {
-		root = os.Args[1]
-	}
-
+	fm := core.NewFileManager("typer/generator/platforms/golang")
 	for _, g := range testutils.Goldens {
-		path := filepath.Join(root, g.Path)
 		files, err := (&golang.Generator{}).Generate(g.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golang.GoOptions{PackageName: g.PackageName})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "generating %s: %v\n", path, err)
-			os.Exit(1)
+			log.Fatalf("generating %s: %v", g.Path, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "creating the directory of %s: %v\n", path, err)
-			os.Exit(1)
-		}
-		if err := os.WriteFile(path, []byte(files[0].Content), 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "writing %s: %v\n", path, err)
-			os.Exit(1)
+		if err := fm.WriteFile(&core.File{Path: g.Path, Content: files[0].Content}); err != nil {
+			log.Fatalf("writing %s: %v", g.Path, err)
 		}
 	}
 }
