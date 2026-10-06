@@ -65,6 +65,10 @@ type trackRule struct {
 // properties with the same name and different types.
 type propertyKey struct{ name, signature string }
 
+func keyOf(p plan.Property) propertyKey {
+	return propertyKey{p.Name, typeSignature(p)}
+}
+
 type propertyType struct {
 	name    string
 	nilable bool
@@ -110,11 +114,13 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	}
 
 	ctx.Imports = []string{"errors", "maps", "time"}
+	var usesJSON bool
 	for _, payload := range ctx.Payloads {
+		usesJSON = usesJSON || !payload.MapAlias
 		ctx.UsesWithAdditional = ctx.UsesWithAdditional || payload.Open
 		ctx.UsesPtr = ctx.UsesPtr || slices.ContainsFunc(payload.Fields, func(f GoField) bool { return f.Pointer })
 	}
-	if slices.ContainsFunc(ctx.Payloads, func(p *GoPayload) bool { return !p.MapAlias }) {
+	if usesJSON {
 		ctx.Imports = append(ctx.Imports, "encoding/json")
 	}
 	if ctx.UsesWithAdditional {
@@ -267,7 +273,7 @@ func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegi
 	for _, r := range rules {
 		for _, wireKey := range r.fields {
 			prop := r.rule.Schema.Properties[wireKey].Property
-			k := propertyKey{prop.Name, typeSignature(prop)}
+			k := keyOf(prop)
 			if _, seen := first[k]; !seen {
 				first[k] = prop
 			}
@@ -312,25 +318,11 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 		return fmt.Errorf("naming track event %q: %w", event.Name, err)
 	}
 
-	var payload *GoPayload
-	schema := r.rule.Schema
-	if len(schema.Properties) > 0 || schema.AdditionalProperties {
-		name, err := registry.RegisterName("payload:"+r.key, packageScope, "Track"+base+"Properties")
-		if err != nil {
-			return fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
-		}
-		payload = &GoPayload{Name: name}
-		if len(schema.Properties) == 0 {
-			payload.MapAlias = true
-			payload.Doc = fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name))
-		} else {
-			payload.Open = schema.AdditionalProperties
-			payload.DeclaredKeys = slices.Sorted(maps.Keys(schema.Properties))
-			payload.Doc = fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name))
-			if payload.Fields, err = structFields(r, payload, propertyTypes, registry); err != nil {
-				return err
-			}
-		}
+	payload, err := newPayload(r, base, propertyTypes, registry)
+	if err != nil {
+		return err
+	}
+	if payload != nil {
 		ctx.Payloads = append(ctx.Payloads, payload)
 	}
 
@@ -354,12 +346,50 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 	return nil
 }
 
+// newPayload registers the payload type of a track rule whose event name
+// pascal-cases to base, or returns nil when the rule's schema is empty and
+// closed.
+func newPayload(r trackRule, base string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoPayload, error) {
+	var (
+		event  = r.rule.Event
+		schema = r.rule.Schema
+	)
+	if len(schema.Properties) == 0 && !schema.AdditionalProperties {
+		return nil, nil
+	}
+
+	name, err := registry.RegisterName("payload:"+r.key, packageScope, "Track"+base+"Properties")
+	if err != nil {
+		return nil, fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
+	}
+	if len(schema.Properties) == 0 {
+		return &GoPayload{
+			Name:     name,
+			Doc:      fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name)),
+			MapAlias: true,
+		}, nil
+	}
+
+	payload := &GoPayload{
+		Name:         name,
+		Doc:          fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)),
+		Open:         schema.AdditionalProperties,
+		DeclaredKeys: slices.Sorted(maps.Keys(schema.Properties)),
+	}
+	if payload.Fields, err = structFields(r, payload, propertyTypes, registry); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
 // structFields names the fields of a payload struct in byte order of their
 // wire keys, after the names the struct's own methods and its
 // AdditionalProperties field already hold.
 func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) ([]GoField, error) {
-	scope := "struct:" + payload.Name + ":fields"
-	reserved := []string{"MarshalJSON", "ToProperties"}
+	var (
+		scope    = "struct:" + payload.Name + ":fields"
+		reserved = []string{"MarshalJSON", "ToProperties"}
+	)
 	if payload.Open {
 		reserved = append(reserved, "AdditionalProperties")
 	}
@@ -381,7 +411,7 @@ func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey
 			return nil, fmt.Errorf("registering property %q of track event %q: %w", wireKey, r.rule.Event.Name, err)
 		}
 
-		pt := propertyTypes[propertyKey{ps.Property.Name, typeSignature(ps.Property)}]
+		pt := propertyTypes[keyOf(ps.Property)]
 		field := GoField{Name: name, Key: wireKey, Type: pt.name, Required: ps.Required}
 		// Optional fields need an absent state; slices, maps and interfaces
 		// already have one in nil.
