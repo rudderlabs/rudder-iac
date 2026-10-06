@@ -1,0 +1,75 @@
+name: typer go validate
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "typer/generator/platforms/golang/**"
+      - "typer/generator/core/**"
+      - "typer/plan/**"
+      - "Makefile"
+      - ".github/workflows/typer-go-validate.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "typer/generator/platforms/golang/**"
+      - "typer/generator/core/**"
+      - "typer/plan/**"
+      - "Makefile"
+      - ".github/workflows/typer-go-validate.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typer-go-validate:
+    name: validate generated Go against RudderStack Go SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: setup go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: regenerate golden files
+        run: make typer-go-update-testdata
+
+      # git status, not git diff, so a golden that was never committed fails too.
+      - name: assert validator directory is unchanged
+        run: |
+          changes=$(git status --porcelain -- typer/generator/platforms/golang/testdata/validator)
+          if [ -n "$changes" ]; then
+            echo "$changes"
+            echo "::error::Go golden files are out of date. Run 'make typer-go-update-testdata' locally and commit the changes."
+            exit 1
+          fi
+
+      # The validator module declares go 1.21, the oldest Go the generated code supports.
+      - name: run typer-go-validate against analytics-go v4.2.2
+        env:
+          GOTOOLCHAIN: go1.21.0
+        run: make typer-go-validate
+
+      # The upgrade stays in this job; the committed pin remains v4.2.2.
+      - name: run typer-go-validate against latest analytics-go v4
+        env:
+          GOTOOLCHAIN: go1.21.0
+        run: |
+          (cd typer/generator/platforms/golang/testdata/validator && go get github.com/rudderlabs/analytics-go/v4@latest)
+          make typer-go-validate
