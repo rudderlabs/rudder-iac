@@ -60,7 +60,8 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 	client, err := analytics.NewWithConfig("write-key", analytics.Config{
 		DataPlaneUrl: srv.URL,
 		DisableGzip:  true,
-		// Only Close flushes, so every call lands in one batch in send order;
+		// Only Close flushes while a capture stays under the default ~500 KB
+		// MaxBatchBytes, so every call lands in one batch in send order;
 		// smaller batches are sent concurrently and can arrive in any order.
 		BatchSize: 1000,
 		Interval:  time.Hour,
