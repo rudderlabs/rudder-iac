@@ -120,6 +120,54 @@ func TestGenerateRejectsUnnamedTrackEvents(t *testing.T) {
 	}
 }
 
+func TestGenerateQuickStart(t *testing.T) {
+	var (
+		stringProperty = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		enumProperty   = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
+	)
+	rule := func(event string, properties map[string]plan.PropertySchema) plan.EventRule {
+		return plan.EventRule{
+			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
+			Section: plan.IdentitySectionProperties,
+			Schema:  plan.ObjectSchema{Properties: properties},
+		}
+	}
+
+	tests := []struct {
+		name  string
+		rules []plan.EventRule
+		want  string
+	}{
+		{
+			"payload with an emitted field before one whose fields were all skipped",
+			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": enumProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			"//\terr := rt.TrackB(\n",
+		},
+		{
+			"payload that declares a property before one without properties",
+			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": enumProperty})},
+			"//\terr := rt.TrackB(\n",
+		},
+		{
+			"first method when no payload declares a property",
+			[]plan.EventRule{rule("A", nil), rule("B", nil)},
+			"//\terr := rt.TrackA(\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			captureWarnings(t)
+
+			files, err := (&golang.Generator{}).Generate(&plan.TrackingPlan{Rules: tt.rules}, core.GenerateOptions{}, nil)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			assert.Contains(t, files[0].Content, tt.want)
+		})
+	}
+}
+
 // A skipped property is still declared, so AdditionalProperties cannot supply it.
 func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	warnings := captureWarnings(t)
