@@ -37,11 +37,6 @@ func TestTypeSignature(t *testing.T) {
 			plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}}},
 			"custom:email;items:;enum:",
 		},
-		{
-			"enum values in plan order",
-			plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeNumber, plan.PrimitiveTypeInteger}, Config: &plan.PropertyConfig{Enum: []any{2, 1}}},
-			"integer|number;items:;enum:[2,1]",
-		},
 	}
 
 	for _, tt := range tests {

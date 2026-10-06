@@ -19,9 +19,10 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 // message and could otherwise modify a shared one.
 func rudderTyperContext() map[string]any {
 	return map[string]any{
-{{- range $key, $value := .EventContext }}
-		{{ quote $key }}: {{ $value }},
-{{- end }}
+		"platform": "go",
+		"rudderCLIVersion": {{ quote .RudderCLIVersion }},
+		"trackingPlanId": {{ quote .PlanID }},
+		"trackingPlanVersion": {{ .PlanVersion }},
 	}
 }
 

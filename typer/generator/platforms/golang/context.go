@@ -9,8 +9,6 @@ type GoContext struct {
 	PlanURL          string
 	PlanID           string
 	PlanVersion      int
-	// EventContext maps each context.ruddertyper key to its Go literal.
-	EventContext map[string]string
 	// Imports lists the standard library packages the file uses.
 	Imports            []string
 	UsesPtr            bool

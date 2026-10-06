@@ -22,11 +22,7 @@ func commentLines(text string) []string {
 func comment(text string) string {
 	lines := commentLines(text)
 	for i, line := range lines {
-		if line == "" {
-			lines[i] = "//"
-			continue
-		}
-		lines[i] = "// " + line
+		lines[i] = strings.TrimSuffix("// "+line, " ")
 	}
 	return strings.Join(lines, "\n")
 }

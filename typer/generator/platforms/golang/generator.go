@@ -2,7 +2,6 @@ package golang
 
 import (
 	"cmp"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -13,9 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
-
-// Platform is the --platform key of the Go generator.
-const Platform = "go"
 
 // Generator generates a Go package for the RudderStack Go SDK,
 // github.com/rudderlabs/analytics-go/v4.
@@ -82,12 +78,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		PlanURL:          p.Metadata.URL,
 		PlanID:           p.Metadata.TrackingPlanID,
 		PlanVersion:      p.Metadata.TrackingPlanVersion,
-		EventContext: map[string]string{
-			"platform":            strconv.Quote(Platform),
-			"rudderCLIVersion":    strconv.Quote(version),
-			"trackingPlanId":      strconv.Quote(p.Metadata.TrackingPlanID),
-			"trackingPlanVersion": strconv.Itoa(p.Metadata.TrackingPlanVersion),
-		},
 	}
 
 	registry := core.NewNameRegistry(core.DefaultCollisionHandler)
@@ -96,10 +86,9 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 			return nil, fmt.Errorf("reserving %s: %w", name, err)
 		}
 	}
-	for _, name := range reservedMethodNames {
-		if _, err := registry.RegisterName("reserved:"+name, methodScope, name); err != nil {
-			return nil, fmt.Errorf("reserving %s: %w", name, err)
-		}
+	// No event may take Alias, so a future alias rule needs no renames.
+	if _, err := registry.RegisterName("reserved:Alias", methodScope, "Alias"); err != nil {
+		return nil, fmt.Errorf("reserving Alias: %w", err)
 	}
 
 	rules, err := trackRules(p)
@@ -131,7 +120,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	if ctx.UsesWithAdditional {
 		ctx.Imports = append(ctx.Imports, "slices")
 	}
-	slices.Sort(ctx.Imports)
 
 	for i, m := range ctx.Methods {
 		if m.Payload != nil && !m.Payload.MapAlias {
@@ -221,14 +209,10 @@ func declaredTypes(p plan.Property) string {
 }
 
 // typeSignature is a property's canonical type signature: its sorted types,
-// its sorted item types and its enum values.
+// its sorted item types and its enum values, always empty while the skip check
+// drops enum fields.
 func typeSignature(p plan.Property) string {
-	sig := typeList(p.Types) + ";items:" + typeList(p.ItemTypes) + ";enum:"
-	if p.Config != nil && len(p.Config.Enum) > 0 {
-		values, _ := json.Marshal(p.Config.Enum)
-		sig += string(values)
-	}
-	return sig
+	return typeList(p.Types) + ";items:" + typeList(p.ItemTypes) + ";enum:"
 }
 
 func typeList(types []plan.PropertyType) string {
@@ -366,10 +350,10 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 // wire keys, after the names the struct's own methods and its
 // AdditionalProperties field already hold.
 func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) ([]GoField, error) {
-	scope := fieldScope(payload.Name)
-	reserved := propertiesStructMethods
+	scope := "struct:" + payload.Name + ":fields"
+	reserved := []string{"MarshalJSON", "ToProperties"}
 	if payload.Open {
-		reserved = append(slices.Clone(reserved), additionalPropertiesField)
+		reserved = append(reserved, "AdditionalProperties")
 	}
 	for _, name := range reserved {
 		if _, err := registry.RegisterName("reserved:"+name, scope, name); err != nil {
