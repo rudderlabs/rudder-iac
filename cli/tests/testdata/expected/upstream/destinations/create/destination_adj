@@ -30,6 +30,9 @@
       "android": "device",
       "reactnative": "cloud"
     },
+    "useNativeSDK": {
+      "android": true
+    },
     "partnerParamsKeys": [
       {
         "from": "userId",

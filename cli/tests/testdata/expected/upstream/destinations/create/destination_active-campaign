@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "apiUrl": "https://rudder-cli-e2e.api-us1.com",
     "actid": "activeCampaignActidXXXXXXXXXXXX"
   },
