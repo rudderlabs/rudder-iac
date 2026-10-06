@@ -128,6 +128,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		in      any
 		want    map[string]any
 		wantErr error
+		wantAs  any // a pointer errors.As must fill from the error chain
 	}{
 		{
 			name: "integers become int64, unsigned integers uint64",
@@ -233,7 +234,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
-			wantErr: testMarshalError{},
+			wantErr: ErrInvalidValue,
+			wantAs:  new(testMarshalError),
 		},
 		{
 			name:    "map that contains itself",
@@ -293,6 +295,10 @@ func TestSnapshotAndMarshal(t *testing.T) {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.ErrorIs(t, marshalErr, ErrInvalidValue)
 				assert.ErrorIs(t, marshalErr, tt.wantErr)
+				if tt.wantAs != nil {
+					assert.ErrorAs(t, err, tt.wantAs)
+					assert.ErrorAs(t, marshalErr, tt.wantAs)
+				}
 				return
 			}
 			require.NoError(t, err)
