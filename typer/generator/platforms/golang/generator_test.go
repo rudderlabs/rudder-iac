@@ -89,17 +89,32 @@ func TestGenerateGoldens(t *testing.T) {
 	}
 }
 
+// Names are checked before the skip check, so rules and fields the generator
+// leaves out for now fail on them too.
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
-	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
-			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
-			Section: plan.IdentitySectionProperties,
+			Event:   plan.Event{EventType: eventType, Name: event},
+			Section: section,
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}}}
 	}
-	stringProperty := func(name string) map[string]plan.PropertySchema {
-		return map[string]plan.PropertySchema{name: {Property: plan.Property{Name: name, Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}
+	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+		return rule(plan.EventTypeTrack, event, plan.IdentitySectionProperties, properties)
 	}
+	property := func(name string, p plan.PropertySchema) map[string]plan.PropertySchema {
+		p.Property.Name = name
+		return map[string]plan.PropertySchema{name: p}
+	}
+	var (
+		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		enumSchema   = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
+		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
+		nestedSchema = plan.PropertySchema{
+			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
+		}
+	)
 
 	tests := []struct {
 		name    string
@@ -109,7 +124,41 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		{"empty track event name", trackEvent("", nil), "a track event has an empty name"},
 		{"symbols only", trackEvent("!!!", nil), `naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`},
 		{"emoji only", trackEvent("🎯", nil), `naming track event "🎯": name "🎯" has no letters or digits to build a Go identifier from`},
-		{"property without words", trackEvent("Some Event", stringProperty("$$")), `naming property "$$": name "$$" has no letters or digits to build a Go identifier from`},
+		{
+			"track event in a skipped section",
+			rule(plan.EventTypeTrack, "!!!", plan.IdentitySectionTraits, nil),
+			`naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"empty track event in a skipped section",
+			rule(plan.EventTypeTrack, "", plan.IdentitySectionTraits, nil),
+			"a track event has an empty name",
+		},
+		{
+			"skipped event type",
+			rule(plan.EventTypePage, "🎯", plan.IdentitySectionProperties, nil),
+			`naming page event "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"property without words",
+			trackEvent("Some Event", property("$$", stringSchema)),
+			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"skipped property without words",
+			trackEvent("Some Event", property("$$", enumSchema)),
+			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"custom type without words",
+			trackEvent("Some Event", property("kind", customSchema)),
+			`naming custom type "!!!" of property "kind": name "!!!" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"nested property without words",
+			trackEvent("Some Event", property("context", nestedSchema)),
+			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+		},
 	}
 
 	for _, tt := range tests {
