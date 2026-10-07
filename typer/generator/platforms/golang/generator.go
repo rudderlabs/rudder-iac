@@ -73,6 +73,16 @@ type propertyType struct {
 	nilable bool
 }
 
+// Registry scopes: Go has one namespace per package, methods live on
+// RudderTyperAnalytics, and each struct's fields share a namespace with its
+// methods. Every name derived from the plan starts with a role prefix
+// (Property, Track, ...), so none can equal a runtime name such as New or
+// Identity, and neither scope needs reservations.
+const (
+	packageScope = "package"
+	methodScope  = "methods"
+)
+
 func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, error) {
 	ctx := &GoContext{
 		RudderCLIVersion: version,
@@ -84,16 +94,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	}
 
 	registry := core.NewNameRegistry(core.DefaultCollisionHandler)
-	for _, name := range runtimeNames {
-		if _, err := registry.RegisterName("runtime:"+name, packageScope, name); err != nil {
-			return nil, fmt.Errorf("reserving %s: %w", name, err)
-		}
-	}
-	// No event may take Alias, so a future alias rule needs no renames.
-	if _, err := registry.RegisterName("reserved:Alias", methodScope, "Alias"); err != nil {
-		return nil, fmt.Errorf("reserving Alias: %w", err)
-	}
-
 	rules := trackRules(p)
 
 	// Property types register before payloads and methods, so the order in
