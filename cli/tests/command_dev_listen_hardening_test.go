@@ -79,7 +79,7 @@ func TestDevListenRefusesForeignHostsAndCrossSiteReads(t *testing.T) {
 		"LOCALHOST:" + port:         http.StatusOK,
 		"[::1]:" + port:             http.StatusOK,
 	}
-	for _, path := range []string{"/_dev/v1/events", "/_dev/v1/requests", "/_dev/v1/info", "/_dev/ui/"} {
+	for _, path := range []string{"/_local/v1/events", "/_local/v1/requests", "/_local/v1/info", "/_local/ui/"} {
 		for host, want := range hosts {
 			resp := devDo(t, http.MethodGet, p.url()+path, nil, func(r *http.Request) { r.Host = host })
 			assert.Equal(t, want, resp.status, "%s Host=%s", path, host)
@@ -92,7 +92,7 @@ func TestDevListenRefusesForeignHostsAndCrossSiteReads(t *testing.T) {
 		"same-origin": http.StatusOK,
 		"none":        http.StatusOK,
 	} {
-		resp := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events", nil, func(r *http.Request) {
+		resp := devDo(t, http.MethodGet, p.url()+"/_local/v1/events", nil, func(r *http.Request) {
 			r.Header.Set("Sec-Fetch-Site", header)
 		})
 		assert.Equal(t, want, resp.status, "Sec-Fetch-Site: %s", header)
@@ -109,7 +109,7 @@ func TestDevListenRefusesForeignHostsAndCrossSiteReads(t *testing.T) {
 }
 
 // CORS headers belong to ingestion only. A foreign page must not get
-// permission to read /_dev/v1.
+// permission to read /_local/v1.
 func TestDevListenCORSCoversIngestionOnly(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
@@ -120,14 +120,14 @@ func TestDevListenCORSCoversIngestionOnly(t *testing.T) {
 	})
 	assert.Equal(t, "https://app.example", ingest.header.Get("Access-Control-Allow-Origin"))
 
-	for _, path := range []string{"/_dev/v1/info", "/_dev/v1/events", "/_dev/v1/requests", "/_dev/ui/"} {
+	for _, path := range []string{"/_local/v1/info", "/_local/v1/events", "/_local/v1/requests", "/_local/ui/"} {
 		resp := devDo(t, http.MethodGet, p.url()+path, nil, func(r *http.Request) {
 			r.Header.Set("Origin", "https://evil.example")
 		})
 		assert.Empty(t, resp.header.Get("Access-Control-Allow-Origin"), path)
 	}
 
-	preflight := devDo(t, http.MethodOptions, p.url()+"/_dev/v1/events", nil, func(r *http.Request) {
+	preflight := devDo(t, http.MethodOptions, p.url()+"/_local/v1/events", nil, func(r *http.Request) {
 		r.Header.Set("Origin", "https://evil.example")
 		r.Header.Set("Access-Control-Request-Method", "GET")
 	})
@@ -141,7 +141,7 @@ func TestDevListenReviewPageIsLockedDown(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 
-	page := devDo(t, http.MethodGet, p.url()+"/_dev/ui/", nil, nil)
+	page := devDo(t, http.MethodGet, p.url()+"/_local/ui/", nil, nil)
 	require.Equal(t, http.StatusOK, page.status)
 	csp := page.header.Get("Content-Security-Policy")
 	assert.Contains(t, csp, "default-src 'self'")
@@ -153,11 +153,11 @@ func TestDevListenReviewPageIsLockedDown(t *testing.T) {
 	assert.NotContains(t, page.body, "<script>", "the page must not ship inline script")
 
 	for _, path := range []string{
-		"/_dev/ui/../../etc/passwd",
-		"/_dev/ui/%2e%2e/%2e%2e/etc/passwd",
-		"/_dev/ui/..%2f..%2fetc/passwd",
-		"/_dev/ui/%2e%2e%2f",
-		"/_dev/ui/;/",
+		"/_local/ui/../../etc/passwd",
+		"/_local/ui/%2e%2e/%2e%2e/etc/passwd",
+		"/_local/ui/..%2f..%2fetc/passwd",
+		"/_local/ui/%2e%2e%2f",
+		"/_local/ui/;/",
 	} {
 		conn, err := net.Dial("tcp", strings.TrimPrefix(p.url(), "http://"))
 		require.NoError(t, err)
@@ -196,14 +196,14 @@ func TestDevListenMasksTheWriteKey(t *testing.T) {
 	devDo(t, http.MethodGet, p.url()+"/pixel/v1/track?writeKey="+key+"&anonymousId=a&event=px", nil, nil)
 
 	for _, path := range []string{
-		"/_dev/v1/requests?kind=all&view=full&limit=1000",
-		"/_dev/v1/info",
-		"/_dev/v1/guide",
+		"/_local/v1/requests?kind=all&view=full&limit=1000",
+		"/_local/v1/info",
+		"/_local/v1/guide",
 	} {
 		resp := devDo(t, http.MethodGet, p.url()+path, nil, nil)
 		assert.NotContains(t, resp.body, key, path)
 	}
-	full := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?kind=all&view=full&limit=1000", nil, nil)
+	full := devDo(t, http.MethodGet, p.url()+"/_local/v1/requests?kind=all&view=full&limit=1000", nil, nil)
 	assert.NotContains(t, full.body, "session="+key, "cookie headers must not be stored")
 	assert.NotContains(t, strings.ToLower(full.body), "cookie")
 	assert.Contains(t, full.body, "test...kkkk", "the masked form stays recognizable")
@@ -224,7 +224,7 @@ func TestDevListenKeepsTheBytesTheSDKSent(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.status, payload)
 	}
 
-	got := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?event=bytes", nil, nil)
+	got := devDo(t, http.MethodGet, p.url()+"/_local/v1/events?event=bytes", nil, nil)
 	lines := strings.Split(strings.TrimSpace(got.body), "\n")
 	assert.Equal(t, payloads, lines)
 }
@@ -306,9 +306,9 @@ func TestDevListenCapsInFlightRequests(t *testing.T) {
 
 	resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON("dev"))
 	assert.Equal(t, http.StatusServiceUnavailable, resp.status)
-	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).status,
+	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_local/v1/info", nil, nil).status,
 		"the query API must not share the ingestion cap")
-	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/ui/", nil, nil).status)
+	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_local/ui/", nil, nil).status)
 
 	// The body must arrive within 10 s, so the slots come back on their own.
 	require.Eventually(t, func() bool {
@@ -360,7 +360,7 @@ func TestDevListenCapturesParallelWritersExactly(t *testing.T) {
 	}
 	wg.Wait()
 
-	resp := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?limit=1000&view=compact", nil, nil)
+	resp := devDo(t, http.MethodGet, p.url()+"/_local/v1/requests?limit=1000&view=compact", nil, nil)
 	var list struct {
 		Total    int `json:"total"`
 		Requests []struct {
@@ -372,7 +372,7 @@ func TestDevListenCapturesParallelWritersExactly(t *testing.T) {
 	for i := 1; i < len(list.Requests); i++ {
 		require.Greater(t, list.Requests[i].Seq, list.Requests[i-1].Seq)
 	}
-	events := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?event=parallel&limit=1000", nil, nil)
+	events := devDo(t, http.MethodGet, p.url()+"/_local/v1/events?event=parallel&limit=1000", nil, nil)
 	assert.Equal(t, writers*each, len(strings.Split(strings.TrimSpace(events.body), "\n")))
 }
 
@@ -418,13 +418,13 @@ func TestDevListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 			MaxRequests    int `json:"maxRequests"`
 		} `json:"store"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).body), &info))
+	require.NoError(t, json.Unmarshal([]byte(devDo(t, http.MethodGet, p.url()+"/_local/v1/info", nil, nil).body), &info))
 	assert.Equal(t, total, info.Cursor)
 	assert.LessOrEqual(t, info.Store.Requests, info.Store.MaxRequests)
 	assert.Equal(t, total-info.Store.Requests, info.Store.Evicted)
 	assert.Equal(t, info.Store.Evicted, info.Store.EvictedThrough)
 
-	list := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?since=0&limit=1&view=compact", nil, nil)
+	list := devDo(t, http.MethodGet, p.url()+"/_local/v1/requests?since=0&limit=1&view=compact", nil, nil)
 	assert.Contains(t, list.body, fmt.Sprintf(`"evictedThrough":%d`, info.Store.EvictedThrough))
 }
 
@@ -448,7 +448,7 @@ func TestDevListenKeepsCapturesWhenOversizedPostsArrive(t *testing.T) {
 		require.Equal(t, http.StatusRequestEntityTooLarge, resp.status)
 	}
 
-	events := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?since=0", nil, nil)
+	events := devDo(t, http.MethodGet, p.url()+"/_local/v1/events?since=0", nil, nil)
 	assert.Equal(t, 3, len(strings.Split(strings.TrimSpace(events.body), "\n")),
 		"40 refused 2 MB posts evicted the earlier captures: %s", events.body)
 }

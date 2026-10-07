@@ -63,12 +63,12 @@ test.describe('hostile events', () => {
     expect(file.suggestedFilename()).toMatch(/^[\w.-]+$/);
   });
 
-  test('the page makes no request outside /_dev', async ({ page, listener }) => {
+  test('the page makes no request outside /_local', async ({ page, listener }) => {
     await postHostile(listener, PAYLOADS[0]);
     const outside = [];
     page.on('request', (req) => {
       const u = new URL(req.url());
-      if (u.origin !== new URL(listener.url).origin || !u.pathname.startsWith('/_dev/')) outside.push(req.url());
+      if (u.origin !== new URL(listener.url).origin || !u.pathname.startsWith('/_local/')) outside.push(req.url());
     });
     await open(page, listener);
     await page.waitForTimeout(500);

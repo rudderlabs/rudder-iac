@@ -13,7 +13,7 @@ env:
 # per-PR checks stay in dev-listen-e2e.yml.
 jobs:
   soak:
-    name: dev listen soak, long fuzz
+    name: local event-stream serve soak, long fuzz
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -41,7 +41,7 @@ jobs:
           if-no-files-found: ignore
 
   page:
-    name: dev listen review page, hostile events
+    name: local event-stream serve review page, hostile events
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
