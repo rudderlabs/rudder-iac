@@ -85,6 +85,14 @@ jobs:
           RUDDERSTACK_API_URL: ${{ vars.RUDDERSTACK_API_URL }}
           RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
 
+      # demo-test is the demo framework's own drift/regression check
+      # (scripts/demo_cast_test.py + demo-check for every committed demo).
+      # It reads only what's already committed under demos/ — no backend, no
+      # network — so it belongs beside the unit job, not the live-control-
+      # plane e2e job below.
+      - name: running demo framework tests
+        run: make demo-test
+
       - name: upload unit coverage to Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
         with:
