@@ -2,7 +2,6 @@ package golang_test
 
 import (
 	"os"
-	"regexp"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -74,13 +73,10 @@ func TestGenerateGoldens(t *testing.T) {
 
 			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golden.Options)
 			require.NoError(t, err)
-			require.Len(t, files, 1)
-			assert.Equal(t, "ruddertyper.go", files[0].Path)
-			assert.Regexp(t, regexp.MustCompile(`\A// Code generated .* DO NOT EDIT\.\n`), files[0].Content)
 
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
-			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
+			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
 		})
 	}
