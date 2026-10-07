@@ -79,6 +79,10 @@ typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
 	go run typer/generator/platforms/kotlin/testutils/generate_reference_plan.go
 
+.PHONY: typer-go-update-testdata
+typer-go-update-testdata: ## Update test data for Go code generation
+	go run ./typer/generator/platforms/golang/testutils/generate_reference_plan
+
 .PHONY: typer-swift-update-testdata
 typer-swift-update-testdata: ## Update test data for Swift code generation
 	go run typer/generator/platforms/swift/testutils/generate_reference_plan.go \

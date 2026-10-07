@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	platformGo         = "go"
 	platformKotlin     = "kotlin"
 	platformSwift      = "swift"
 	platformTypeScript = "typescript"
@@ -53,7 +54,7 @@ func newCmdGenerate() *cobra.Command {
 			$ rudder-cli typer generate --local --location ./project --platform kotlin
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			validPlatforms := map[string]bool{platformKotlin: true, platformSwift: true, platformTypeScript: true}
+			validPlatforms := map[string]bool{platformGo: true, platformKotlin: true, platformSwift: true, platformTypeScript: true}
 			if !validPlatforms[platform] {
 				supported := make([]string, 0, len(validPlatforms))
 				for p := range validPlatforms {
@@ -102,7 +103,7 @@ func newCmdGenerate() *cobra.Command {
 
 	cmd.Flags().StringVar(&trackingPlanID, "tracking-plan-id", "", "Tracking plan ID to generate code from (remote), or local id of the plan in the specs (with --local)")
 
-	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s, %s)", platformKotlin, platformSwift, platformTypeScript))
+	cmd.Flags().StringVar(&platform, "platform", platformKotlin, fmt.Sprintf("Platform to generate code for (%s, %s, %s, %s)", platformGo, platformKotlin, platformSwift, platformTypeScript))
 	cmd.MarkFlagRequired("platform")
 
 	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory for generated files")
