@@ -457,17 +457,17 @@ func TestAnalyticsContext(t *testing.T) {
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}
 
-	got := callOptions{context: &caller}.analyticsContext(analytics.Traits{"email": "typed@example.com"})
+	got := callOptions{context: &caller}.analyticsContext()
 
 	assert.Equal(t, &analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"custom": 1, "ruddertyper": rudderTyperContext()},
-		Traits: analytics.Traits{"email": "typed@example.com", "name": "Caller"},
+		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, got)
 	assert.Equal(t, analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"ruddertyper": "overwritten", "custom": 1},
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, caller)
-	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext(nil))
+	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext())
 }

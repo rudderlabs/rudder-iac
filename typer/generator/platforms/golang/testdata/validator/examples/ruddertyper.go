@@ -510,7 +510,7 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -568,9 +568,8 @@ func applyOptions(opts []Option) (callOptions, error) {
 }
 
 // analyticsContext builds a fresh context for the call, because the SDK
-// writes into the context it is given. contextTraits (from a context.traits
-// identify rule) win over caller-supplied Context.Traits keys.
-func (o callOptions) analyticsContext(contextTraits analytics.Traits) *analytics.Context {
+// writes into the context it is given.
+func (o callOptions) analyticsContext() *analytics.Context {
 	var ctx analytics.Context
 	if o.context != nil {
 		ctx = *o.context
@@ -579,12 +578,6 @@ func (o callOptions) analyticsContext(contextTraits analytics.Traits) *analytics
 	maps.Copy(extra, ctx.Extra)
 	extra["ruddertyper"] = rudderTyperContext()
 	ctx.Extra = extra
-	if len(contextTraits) > 0 {
-		traits := make(analytics.Traits, len(ctx.Traits)+len(contextTraits))
-		maps.Copy(traits, ctx.Traits)
-		maps.Copy(traits, contextTraits)
-		ctx.Traits = traits
-	}
 	return &ctx
 }
 
