@@ -269,6 +269,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 		RETLSources:  retlClient.NewRudderRETLStore(c),
 		Sources:      c.Sources,
 		Destinations: c.Destinations,
+		DataGraphs:   dgClient.NewRudderDataGraphClient(c),
 	})
 	dp := destProvider.NewProvider(c, destRegistry)
 

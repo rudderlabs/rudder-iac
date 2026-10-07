@@ -46,6 +46,7 @@ func ExplainBlockingAccountUsage(err error) error {
 
 	return fmt.Errorf(
 		"%w: resources this run is not managing still use this account. If they are rETL sources the CLI created, "+
-			"re-run with %s; otherwise delete them in the workspace first",
+			"re-run with %s; if they are data graphs the CLI manages, remove them from the project in the same run; "+
+			"otherwise delete them in the workspace first",
 		err, retlSourceFlags())
 }

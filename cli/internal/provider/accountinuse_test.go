@@ -27,6 +27,8 @@ func TestExplainBlockingAccountUsage_ExplainsTheRefusal(t *testing.T) {
 	assert.Contains(t, got.Error(), "src-1", "the backend's own reason must survive")
 	assert.Contains(t, got.Error(), "RUDDERSTACK_X_RETL_TABLE_SUPPORT=true",
 		"the remedy must name the flag that lets the CLI see and remove them")
+	assert.Contains(t, got.Error(), "data graphs the CLI manages, remove them from the project",
+		"a data graph is not fixed by the rETL flags, so the message must say so")
 	assert.Contains(t, got.Error(), "otherwise delete them in the workspace first",
 		"a source made in the webapp is not fixed by any flag, so the message must name both routes")
 

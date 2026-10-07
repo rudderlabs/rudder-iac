@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -65,7 +66,29 @@ func (f *fakeDestinations) GetAll(context.Context, ...client.ListDestinationsOpt
 	return f.dests, f.err
 }
 
+type fakeDataGraphs struct {
+	pages [][]dgClient.DataGraph
+	err   error
+	calls int
+}
+
+func (f *fakeDataGraphs) ListDataGraphs(_ context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	resp := &dgClient.ListDataGraphsResponse{}
+	if req.Page-1 < len(f.pages) {
+		resp.Data = f.pages[req.Page-1]
+	}
+	if req.Page < len(f.pages) {
+		resp.Paging.Next = "next"
+	}
+	return resp, nil
+}
+
 type harness struct {
+	graphs   *fakeDataGraphs
 	accounts *fakeAccounts
 	retl     *fakeRETL
 	sources  *fakeSources
@@ -79,9 +102,10 @@ func newHarness() *harness {
 		retl:     &fakeRETL{},
 		sources:  &fakeSources{},
 		dests:    &fakeDestinations{},
+		graphs:   &fakeDataGraphs{},
 	}
 	h.provider = accounts.NewProvider(h.accounts, &accounts.ReferrerClients{
-		RETLSources: h.retl, Sources: h.sources, Destinations: h.dests,
+		RETLSources: h.retl, Sources: h.sources, Destinations: h.dests, DataGraphs: h.graphs,
 	})
 	return h
 }
@@ -91,7 +115,7 @@ func planRemoving(urns ...string) *planner.Plan {
 }
 
 func (h *harness) apiCalls() int {
-	return h.accounts.calls + h.retl.calls + h.sources.calls + h.dests.calls
+	return h.accounts.calls + h.retl.calls + h.sources.calls + h.dests.calls + h.graphs.calls
 }
 
 func TestCheckPlan_NoAccountRemovedMakesNoAPICalls(t *testing.T) {
@@ -126,7 +150,7 @@ func TestCheckPlan_AccountNotInWorkspaceIsSkipped(t *testing.T) {
 	h.accounts.list = nil
 
 	require.NoError(t, h.provider.CheckPlan(context.Background(), planRemoving("account:wh")))
-	assert.Zero(t, h.retl.calls+h.sources.calls+h.dests.calls)
+	assert.Zero(t, h.retl.calls+h.sources.calls+h.dests.calls+h.graphs.calls)
 }
 
 func TestCheckPlan_FindsReferrerPerShape(t *testing.T) {
@@ -208,6 +232,48 @@ func TestCheckPlan_FindsReferrerPerShape(t *testing.T) {
 	}
 }
 
+func TestCheckPlan_DataGraph(t *testing.T) {
+	t.Run("found on a later page, created outside the CLI", func(t *testing.T) {
+		h := newHarness()
+		h.graphs.pages = [][]dgClient.DataGraph{
+			{{ID: "dg-other", AccountID: "another-acc"}},
+			{{ID: "dg-1", AccountID: "remote-acc"}},
+		}
+
+		err := h.provider.CheckPlan(context.Background(), planRemoving("account:wh"))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `data graph "dg-1" (dg-1) uses it through accountId`)
+		assert.Contains(t, err.Error(), "delete it in the workspace first")
+		assert.NotContains(t, err.Error(), "dg-other")
+	})
+
+	t.Run("CLI managed names no rETL flags", func(t *testing.T) {
+		h := newHarness()
+		h.graphs.pages = [][]dgClient.DataGraph{{{ID: "dg-1", AccountID: "remote-acc", ExternalID: "graph"}}}
+
+		err := h.provider.CheckPlan(context.Background(), planRemoving("account:wh"))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the CLI manages it")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL")
+	})
+
+	t.Run("none found", func(t *testing.T) {
+		h := newHarness()
+		h.graphs.pages = [][]dgClient.DataGraph{{{ID: "dg-1", AccountID: "another-acc"}}}
+
+		require.NoError(t, h.provider.CheckPlan(context.Background(), planRemoving("account:wh")))
+	})
+
+	t.Run("deleted in the same plan does not block", func(t *testing.T) {
+		h := newHarness()
+		h.graphs.pages = [][]dgClient.DataGraph{{{ID: "dg-1", AccountID: "remote-acc", ExternalID: "graph"}}}
+
+		require.NoError(t, h.provider.CheckPlan(context.Background(), planRemoving("account:wh", "data-graph:graph")))
+	})
+}
+
 func TestCheckPlan_NamesEveryReferrer(t *testing.T) {
 	h := newHarness()
 	h.retl.sources = []retl.RETLSource{{ID: "r1", Name: "orders", AccountID: "remote-acc"}}
@@ -262,6 +328,7 @@ func TestCheckPlan_APIErrorsSurface(t *testing.T) {
 		{"rETL sources", func(h *harness) { h.retl.err = boom }, "listing rETL sources"},
 		{"sources", func(h *harness) { h.sources.err = boom }, "listing sources"},
 		{"destinations", func(h *harness) { h.dests.err = boom }, "listing destinations"},
+		{"data graphs", func(h *harness) { h.graphs.err = boom }, "listing data graphs"},
 	}
 
 	for _, tc := range cases {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
@@ -17,6 +18,18 @@ import (
 // (retl-source-table, retl-source-sql-model). The accounts package cannot import
 // those packages, because they import this one.
 const retlSourceURNPrefix = "retl-source-"
+
+// dataGraphURNPrefix starts the URN of a data graph resource. Same import cycle
+// as above.
+const dataGraphURNPrefix = "data-graph:"
+
+// dataGraphPageSize is the page size for listing data graphs.
+const dataGraphPageSize = 100
+
+// DataGraphLister lists data graphs. The data graph client satisfies it.
+type DataGraphLister interface {
+	ListDataGraphs(ctx context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error)
+}
 
 // RETLSourceLister lists rETL sources. *retl.RudderRETLStore satisfies it.
 type RETLSourceLister interface {
@@ -41,16 +54,17 @@ type ReferrerClients struct {
 	RETLSources  RETLSourceLister
 	Sources      SourceLister
 	Destinations DestinationLister
+	DataGraphs   DataGraphLister
 }
 
 // accountReference is one workspace resource that still points at an account.
 type accountReference struct {
-	kind  string // "rETL source", "source" or "destination"
+	kind  string // "rETL source", "source", "destination" or "data graph"
 	id    string
 	name  string
 	field string // where the account id was found, for the message
-	// managedByCLI is true for an rETL source the CLI created (it has an
-	// external id), whose kind is simply not loaded in this run.
+	// managedByCLI is true for an rETL source or data graph the CLI created (it
+	// has an external id).
 	managedByCLI bool
 }
 
@@ -77,9 +91,8 @@ type accountReference struct {
 //	               value under credentials equal to the account id counts.
 //	destinations   client.Destination.Config is raw: config.rudderAccountId and
 //	               config.rudderDeleteAccountId.
-//
-// Gap: if /v2/sources omitted config from a list item, the source shapes would
-// need one GET per source. The code does not make those calls.
+//	data graphs    DataGraph.AccountID, mirroring the backend's usedByDataGraph,
+//	               which matches the data graph's accountId column.
 func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
 	removed := removedAccountIDs(plan)
 	if len(removed) == 0 || p.referrers == nil {
@@ -100,7 +113,7 @@ func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
 		return nil
 	}
 
-	refs, err := p.findReferences(ctx, remoteIDs, deletedRETLSources(plan))
+	refs, err := p.findReferences(ctx, remoteIDs, deletedInPlan(plan))
 	if err != nil {
 		return err
 	}
@@ -120,6 +133,9 @@ func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
 
 // advice mirrors provider.ExplainBlockingAccountUsage, per referrer.
 func (r accountReference) advice() string {
+	if r.managedByCLI && r.kind == "data graph" {
+		return "the CLI manages it, so remove it from the project in the same run, or point it at another account"
+	}
 	if r.managedByCLI {
 		return fmt.Sprintf("the CLI created it, so re-run with %s to let this run remove it", provider.RETLSourceFlags())
 	}
@@ -138,22 +154,30 @@ func removedAccountIDs(plan *planner.Plan) []string {
 	return ids
 }
 
-// deletedRETLSources is the set of external ids of the rETL sources the same
+// deletedReferrers holds the external ids of the CLI-managed resources the same
 // plan deletes. The planner orders dependents first, so these do not block.
-func deletedRETLSources(plan *planner.Plan) map[string]bool {
-	deleted := map[string]bool{}
+type deletedReferrers struct {
+	retlSources map[string]bool
+	dataGraphs  map[string]bool
+}
+
+func deletedInPlan(plan *planner.Plan) deletedReferrers {
+	deleted := deletedReferrers{retlSources: map[string]bool{}, dataGraphs: map[string]bool{}}
 	for _, urn := range plan.Diff.RemovedResources {
 		if rest, ok := strings.CutPrefix(urn, retlSourceURNPrefix); ok {
 			if _, id, found := strings.Cut(rest, ":"); found {
-				deleted[id] = true
+				deleted.retlSources[id] = true
 			}
+		}
+		if id, ok := strings.CutPrefix(urn, dataGraphURNPrefix); ok {
+			deleted.dataGraphs[id] = true
 		}
 	}
 	return deleted
 }
 
 // findReferences returns, per local account id, what still references it.
-func (p *Provider) findReferences(ctx context.Context, remoteIDs map[string]string, deleted map[string]bool) (map[string][]accountReference, error) {
+func (p *Provider) findReferences(ctx context.Context, remoteIDs map[string]string, deleted deletedReferrers) (map[string][]accountReference, error) {
 	refs := map[string][]accountReference{}
 	add := func(remoteID string, r accountReference) {
 		if local, ok := remoteIDs[remoteID]; ok {
@@ -169,7 +193,7 @@ func (p *Provider) findReferences(ctx context.Context, remoteIDs map[string]stri
 		}
 		for _, s := range list.Data {
 			seen[s.ID] = true
-			if s.ExternalID != "" && deleted[s.ExternalID] {
+			if s.ExternalID != "" && deleted.retlSources[s.ExternalID] {
 				continue
 			}
 			add(s.AccountID, accountReference{
@@ -207,6 +231,28 @@ func (p *Provider) findReferences(ctx context.Context, remoteIDs map[string]stri
 				if field := accountField(d.Config, remoteID, destinationAccountKeys, false); field != "" {
 					add(remoteID, accountReference{kind: "destination", id: d.ID, name: d.Name, field: field})
 				}
+			}
+		}
+	}
+
+	if p.referrers.DataGraphs != nil {
+		for page := 1; ; page++ {
+			resp, err := p.referrers.DataGraphs.ListDataGraphs(ctx, &dgClient.ListDataGraphsRequest{Page: page, PageSize: dataGraphPageSize})
+			if err != nil {
+				return nil, fmt.Errorf("listing data graphs to check what uses the account: %w", err)
+			}
+			for _, g := range resp.Data {
+				if g.ExternalID != "" && deleted.dataGraphs[g.ExternalID] {
+					continue
+				}
+				add(g.AccountID, accountReference{
+					kind: "data graph", id: g.ID, name: g.ID,
+					field:        "accountId",
+					managedByCLI: g.ExternalID != "",
+				})
+			}
+			if resp.Paging.Next == "" {
+				break
 			}
 		}
 	}
