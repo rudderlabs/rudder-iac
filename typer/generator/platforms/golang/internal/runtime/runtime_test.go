@@ -85,19 +85,20 @@ type (
 	callerHolder struct{ Payload testPayload }
 )
 
-// callerFields holds the field shapes the nil rule treats differently. Its
-// embedded struct has an unexported type, so encoding/json promotes its
-// exported fields.
-type callerFields struct {
-	Items  []string
-	Labels map[string]int
-	Bytes  []byte
-	ByID   map[int]string
-	Ptr    *int
-	embeddedFields
-}
-
-type embeddedFields struct{ Tags []string }
+// callerFields promotes Tags from an embedded pointer to an unexported type,
+// as encoding/json does.
+type (
+	callerFields struct {
+		Items  []string
+		Labels map[string]int
+		*embeddedFields
+	}
+	embeddedFields struct{ Tags []string }
+	callerOmitZero struct {
+		Items  []string       `json:",omitzero"`
+		Labels map[string]int `json:",omitzero"`
+	}
+)
 
 type (
 	callerEmbedded    struct{ embeddedPayload }
@@ -268,12 +269,17 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			want: map[string]any{"s": map[string]any{"Count": json.Number("3"), "Price": json.Number("1.5")}},
 		},
 		{
-			name: "nil slices and maps inside caller data become [] and {}, except []byte and non-string keys",
-			in:   map[string]any{"s": &callerFields{}, "byID": map[int][]string{1: nil}},
+			name: "nil slices and maps inside caller structs and non-string-key maps are null, as in encoding/json",
+			in:   map[string]any{"s": callerFields{embeddedFields: &embeddedFields{}}, "byID": map[int][]string{1: nil}},
 			want: map[string]any{
-				"s":    map[string]any{"Items": []any{}, "Labels": map[string]any{}, "Bytes": nil, "ByID": nil, "Ptr": nil, "Tags": []any{}},
-				"byID": map[string]any{"1": []any{}},
+				"s":    map[string]any{"Items": nil, "Labels": nil, "Tags": nil},
+				"byID": map[string]any{"1": nil},
 			},
+		},
+		{
+			name: "caller struct fields tagged omitzero are omitted when nil, as in encoding/json",
+			in:   map[string]any{"s": callerOmitZero{}},
+			want: map[string]any{"s": map[string]any{}},
 		},
 		{
 			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
