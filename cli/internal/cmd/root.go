@@ -13,7 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
-	devcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/dev"
+	localcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/local"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -63,7 +63,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
-	devCmd          *cobra.Command
+	localCmd          *cobra.Command
 	datagraphCmd    *cobra.Command
 )
 
@@ -100,8 +100,8 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
 
-	devCmd = devcmd.NewCmdDev()
-	rootCmd.AddCommand(devCmd)
+	localCmd = localcmd.NewCmdLocal()
+	rootCmd.AddCommand(localCmd)
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
@@ -124,8 +124,8 @@ func initConfig() {
 		experimentalCmd.Hidden = false
 	}
 
-	if config.GetConfig().ExperimentalFlags.DevListen {
-		devCmd.Hidden = false
+	if config.GetConfig().ExperimentalFlags.LocalEventStream {
+		localCmd.Hidden = false
 	}
 }
 

@@ -37,9 +37,9 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 
 func eventsHelp(query url.Values) string {
 	if query.Get("view") == "counts" {
-		return "rudder-cli dev events --help"
+		return "rudder-cli local event-stream events summary --help"
 	}
-	return "rudder-cli dev events list --help"
+	return "rudder-cli local event-stream events list --help"
 }
 
 func (h *Handler) serverChanged(w http.ResponseWriter) {
@@ -48,7 +48,7 @@ func (h *Handler) serverChanged(w http.ResponseWriter) {
 		Code:    "server_changed",
 		Message: "Another listener answers at this URL, or it restarted. Start again from a fresh cursor.",
 		Details: map[string]any{"serverId": h.cfg.Identity.ServerID, "startedAt": h.cfg.Identity.StartedAt},
-		Next:    "rudder-cli dev events --json",
+		Next:    "rudder-cli local event-stream events summary --json",
 	}})
 }
 
@@ -82,8 +82,8 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 
 	header := w.Header()
 	header.Set("Content-Type", "application/x-ndjson")
-	header.Set("X-Dev-Cursor", strconv.FormatUint(cursor, 10))
-	header.Set("X-Dev-Has-More", strconv.FormatBool(hasMore))
+	header.Set("X-Local-Cursor", strconv.FormatUint(cursor, 10))
+	header.Set("X-Local-Has-More", strconv.FormatBool(hasMore))
 	if hasMore {
 		header.Set("Link", "<"+base+"events?"+nextQuery(q.raw, cursor)+`>; rel="next"`)
 	}

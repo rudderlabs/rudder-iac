@@ -21,15 +21,15 @@ func TestDevListenRequests(t *testing.T) {
 		`{"batch":[{"type":"track","userId":"u1","event":"Order Completed","messageId":"m-1"}]}`))
 	require.Equal(t, http.StatusBadRequest, post(t, url+"/v1/track", `{"event":"Order Completed"}`))
 
-	summary := curl(t, url+"/_dev/v1/events?view=counts")
+	summary := curl(t, url+"/_local/v1/events?view=counts")
 	next := gjson.Get(summary, `summary.diagnosis.#(code=="body_rejected").next`).Str
-	require.Equal(t, "curl -fsS '"+url+"/_dev/v1/requests?since=0&failed=true&view=compact'", next)
+	require.Equal(t, "curl -fsS '"+url+"/_local/v1/requests?since=0&failed=true&view=compact'", next)
 
 	failed := curl(t, strings.TrimSuffix(strings.TrimPrefix(next, "curl -fsS '"), "'"))
 	require.Equal(t, int64(1), gjson.Get(failed, "total").Int())
 	require.Equal(t, "identity", gjson.Get(failed, "requests.0.rejection.stage").Str)
 
-	record := curl(t, url+"/_dev/v1/requests?messageId=m-1&view=full")
+	record := curl(t, url+"/_local/v1/requests?messageId=m-1&view=full")
 	require.Equal(t, int64(1), gjson.Get(record, "requests.0.seq").Int())
 	require.Equal(t, `{"type":"track","userId":"u1","event":"Order Completed","messageId":"m-1"}`,
 		gjson.Get(record, "requests.0.events.0.message").Raw)
@@ -40,7 +40,7 @@ func TestDevListenServesTheReviewPage(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	ui := p.ready["ui"].(string)
-	require.Equal(t, p.url()+"/_dev/ui/", ui)
+	require.Equal(t, p.url()+"/_local/ui/", ui)
 
 	for _, file := range []string{"", "app.js", "app.css", "icon.svg"} {
 		resp, err := http.Get(ui + file)
@@ -56,12 +56,12 @@ func TestDevListenServesTheReviewPage(t *testing.T) {
 func TestDevListenHelpIsTheGuide(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
-	cmd := exec.Command(cliBinPath, "dev", "--help")
-	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "RUDDERSTACK_CLI_EXPERIMENTAL=true", "RUDDERSTACK_X_DEV_LISTEN=true")
+	cmd := exec.Command(cliBinPath, "local", "event-stream", "--help")
+	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "RUDDERSTACK_CLI_EXPERIMENTAL=true", "RUDDERSTACK_X_LOCAL_EVENT_STREAM=true")
 	help, err := cmd.Output()
 	require.NoError(t, err)
 
-	guide := curl(t, p.url()+"/_dev/v1/guide")
+	guide := curl(t, p.url()+"/_local/v1/guide")
 
 	require.True(t, strings.HasPrefix(string(help), strings.TrimRight(guide, "\n")+"\n"))
 	require.Greater(t, len(guide), 8000)

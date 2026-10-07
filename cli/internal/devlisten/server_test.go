@@ -61,13 +61,13 @@ func TestStartReportsItsIdentity(t *testing.T) {
 			WriteKeyPolicy: "any",
 		},
 		Cursor: 0,
-		UI:     url + "/_dev/ui/",
+		UI:     url + "/_local/ui/",
 	}, ready)
 	require.Equal(t, time.UTC, ready.StartedAt.Location())
 	require.Zero(t, ready.StartedAt.Nanosecond())
 
 	var info map[string]any
-	getJSON(t, url+"/_dev/v1/info", &info)
+	getJSON(t, url+"/_local/v1/info", &info)
 	line, err := json.Marshal(ready)
 	require.NoError(t, err)
 	var readyLine map[string]any
@@ -110,7 +110,7 @@ func TestReadyShowsAReachableURLAndTheMaskedKey(t *testing.T) {
 			require.Equal(t, tc.wantKey, ready.WriteKey)
 			require.Equal(t, tc.wantPolicy, ready.WriteKeyPolicy)
 			var info map[string]any
-			getJSON(t, ready.URL+"/_dev/v1/info", &info)
+			getJSON(t, ready.URL+"/_local/v1/info", &info)
 			require.Equal(t, tc.wantKeys, info["writeKeys"])
 		})
 	}
@@ -152,7 +152,7 @@ func TestServerRoutesIngestionAndTheQueryAPI(t *testing.T) {
 		Cursor uint64         `json:"cursor"`
 		Store  map[string]int `json:"store"`
 	}
-	getJSON(t, url+"/_dev/v1/info", &info)
+	getJSON(t, url+"/_local/v1/info", &info)
 	require.Equal(t, uint64(1), info.Cursor)
 	require.Equal(t, 1, info.Store["requests"])
 	require.Equal(t, 1, info.Store["events"])
@@ -216,7 +216,7 @@ func TestServerServesTheReviewPage(t *testing.T) {
 	var info struct {
 		Cursor uint64 `json:"cursor"`
 	}
-	getJSON(t, ready.URL+"/_dev/v1/info", &info)
+	getJSON(t, ready.URL+"/_local/v1/info", &info)
 	require.Zero(t, info.Cursor)
 }
 
@@ -242,7 +242,7 @@ func TestServerLimitsHeaderBytes(t *testing.T) {
 func TestUnreadBodyDoesNotHoldTheConnection(t *testing.T) {
 	t.Parallel()
 	s := start(t, Config{readTimeout: 200 * time.Millisecond})
-	for _, target := range []string{"/_dev/v1/info", "/health"} {
+	for _, target := range []string{"/_local/v1/info", "/health"} {
 		t.Run(target, func(t *testing.T) {
 			t.Parallel()
 			conn, err := net.Dial("tcp", strings.TrimPrefix(s.Ready().URL, "http://"))
@@ -312,7 +312,7 @@ func TestCloseAnswersALongPollAtOnce(t *testing.T) {
 	s := start(t, Config{})
 	answered := make(chan int, 1)
 	go func() {
-		resp, err := http.Get(s.Ready().URL + "/_dev/v1/events?view=counts&wait=60s")
+		resp, err := http.Get(s.Ready().URL + "/_local/v1/events?view=counts&wait=60s")
 		if err != nil {
 			answered <- 0
 			return
@@ -338,7 +338,7 @@ func TestCloseWithAnEndedContextFreesEveryConnection(t *testing.T) {
 	held, release := make(chan struct{}), make(chan struct{})
 	t.Cleanup(func() { close(release) })
 	s := start(t, Config{beforeServe: func(r *http.Request) {
-		if r.URL.Path == "/_dev/v1/events" {
+		if r.URL.Path == "/_local/v1/events" {
 			close(held)
 			<-release
 		}
@@ -346,7 +346,7 @@ func TestCloseWithAnEndedContextFreesEveryConnection(t *testing.T) {
 	conn, err := net.Dial("tcp", strings.TrimPrefix(s.Ready().URL, "http://"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
-	_, err = io.WriteString(conn, "GET /_dev/v1/events?view=counts&wait=60s HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+	_, err = io.WriteString(conn, "GET /_local/v1/events?view=counts&wait=60s HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
 	require.NoError(t, err)
 	<-held
 	ctx, cancel := context.WithCancel(context.Background())

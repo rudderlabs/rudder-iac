@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"bufio"
@@ -114,7 +114,7 @@ func renderStream(out io.Writer, body []byte, t streamTable) error {
 		window = "since " + t.since
 	}
 	if len(events) == 0 {
-		fmt.Fprintf(w, "0 events %s; run rudder-cli dev events --url %s --since %s for the diagnosis\n",
+		fmt.Fprintf(w, "0 events %s; run rudder-cli local event-stream events summary --url %s --since %s for the diagnosis\n",
 			window, shellWord(t.base), shellWord(t.since))
 		return w.Flush()
 	}

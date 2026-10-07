@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"cmp"
@@ -19,7 +19,7 @@ import (
 
 const (
 	// urlEnv lets a script set the listener URL once per shell.
-	urlEnv = "RUDDERSTACK_DEV_URL"
+	urlEnv = "RUDDERSTACK_LOCAL_EVENT_STREAM_URL"
 	// placeholderURL stands in a next command when no URL is known yet.
 	placeholderURL = "http://127.0.0.1:4321"
 	// clientMargin is the time a read gets on top of its wait.
@@ -108,13 +108,25 @@ func (o *readOptions) validate(cmd *cobra.Command) *usageError {
 }
 
 func newCmdEvents() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "events",
+		Short: "Read the events the local gateway captured",
+		Args:  groupArgs,
+		RunE:  showHelp,
+	}
+	cmd.AddCommand(newCmdEventsSummary())
+	cmd.AddCommand(newCmdEventsList())
+	return cmd
+}
+
+func newCmdEventsSummary() *cobra.Command {
 	var (
 		opts    readOptions
 		wait    string
 		atLeast int
 	)
 	cmd := &cobra.Command{
-		Use:   "events",
+		Use:   "summary",
 		Short: "Count and diagnose captured events",
 		Long: heredoc.Doc(`
 			Print the summary of what arrived: accepted events by name (byEvent), events in rejected
@@ -128,24 +140,24 @@ func newCmdEvents() *cobra.Command {
 
 			--wait holds the call until --min matching accepted events exist, at most 110s. Every
 			successful read exits 0, also when --wait runs out (timedOut is true in the JSON); errors
-			exit 1. A request's reason, headers and body are on URL/_dev/v1/requests and on the review
+			exit 1. A request's reason, headers and body are on URL/_local/v1/requests and on the review
 			page.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli dev events --url http://127.0.0.1:4321
+			$ rudder-cli local event-stream events summary --url http://127.0.0.1:4321
 
 			# Assert a count in CI
-			$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
+			$ rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
 
 			# Wait up to 30s for an event the app sends later
-			$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
+			$ rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
 
 			# A fresh cursor
-			$ rudder-cli dev events --url "$url" --json | jq .cursor
+			$ rudder-cli local event-stream events summary --url "$url" --json | jq .cursor
 		`),
 		Args: groupArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("dev events", err) }()
+			defer func() { track("local event-stream events summary", err) }()
 			base, e := opts.listenerURL(cmd)
 			if e == nil {
 				e = opts.validate(cmd)
@@ -183,7 +195,6 @@ func newCmdEvents() *cobra.Command {
 	f.StringVar(&wait, "wait", "0s", "Hold the call until --min matching accepted events exist, at most 110s")
 	f.IntVar(&atLeast, "min", 1, "The number of matching accepted events --wait waits for")
 
-	cmd.AddCommand(newCmdEventsList())
 	return cmd
 }
 
@@ -203,25 +214,25 @@ func newCmdEventsList() *cobra.Command {
 			--view compact drops the SDK's auto-collected context; --fields PATH keeps only that dotted
 			path (repeat it; it cannot be combined with --view).
 
-			The stream carries no cursor. Take it from the ready line or from dev events --json. At
+			The stream carries no cursor. Take it from the ready line or from local event-stream events summary --json. At
 			most --limit events per page; when more are left, stderr names the --since to continue
-			from. Events of rejected requests are not in the stream: dev events counts them.
+			from. Events of rejected requests are not in the stream: local event-stream events summary counts them.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli dev events list --url http://127.0.0.1:4321 --since 5m
+			$ rudder-cli local event-stream events list --url http://127.0.0.1:4321 --since 5m
 
 			# The properties of one event
-			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
+			$ rudder-cli local event-stream events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
 
 			# Check a property type (guard the empty stream)
-			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
+			$ rudder-cli local event-stream events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
 
 			# How many events
-			$ rudder-cli dev events list --url "$url" --since "$cur" --json | wc -l
+			$ rudder-cli local event-stream events list --url "$url" --since "$cur" --json | wc -l
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("dev events list", err) }()
+			defer func() { track("local event-stream events list", err) }()
 			base, e := opts.listenerURL(cmd)
 			if e == nil {
 				e = opts.validate(cmd)
@@ -264,7 +275,7 @@ func checkListFlags(cmd *cobra.Command, limit int, view string, fields []string)
 	help := cmd.CommandPath() + " --help"
 	switch {
 	case view == "counts":
-		return &usageError{message: "--view counts is the summary, which dev events prints", next: "rudder-cli dev events --json"}
+		return &usageError{message: "--view counts is the summary, which local event-stream events summary prints", next: "rudder-cli local event-stream events summary --json"}
 	case !slices.Contains([]string{"list", "compact", "full"}, view):
 		return &usageError{message: fmt.Sprintf("--view must be list, compact or full, got %q", view), next: help}
 	case len(fields) > 0 && cmd.Flags().Changed("view"):
@@ -298,13 +309,13 @@ func shellWords(values []string) []string {
 	return out
 }
 
-// withURL adds the listener URL to a dev events command, so a next runs
+// withURL adds the listener URL to a local event-stream events summary command, so a next runs
 // against the listener the caller read. The server writes next without it.
 func withURL(next, base string) string {
 	if base == "" {
 		return next
 	}
-	for _, path := range []string{"rudder-cli dev events list", "rudder-cli dev events"} {
+	for _, path := range []string{"rudder-cli local event-stream events list", "rudder-cli local event-stream events summary"} {
 		if rest, ok := strings.CutPrefix(next, path); ok && (rest == "" || rest[0] == ' ') {
 			return path + " --url " + shellWord(base) + rest
 		}

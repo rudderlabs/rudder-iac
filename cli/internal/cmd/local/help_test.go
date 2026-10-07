@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"regexp"
@@ -18,7 +18,7 @@ import (
 // removed are names that earlier designs had. An agent that learned them
 // must get a usage error, never a silent match.
 var (
-	removedCommands = []string{"summary", "exec", "stop", "cursor", "info", "send", "reset", "guide", "requests"}
+	removedCommands = []string{"exec", "stop", "cursor", "info", "send", "reset", "guide", "requests"}
 	removedFlags    = []string{
 		"expect", "jq", "detach", "include", "summary", "seq", "state-file", "idle-exit", "quiet",
 		"max-bytes", "status-code", "kind", "failed",
@@ -35,11 +35,11 @@ func walk(c *cobra.Command, visit func(*cobra.Command)) {
 func TestDevHelpPrintsTheGuide(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := execute("dev", "--help")
+	stdout, _, err := execute("local", "event-stream", "--help")
 
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(stdout, strings.TrimRightFunc(devlisten.Guide, unicode.IsSpace)+"\n"),
-		"dev --help starts with the guide that /_dev/v1/guide serves")
+		"event-stream --help starts with the guide that /_local/v1/guide serves")
 	require.Contains(t, stdout, "Available Commands:")
 }
 
@@ -47,7 +47,7 @@ func TestHelpTree(t *testing.T) {
 	t.Parallel()
 
 	var paths []string
-	walk(NewCmdDev(), func(c *cobra.Command) {
+	walk(NewCmdLocal(), func(c *cobra.Command) {
 		paths = append(paths, c.CommandPath())
 		for _, name := range append([]string{c.Name()}, c.Aliases...) {
 			require.NotContains(t, removedCommands, name, c.CommandPath())
@@ -56,7 +56,7 @@ func TestHelpTree(t *testing.T) {
 			require.Nil(t, c.Flags().Lookup(name), "%s --%s", c.CommandPath(), name)
 			require.Nil(t, c.InheritedFlags().Lookup(name), "%s --%s", c.CommandPath(), name)
 		}
-		if c.Name() == "dev" {
+		if c.Name() == "local" || c.Name() == "event-stream" || c.Name() == "events" {
 			return
 		}
 		require.NotEmpty(t, c.Short, c.CommandPath())
@@ -70,7 +70,10 @@ func TestHelpTree(t *testing.T) {
 			require.True(t, strings.HasPrefix(line, "$ rudder-cli "), "%s: %q", c.CommandPath(), line)
 		}
 	})
-	require.Equal(t, []string{"dev", "dev events", "dev events list", "dev listen"}, paths)
+	require.Equal(t, []string{
+		"local", "local event-stream", "local event-stream events",
+		"local event-stream events list", "local event-stream events summary", "local event-stream serve",
+	}, paths)
 }
 
 // Every command line in the help and the guide runs against the real
@@ -79,7 +82,7 @@ func TestHelpCommandsParse(t *testing.T) {
 	t.Parallel()
 
 	var lines []string
-	walk(NewCmdDev(), func(c *cobra.Command) {
+	walk(NewCmdLocal(), func(c *cobra.Command) {
 		lines = append(lines, commandLines(c.Example)...)
 		lines = append(lines, commandLines(c.Long)...)
 	})
@@ -89,11 +92,11 @@ func TestHelpCommandsParse(t *testing.T) {
 
 	for _, line := range lines {
 		args := splitShell(line)
-		if len(args) == 0 || args[0] != "dev" {
+		if len(args) == 0 || args[0] != "local" {
 			continue
 		}
 		root := &cobra.Command{Use: "rudder-cli"}
-		root.AddCommand(NewCmdDev())
+		root.AddCommand(NewCmdLocal())
 		c, rest, err := root.Find(args)
 		require.NoError(t, err, line)
 		c.InitDefaultHelpFlag()
@@ -205,10 +208,10 @@ func TestSplitShell(t *testing.T) {
 	t.Parallel()
 
 	for line, want := range map[string][]string{
-		`dev events --event 'Order Completed' --json | jq -e .`: {"dev", "events", "--event", "Order Completed", "--json"},
-		`dev listen --port 0 > ready.json 2> listen.log &`:      {"dev", "listen", "--port", "0"},
-		`dev events list --url "$url" --since "$cur"`:           {"dev", "events", "list", "--url", "$url", "--since", "$cur"},
-		`dev events --json)`: {"dev", "events", "--json"},
+		`local event-stream events summary --event 'Order Completed' --json | jq -e .`: {"local", "event-stream", "events", "summary", "--event", "Order Completed", "--json"},
+		`local event-stream serve --port 0 > ready.json 2> listen.log &`:               {"local", "event-stream", "serve", "--port", "0"},
+		`local event-stream events list --url "$url" --since "$cur"`:                   {"local", "event-stream", "events", "list", "--url", "$url", "--since", "$cur"},
+		`local event-stream events summary --json)`:                                    {"local", "event-stream", "events", "summary", "--json"},
 	} {
 		require.Equal(t, want, splitShell(line), line)
 	}

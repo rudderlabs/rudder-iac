@@ -88,7 +88,7 @@ func (h *Handler) sourceConfig(r *http.Request, writeKey string) reply {
 			"destinations": []any{},
 			"enabled":      true,
 			"id":           "dev-" + hex.EncodeToString(sum[:6]),
-			"name":         "rudder-cli dev listen",
+			"name":         "rudder-cli local event-stream serve",
 			"updatedAt":    updatedAt,
 			"workspaceId":  "dev-workspace",
 			"writeKey":     writeKey,

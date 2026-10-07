@@ -36,9 +36,9 @@ type ExperimentalConfig struct {
 	// provider.
 	RETLTableSupport bool `mapstructure:"retlTableSupport"`
 
-	// DevListen shows and enables the `dev` command group: a local listener that
+	// LocalEventStream shows and enables the `local` command group: a local listener that
 	// captures the events an app sends, and the commands that read them.
-	DevListen bool `mapstructure:"devListen"`
+	LocalEventStream bool `mapstructure:"localEventStream"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

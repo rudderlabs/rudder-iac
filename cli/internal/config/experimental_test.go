@@ -177,6 +177,6 @@ func TestGetAvailableExperimentalFlags(t *testing.T) {
 func TestIsValidExperimentalFlag_DevListen(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, IsValidExperimentalFlag("devListen"))
-	assert.Equal(t, "RUDDERSTACK_X_DEV_LISTEN", GetEnvironmentVariableName("devListen"))
+	assert.True(t, IsValidExperimentalFlag("localEventStream"))
+	assert.Equal(t, "RUDDERSTACK_X_LOCAL_EVENT_STREAM", GetEnvironmentVariableName("localEventStream"))
 }

@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"bufio"
@@ -26,43 +26,43 @@ func TestListenRejectsBadFlags(t *testing.T) {
 	}{
 		{
 			args: []string{"--port", "70000"},
-			want: "Error: --port must be 0 to 65535, got 70000\nNext: rudder-cli dev listen --port 0\n",
+			want: "Error: --port must be 0 to 65535, got 70000\nNext: rudder-cli local event-stream serve --port 0\n",
 		},
 		{
 			args: []string{"--port", "-1"},
-			want: "Error: --port must be 0 to 65535, got -1\nNext: rudder-cli dev listen --port 0\n",
+			want: "Error: --port must be 0 to 65535, got -1\nNext: rudder-cli local event-stream serve --port 0\n",
 		},
 		{
 			args: []string{"--bind", "localhost"},
 			want: "Error: --bind must be an IP address such as 127.0.0.1, got \"localhost\"\n" +
-				"Next: rudder-cli dev listen --bind 127.0.0.1\n",
+				"Next: rudder-cli local event-stream serve --bind 127.0.0.1\n",
 		},
 		{
 			args: []string{"--write-key", ""},
-			want: "Error: --write-key needs a key\nNext: rudder-cli dev listen --help\n",
+			want: "Error: --write-key needs a key\nNext: rudder-cli local event-stream serve --help\n",
 		},
 		{
 			args: []string{"--allow-host", ""},
-			want: "Error: --allow-host needs a host name\nNext: rudder-cli dev listen --help\n",
+			want: "Error: --allow-host needs a host name\nNext: rudder-cli local event-stream serve --help\n",
 		},
 		{
 			args: []string{"--allow-host", "dev-listen:4321"},
 			want: "Error: --allow-host takes a host name without a port, got \"dev-listen:4321\"\n" +
-				"Next: rudder-cli dev listen --allow-host dev-listen\n",
+				"Next: rudder-cli local event-stream serve --allow-host dev-listen\n",
 		},
 		{
 			args: []string{"now"},
-			want: "Error: unknown argument \"now\" for \"rudder-cli dev listen\"\nNext: rudder-cli dev listen --help\n",
+			want: "Error: unknown argument \"now\" for \"rudder-cli local event-stream serve\"\nNext: rudder-cli local event-stream serve --help\n",
 		},
 		{
 			args: []string{"--json"},
-			want: "Error: unknown flag: --json\nNext: rudder-cli dev listen --help\n",
+			want: "Error: unknown flag: --json\nNext: rudder-cli local event-stream serve --help\n",
 		},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			t.Parallel()
 
-			stdout, stderr, err := execute(append([]string{"dev", "listen"}, tc.args...)...)
+			stdout, stderr, err := execute(append([]string{"local", "event-stream", "serve"}, tc.args...)...)
 
 			var silent *cmderrors.SilentError
 			require.ErrorAs(t, err, &silent)
@@ -81,7 +81,7 @@ func TestListenReportsATakenPort(t *testing.T) {
 	t.Cleanup(func() { _ = taken.Close() })
 	port := strconv.Itoa(taken.Addr().(*net.TCPAddr).Port)
 
-	stdout, stderr, err := execute("dev", "listen", "--port", port)
+	stdout, stderr, err := execute("local", "event-stream", "serve", "--port", port)
 
 	var silent *cmderrors.SilentError
 	require.ErrorAs(t, err, &silent)
@@ -101,7 +101,7 @@ func TestListenReportsATakenPort(t *testing.T) {
 	require.Nil(t, got.Error.Status)
 	require.Equal(t, "port_in_use", got.Error.Code)
 	require.Contains(t, got.Error.Message, port)
-	require.Equal(t, "rudder-cli dev listen --port 0", got.Error.Next)
+	require.Equal(t, "rudder-cli local event-stream serve --port 0", got.Error.Next)
 }
 
 type listening struct {
@@ -151,7 +151,7 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 	require.Equal(t, "fake...ests", l.ready["writeKey"])
 	require.Equal(t, "allowlist", l.ready["writeKeyPolicy"])
 	require.Equal(t, float64(0), l.ready["cursor"])
-	require.Equal(t, url+"/_dev/ui/", l.ready["ui"])
+	require.Equal(t, url+"/_local/ui/", l.ready["ui"])
 
 	req, err := http.NewRequest(http.MethodPost, url+"/v1/track", strings.NewReader(`{"userId":"u1","event":"e"}`))
 	require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 	require.NoError(t, resp.Body.Close())
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	req, err = http.NewRequest(http.MethodGet, url+"/_dev/v1/info", nil)
+	req, err = http.NewRequest(http.MethodGet, url+"/_local/v1/info", nil)
 	require.NoError(t, err)
 	req.Host = "dev-listen"
 	resp, err = http.DefaultClient.Do(req)
@@ -180,7 +180,7 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 	case <-l.done:
 		require.NoError(t, l.err)
 	case <-time.After(2 * time.Second):
-		t.Fatal("dev listen did not stop")
+		t.Fatal("local event-stream serve did not stop")
 	}
 	require.Empty(t, l.stderr.String(), "stderr stays silent when it is not a terminal")
 }

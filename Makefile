@@ -56,7 +56,7 @@ test-e2e: ## Run end-to-end tests
 	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out -timeout 20m ./cli/tests/...  -v
 
 .PHONY: test-e2e-ui
-test-e2e-ui: build ## Run the browser tests of the dev listen review page (needs Node 20+)
+test-e2e-ui: build ## Run the browser tests of the local event-stream serve review page (needs Node 20+)
 	cd cli/tests/e2e-ui && npm ci && npx playwright install chromium && \
 		RUDDER_CLI_BIN=$(CURDIR)/bin/rudder-cli npx playwright test
 

@@ -63,9 +63,9 @@ func TestGetConfig_SyncerConcurrencyBindsEnv(t *testing.T) {
 
 func TestInitConfig_DevListenBindsEnv(t *testing.T) {
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_DEV_LISTEN", "true")
+	t.Setenv("RUDDERSTACK_X_LOCAL_EVENT_STREAM", "true")
 
 	InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
-	require.True(t, GetConfig().ExperimentalFlags.DevListen)
+	require.True(t, GetConfig().ExperimentalFlags.LocalEventStream)
 }

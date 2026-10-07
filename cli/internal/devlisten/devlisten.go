@@ -11,8 +11,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
 )
 
-// Guide is the user guide. rudder-cli dev --help prints it, and the
-// listener serves it at /_dev/v1/guide.
+// Guide is the user guide. rudder-cli local event-stream --help prints it, and the
+// listener serves it at /_local/v1/guide.
 //
 //go:embed guide.md
 var Guide string

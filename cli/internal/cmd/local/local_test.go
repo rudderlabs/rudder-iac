@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 )
 
-// TestMain turns devListen on for the whole package; cli/tests covers the
+// TestMain turns localEventStream on for the whole package; cli/tests covers the
 // flag-off path through the binary.
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "dev-test-*")
@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	_ = os.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	_ = os.Setenv("RUDDERSTACK_X_DEV_LISTEN", "true")
+	_ = os.Setenv("RUDDERSTACK_X_LOCAL_EVENT_STREAM", "true")
 	_ = os.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", "true")
 	config.InitConfig(filepath.Join(dir, "config.json"))
 
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 // execute runs args through a root that handles errors as the real root does.
 func execute(args ...string) (stdout, stderr string, err error) {
 	root := &cobra.Command{Use: "rudder-cli", SilenceErrors: true, SilenceUsage: true}
-	root.AddCommand(NewCmdDev())
+	root.AddCommand(NewCmdLocal())
 
 	var out, errOut bytes.Buffer
 	root.SetOut(&out)
@@ -45,16 +45,16 @@ func execute(args ...string) (stdout, stderr string, err error) {
 	return out.String(), errOut.String(), err
 }
 
-func TestNewCmdDevIsHidden(t *testing.T) {
+func TestNewCmdLocalIsHidden(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, NewCmdDev().Hidden)
+	require.True(t, NewCmdLocal().Hidden)
 }
 
 func TestDevPrintsHelp(t *testing.T) {
 	t.Parallel()
 
-	for _, args := range [][]string{{"dev"}, {"dev", "--help"}} {
+	for _, args := range [][]string{{"local", "event-stream"}, {"local", "event-stream", "--help"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Parallel()
 
@@ -74,12 +74,12 @@ func TestDevUsageErrors(t *testing.T) {
 		args []string
 		want string
 	}{
-		{args: []string{"dev", "summary"}, want: `Error: unknown command "summary" for "rudder-cli dev"`},
-		{args: []string{"dev", "exec"}, want: `Error: unknown command "exec" for "rudder-cli dev"`},
-		{args: []string{"dev", "stop"}, want: `Error: unknown command "stop" for "rudder-cli dev"`},
-		{args: []string{"dev", "cursor"}, want: `Error: unknown command "cursor" for "rudder-cli dev"`},
-		{args: []string{"dev", "nope"}, want: `Error: unknown command "nope" for "rudder-cli dev"`},
-		{args: []string{"dev", "--bogus"}, want: "Error: unknown flag: --bogus"},
+		{args: []string{"local", "event-stream", "summary"}, want: `Error: unknown command "summary" for "rudder-cli local event-stream"`},
+		{args: []string{"local", "event-stream", "exec"}, want: `Error: unknown command "exec" for "rudder-cli local event-stream"`},
+		{args: []string{"local", "event-stream", "stop"}, want: `Error: unknown command "stop" for "rudder-cli local event-stream"`},
+		{args: []string{"local", "event-stream", "cursor"}, want: `Error: unknown command "cursor" for "rudder-cli local event-stream"`},
+		{args: []string{"local", "event-stream", "nope"}, want: `Error: unknown command "nope" for "rudder-cli local event-stream"`},
+		{args: []string{"local", "event-stream", "--bogus"}, want: "Error: unknown flag: --bogus"},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			t.Parallel()
@@ -89,7 +89,7 @@ func TestDevUsageErrors(t *testing.T) {
 			var silent *cmderrors.SilentError
 			require.ErrorAs(t, err, &silent)
 			require.Empty(t, stdout)
-			require.Equal(t, tc.want+"\nNext: rudder-cli dev --help\n", stderr)
+			require.Equal(t, tc.want+"\nNext: rudder-cli local event-stream --help\n", stderr)
 		})
 	}
 }
@@ -107,5 +107,5 @@ func TestNoChildReplacesTheGate(t *testing.T) {
 			walk(child)
 		}
 	}
-	walk(NewCmdDev())
+	walk(NewCmdLocal())
 }

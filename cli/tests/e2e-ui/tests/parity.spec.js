@@ -1,4 +1,4 @@
-// Parity: every parameter of /_dev/v1/events and /_dev/v1/requests has a
+// Parity: every parameter of /_local/v1/events and /_local/v1/requests has a
 // control on the page, and setting the control changes the query the page
 // sends. The parameter lists come from the API index, so a new parameter
 // fails this test until the page has a control for it.
@@ -75,18 +75,18 @@ const CONTROLS = {
 // not the summary.
 const isListLoad = (route) => (req) => {
   const url = new URL(req.url());
-  return url.pathname === '/_dev/v1/' + route && !url.searchParams.has('wait') && url.searchParams.get('view') !== 'counts';
+  return url.pathname === '/_local/v1/' + route && !url.searchParams.has('wait') && url.searchParams.get('view') !== 'counts';
 };
 
 async function endpointParams(listener, route) {
   const index = await (await listener.api('')).json();
-  const endpoint = index.endpoints.find((e) => e.path === '/_dev/v1/' + route);
-  expect(endpoint, `the index lists /_dev/v1/${route}`).toBeTruthy();
+  const endpoint = index.endpoints.find((e) => e.path === '/_local/v1/' + route);
+  expect(endpoint, `the index lists /_local/v1/${route}`).toBeTruthy();
   return endpoint.params;
 }
 
 for (const route of ['events', 'requests']) {
-  test.describe(`/_dev/v1/${route}`, () => {
+  test.describe(`/_local/v1/${route}`, () => {
     test('every parameter has a control or is set by the page', async ({ listener }) => {
       const params = await endpointParams(listener, route);
       expect(params.length).toBeGreaterThan(0);

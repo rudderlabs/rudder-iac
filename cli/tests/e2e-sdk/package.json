@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "A fixture app and real RudderStack SDKs sending to a built rudder-cli dev listen.",
+  "description": "A fixture app and real RudderStack SDKs sending to a built rudder-cli local event-stream serve.",
   "engines": {
     "node": ">=20.0.0"
   },

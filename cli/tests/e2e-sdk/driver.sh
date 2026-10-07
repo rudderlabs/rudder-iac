@@ -22,7 +22,7 @@ run_app() {
 
 # sent_is_right is the byte check: one Suggestion Sent, position a number.
 sent_is_right() {
-  rudder-cli dev events list --url "$url" --since "$cur" --event 'Suggestion Sent' --fields properties --json |
+  rudder-cli local event-stream events list --url "$url" --since "$cur" --event 'Suggestion Sent' --fields properties --json |
     jq -e -s 'length == 1 and .[0].properties.position == 2 and .[0].properties.edited == false'
 }
 
@@ -37,12 +37,12 @@ for run in $(seq "${RUNS:-10}"); do
   start_listener
   run_app none
 
-  rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" \
+  rudder-cli local event-stream events summary --url "$url" --server-id "$sid" --since "$cur" \
     --event 'Suggestion Shown' --event 'Suggestion Clicked' --event 'Suggestion Sent' --event 'Order Completed' \
     --min 4 --wait 30s --json |
     jq -e '.timedOut == false and ([.summary.byEvent[]] | all(. == 1)) and .summary.rejected.events == 0'
   # Filters narrow every count, so the failure and control checks run without them.
-  rudder-cli dev events --url "$url" --since "$cur" --json |
+  rudder-cli local event-stream events summary --url "$url" --since "$cur" --json |
     jq -e '.summary.requests.failed == 0 and .summary.control.sourceConfig >= 1'
   sent_is_right
 
@@ -52,7 +52,7 @@ done
 
 start_listener
 run_app wrong-type
-rudder-cli dev events --url "$url" --since "$cur" --event 'Suggestion Sent' --min 1 --wait 30s --json |
+rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Suggestion Sent' --min 1 --wait 30s --json |
   jq -e '.timedOut == false'
 if sent_is_right; then
   echo "the byte check did not catch DEFECT=wrong-type" >&2
