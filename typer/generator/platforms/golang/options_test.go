@@ -20,7 +20,6 @@ func TestOptionsValidate(t *testing.T) {
 		{"digits after the first letter", golang.GoOptions{PackageName: "events2", OutputFileName: "events.go"}, ""},
 		{"file name with an OS-like stem", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "linux.go"}, ""},
 		{"file name with an underscore", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "rudder_typer.go"}, ""},
-		{"init, which callers import under an alias", golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"}, ""},
 		{
 			"upper-case package name",
 			golang.GoOptions{PackageName: "RudderTyper", OutputFileName: "ruddertyper.go"},
@@ -45,6 +44,11 @@ func TestOptionsValidate(t *testing.T) {
 			"main",
 			golang.GoOptions{PackageName: "main", OutputFileName: "ruddertyper.go"},
 			`validating packageName "main": package main is a command and cannot be imported`,
+		},
+		{
+			"init",
+			golang.GoOptions{PackageName: "init", OutputFileName: "ruddertyper.go"},
+			`validating packageName "init": package init cannot be imported without an alias`,
 		},
 		{
 			"keyword",
