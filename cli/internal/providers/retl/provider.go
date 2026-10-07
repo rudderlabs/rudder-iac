@@ -227,7 +227,7 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 
 // CheckPlan refuses a connection update that changes config the API cannot
 // update in place, which Update would otherwise refuse mid-apply.
-func (p *Provider) CheckPlan(plan *planner.Plan) error {
+func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan) error {
 	if _, ok := p.handlers[connection.ResourceType]; !ok {
 		return nil
 	}

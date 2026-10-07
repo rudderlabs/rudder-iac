@@ -32,11 +32,12 @@ type SyncProvider interface {
 	provider.ConsolidateSyncer
 }
 
-// PlanChecker is implemented by a provider that can refuse a plan from the plan
-// alone. It runs before the plan is shown, so --dry-run and apply fail alike and
-// no resource has been touched.
+// PlanChecker is implemented by a provider that can refuse a plan. It runs
+// before the plan is shown, so --dry-run and apply fail alike and no resource
+// has been touched. A check may read from the API, but should do so only when
+// the plan makes it necessary.
 type PlanChecker interface {
-	CheckPlan(plan *planner.Plan) error
+	CheckPlan(ctx context.Context, plan *planner.Plan) error
 }
 
 func New(p SyncProvider, workspace *client.Workspace, options ...Option) (*ProjectSyncer, error) {
@@ -147,7 +148,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	ui.StopSpinner()
 
 	if checker, ok := s.provider.(PlanChecker); ok {
-		if err := checker.CheckPlan(plan); err != nil {
+		if err := checker.CheckPlan(ctx, plan); err != nil {
 			return []error{err}
 		}
 	}

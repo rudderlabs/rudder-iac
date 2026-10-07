@@ -273,3 +273,53 @@ func TestClientSourcesUpdate(t *testing.T) {
 
 	httpClient.AssertNumberOfCalls()
 }
+
+func TestClientSources_GetAll(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("walks every page and keeps config", func(t *testing.T) {
+		httpClient := testutils.NewMockHTTPClient(t,
+			testutils.Call{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/sources", "")
+				},
+				ResponseStatus: 200,
+				ResponseBody: `{"sources":[{"id":"id-1","type":"t","name":"n1","config":{"rudderAccountId":"acc-1"}}],
+					"paging":{"total":2,"next":"/sources?page=2"}}`,
+			},
+			testutils.Call{
+				Validate: func(req *http.Request) bool {
+					return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/sources?page=2", "")
+				},
+				ResponseStatus: 200,
+				ResponseBody:   `{"sources":[{"id":"id-2","type":"t","name":"n2","config":{}}],"paging":{"total":2}}`,
+			},
+		)
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		got, err := c.Sources.GetAll(ctx)
+
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.JSONEq(t, `{"rudderAccountId":"acc-1"}`, string(got[0].Config))
+		assert.Equal(t, "id-2", got[1].ID)
+	})
+
+	t.Run("wraps a list error", func(t *testing.T) {
+		httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return testutils.ValidateRequest(t, req, "GET", "https://api.rudderstack.com/v2/sources", "")
+			},
+			ResponseStatus: 500,
+			ResponseBody:   `{"error":"Internal Server Error"}`,
+		})
+		c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+		require.NoError(t, err)
+
+		got, err := c.Sources.GetAll(ctx)
+
+		require.ErrorContains(t, err, "listing sources")
+		assert.Nil(t, got)
+	})
+}
