@@ -23,7 +23,7 @@ spec:
   config:
     bucket_name: rudder-events-prod
     prefix: rudder/events
-    credentials: "{{ .GCS_CREDENTIALS }}"
+    credentials: '{{ .GCS_CREDENTIALS }}'
 
     connection_mode:
       web: cloud
@@ -109,19 +109,11 @@ Every source type is `cloud` only — events reach the bucket from RudderStack's
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers Google Cloud Storage to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'gcs-events-prod' (type 'gcs') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -135,21 +127,15 @@ A Reverse ETL connection reaches this destination as source type `warehouse` and
 
 ## Secrets
 
-`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
+`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
-  credentials: "{{ .GCS_CREDENTIALS }}"
+  credentials: '{{ .GCS_CREDENTIALS }}'
 ```
+
+`credentials` is JSON, so its reference needs single quotes, as above, even when `import` wrote it — see [Secrets](../README.md#secrets). The key file works as is:
 
 ```bash
 export RUDDER_GCS_CREDENTIALS="$(cat service-account.json)"
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
 ```
-
-Note that:
-
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

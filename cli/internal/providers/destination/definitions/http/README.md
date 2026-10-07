@@ -47,11 +47,6 @@ spec:
     is_batching_enabled: true
     max_batch_size: "50"
 
-    event_filtering:
-      whitelist:
-        - Order Completed
-        - Order Refunded
-
     connection_mode:
       web: cloud
       cloud: cloud
@@ -70,17 +65,17 @@ The above example uses API key authentication and custom request mapping. `xml_r
 
 ### Key dependencies
 
-Several keys only take effect in combination with another key's value. The CLI enforces one of these — `max_batch_size` — and accepts the rest whatever the other key says, so a key that doesn't apply is stored and ignored rather than rejected.
+Several keys depend on another key's value. Rudder CLI enforces the **Required** rows below: the credentials for the chosen `auth`, and `max_batch_size` whenever batching is on, for any `format`. It accepts the **Applies** rows whatever the other key says, so a key that doesn't apply is stored and ignored rather than rejected.
 
-| Key | Applies when |
+| Key | Depends on |
 | :-----| :-----|
-| `username`, `password` | `auth` is `basicAuth` |
-| `bearer_token` | `auth` is `bearerTokenAuth` |
-| `api_key_name`, `api_key_value` | `auth` is `apiKeyAuth` |
-| `xml_root_key` | `format` is `XML` |
-| `properties_mapping` | `is_default_mapping` is `false` |
-| `is_batching_enabled` | `format` is `JSON` |
-| `max_batch_size` | `is_batching_enabled` is `true` **and** `format` is `JSON` |
+| `username`, `password` | **Required** when `auth` is `basicAuth` |
+| `bearer_token` | **Required** when `auth` is `bearerTokenAuth` |
+| `api_key_name`, `api_key_value` | **Required** when `auth` is `apiKeyAuth` |
+| `max_batch_size` | **Required** when `is_batching_enabled` is `true` |
+| `is_batching_enabled` | **Applies** when `format` is `JSON` |
+| `xml_root_key` | **Applies** when `format` is `XML` |
+| `properties_mapping` | **Applies** when `is_default_mapping` is `false` |
 
 ### Endpoint
 
@@ -183,7 +178,7 @@ Maps fields of the source event onto the request body.
 
 - Applies when `is_default_mapping` is `false`.
 - `to` — JSONPath of the field on the outgoing request. Must be a JSONPath or empty; a bare token like `properties.value` is rejected.
-- `from` — JSONPath into the source event, or a constant of up to 100 characters.
+- `from` — JSONPath into the source event, or a constant of up to 100 characters from letters, digits, and ``! # $ % & ' * + . ^ _ ` | ~ -``. Spaces and characters such as `/ : @ ;` are rejected.
 
 ```yaml
 properties_mapping:
@@ -198,7 +193,7 @@ properties_mapping:
 Query parameters appended to `api_url`.
 
 - `to` — parameter name. Must be a plain token of up to 100 characters, not a JSONPath.
-- `from` — JSONPath into the source event, or a constant of up to 100 characters.
+- `from` — JSONPath into the source event, or a constant of up to 100 characters from letters, digits, spaces, and ``! # $ % & ' * + . ^ _ ` | ~ -``. Characters such as `/ : @ ;` are rejected.
 
 ```yaml
 query_params:
@@ -213,7 +208,7 @@ query_params:
 Headers added to the outgoing request.
 
 - `to` — header name. Must be a plain token of up to 100 characters, not a JSONPath.
-- `from` — JSONPath into the source event, or a constant of up to 100 characters. **Secret** — see [Secrets](#secrets).
+- `from` — JSONPath into the source event, or a constant of up to 100 characters from letters, digits, spaces, `/`, `\`, and ``! # $ % & ' * + . ^ _ ` | ~ -``. Characters such as `: ; = ,` are rejected. **Secret** — see [Secrets](#secrets).
 
 ```yaml
 headers:
@@ -263,7 +258,7 @@ Restricts which `track` events reach the destination, by event name.
 
 - `whitelist` — array of event names to allow; every other `track` event is dropped.
 - `blacklist` — array of event names to drop; every other `track` event is allowed.
-- The two are mutually exclusive, and this the CLI does enforce — setting both fails validation. Omit the block entirely to filter nothing.
+- The two are mutually exclusive, and Rudder CLI enforces it — setting both fails validation. Omit the block entirely to filter nothing.
 - Each name is at most 100 characters, or a `{{ path || fallback }}` template.
 
 ```yaml
@@ -320,19 +315,11 @@ Every source type is `cloud` only — events reach the endpoint from RudderStack
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers HTTP Webhook to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'orders-webhook-prod' (type 'http') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -346,7 +333,7 @@ A Reverse ETL connection reaches this destination as source type `warehouse` and
 
 ## Secrets
 
-Rudder CLI treats six keys as secrets: `username`, `password`, `bearer_token`, `api_key_name`, `api_key_value`, and every `headers` entry's `from` value. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats six keys as secrets: `username`, `password`, `bearer_token`, `api_key_name`, `api_key_value`, and every `headers` entry's `from` value. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -358,16 +345,7 @@ config:
       from: "{{ .WEBHOOK_HEADER_VALUE }}"
 ```
 
-```bash
-export RUDDER_WEBHOOK_API_KEY="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
 Note that:
 
 - `api_key_name` is secret even though it's the header name, not the key itself.
 - Every header value is secret, including constants such as `application/json`.
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

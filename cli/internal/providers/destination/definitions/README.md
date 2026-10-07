@@ -59,7 +59,9 @@ A key that's valid for one destination type isn't valid for another. There are n
 
 ### Omitting a key with a default is safe
 
-Where a key declares a default, Rudder CLI fills that value in before it validates the spec and before the spec reaches the API, because the backend applies the same default when it stores the destination. Omitting such a key is equivalent to writing its default: it doesn't produce a permanent diff on the next `plan` or `apply`, and it's validated as though you had written the default — which can make another key required.
+Where a key declares a default, Rudder CLI fills that value in before it validates the spec and before the spec reaches the API, because the backend applies the same default when it stores the destination. Omitting such a key is equivalent to writing its default: it doesn't produce a permanent diff on the next `apply`, and it's validated as though you had written the default — which can make another key required.
+
+A default inside a nested block, such as `sdk_version.web`, fills in only when the spec writes that block. Omit the whole block and nothing is sent for it.
 
 Keys without a default are sent only when you set them.
 
@@ -96,6 +98,8 @@ A destination declares the source types it accepts events from. Each type README
 | `warehouse` | Reverse ETL sources |
 
 A source's own definition resolves to exactly one token. Note that `cloud` and `cloud_source` are different tokens: a webhook or server-side SDK source resolves to `cloud`, while a cloud app source resolves to `cloud_source`.
+
+Rudder CLI doesn't manage connections from AMP, Shopify, or cloud app sources, so `amp`, `shopify`, and `cloud_source` aren't valid for any type here, even where the dashboard offers the destination to them.
 
 A Reverse ETL connection reaches its destination as a `warehouse` source, and is checked against the same destination config rules as an event stream connection. Reverse ETL connections sit behind the `retlConnectionSupport` experimental flag. A destination can't receive from both event stream and Reverse ETL sources in the same project.
 
@@ -140,12 +144,20 @@ destination '<id>' config has no 'connection_mode' entry for source type '<sourc
 
 ## Secrets
 
-Each type README lists the keys Rudder CLI treats as secrets. Write them as `{{ .VARIABLE_NAME }}` references rather than literals, and supply the values at apply time:
+Each type README lists the keys Rudder CLI treats as secrets. Write each one you use as a `{{ .VARIABLE_NAME }}` reference rather than a literal, and supply the value from the environment, prefixed with `RUDDER_`, or from a var file:
 
 ```bash
+export RUDDER_BRAZE_REST_API_KEY="..."
+rudder-cli apply
+
+# or
 rudder-cli apply --var-file secrets.vars.yaml
 ```
 
-The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+Note that:
+
+- `validate` substitutes variables too, so every variable a spec references must be set when you run it. An undefined one stops the run.
+- Substitution pastes each value into the YAML as is, before the YAML is parsed. A value containing double quotes, such as a JSON key file, needs a single-quoted reference: `'{{ .VAR }}'`. A value spanning several lines, such as a PEM key, needs its line breaks written as `\n` inside a double-quoted reference. The type READMEs show the form where a key needs it.
+- `rudder-cli import` writes each secret the destination has set as a reference named after the spec `id` and the key, upper-cased with `-` turned into `_`. For example, `credentials` on a destination imported as `bigquery-prod` becomes `{{ .BIGQUERY_PROD_CREDENTIALS }}`, and a nested key adds its path, such as `{{ .ORDERS_WEBHOOK_HEADERS_0_TO }}`. Supply those variables before you apply. `import` writes every reference in double quotes, so switch a JSON-valued one, such as BigQuery's `credentials`, to single quotes.
 
 See [variable substitution](../../../varsubst/README.md) for how references resolve.

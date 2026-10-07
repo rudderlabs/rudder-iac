@@ -251,12 +251,14 @@ Google Ads accepts only web sources, and only in `device` mode — the SDK loads
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Any source other than a JavaScript source reports:
+**The source's type must be supported.** Google Ads accepts only `web`, the type a JavaScript source resolves to. Every other source resolves to a type it doesn't accept — an iOS source to `ios`, an Android source to `android`, and webhook and server-side SDK sources to `cloud` — and reports, for example:
 
 ```text
-destination 'google-ads-prod' (type 'googleads') does not support source 'my-source':
-source type 'cloud' is not among supported source types: web
+destination 'google-ads-prod' (type 'googleads') does not support source 'my-ios-app':
+source type 'ios' is not among supported source types: web
 ```
+
+A Reverse ETL connection, whose source resolves to `warehouse`, is refused the same way.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -268,22 +270,11 @@ Google Ads needs no additional config keys to connect a web source.
 
 ## Secrets
 
-`conversion_id` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
+`conversion_id` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
   conversion_id: "{{ .GOOGLE_ADS_CONVERSION_ID }}"
 ```
 
-```bash
-export RUDDER_GOOGLE_ADS_CONVERSION_ID="AW-123456789"
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
-Note that:
-
-- In device mode the conversion ID is embedded in the page's JavaScript, so treating it as a secret keeps it out of your YAML but doesn't hide it from the browser.
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+In device mode the conversion ID is embedded in the page's JavaScript, so treating it as a secret keeps it out of your YAML but doesn't hide it from the browser.

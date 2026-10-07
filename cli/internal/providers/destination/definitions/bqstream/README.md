@@ -25,7 +25,7 @@ spec:
     dataset_id: product_events
     table_id: product_inserts
     insert_id: productId
-    credentials: "{{ .BQSTREAM_CREDENTIALS }}"
+    credentials: '{{ .BQSTREAM_CREDENTIALS }}'
 
     connection_mode:
       web: cloud
@@ -125,19 +125,11 @@ Every source type is `cloud` only — events reach the table from RudderStack's 
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers BigQuery Stream to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'bigquery-stream-prod' (type 'bqstream') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -151,21 +143,15 @@ A Reverse ETL connection reaches this destination as source type `warehouse` and
 
 ## Secrets
 
-`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
+`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
-  credentials: "{{ .BQSTREAM_CREDENTIALS }}"
+  credentials: '{{ .BQSTREAM_CREDENTIALS }}'
 ```
+
+`credentials` is JSON, so its reference needs single quotes, as above, even when `import` wrote it — see [Secrets](../README.md#secrets). The key file works as is:
 
 ```bash
 export RUDDER_BQSTREAM_CREDENTIALS="$(cat service-account.json)"
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
 ```
-
-Note that:
-
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.

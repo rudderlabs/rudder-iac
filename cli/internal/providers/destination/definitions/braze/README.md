@@ -255,19 +255,11 @@ In `hybrid` mode, RudderStack sends every user-generated event — `identify`, `
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers Braze to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against three rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'braze-prod' (type 'braze') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -287,7 +279,7 @@ A Reverse ETL connection reaches this destination as source type `warehouse` and
 
 ## Secrets
 
-Rudder CLI treats five keys as secrets: `rest_api_key`, `app_key`, `android_api_key`, `ios_api_key`, and `web_api_key`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats five keys as secrets: `rest_api_key`, `app_key`, `android_api_key`, `ios_api_key`, and `web_api_key`. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -295,16 +287,4 @@ config:
   app_key: "{{ .BRAZE_APP_KEY }}"
 ```
 
-```bash
-export RUDDER_BRAZE_REST_API_KEY="..."
-export RUDDER_BRAZE_APP_KEY="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
-Note that:
-
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
-- In device and hybrid mode the app identifier keys are embedded in the app or page, so masking them protects your YAML, not the values themselves.
+In device and hybrid mode the app identifier keys are embedded in the app or page, so masking them protects your YAML, not the values themselves.

@@ -238,19 +238,11 @@ Only `web` offers `device` mode, which loads the Meta Pixel in the browser.
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers Facebook Pixel to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against three rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'fb-pixel-prod' (type 'facebook_pixel') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -268,7 +260,7 @@ A Reverse ETL connection reaches this destination as source type `warehouse` and
 
 ## Secrets
 
-Rudder CLI treats three keys as secrets: `pixel_id`, `access_token`, and every `legacy_conversion_pixel_id` entry's `to` value. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats three keys as secrets: `pixel_id`, `access_token`, and every `legacy_conversion_pixel_id` entry's `to` value. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -276,16 +268,4 @@ config:
   access_token: "{{ .FB_ACCESS_TOKEN }}"
 ```
 
-```bash
-export RUDDER_FB_PIXEL_ID="..."
-export RUDDER_FB_ACCESS_TOKEN="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
-Note that:
-
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
-- In device mode the Pixel IDs are embedded in the page's JavaScript, so masking them protects your YAML, not the values themselves.
+In device mode the Pixel IDs are embedded in the page's JavaScript, so masking them protects your YAML, not the values themselves.

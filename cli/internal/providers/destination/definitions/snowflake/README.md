@@ -167,11 +167,13 @@ PEM-encoded private key whose public half is assigned to `user` in Snowflake.
 - Must include the delimiters: `-----BEGIN PRIVATE KEY-----` … `-----END PRIVATE KEY-----`, or the `ENCRYPTED PRIVATE KEY` equivalents. A bare base64 key body is rejected.
 - Templates aren't accepted. `{{ .VAR }}` references are resolved before validation, so the resolved value is what must be PEM-shaped.
 
-Load the key from a file rather than pasting it into YAML:
+Load the key from a file with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks:
 
 ```bash
-export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(cat rsa_key.p8)"
+export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' rsa_key.p8)"
 ```
+
+A raw multi-line value has its line breaks folded into spaces. That still passes the PEM check, so the broken key reaches the API.
 
 #### `private_key_passphrase` — string, secret
 
@@ -263,7 +265,7 @@ cloud_provider: GCP
 bucket_name: acme-snowflake-staging
 storage_integration: RUDDER_GCS_INTEGRATION
 gcp:
-  credentials: "{{ .SNOWFLAKE_GCS_CREDENTIALS }}"
+  credentials: '{{ .SNOWFLAKE_GCS_CREDENTIALS }}'
 ```
 
 #### `azure` — object, required
@@ -385,18 +387,14 @@ Snowflake accepts events from these source types in the mentioned connection mod
 
 Every source type is `cloud` only — events reach the warehouse from RudderStack's servers, never in device mode.
 
-> [!NOTE]
-> The dashboard additionally offers Snowflake to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
 
 ```text
-destination 'snowflake-prod' (type 'snowflake') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
+destination 'snowflake-prod' (type 'snowflake') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
 ```
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
@@ -409,7 +407,7 @@ Snowflake needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-Rudder CLI treats nine keys as secrets: `user`, `password`, `private_key`, `private_key_passphrase`, `s3.access_key_id`, `s3.access_key`, `gcp.credentials`, `azure.account_key`, and `azure.sas_token`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats nine keys as secrets: `user`, `password`, `private_key`, `private_key_passphrase`, `s3.access_key_id`, `s3.access_key`, `gcp.credentials`, `azure.account_key`, and `azure.sas_token`. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -418,17 +416,8 @@ config:
   private_key_passphrase: "{{ .SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}"
 ```
 
-```bash
-export RUDDER_SNOWFLAKE_USER="RUDDER_USER"
-export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(cat rsa_key.p8)"
-export RUDDER_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
 Note that:
 
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
+- `private_key` spans several lines, so pass it with its line breaks written as `\n` — see [`private_key`](#private_key--string-required-secret).
+- `gcp.credentials` is JSON, so its reference needs single quotes, even when `import` wrote it: `credentials: '{{ .SNOWFLAKE_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
 - `s3.iam_role_arn` and `storage_integration` aren't secrets — neither grants access on its own.

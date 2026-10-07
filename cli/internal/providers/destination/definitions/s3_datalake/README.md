@@ -234,18 +234,14 @@ S3 Data Lake accepts events from these source types in the mentioned connection 
 
 Every source type is `cloud` only — events reach the bucket from RudderStack's servers, never in device mode.
 
-> [!NOTE]
-> The dashboard additionally offers S3 Data Lake to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
 
 ```text
-destination 's3-datalake-prod' (type 's3_datalake') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
+destination 's3-datalake-prod' (type 's3_datalake') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
 ```
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
@@ -258,7 +254,7 @@ S3 Data Lake needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`access_key_id` and `access_key` are the secret keys, and apply only when `role_based_auth` is `false`. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
+`access_key_id` and `access_key` are the secret keys, and apply only when `role_based_auth` is `false`. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -268,17 +264,4 @@ config:
   access_key: "{{ .AWS_SECRET_ACCESS_KEY }}"
 ```
 
-```bash
-export RUDDER_AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
-export RUDDER_AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
-Note that:
-
-- A `{{ .VAR }}` reference satisfies the requirement check, so a spec using access keys validates before the values are supplied.
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
-- `iam_role_arn` isn't a secret — an ARN identifies a role but grants nothing on its own.
+`iam_role_arn` isn't a secret — an ARN identifies a role but grants nothing on its own.

@@ -260,19 +260,11 @@ Customer.io accepts events from these source types in the mentioned connection m
 
 `warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
-> [!NOTE]
-> The dashboard additionally offers Customer.io to AMP and Shopify sources. Rudder CLI doesn't manage those connections, so `amp` and `shopify` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against three rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
-
-```text
-destination 'customerio-prod' (type 'customerio') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -296,7 +288,7 @@ destination api type "CUSTOMERIO" uses a destination-specific rETL flow, which i
 
 ## Secrets
 
-`api_key` and `site_id` are the secret keys. Write each as a `{{ .VAR }}` reference and supply the value at apply time:
+`api_key` and `site_id` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -304,16 +296,4 @@ config:
   api_key: "{{ .CUSTOMERIO_API_KEY }}"
 ```
 
-```bash
-export RUDDER_CUSTOMERIO_SITE_ID="..."
-export RUDDER_CUSTOMERIO_API_KEY="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
-Note that:
-
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
-- In web device mode the site ID (`v1`) or `write_key` (`v2`) is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself. `write_key` isn't treated as a secret.
+In web device mode the site ID (`v1`) or `write_key` (`v2`) is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself. `write_key` isn't treated as a secret.

@@ -26,7 +26,7 @@ spec:
     bucket_name: rudder-bq-staging
     prefix: rudder/events
     namespace: rudder_events
-    credentials: "{{ .BQ_CREDENTIALS }}"
+    credentials: '{{ .BQ_CREDENTIALS }}'
 
     sync_frequency: "180"
     sync_start_at: "01:00"
@@ -239,18 +239,16 @@ BigQuery accepts events from these source types in the mentioned connection mode
 
 Every source type is `cloud` only — events reach the dataset from RudderStack's servers, never in device mode.
 
-> [!NOTE]
-> The dashboard additionally offers BigQuery to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here. `warehouse` isn't valid either — BigQuery doesn't accept it even in the dashboard.
+BigQuery doesn't accept `warehouse`, even in the dashboard.
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
 
 ```text
-destination 'bigquery-prod' (type 'bq') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
+destination 'bigquery-prod' (type 'bq') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
 ```
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
@@ -263,19 +261,15 @@ BigQuery needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and supply the value at apply time:
+`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
-  credentials: "{{ .BQ_CREDENTIALS }}"
+  credentials: '{{ .BQ_CREDENTIALS }}'
 ```
+
+`credentials` is JSON, so its reference needs single quotes, as above, even when `import` wrote it — see [Secrets](../README.md#secrets). The key file works as is:
 
 ```bash
 export RUDDER_BQ_CREDENTIALS="$(cat service-account.json)"
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
 ```
-
-Note that the YAML `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure `credentials` is present and populated through variable substitution.

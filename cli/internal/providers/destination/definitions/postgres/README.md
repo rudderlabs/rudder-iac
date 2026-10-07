@@ -266,7 +266,7 @@ Google Cloud Storage settings.
 bucket_provider: GCS
 bucket_name: acme-postgres-staging
 gcs:
-  credentials: "{{ .PG_GCS_CREDENTIALS }}"
+  credentials: '{{ .PG_GCS_CREDENTIALS }}'
 ```
 
 #### `azure` — object, required
@@ -402,18 +402,14 @@ PostgreSQL accepts events from these source types in the mentioned connection mo
 
 Every source type is `cloud` only — events reach the warehouse from RudderStack's servers, never in device mode.
 
-> [!NOTE]
-> The dashboard additionally offers PostgreSQL to AMP, Shopify, and cloud app sources. Rudder CLI doesn't manage those connections, so `amp`, `shopify`, and `cloud_source` are invalid here.
-
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. An unsupported type reports:
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
 
 ```text
-destination 'postgres-prod' (type 'postgres') does not support source 'my-source':
-source type 'amp' is not among supported source types: android, android_kotlin, ...
+destination 'postgres-prod' (type 'postgres') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
 ```
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
@@ -426,7 +422,7 @@ PostgreSQL needs no additional config keys to connect a source of any type.
 
 ## Secrets
 
-Rudder CLI treats eleven keys as secrets: `user`, `password`, `client_key`, `client_cert`, `access_key_id`, `s3.access_key`, `gcs.credentials`, `azure.account_key`, `azure.sas_token`, `minio.secret_access_key`, and `ssh.user`. Write each one you use as a `{{ .VAR }}` reference and supply the value at apply time:
+Rudder CLI treats eleven keys as secrets: `user`, `password`, `client_key`, `client_cert`, `access_key_id`, `s3.access_key`, `gcs.credentials`, `azure.account_key`, `azure.sas_token`, `minio.secret_access_key`, and `ssh.user`. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
@@ -434,16 +430,8 @@ config:
   password: "{{ .PG_PASSWORD }}"
 ```
 
-```bash
-export RUDDER_PG_USER="rudder"
-export RUDDER_PG_PASSWORD="..."
-rudder-cli apply
-
-# or
-rudder-cli apply --var-file secrets.vars.yaml
-```
-
 Note that:
 
+- `gcs.credentials` is JSON, so its reference needs single quotes, even when `import` wrote it: `credentials: '{{ .PG_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
+- `client_key` and `client_cert` span several lines. Pass each with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks: `export RUDDER_PG_CLIENT_KEY="$(awk '{printf "%s\\n", $0}' client-key.pem)"`.
 - `server_ca` isn't a secret — a CA certificate is public by design.
-- The YAML that `rudder-cli import` writes may or may not include secret keys. Before you apply, make sure every secret key your configuration needs is present and populated through variable substitution.
