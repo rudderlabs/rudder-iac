@@ -164,7 +164,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		name    string
 		in      any
 		want    map[string]any
-		wantErr error
+		wantErr bool
 		wantAs  any // a pointer errors.As must fill from the error chain
 	}{
 		{
@@ -226,7 +226,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "wireValue error",
 			in:      map[string]any{"union": testUnion{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name: "variant items",
@@ -236,12 +236,12 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "nil variant item",
 			in:      map[string]any{"items": []testVariant{nil}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "typed-nil variant item",
 			in:      map[string]any{"items": []testVariant{(*testCase)(nil)}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name: "[]byte becomes base64, a nil one null",
@@ -294,23 +294,23 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 			wantAs:  new(testMarshalError),
 		},
 		{
 			name:    "map that contains itself",
 			in:      cyclicMap,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "AdditionalProperties that contain their object",
 			in:      cyclicObj,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "caller struct that contains itself",
 			in:      map[string]any{"node": cyclicNode},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			// encoding/json cannot see these cycles, because each MarshalJSON
@@ -318,22 +318,22 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// map can.
 			name:    "generated value that contains itself through a caller struct",
 			in:      cyclicHolder,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through a non-string-key map",
 			in:      cyclicKeyed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded struct of an unexported type",
 			in:      cyclicEmbed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded pointer to an unexported type",
 			in:      cyclicEmbedP,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			// Each level is a slice and the interface holding it: 499 levels
@@ -346,25 +346,23 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// The pointer to the leaf is one level more.
 			name:    "nesting past the depth bound",
 			in:      map[string]any{"v": nest(499, &leaf)},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
-		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: ErrInvalidValue},
-		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: ErrInvalidValue},
-		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: ErrInvalidValue},
-		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: ErrInvalidValue},
-		{name: "function", in: map[string]any{"f": func() {}}, wantErr: ErrInvalidValue},
-		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: ErrInvalidValue},
+		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: true},
+		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: true},
+		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: true},
+		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: true},
+		{name: "function", in: map[string]any{"f": func() {}}, wantErr: true},
+		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := snapshot(tt.in)
 			b, marshalErr := marshal(tt.in)
-			if tt.wantErr != nil {
+			if tt.wantErr {
 				assert.ErrorIs(t, err, ErrInvalidValue)
-				assert.ErrorIs(t, err, tt.wantErr)
 				assert.ErrorIs(t, marshalErr, ErrInvalidValue)
-				assert.ErrorIs(t, marshalErr, tt.wantErr)
 				if tt.wantAs != nil {
 					assert.ErrorAs(t, err, tt.wantAs)
 					assert.ErrorAs(t, marshalErr, tt.wantAs)
