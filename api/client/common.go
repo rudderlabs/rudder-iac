@@ -31,6 +31,18 @@ var blockedByConnectionsMessages = []string{
 	"connected to some destinations",
 }
 
+// accountInUseMessage is the refusal the control plane raises when an account
+// still backs a source, destination or data graph. Matching on prose is
+// fragile, but ConflictError carries a message and a status and nothing else,
+// so APIError.ErrorCode is empty on this path.
+//
+//	AccountService.deleteAccountByIdAndWorkspaceId   the public accounts API
+//
+// The CLI calls only the public accounts API, which throws ConflictError (409)
+// with "is being used by". The webapp's legacy routes word it differently and
+// are not reachable from the CLI.
+const accountInUseMessage = "can't be removed because it is being used"
+
 type Paging struct {
 	Total int    `json:"total"`
 	Next  string `json:"next"`
@@ -116,6 +128,15 @@ func (e *APIError) BlockedByConnections() bool {
 	}
 
 	return false
+}
+
+// BlockedByAccountUsage reports whether this is the control plane refusing to
+// delete an account because sources, destinations or data graphs still use it.
+func (e *APIError) BlockedByAccountUsage() bool {
+	if e.HTTPStatusCode != http.StatusConflict {
+		return false
+	}
+	return strings.Contains(strings.ToLower(e.Msg()), accountInUseMessage)
 }
 
 func (e *APIError) Msg() string {

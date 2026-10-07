@@ -34,18 +34,6 @@ func TestExplainBlockingAccountUsage_ExplainsTheRefusal(t *testing.T) {
 	assert.True(t, errors.As(got, &unwrapped), "the annotation is added, not substituted")
 }
 
-// The legacy webapp route words the same refusal differently.
-func TestExplainBlockingAccountUsage_MatchesLegacyWording(t *testing.T) {
-	apiErr := &client.APIError{
-		HTTPStatusCode: http.StatusBadRequest,
-		Message:        "This account can't be removed because it is being used in destinations: dst-1.",
-	}
-
-	got := provider.ExplainBlockingAccountUsage(apiErr)
-
-	assert.Contains(t, got.Error(), "RUDDERSTACK_X_RETL_TABLE_SUPPORT=true")
-}
-
 // An unrelated failure must not acquire advice about a flag that has nothing to
 // do with it.
 func TestExplainBlockingAccountUsage_LeavesOtherFailuresAlone(t *testing.T) {
@@ -54,6 +42,7 @@ func TestExplainBlockingAccountUsage_LeavesOtherFailuresAlone(t *testing.T) {
 		err  error
 	}{
 		{"unrelated conflict", &client.APIError{HTTPStatusCode: http.StatusConflict, Message: "external id already claimed"}},
+		{"right words, 400 from a route the CLI does not call", &client.APIError{HTTPStatusCode: http.StatusBadRequest, Message: "can't be removed because it is being used"}},
 		{"right words, wrong status", &client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "can't be removed because it is being used"}},
 		{"not an API error", errors.New("connection refused")},
 	}
