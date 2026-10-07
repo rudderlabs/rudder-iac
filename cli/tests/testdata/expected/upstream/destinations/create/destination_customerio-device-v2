@@ -2,21 +2,28 @@
   "id": "<ignored>",
   "workspaceId": "<ignored>",
   "version": "<ignored>",
-  "externalId": "customerio",
-  "name": "E2E Customer.io",
+  "externalId": "customerio-device-v2",
+  "name": "E2E Customer.io Device V2",
   "type": "CUSTOMERIO",
   "enabled": true,
   "config": {
     "connectionMode": {
-      "web": "cloud",
-      "androidKotlin": "cloud"
+      "web": "device"
     },
     "useNativeSDK": {
+      "web": true
+    },
+    "apiVersion": "v2",
+    "userIdIdentifierType": "id",
+    "sdkVersion": {
+      "web": "v2"
+    },
+    "writeKey": {
+      "web": "customerio-e2e-write-key"
+    },
+    "anonymousInApp": {
       "web": false
     },
-    "siteID": "rudderCliE2eSiteId",
-    "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
-    "apiVersion": "v1",
     "datacenter": "US",
     "deviceTokenEventName": "Device Token Registered",
     "whitelistedEvents": [
@@ -26,9 +33,6 @@
     ],
     "eventFilteringOption": "whitelistedEvents",
     "sendPageNameInSDK": {
-      "web": false
-    },
-    "dataUseInApp": {
       "web": false
     },
     "autoTrackDeviceAttributes": {

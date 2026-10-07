@@ -11,6 +11,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
+func TestNewCmdPreviewAcceptsVarFile(t *testing.T) {
+	t.Parallel()
+
+	flag := newCmdPreview().Flags().Lookup("var-file")
+	require.NotNil(t, flag, "retl-sources preview must accept --var-file")
+	assert.Equal(t, "stringArray", flag.Value.Type())
+}
+
 func graphOf(rs ...*resources.Resource) *resources.Graph {
 	g := resources.NewGraph()
 	for _, r := range rs {

@@ -52,6 +52,25 @@ func TestTransformationsTest(t *testing.T) {
 		verifyTestResults(t, "success", resultsFile)
 	})
 
+	t.Run("variable substitution", func(t *testing.T) {
+		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "substitution")
+		varFile := filepath.Join(fixtureDir, "transformation.vars.yaml")
+
+		output, err := executor.Execute(cliBinPath, "transformations", "test", "--all",
+			"-l", fixtureDir, "-o", filepath.Join(t.TempDir(), "without-vars.json"))
+		require.Error(t, err, "test command without --var-file should fail: %s", string(output))
+		assert.Contains(t, string(output), "variable substitution failed")
+
+		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
+		output, err = executor.Execute(cliBinPath, "transformations", "test", "--all",
+			"-l", fixtureDir, "--var-file", varFile, "-o", resultsFile)
+		require.NoError(t, err, "test command with --var-file failed: %s", string(output))
+
+		results := readResultsFile(t, resultsFile)
+		assert.Equal(t, testorchestrator.RunStatusExecuted, results.Status)
+		assert.False(t, results.HasFailures())
+	})
+
 	t.Run("failure", func(t *testing.T) {
 		resultsFile := filepath.Join(t.TempDir(), "test-results.json")
 		fixtureDir := filepath.Join("testdata", "project", "transformations-test", "failure")
