@@ -2,7 +2,6 @@ package golang
 
 import (
 	"cmp"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -95,10 +94,7 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		return nil, fmt.Errorf("reserving Alias: %w", err)
 	}
 
-	rules, err := trackRules(p)
-	if err != nil {
-		return nil, err
-	}
+	rules := trackRules(p)
 
 	// Property types register before payloads and methods, so the order in
 	// which names take collision suffixes matches the other generators.
@@ -146,7 +142,7 @@ func quickStart(methods []GoMethod) *GoMethod {
 // trackRules returns the plan's track rules in rule-key order. Rules, variants
 // and fields that need constructs the generator does not support yet are left
 // out with a warning, never silently.
-func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
+func trackRules(p *plan.TrackingPlan) []trackRule {
 	all := make([]trackRule, len(p.Rules))
 	for i := range p.Rules {
 		rule := &p.Rules[i]
@@ -159,12 +155,6 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 
 	var rules []trackRule
 	for _, r := range all {
-		// Names are checked before the skip check, so a rule or field left out
-		// for now still fails generation on a name no Go identifier can carry.
-		if err := validateNames(r.rule); err != nil {
-			return nil, err
-		}
-
 		event := r.rule.Event
 		if event.EventType != plan.EventTypeTrack {
 			core.Warn(fmt.Sprintf("skipping the %s rule (section %q): Go generation does not support %s events yet", event.EventType, r.rule.Section, event.EventType))
@@ -188,52 +178,7 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 		}
 		rules = append(rules, r)
 	}
-	return rules, nil
-}
-
-// validateNames rejects a rule whose supplied event, property or custom-type
-// names produce no words. Only a track event must have a name; the other event
-// types are named by their type.
-func validateNames(rule *plan.EventRule) error {
-	event := rule.Event
-	if event.EventType == plan.EventTypeTrack && event.Name == "" {
-		return errors.New("a track event has an empty name")
-	}
-	if event.Name != "" {
-		if _, err := pascalCase(event.Name); err != nil {
-			return fmt.Errorf("naming %s event %q: %w", event.EventType, event.Name, err)
-		}
-	}
-	return validateSchemaNames(rule.Schema, event)
-}
-
-// validateSchemaNames checks the properties of schema and of its nested object
-// schemas, and the custom types they reference.
-func validateSchemaNames(schema plan.ObjectSchema, event plan.Event) error {
-	for _, wireKey := range slices.Sorted(maps.Keys(schema.Properties)) {
-		ps := schema.Properties[wireKey]
-		for _, name := range []string{wireKey, ps.Property.Name} {
-			if _, err := pascalCase(name); err != nil {
-				return fmt.Errorf("naming property %q of %s event %q: %w", name, event.EventType, event.Name, err)
-			}
-		}
-		for _, t := range slices.Concat(ps.Property.Types, ps.Property.ItemTypes) {
-			ct := plan.AsCustomType(t)
-			if ct == nil {
-				continue
-			}
-			if _, err := pascalCase(ct.Name); err != nil {
-				return fmt.Errorf("naming custom type %q of property %q: %w", ct.Name, wireKey, err)
-			}
-		}
-		if ps.Schema == nil {
-			continue
-		}
-		if err := validateSchemaNames(*ps.Schema, event); err != nil {
-			return err
-		}
-	}
-	return nil
+	return rules
 }
 
 // unsupportedReason names the construct a field needs that a later version of
