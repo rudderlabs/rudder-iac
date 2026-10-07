@@ -3,14 +3,12 @@ package golang
 // GoContext holds every name, type expression and comment of the generated
 // file; the templates only lay them out.
 type GoContext struct {
-	RudderCLIVersion string
-	PackageName      string
-	PlanName         string
-	PlanURL          string
-	PlanID           string
-	PlanVersion      int
-	// Imports lists the standard library packages the file uses.
-	Imports            []string
+	RudderCLIVersion   string
+	PackageName        string
+	PlanName           string
+	PlanURL            string
+	PlanID             string
+	PlanVersion        int
 	UsesPtr            bool
 	UsesWithAdditional bool
 	// QuickStart is the method the package doc calls; nil when there is none.

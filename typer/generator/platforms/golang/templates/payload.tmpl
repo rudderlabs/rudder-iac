@@ -38,13 +38,13 @@ func (v {{ .Name }}) toMap() map[string]any {
 	return m
 }
 
-// ToProperties returns the properties as sent on the wire.
+// ToProperties returns a deep copy of the properties as sent on the wire.
 func (v {{ .Name }}) ToProperties() (analytics.Properties, error) {
-	return v.toMap(), nil
+	return snapshot(v)
 }
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v {{ .Name }}) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.toMap())
+	return marshal(v)
 }
 {{- end }}

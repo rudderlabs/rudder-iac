@@ -109,18 +109,9 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		}
 	}
 
-	ctx.Imports = []string{"errors", "maps", "time"}
-	var usesJSON bool
 	for _, payload := range ctx.Payloads {
-		usesJSON = usesJSON || !payload.MapAlias
 		ctx.UsesWithAdditional = ctx.UsesWithAdditional || payload.Open
 		ctx.UsesPtr = ctx.UsesPtr || slices.ContainsFunc(payload.Fields, func(f GoField) bool { return f.Pointer })
-	}
-	if usesJSON {
-		ctx.Imports = append(ctx.Imports, "encoding/json")
-	}
-	if ctx.UsesWithAdditional {
-		ctx.Imports = append(ctx.Imports, "slices")
 	}
 
 	ctx.QuickStart = quickStart(ctx.Methods)
@@ -323,7 +314,7 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 	case payload == nil:
 		summary = fmt.Sprintf("%s sends the track event %s, which has no properties.", method, strconv.Quote(event.Name))
 	case payload.MapAlias:
-		summary += " props may be nil."
+		summary += " props may be nil; it is copied, so it can be reused after the call."
 	}
 	ctx.Methods = append(ctx.Methods, GoMethod{
 		Name:    method,

@@ -78,6 +78,9 @@ func TestGenerateGoldens(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			// The runtime package's tests cover the generated runtime only
+			// while it is emitted unchanged.
+			assert.Contains(t, files[0].Content, golang.RuntimeSource)
 		})
 	}
 }
