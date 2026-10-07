@@ -3,6 +3,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "consolidatedPageCalls": true,
     "crossSubdomainCookie": false,
     "dataResidency": "us",

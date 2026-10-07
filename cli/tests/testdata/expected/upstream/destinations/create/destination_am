@@ -4,6 +4,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "enableEnhancedUserOperations": false,
     "enablePageViewsAutoCapture": {
       "web": true
