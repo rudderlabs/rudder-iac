@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -12,7 +13,11 @@ func NewCmdRetlSource() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retl-sources",
 		Short: "Manage RETL sources in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Inspect reverse ETL sources available in the authenticated workspace.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace retl-sources list --json
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListRetlSources())
@@ -24,7 +29,12 @@ func newCmdListRetlSources() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List RETL sources in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "List reverse ETL sources in the authenticated workspace, as a table or JSON.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace retl-sources list
+			rudder-cli workspace retl-sources list --json
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

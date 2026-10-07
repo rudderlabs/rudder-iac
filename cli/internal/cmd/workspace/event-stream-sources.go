@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -12,7 +13,11 @@ func NewCmdEventStreamSources() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "event-stream-sources",
 		Short: "Manage event stream sources in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "Inspect event stream sources available in the authenticated workspace.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace event-stream-sources list --json
+		`),
+		Args: cobra.NoArgs,
 	}
 
 	cmd.AddCommand(newCmdListEventStreamSources())
@@ -24,7 +29,12 @@ func newCmdListEventStreamSources() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List event stream sources in the workspace",
-		Args:  cobra.NoArgs,
+		Long:  "List event stream sources in the authenticated workspace, as a table or JSON.",
+		Example: heredoc.Doc(`
+			rudder-cli workspace event-stream-sources list
+			rudder-cli workspace event-stream-sources list --json
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 

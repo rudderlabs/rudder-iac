@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
@@ -34,8 +35,11 @@ import (
 )
 
 var (
-	cfgFile string
-	log     = logger.New("root")
+	cfgFile         string
+	debugCmd        *cobra.Command
+	experimentalCmd *cobra.Command
+	log             = logger.New("root")
+	rootCmd         *cobra.Command
 )
 
 func recovery() {
@@ -59,62 +63,160 @@ func recovery() {
 	}
 }
 
-var (
-	debugCmd        *cobra.Command
-	experimentalCmd *cobra.Command
-	datagraphCmd    *cobra.Command
+// Mode controls whether a command tree is created for normal execution or
+// documentation. Documentation mode never registers runtime initializers and
+// deliberately exposes debug and experimental commands before final filtering.
+type Mode int
+
+const (
+	ModeRuntime Mode = iota
+	ModeDocs
 )
 
-func init() {
-	cobra.OnInitialize(initConfig)
-	cobra.OnInitialize(initLogger)
-	cobra.OnInitialize(initAppDependencies)
-	cobra.OnInitialize(initTelemetry)
+// NewRootCommand builds a fresh command tree. Keeping construction independent
+// from the package-global runtime root lets documentation and tests inspect the
+// CLI without reading config, initializing telemetry, or making network calls.
+func NewRootCommand(mode Mode) *cobra.Command {
+	var configFile string
+	configTarget := &configFile
+	configDefault := "~/.rudder/config.json"
+	if mode == ModeRuntime {
+		configTarget = &cfgFile
+		configDefault = config.DefaultConfigFile()
+	}
 
-	rootCmd.PersistentFlags().StringVarP(
-		&cfgFile,
+	root := &cobra.Command{
+		Use:     "rudder-cli",
+		Short:   "Manage RudderStack resources as code",
+		Version: "dev",
+		Long: `Manage RudderStack resources with declarative YAML project files.
+
+Use apply, validate, destroy, and import to manage project state; inspect remote
+resources with workspace listings; and configure authentication and telemetry.
+Run help for command guidance or consult the generated command documentation for
+the complete reference.`,
+		Example: `  # Safely validate local declarative YAML before applying changes
+  rudder-cli validate --location ./project
+
+  # Preview the changes without modifying the workspace
+  rudder-cli apply --location ./project --dry-run
+
+  # Browse available commands and documentation
+  rudder-cli help`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			_ = cmd.Help()
+		},
+	}
+
+	root.PersistentFlags().StringVarP(
+		configTarget,
 		"config",
 		"c",
-		config.DefaultConfigFile(),
-		fmt.Sprintf("config file (default is '%s')", config.DefaultConfigFile()),
+		configDefault,
+		"config file",
 	)
 
-	// Add subcommands to the root command
-	rootCmd.AddCommand(auth.NewCmdAuth())
-	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
-	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
-	rootCmd.AddCommand(workspace.NewCmdWorkspace())
-	rootCmd.AddCommand(importcmd.NewCmdImport())
-	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
+	root.AddCommand(auth.NewCmdAuth())
+	root.AddCommand(trackingplan.NewCmdTrackingPlan())
+	root.AddCommand(telemetryCmd.NewCmdTelemetry())
+	root.AddCommand(workspace.NewCmdWorkspace())
+	root.AddCommand(importcmd.NewCmdImport())
+	root.AddCommand(retlsource.NewCmdRetlSources())
+	root.AddCommand(apply.NewCmdApply())
+	root.AddCommand(validate.NewCmdValidate())
+	root.AddCommand(destroy.NewCmdDestroy())
+	root.AddCommand(migrate.NewCmdMigrate())
 
-	rootCmd.AddCommand(apply.NewCmdApply())
-	rootCmd.AddCommand(validate.NewCmdValidate())
-	rootCmd.AddCommand(destroy.NewCmdDestroy())
-	rootCmd.AddCommand(migrate.NewCmdMigrate())
+	debugCmd := d.NewCmdDebug()
+	experimentalCmd := experimental.NewCmdExperimental()
+	if mode == ModeDocs {
+		debugCmd.Hidden = false
+		experimentalCmd.Hidden = false
+	}
+	root.AddCommand(debugCmd)
+	root.AddCommand(experimentalCmd)
 
-	debugCmd = d.NewCmdDebug()
-	experimentalCmd = experimental.NewCmdExperimental()
+	root.AddCommand(typer.NewCmdTyper())
+	root.AddCommand(transformations.NewCmdTransformations())
+	root.AddCommand(datagraphPkg.NewCmdDataGraph())
+	configureDefaultCommands(root)
+	root.InitDefaultVersionFlag()
 
-	rootCmd.AddCommand(debugCmd)
-	rootCmd.AddCommand(experimentalCmd)
+	return root
+}
 
-	rootCmd.AddCommand(typer.NewCmdTyper())
-	rootCmd.AddCommand(transformations.NewCmdTransformations())
+func configureDefaultCommands(root *cobra.Command) {
+	root.InitDefaultCompletionCmd()
+	completion, _, _ := root.Find([]string{"completion"})
+	completion.Long = heredoc.Doc(`
+		Generate shell completion scripts for rudder-cli.
 
-	datagraphCmd = datagraphPkg.NewCmdDataGraph()
-	rootCmd.AddCommand(datagraphCmd)
+		Use this command to install tab completion for a supported shell. Each shell
+		subcommand prints the script to standard output so you can source it for the
+		current session or redirect it to the location your shell loads at startup.
+	`)
+	completion.Example = heredoc.Doc(`
+		# Load bash completions for the current shell
+		source <(rudder-cli completion bash)
+
+		# Install zsh completions for future shells
+		rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"
+	`)
+
+	completionExamples := map[string]string{
+		"bash": `# Load completions for the current shell
+source <(rudder-cli completion bash)
+
+# Install completions system-wide on Linux
+rudder-cli completion bash > /etc/bash_completion.d/rudder-cli`,
+		"fish": `# Load completions for the current shell
+rudder-cli completion fish | source
+
+# Install completions for future fish shells
+rudder-cli completion fish > ~/.config/fish/completions/rudder-cli.fish`,
+		"powershell": `# Load completions for the current shell
+rudder-cli completion powershell | Out-String | Invoke-Expression`,
+		"zsh": `# Load completions for the current shell
+source <(rudder-cli completion zsh)
+
+# Install completions for future zsh shells
+rudder-cli completion zsh > "${fpath[1]}/_rudder-cli"`,
+	}
+	for shell, example := range completionExamples {
+		command, _, _ := completion.Find([]string{shell})
+		command.Example = example
+	}
+
+	root.InitDefaultHelpCmd()
+	help, _, _ := root.Find([]string{"help"})
+	help.Long = heredoc.Doc(`
+		Show detailed help for rudder-cli or one of its subcommands.
+
+		Use this command when you need command syntax, available flags, examples, or
+		the list of child commands from the installed CLI. Passing a command path shows
+		help for that command; omitting it shows the root command help.
+	`)
+	help.Example = heredoc.Doc(`
+		rudder-cli help
+		rudder-cli help apply
+		rudder-cli help workspace tracking-plans list
+	`)
+}
+
+func init() {
+	rootCmd = NewRootCommand(ModeRuntime)
+	debugCmd, _, _ = rootCmd.Find([]string{"debug"})
+	experimentalCmd, _, _ = rootCmd.Find([]string{"experimental"})
+	cobra.OnInitialize(initConfig, initLogger, initAppDependencies, initTelemetry)
 }
 
 func initConfig() {
 	config.InitConfig(cfgFile)
-
-	// only add debug command if enabled in config
 	if config.GetConfig().Debug {
 		debugCmd.Hidden = false
 	}
-
-	// reading this property from viper directly as it is not exposed in Config,
-	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
 	if viper.GetBool("experimental") {
 		experimentalCmd.Hidden = false
 	}
@@ -134,19 +236,32 @@ func initTelemetry() {
 	telemetry.Initialise(rootCmd.Version)
 }
 
-func SetVersion(v string) {
-	rootCmd.Version = v
+// DocsEligible is the shared contract for commands included in generated docs.
+// Hidden is evaluated after docs-mode exposure, so intentionally documented
+// debug and experimental commands are included while final hidden commands are not.
+func DocsEligible(command *cobra.Command) bool {
+	return command != nil && !command.Hidden && command.Deprecated == ""
 }
 
-var rootCmd = &cobra.Command{
-	Use:           "rudder-cli",
-	Short:         "Rudder CLI",
-	Long:          `Rudder is a CLI tool for managing your projects.`,
-	SilenceUsage:  true,
-	SilenceErrors: true, // We will handle errors directly in Execute
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
+// PrepareDocsTree removes commands outside the documentation contract and sets
+// deterministic generation options on every remaining command.
+func PrepareDocsTree(root *cobra.Command) {
+	var prepare func(*cobra.Command)
+	prepare = func(command *cobra.Command) {
+		command.DisableAutoGenTag = true
+		for _, child := range append([]*cobra.Command(nil), command.Commands()...) {
+			if !DocsEligible(child) {
+				command.RemoveCommand(child)
+				continue
+			}
+			prepare(child)
+		}
+	}
+	prepare(root)
+}
+
+func SetVersion(v string) {
+	rootCmd.Version = v
 }
 
 // Execute runs the root command. If the command returns an error, it is printed

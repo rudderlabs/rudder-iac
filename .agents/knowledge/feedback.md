@@ -59,3 +59,7 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## DEX-1006 — Generated Command Documentation Ownership
+<!-- ticket:DEX-1006 -->
+- Keep `docs/generated/commands/` and `man/*.1` as ignored build artifacts rather than committed source. `cli/.goreleaser.yaml` must run `make docs-commands` before packaging, and `cli/internal/cmddocs/generate_test.go` must verify byte-identical temporary output trees instead of comparing generated files with repository contents.

@@ -57,3 +57,11 @@ Read these first when working on HTTP destination onboarding or destination defi
 - `cli/internal/providers/destination/definitions`: shared destination definition and converter surface used by HTTP event filtering mappings.
 - `cli/internal/providers/destination/handler.go`: local spec extraction, secret wrapping, API conversion, and remote-to-state conversion boundary for destination definitions.
 - `cli/internal/app/dependencies.go`: destination definition registry wiring and experimental-flag gating for unverified destinations such as HTTP.
+
+## DEX-1006 — CLI Command Reference Generation Entry
+<!-- session: 2026-09-25 -->
+Read these first when changing generated command documentation or command help completeness:
+- `cli/internal/cmddocs/generate.go`: owns the deterministic Markdown, YAML, and man-page generation lifecycle, including eligibility filtering and scoped cleanup.
+- `cli/internal/cmd/root.go`: builds the side-effect-free documentation command tree and adds help metadata to Cobra's default help and completion commands without running normal CLI initialization.
+- `cli/cmd/gen-cmd-docs/main.go`: generator executable used by the `Makefile` `docs-commands` target.
+- `cli/internal/cmd/docs_contract_test.go` and `cli/internal/cmddocs/generate_test.go`: enforce `Long`/`Example` completeness, output coverage, and deterministic generation for visible, non-deprecated commands.

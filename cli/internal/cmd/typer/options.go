@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/typer/generator"
@@ -16,7 +17,10 @@ func newCmdOptions() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "options",
 		Short: "Show available options for a platform",
-		Long:  "Show all available platform-specific options for code generation",
+		Long:  "List platform-specific code generation options and their default values.",
+		Example: heredoc.Doc(`
+			rudder-cli typer options --platform kotlin
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gen, err := generator.GeneratorForPlatform(platform)
 			if err != nil {
