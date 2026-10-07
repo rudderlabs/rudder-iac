@@ -16,8 +16,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
-	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func TestNewCompositeProvider(t *testing.T) {
@@ -526,17 +526,78 @@ func (m *matcherMockProvider) ResourceMatchers() []importmatcher.Matcher {
 	return m.matchers
 }
 
-func TestCompositeProviderResourceMatchers(t *testing.T) {
+func noopMatcher(resourceType string) importmatcher.Matcher {
+	return importmatcher.Matcher{
+		ResourceType: resourceType,
+		Match: func(importmatcher.Scope, *resources.RemoteResource) *resources.Resource {
+			return nil
+		},
+	}
+}
+
+func matcherTypes(matchers []importmatcher.Matcher) []string {
+	types := make([]string, 0, len(matchers))
+	for _, m := range matchers {
+		types = append(types, m.ResourceType)
+	}
+	return types
+}
+
+func TestCompositeProviderResourceMatchers_FollowsProviderOrder(t *testing.T) {
 	t.Parallel()
 
-	noopMatcher := func(resourceType string) importmatcher.Matcher {
-		return importmatcher.Matcher{
-			ResourceType: resourceType,
-			Match: func(importmatcher.Scope, *resources.RemoteResource) *resources.Resource {
-				return nil
-			},
+	// The dependency's name sorts after the dependent's, so only the given
+	// order — not map iteration, not sorted names — puts its matcher first.
+	var (
+		dependency = &matcherMockProvider{
+			MockProvider: testutils.NewMockProvider([]string{"kindZ"}, []string{"typeZ"}),
+			matchers:     []importmatcher.Matcher{noopMatcher("z1")},
 		}
+		dependent = &matcherMockProvider{
+			MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+			matchers:     []importmatcher.Matcher{noopMatcher("a1"), noopMatcher("a2")},
+		}
+	)
+
+	cp, err := provider.NewCompositeProvider(
+		map[string]provider.Provider{"alpha": dependent, "zeta": dependency},
+		"zeta", "alpha",
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"z1", "a1", "a2"}, matcherTypes(cp.ResourceMatchers()))
+}
+
+func TestNewCompositeProvider_RejectsOrderNotNamingEachProviderOnce(t *testing.T) {
+	t.Parallel()
+
+	providers := map[string]provider.Provider{
+		"alpha": testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
+		"zeta":  testutils.NewMockProvider([]string{"kindZ"}, []string{"typeZ"}),
 	}
+
+	cases := []struct {
+		name  string
+		order []string
+	}{
+		{"missing provider", []string{"alpha"}},
+		{"unknown provider", []string{"alpha", "zeta", "omega"}},
+		{"duplicate provider", []string{"alpha", "zeta", "alpha"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := provider.NewCompositeProvider(providers, tc.order...)
+
+			assert.ErrorContains(t, err, "provider order")
+		})
+	}
+}
+
+func TestCompositeProviderResourceMatchers(t *testing.T) {
+	t.Parallel()
 
 	alpha := &matcherMockProvider{
 		MockProvider: testutils.NewMockProvider([]string{"kindA"}, []string{"typeA"}),
@@ -552,14 +613,11 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	matchers := cp.ResourceMatchers()
-	types := make([]string, 0, len(matchers))
-	for _, m := range matchers {
-		types = append(types, m.ResourceType)
-	}
+	types := matcherTypes(cp.ResourceMatchers())
 
-	// Cross-provider order is unspecified; a provider's own matcher order is
-	// preserved (parent-before-child).
+	// Without an order, providers are taken by name.
+	assert.Equal(t, []string{"alpha", "gamma"}, cp.(*provider.CompositeProvider).Order)
+	// A provider's own matcher order is preserved (parent-before-child).
 	assert.ElementsMatch(t, []string{"a1", "a2"}, types)
 	assert.Less(t,
 		slices.Index(types, "a1"), slices.Index(types, "a2"),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -21,15 +22,22 @@ import (
 )
 
 type CompositeProvider struct {
-	concurrency     int
-	Providers       map[string]Provider
+	concurrency int
+	Providers   map[string]Provider
+	// Order lists the providers in dependency order: a provider whose matchers
+	// consult another provider's matches comes after that provider.
+	Order           []string
 	registeredKinds map[string]Provider
 	registeredTypes map[string]Provider
 }
 
-func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
-	if len(providers) == 0 {
-		return nil, fmt.Errorf("at least one provider must be specified")
+// NewCompositeProvider composes the providers. order names every provider in
+// dependency order (see app.providerOrder); callers whose providers are
+// independent may omit it and get them sorted by name.
+func NewCompositeProvider(providers map[string]Provider, order ...string) (Provider, error) {
+	order, err := providerOrder(providers, order)
+	if err != nil {
+		return nil, err
 	}
 
 	registeredKinds := make(map[string]Provider)
@@ -53,20 +61,43 @@ func NewCompositeProvider(providers map[string]Provider) (Provider, error) {
 	return &CompositeProvider{
 		concurrency:     config.GetConfig().Concurrency.CompositeProvider,
 		Providers:       providers,
+		Order:           order,
 		registeredKinds: registeredKinds,
 		registeredTypes: registeredTypes,
 	}, nil
 }
 
-// ResourceMatchers aggregates import --merge matchers from all providers.
-// Cross-provider order is immaterial — resource types are disjoint across
-// providers (enforced at construction) and no matcher reads another
-// provider's marks — so plain map iteration is fine; only the order within a
-// provider's own slice (parent-before-child) is meaningful and is preserved.
+// providerOrder returns the given order, or the provider names sorted when
+// none is given. An order must name each provider exactly once: a missing
+// provider would silently drop its matchers, a duplicate would run them twice.
+func providerOrder(providers map[string]Provider, order []string) ([]string, error) {
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("at least one provider must be specified")
+	}
+
+	names := maps.Keys(providers)
+	slices.Sort(names)
+	if len(order) == 0 {
+		return names, nil
+	}
+
+	sorted := slices.Clone(order)
+	slices.Sort(sorted)
+	if !slices.Equal(sorted, names) {
+		return nil, fmt.Errorf("provider order %v must name each provider exactly once: %v", order, names)
+	}
+	return order, nil
+}
+
+// ResourceMatchers aggregates import --merge matchers from all providers in
+// Order. importmatcher.Mark runs them in this order, and a matcher that
+// consults another provider's matches (a connection matcher resolving its
+// destination endpoint) only finds them if that provider's matchers ran first.
+// Within a provider, the slice order it returns is preserved.
 func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
 	var all []importmatcher.Matcher
-	for _, provider := range p.Providers {
-		all = append(all, provider.ResourceMatchers()...)
+	for _, name := range p.Order {
+		all = append(all, p.Providers[name].ResourceMatchers()...)
 	}
 	return all
 }
