@@ -18,4 +18,3 @@ func TestPrintTableWithDetails_WhenNoResources_PrintsPlainMessage(t *testing.T) 
 
 	require.Equal(t, "No resources found\n", buf.String())
 }
-

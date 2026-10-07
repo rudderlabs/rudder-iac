@@ -2,6 +2,11 @@ package lister
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"golang.org/x/term"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -11,7 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
- 
+
 const noResourcesFoundMsg = "No resources found"
 
 type model struct {
@@ -149,6 +154,16 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		}
 	}
 
+	// The TUI is only usable by someone who can press esc to leave it. Piped,
+	// redirected, in CI or inside a recorded pty there is nobody to press it:
+	// the program either fails to open /dev/tty or blocks forever. Print a
+	// static table there instead, which is what every other CLI does when it
+	// is not talking to a terminal.
+	if !interactiveStdout() {
+		printStaticTable(os.Stdout, columns, rows)
+		return nil
+	}
+
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
@@ -180,4 +195,56 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 	}
 
 	return nil
+}
+
+// interactiveStdout reports whether stdout is a terminal a person is watching
+// AND that they have not asked for plain output.
+//
+// The terminal check catches pipes, redirects and CI. It cannot catch every
+// case: a pty is a terminal whether or not a human is at the other end, so a
+// session recorder or an automation harness driving a pty passes it and the TUI
+// still blocks waiting for esc. Nothing can distinguish those from a real
+// terminal, so RUDDERSTACK_CLI_NONINTERACTIVE exists to say so explicitly.
+//
+// bubbletea also opens /dev/tty rather than stdout, so even the terminal check
+// is a proxy for what it will do rather than a guarantee.
+func interactiveStdout() bool {
+	if os.Getenv("RUDDERSTACK_CLI_NONINTERACTIVE") == "1" {
+		return false
+	}
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+// printStaticTable writes the same columns and rows as plain aligned text.
+func printStaticTable(w io.Writer, columns []table.Column, rows []table.Row) {
+	widths := make([]int, len(columns))
+	for i, c := range columns {
+		widths[i] = len(c.Title)
+	}
+	for _, row := range rows {
+		for i, cell := range row {
+			if i < len(widths) && len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	line := func(cells []string) {
+		parts := make([]string, 0, len(cells))
+		for i, cell := range cells {
+			if i < len(widths) {
+				parts = append(parts, fmt.Sprintf("%-*s", widths[i], cell))
+			}
+		}
+		fmt.Fprintln(w, strings.TrimRight(strings.Join(parts, "  "), " "))
+	}
+
+	titles := make([]string, len(columns))
+	for i, c := range columns {
+		titles[i] = c.Title
+	}
+	line(titles)
+	for _, row := range rows {
+		line(row)
+	}
 }
