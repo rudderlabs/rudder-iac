@@ -4,7 +4,7 @@
 
 - [⚠️ Work in Progress](#️-work-in-progress)
 - [Installation](#installation)
-  - [MacOS](#macos)
+  - [macOS](#macos)
     - [Apple Silicon](#apple-silicon)
     - [Intel-based](#intel-based)
   - [Linux](#linux)
@@ -19,7 +19,7 @@
 
 ## Installation
 
-### MacOS
+### macOS
 
 #### Apple Silicon
 
