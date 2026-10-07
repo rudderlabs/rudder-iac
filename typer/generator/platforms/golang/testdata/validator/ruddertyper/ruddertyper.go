@@ -618,10 +618,21 @@ func foreign(rv reflect.Value, depth int) (any, error) {
 		return encode(rv.Interface())
 	}
 	// VisibleFields includes the fields encoding/json promotes from embedded
-	// structs; those behind a nil embedded pointer have no value to walk.
+	// structs, right after the embedded field; those behind a nil embedded
+	// pointer or an embedded field tagged "-" are never encoded. A zero field
+	// holds nothing to walk, and walking it would reject a nil func that
+	// omitzero leaves out.
+	var skip []int
 	for _, f := range reflect.VisibleFields(rv.Type()) {
+		if skip != nil && len(f.Index) > len(skip) && slices.Equal(f.Index[:len(skip)], skip) {
+			continue
+		}
+		if f.Tag.Get("json") == "-" {
+			skip = f.Index
+			continue
+		}
 		fv, err := rv.FieldByIndexErr(f.Index)
-		if err != nil || !f.IsExported() || f.Tag.Get("json") == "-" {
+		if err != nil || !f.IsExported() || fv.IsZero() {
 			continue
 		}
 		if _, err := wire(fv, depth); err != nil {

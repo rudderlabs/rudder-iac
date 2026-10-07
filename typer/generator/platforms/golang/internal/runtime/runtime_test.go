@@ -97,7 +97,15 @@ type (
 	callerOmitZero struct {
 		Items  []string       `json:",omitzero"`
 		Labels map[string]int `json:",omitzero"`
+		Done   func()         `json:",omitzero"`
 	}
+	// encoding/json skips the fields promoted from an embedded struct tagged
+	// "-", so a function there is never encoded.
+	callerIgnored struct {
+		Name        string
+		callerHooks `json:"-"`
+	}
+	callerHooks struct{ OnSend func() }
 )
 
 type (
@@ -280,6 +288,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			name: "caller struct fields tagged omitzero are omitted when nil, as in encoding/json",
 			in:   map[string]any{"s": callerOmitZero{}},
 			want: map[string]any{"s": map[string]any{}},
+		},
+		{
+			name: "fields promoted from an embedded struct tagged \"-\" are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerIgnored{Name: "a", callerHooks: callerHooks{OnSend: func() {}}}},
+			want: map[string]any{"s": map[string]any{"Name": "a"}},
 		},
 		{
 			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
