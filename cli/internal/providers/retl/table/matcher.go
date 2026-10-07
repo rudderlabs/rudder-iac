@@ -8,9 +8,9 @@ import (
 )
 
 // Matcher returns the import --merge matcher for table sources. It mirrors the
-// sqlmodel rule: a remote source links to a local one with the same
-// display_name AND account_id, since a false link across accounts is worse than
-// falling back to the namer and generating a new spec.
+// sqlmodel rule: a remote source links to a local one whose display_name folds
+// to the same value. See sqlmodel.Matcher for why account_id is no longer a
+// second conjunct.
 func Matcher() importmatcher.Matcher {
 	return importmatcher.Matcher{
 		ResourceType: ResourceType,
@@ -26,11 +26,8 @@ func matchTable(scope importmatcher.Scope, r *resources.RemoteResource) *resourc
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
-		var (
-			displayName, _ = data[sqlmodel.DisplayNameKey].(string)
-			accountID, _   = data[sqlmodel.AccountIDKey].(string)
-		)
-		return displayName == remote.Name && accountID == remote.AccountID
+		displayName, _ := data[sqlmodel.DisplayNameKey].(string)
+		return importmatcher.SameName(displayName, remote.Name)
 	})
 	return local
 }
