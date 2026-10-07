@@ -60,14 +60,12 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 	client, err := analytics.NewWithConfig("write-key", analytics.Config{
 		DataPlaneUrl: srv.URL,
 		DisableGzip:  true,
-		// Only Close flushes, so every call lands in one batch in send order;
+		// Only Close flushes while a capture stays under the default ~500 KB
+		// MaxBatchBytes, so every call lands in one batch in send order;
 		// smaller batches are sent concurrently and can arrive in any order.
-		// The SDK also flushes early once a batch passes MaxBatchBytes
-		// (~500 KB by default), so that limit is lifted too.
-		BatchSize:     1000,
-		MaxBatchBytes: 1 << 30,
-		Interval:      time.Hour,
-		Callback:      rec,
+		BatchSize: 1000,
+		Interval:  time.Hour,
+		Callback:  rec,
 	})
 	require.NoError(t, err)
 	send(client)
