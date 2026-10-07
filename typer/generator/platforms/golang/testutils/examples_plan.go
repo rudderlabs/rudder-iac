@@ -33,7 +33,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			track("$eventWithNameCamelCase$!", "", false, map[string]plan.PropertySchema{
 				"someString": optional(property("someString", "some string property", plan.PrimitiveTypeString)),
 			}),
-			// Property names that are Go keywords or predeclared identifiers.
+			// One property named after each primitive type, plus type: string
+			// and any are predeclared Go identifiers, and type is a keyword.
 			track("Every Primitive Type", "", false, map[string]plan.PropertySchema{
 				"string":  required(property("string", "", plan.PrimitiveTypeString)),
 				"integer": optional(property("integer", "", plan.PrimitiveTypeInteger)),

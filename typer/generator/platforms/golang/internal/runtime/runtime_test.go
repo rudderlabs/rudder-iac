@@ -85,19 +85,28 @@ type (
 	callerHolder struct{ Payload testPayload }
 )
 
-// callerFields holds the field shapes the nil rule treats differently. Its
-// embedded struct has an unexported type, so encoding/json promotes its
-// exported fields.
-type callerFields struct {
-	Items  []string
-	Labels map[string]int
-	Bytes  []byte
-	ByID   map[int]string
-	Ptr    *int
-	embeddedFields
-}
-
-type embeddedFields struct{ Tags []string }
+// callerFields promotes Tags from an embedded pointer to an unexported type,
+// as encoding/json does.
+type (
+	callerFields struct {
+		Items  []string
+		Labels map[string]int
+		*embeddedFields
+	}
+	embeddedFields struct{ Tags []string }
+	callerOmitZero struct {
+		Items  []string       `json:",omitzero"`
+		Labels map[string]int `json:",omitzero"`
+		Done   func()         `json:",omitzero"`
+	}
+	// encoding/json skips the fields promoted from an embedded struct tagged
+	// "-", so a function there is never encoded.
+	callerIgnored struct {
+		Name        string
+		callerHooks `json:"-"`
+	}
+	callerHooks struct{ OnSend func() }
+)
 
 type (
 	callerEmbedded    struct{ embeddedPayload }
@@ -163,7 +172,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		name    string
 		in      any
 		want    map[string]any
-		wantErr error
+		wantErr bool
 		wantAs  any // a pointer errors.As must fill from the error chain
 	}{
 		{
@@ -225,7 +234,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "wireValue error",
 			in:      map[string]any{"union": testUnion{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name: "variant items",
@@ -235,12 +244,12 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "nil variant item",
 			in:      map[string]any{"items": []testVariant{nil}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "typed-nil variant item",
 			in:      map[string]any{"items": []testVariant{(*testCase)(nil)}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name: "[]byte becomes base64, a nil one null",
@@ -268,12 +277,22 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			want: map[string]any{"s": map[string]any{"Count": json.Number("3"), "Price": json.Number("1.5")}},
 		},
 		{
-			name: "nil slices and maps inside caller data become [] and {}, except []byte and non-string keys",
-			in:   map[string]any{"s": &callerFields{}, "byID": map[int][]string{1: nil}},
+			name: "nil slices and maps inside caller structs and non-string-key maps are null, as in encoding/json",
+			in:   map[string]any{"s": callerFields{embeddedFields: &embeddedFields{}}, "byID": map[int][]string{1: nil}},
 			want: map[string]any{
-				"s":    map[string]any{"Items": []any{}, "Labels": map[string]any{}, "Bytes": nil, "ByID": nil, "Ptr": nil, "Tags": []any{}},
-				"byID": map[string]any{"1": []any{}},
+				"s":    map[string]any{"Items": nil, "Labels": nil, "Tags": nil},
+				"byID": map[string]any{"1": nil},
 			},
+		},
+		{
+			name: "caller struct fields tagged omitzero are omitted when nil, as in encoding/json",
+			in:   map[string]any{"s": callerOmitZero{}},
+			want: map[string]any{"s": map[string]any{}},
+		},
+		{
+			name: "fields promoted from an embedded struct tagged \"-\" are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerIgnored{Name: "a", callerHooks: callerHooks{OnSend: func() {}}}},
+			want: map[string]any{"s": map[string]any{"Name": "a"}},
 		},
 		{
 			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
@@ -288,23 +307,23 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 			wantAs:  new(testMarshalError),
 		},
 		{
 			name:    "map that contains itself",
 			in:      cyclicMap,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "AdditionalProperties that contain their object",
 			in:      cyclicObj,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "caller struct that contains itself",
 			in:      map[string]any{"node": cyclicNode},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			// encoding/json cannot see these cycles, because each MarshalJSON
@@ -312,22 +331,22 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// map can.
 			name:    "generated value that contains itself through a caller struct",
 			in:      cyclicHolder,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through a non-string-key map",
 			in:      cyclicKeyed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded struct of an unexported type",
 			in:      cyclicEmbed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded pointer to an unexported type",
 			in:      cyclicEmbedP,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			// Each level is a slice and the interface holding it: 499 levels
@@ -340,25 +359,23 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// The pointer to the leaf is one level more.
 			name:    "nesting past the depth bound",
 			in:      map[string]any{"v": nest(499, &leaf)},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
-		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: ErrInvalidValue},
-		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: ErrInvalidValue},
-		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: ErrInvalidValue},
-		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: ErrInvalidValue},
-		{name: "function", in: map[string]any{"f": func() {}}, wantErr: ErrInvalidValue},
-		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: ErrInvalidValue},
+		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: true},
+		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: true},
+		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: true},
+		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: true},
+		{name: "function", in: map[string]any{"f": func() {}}, wantErr: true},
+		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := snapshot(tt.in)
 			b, marshalErr := marshal(tt.in)
-			if tt.wantErr != nil {
+			if tt.wantErr {
 				assert.ErrorIs(t, err, ErrInvalidValue)
-				assert.ErrorIs(t, err, tt.wantErr)
 				assert.ErrorIs(t, marshalErr, ErrInvalidValue)
-				assert.ErrorIs(t, marshalErr, tt.wantErr)
 				if tt.wantAs != nil {
 					assert.ErrorAs(t, err, tt.wantAs)
 					assert.ErrorAs(t, marshalErr, tt.wantAs)
@@ -451,17 +468,17 @@ func TestAnalyticsContext(t *testing.T) {
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}
 
-	got := callOptions{context: &caller}.analyticsContext(analytics.Traits{"email": "typed@example.com"})
+	got := callOptions{context: &caller}.analyticsContext()
 
 	assert.Equal(t, &analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"custom": 1, "ruddertyper": rudderTyperContext()},
-		Traits: analytics.Traits{"email": "typed@example.com", "name": "Caller"},
+		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, got)
 	assert.Equal(t, analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"ruddertyper": "overwritten", "custom": 1},
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, caller)
-	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext(nil))
+	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext())
 }

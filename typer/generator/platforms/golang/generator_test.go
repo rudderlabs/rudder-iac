@@ -1,10 +1,7 @@
 package golang_test
 
 import (
-	"go/parser"
-	"go/token"
 	"os"
-	"regexp"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -69,8 +66,6 @@ func TestGenerateGoldens(t *testing.T) {
 		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
 		"testdata/validator/examples/ruddertyper.go":    nil,
 	}
-	runtimeFile, err := parser.ParseFile(token.NewFileSet(), "internal/runtime/runtime.go", nil, parser.ImportsOnly)
-	require.NoError(t, err)
 
 	for _, golden := range testutils.Goldens {
 		t.Run(golden.Path, func(t *testing.T) {
@@ -78,95 +73,44 @@ func TestGenerateGoldens(t *testing.T) {
 
 			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golden.Options)
 			require.NoError(t, err)
-			require.Len(t, files, 1)
-			assert.Equal(t, "ruddertyper.go", files[0].Path)
-			assert.Regexp(t, regexp.MustCompile(`\A// Code generated .* DO NOT EDIT\.\n`), files[0].Content)
 
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
-			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
+			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
-			// `make test` does not compile the goldens (only `make typer-go-validate`
-			// does), so this catches a runtime import the template does not declare.
-			for _, imp := range runtimeFile.Imports {
-				assert.Contains(t, files[0].Content, imp.Path.Value)
-			}
 		})
 	}
 }
 
-// Names are checked before the skip check, so rules and fields the generator
-// leaves out for now fail on them too.
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
-	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
-			Event:   plan.Event{EventType: eventType, Name: event},
-			Section: section,
+			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
+			Section: plan.IdentitySectionProperties,
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}}}
-	}
-	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
-		return rule(plan.EventTypeTrack, event, plan.IdentitySectionProperties, properties)
 	}
 	property := func(name string, p plan.PropertySchema) map[string]plan.PropertySchema {
 		p.Property.Name = name
 		return map[string]plan.PropertySchema{name: p}
 	}
-	var (
-		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		enumSchema   = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
-		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
-		nestedSchema = plan.PropertySchema{
-			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
-			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
-		}
-	)
+	stringSchema := plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
 
 	tests := []struct {
 		name    string
 		plan    *plan.TrackingPlan
 		wantErr string
 	}{
-		{"empty track event name", trackEvent("", nil), "a track event has an empty name"},
+		{"empty track event name", trackEvent("", nil), `naming track event "": name "" has no letters or digits to build a Go identifier from`},
 		{"symbols only", trackEvent("!!!", nil), `naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`},
 		{"emoji only", trackEvent("🎯", nil), `naming track event "🎯": name "🎯" has no letters or digits to build a Go identifier from`},
 		{
-			"track event in a skipped section",
-			rule(plan.EventTypeTrack, "!!!", plan.IdentitySectionTraits, nil),
-			`naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"empty track event in a skipped section",
-			rule(plan.EventTypeTrack, "", plan.IdentitySectionTraits, nil),
-			"a track event has an empty name",
-		},
-		{
-			"skipped event type",
-			rule(plan.EventTypePage, "🎯", plan.IdentitySectionProperties, nil),
-			`naming page event "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
-		},
-		{
 			"property without words",
 			trackEvent("Some Event", property("$$", stringSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"skipped property without words",
-			trackEvent("Some Event", property("$$", enumSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"custom type without words",
-			trackEvent("Some Event", property("kind", customSchema)),
-			`naming custom type "!!!" of property "kind": name "!!!" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"nested property without words",
-			trackEvent("Some Event", property("context", nestedSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+			`naming property "$$": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 	}
 

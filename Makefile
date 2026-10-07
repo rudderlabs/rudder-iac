@@ -81,7 +81,7 @@ typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
 
 .PHONY: typer-go-update-testdata
 typer-go-update-testdata: ## Update test data for Go code generation
-	go run typer/generator/platforms/golang/testutils/generate_reference_plan.go
+	go run ./typer/generator/platforms/golang/testutils/generate_reference_plan
 
 .PHONY: typer-swift-update-testdata
 typer-swift-update-testdata: ## Update test data for Swift code generation
