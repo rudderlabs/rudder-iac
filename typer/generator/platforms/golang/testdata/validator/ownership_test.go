@@ -1,4 +1,4 @@
-package golang_test
+package validator
 
 import (
 	"net"
