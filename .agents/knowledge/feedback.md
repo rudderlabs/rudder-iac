@@ -59,3 +59,8 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## DEX-999 — Preserve Current Rule Documentation During Carry-over
+<!-- ticket:DEX-999 -->
+- When carrying selected `*.docs.yaml` changes from an older branch, start from each fragment on current `main` and reapply only the intended hunks; never replace the whole fragment with the older version.
+- Preserve examples and diagnostics added after the source branch diverged, and compare `example_id` sets before committing to detect accidental deletions.

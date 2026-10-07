@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "transformation-library-spec-syntax-valid-inline-js"
-        title: "Valid transformation library spec with inline JavaScript code"
+        title: "Valid transformation library spec with inline JavaScript"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -25,7 +25,7 @@ match_behavior:
                     }
     invalid:
       - example_id: "transformation-library-spec-syntax-valid-missing-id"
-        title: "Transformation library spec missing required id field"
+        title: "Transformation library spec missing required id"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -47,7 +47,7 @@ match_behavior:
             severity: "error"
             message_contains: "'id' is required"
       - example_id: "transformation-library-spec-syntax-valid-missing-import-name"
-        title: "Transformation library spec missing required import_name field"
+        title: "Transformation library spec missing required import_name"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -69,7 +69,7 @@ match_behavior:
             severity: "error"
             message_contains: "'import_name' is required"
       - example_id: "transformation-library-spec-syntax-valid-wrong-import-name-case"
-        title: "Transformation library import_name not in camelCase of name"
+        title: "Transformation library import_name is not camelCase of name"
         files:
           spec.yaml: |
             version: rudder/v1

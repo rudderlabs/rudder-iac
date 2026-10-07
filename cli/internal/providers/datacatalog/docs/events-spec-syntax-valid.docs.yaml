@@ -25,7 +25,7 @@ match_behavior:
                   event_type: identify
     invalid:
       - example_id: "ev-spec-legacy-missing-id"
-        title: "Legacy event missing the required id field"
+        title: "Legacy event missing required id field"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -57,14 +57,14 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/events/0/event_type"
             severity: "error"
-            message_contains: "oneof"
+            message_contains: "'event_type' must be one of [track screen identify group page]"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "events"
         version: "rudder/v1"
     valid:
       - example_id: "ev-spec-v1-valid"
-        title: "Valid v1 events spec"
+        title: "Valid events spec"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -80,7 +80,7 @@ match_behavior:
                   event_type: identify
     invalid:
       - example_id: "ev-spec-v1-missing-event-type"
-        title: "v1 event missing the required event_type field"
+        title: "v1 event missing required event_type field"
         files:
           spec.yaml: |
             version: rudder/v1
