@@ -31,6 +31,13 @@
       "android": "cloud",
       "unity": "cloud"
     },
+    "useNativeSDK": {
+      "web": true,
+      "android": false
+    },
+    "useNativeSDKToSend": {
+      "web": false
+    },
     "capturePageView": {
       "web": "rs"
     },

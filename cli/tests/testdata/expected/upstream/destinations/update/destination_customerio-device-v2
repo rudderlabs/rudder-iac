@@ -2,21 +2,28 @@
   "id": "<ignored>",
   "workspaceId": "<ignored>",
   "version": "<ignored>",
-  "externalId": "customerio",
-  "name": "E2E Customer.io Updated",
+  "externalId": "customerio-device-v2",
+  "name": "E2E Customer.io Device V2 Updated",
   "type": "CUSTOMERIO",
   "enabled": true,
   "config": {
     "connectionMode": {
-      "web": "cloud",
-      "androidKotlin": "cloud"
+      "web": "device"
     },
     "useNativeSDK": {
-      "web": false
+      "web": true
     },
-    "siteID": "rudderCliE2eSiteIdUpdated",
-    "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
-    "apiVersion": "v1",
+    "apiVersion": "v2",
+    "userIdIdentifierType": "email",
+    "sdkVersion": {
+      "web": "v2"
+    },
+    "writeKey": {
+      "web": "customerio-e2e-write-key-updated"
+    },
+    "anonymousInApp": {
+      "web": true
+    },
     "datacenter": "EU",
     "deviceTokenEventName": "Token Refreshed",
     "blacklistedEvents": [
@@ -28,9 +35,6 @@
     "sendPageNameInSDK": {
       "web": true
     },
-    "dataUseInApp": {
-      "web": true
-    },
     "autoTrackDeviceAttributes": {
       "android": true,
       "ios": true
@@ -40,18 +44,6 @@
     },
     "backgroundQueueSecondsDelay": {
       "android": "45"
-    },
-    "consentManagement": {
-      "web": [
-        {
-          "provider": "oneTrust",
-          "consents": [
-            {
-              "consent": "analytics"
-            }
-          ]
-        }
-      ]
     }
   },
   "createdAt": "<ignored>",
