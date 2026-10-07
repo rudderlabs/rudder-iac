@@ -78,16 +78,16 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 }
 
 // assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
-// messageId, originalTimestamp, sentAt, anonymousId and context.library are
-// ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
-// testable.
+// messageId, originalTimestamp, sentAt, anonymousId, channel and context.library
+// are ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp
+// stay testable.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
 	require.NoError(t, decode(strings.NewReader(wantJSON), &want))
 
 	got = maps.Clone(got)
-	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"} {
+	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId", "channel"} {
 		if _, ok := want[key]; !ok {
 			delete(got, key)
 		}
@@ -121,7 +121,6 @@ func TestTrackSmoke(t *testing.T) {
 	require.Len(t, wire, 1)
 	assertMessage(t, `{
 		"type": "track",
-		"channel": "server",
 		"event": "Some Track Event",
 		"userId": "user-123",
 		"properties": {"someString": "hello", "someInteger": 42, "someBoolean": true},
