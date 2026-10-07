@@ -70,6 +70,7 @@ jobs:
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_NOTIFICATIONS_BOT_TOKEN }}
+          errors: true
           payload: |
             channel: ${{ secrets.SLACK_NOTIFICATIONS_CHANNEL_ID }}
             text: ":red_circle: destination e2e nightly failed: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|view run>"
