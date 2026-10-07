@@ -13,9 +13,10 @@ import (
 )
 
 // rawAccountSecret is the literal BigQuery credentials value supplied via the var
-// file. It must never surface in CLI output — the secret is write-only and the API
-// never returns it.
-const rawAccountSecret = "dummy-bq-service-account-key-12345"
+// file: a service account key shaped like a downloaded key file, which the
+// accounts provider requires. It must never surface in CLI output — the secret is
+// write-only and the API never returns it.
+const rawAccountSecret = `{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy-bq-key-id-12345","private_key":"-----BEGIN PRIVATE KEY-----\nZHVtbXk=\n-----END PRIVATE KEY-----\n","client_email":"dummy@rudder-cli-e2e.iam.gserviceaccount.com"}`
 
 // accountExternalIDs are the accounts the fixtures manage, one per supported
 // warehouse definition. Each has a testdata/expected/upstream/accounts/<dir>/<id>.json

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -454,6 +455,88 @@ func TestImportedAbsentModeAccount_AddsDiscriminatorOnce(t *testing.T) {
 
 			assert.ElementsMatch(t, tc.wantDiffKeys, slices.Collect(maps.Keys(diffs)))
 			assert.Equal(t, tc.wantSecretOnly, secretOnly)
+		})
+	}
+}
+
+// Fixture placeholder, not a credential.
+const bqPEM = "-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEA\n-----END PRIVATE KEY-----\n" //gitleaks:allow
+
+func bqKeyJSON(t *testing.T, privateKey string) string {
+	t.Helper()
+	raw, err := json.Marshal(map[string]string{
+		"type":         "service_account",
+		"project_id":   "acme-analytics-prod",
+		"private_key":  privateKey,
+		"client_email": "rudder@acme-analytics-prod.iam.gserviceaccount.com",
+	})
+	require.NoError(t, err)
+	return string(raw)
+}
+
+// A {{ .VAR }} token is substituted into the YAML text before it is parsed, so
+// a key file's JSON can reach the account as something other than the key: a
+// map, text with its PEM line breaks folded into spaces, or not JSON at all.
+// The backend stores any non-empty string and the UI only reports the damage
+// at credential validation, so the spec must be refused up front (DEX-1022).
+func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		errContains string
+	}{
+		{
+			name:   "service account key JSON",
+			config: map[string]any{"project": "acme-analytics-prod", "credentials": bqKeyJSON(t, bqPEM)},
+		},
+		{
+			name:   "workload identity federation carries no credentials",
+			config: map[string]any{"project": "acme-analytics-prod", "authMethod": "workloadIdentityFederation"},
+		},
+		{
+			name: "PEM line breaks folded into spaces",
+			config: map[string]any{
+				"project":     "acme-analytics-prod",
+				"credentials": bqKeyJSON(t, strings.ReplaceAll(bqPEM, "\n", " ")),
+			},
+			errContains: "private_key is not a PEM block",
+		},
+		{
+			name:        "not JSON",
+			config:      map[string]any{"project": "acme-analytics-prod", "credentials": "dummy-key"},
+			errContains: "not valid JSON",
+		},
+		{
+			name: "JSON parsed into a map by an unquoted variable",
+			config: map[string]any{
+				"project":     "acme-analytics-prod",
+				"credentials": map[string]any{"type": "service_account"},
+			},
+			errContains: "must be a string",
+		},
+		{
+			name: "no client_email",
+			config: map[string]any{
+				"project":     "acme-analytics-prod",
+				"credentials": `{"type":"service_account","private_key":"` + strings.ReplaceAll(bqPEM, "\n", `\n`) + `"}`,
+			},
+			errContains: "client_email",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := h.ExtractResourcesFromSpec("f.yaml", &AccountSpec{
+				ID: "bq", Name: "bq", AccountDefinitionName: "SOURCE_BIGQUERY", Config: tt.config,
+			})
+			if tt.errContains == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
 		})
 	}
 }

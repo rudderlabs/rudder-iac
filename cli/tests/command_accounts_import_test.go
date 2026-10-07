@@ -104,7 +104,7 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	// Fill in the placeholder and adopt the account. Import only scaffolds; the
 	// remote is claimed (Update + SetExternalID) on apply.
-	require.NoError(t, os.WriteFile(varFile, []byte(varName+": "+rawAccountSecret+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(varFile, []byte(varName+": '"+rawAccountSecret+"'\n"), 0o600))
 
 	out, err = executor.Execute(cliBinPath, "apply", "-l", projectDir, "--var-file", varFile, "--confirm=false")
 	require.NoError(t, err, "apply after import failed: %s", out)

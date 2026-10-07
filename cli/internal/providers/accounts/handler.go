@@ -153,6 +153,11 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
+	if spec.AccountDefinitionName == definitionBigQuery {
+		if err := validateBigQueryCredentials(spec.Config); err != nil {
+			return nil, fmt.Errorf("account %q: %w", spec.ID, err)
+		}
+	}
 	resource := &AccountResource{
 		ID:                    spec.ID,
 		Name:                  spec.Name,
