@@ -1,8 +1,5 @@
-//go:build ignore
-
 // Writes every Go golden into the validator module (make
-// typer-go-update-testdata). It shares its directory with the testutils
-// package, hence the ignore constraint: run it with go run on this file.
+// typer-go-update-testdata).
 package main
 
 import (
