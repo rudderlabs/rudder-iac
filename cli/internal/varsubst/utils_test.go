@@ -50,26 +50,24 @@ func TestExtractVariableNames(t *testing.T) {
 	}
 }
 
-func TestUnquoteTokens(t *testing.T) {
+func TestSingleQuoteTokens(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
 		want string
 	}{
 		{
-			name: "quoted token unquoted",
+			name: "double-quoted token single-quoted",
 			in:   `accessKey: "{{ .ACCESS_KEY }}"`,
-			want: `accessKey: {{ .ACCESS_KEY }}`,
+			want: `accessKey: '{{ .ACCESS_KEY }}'`,
 		},
 		{
-			name: "token with default unquoted",
+			name: "token with default single-quoted",
 			in:   `region: "{{ .REGION | us-east-1 }}"`,
-			want: `region: {{ .REGION | us-east-1 }}`,
+			want: `region: '{{ .REGION | us-east-1 }}'`,
 		},
 		{
-			// Not a variable reference, so it keeps its quotes — unquoting a
-			// non-variable token would emit a scalar starting with '{', which
-			// YAML reads as a flow mapping.
+			// Not a variable reference, so it keeps its double quotes.
 			name: "non variable token keeps quotes",
 			in:   `a: "{{ NO_DOT }}"`,
 			want: `a: "{{ NO_DOT }}"`,
@@ -92,7 +90,7 @@ func TestUnquoteTokens(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, string(UnquoteTokens([]byte(tt.in))))
+			assert.Equal(t, tt.want, string(SingleQuoteTokens([]byte(tt.in))))
 		})
 	}
 }

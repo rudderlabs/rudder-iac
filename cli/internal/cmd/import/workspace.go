@@ -95,7 +95,8 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				ui.PrintWarning(`Secrets are not imported from the remote workspace.
          Add any required secret fields to the exported specs using
          variable substitution ({{ .VAR }}), and pass them with
-         --var-file to apply and to later imports.`)
+         --var-file to apply and to later imports. Wrap JSON values,
+         such as a service account key, in single quotes.`)
 				ui.PrintSuccess("Done")
 			}
 

@@ -7,15 +7,17 @@ import "regexp"
 // in one place.
 var quotedVarRegex = regexp.MustCompile(`"(` + varRegex.String() + `)"`)
 
-// UnquoteTokens replaces every double-quoted "{{ .VAR }}" token in data with
-// its unquoted form, so generated specs read as template references rather
-// than string literals. YAML encoders cannot emit a scalar starting with '{'
-// unquoted (it reads as a flow mapping), so generators that emit references
-// post-process their output with this. Substitution rewrites raw bytes before
-// YAML parsing, so the unquoted form never reaches a parser. Tokens embedded
-// in longer strings keep their quotes.
-func UnquoteTokens(data []byte) []byte {
-	return quotedVarRegex.ReplaceAll(data, []byte("$1"))
+// SingleQuoteTokens rewrites every double-quoted "{{ .VAR }}" token in data to
+// its single-quoted form. Generated specs emit secrets as variable references,
+// and the encoder double-quotes them like any string. A bare slot is not safe:
+// substitution rewrites raw bytes before YAML parsing, so a JSON-blob secret
+// (a GCP service account key) substituted into an unquoted slot parses as a
+// flow mapping and the field silently becomes a map. A double-quoted slot also
+// breaks, because the JSON's own quotes end the scalar. Single quotes keep the
+// substituted JSON a string because they do not interpret backslashes or
+// double quotes. Tokens embedded in longer strings keep their double quotes.
+func SingleQuoteTokens(data []byte) []byte {
+	return quotedVarRegex.ReplaceAll(data, []byte("'$1'"))
 }
 
 // ExtractVariableNames returns the names of all well-formed {{ .VAR }}

@@ -1,13 +1,15 @@
 package formatter
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"gopkg.in/yaml.v3"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestYAMLFormatter_Format(t *testing.T) {
@@ -145,11 +147,11 @@ level1:
 	}
 }
 
-// Variable substitution tokens must come out unquoted: substitution rewrites
-// the raw bytes before YAML parsing, and the unquoted form marks the value as
-// a reference rather than a string literal. Tokens embedded in larger strings
-// stay quoted — only a whole-scalar token is a reference.
-func TestYAMLFormatter_UnquotesVariableTokens(t *testing.T) {
+// Variable substitution tokens must come out single-quoted. A bare "{{ .VAR }}"
+// slot turns a JSON-blob secret into a YAML flow mapping once substituted, so
+// the field becomes a map instead of a string. Tokens embedded in larger
+// strings stay double-quoted: only a whole-scalar token is a reference.
+func TestYAMLFormatter_SingleQuotesVariableTokens(t *testing.T) {
 	t.Parallel()
 
 	input := map[string]interface{}{
@@ -162,11 +164,78 @@ func TestYAMLFormatter_UnquotesVariableTokens(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`
-		accessKey: {{ .BOOKS_ACCESS_KEY }}
+		accessKey: '{{ .BOOKS_ACCESS_KEY }}'
 		items:
-		  - {{ .ITEM_TOKEN }}
+		  - '{{ .ITEM_TOKEN }}'
 		partial: "prefix {{ .EMBEDDED }} suffix"
 	`), string(output))
+}
+
+type mapResolver map[string]string
+
+func (m mapResolver) Resolve(name string) (string, bool) {
+	v, ok := m[name]
+	return v, ok
+}
+
+// The generated slot must survive substitution and YAML parsing as a string
+// for a JSON value, whether the var file holds it compact or pretty-printed.
+// Substitution inserts values verbatim, so this is the end-to-end contract.
+func TestYAMLFormatter_JSONSecretSlotParsesAsString(t *testing.T) {
+	t.Parallel()
+
+	// Dummy PEM markers with a fake body, built by concatenation so the fixture
+	// is not mistaken for a real key. The \n sequences are literal backslash-n
+	// inside the JSON string, as in a real service account key file.
+	const (
+		pemBegin = "-----BEGIN " + "PRIVATE KEY-----"
+		pemEnd   = "-----END " + "PRIVATE KEY-----"
+		pemBody  = pemBegin + `\nabc\ndef\n` + pemEnd + `\n`
+	)
+
+	//nolint:gosec // fixture, not a credential
+	const prettyKey = `{
+  "type": "service_account",
+  "project_id": "demo",
+  "private_key": "` + pemBody + `"
+}`
+	//nolint:gosec // fixture, not a credential
+	const compactKey = `{"type":"service_account","project_id":"demo","private_key":"` + pemBody + `"}`
+
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{name: "pretty-printed multi-line JSON", value: prettyKey},
+		{name: "compact JSON", value: compactKey},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			generated, err := YAMLFormatter{}.Format(map[string]any{
+				"credentials": "{{ .BQ_CREDENTIALS }}",
+			})
+			require.NoError(t, err)
+
+			substituted, errs := varsubst.NewSubstitutor(
+				mapResolver{"BQ_CREDENTIALS": tt.value},
+			).SubstituteBytes(generated)
+			require.Empty(t, errs)
+
+			var parsed map[string]any
+			require.NoError(t, yaml.Unmarshal(substituted, &parsed))
+
+			creds, ok := parsed["credentials"].(string)
+			require.True(t, ok, "credentials must parse as a string, got %T", parsed["credentials"])
+
+			var got, want map[string]any
+			require.NoError(t, json.Unmarshal([]byte(creds), &got))
+			require.NoError(t, json.Unmarshal([]byte(tt.value), &want))
+			assert.Equal(t, want, got)
+		})
+	}
 }
 
 func TestYAMLFormatter_Extension(t *testing.T) {

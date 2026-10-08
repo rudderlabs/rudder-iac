@@ -26,6 +26,11 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 #
 # An unfilled (null) entry makes apply fail rather than silently sending an
 # empty secret; to deliberately send an empty value, use KEY: "".
+#
+# For a JSON value (such as a service account key), wrap it in single quotes:
+#   KEY: '{"private_key": "...", ...}'
+# Double quotes turn the \n escapes inside the key into real newlines, which
+# breaks the private key.
 `
 
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every

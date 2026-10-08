@@ -148,7 +148,8 @@ func WorkspaceImport(
 	}
 	if varFile != "" {
 		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
-			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.", varFile))
+			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.\n"+
+			"Wrap JSON values, such as a service account key, in single quotes.", varFile))
 	}
 
 	return nil
