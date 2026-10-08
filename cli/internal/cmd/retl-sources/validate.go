@@ -3,6 +3,8 @@ package retlsource
 import (
 	"fmt"
 	"io"
+	"strings"
+	"unicode"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -14,7 +16,10 @@ import (
 )
 
 func newCmdValidate() *cobra.Command {
-	var location string
+	var (
+		location string
+		varFiles []string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "validate <external-id>",
@@ -30,6 +35,7 @@ func newCmdValidate() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli retl-sources validate my-model
 			$ rudder-cli retl-sources validate my-model --location ./project
+			$ rudder-cli retl-sources validate my-model --var-file prod.vars.yaml
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -46,9 +52,14 @@ func newCmdValidate() *cobra.Command {
 				return err
 			}
 
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
 			// Load runs the project's syntactic and semantic rules over every spec,
 			// so reaching the graph at all means the project validated.
-			p := d.NewProject()
+			p := d.NewProject(projectOpts...)
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
@@ -62,12 +73,13 @@ func newCmdValidate() *cobra.Command {
 				return err
 			}
 
-			reportValidation(cmd.OutOrStdout(), externalID, location, resource.Type(), resource.Data())
+			reportValidation(cmd.OutOrStdout(), externalID, location, varFiles, resource.Type(), resource.Data())
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
 }
@@ -75,8 +87,8 @@ func newCmdValidate() *cobra.Command {
 // reportValidation names the source that validated and where the warehouse check
 // lives, so a green validate is not read as a reachable warehouse. An s3 table
 // source has no query, and preview exits 1 on one, so it is told there is
-// nothing to preview. The hint carries --location so it works when pasted.
-func reportValidation(w io.Writer, externalID, location, resourceType string, data resources.ResourceData) {
+// nothing to preview. The hint carries project-loading flags so it works when pasted.
+func reportValidation(w io.Writer, externalID, location string, varFiles []string, resourceType string, data resources.ResourceData) {
 	fmt.Fprintf(w, "✅ %s '%s' is valid\n", resourceType, externalID)
 
 	if definition, _ := data[sqlmodel.SourceDefinitionKey].(string); definition == table.SourceDefinitionS3 {
@@ -84,9 +96,22 @@ func reportValidation(w io.Writer, externalID, location, resourceType string, da
 		return
 	}
 
-	previewCmd := "rudder-cli retl-sources preview " + externalID
+	previewCmd := "rudder-cli retl-sources preview " + shellQuote(externalID)
 	if location != "." {
-		previewCmd += " --location " + location
+		previewCmd += " --location " + shellQuote(location)
+	}
+	for _, varFile := range varFiles {
+		previewCmd += " --var-file " + shellQuote(varFile)
 	}
 	fmt.Fprintf(w, "   To check that its query runs against the warehouse: %s\n", previewCmd)
+}
+
+func shellQuote(value string) string {
+	if value != "" && strings.IndexFunc(value, func(r rune) bool {
+		return !(unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune("@%_-+=:,./", r))
+	}) == -1 {
+		return value
+	}
+
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
