@@ -120,29 +120,30 @@ func trackCommand(command string, err error, extras ...KV) {
 }
 
 // TrackPreRunFailures reports failures of the PreRunE and PersistentPreRunE
-// hooks (auth, workspace lookup, spec loading, experimental gates) across the
-// command tree under the same name RunE uses. Call it once, after every command
-// is registered: a second call wraps each hook again and reports every failure
-// twice.
-func TrackPreRunFailures(cmd *cobra.Command) {
+// hooks (auth, workspace lookup, spec loading) across the command tree under
+// the same name RunE uses, for the commands in tracked. Any other command never
+// reports success, so a failure event would read as a 100% failure rate. Call
+// it once, after every command is registered: a second call wraps each hook
+// again and reports every failure twice.
+func TrackPreRunFailures(cmd *cobra.Command, tracked []string) {
 	for _, sub := range cmd.Commands() {
-		TrackPreRunFailures(sub)
+		TrackPreRunFailures(sub, tracked)
 	}
 
-	cmd.PreRunE = trackHook(cmd.PreRunE)
-	cmd.PersistentPreRunE = trackHook(cmd.PersistentPreRunE)
+	cmd.PreRunE = trackHook(cmd.PreRunE, tracked)
+	cmd.PersistentPreRunE = trackHook(cmd.PersistentPreRunE, tracked)
 }
 
 // trackHook wraps a hook so its failure is reported under the command being
 // run, which cobra passes in: a persistent hook on a parent runs for the child.
-func trackHook(hook func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+func trackHook(hook func(*cobra.Command, []string) error, tracked []string) func(*cobra.Command, []string) error {
 	if hook == nil {
 		return nil
 	}
 
 	return func(c *cobra.Command, args []string) error {
 		err := hook(c, args)
-		if err != nil {
+		if err != nil && slices.Contains(tracked, CommandName(c)) {
 			TrackCommand(CommandName(c), err, KV{K: "stage", V: "pre_run"})
 		}
 		return err

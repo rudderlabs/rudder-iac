@@ -40,6 +40,7 @@ func TestTrackPreRunFailures(t *testing.T) {
 		name       string
 		preRunErr  error
 		persistent bool
+		untracked  bool
 		wantRunE   bool
 		want       []telemetrytest.Call
 	}{
@@ -53,6 +54,12 @@ func TestTrackPreRunFailures(t *testing.T) {
 			preRunErr:  errors.New("experimental flag is off"),
 			persistent: true,
 			want:       []telemetrytest.Call{{Command: "import workspace", Errored: true, Extras: []telemetry.KV{{K: "stage", V: "pre_run"}}}},
+		},
+		{
+			name:       "does not report a hook failure of a command that never reports success",
+			preRunErr:  errors.New("experimental flag is off"),
+			persistent: true,
+			untracked:  true,
 		},
 		{
 			name:     "leaves run tracking alone",
@@ -71,7 +78,11 @@ func TestTrackPreRunFailures(t *testing.T) {
 			} else {
 				group.Commands()[0].PreRunE = func(*cobra.Command, []string) error { return tt.preRunErr }
 			}
-			telemetry.TrackPreRunFailures(root)
+			tracked := []string{"import workspace"}
+			if tt.untracked {
+				tracked = nil
+			}
+			telemetry.TrackPreRunFailures(root, tracked)
 
 			root.SetArgs([]string{"import", "workspace"})
 			require.Error(t, root.Execute())
@@ -86,7 +97,7 @@ func TestTrackPreRunFailuresSkipsCommandsWithoutPreRun(t *testing.T) {
 	root, _ := newTree()
 	group := root.Commands()[0]
 
-	telemetry.TrackPreRunFailures(root)
+	telemetry.TrackPreRunFailures(root, []string{"import workspace"})
 
 	assert.Nil(t, root.PreRunE)
 	assert.Nil(t, group.PreRunE)

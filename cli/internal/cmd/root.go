@@ -105,7 +105,7 @@ func init() {
 	rootCmd.AddCommand(datagraphCmd)
 
 	// Must run after every command is registered.
-	telemetryCmd.TrackPreRunFailures(rootCmd)
+	telemetryCmd.TrackPreRunFailures(rootCmd, trackedCommands)
 }
 
 func initConfig() {

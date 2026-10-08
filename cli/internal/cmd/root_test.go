@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"bytes"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"reflect"
 	"runtime"
@@ -64,14 +67,36 @@ func TestTrackedCommandsMatchRunEReporters(t *testing.T) {
 		}
 
 		fn := runtime.FuncForPC(reflect.ValueOf(c.RunE).Pointer())
-		file, _ := fn.FileLine(fn.Entry())
-		source, err := os.ReadFile(file)
-		require.NoError(t, err)
-		if bytes.Contains(source, []byte("TrackCommand(")) {
+		file, line := fn.FileLine(fn.Entry())
+		if runEReports(t, file, line) {
 			reporters = append(reporters, telemetry.CommandName(c))
 		}
 	}
 	walk(rootCmd)
 
 	assert.ElementsMatch(t, reporters, trackedCommands)
+}
+
+// runEReports reports whether the function literal that starts on line of file
+// calls TrackCommand. Matching the literal, not the file, keeps a tracked and
+// an untracked command in one file apart.
+func runEReports(t *testing.T, file string, line int) bool {
+	t.Helper()
+
+	source, err := os.ReadFile(file)
+	require.NoError(t, err)
+	fset := token.NewFileSet()
+	parsed, err := parser.ParseFile(fset, file, source, 0)
+	require.NoError(t, err)
+
+	reports := false
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		lit, ok := n.(*ast.FuncLit)
+		if !ok || fset.Position(lit.Pos()).Line != line {
+			return true
+		}
+		reports = bytes.Contains(source[fset.Position(lit.Pos()).Offset:fset.Position(lit.End()).Offset], []byte("TrackCommand("))
+		return false
+	})
+	return reports
 }
