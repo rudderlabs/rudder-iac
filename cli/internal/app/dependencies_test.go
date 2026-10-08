@@ -37,6 +37,25 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
 	assert.Same(t, providers.Account, cp.Providers["account"])
 	assert.Same(t, providers.Destination, cp.Providers["destination"])
+	assert.Equal(t, providerOrder, cp.Order)
+}
+
+// A provider whose matchers consult another provider's matches, or whose
+// specs reference its resources, must come after it in providerOrder.
+func TestProviderOrderSatisfiesProviderEdges(t *testing.T) {
+	t.Parallel()
+
+	for dependent, dependencies := range providerEdges {
+		for _, dependency := range dependencies {
+			var (
+				at     = slices.Index(providerOrder, dependent)
+				before = slices.Index(providerOrder, dependency)
+			)
+			require.NotEqual(t, -1, at, "%s is not in providerOrder", dependent)
+			require.NotEqual(t, -1, before, "%s is not in providerOrder", dependency)
+			assert.Less(t, before, at, "%s must precede %s in providerOrder", dependency, dependent)
+		}
+	}
 }
 
 // The recording server stands in for the backend so the remote load is
