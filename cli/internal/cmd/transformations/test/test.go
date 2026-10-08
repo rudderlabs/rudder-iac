@@ -172,8 +172,7 @@ func NewCmdTest() *cobra.Command {
 			displayer.Display(results)
 
 			if results.HasFailures() {
-				err = ErrTestsFailed
-				return err
+				return ErrTestsFailed
 			}
 
 			return nil

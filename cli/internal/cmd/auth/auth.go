@@ -22,8 +22,7 @@ func NewCmdAuth() *cobra.Command {
 				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
-			err = auth.Login()
-			return err
+			return auth.Login()
 		},
 	}
 

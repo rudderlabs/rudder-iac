@@ -17,12 +17,9 @@ func TestValidateTracksRunFailureAsErrored(t *testing.T) {
 	calls := telemetrytest.Record(t)
 	location := filepath.Join(t.TempDir(), "missing")
 
-	cmd := NewCmdValidate()
-	cmd.SetArgs([]string{"--location", location})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
+	err := telemetrytest.Execute(NewCmdValidate(), nil, []string{"--location", location})
 
-	require.Error(t, cmd.Execute())
+	require.Error(t, err)
 	assert.Equal(t, []telemetrytest.Call{{
 		Command: "validate",
 		Errored: true,

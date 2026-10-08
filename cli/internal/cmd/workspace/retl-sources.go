@@ -48,8 +48,7 @@ func newCmdListRetlSources() *cobra.Command {
 			}
 			l := lister.New(retlProvider, lister.WithFormat(format))
 
-			err = l.List(cmd.Context(), sqlmodel.ResourceType, nil)
-			return err
+			return l.List(cmd.Context(), sqlmodel.ResourceType, nil)
 		},
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")

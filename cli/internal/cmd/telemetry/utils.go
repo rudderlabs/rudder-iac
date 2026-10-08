@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -45,8 +46,8 @@ func getCIExecutionContext() map[string]interface{} {
 // return: an unnamed return is copied before the defer runs.
 var TrackCommand = trackCommand
 
-// reported is set once any command event is emitted, so the fallback in
-// TrackUnreportedFailure does not count a failure twice.
+// reported is set once any command event is emitted, so TrackInvalidInput does
+// not count a failure twice.
 var reported atomic.Bool
 
 // telemetryReady is a variable so tests can stand in for loaded config.
@@ -58,14 +59,22 @@ func CommandName(cmd *cobra.Command) string {
 	return strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
 }
 
-// TrackUnreportedFailure reports a failure that no hook reported. cobra rejects
-// stray arguments, missing required flags and flag groups outside PreRunE and
-// RunE, so Execute is the only place that sees them.
+// InvalidInputStage labels failures cobra raises itself, before any hook runs.
+const InvalidInputStage = "invalid_input"
+
+// TrackInvalidInput reports a failure cobra raised on the user's input: stray
+// arguments, a missing required flag, a violated flag group. Cobra rejects
+// these outside the hooks TrackPreRunFailures wraps, so Execute is the only
+// place that sees them.
+//
+// It reports only for the commands in tracked, those whose RunE reports its own
+// result. For any other command the event would be a failure with no success
+// events to set it against, which reads as a 100% failure rate.
 //
 // It reports nothing for flag-parse errors or an unknown command: cobra fails
 // those before the OnInitialize hooks load config and telemetry, and without
 // the config the opt-out setting cannot be honoured.
-func TrackUnreportedFailure(root *cobra.Command, args []string, err error) {
+func TrackInvalidInput(root *cobra.Command, args []string, err error, tracked []string) {
 	if err == nil || reported.Load() || !telemetryReady() {
 		return
 	}
@@ -75,7 +84,12 @@ func TrackUnreportedFailure(root *cobra.Command, args []string, err error) {
 		return
 	}
 
-	TrackCommand(CommandName(target), err, KV{K: "stage", V: "unreported"})
+	name := CommandName(target)
+	if !slices.Contains(tracked, name) {
+		return
+	}
+
+	TrackCommand(name, err, KV{K: "stage", V: InvalidInputStage})
 }
 
 func trackCommand(command string, err error, extras ...KV) {
@@ -105,22 +119,29 @@ func trackCommand(command string, err error, extras ...KV) {
 	}
 }
 
-// TrackPreRunFailures reports PreRunE failures (auth, workspace lookup, spec
-// loading) across the command tree under the same name RunE uses. Call it once,
-// after every command is registered: a second call wraps each PreRunE again and
-// reports every failure twice.
+// TrackPreRunFailures reports failures of the PreRunE and PersistentPreRunE
+// hooks (auth, workspace lookup, spec loading, experimental gates) across the
+// command tree under the same name RunE uses. Call it once, after every command
+// is registered: a second call wraps each hook again and reports every failure
+// twice.
 func TrackPreRunFailures(cmd *cobra.Command) {
 	for _, sub := range cmd.Commands() {
 		TrackPreRunFailures(sub)
 	}
 
-	preRunE := cmd.PreRunE
-	if preRunE == nil {
-		return
+	cmd.PreRunE = trackHook(cmd.PreRunE)
+	cmd.PersistentPreRunE = trackHook(cmd.PersistentPreRunE)
+}
+
+// trackHook wraps a hook so its failure is reported under the command being
+// run, which cobra passes in: a persistent hook on a parent runs for the child.
+func trackHook(hook func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	if hook == nil {
+		return nil
 	}
 
-	cmd.PreRunE = func(c *cobra.Command, args []string) error {
-		err := preRunE(c, args)
+	return func(c *cobra.Command, args []string) error {
+		err := hook(c, args)
 		if err != nil {
 			TrackCommand(CommandName(c), err, KV{K: "stage", V: "pre_run"})
 		}

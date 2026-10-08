@@ -47,8 +47,7 @@ func newCmdPreview() *cobra.Command {
 			// The request carries limit unchanged while the SQL uses max(limit, 1),
 			// so a negative value would disagree; checked below the defer so it is tracked.
 			if limit < 0 {
-				err = fmt.Errorf("--limit cannot be negative, got %d", limit)
-				return err
+				return fmt.Errorf("--limit cannot be negative, got %d", limit)
 			}
 
 			d, err := app.NewDeps()

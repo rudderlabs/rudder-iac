@@ -16,12 +16,9 @@ func TestApplyTracksRunFailureAsErrored(t *testing.T) {
 	calls := telemetrytest.Record(t)
 	location := t.TempDir()
 
-	cmd := NewCmdApply()
-	cmd.SetArgs([]string{"--location", location, "--confirm=false"})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
+	err := telemetrytest.Execute(NewCmdApply(), nil, []string{"--location", location, "--confirm=false"})
 
-	require.Error(t, cmd.Execute())
+	require.Error(t, err)
 	assert.Equal(t, []telemetrytest.Call{{
 		Command: "apply",
 		Errored: true,

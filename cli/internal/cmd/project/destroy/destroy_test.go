@@ -15,12 +15,9 @@ func TestDestroyTracksRunFailureAsErrored(t *testing.T) {
 	testutils.UseFakeAPI(t)
 	calls := telemetrytest.Record(t)
 
-	cmd := NewCmdDestroy()
-	cmd.SetArgs([]string{"--confirm=false"})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
+	err := telemetrytest.Execute(NewCmdDestroy(), nil, []string{"--confirm=false"})
 
-	require.Error(t, cmd.Execute())
+	require.Error(t, err)
 	assert.Equal(t, []telemetrytest.Call{{
 		Command: "destroy",
 		Errored: true,

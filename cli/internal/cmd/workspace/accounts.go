@@ -58,8 +58,7 @@ func newCmdListAccounts() *cobra.Command {
 				filters["type"] = accountType
 			}
 
-			err = l.List(cmd.Context(), workspace.AccountResourceType, filters)
-			return err
+			return l.List(cmd.Context(), workspace.AccountResourceType, filters)
 		},
 	}
 

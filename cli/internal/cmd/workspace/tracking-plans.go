@@ -53,8 +53,7 @@ func newCmdListTrackingPlans() *cobra.Command {
 				}),
 			)
 
-			err = l.List(cmd.Context(), types.TrackingPlanResourceType, nil)
-			return err
+			return l.List(cmd.Context(), types.TrackingPlanResourceType, nil)
 		},
 	}
 

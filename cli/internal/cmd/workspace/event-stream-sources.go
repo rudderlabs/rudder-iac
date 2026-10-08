@@ -45,8 +45,7 @@ func newCmdListEventStreamSources() *cobra.Command {
 			}
 
 			l := lister.New(d.Providers().EventStream, lister.WithFormat(format))
-			err = l.List(cmd.Context(), source.ResourceType, nil)
-			return err
+			return l.List(cmd.Context(), source.ResourceType, nil)
 		},
 	}
 

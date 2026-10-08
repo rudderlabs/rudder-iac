@@ -141,6 +141,30 @@ func SetVersion(v string) {
 	rootCmd.Version = v
 }
 
+// trackedCommands are the commands whose RunE reports its own result through
+// telemetry.TrackCommand. TestTrackedCommandsMatchRunEReporters keeps the list
+// in step with the code.
+var trackedCommands = []string{
+	"apply",
+	"auth login",
+	"data-graphs validate",
+	"destroy",
+	"import retl-sources",
+	"import workspace",
+	"migrate",
+	"retl-sources preview",
+	"retl-sources validate",
+	"transformations show-default-events",
+	"transformations test",
+	"typer generate",
+	"validate",
+	"workspace accounts list",
+	"workspace event-stream-sources list",
+	"workspace info",
+	"workspace retl-sources list",
+	"workspace tracking-plans list",
+}
+
 var rootCmd = &cobra.Command{
 	Use:           "rudder-cli",
 	Short:         "Rudder CLI",
@@ -160,8 +184,8 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
-		// Reports failures cobra rejects outside PreRunE and RunE, when nothing else did.
-		telemetryCmd.TrackUnreportedFailure(rootCmd, os.Args[1:], err)
+		// Reports the input cobra rejects before any hook runs, when nothing else did.
+		telemetryCmd.TrackInvalidInput(rootCmd, os.Args[1:], err, trackedCommands)
 
 		var silent *cmderrors.SilentError
 		if !errors.As(err, &silent) {

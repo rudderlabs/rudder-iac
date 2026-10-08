@@ -11,7 +11,6 @@ import (
 )
 
 func NewCmdShowDefaultEvents() *cobra.Command {
-	var err error
 
 	cmd := &cobra.Command{
 		Use:   "show-default-events",
@@ -28,7 +27,7 @@ func NewCmdShowDefaultEvents() *cobra.Command {
 			# Show all default test events
 			$ rudder-cli transformations show-default-events
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
 				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
