@@ -3,7 +3,9 @@ package table
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -17,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
 
 // tableSourceTypeFilter is the sourceType query value passed to
@@ -171,41 +174,71 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 	if desired.SourceDefinition != current {
 		return nil, fmt.Errorf("updating table source %s: source_definition cannot be changed from %q to %q", ID, current, desired.SourceDefinition)
 	}
-	if err := h.checkTableMoveAllowed(ctx, ID, sourceID, desired, state); err != nil {
-		return nil, err
-	}
 	return h.update(ctx, sourceID, desired)
 }
 
-// checkTableMoveAllowed refuses a schema or table change on a source a
-// destination is already syncing from, which the webapp blocks outright: the
-// destination has started against the old table's shape, and repointing the
-// source underneath it silently changes what every later sync reads. primary_key
-// stays editable, as it does in the webapp (DEX-960).
+// CheckPlan refuses, before anything is applied, a schema or table change on a
+// source a destination is already syncing from (DEX-960). Checking in Update
+// meant the refusal came mid-apply, after earlier creates and updates, and
+// validate and dry-run stayed clean.
+//
+// The plan carries the stored and the desired value of every changed key, and
+// the stored remote id, so the diff alone says which sources moved. Updates run
+// before deletes, so a plan that also removes the connection is still refused;
+// the connection has to go in an earlier apply.
+func (h *Handler) CheckPlan(ctx context.Context, diff *differ.Diff) error {
+	prefix := ResourceType + ":"
+	for _, urn := range slices.Sorted(maps.Keys(diff.UpdatedResources)) {
+		if !strings.HasPrefix(urn, prefix) {
+			continue
+		}
+		diffs := diff.UpdatedResources[urn].Diffs
+		sourceID, _ := diffs[sqlmodel.IDKey].SourceValue.(string)
+		if sourceID == "" {
+			continue
+		}
+		var (
+			schema = diffs[SchemaKey]
+			table  = diffs[TableKey]
+		)
+		err := h.refuseTableMove(ctx, strings.TrimPrefix(urn, prefix), sourceID,
+			stringOf(schema.SourceValue), stringOf(table.SourceValue),
+			stringOf(schema.TargetValue), stringOf(table.TargetValue))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func stringOf(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+// refuseTableMove errors when a source a destination syncs from changes schema
+// or table, which the webapp blocks outright: the destination has started
+// against the old table's shape, and repointing the source underneath it
+// silently changes what every later sync reads. primary_key stays editable, as
+// it does in the webapp.
 //
 // The connections are read from the API rather than the project, because a
 // connection made in the webapp blocks the edit just as much as one the project
-// manages — and is invisible locally. The call only happens on the rare apply
-// that actually moves a source.
-func (h *Handler) checkTableMoveAllowed(
+// manages, and is invisible locally. The call only happens when a source moves.
+func (h *Handler) refuseTableMove(
 	ctx context.Context,
 	ID, sourceID string,
-	desired TableSpec,
-	state resources.ResourceData,
+	currentSchema, currentTable, desiredSchema, desiredTable string,
 ) error {
-	var (
-		currentSchema, _ = state[SchemaKey].(string)
-		currentTable, _  = state[TableKey].(string)
-		moved            []string
-	)
-	// An empty current value means the state never recorded one — an s3 source,
-	// which has neither — so there is no move to refuse. Both are required on
-	// every other source definition, so a real move always has a value to name.
-	if currentSchema != "" && desired.Schema != currentSchema {
-		moved = append(moved, fmt.Sprintf("schema %q -> %q", currentSchema, desired.Schema))
+	var moved []string
+	// An empty current value means no value was recorded, as for an s3 source,
+	// which has neither, so there is no move to refuse. A desired value is
+	// compared as is: an unset target on a changed key is also a move.
+	if currentSchema != "" && desiredSchema != currentSchema {
+		moved = append(moved, fmt.Sprintf("schema %q -> %q", currentSchema, desiredSchema))
 	}
-	if currentTable != "" && desired.Table != currentTable {
-		moved = append(moved, fmt.Sprintf("table %q -> %q", currentTable, desired.Table))
+	if currentTable != "" && desiredTable != currentTable {
+		moved = append(moved, fmt.Sprintf("table %q -> %q", currentTable, desiredTable))
 	}
 	if len(moved) == 0 {
 		return nil
@@ -213,7 +246,7 @@ func (h *Handler) checkTableMoveAllowed(
 
 	page, err := h.client.ListConnections(ctx, &retlClient.ListRETLConnectionsRequest{SourceID: sourceID})
 	if err != nil {
-		return fmt.Errorf("updating table source %s: checking whether it is connected: %w", ID, err)
+		return fmt.Errorf("table source %s: checking whether it is connected: %w", ID, err)
 	}
 	if page == nil || len(page.Data) == 0 {
 		return nil
@@ -224,7 +257,7 @@ func (h *Handler) checkTableMoveAllowed(
 		connected = append(connected, c.ID)
 	}
 	return fmt.Errorf(
-		"updating table source %s: %s cannot be changed while the source is connected to a destination (connections: %s); delete the connection first, or create a new source for the new table",
+		"table source %s: %s cannot be changed while the source is connected to a destination (connections: %s); delete the connection in an earlier apply, or create a new source for the new table",
 		ID, strings.Join(moved, " and "), strings.Join(connected, ", "),
 	)
 }
@@ -297,6 +330,11 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 	// Checked before claiming the source, so a mismatch leaves it untouched.
 	if local.SourceDefinition != remote.SourceDefinition {
 		return nil, fmt.Errorf("importing RETL source %s: source_definition is %q remotely and %q locally, and cannot be changed", remoteID, remote.SourceDefinition, local.SourceDefinition)
+	}
+	// Importing a spec whose table differs would move the source, so it is held
+	// to the same rule as an update.
+	if err := h.refuseTableMove(ctx, ID, remoteID, remote.Schema, remote.Table, local.Schema, local.Table); err != nil {
+		return nil, fmt.Errorf("importing RETL source %s: %w", remoteID, err)
 	}
 
 	if err := h.client.SetExternalId(ctx, remoteID, ID); err != nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
 
 // fakeStore is an in-memory RETL source API. It mirrors the server behaviour
@@ -493,72 +494,6 @@ func TestUpdate(t *testing.T) {
 		assert.Empty(t, store.calls)
 	})
 
-	// The webapp blocks schema/table edits once a destination is syncing from the
-	// source, because the destination started against the old table's shape.
-	// apply used to let both through (DEX-960).
-	t.Run("refuses a schema or table change on a connected source", func(t *testing.T) {
-		t.Parallel()
-		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
-		store.connections = map[string][]retlClient.RETLConnection{
-			"src-1": {{ID: "conn-1"}},
-		}
-		h, r := loadResource(t, store, withField(withField(warehouseSpec(), "schema", "PUBLIC"), "table", "OTHER"))
-		state := resources.ResourceData{
-			sqlmodel.IDKey:               "src-1",
-			sqlmodel.SourceDefinitionKey: "postgres",
-			table.SchemaKey:              "public",
-			table.TableKey:               "users",
-		}
-
-		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), `schema "public" -> "PUBLIC"`)
-		assert.Contains(t, err.Error(), `table "users" -> "OTHER"`)
-		assert.Contains(t, err.Error(), "conn-1", "the message must name the blocking connection")
-		assert.NotContains(t, store.calls, "update:src-1", "the update must not reach the API")
-	})
-
-	// primary_key stays editable on a connected source, as it does in the webapp.
-	t.Run("allows a primary_key change on a connected source", func(t *testing.T) {
-		t.Parallel()
-		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
-		store.connections = map[string][]retlClient.RETLConnection{
-			"src-1": {{ID: "conn-1"}},
-		}
-		h, r := loadResource(t, store, withField(warehouseSpec(), "primary_key", "email"))
-		state := resources.ResourceData{
-			sqlmodel.IDKey:               "src-1",
-			sqlmodel.SourceDefinitionKey: "postgres",
-			table.SchemaKey:              "public",
-			table.TableKey:               "users",
-		}
-
-		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
-
-		require.NoError(t, err)
-		assert.NotContains(t, store.calls, "list-connections:src-1", "an unchanged table needs no connection lookup")
-	})
-
-	// The same edit on an unconnected source is the user's to make.
-	t.Run("allows a schema change on an unconnected source", func(t *testing.T) {
-		t.Parallel()
-		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
-		h, r := loadResource(t, store, withField(warehouseSpec(), "schema", "PUBLIC"))
-		state := resources.ResourceData{
-			sqlmodel.IDKey:               "src-1",
-			sqlmodel.SourceDefinitionKey: "postgres",
-			table.SchemaKey:              "public",
-			table.TableKey:               "users",
-		}
-
-		_, err := h.Update(context.Background(), r.ID(), r.Data(), state)
-
-		require.NoError(t, err)
-		assert.Contains(t, store.calls, "list-connections:src-1")
-		assert.Contains(t, store.calls, "update:src-1")
-	})
-
 	t.Run("errors when state has no remote id", func(t *testing.T) {
 		t.Parallel()
 		h, r := loadResource(t, newFakeStore(), warehouseSpec())
@@ -691,8 +626,24 @@ func TestImport(t *testing.T) {
 		_, err := h.Import(context.Background(), r.ID(), r.Data(), "src-remote")
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"get:src-remote", "setExternalId:src-remote", "update:src-remote"}, store.calls)
+		assert.Equal(t, []string{"get:src-remote", "list-connections:src-remote", "setExternalId:src-remote", "update:src-remote"}, store.calls)
 		assert.Equal(t, retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"}, store.sources["src-remote"].Config)
+	})
+
+	// Importing a spec with another table would move a source a destination
+	// reads from, which an update is not allowed to do either.
+	t.Run("refuses to move a connected source before claiming it", func(t *testing.T) {
+		t.Parallel()
+		diverged := remoteUsers()
+		diverged.Config = retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "staging", Table: "users"}
+		store := newFakeStore(diverged)
+		store.connections = map[string][]retlClient.RETLConnection{"src-remote": {{ID: "conn-1"}}}
+		h, r := loadResource(t, store, warehouseSpec())
+
+		_, err := h.Import(context.Background(), r.ID(), r.Data(), "src-remote")
+
+		require.ErrorContains(t, err, `schema "staging" -> "public"`)
+		assert.Equal(t, []string{"get:src-remote", "list-connections:src-remote"}, store.calls)
 	})
 
 	t.Run("refuses a source_definition mismatch before claiming the source", func(t *testing.T) {
@@ -892,4 +843,90 @@ func TestUnsupportedOperations(t *testing.T) {
 	_, err := h.FetchImportData(context.Background(), specs.ImportIds{LocalID: "users", RemoteID: "src-1"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "single-source import is not supported for retl-source-table")
+}
+
+// tablePlan is the diff the syncer computes for a table source whose stored
+// schema and table differ from the desired ones. The differ reports flat keys,
+// and the stored remote id sits on the source side of "id".
+func tablePlan(urn, sourceID string, changes map[string][2]string) *differ.Diff {
+	diffs := map[string]differ.PropertyDiff{
+		sqlmodel.IDKey: {Property: sqlmodel.IDKey, SourceValue: sourceID},
+	}
+	for key, change := range changes {
+		diffs[key] = differ.PropertyDiff{Property: key, SourceValue: change[0], TargetValue: change[1]}
+	}
+	return &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{urn: {URN: urn, Diffs: diffs}}}
+}
+
+// The webapp blocks schema/table edits once a destination is syncing from the
+// source, because the destination started against the old table's shape. The
+// CLI used to let both through, and then refused mid-apply from Update (DEX-960).
+func TestCheckPlan(t *testing.T) {
+	t.Parallel()
+
+	const urn = "retl-source-table:users-table"
+	connected := func() *fakeStore {
+		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
+		store.connections = map[string][]retlClient.RETLConnection{"src-1": {{ID: "conn-1"}}}
+		return store
+	}
+
+	t.Run("refuses a schema or table change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		h := table.NewHandler(store, "retl")
+
+		err := h.CheckPlan(context.Background(), tablePlan(urn, "src-1", map[string][2]string{
+			table.SchemaKey: {"public", "PUBLIC"},
+			table.TableKey:  {"users", "OTHER"},
+		}))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `schema "public" -> "PUBLIC"`)
+		assert.Contains(t, err.Error(), `table "users" -> "OTHER"`)
+		assert.Contains(t, err.Error(), "conn-1", "the message must name the blocking connection")
+		assert.Contains(t, err.Error(), "earlier apply")
+		assert.Equal(t, []string{"list-connections:src-1"}, store.calls)
+	})
+
+	// primary_key stays editable on a connected source, as it does in the webapp.
+	t.Run("allows a primary_key change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		h := table.NewHandler(store, "retl")
+
+		err := h.CheckPlan(context.Background(), tablePlan(urn, "src-1", map[string][2]string{
+			"primary_key": {"id", "email"},
+		}))
+
+		require.NoError(t, err)
+		assert.Empty(t, store.calls, "an unchanged table needs no connection lookup")
+	})
+
+	// The same edit on an unconnected source is the user's to make.
+	t.Run("allows a schema change on an unconnected source", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore(retlClient.RETLSource{ID: "src-1", SourceType: retlClient.TableSourceType})
+		h := table.NewHandler(store, "retl")
+
+		err := h.CheckPlan(context.Background(), tablePlan(urn, "src-1", map[string][2]string{
+			table.SchemaKey: {"public", "PUBLIC"},
+		}))
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"list-connections:src-1"}, store.calls)
+	})
+
+	t.Run("ignores other resource kinds", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		h := table.NewHandler(store, "retl")
+
+		err := h.CheckPlan(context.Background(), tablePlan("retl-source-sql-model:m", "src-1", map[string][2]string{
+			table.SchemaKey: {"public", "PUBLIC"},
+		}))
+
+		require.NoError(t, err)
+		assert.Empty(t, store.calls)
+	})
 }

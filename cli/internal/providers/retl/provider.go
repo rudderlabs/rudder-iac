@@ -225,13 +225,19 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 	return s, nil
 }
 
-// CheckPlan refuses a connection update that changes config the API cannot
-// update in place, which Update would otherwise refuse mid-apply.
-func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan) error {
-	if _, ok := p.handlers[connection.ResourceType]; !ok {
-		return nil
+// CheckPlan refuses changes the API would refuse partway through an apply: a
+// connection update that changes config it cannot update in place, and a
+// schema or table change on a source that still has a connection.
+func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		if err := connection.CheckImmutableChanges(plan.Diff); err != nil {
+			return err
+		}
 	}
-	return connection.CheckImmutableChanges(plan.Diff)
+	if th, ok := p.handlers[table.ResourceType].(*table.Handler); ok {
+		return th.CheckPlan(ctx, plan.Diff)
+	}
+	return nil
 }
 
 func (p *Provider) SyntacticRules() []rules.Rule {
