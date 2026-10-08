@@ -6,45 +6,97 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
 
-func updated(urn string, props ...string) *differ.Diff {
-	diffs := map[string]differ.PropertyDiff{}
-	for _, p := range props {
-		diffs[p] = differ.PropertyDiff{Property: p, SourceValue: "upsert", TargetValue: "mirror"}
+const planURN = "retl-connection:sf-to-amp"
+
+// planDiff builds the diff the syncer computes for a connection: the stored
+// entry on the source side, the desired entry on the target side, compared by the
+// real differ. A nested config change lands under the top-level "config" key,
+// which is what the check has to cope with.
+func planDiff(t *testing.T, stored, desired resources.ResourceData) *differ.Diff {
+	t.Helper()
+
+	diffs, secretOnly := differ.CompareData(stored, desired)
+	require.NotEmpty(t, diffs)
+	return &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{
+		planURN: {URN: planURN, Diffs: diffs, SecretOnly: secretOnly},
+	}}
+}
+
+func TestCheckImmutableChanges(t *testing.T) {
+	t.Parallel()
+
+	withConfig := func(change func(*ConfigSpec)) ConfigSpec {
+		config := jsonMapperConfig()
+		change(&config)
+		return config
 	}
-	return &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{urn: {URN: urn, Diffs: diffs}}}
-}
 
-// DEX-1020: the refusal used to come from Update, after unrelated resources in
-// the same plan had been applied.
-func TestCheckImmutableChanges_RefusesSyncBehaviourChange(t *testing.T) {
-	err := CheckImmutableChanges(updated("retl-connection:sf-to-amp", "config.sync_behaviour"))
+	tests := []struct {
+		name    string
+		desired ConfigSpec
+		wantErr string
+	}{
+		{
+			name:    "refuses a sync_behaviour change",
+			desired: withConfig(func(c *ConfigSpec) { c.SyncBehaviour = "mirror" }),
+			wantErr: `retl-connection:sf-to-amp: connection update: sync_behaviour is immutable ("upsert" -> "mirror")`,
+		},
+		{
+			name:    "refuses an event change",
+			desired: withConfig(func(c *ConfigSpec) { c.Event = &EventSpec{Type: "track", Name: "Synced"} }),
+			wantErr: "retl-connection:sf-to-amp: connection update: event is immutable",
+		},
+		{
+			name:    "allows a schedule change",
+			desired: withConfig(func(c *ConfigSpec) { c.Schedule = ScheduleSpec{Type: "basic", EveryMinutes: ptr(60)} }),
+		},
+		{
+			name:    "allows a mapping change",
+			desired: withConfig(func(c *ConfigSpec) { c.Mappings = nil }),
+		},
+	}
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "retl-connection:sf-to-amp")
-	assert.Contains(t, err.Error(), "sync_behaviour is immutable (upsert -> mirror)")
-	assert.Contains(t, err.Error(), "delete and recreate")
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestCheckImmutableChanges_RefusesNestedEventChange(t *testing.T) {
-	require.Error(t, CheckImmutableChanges(updated("retl-connection:c", "config.event.name")))
-}
+			err := CheckImmutableChanges(planDiff(t, graphData(t, jsonMapperConfig()), graphData(t, tt.desired)))
 
-func TestCheckImmutableChanges_AllowsMutableChanges(t *testing.T) {
-	assert.NoError(t, CheckImmutableChanges(updated("retl-connection:c", "config.schedule.every_minutes", "enabled")))
-	// A key that merely starts with an immutable name is a different key.
-	assert.NoError(t, CheckImmutableChanges(updated("retl-connection:c", "config.object_mappings")))
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, tt.wantErr)
+			assert.ErrorContains(t, err, "delete and recreate")
+		})
+	}
 }
 
 func TestCheckImmutableChanges_AllowsReplacement(t *testing.T) {
+	t.Parallel()
+
 	// A moved endpoint recreates the connection, which carries the new config.
-	assert.NoError(t, CheckImmutableChanges(updated("retl-connection:c", "config.sync_behaviour", "destination")))
-	assert.NoError(t, CheckImmutableChanges(updated("retl-connection:c", "config.sync_behaviour", "source")))
+	stored := graphData(t, jsonMapperConfig())
+	desired := graphData(t, func() ConfigSpec { c := jsonMapperConfig(); c.SyncBehaviour = "mirror"; return c }())
+	desired[DestinationKey] = "dst-2"
+
+	assert.NoError(t, CheckImmutableChanges(planDiff(t, stored, desired)))
 }
 
 func TestCheckImmutableChanges_IgnoresOtherKinds(t *testing.T) {
-	assert.NoError(t, CheckImmutableChanges(updated("retl-source-table:t", "config.sync_behaviour")))
+	t.Parallel()
+
+	diff := planDiff(t,
+		graphData(t, jsonMapperConfig()),
+		graphData(t, func() ConfigSpec { c := jsonMapperConfig(); c.SyncBehaviour = "mirror"; return c }()),
+	)
+	diff.UpdatedResources["retl-source-table:t"] = diff.UpdatedResources[planURN]
+	delete(diff.UpdatedResources, planURN)
+
+	assert.NoError(t, CheckImmutableChanges(diff))
 	assert.NoError(t, CheckImmutableChanges(&differ.Diff{}))
 }

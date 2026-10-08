@@ -111,6 +111,15 @@ func TestRETLLifecycle(t *testing.T) {
 		assert.Equal(t, connectionID, assertLifecycleConnection(t, tableID), "the refused connection must not be replaced")
 	})
 
+	// The plan-time check is what makes the refusal visible before anything
+	// is applied (DEX-1020).
+	t.Run("a dry run refuses the same sync_behaviour change", func(t *testing.T) {
+		out, err := executor.Execute(cliBinPath, "apply", "--dry-run", "-l", step("immutable_connection"),
+			"--var-file", credentials, "--confirm=false")
+		require.Error(t, err, "dry-run should refuse an immutable connection change, got: %s", out)
+		assert.Contains(t, string(out), `sync_behaviour is immutable ("upsert" -> "full")`)
+	})
+
 	// "Refused" is about the table source, not about the whole apply: the
 	// handler errors inside Update, by which point the graph has already created
 	// the Snowflake account the new definition needs. That account is what the
