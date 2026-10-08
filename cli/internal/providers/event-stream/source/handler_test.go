@@ -1273,13 +1273,6 @@ func TestEventStreamSourceHandler(t *testing.T) {
 					Type:       "python",
 					Enabled:    false,
 				},
-				{
-					ID:         "remote789",
-					ExternalID: "", // This should be skipped
-					Name:       "Test Source 3",
-					Type:       "Go",
-					Enabled:    true,
-				},
 			}, nil
 		})
 		handler := source.NewHandler(mockClient, importDir)
@@ -1287,7 +1280,7 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadResourcesFromRemote(context.Background())
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(true)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
 		assert.Len(t, esResources, 2)
@@ -1493,6 +1486,34 @@ func TestEventStreamSourceHandler(t *testing.T) {
 				},
 			}, resource123)
 		})
+
+		// Until the hasExternalId filter is live server side, unmanaged sources
+		// still reach the collection. Their UI-created tracking plan is absent
+		// from the managed-only tracking plan collection, so resolving it would
+		// abort the whole state load.
+		t.Run("skips an unmanaged source whose tracking plan is not managed", func(t *testing.T) {
+			t.Parallel()
+			handler := source.NewHandler(nil, importDir)
+
+			collection := resources.NewRemoteResources()
+			collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+				"remote456": {
+					ID: "remote456",
+					Data: sourceClient.EventStreamSource{
+						ID:           "remote456",
+						Name:         "UI Source",
+						Type:         "python",
+						TrackingPlan: &sourceClient.TrackingPlan{ID: "remote-tp-456"},
+					},
+				},
+			})
+			collection.Set(types.TrackingPlanResourceType, map[string]*resources.RemoteResource{})
+
+			st, err := handler.MapRemoteToState(collection)
+
+			require.NoError(t, err)
+			assert.Empty(t, st.Resources)
+		})
 	})
 
 	t.Run("LoadImportable", func(t *testing.T) {
@@ -1501,22 +1522,15 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
 				{
-					ID:         "remote123",
-					ExternalID: "external-123", // Has ExternalID - should be filtered out
-					Name:       "Test Source 1",
-					Type:       "javascript",
-					Enabled:    true,
-				},
-				{
 					ID:         "remote456",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 2",
 					Type:       "python",
 					Enabled:    false,
 				},
 				{
 					ID:         "remote789",
-					ExternalID: "", // No ExternalID - should be included
+					ExternalID: "",
 					Name:       "Test Source 3",
 					Type:       "javascript",
 					Enabled:    true,
@@ -1528,10 +1542,10 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		collection, err := handler.LoadImportable(context.Background(), &mockNamer{})
 
 		assert.NoError(t, err)
-		assert.True(t, mockClient.GetSourcesCalled())
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(false)}}, mockClient.GetSourcesCalls())
 
 		esResources := collection.GetAll(source.ResourceType)
-		require.Len(t, esResources, 2, "Should only include sources without ExternalID")
+		require.Len(t, esResources, 2)
 
 		// Verify the returned resources
 		resource456, exists := esResources["remote456"]

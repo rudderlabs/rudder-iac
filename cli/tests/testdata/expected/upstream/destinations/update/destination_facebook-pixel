@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "pixelId": "6543210987654321",
     "standardPageCall": false,
     "valueFieldIdentifier": "properties.price",

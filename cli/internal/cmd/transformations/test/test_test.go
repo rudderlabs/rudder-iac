@@ -12,6 +12,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/testorchestrator"
 )
 
+func TestNewCmdTestAcceptsVarFile(t *testing.T) {
+	t.Parallel()
+
+	flag := NewCmdTest().Flags().Lookup("var-file")
+	require.NotNil(t, flag, "transformations test must accept --var-file")
+	assert.Equal(t, "stringArray", flag.Value.Type())
+}
+
 func TestValidateFlags(t *testing.T) {
 	t.Parallel()
 

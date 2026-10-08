@@ -202,14 +202,9 @@ func CompareData(r1, r2 resources.ResourceData) (map[string]PropertyDiff, bool) 
 
 		switch v1Typed := v1.(type) {
 
-		case *resources.PropertyRef:
-			v2Typed := v2.(*resources.PropertyRef)
-			if !comparePropertyRefs(v1Typed, v2Typed) {
-				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
-			}
+		// A *PropertyRef never reaches here: the pointer branch above derefs it.
 		case resources.PropertyRef:
-			v2Typed := v2.(resources.PropertyRef)
-			if !comparePropertyRefs(&v1Typed, &v2Typed) {
+			if !comparePropertyRefs(v1Typed, v2.(resources.PropertyRef)) {
 				record(key, PropertyDiff{Property: key, SourceValue: v1, TargetValue: v2})
 			}
 
@@ -384,17 +379,13 @@ func isSecretValue(v any) bool {
 	}
 }
 
-// comparePropertyRefs compares two PropertyRef objects by their comparable fields
-// (excludes the Resolve function field which cannot be compared)
-func comparePropertyRefs(r1, r2 *resources.PropertyRef) bool {
-	if r1 == nil && r2 == nil {
-		return true
-	}
-	if r1 == nil || r2 == nil {
-		return false
-	}
-	return r1.URN == r2.URN &&
-		r1.Property == r2.Property &&
-		r1.IsResolved == r2.IsResolved &&
-		r1.Value == r2.Value
+// comparePropertyRefs compares two PropertyRef objects by URN alone. URN is the
+// only field the user configures; Property, IsResolved and Value are internal
+// runtime state. A Property that disagrees between the two graphs is an
+// implementation error rather than a user-visible change, so it must not drive
+// an update operation. IsResolved and Value are written during plan execution,
+// which runs after the diff, so both sides are always unresolved here —
+// comparing them would report drift the moment that ordering changed.
+func comparePropertyRefs(r1, r2 resources.PropertyRef) bool {
+	return r1.URN == r2.URN
 }

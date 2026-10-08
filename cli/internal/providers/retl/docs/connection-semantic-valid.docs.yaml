@@ -9,9 +9,8 @@ match_behavior:
   # (V-C8), the mappings and sync behaviour must match the flow the destination
   # runs (V-R2, V-R4, V-R5, V-R9b, V-R10), and the source's warehouse must
   # support the connection whatever state the destination is in (V-R11, V-R13,
-  # V-R14). No committed destination definition requires config from a
-  # warehouse source yet, so V-C5 has no example here. Every source_definition a
-  # SQL model accepts is a SQL warehouse whose metadata this CLI knows, so the
+  # V-R14). Every source_definition a SQL model accepts is a SQL warehouse
+  # whose metadata this CLI knows, so the
   # unknown-metadata, SQL-model and sync-settings capability checks cannot be
   # reached from a valid SQL model and have no example either. V-R11 is
   # unreachable for the same reason — primary_key is a required field on every
@@ -20,8 +19,8 @@ match_behavior:
   # table sources, which require primary_key unless the definition is file-based
   # and forbid it when it is, so the only sources that can omit it are the
   # exempt ones. So is V-R10,
-  # because the only destination that supports object mapping today carries no
-  # hyphen in its type or API type. Known limitation: these checks see only
+  # because no destination that supports object mapping carries a hyphen in its
+  # type or API type. Known limitation: these checks see only
   # project-managed connections; a connection that exists remotely but is not in
   # the project is invisible at validate time.
   - applies_to:
@@ -100,9 +99,9 @@ match_behavior:
               source_definition: postgres
               sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
           destination.yaml: &bing-destination |
-            # bingads_offline_conversions is the only destination supporting
-            # object mapping, and it is unverified: validate this project with
-            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            # bingads_offline_conversions is unverified: validate this project
+            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
+            # unknown.
             version: rudder/v1
             kind: destination
             metadata:
@@ -315,22 +314,22 @@ match_behavior:
             message_contains: "destination 'my-http-destination' is also connected to rETL source 'users-model' in this project; a destination cannot receive from both event stream and rETL sources"
       - example_id: "retl-connection-semantic-destination-rejects-warehouse-sources"
         title: "Destination whose definition does not accept warehouse sources"
-        description: "Attentive Tag supports only event stream sources upstream, and rETL sources connect as warehouse sources."
+        description: "Google Ads supports only event stream sources upstream, and rETL sources connect as warehouse sources."
         files:
           model.yaml: *users-model
           destination.yaml: |
             version: rudder/v1
             kind: destination
             metadata:
-              name: my-attentive-destination
+              name: my-googleads-destination
             spec:
-              id: my-attentive-destination
-              display_name: Attentive Tag
-              type: attentive_tag
+              id: my-googleads-destination
+              display_name: Google Ads
+              type: googleads
               enabled: true
               definition_version: 1
               config:
-                api_key: example-api-key
+                conversion_id: AW-123456789
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -338,9 +337,9 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: users-to-attentive
+                - id: users-to-googleads
                   source: "#retl-source-sql-model:users-model"
-                  destination: "#destination:my-attentive-destination"
+                  destination: "#destination:my-googleads-destination"
                   config:
                     sync_behaviour: upsert
                     schedule:
@@ -355,7 +354,7 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/destination"
             severity: "error"
-            message_contains: "destination 'my-attentive-destination' (type 'attentive_tag') does not accept rETL sources: source type 'warehouse' is not among supported source types"
+            message_contains: "destination 'my-googleads-destination' (type 'googleads') does not accept rETL sources: source type 'warehouse' is not among supported source types"
       - example_id: "retl-connection-semantic-missing-warehouse-settings"
         title: "Destination with no connection_mode entry for warehouse sources"
         files:
@@ -382,6 +381,51 @@ match_behavior:
             reference: "/spec/connections/0/destination"
             severity: "error"
             message_contains: "destination 'my-http-destination' config has no 'connection_mode' entry for source type 'warehouse'"
+      - example_id: "retl-connection-semantic-missing-warehouse-required-config"
+        title: "Destination config missing a key a warehouse source needs to connect"
+        description: "Facebook Pixel needs an access token for every cloud-mode source, warehouse included. The destination config passes on its own, since schema.json demands the token there only when connection_mode names a web source outside device mode, so the gap surfaces when the warehouse source connects."
+        files:
+          model.yaml: *users-model
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-pixel-destination
+            spec:
+              id: my-pixel-destination
+              display_name: Facebook Pixel
+              type: facebook_pixel
+              enabled: true
+              definition_version: 1
+              config:
+                pixel_id: "123456789012345"
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-pixel
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-pixel-destination"
+                  config:
+                    sync_behaviour: upsert
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "destination 'my-pixel-destination' config is missing fields required to connect a 'warehouse' source: access_token"
       - example_id: "retl-connection-semantic-destination-specific-flow"
         title: "Destination that drives rETL through its own flow"
         description: "Customer.io Audience connections run a destination-specific flow this CLI does not support, whatever the connection config says."

@@ -23,6 +23,10 @@ import (
 // ignored key may be *extra* in the response, which is what keeps versionInfo
 // harmless — the API only attaches it once a destination's stored major falls
 // behind its definition's current one, so it is absent from every snapshot here.
+//
+// Backend-derived keys the CLI never sends, such as useNativeSDK (set from
+// connectionMode), are deliberately kept in the snapshots rather than ignored,
+// so the stored values stay visible and a change in the derivation fails here.
 var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versionInfo", "createdAt", "updatedAt"}
 
 // destinationRawSecrets are literal secret values from the var file that must

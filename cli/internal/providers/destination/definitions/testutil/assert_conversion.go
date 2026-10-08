@@ -19,6 +19,22 @@ type ConversionCase struct {
 	APIJSON   string
 }
 
+// WarehouseSettings is a conversion case that pins the warehouse entries of
+// connection_mode and consent_management, which convert like any other source
+// type's. It carries no other config; a definition whose case needs more
+// (http) writes its own.
+var WarehouseSettings = ConversionCase{
+	Name: "warehouse settings",
+	LocalJSON: `{
+		"connection_mode": {"warehouse": "cloud"},
+		"consent_management": {"warehouse": [{"provider": "custom", "resolution_strategy": "and", "consents": ["marketing"]}]}
+	}`,
+	APIJSON: `{
+		"connectionMode": {"warehouse": "cloud"},
+		"consentManagement": {"warehouse": [{"provider": "custom", "resolutionStrategy": "and", "consents": [{"consent": "marketing"}]}]}
+	}`,
+}
+
 func AssertConversion(t *testing.T, props []converter.ConfigProperty, cases []ConversionCase) {
 	t.Helper()
 

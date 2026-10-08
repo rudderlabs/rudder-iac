@@ -15,8 +15,8 @@ type MockSourceClient struct {
 	linkTPCalled             bool
 	unlinkTPCalled           bool
 	updateTPConnectionCalled bool
-	getSourcesCalled         bool
 	setExternalIDCalled      bool
+	getSourcesCalls          []sourceClient.ListSourcesOptions
 	getSourcesFunc           func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 	deleteErr                error
 }
@@ -53,8 +53,12 @@ func (m *MockSourceClient) Delete(ctx context.Context, sourceID string) error {
 	return m.deleteErr
 }
 
-func (m *MockSourceClient) GetSources(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
-	m.getSourcesCalled = true
+func (m *MockSourceClient) GetSources(ctx context.Context, opts ...sourceClient.ListSourcesOption) ([]sourceClient.EventStreamSource, error) {
+	options := sourceClient.ListSourcesOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	m.getSourcesCalls = append(m.getSourcesCalls, options)
 	if m.getSourcesFunc != nil {
 		return m.getSourcesFunc(ctx)
 	}
@@ -102,7 +106,11 @@ func (m *MockSourceClient) DeleteCalled() bool {
 }
 
 func (m *MockSourceClient) GetSourcesCalled() bool {
-	return m.getSourcesCalled
+	return len(m.getSourcesCalls) > 0
+}
+
+func (m *MockSourceClient) GetSourcesCalls() []sourceClient.ListSourcesOptions {
+	return m.getSourcesCalls
 }
 
 func (m *MockSourceClient) LinkTPCalled() bool {
