@@ -1,0 +1,21 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: bq-wif
+spec:
+  id: bq-wif
+  display_name: E2E BigQuery WIF
+  type: bq
+  enabled: true
+  definition_version: 1
+  config:
+    project: rudder-cli-e2e
+    bucket_name: rudder-cli-e2e-bq-wif
+    namespace: rudder_e2e_wif
+    auth_method: workloadIdentityFederation
+    workload_identity_project_number: "123456789012"
+    workload_identity_pool_id: rudderstack-pool
+    workload_identity_provider_id: rudderstack-aws
+    sync_frequency: "180"
+    connection_mode:
+      web: cloud

@@ -6,6 +6,28 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 ## Upcoming (unreleased)
 
+### Review the `authMethod` update on BigQuery destinations
+
+**Scope:** spec
+
+**Why:** the CLI now maps BigQuery's `authMethod` and its workload identity federation keys. `auth_method` defaults to `serviceAccountKey`, the same default the backend applies, and `credentials` is now required only for that method. Before, the CLI dropped these keys, so every update it made removed `authMethod` from the stored config.
+
+For BigQuery destinations whose stored config has no `authMethod`, `plan` now shows a one-time update that adds `authMethod: serviceAccountKey`. Applying it doesn't change how the destination authenticates.
+
+Destinations set up with workload identity federation in the dashboard are different: specs imported earlier don't carry the `workload_identity_*` keys, so `plan` shows an update that switches them back to a service account key.
+
+**Migration:** none for destinations that authenticate with a service account key. For destinations that use workload identity federation, re-import them with `rudder-cli import workspace` before your next `apply`, or add `auth_method: workloadIdentityFederation` and the `workload_identity_*` keys to their specs.
+
+### Re-import Customer.io destinations that use the web SDK v2 settings
+
+**Scope:** spec
+
+**Why:** the CLI now maps Customer.io's web device-mode settings `sdkVersion`, `writeKey` and `anonymousInApp` (`sdk_version`, `write_key` and `anonymous_in_app` in specs). Before, it dropped them, so an `apply` erased any values set in the dashboard.
+
+For destinations that have these keys set, specs imported earlier don't have them. `plan` now shows an update that removes them, which would return the web SDK to v1.
+
+**Migration:** re-import the affected destinations with `rudder-cli import workspace` before your next `apply`, or add the keys to their specs.
+
 ### Re-import destinations that already have an rETL connection
 
 **Scope:** spec
@@ -518,6 +540,20 @@ spec:
     validations:
       tracking_plan: "#tracking-plan:tp-abc123"
 ```
+
+---
+
+## v0.27.0 — 2026-09-22
+
+### Set `api_version: v1` on Customer.io destinations that should stay on API v1
+
+**Scope:** spec
+
+**Why:** an omitted `api_version` on a Customer.io destination now means `v2`, matching the backend's default for new destinations. It used to mean `v1`. API v2 also requires `user_id_identifier_type`.
+
+Specs that omit `api_version` now fail validation unless they set `user_id_identifier_type`. Once they pass, `plan` shows an update that moves destinations still on v1 to v2.
+
+**Migration:** to keep a destination on API v1, add `api_version: v1` to its spec. To move it to v2, add `user_id_identifier_type` (`id`, `email`, `phone` or `cio_id`).
 
 ---
 
