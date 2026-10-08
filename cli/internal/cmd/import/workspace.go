@@ -52,6 +52,14 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				return err
 			}
 
+			// Scoping to the workspace attaches its import-manifest metadata to
+			// local resources, which merge relies on to skip already-linked ones.
+			workspace, err := deps.Client().Workspaces.GetByAuthToken(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("fetching workspace information: %w", err)
+			}
+			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
+
 			p = deps.NewProject(projectOpts...)
 
 			if err := p.Load(location); err != nil {
