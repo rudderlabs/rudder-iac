@@ -432,6 +432,6 @@ config:
 
 Note that:
 
-- `gcs.credentials` is JSON, so its reference needs single quotes, even when `import` wrote it: `credentials: '{{ .PG_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
+- `gcs.credentials` is JSON, so write its reference in single quotes: `credentials: '{{ .PG_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
 - `client_key` and `client_cert` span several lines. Pass each with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks: `export RUDDER_PG_CLIENT_KEY="$(awk '{printf "%s\\n", $0}' client-key.pem)"`.
 - `server_ca` isn't a secret — a CA certificate is public by design.

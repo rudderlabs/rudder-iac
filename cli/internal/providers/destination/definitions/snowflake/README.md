@@ -419,5 +419,5 @@ config:
 Note that:
 
 - `private_key` spans several lines, so pass it with its line breaks written as `\n` — see [`private_key`](#private_key--string-required-secret).
-- `gcp.credentials` is JSON, so its reference needs single quotes, even when `import` wrote it: `credentials: '{{ .SNOWFLAKE_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
+- `gcp.credentials` is JSON, so write its reference in single quotes: `credentials: '{{ .SNOWFLAKE_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
 - `s3.iam_role_arn` and `storage_integration` aren't secrets — neither grants access on its own.

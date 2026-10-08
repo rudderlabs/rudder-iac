@@ -268,7 +268,7 @@ config:
   credentials: '{{ .BQ_CREDENTIALS }}'
 ```
 
-`credentials` is JSON, so its reference needs single quotes, as above, even when `import` wrote it — see [Secrets](../README.md#secrets). The key file works as is:
+`credentials` is JSON, so write its reference in single quotes, as above — see [Secrets](../README.md#secrets). Export the key file as is:
 
 ```bash
 export RUDDER_BQ_CREDENTIALS="$(cat service-account.json)"
