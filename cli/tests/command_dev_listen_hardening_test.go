@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,18 +23,19 @@ import (
 // the same job as the other TestDevListen tests.
 
 type devResponse struct {
-	status  int
-	header  http.Header
-	body    string
-	elapsed time.Duration
+	status int
+	header http.Header
+	body   string
 }
 
-// devDo sends one request. It never follows redirects and never reuses a
+// tryDo sends one request and returns the error instead of failing the test,
+// so goroutines can call it. It never follows redirects and never reuses a
 // connection, so one test cannot hold a listener slot for another.
-func devDo(t *testing.T, method, url string, body []byte, mutate func(*http.Request)) devResponse {
-	t.Helper()
+func tryDo(method, url string, body []byte, mutate func(*http.Request)) (devResponse, error) {
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
-	require.NoError(t, err)
+	if err != nil {
+		return devResponse{}, err
+	}
 	req.Close = true
 	if mutate != nil {
 		mutate(req)
@@ -42,20 +44,29 @@ func devDo(t *testing.T, method, url string, body []byte, mutate func(*http.Requ
 		Timeout:       30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	start := time.Now()
 	resp, err := client.Do(req)
-	require.NoError(t, err)
+	if err != nil {
+		return devResponse{}, err
+	}
 	defer resp.Body.Close()
 	out, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return devResponse{resp.StatusCode, resp.Header, string(out), time.Since(start)}
+	if err != nil {
+		return devResponse{}, err
+	}
+	return devResponse{resp.StatusCode, resp.Header, string(out)}, nil
 }
 
-func postJSON(key string) func(*http.Request) {
-	return func(r *http.Request) {
-		r.Header.Set("Content-Type", "application/json")
-		r.SetBasicAuth(key, "")
-	}
+func devDo(t *testing.T, method, url string, body []byte, mutate func(*http.Request)) devResponse {
+	t.Helper()
+	resp, err := tryDo(method, url, body, mutate)
+	require.NoError(t, err)
+	return resp
+}
+
+// postJSON marks a request as JSON from the "dev" source.
+func postJSON(r *http.Request) {
+	r.Header.Set("Content-Type", "application/json")
+	r.SetBasicAuth("dev", "")
 }
 
 // Security: a page that rebinds its DNS name to 127.0.0.1 must not read captures.
@@ -101,7 +112,7 @@ func TestDevListenRefusesForeignHostsAndCrossSiteReads(t *testing.T) {
 	// Ingestion stays open to any page and any Host: that is how a browser SDK
 	// on another origin reaches the listener.
 	resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u"}`), func(r *http.Request) {
-		postJSON("dev")(r)
+		postJSON(r)
 		r.Host = "evil.example"
 		r.Header.Set("Origin", "https://evil.example")
 	})
@@ -115,7 +126,7 @@ func TestDevListenCORSCoversIngestionOnly(t *testing.T) {
 	p := startListen(t)
 
 	ingest := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u"}`), func(r *http.Request) {
-		postJSON("dev")(r)
+		postJSON(r)
 		r.Header.Set("Origin", "https://app.example")
 	})
 	assert.Equal(t, "https://app.example", ingest.header.Get("Access-Control-Allow-Origin"))
@@ -191,10 +202,11 @@ func TestDevListenMasksTheWriteKey(t *testing.T) {
 		r.SetBasicAuth(key, "")
 		r.Header.Set("AnonymousId", "anon")
 		r.Header.Set("Cookie", "session="+key)
-		r.Header.Set("Authorization", r.Header.Get("Authorization"))
 	})
 	devDo(t, http.MethodGet, p.url()+"/pixel/v1/track?writeKey="+key+"&anonymousId=a&event=px", nil, nil)
 
+	// A stored Authorization header holds the key as base64, not as plain text.
+	encoded := base64.StdEncoding.EncodeToString([]byte(key + ":"))
 	for _, path := range []string{
 		"/_dev/v1/requests?kind=all&view=full&limit=1000",
 		"/_dev/v1/info",
@@ -202,10 +214,12 @@ func TestDevListenMasksTheWriteKey(t *testing.T) {
 	} {
 		resp := devDo(t, http.MethodGet, p.url()+path, nil, nil)
 		assert.NotContains(t, resp.body, key, path)
+		assert.NotContains(t, resp.body, encoded, "%s: the key as a Basic auth value", path)
 	}
 	full := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?kind=all&view=full&limit=1000", nil, nil)
 	assert.NotContains(t, full.body, "session="+key, "cookie headers must not be stored")
 	assert.NotContains(t, strings.ToLower(full.body), "cookie")
+	assert.NotContains(t, strings.ToLower(full.body), "authorization", "credential headers must not be stored")
 	assert.Contains(t, full.body, "test...kkkk", "the masked form stays recognizable")
 }
 
@@ -220,7 +234,7 @@ func TestDevListenKeepsTheBytesTheSDKSent(t *testing.T) {
 		`{"userId":"u","event":"bytes","properties":{"s":"\u0000é😀 \\ \/"}}`,
 	}
 	for _, payload := range payloads {
-		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON("dev"))
+		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON)
 		require.Equal(t, http.StatusOK, resp.status, payload)
 	}
 
@@ -250,7 +264,7 @@ func TestDevListenEnforcesBodyAndEventLimits(t *testing.T) {
 	batch := func(n int) []byte {
 		return []byte(`{"batch":[` + strings.TrimSuffix(strings.Repeat(`{"type":"track","event":"e","userId":"u"},`, n), ",") + `]}`)
 	}
-	gzipped := func(r *http.Request) { postJSON("dev")(r); r.Header.Set("Content-Encoding", "gzip") }
+	gzipped := func(r *http.Request) { postJSON(r); r.Header.Set("Content-Encoding", "gzip") }
 
 	cases := []struct {
 		name   string
@@ -259,16 +273,16 @@ func TestDevListenEnforcesBodyAndEventLimits(t *testing.T) {
 		mutate func(*http.Request)
 		status int
 	}{
-		{"body at the cap", "/v1/track", padded(bodyCap), postJSON("dev"), http.StatusOK},
-		{"body over the cap", "/v1/track", padded(bodyCap + 1), postJSON("dev"), http.StatusRequestEntityTooLarge},
+		{"body at the cap", "/v1/track", padded(bodyCap), postJSON, http.StatusOK},
+		{"body over the cap", "/v1/track", padded(bodyCap + 1), postJSON, http.StatusRequestEntityTooLarge},
 		{"gzip that expands past the cap", "/v1/track", gz(bytes.Repeat([]byte("0"), 50<<20)), gzipped, http.StatusRequestEntityTooLarge},
 		{"gzip of 200k empty objects", "/v1/batch", gz([]byte(`{"batch":[` + strings.TrimSuffix(strings.Repeat("{},", 200000), ",") + `]}`)), gzipped, http.StatusRequestEntityTooLarge},
-		{"batch of 10000 events", "/v1/batch", batch(10000), postJSON("dev"), http.StatusOK},
-		{"batch of 10001 events", "/v1/batch", batch(10001), postJSON("dev"), http.StatusRequestEntityTooLarge},
+		{"batch of 10000 events", "/v1/batch", batch(10000), postJSON, http.StatusOK},
+		{"batch of 10001 events", "/v1/batch", batch(10001), postJSON, http.StatusRequestEntityTooLarge},
 		{"corrupt gzip", "/v1/track", []byte("not gzip"), gzipped, http.StatusBadRequest},
-		{"truncated JSON", "/v1/track", []byte(`{"userId":`), postJSON("dev"), http.StatusBadRequest},
-		{"empty body", "/v1/track", nil, postJSON("dev"), http.StatusBadRequest},
-		{"no identity", "/v1/track", []byte(`{"event":"e"}`), postJSON("dev"), http.StatusBadRequest},
+		{"truncated JSON", "/v1/track", []byte(`{"userId":`), postJSON, http.StatusBadRequest},
+		{"empty body", "/v1/track", nil, postJSON, http.StatusBadRequest},
+		{"no identity", "/v1/track", []byte(`{"event":"e"}`), postJSON, http.StatusBadRequest},
 	}
 	for _, tc := range cases {
 		resp := devDo(t, http.MethodPost, p.url()+tc.path, tc.body, tc.mutate)
@@ -276,7 +290,7 @@ func TestDevListenEnforcesBodyAndEventLimits(t *testing.T) {
 	}
 
 	resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u"}`), func(r *http.Request) {
-		postJSON("dev")(r)
+		postJSON(r)
 		r.Header.Set("X-Big", strings.Repeat("a", 600<<10))
 	})
 	assert.Equal(t, http.StatusRequestHeaderFieldsTooLarge, resp.status)
@@ -302,17 +316,20 @@ func TestDevListenCapsInFlightRequests(t *testing.T) {
 		require.NoError(t, err)
 		stalled = append(stalled, conn)
 	}
-	time.Sleep(300 * time.Millisecond)
 
-	resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON("dev"))
-	assert.Equal(t, http.StatusServiceUnavailable, resp.status)
+	// The server takes a moment to reach the handler of each stalled
+	// connection, so poll until the ninth request is refused.
+	require.Eventually(t, func() bool {
+		resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON)
+		return err == nil && resp.status == http.StatusServiceUnavailable
+	}, 10*time.Second, 50*time.Millisecond)
 	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).status,
 		"the query API must not share the ingestion cap")
 	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/ui/", nil, nil).status)
 
 	// The body must arrive within 10 s, so the slots come back on their own.
 	require.Eventually(t, func() bool {
-		return devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON("dev")).status == http.StatusOK
+		return devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON).status == http.StatusOK
 	}, 20*time.Second, 500*time.Millisecond)
 }
 
@@ -347,7 +364,10 @@ func TestDevListenCapturesParallelWritersExactly(t *testing.T) {
 			for i := range each {
 				payload := fmt.Sprintf(`{"userId":"w%d","event":"parallel","properties":{"i":%d}}`, w, i)
 				for {
-					resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON("dev"))
+					resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON)
+					if !assert.NoError(t, err) {
+						return
+					}
 					if resp.status == http.StatusServiceUnavailable {
 						time.Sleep(5 * time.Millisecond)
 						continue
@@ -383,31 +403,21 @@ func TestDevListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 	p := startListen(t)
 	const total = 10050
 
-	client := &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 4}}
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
+	// One request at a time stays far below the in-flight cap, so none is
+	// refused. Reusing one connection keeps 10,000 posts from exhausting ports.
+	client := &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 1}}
+	t.Cleanup(client.CloseIdleConnections)
 	for range total {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer wg.Done()
-			defer func() { <-sem }()
-			req, _ := http.NewRequest(http.MethodPost, p.url()+"/v1/track", strings.NewReader(`{"userId":"u","event":"flood"}`))
-			req.SetBasicAuth("dev", "")
-			for {
-				resp, err := client.Do(req.Clone(req.Context()))
-				if err == nil {
-					_, _ = io.Copy(io.Discard, resp.Body)
-					_ = resp.Body.Close()
-					if resp.StatusCode == http.StatusOK {
-						return
-					}
-				}
-				time.Sleep(2 * time.Millisecond)
-			}
-		}()
+		req, err := http.NewRequest(http.MethodPost, p.url()+"/v1/track", strings.NewReader(`{"userId":"u","event":"flood"}`))
+		require.NoError(t, err)
+		req.SetBasicAuth("dev", "")
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		_, err = io.Copy(io.Discard, resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 	}
-	wg.Wait()
 
 	var info struct {
 		Cursor int `json:"cursor"`
@@ -420,7 +430,7 @@ func TestDevListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).body), &info))
 	assert.Equal(t, total, info.Cursor)
-	assert.LessOrEqual(t, info.Store.Requests, info.Store.MaxRequests)
+	assert.Equal(t, info.Store.MaxRequests, info.Store.Requests, "a full store holds exactly its cap")
 	assert.Equal(t, total-info.Store.Requests, info.Store.Evicted)
 	assert.Equal(t, info.Store.Evicted, info.Store.EvictedThrough)
 
@@ -435,7 +445,7 @@ func TestDevListenKeepsCapturesWhenOversizedPostsArrive(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	for _, name := range []string{"first", "second", "third"} {
-		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u","event":"`+name+`"}`), postJSON("dev"))
+		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u","event":"`+name+`"}`), postJSON)
 		require.Equal(t, http.StatusOK, resp.status)
 	}
 

@@ -1,6 +1,7 @@
 // Any web page can post to a local listener, so every string the review page
 // shows is attacker-controlled. This test puts a hostile payload into every
 // field the page renders and fails if any of them runs or becomes markup.
+const fs = require('node:fs');
 const { test, expect, open } = require('./fixtures');
 
 const PAYLOADS = [
@@ -25,7 +26,8 @@ async function postHostile(listener, payload) {
   };
   await listener.send('/v1/batch', { batch: [event] }, payload);
   await listener.send('/v1/track?x=' + encodeURIComponent(payload), event, payload);
-  // A refused request puts the payload into the rejection reason and target.
+  // A refused request keeps the payload only in its body. The rejection
+  // reason is a fixed string and the target is the plain /v1/track.
   await listener.send('/v1/track', '{"event":"' + payload.replace(/"/g, '\\"') + '","userId":');
 }
 
@@ -37,14 +39,16 @@ test.describe('hostile events', () => {
     page.on('dialog', async (d) => { dialog = d.message(); await d.dismiss(); });
     await open(page, listener);
 
+    // Lists show the newest row first, so opening only the top row would skip
+    // most payloads. Open every row of both tabs.
     for (const tab of ['Events', 'Requests']) {
       await page.getByRole('tab', { name: tab }).click();
-      const first = page.locator('#list-body tr:not([hidden])').first();
-      await expect(first).toBeVisible();
-      await first.click();
+      const rows = page.locator('#list-body tr:not([hidden])');
+      await expect(rows.first()).toBeVisible();
+      const count = await rows.count();
+      expect(count).toBeGreaterThanOrEqual(PAYLOADS.length * 2);
+      for (let i = 0; i < count; i++) await rows.nth(i).click();
     }
-    await page.getByRole('tab', { name: 'Events' }).click();
-    await page.locator('#list-body tr:not([hidden])').first().click();
 
     expect(dialog, 'no alert, confirm or prompt').toBeNull();
     expect(await page.evaluate(() => window.__pwned), 'payload script ran').toBeUndefined();
@@ -56,11 +60,19 @@ test.describe('hostile events', () => {
   test('the export is plain text a browser will not render', async ({ page, listener }) => {
     await postHostile(listener, PAYLOADS[0]);
     await open(page, listener);
+    await page.getByRole('tab', { name: 'Events' }).click();
     const [file] = await Promise.all([
       page.waitForEvent('download'),
       page.getByRole('button', { name: 'Export' }).click(),
     ]);
-    expect(file.suggestedFilename()).toMatch(/^[\w.-]+$/);
+    // A .html or .svg name would make the browser render the payload.
+    expect(file.suggestedFilename()).toMatch(/^[\w.-]+\.ndjson$/);
+    const text = fs.readFileSync(await file.path(), 'utf8');
+    // Each line is one event as JSON. The payload is a string value in it,
+    // never a tag at the start of the file.
+    expect(text.startsWith('{')).toBe(true);
+    const events = text.trim().split('\n').map((line) => JSON.parse(line));
+    expect(events.map((e) => e.event)).toContain(PAYLOADS[0]);
   });
 
   test('the page makes no request outside /_dev', async ({ page, listener }) => {

@@ -123,10 +123,15 @@ var keptHeaders = []string{"User-Agent", "Content-Type", "Content-Encoding", "Or
 // maxHeaderValue bounds each kept value, because the sender controls it.
 const maxHeaderValue = 1024
 
-// maxRefusedBody bounds the body kept for a refused request that carries no
-// events. The sender picks its size, and any web page can post to the
-// listener, so keeping a refused 2 MB body lets 32 posts evict every capture.
+// maxRefusedBody bounds the body kept for a request refused before parsing,
+// such as one over the size cap or with a corrupt gzip stream. The sender
+// picks its size, and any web page can post to the listener, so keeping a
+// refused 2 MB body lets 32 posts evict every capture.
 const maxRefusedBody = 1024
+
+// maxTarget bounds the kept request target. The sender controls the query,
+// and the route is in the first bytes.
+const maxTarget = 1024
 
 // firstValues keeps the first value of each header in names, or of every
 // header when names is nil, and counts the values it leaves out.
@@ -158,9 +163,11 @@ func newRecord(c *ingest.Capture) *Record {
 		body = nil
 	}
 	bodyComplete := c.BodyComplete
-	// Without events nothing points into the body, so a copy lets the large
-	// array go. BodyBytes still reports the real size.
-	if c.StatusCode >= http.StatusBadRequest && len(c.Events) == 0 && len(body) > maxRefusedBody {
+	// A body that was not read or decoded in full never reached the parser, so
+	// no event points into it and a copy lets the large array go. A body that
+	// parsed and failed, such as truncated JSON, stays whole so the sender can
+	// see where it broke. BodyBytes still reports the real size.
+	if !c.BodyComplete && c.StatusCode >= http.StatusBadRequest && len(c.Events) == 0 && len(body) > maxRefusedBody {
 		body = slices.Clone(body[:maxRefusedBody])
 		bodyComplete = false
 	}
@@ -176,6 +183,8 @@ func newRecord(c *ingest.Capture) *Record {
 	}
 	requestHeaders, dropped := firstValues(c.Request.Header, keptHeaders)
 	responseHeaders, _ := firstValues(c.Header, nil)
+	target := maskQuery(c.Request.RequestURI)
+	target = target[:min(len(target), maxTarget)]
 	// Method, target and route are slices of the whole request line, so the
 	// record keeps copies.
 	rec := &Record{
@@ -186,7 +195,7 @@ func newRecord(c *ingest.Capture) *Record {
 		WriteKey:   key,
 		Request: Request{
 			Method:         strings.Clone(c.Request.Method),
-			Target:         strings.Clone(maskQuery(c.Request.RequestURI)),
+			Target:         strings.Clone(target),
 			RemoteAddr:     c.Request.RemoteAddr,
 			Headers:        requestHeaders,
 			DroppedHeaders: dropped,

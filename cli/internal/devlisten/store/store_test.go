@@ -281,8 +281,23 @@ func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
 	parsed.StatusCode = http.StatusBadRequest
 	require.Len(t, newRecord(parsed).Request.Body, len(huge))
 
+	// A body that was read in full but failed the parser keeps its bytes, so
+	// the sender can see where the JSON broke.
+	broken := capture("dev", "/v1/track", huge)
+	broken.StatusCode = http.StatusBadRequest
+	broken.Events = nil
+	require.Len(t, newRecord(broken).Request.Body, len(huge))
+
 	// An accepted request is captured whole.
 	require.Len(t, newRecord(capture("dev", "/v1/track", huge)).Request.Body, len(huge))
+}
+
+func TestRecordCapsTheTarget(t *testing.T) {
+	t.Parallel()
+	rec := newRecord(capture("dev", "/v1/track?x="+strings.Repeat("a", 512<<10), "{}"))
+
+	require.Len(t, rec.Request.Target, maxTarget)
+	require.True(t, strings.HasPrefix(rec.Request.Target, "/v1/track?x="))
 }
 
 func TestStoreIsSafeForConcurrentUse(t *testing.T) {
