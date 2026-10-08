@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,8 +13,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // mockStore records the last request seen by each verb and returns canned data.
@@ -466,7 +469,6 @@ func bqKeyJSON(t *testing.T, privateKey string) string {
 	t.Helper()
 	raw, err := json.Marshal(map[string]string{
 		"type":         "service_account",
-		"project_id":   "acme-analytics-prod",
 		"private_key":  privateKey,
 		"client_email": "rudder@acme-analytics-prod.iam.gserviceaccount.com",
 	})
@@ -474,56 +476,29 @@ func bqKeyJSON(t *testing.T, privateKey string) string {
 	return string(raw)
 }
 
-// A {{ .VAR }} token is substituted into the YAML text before it is parsed, so
-// a key file's JSON can reach the account as something other than the key: a
-// map, text with its PEM line breaks folded into spaces, or not JSON at all.
-// The backend stores any non-empty string and the UI only reports the damage
-// at credential validation, so the spec must be refused up front (DEX-1022).
+// The spec must be refused up front when the credentials are not a service
+// account key file: the backend stores any non-empty string and the UI reports
+// the damage only at credential validation (DEX-1022).
 func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{}}
+	withCredentials := func(credentials any) map[string]any {
+		return map[string]any{"project": "acme-analytics-prod", "credentials": credentials}
+	}
 
 	tests := []struct {
 		name        string
 		config      map[string]any
 		errContains string
 	}{
-		{
-			name:   "service account key JSON",
-			config: map[string]any{"project": "acme-analytics-prod", "credentials": bqKeyJSON(t, bqPEM)},
-		},
-		{
-			name:   "workload identity federation carries no credentials",
-			config: map[string]any{"project": "acme-analytics-prod", "authMethod": "workloadIdentityFederation"},
-		},
-		{
-			name: "PEM line breaks folded into spaces",
-			config: map[string]any{
-				"project":     "acme-analytics-prod",
-				"credentials": bqKeyJSON(t, strings.ReplaceAll(bqPEM, "\n", " ")),
-			},
-			errContains: "private_key is not a PEM block",
-		},
-		{
-			name:        "not JSON",
-			config:      map[string]any{"project": "acme-analytics-prod", "credentials": "dummy-key"},
-			errContains: "not valid JSON",
-		},
-		{
-			name: "JSON parsed into a map by an unquoted variable",
-			config: map[string]any{
-				"project":     "acme-analytics-prod",
-				"credentials": map[string]any{"type": "service_account"},
-			},
-			errContains: "must be a string",
-		},
-		{
-			name: "no client_email",
-			config: map[string]any{
-				"project":     "acme-analytics-prod",
-				"credentials": `{"type":"service_account","private_key":"` + strings.ReplaceAll(bqPEM, "\n", `\n`) + `"}`,
-			},
-			errContains: "client_email",
-		},
+		{name: "service account key JSON", config: withCredentials(bqKeyJSON(t, bqPEM))},
+		{name: "workload identity federation carries no credentials", config: map[string]any{"project": "acme-analytics-prod", "authMethod": authMethodWIF}},
+		{name: "PEM line breaks folded into spaces", config: withCredentials(bqKeyJSON(t, strings.ReplaceAll(bqPEM, "\n", " "))), errContains: "private_key is not a PEM block"},
+		{name: "not JSON", config: withCredentials("dummy-key"), errContains: "not valid JSON"},
+		{name: "not a string or map", config: withCredentials(42), errContains: "must be the service account key JSON"},
+		{name: "gcloud user credentials", config: withCredentials(`{"type":"authorized_user","client_id":"x"}`), errContains: "authorized_user"},
+		{name: "external account file", config: withCredentials(`{"type":"external_account"}`), errContains: "authMethod: workloadIdentityFederation"},
+		{name: "no type", config: withCredentials(`{"client_email":"a@b.c"}`), errContains: "its type must be service_account"},
+		{name: "no client_email", config: withCredentials(`{"type":"service_account","private_key":"` + strings.ReplaceAll(bqPEM, "\n", `\n`) + `"}`), errContains: "client_email"},
 	}
 
 	for _, tt := range tests {
@@ -535,8 +510,64 @@ func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
 				require.NoError(t, err)
 				return
 			}
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.errContains)
+			require.ErrorContains(t, err, tt.errContains)
+			assert.Contains(t, err.Error(), `validating account "bq"`)
 		})
 	}
+}
+
+// A refusal must never repeat the credentials: they are a secret, and the
+// parse error of encoding/json would print a byte of them.
+func TestExtractResourcesFromSpec_BigQueryErrorsDoNotLeakTheValue(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+
+	for _, value := range []string{"Supersecret-not-json", ""} {
+		_, err := h.ExtractResourcesFromSpec("f.yaml", &AccountSpec{
+			ID: "bq", Name: "bq", AccountDefinitionName: "SOURCE_BIGQUERY",
+			Config: map[string]any{"project": "p", "credentials": value},
+		})
+
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "Supersecret")
+		assert.NotContains(t, err.Error(), "invalid character")
+		assert.NotContains(t, err.Error(), "unexpected end")
+	}
+}
+
+// import workspace writes `credentials: {{ .VAR }}` unquoted. Once the key is
+// in the var file, YAML reads the JSON as a map, and apply has to accept the
+// spec the CLI just generated and send the key as the JSON string it was.
+func TestExtractResourcesFromSpec_BigQueryAcceptsTheUnquotedImportScaffold(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{}}
+	compact := bqKeyJSON(t, bqPEM)
+	var pretty bytes.Buffer
+	require.NoError(t, json.Indent(&pretty, []byte(compact), "", "  "))
+
+	for name, key := range map[string]string{"compact": compact, "pretty-printed": pretty.String()} {
+		t.Run(name, func(t *testing.T) {
+			scaffold := []byte("credentials: {{ .BQ_CREDENTIALS }}\nproject: acme-analytics-prod\n")
+			substituted, errs := varsubst.NewSubstitutor(mapResolver{"BQ_CREDENTIALS": key}).SubstituteBytes(scaffold)
+			require.Empty(t, errs)
+
+			var config map[string]any
+			require.NoError(t, yaml.Unmarshal(substituted, &config))
+			require.IsType(t, map[string]any{}, config["credentials"], "an unquoted token must arrive as a map")
+
+			resources, err := h.ExtractResourcesFromSpec("f.yaml", &AccountSpec{
+				ID: "bq", Name: "bq", AccountDefinitionName: "SOURCE_BIGQUERY", Config: config,
+			})
+			require.NoError(t, err)
+
+			sent, ok := resources["bq"].Config["credentials"].(*secret.String)
+			require.True(t, ok, "credentials must be wrapped as a secret")
+			assert.JSONEq(t, compact, sent.Reveal(), "the key must reach the backend as the JSON it was")
+		})
+	}
+}
+
+type mapResolver map[string]string
+
+func (m mapResolver) Resolve(name string) (string, bool) {
+	v, ok := m[name]
+	return v, ok
 }

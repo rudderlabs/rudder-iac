@@ -26,8 +26,13 @@ var accountExternalIDs = []string{"prod-bq", "prod-pg", "prod-sf"}
 // fixtureAccountSecrets is every secret value in credentials.vars.yaml. Snowflake
 // carries more than one, so the leak assertion has to cover the whole set. These
 // are fixture placeholders, not credentials -- hence the gitleaks exemption.
+//
+// rawAccountSecret holds quotes and \n escapes, so a leak into JSON or quoted
+// YAML shows up escaped and never matches it; the escape-free key id catches
+// those leaks.
 var fixtureAccountSecrets = []string{
 	rawAccountSecret,
+	"dummy-bq-key-id-12345",
 	"dummy-pg-password-12345",
 	"dummy-sf-key-12345",
 	"dummy-sf-phrase-12345", //gitleaks:allow
