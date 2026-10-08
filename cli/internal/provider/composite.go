@@ -22,20 +22,18 @@ import (
 )
 
 type CompositeProvider struct {
-	concurrency int
-	Providers   map[string]Provider
-	// Order lists the providers in dependency order: a provider whose matchers
-	// consult another provider's matches comes after that provider.
+	concurrency     int
+	Providers       map[string]Provider
 	Order           []string
 	registeredKinds map[string]Provider
 	registeredTypes map[string]Provider
 }
 
 // NewCompositeProvider composes the providers. order names every provider in
-// dependency order (see app.providerOrder); callers whose providers are
-// independent may omit it and get them sorted by name.
+// dependency order; callers whose providers are independent may omit it and
+// get them sorted by name.
 func NewCompositeProvider(providers map[string]Provider, order ...string) (Provider, error) {
-	order, err := providerOrder(providers, order)
+	order, err := resolveOrder(providers, order)
 	if err != nil {
 		return nil, err
 	}
@@ -67,10 +65,10 @@ func NewCompositeProvider(providers map[string]Provider, order ...string) (Provi
 	}, nil
 }
 
-// providerOrder returns the given order, or the provider names sorted when
+// resolveOrder returns the given order, or the provider names sorted when
 // none is given. An order must name each provider exactly once: a missing
 // provider would silently drop its matchers, a duplicate would run them twice.
-func providerOrder(providers map[string]Provider, order []string) ([]string, error) {
+func resolveOrder(providers map[string]Provider, order []string) ([]string, error) {
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("at least one provider must be specified")
 	}
@@ -81,19 +79,13 @@ func providerOrder(providers map[string]Provider, order []string) ([]string, err
 		return names, nil
 	}
 
-	sorted := slices.Clone(order)
-	slices.Sort(sorted)
-	if !slices.Equal(sorted, names) {
+	if !slices.Equal(slices.Sorted(slices.Values(order)), names) {
 		return nil, fmt.Errorf("provider order %v must name each provider exactly once: %v", order, names)
 	}
-	return order, nil
+	return slices.Clone(order), nil
 }
 
-// ResourceMatchers aggregates import --merge matchers from all providers in
-// Order. importmatcher.Mark runs them in this order, and a matcher that
-// consults another provider's matches (a connection matcher resolving its
-// destination endpoint) only finds them if that provider's matchers ran first.
-// Within a provider, the slice order it returns is preserved.
+// ResourceMatchers aggregates matchers in Order, keeping each provider's own order.
 func (p *CompositeProvider) ResourceMatchers() []importmatcher.Matcher {
 	var all []importmatcher.Matcher
 	for _, name := range p.Order {

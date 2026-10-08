@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"testing"
 
@@ -583,6 +582,8 @@ func TestNewCompositeProvider_RejectsOrderNotNamingEachProviderOnce(t *testing.T
 		{"missing provider", []string{"alpha"}},
 		{"unknown provider", []string{"alpha", "zeta", "omega"}},
 		{"duplicate provider", []string{"alpha", "zeta", "alpha"}},
+		{"unknown replacing a provider", []string{"alpha", "omega"}},
+		{"duplicate replacing a provider", []string{"alpha", "alpha"}},
 	}
 
 	for _, tc := range cases {
@@ -618,8 +619,5 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 	// Without an order, providers are taken by name.
 	assert.Equal(t, []string{"alpha", "gamma"}, cp.(*provider.CompositeProvider).Order)
 	// A provider's own matcher order is preserved (parent-before-child).
-	assert.ElementsMatch(t, []string{"a1", "a2"}, types)
-	assert.Less(t,
-		slices.Index(types, "a1"), slices.Index(types, "a2"),
-		"per-provider matcher order must be preserved")
+	assert.Equal(t, []string{"a1", "a2"}, types)
 }
