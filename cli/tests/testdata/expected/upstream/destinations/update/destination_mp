@@ -8,6 +8,9 @@
     "connectionMode": {
       "web": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "consentManagement": {
       "web": [
         {

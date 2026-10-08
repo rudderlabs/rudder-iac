@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -14,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
@@ -179,6 +181,9 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 func (p *project) Load(location string) error {
 	p.location = location
 
+	ui.StartSpinner("Loading project ...")
+	defer ui.StopSpinner()
+
 	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
@@ -187,8 +192,8 @@ func (p *project) Load(location string) error {
 	if p.substitutor != nil {
 		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
-			if err := p.renderer.Render(subDiags); err != nil {
-				return fmt.Errorf("rendering diagnostics: %w", err)
+			if err := p.render(subDiags); err != nil {
+				return err
 			}
 			// An undefined variable almost always means a var file was not
 			// passed, not a broken spec, so point at the fix.
@@ -233,13 +238,22 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
 	// Both of them are part of the syntax validation although done at different places.
 	if specDiags.HasErrors() || syntaxDiags.HasErrors() {
-		if err := p.renderer.Render(append(
-			specDiags,
-			syntaxDiags...,
-		)); err != nil {
-			return fmt.Errorf("rendering diagnostics: %w", err)
+		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
+			return err
 		}
 		return fmt.Errorf("syntax validation failed")
+	}
+
+	// The syntax phase only stops the load on errors, so its warnings are carried
+	// past this gate. Every error return below goes through fail, which renders
+	// them first — returning bare would drop them, which is the drop this two-phase
+	// render exists to fix. The success path folds them into the single render at
+	// the end instead.
+	fail := func(err error) error {
+		if renderErr := p.render(slices.Concat(specDiags, syntaxDiags)); renderErr != nil {
+			return renderErr
+		}
+		return err
 	}
 
 	for path, rawSpec := range parsedRawSpecs {
@@ -247,7 +261,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			path,
 			rawSpec.Parsed(),
 		); err != nil {
-			return fmt.Errorf("loading spec %s: %w", path, err)
+			return fail(fmt.Errorf("loading spec %s: %w", path, err))
 		}
 	}
 
@@ -264,7 +278,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			continue
 		}
 		if err := p.provider.LoadImportManifest(&ws); err != nil {
-			return fmt.Errorf("broadcasting import manifest: %w", err)
+			return fail(fmt.Errorf("broadcasting import manifest: %w", err))
 		}
 		break
 	}
@@ -272,29 +286,43 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
-		return fmt.Errorf("building resource graph: %w", err)
+		return fail(fmt.Errorf("building resource graph: %w", err))
 	}
 
 	// Cycles make the graph unusable,
 	// so detect them before semantic validation
 	if _, err := graph.DetectCycles(); err != nil {
-		return fmt.Errorf("cycle detected in resource graph: %w", err)
+		return fail(fmt.Errorf("cycle detected in resource graph: %w", err))
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
 	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
-		return fmt.Errorf("semantic validation: %w", err)
+		return fail(fmt.Errorf("semantic validation: %w", err))
 	}
 
-	if err := p.renderer.Render(semanticDiags); err != nil {
-		return fmt.Errorf("rendering diagnostics: %w", err)
+	// specDiags is error-only by construction today and is folded in only so
+	// every render path carries the same set.
+	if err := p.render(slices.Concat(specDiags, syntaxDiags, semanticDiags)); err != nil {
+		return err
 	}
 
 	if semanticDiags.HasErrors() {
 		return fmt.Errorf("semantic validation failed")
 	}
 
+	return nil
+}
+
+// render is the single exit for diagnostics, so both validation phases report
+// in the same file order whichever one reached the renderer. It also clears the
+// Load spinner, which would otherwise interleave with the printed diagnostics.
+func (p *project) render(diagnostics validation.Diagnostics) error {
+	ui.StopSpinner()
+	diagnostics.Sort()
+	if err := p.renderer.Render(diagnostics); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
 	return nil
 }
 

@@ -723,6 +723,58 @@ func TestHandlerImpl_Delete(t *testing.T) {
 		assert.True(t, deleteCalled)
 	})
 
+	// The backend refuses to delete a destination that still has connections, and
+	// says only that. When the blocking connection is a kind this run is not
+	// managing — rETL connections are behind an experimental flag — nothing in
+	// the plan mentions it, so the workspace becomes un-destroyable with no hint
+	// as to why. The wrapper adds the missing half.
+	t.Run("explains a delete blocked by connections", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"The destination has active connections, please delete those first"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The destination has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+			"the remedy must name the flags that let the CLI remove them")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	// Only the connections refusal earns the extra guidance; every other failure
+	// is passed through, so an unrelated 400 does not acquire advice about a flag
+	// that has nothing to do with it.
+	t.Run("leaves an unrelated delete failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"destination is referenced by a running job"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
+	})
+
 	t.Run("deletes destination when no transformation", func(t *testing.T) {
 		t.Parallel()
 
@@ -895,11 +947,12 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/v2/destinations", r.URL.Path)
+		require.Equal(t, "true", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","name":"Unmanaged","type":"GA4","version":1,"config":{}}
+				{"id":"dst-2","name":"UI S3","type":"S3","version":1,"config":{}}
 			],
 			"paging": {"total": 2}
 		}`))
@@ -909,6 +962,8 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	h := destination.NewHandler(c, registry)
 
+	// dst-2 simulates a control plane that ignores hasExternalId: it must be
+	// skipped rather than fail on its unregistered type.
 	remotes, err := h.Impl.LoadRemoteResources(ctx)
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
@@ -952,16 +1007,16 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	ctx := context.Background()
 	registry := testRegistry(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "false", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","name":"GA4-unmanaged","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","externalId":"ga4-managed","name":"GA4-managed","type":"GA4","version":1,"config":{}},
 				{"id":"dst-3","name":"S3-unmanaged","type":"S3","config":{}},
 				{"id":"dst-4","name":"GA4-unregistered-version","type":"GA4","version":2,"config":{}}
 			],
-			"paging": {"total": 4}
+			"paging": {"total": 3}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -971,7 +1026,7 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 
 	remotes, err := h.Impl.LoadImportableResources(ctx)
 	require.NoError(t, err)
-	require.Len(t, remotes, 1, "only unmanaged + registered (type, version) pairs pass")
+	require.Len(t, remotes, 1, "only registered (type, version) pairs pass")
 	assert.Equal(t, "dst-1", remotes[0].ID)
 	assert.Equal(t, "", remotes[0].ExternalID)
 }
@@ -1494,6 +1549,8 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 
+	// The managed-transformation case, with the real ImportRefResolver and the
+	// export/load round trip, is in export_ref_test.go.
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 

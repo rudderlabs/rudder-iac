@@ -11,10 +11,13 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "apiVersion": "newApi",
     "doAssociation": true,
     "eventFilteringOption": "whitelistedEvents",
-    "hubID": "12345678",
+    "hubID": "rudderCliE2eHubId",
     "hubspotEvents": [
       {
         "eventProperties": [

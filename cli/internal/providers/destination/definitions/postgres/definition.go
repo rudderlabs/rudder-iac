@@ -436,6 +436,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"azure.sas_token",
 			"gcs.credentials",
 			"minio.secret_access_key",
+			"client_cert",
+			"client_key",
+			"user",
+			"ssh.user",
 		},
 		NewConfig: func() any {
 			return &postgresConfig{}

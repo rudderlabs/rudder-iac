@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "pixelId": "6543210987654321",
     "standardPageCall": false,
     "valueFieldIdentifier": "properties.price",
@@ -50,7 +53,7 @@
       "web": [
         {
           "from": "Product Viewed",
-          "to": "1111111111"
+          "to": "rudderCliE2eLegacyPixelIdUpdated"
         }
       ]
     },

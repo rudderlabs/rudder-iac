@@ -119,7 +119,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "rs", registered.Type)
 	assert.Equal(t, "RS", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "access_key_id", "access_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "access_key_id", "access_key", "user", "ssh.user"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
@@ -213,6 +213,17 @@ func TestRSConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(cfg))
 	})
 
+	t.Run("iam auth with use_serverless omitted defaults to a provisioned cluster", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validIAMClusterConfig()
+		delete(cfg, "use_serverless")
+		assert.Empty(t, registered.ValidateConfig(cfg))
+
+		delete(cfg, "cluster_id")
+		assertHasPath(t, registered.ValidateConfig(cfg), "/cluster_id")
+	})
+
 	t.Run("iam serverless auth requires workgroup", func(t *testing.T) {
 		t.Parallel()
 
@@ -252,6 +263,16 @@ func TestRSConfigValidation(t *testing.T) {
 		t.Parallel()
 
 		cfg := validCustomRoleStorageConfig()
+		delete(cfg, "iam_role_arn")
+
+		assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")
+	})
+
+	t.Run("custom storage with role_based_auth omitted defaults to role auth", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := validCustomRoleStorageConfig()
+		delete(cfg, "role_based_auth")
 		delete(cfg, "iam_role_arn")
 
 		assertHasPath(t, registered.ValidateConfig(cfg), "/iam_role_arn")

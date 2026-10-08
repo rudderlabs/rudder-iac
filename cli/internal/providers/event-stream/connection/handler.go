@@ -556,11 +556,11 @@ func (h *Handler) FormatForExport(
 // through the merged collection — imported in the same run or already
 // CLI-managed.
 func toImportItem(externalID string, data *RemoteConnection, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
-	sourceRef, err := endpointRef(inputResolver, source.ResourceType, source.ResourceKind, data.SourceID, data.SourceExternalID)
+	sourceRef, err := EndpointRef(inputResolver, source.ResourceType, source.ResourceKind, data.SourceID, data.SourceExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving source reference: %w", err)
 	}
-	destinationRef, err := endpointRef(inputResolver, destination.DestinationResourceType, destination.DestinationSpecKind, data.DestinationID, data.DestinationExternalID)
+	destinationRef, err := EndpointRef(inputResolver, destination.DestinationResourceType, destination.DestinationSpecKind, data.DestinationID, data.DestinationExternalID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving destination reference: %w", err)
 	}
@@ -572,13 +572,15 @@ func toImportItem(externalID string, data *RemoteConnection, inputResolver resol
 	}, nil
 }
 
-// endpointRef resolves an endpoint's remote id into a spec reference: through
+// EndpointRef resolves an endpoint's remote id into a spec reference: through
 // the import resolver — the endpoint imported in the same run, or managed with
 // file metadata on its graph entry — or, for an already-managed endpoint the
 // resolver cannot serve (BaseHandler-backed destinations carry no file
 // metadata), built from its externalId, which is the endpoint's local resource
-// id. The ref shape mirrors what parseSourceRef/ParseDestinationRef accept.
-func endpointRef(inputResolver resolver.ReferenceResolver, resourceType string, kind string, remoteID string, externalID string) (string, error) {
+// id. The ref shape mirrors what parseSourceRef/ParseDestinationRef accept. An
+// endpoint with neither is left unresolved rather than given an invented ref.
+// Shared with the rETL connection handler, whose spec takes the same refs.
+func EndpointRef(inputResolver resolver.ReferenceResolver, resourceType string, kind string, remoteID string, externalID string) (string, error) {
 	ref, err := inputResolver.ResolveToReference(resourceType, remoteID)
 	if err == nil {
 		return ref, nil

@@ -7,7 +7,8 @@ import (
 )
 
 // Source types from integrations-config destinations/gcs/db-config.json
-// supportedSourceTypes, restricted to types the CLI event-stream provider owns.
+// supportedSourceTypes, restricted to types the CLI can reach: those the
+// event-stream provider owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -19,6 +20,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +34,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // gcsConfig is the local YAML config model. Field set mirrors integrations-config
@@ -45,9 +48,8 @@ type gcsConfig struct {
 	ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 }
 
-// NewDefinition returns the Google Cloud Storage destination definition. GCS stays
-// behind the unverified destination gate; source support remains restricted to the
-// CLI-owned event-stream types above.
+// NewDefinition returns the Google Cloud Storage destination definition. Source
+// support remains restricted to the CLI-owned event-stream types above.
 func NewDefinition() *definitions.DestinationDefinition {
 	properties := []converter.ConfigProperty{
 		converter.Simple("bucketName", "bucket_name"),

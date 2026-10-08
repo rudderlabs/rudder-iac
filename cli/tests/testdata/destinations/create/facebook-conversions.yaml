@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    dataset_id: "123456789012345"
+    dataset_id: "{{ .FACEBOOK_CONVERSIONS_DATASET_ID }}"
     access_token: "{{ .FACEBOOK_CONVERSIONS_ACCESS_TOKEN }}"
     action_source: website
     limited_data_usage: false
