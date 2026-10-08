@@ -86,3 +86,23 @@ func TestSpecSyntaxValid_SnowflakeSecretFollowsAuthMode(t *testing.T) {
 func TestMissingRequiredConfig_UnregisteredDefinition(t *testing.T) {
 	assert.Empty(t, missingRequiredConfig("SOURCE_UNKNOWN", map[string]any{}))
 }
+
+// The SOURCE_BIGQUERY schema requires credentials only when authMethod is not
+// workloadIdentityFederation, so a hand-written federated account carries none.
+func TestMissingRequiredConfig_BigQueryCredentialsFollowAuthMethod(t *testing.T) {
+	tests := []struct {
+		name   string
+		config map[string]any
+		want   []string
+	}{
+		{"key file needs credentials", map[string]any{"project": "p"}, []string{"credentials"}},
+		{"explicit key file method needs credentials", map[string]any{"project": "p", "authMethod": "serviceAccountKey"}, []string{"credentials"}},
+		{"federation needs none", map[string]any{"project": "p", "authMethod": "workloadIdentityFederation"}, nil},
+		{"federation still needs the project", map[string]any{"authMethod": "workloadIdentityFederation"}, []string{"project"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, missingRequiredConfig("SOURCE_BIGQUERY", tt.config))
+		})
+	}
+}

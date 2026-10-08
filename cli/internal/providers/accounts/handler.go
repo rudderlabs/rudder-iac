@@ -53,6 +53,10 @@ type accountDefinition struct {
 	// authModeRequiredSecrets instead.
 	RequiredOptions []string
 	RequiredSecrets []string
+	// SecretsNotRequiredWhen lists config values that exempt RequiredSecrets:
+	// the schema requires them only when the key holds some other value or is
+	// absent. BigQuery with workloadIdentityFederation carries no key file.
+	SecretsNotRequiredWhen map[string]string
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -66,6 +70,7 @@ var registeredAccounts = map[string]accountDefinition{
 	"SOURCE_BIGQUERY": {
 		Type: "bigquery", SecretKeys: []string{"credentials"},
 		RequiredOptions: []string{"project"}, RequiredSecrets: []string{"credentials"},
+		SecretsNotRequiredWhen: map[string]string{"authMethod": "workloadIdentityFederation"},
 	},
 	"SOURCE_POSTGRES": {
 		Type: "postgres", SecretKeys: []string{"password"},
@@ -86,6 +91,17 @@ var authModeRequiredSecrets = map[string]map[string][]string{
 	},
 }
 
+// secretsExempt reports whether the config selects an auth mode that needs none
+// of the definition's required secrets.
+func secretsExempt(def accountDefinition, config map[string]any) bool {
+	for key, value := range def.SecretsNotRequiredWhen {
+		if got, _ := config[key].(string); got == value {
+			return true
+		}
+	}
+	return false
+}
+
 // missingRequiredConfig lists the required config keys an account of this
 // definition leaves out, options first. A definition the CLI does not register
 // has no known requirements, so it reports nothing.
@@ -101,7 +117,7 @@ func missingRequiredConfig(definitionName string, config map[string]any) []strin
 		// missing authenticationType is reported on its own.
 		mode, _ := config["authenticationType"].(string)
 		required = append(required, modeSecrets[mode]...)
-	} else {
+	} else if !secretsExempt(def, config) {
 		required = append(required, def.RequiredSecrets...)
 	}
 

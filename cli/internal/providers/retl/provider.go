@@ -229,10 +229,8 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 // connection update that changes config it cannot update in place, and a
 // schema or table change on a source that still has a connection.
 func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
-	if _, ok := p.handlers[connection.ResourceType]; ok {
-		if err := connection.CheckImmutableChanges(plan.Diff); err != nil {
-			return err
-		}
+	if err := connection.CheckImmutableChanges(plan.Diff); err != nil {
+		return err
 	}
 	if th, ok := p.handlers[table.ResourceType].(*table.Handler); ok {
 		return th.CheckPlan(ctx, plan.Diff)

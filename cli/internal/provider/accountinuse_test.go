@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The dependent is usually invisible to the run that tripped this: a rETL
-// source behind an experimental flag is never loaded, so the backend's reason
-// names nothing the user can see in the plan.
+// The dependent is usually invisible to the run that tripped this: a source
+// made in the webapp is outside the project, so the backend's reason names
+// nothing the user can see in the plan.
 func TestExplainBlockingAccountUsage_ExplainsTheRefusal(t *testing.T) {
 	apiErr := &client.APIError{
 		HTTPStatusCode: http.StatusConflict,
@@ -25,19 +25,15 @@ func TestExplainBlockingAccountUsage_ExplainsTheRefusal(t *testing.T) {
 
 	require.Error(t, got)
 	assert.Contains(t, got.Error(), "src-1", "the backend's own reason must survive")
-	assert.Contains(t, got.Error(), "RUDDERSTACK_X_RETL_TABLE_SUPPORT=true",
-		"the remedy must name the flag that lets the CLI see and remove them")
-	assert.Contains(t, got.Error(), "data graphs the CLI manages, remove them from the project",
-		"a data graph is not fixed by the rETL flags, so the message must say so")
-	assert.Contains(t, got.Error(), "otherwise delete them in the workspace first",
-		"a source made in the webapp is not fixed by any flag, so the message must name both routes")
+	assert.NotContains(t, got.Error(), "RUDDERSTACK_", "the message must not send the reader to experimental flags (DEX-959)")
+	assert.Contains(t, got.Error(), "data graphs the CLI manages, remove them from the project")
+	assert.Contains(t, got.Error(), "otherwise delete them in the workspace first")
 
 	var unwrapped *client.APIError
 	assert.True(t, errors.As(got, &unwrapped), "the annotation is added, not substituted")
 }
 
-// An unrelated failure must not acquire advice about a flag that has nothing to
-// do with it.
+// An unrelated failure must not acquire advice that has nothing to do with it.
 func TestExplainBlockingAccountUsage_LeavesOtherFailuresAlone(t *testing.T) {
 	cases := []struct {
 		name string

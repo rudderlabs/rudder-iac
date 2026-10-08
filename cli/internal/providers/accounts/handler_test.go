@@ -472,7 +472,8 @@ func TestDelete_ExplainsAnInUseRefusal(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "src-1", "the backend's reason must survive")
-	assert.Contains(t, err.Error(), "RUDDERSTACK_X_RETL_TABLE_SUPPORT=true")
+	assert.Contains(t, err.Error(), "still use this account")
+	assert.NotContains(t, err.Error(), "RUDDERSTACK_", "the message must not mention experimental flags (DEX-959)")
 }
 
 func TestDelete_LeavesOtherFailuresAlone(t *testing.T) {

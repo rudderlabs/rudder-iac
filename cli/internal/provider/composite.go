@@ -398,12 +398,12 @@ func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan) e
 	names := maps.Keys(p.Providers)
 	sort.Strings(names)
 	for _, name := range names {
-		if checker, ok := p.Providers[name].(interface {
-			CheckPlan(context.Context, *planner.Plan) error
-		}); ok {
-			if err := checker.CheckPlan(ctx, plan); err != nil {
-				return err
-			}
+		checker, ok := p.Providers[name].(PlanChecker)
+		if !ok {
+			continue
+		}
+		if err := checker.CheckPlan(ctx, plan); err != nil {
+			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
 	return nil
