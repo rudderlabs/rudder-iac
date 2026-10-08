@@ -12,17 +12,13 @@ import (
 // as the destination provider.
 type Provider struct {
 	*provider.BaseProvider
-	store     AccountStore
-	referrers *ReferrerClients
+	store AccountStore
 }
 
-// NewProvider constructs the accounts provider around the given store. A nil
-// referrers skips the plan-time check for what still uses a removed account; the
-// backend refusal and ExplainBlockingAccountUsage remain.
-func NewProvider(store AccountStore, referrers *ReferrerClients) *Provider {
+// NewProvider constructs the accounts provider around the given store.
+func NewProvider(store AccountStore) *Provider {
 	return &Provider{
-		store:     store,
-		referrers: referrers,
+		store: store,
 		BaseProvider: provider.NewBaseProvider([]provider.Handler{
 			NewHandler(store),
 		}),

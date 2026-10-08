@@ -265,12 +265,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	trp := transformations.NewProvider(c)
 	wsp := workspace.New(c)
 	dgp := dgProvider.NewProvider(dgClient.NewRudderDataGraphClient(c), c.Accounts)
-	ap := accountsProvider.NewProvider(c.Accounts, &accountsProvider.ReferrerClients{
-		RETLSources:  retlClient.NewRudderRETLStore(c),
-		Sources:      c.Sources,
-		Destinations: c.Destinations,
-		DataGraphs:   dgClient.NewRudderDataGraphClient(c),
-	})
+	ap := accountsProvider.NewProvider(c.Accounts)
 	dp := destProvider.NewProvider(c, destRegistry)
 
 	providers := &Providers{

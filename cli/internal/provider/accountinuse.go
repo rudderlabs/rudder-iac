@@ -21,11 +21,6 @@ func retlSourceFlags() string {
 	)
 }
 
-// RETLSourceFlags returns the environment settings that put the rETL source
-// kinds in scope for a run, for a caller that explains a refusal in the same
-// words as ExplainBlockingAccountUsage.
-func RETLSourceFlags() string { return retlSourceFlags() }
-
 // ExplainBlockingAccountUsage annotates the control plane's refusal to delete an
 // account that something still uses.
 //

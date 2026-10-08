@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -45,26 +44,6 @@ func (s *sources) List(ctx context.Context) (*SourcesPage, error) {
 	}
 
 	return page, nil
-}
-
-// GetAll walks every page of sources. Unlike the event-stream source listing,
-// each Source carries its raw Config.
-func (s *sources) GetAll(ctx context.Context) ([]Source, error) {
-	var all []Source
-
-	page, err := s.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("listing sources: %w", err)
-	}
-
-	for page != nil {
-		all = append(all, page.Sources...)
-		page, err = s.Next(ctx, page.Paging)
-		if err != nil {
-			return nil, fmt.Errorf("fetching next sources page: %w", err)
-		}
-	}
-	return all, nil
 }
 
 func (s *sources) Get(ctx context.Context, id string) (*Source, error) {
