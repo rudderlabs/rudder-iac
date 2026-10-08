@@ -2,6 +2,7 @@ package customerio_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,13 +34,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json narrows syncBehaviours to upsert and mirror and declares no
+	// visual mapper.
+	assert.Equal(t, []string{"upsert", "mirror"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -52,20 +57,35 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
+	credentials := []string{"api_key", "site_id"}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, sourceType)
+
+		for _, mode := range modes {
+			if sourceType == "web" && mode == "device" {
+				continue
+			}
+			assert.Equal(t, credentials, registered.ConnectionRequiredKeys(sourceType, mode), sourceType+"/"+mode)
+		}
 	}
+	// web device mode's requirement also depends on sdk_version, which only the
+	// config validators can see.
+	assert.Nil(t, registered.ConnectionRequiredKeys("web", "device"))
 
 	assert.Equal(t, map[string][]string{
 		"auto_track_device_attributes/android":         {"android"},
 		"auto_track_device_attributes/ios":             {"ios"},
 		"background_queue_min_number_of_tasks/android": {"android"},
 		"background_queue_seconds_delay/android":       {"android"},
+		"anonymous_in_app/web":                         {"web"},
 		"data_use_in_app/web":                          {"web"},
+		"sdk_version/web":                              {"web"},
 		"send_page_name_in_sdk/web":                    {"web"},
+		"write_key/web":                                {"web"},
 	}, registered.GatedKeyPaths())
 
 	byAPI, err := registry.GetByAPIType("CUSTOMERIO", 1)
@@ -99,6 +119,217 @@ func TestCustomerioConfigValidation(t *testing.T) {
 			assert.Contains(t, errors[0].Message, "required")
 		})
 	}
+
+	t.Run("web device v2 accepts write key without server credentials", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v2"},
+			"write_key":               map[string]any{"web": "customerio-write-key"},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+		assert.Empty(t, errors)
+	})
+
+	t.Run("web device v2 requires write key block", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v2"},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/write_key")
+	})
+
+	t.Run("web device v2 requires write key value", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v2"},
+			"write_key":               map[string]any{},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/write_key/web")
+	})
+
+	t.Run("web device v1 requires site id", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v1"},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/site_id")
+	})
+
+	t.Run("cloud mode requires api key", func(t *testing.T) {
+		t.Parallel()
+
+		config := minimalConfig()
+		delete(config, "api_key")
+		config["connection_mode"] = map[string]any{"web": "cloud"}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/api_key")
+	})
+
+	t.Run("web device v2 plus another source requires api key", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"site_id":                 "site-id-1",
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v2"},
+			"write_key":               map[string]any{"web": "customerio-write-key"},
+			"connection_mode": map[string]any{
+				"web":     "device",
+				"android": "cloud",
+			},
+		})
+
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/api_key")
+	})
+
+	t.Run("web device v2 plus another source requires site id", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"api_key":                 "api-key-1",
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{"web": "v2"},
+			"write_key":               map[string]any{"web": "customerio-write-key"},
+			"connection_mode": map[string]any{
+				"web": "device",
+				"ios": "device",
+			},
+		})
+
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/site_id")
+	})
+
+	// An explicit empty value survives defaulting and is sent as-is, where
+	// upstream's enum rejects it.
+	t.Run("sdk version rejects unsupported value", func(t *testing.T) {
+		t.Parallel()
+
+		for _, value := range []string{"v3", ""} {
+			config := minimalConfig()
+			config["sdk_version"] = map[string]any{"web": value}
+
+			errors := registered.ValidateConfig(config)
+			require.NotEmpty(t, errors, value)
+			assertValidationPaths(t, errors, "/sdk_version/web")
+		}
+	})
+
+	// schema.json gives writeKey.web no template branch, so a template is judged
+	// as a literal: accepted within the limit, rejected past it.
+	t.Run("write key template gets no length exemption", func(t *testing.T) {
+		t.Parallel()
+
+		config := minimalConfig()
+		config["write_key"] = map[string]any{"web": "{{ config.writeKey || customerio-write-key }}"}
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		config["write_key"] = map[string]any{"web": "{{ config.writeKey || " + strings.Repeat("w", 100) + " }}"}
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/write_key/web")
+	})
+
+	t.Run("write key rejects values over 100 characters", func(t *testing.T) {
+		t.Parallel()
+
+		config := minimalConfig()
+		config["write_key"] = map[string]any{"web": strings.Repeat("w", 101)}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/write_key/web")
+	})
+
+	t.Run("write key rejects line breaks", func(t *testing.T) {
+		t.Parallel()
+
+		config := minimalConfig()
+		config["write_key"] = map[string]any{"web": "bad\nkey"}
+
+		errors := registered.ValidateConfig(config)
+		require.NotEmpty(t, errors)
+		assertValidationPaths(t, errors, "/write_key/web")
+	})
+
+	t.Run("omitted web sdk version defaults to v2", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, map[string]any{
+			"web": "v2",
+		}, registered.ApplyDefaults(map[string]any{
+			"sdk_version": map[string]any{},
+		})["sdk_version"])
+	})
+
+	t.Run("web device with empty sdk version uses v2 requiredness", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"sdk_version":             map[string]any{},
+			"write_key":               map[string]any{"web": "customerio-write-key"},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		assert.Empty(t, errors)
+	})
+
+	// An omitted sdk_version block is sent absent, which upstream's conditionals
+	// and the web SDK both read as v1, despite the v2 schema default.
+	t.Run("web device with omitted sdk version requires site id", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"write_key":               map[string]any{"web": "customerio-write-key"},
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/site_id", errors[0].Path)
+	})
+
+	t.Run("web device with omitted sdk version needs no write key", func(t *testing.T) {
+		t.Parallel()
+
+		errors := registered.ValidateConfig(map[string]any{
+			"site_id":                 "site-id-1",
+			"datacenter":              "US",
+			"user_id_identifier_type": "id",
+			"connection_mode":         map[string]any{"web": "device"},
+		})
+
+		assert.Empty(t, errors)
+	})
 
 	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
@@ -331,6 +562,9 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"api_key": "api-key-1",
 				"device_token_event_name": "Device Token Registered",
 				"datacenter": "EU",
+				"sdk_version": {"web": "v2"},
+				"write_key": {"web": "customerio-write-key"},
+				"anonymous_in_app": {"web": true},
 				"send_page_name_in_sdk": {"web": true},
 				"data_use_in_app": {"web": false},
 				"auto_track_device_attributes": {"android": true, "ios": true},
@@ -342,6 +576,9 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				"apiKey": "api-key-1",
 				"deviceTokenEventName": "Device Token Registered",
 				"datacenter": "EU",
+				"sdkVersion": {"web": "v2"},
+				"writeKey": {"web": "customerio-write-key"},
+				"anonymousInApp": {"web": true},
 				"sendPageNameInSDK": {"web": true},
 				"dataUseInApp": {"web": false},
 				"autoTrackDeviceAttributes": {"android": true, "ios": true},
@@ -404,6 +641,7 @@ func TestCustomerioConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
@@ -499,9 +737,10 @@ func registeredCustomerioDefinition(t *testing.T) *definitions.RegisteredDefinit
 
 func minimalConfig() map[string]any {
 	return map[string]any{
-		"site_id":    "site-id-1",
-		"api_key":    "api-key-1",
-		"datacenter": "US",
+		"site_id":                 "site-id-1",
+		"api_key":                 "api-key-1",
+		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 	}
 }
 
@@ -511,6 +750,11 @@ func fullConfig() map[string]any {
 		"api_key":                              "api-key-1",
 		"device_token_event_name":              "Device Token Registered",
 		"datacenter":                           "EU",
+		"user_id_identifier_type":              "email",
+		"connection_mode":                      map[string]any{"web": "cloud"},
+		"sdk_version":                          map[string]any{"web": "v2"},
+		"write_key":                            map[string]any{"web": "customerio-write-key"},
+		"anonymous_in_app":                     map[string]any{"web": true},
 		"send_page_name_in_sdk":                map[string]any{"web": true},
 		"data_use_in_app":                      map[string]any{"web": false},
 		"auto_track_device_attributes":         map[string]any{"android": true, "ios": true},
@@ -542,9 +786,13 @@ func exampleConfig() map[string]any {
 		"site_id":                 "cio-site-id",
 		"api_key":                 "cio-api-key",
 		"datacenter":              "US",
+		"user_id_identifier_type": "id",
 		"device_token_event_name": "Device Token Registered",
+		"sdk_version":             map[string]any{"web": "v1"},
 		"send_page_name_in_sdk":   map[string]any{"web": true},
-		"data_use_in_app":         map[string]any{"web": false},
+		// data_use_in_app is a v1 SDK setting; upstream currently accepts it on v2,
+		// so this remains documentation rather than a stricter CLI validation rule.
+		"data_use_in_app": map[string]any{"web": false},
 		"auto_track_device_attributes": map[string]any{
 			"android": true,
 			"ios":     true,
@@ -627,9 +875,12 @@ func TestCustomerioAPIVersionKeys(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(base(map[string]any{"api_version": "v1"})))
 	})
 
-	t.Run("both keys are optional when api_version is unset", func(t *testing.T) {
+	t.Run("omitted api_version defaults to v2", func(t *testing.T) {
 		t.Parallel()
-		assert.Empty(t, registered.ValidateConfig(base(nil)))
+		errors := registered.ValidateConfig(base(nil))
+
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/user_id_identifier_type", errors[0].Path)
 	})
 
 	t.Run("invalid enum values rejected", func(t *testing.T) {

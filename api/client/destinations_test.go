@@ -105,6 +105,39 @@ func TestClientDestinationsList(t *testing.T) {
 	httpClient.AssertNumberOfCalls()
 }
 
+func TestClientDestinationsListWithHasExternalID(t *testing.T) {
+	ctx := context.Background()
+
+	httpClient := testutils.NewMockHTTPClient(t,
+		testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return assert.Equal(t, "https://api.rudderstack.com/v2/destinations?hasExternalId=true", req.URL.String())
+			},
+			ResponseStatus: 200,
+			ResponseBody:   `{"destinations":[],"paging":{"total":0}}`,
+		},
+		// GetAll must thread the option through to the same query string.
+		testutils.Call{
+			Validate: func(req *http.Request) bool {
+				return assert.Equal(t, "https://api.rudderstack.com/v2/destinations?hasExternalId=false", req.URL.String())
+			},
+			ResponseStatus: 200,
+			ResponseBody:   `{"destinations":[],"paging":{"total":0}}`,
+		},
+	)
+
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	_, err = c.Destinations.List(ctx, client.WithDestinationsHasExternalID(true))
+	require.NoError(t, err)
+
+	_, err = c.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(false))
+	require.NoError(t, err)
+
+	httpClient.AssertNumberOfCalls()
+}
+
 func TestClientDestinationsGet(t *testing.T) {
 	ctx := context.Background()
 

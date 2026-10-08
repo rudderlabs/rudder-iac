@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	esConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/connection"
 	esSource "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
+	retlConnection "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -57,7 +58,7 @@ func validateConnectionsSemantic(
 	spec esConnection.ConnectionsSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
-	edges := projectConnectionEdges(graph)
+	edges := ProjectConnectionEdges(graph)
 
 	var results []rules.ValidationResult
 	for index, c := range spec.Connections {
@@ -65,7 +66,11 @@ func validateConnectionsSemantic(
 
 		results = append(results, validateEndpointsExist(index, endpoints)...)
 		if endpoints.sourceRefOK && endpoints.destinationRefOK {
-			results = append(results, validatePairUniqueness(edges, index, endpoints)...)
+			pair := ConnectionEdge{
+				SourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
+				DestinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
+			}
+			results = append(results, ValidatePairUniqueness(edges, pair, connectionRef(index))...)
 		}
 		// Sharing a destination is only meaningful for a destination that
 		// exists; a dangling ref already carries the V-C1 error above.
@@ -172,16 +177,12 @@ func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.Va
 	return results
 }
 
-// validatePairUniqueness (V-C3): the same source–destination pair can only be
-// connected once in the project. The count runs over every project
-// connection, so duplicates are flagged whether they sit in this spec or in
-// another one.
-func validatePairUniqueness(edges []connectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
-	pair := connectionEdge{
-		sourceURN:      resources.URN(endpoints.sourceID, esSource.ResourceType),
-		destinationURN: resources.URN(endpoints.destinationID, destination.DestinationResourceType),
-	}
-
+// ValidatePairUniqueness (V-C3): the same source–destination pair can only be
+// connected once in the project. The count runs over every project connection
+// of either family, so duplicates are flagged whether they sit in this spec or
+// in another one. Shared with the rETL connection rules so both families word
+// the failure identically; reference is where the caller reports it.
+func ValidatePairUniqueness(edges []ConnectionEdge, pair ConnectionEdge, reference string) []rules.ValidationResult {
 	count := 0
 	for _, e := range edges {
 		if e == pair {
@@ -192,29 +193,33 @@ func validatePairUniqueness(edges []connectionEdge, index int, endpoints connect
 		return nil
 	}
 
+	_, sourceID, _ := strings.Cut(pair.SourceURN, ":")
+	_, destinationID, _ := strings.Cut(pair.DestinationURN, ":")
 	return []rules.ValidationResult{{
-		Reference: connectionRef(index),
+		Reference: reference,
 		Message: fmt.Sprintf(
 			"source '%s' and destination '%s' are connected more than once in the project; a source-destination pair can only be connected once",
-			endpoints.sourceID, endpoints.destinationID,
+			sourceID, destinationID,
 		),
 	}}
 }
 
 // validateDestinationHasOnlyEventStreamSources (V-E1): an event stream source
 // cannot share a destination with a rETL source — every project connection to
-// this destination must come from an event stream source. This is enforced
-// only in the webapp today, so the CLI is the last line of defense.
-func validateDestinationHasOnlyEventStreamSources(edges []connectionEdge, index int, destinationID string) []rules.ValidationResult {
+// this destination must come from an event stream source. The edge scan covers
+// both connection families, so the clash is reported here as well as from the
+// rETL side. This is enforced only in the webapp today, so the CLI is the last
+// line of defense.
+func validateDestinationHasOnlyEventStreamSources(edges []ConnectionEdge, index int, destinationID string) []rules.ValidationResult {
 	destinationURN := resources.URN(destinationID, destination.DestinationResourceType)
 	sourcePrefix := esSource.ResourceType + ":"
 
 	var results []rules.ValidationResult
 	for _, e := range edges {
-		if e.destinationURN != destinationURN || strings.HasPrefix(e.sourceURN, sourcePrefix) {
+		if e.DestinationURN != destinationURN || strings.HasPrefix(e.SourceURN, sourcePrefix) {
 			continue
 		}
-		_, foreignID, _ := strings.Cut(e.sourceURN, ":")
+		_, foreignID, _ := strings.Cut(e.SourceURN, ":")
 		results = append(results, rules.ValidationResult{
 			Reference: destinationRef(index),
 			Message: fmt.Sprintf(
@@ -273,37 +278,57 @@ func validateSourceTypeCompatibility(
 		}}
 	}
 
-	var results []rules.ValidationResult
-	missing := missingRequiredConfigKeys(registered, token, destinationData.Config)
-	if len(missing) > 0 {
-		results = append(results, rules.ValidationResult{
-			Reference: destinationRef(index),
-			Message: fmt.Sprintf(
-				"destination '%s' config is missing fields required to connect a '%s' source: %s",
-				endpoints.destinationID, token, strings.Join(missing, ", "),
-			),
-		})
-	}
-
-	return append(results, validateSourceTypeSettings(registered, index, endpoints, token, destinationData.Config)...)
+	return ValidateDestinationConfig(registered, destinationRef(index), endpoints.destinationID, token, destinationData.Config)
 }
 
-// validateSourceTypeSettings (V-C8): a destination declares its per-source
-// connection settings in connection_mode, so connecting a source needs an entry
-// for its type there when that config block is available.
-func validateSourceTypeSettings(
+// ValidateDestinationConfig runs the two destination config checks connecting a
+// source of sourceType depends on: the fields the definition requires for it
+// (V-C5) and an entry for it in a settings block (V-C8). Shared with the rETL
+// connection rules so both families demand the same config and word the
+// failures identically; reference is where the caller reports them.
+func ValidateDestinationConfig(
 	registered *definitions.RegisteredDefinition,
-	index int,
-	endpoints connectionEndpoints,
+	reference string,
+	destinationID string,
 	sourceType string,
 	config map[string]any,
 ) []rules.ValidationResult {
+	var results []rules.ValidationResult
+	if missing := missingRequiredConfigKeys(registered, sourceType, config); len(missing) > 0 {
+		results = append(results, rules.ValidationResult{
+			Reference: reference,
+			Message: fmt.Sprintf(
+				"destination '%s' config is missing fields required to connect a '%s' source: %s",
+				destinationID, sourceType, strings.Join(missing, ", "),
+			),
+		})
+	}
+	if candidates := settingsBlocksMissingSourceType(registered, sourceType, config); len(candidates) > 0 {
+		results = append(results, rules.ValidationResult{
+			Reference: reference,
+			Message: fmt.Sprintf(
+				"destination '%s' config has no '%s' entry for source type '%s'",
+				destinationID, strings.Join(candidates, "' or '"), sourceType,
+			),
+		})
+	}
+	return results
+}
+
+// settingsBlocksMissingSourceType (V-C8): a destination declares its per-source
+// connection settings in blocks keyed by source type — connection_mode today —
+// so connecting a source needs an entry for its type in one of them. It returns
+// the blocks that could hold the entry but do not, so the caller's error names
+// only the ones the author can actually write to; an empty result means there
+// is nothing to report.
+func settingsBlocksMissingSourceType(
+	registered *definitions.RegisteredDefinition,
+	sourceType string,
+	config map[string]any,
+) []string {
 	required := connectTimeRequiredKeys(registered, sourceType, config)
 
-	// Blocks that could hold the entry but do not, so the error names only the
-	// ones the author can actually write to.
 	var candidates []string
-
 	for _, key := range registered.SourceTypeConfigKeys() {
 		// Asking for an entry the config model would reject as an unknown
 		// field leaves an error nobody can clear.
@@ -333,23 +358,14 @@ func validateSourceTypeSettings(
 		candidates = append(candidates, key)
 	}
 
-	// No block can name this source type, so there is nowhere for the author
-	// to write the entry an error would ask for.
-	if len(candidates) == 0 {
-		return nil
-	}
-
-	return []rules.ValidationResult{{
-		Reference: destinationRef(index),
-		Message: fmt.Sprintf(
-			"destination '%s' config has no '%s' entry for source type '%s'",
-			endpoints.destinationID, strings.Join(candidates, "' or '"), sourceType,
-		),
-	}}
+	// An empty result also covers the case where no block can name this source
+	// type, so there is nowhere for the author to write the entry an error
+	// would ask for.
+	return candidates
 }
 
-// missingRequiredConfigKeys returns the definition-required config keys for
-// the given source type that the destination's config does not carry.
+// missingRequiredConfigKeys (V-C5) returns the definition-required config keys
+// for the given source type that the destination's config does not carry.
 func missingRequiredConfigKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -393,34 +409,44 @@ func connectTimeRequiredKeys(
 	return registered.ConnectionRequiredKeys(sourceType, mode)
 }
 
-// connectionEdge is one project connection reduced to its endpoint URNs.
-type connectionEdge struct {
-	sourceURN      string
-	destinationURN string
+// ConnectionEdge is one project connection reduced to its endpoint URNs.
+type ConnectionEdge struct {
+	SourceURN      string
+	DestinationURN string
 }
 
-// projectConnectionEdges reduces every event stream connection in the graph
-// to its endpoint URN pair for the topology checks (V-C3, V-E1). Event
-// stream connections are the only project-managed connections today; when
-// the retl-connections kind lands, its validations must fold its connections
-// into these checks. Known limitation: only project-managed connections are
-// visible — a connection that exists remotely but is not in the project is
-// invisible at validate time.
+// connectionResourceTypes are the project-managed connection kinds the
+// topology scan folds together. Both publish their endpoints under the same
+// graph keys — retl/connection/model.go repeats the event stream names
+// deliberately for this — so one read shape covers both families.
+var connectionResourceTypes = []string{
+	esConnection.EventStreamConnectionResourceType,
+	retlConnection.ResourceType,
+}
+
+// ProjectConnectionEdges reduces every project-managed connection in the graph,
+// event stream and rETL alike, to its endpoint URN pair for the topology checks
+// (V-C3, V-E1, V-R1). Folding both families into one scan is what lets a
+// cross-family clash be diagnosed from whichever side declares it. Known
+// limitation: only project-managed connections are visible — a connection that
+// exists remotely but is not in the project is invisible at validate time.
 //
 // Edges stay a slice with one entry per declared connection rather than a
 // count keyed by pair: V-E1 must fire once for every place the offending
 // edge is written in the YAML, so the author sees an error against each
 // declaration they have to fix.
-func projectConnectionEdges(graph *resources.Graph) []connectionEdge {
-	var edges []connectionEdge
-	for _, res := range graph.ResourcesByType(esConnection.EventStreamConnectionResourceType) {
-		data := res.Data()
-		src, srcOK := data[esConnection.SourceKey].(*resources.PropertyRef)
-		dst, dstOK := data[esConnection.DestinationKey].(*resources.PropertyRef)
-		if !srcOK || !dstOK {
-			continue
+func ProjectConnectionEdges(graph *resources.Graph) []ConnectionEdge {
+	var edges []ConnectionEdge
+	for _, resourceType := range connectionResourceTypes {
+		for _, res := range graph.ResourcesByType(resourceType) {
+			data := res.Data()
+			src, srcOK := data[esConnection.SourceKey].(*resources.PropertyRef)
+			dst, dstOK := data[esConnection.DestinationKey].(*resources.PropertyRef)
+			if !srcOK || !dstOK {
+				continue
+			}
+			edges = append(edges, ConnectionEdge{SourceURN: src.URN, DestinationURN: dst.URN})
 		}
-		edges = append(edges, connectionEdge{sourceURN: src.URN, destinationURN: dst.URN})
 	}
 	return edges
 }

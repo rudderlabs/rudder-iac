@@ -2,6 +2,7 @@ package connection
 
 import (
 	"context"
+	"github.com/samber/lo"
 
 	apiClient "github.com/rudderlabs/rudder-iac/api/client"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
@@ -48,12 +49,30 @@ func (m *MockConnectionClient) CreateConnection(_ context.Context, req *retlClie
 	if m.CreateFunc != nil {
 		return m.CreateFunc(req)
 	}
+	return echoCreated("conn-remote-1", req), nil
+}
+
+// echoCreated is the connection the API returns for a create: the request's
+// config echoed back under a server id. Create reads it back through
+// configFromRemote, so a bare id-only response would look unrepresentable.
+func echoCreated(id string, req *retlClient.CreateRETLConnectionRequest) *retlClient.RETLConnection {
 	return &retlClient.RETLConnection{
-		ID:            "conn-remote-1",
-		SourceID:      req.SourceID,
-		DestinationID: req.DestinationID,
-		ExternalID:    req.ExternalID,
-	}, nil
+		ID:                id,
+		SourceID:          req.SourceID,
+		DestinationID:     req.DestinationID,
+		ExternalID:        req.ExternalID,
+		Enabled:           lo.FromPtr(req.Enabled),
+		Schedule:          req.Schedule,
+		SyncSettings:      req.SyncSettings,
+		SyncBehaviour:     lo.FromPtr(req.SyncBehaviour),
+		Identifiers:       req.Identifiers,
+		Mappings:          req.Mappings,
+		Event:             req.Event,
+		Constants:         req.Constants,
+		CursorColumn:      req.CursorColumn,
+		Object:            req.Object,
+		DestinationConfig: req.DestinationConfig,
+	}
 }
 
 func (m *MockConnectionClient) UpdateConnection(_ context.Context, id string, req *retlClient.UpdateRETLConnectionRequest) (*retlClient.RETLConnection, error) {

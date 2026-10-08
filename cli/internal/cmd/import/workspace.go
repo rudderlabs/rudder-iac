@@ -79,12 +79,9 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				telemetry.TrackCommand("import workspace", err)
 			}()
 
-			spinner := ui.NewSpinner("Importing ...")
-			spinner.Start()
-
+			ui.StartSpinner("Importing ...")
 			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
-
-			spinner.Stop()
+			ui.StopSpinner()
 			if err == nil {
 				// Continuation lines are indented to align under the text after "Warning: ".
 				ui.PrintWarning(`Secrets are not imported from the remote workspace.

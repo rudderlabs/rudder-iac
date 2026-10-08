@@ -21,6 +21,9 @@
       "androidKotlin": "cloud",
       "reactnative": "cloud"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "autocapture": {
       "web": false
     },

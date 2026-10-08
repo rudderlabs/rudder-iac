@@ -12,19 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The mapping targets config-backend reserves for identifiers, per flow —
-// connection-config/constants.ts and assembler.ts. The JSON mapper reserves
-// IDENTIFIER_TARGETS, exactly [user_id, anonymous_id], and treats
-// context.externalId[0].id as an ordinary target. Object mapping reserves the
-// two targets it synthesises from the single identifier, user_id and
-// SYSTEM_CONSTANTS.id, and never writes an anonymous_id mapping at all — so a
-// user mapping aimed at anonymous_id round-trips fine there.
-const (
-	userIDTarget      = "user_id"
-	anonymousIDTarget = "anonymous_id"
-	externalIDTarget  = "context.externalId[0].id"
-)
-
 // graphData builds the resource entry the syncer hands the lifecycle: endpoint
 // refs already dereferenced to remote ids, plus the canonical config map.
 func graphData(t *testing.T, config ConfigSpec) resources.ResourceData {
@@ -60,7 +47,7 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 
 	if request.Object == "" {
 		for _, mapping := range slices.Concat(request.Identifiers, request.Mappings) {
-			if mapping.To == userIDTarget || mapping.To == anonymousIDTarget {
+			if mapping.To == UserIDTarget || mapping.To == AnonymousIDTarget {
 				conn.Identifiers = append(conn.Identifiers, mapping)
 				continue
 			}
@@ -78,12 +65,12 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 	// back out of the system constants. Constants and event never surface.
 	identifier := request.Identifiers[0]
 	stored := append([]retlClient.Mapping{
-		{From: identifier.From, To: userIDTarget},
-		{From: identifier.From, To: externalIDTarget},
+		{From: identifier.From, To: UserIDTarget},
+		{From: identifier.From, To: ExternalIDTarget},
 	}, request.Mappings...)
 
 	for _, mapping := range stored {
-		if mapping.To == userIDTarget || mapping.To == externalIDTarget {
+		if mapping.To == UserIDTarget || mapping.To == ExternalIDTarget {
 			continue
 		}
 		conn.Mappings = append(conn.Mappings, mapping)
@@ -531,7 +518,7 @@ func representableConnection() *retlClient.RETLConnection {
 		ID:            "conn-1",
 		SyncBehaviour: retlClient.SyncBehaviourUpsert,
 		Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
-		Identifiers:   []retlClient.Mapping{{From: "id", To: userIDTarget}},
+		Identifiers:   []retlClient.Mapping{{From: "id", To: UserIDTarget}},
 		Mappings:      []retlClient.Mapping{{From: "email", To: "traits.email"}},
 		SyncSettings:  mergedSyncSettings(nil),
 	}
@@ -663,21 +650,21 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := jsonMapperConfig()
-		config.Mappings = []MappingSpec{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}
+		config.Mappings = []MappingSpec{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The request carries the user's entries untouched: the reclassification
 		// below is the backend's doing, not ours.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
 
 		reclassified := jsonMapperConfig()
-		reclassified.Identifiers = []MappingSpec{{From: "id", To: userIDTarget}, {From: "device", To: anonymousIDTarget}}
+		reclassified.Identifiers = []MappingSpec{{From: "id", To: UserIDTarget}, {From: "device", To: AnonymousIDTarget}}
 		assert.Equal(t, reclassified, remote)
 		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
@@ -686,15 +673,15 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := objectMappingConfig()
-		config.Mappings = []MappingSpec{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}
+		config.Mappings = []MappingSpec{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The entry aimed at the reserved target is still in the request; only
 		// the backend consumes it as a synthetic identifier.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)

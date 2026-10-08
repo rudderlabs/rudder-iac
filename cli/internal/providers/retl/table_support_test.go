@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -130,6 +131,10 @@ func TestTableSupportDisabled(t *testing.T) {
 		_, err = p.Create(context.Background(), "users-table", table.ResourceType, resources.ResourceData{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
+
+		_, err = p.Preview(context.Background(), "users-table", table.ResourceType, resources.ResourceData{}, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
 	})
 
 	t.Run("never lists table sources", func(t *testing.T) {
@@ -206,6 +211,20 @@ func TestTableSupportEnabled(t *testing.T) {
 		require.Len(t, matchers, 2)
 		assert.Equal(t, sqlmodel.ResourceType, matchers[0].ResourceType)
 		assert.Equal(t, table.ResourceType, matchers[1].ResourceType)
+	})
+
+	// import --merge matches in this order, and a connection resolves its
+	// endpoints through source matches. retlOptions happens to pass the
+	// connection option first; the order must not depend on that.
+	t.Run("orders the connection matcher after every source matcher", func(t *testing.T) {
+		t.Parallel()
+		want := []string{sqlmodel.ResourceType, table.ResourceType, connection.ResourceType}
+
+		connectionFirst := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(nil), retl.WithTableSupport())
+		tableFirst := retl.New(newDefaultMockClient(), retl.WithTableSupport(), retl.WithConnectionSupport(nil))
+
+		assert.Equal(t, want, matcherTypes(connectionFirst.ResourceMatchers()))
+		assert.Equal(t, want, matcherTypes(tableFirst.ResourceMatchers()))
 	})
 
 	t.Run("loads table specs into the resource graph", func(t *testing.T) {
@@ -299,5 +318,34 @@ func TestTableSupportEnabled(t *testing.T) {
 			ExternalID:           "users-table",
 		}, got)
 		assert.Equal(t, "src-new", (*output)[sqlmodel.IDKey])
+	})
+
+	// What this pins that the handler-level tests cannot: that Provider.Preview
+	// forwards its limit rather than dropping or hardcoding it. preview_test.go
+	// calls the handler directly, so a Provider.Preview that passed a literal
+	// would still pass there. The handler-map dispatch itself is covered by the
+	// create subtest above, which reads the same p.handlers map.
+	t.Run("previews table sources through the preview API", func(t *testing.T) {
+		t.Parallel()
+		client := newDefaultMockClient()
+		var got *retlClient.PreviewSubmitRequest
+		client.submitPreviewFunc = func(_ context.Context, req *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			got = req
+			return &retlClient.PreviewSubmitResponse{ID: "req-1"}, nil
+		}
+		p := retl.New(client, retl.WithTableSupport())
+		require.NoError(t, p.LoadSpec("users.yaml", tableSpec()))
+		graph, err := p.ResourceGraph()
+		require.NoError(t, err)
+		r, ok := graph.GetResource("retl-source-table:users-table")
+		require.True(t, ok)
+
+		// Non-zero on purpose: with 0 the expected request carries Limit at its
+		// zero value, which is exactly what a Provider.Preview that dropped the
+		// limit would also produce.
+		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 5)
+
+		require.NoError(t, err)
+		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 5`, Limit: 5}, got)
 	})
 }

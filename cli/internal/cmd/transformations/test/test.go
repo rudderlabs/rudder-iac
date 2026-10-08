@@ -39,6 +39,7 @@ func NewCmdTest() *cobra.Command {
 		verbose  bool
 		output   string
 		force    bool
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -67,6 +68,9 @@ func NewCmdTest() *cobra.Command {
 			# Test from a specific project directory
 			$ rudder-cli transformations test --all -l ./my-project
 
+			# Test with variables from a file
+			$ rudder-cli transformations test --all --var-file prod.vars.yaml
+
 			# Write results to a custom file path
 			$ rudder-cli transformations test --all -o /tmp/results.json
 
@@ -86,8 +90,12 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			// Create project
-			p = deps.NewProject()
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
+			p = deps.NewProject(projectOpts...)
 
 			// Load and validate the project configuration
 			if err := p.Load(location); err != nil {
@@ -138,13 +146,10 @@ func NewCmdTest() *cobra.Command {
 				targetID = args[0]
 			}
 
-			spinner := ui.NewSpinner("Running tests...")
-			spinner.Start()
-
+			ui.StartSpinner("Running tests...")
 			runner := testorchestrator.NewRunner(deps.Client(), trProvider, graph, workspace.ID)
 			results, err := runner.Run(ctx, mode, targetID)
-
-			spinner.Stop()
+			ui.StopSpinner()
 
 			if err != nil {
 				return fmt.Errorf("running tests: %w", err)
@@ -177,6 +182,7 @@ func NewCmdTest() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")

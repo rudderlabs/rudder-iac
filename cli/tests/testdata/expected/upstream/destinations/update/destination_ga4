@@ -28,6 +28,13 @@
       "android": "device",
       "unity": "cloud"
     },
+    "useNativeSDK": {
+      "web": true,
+      "android": true
+    },
+    "useNativeSDKToSend": {
+      "web": true
+    },
     "capturePageView": {
       "web": "gtag"
     },

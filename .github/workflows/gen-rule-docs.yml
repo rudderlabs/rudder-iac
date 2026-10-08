@@ -46,10 +46,13 @@ jobs:
         run: make gen-rule-docs
         env:
           RUDDERSTACK_CLI_EXPERIMENTAL: ${{ vars.RUDDERSTACK_CLI_EXPERIMENTAL || 'true' }}
-          # The catalog documents experimental rETL kinds, so their flags are on
-          # here too. Set explicitly rather than inherited from the make target's
-          # defaults, so the dependency is visible to whoever edits this file.
+          # The catalog documents the experimental rETL kinds, whose rules
+          # ship with authored fragments, so their flags are on here too. Set
+          # explicitly rather than inherited from the make target's defaults or
+          # a repo variable: the setting belongs to the workflow that depends
+          # on it.
           RUDDERSTACK_X_RETL_TABLE_SUPPORT: 'true'
+          RUDDERSTACK_X_RETL_CONNECTION_SUPPORT: 'true'
 
       - name: upload rule catalog
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

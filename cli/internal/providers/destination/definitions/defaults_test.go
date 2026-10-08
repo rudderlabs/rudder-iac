@@ -305,3 +305,32 @@ func TestRegisterAllowsDefaultOnConditionallyRequiredField(t *testing.T) {
 
 	assert.Equal(t, map[string]any{"mode": "cloud"}, registered.ConfigDefaults())
 }
+
+func TestValidateConfigDefaultSatisfiesConditionalRequirement(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any {
+		return &struct {
+			UseIAM        *bool `mapstructure:"use_iam"`
+			UseServerless *bool `mapstructure:"use_serverless" validate:"required_if=UseIAM true" default:"false"`
+		}{}
+	})
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{"use_iam": true}))
+}
+
+func TestValidateConfigDefaultTriggersConditionalRequirement(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any {
+		return &struct {
+			RoleBasedAuth *bool  `mapstructure:"role_based_auth" default:"true"`
+			IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true"`
+		}{}
+	})
+
+	assert.Equal(t, []ConfigError{{
+		Path:    "/iam_role_arn",
+		Message: "'iam_role_arn' is required when 'role_based_auth' is true",
+	}}, registered.ValidateConfig(map[string]any{}))
+}

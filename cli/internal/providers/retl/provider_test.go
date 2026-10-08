@@ -1209,6 +1209,8 @@ func TestProviderWithoutConnectionSupport(t *testing.T) {
 	want = append(want, prules.LegacyVersionPatterns(sqlmodel.ResourceKind)...)
 	want = append(want, prules.V1VersionPatterns(sqlmodel.ResourceKind)...)
 	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+	assert.Equal(t, []string{"retl/sqlmodel/spec-syntax-valid"}, ruleIDs(p.SyntacticRules()))
+	assert.Equal(t, []string{"retl/sqlmodel/semantic-valid"}, ruleIDs(p.SemanticRules()))
 
 	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
 }
@@ -1227,6 +1229,16 @@ func TestProviderWithConnectionSupport(t *testing.T) {
 	want = append(want, prules.V1VersionPatterns(sqlmodel.ResourceKind)...)
 	want = append(want, prules.V1VersionPatterns(connection.ResourceKind)...)
 	assert.ElementsMatch(t, want, p.SupportedMatchPatterns())
+	assert.Equal(t, []string{
+		"retl/sqlmodel/spec-syntax-valid",
+		"retl/connection/spec-syntax-valid",
+		"retl/connection/cron-expression-valid",
+	}, ruleIDs(p.SyntacticRules()))
+	assert.Equal(t, []string{
+		"retl/sqlmodel/semantic-valid",
+		"retl/connection/semantic-valid",
+		"retl/connection/enabled-endpoints-valid",
+	}, ruleIDs(p.SemanticRules()))
 
 	require.NoError(t, p.LoadSpec("connections.yaml", connectionsSpec()))
 	require.NoError(t, p.LoadImportManifest(&specs.WorkspaceImportMetadata{

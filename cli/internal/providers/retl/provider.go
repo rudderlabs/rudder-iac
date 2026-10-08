@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/samber/lo"
+
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
@@ -26,6 +28,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 
+	connectionRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/connection"
 	sqlmodelRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/sqlmodel"
 	tableRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/rules/table"
 )
@@ -38,8 +41,11 @@ type Provider struct {
 	kindToType     map[string]string
 	syntacticRules []rules.Rule
 	matchers       []importmatcher.Matcher
-	// destinationRegistry is parked for DEX-829's connection semantic rules;
-	// nothing reads it yet. It is nil unless WithConnectionSupport was applied.
+	// connectionMatcher is held back and appended by New after every option,
+	// so it trails all source matchers whatever order the options come in.
+	connectionMatcher *importmatcher.Matcher
+	// destinationRegistry is nil unless WithConnectionSupport was applied; the
+	// connection semantic rules read it.
 	destinationRegistry *definitions.Registry
 }
 
@@ -48,13 +54,18 @@ const importDir = "retl"
 // Option configures the provider at construction.
 type Option func(*Provider)
 
-// WithConnectionSupport registers the rETL connection kind and its handler.
+// WithConnectionSupport registers the rETL connection kind: its spec kind,
+// resource type and handler, whose presence also enables its validation rules
+// and import --merge matcher. Without it the provider keeps exactly the
+// SQL-model surface it had, and the authored connection fragments stay out of
+// the generated catalog.
 //
 // A nil registry is replaced with an empty one: registry.Get indexes a map on
 // its receiver, so nil constructs fine and only panics later, mid remote load.
 //
-// The matcher is appended, so it trails the SQL model matcher New seeds and its
-// endpoint lookups can rely on source matches being recorded already.
+// Its matcher resolves endpoints through source matches, so New appends it
+// after every option rather than here — a source kind registered by a later
+// option would otherwise match after it and leave its connections unmatched.
 func WithConnectionSupport(registry *definitions.Registry) Option {
 	return func(p *Provider) {
 		if registry == nil {
@@ -63,7 +74,12 @@ func WithConnectionSupport(registry *definitions.Registry) Option {
 		p.destinationRegistry = registry
 		p.kindToType[connection.ResourceKind] = connection.ResourceType
 		p.handlers[connection.ResourceType] = connection.NewHandler(p.client, importDir, registry)
-		p.matchers = append(p.matchers, connection.Matcher())
+		p.syntacticRules = append(p.syntacticRules,
+			connectionRules.NewConnectionSpecSyntaxValidRule(),
+			connectionRules.NewConnectionCronExpressionValidRule(),
+		)
+		m := connection.Matcher()
+		p.connectionMatcher = &m
 	}
 }
 
@@ -99,6 +115,12 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 
 	for _, opt := range opts {
 		opt(p)
+	}
+	if p.connectionMatcher != nil {
+		p.matchers = append(p.matchers, *p.connectionMatcher)
+	}
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.EnableSourceKinds(lo.Keys(p.handlers)...)
 	}
 	return p
 }
@@ -206,14 +228,21 @@ func (p *Provider) SyntacticRules() []rules.Rule {
 	return p.syntacticRules
 }
 
-// SemanticRules registers the table rule only with the table kind, so with the
-// flag off validation is exactly what it was before the kind existed.
+// SemanticRules registers the table and connection rules only with their kinds,
+// so with the flags off validation is exactly what it was before those kinds
+// existed — and their authored fragments stay out of the generated catalog.
 func (p *Provider) SemanticRules() []rules.Rule {
 	semantic := []rules.Rule{
 		sqlmodelRules.NewSQLModelSemanticValidRule(),
 	}
 	if _, ok := p.handlers[table.ResourceType]; ok {
 		semantic = append(semantic, tableRules.NewTableSemanticValidRule())
+	}
+	if _, ok := p.handlers[connection.ResourceType]; ok {
+		semantic = append(semantic,
+			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewConnectionEnabledEndpointsRule(),
+		)
 	}
 	return semantic
 }

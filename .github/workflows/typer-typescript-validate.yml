@@ -5,18 +5,18 @@ on:
       - main
       - "release/*"
     paths:
-      - "cli/internal/typer/generator/platforms/typescript/**"
-      - "cli/internal/typer/generator/core/**"
-      - "cli/internal/typer/plan/**"
+      - "typer/generator/platforms/typescript/**"
+      - "typer/generator/core/**"
+      - "typer/plan/**"
       - "Makefile"
       - ".github/workflows/typer-typescript-validate.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "cli/internal/typer/generator/platforms/typescript/**"
-      - "cli/internal/typer/generator/core/**"
-      - "cli/internal/typer/plan/**"
+      - "typer/generator/platforms/typescript/**"
+      - "typer/generator/core/**"
+      - "typer/plan/**"
       - "Makefile"
       - ".github/workflows/typer-typescript-validate.yml"
 
@@ -52,7 +52,7 @@ jobs:
 
       - name: assert golden file is unchanged
         run: |
-          if ! git diff --exit-code cli/internal/typer/generator/platforms/typescript/testdata/RudderTyper.ts; then
+          if ! git diff --exit-code typer/generator/platforms/typescript/testdata/RudderTyper.ts; then
             echo "::error::Golden file is out of date. Run 'make typer-typescript-update-testdata' locally and commit the changes."
             exit 1
           fi

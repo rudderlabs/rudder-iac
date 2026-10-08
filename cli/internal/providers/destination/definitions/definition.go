@@ -74,7 +74,10 @@ type RegisteredDefinition struct {
 	configDefaults map[string]any
 }
 
+// ValidateConfig validates config with its defaults applied, since that is what
+// apply sends: a default can satisfy a conditional requirement or trigger one.
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
+	config = d.ApplyDefaults(config)
 	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
 	return append(errors, d.validateConnectionMode(config)...)

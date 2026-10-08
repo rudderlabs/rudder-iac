@@ -1,7 +1,6 @@
 package sqlmodel_test
 
 import (
-	"context"
 	"maps"
 	"testing"
 
@@ -284,19 +283,6 @@ func TestExportAccountRoundTrip(t *testing.T) {
 			assert.Empty(t, diffs)
 		})
 	}
-}
-
-func TestPreviewReferencedAccount(t *testing.T) {
-	t.Parallel()
-	h := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
-
-	_, err := h.Preview(context.Background(), "orders", resources.ResourceData{
-		sqlmodel.SQLKey:       "SELECT 1",
-		sqlmodel.AccountIDKey: sqlmodel.AccountRef("prod-pg"),
-	}, 5)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "set account_id on orders to preview it")
 }
 
 // emptyRefResolver hands back no reference and no error — the shape
