@@ -56,7 +56,7 @@ func NewCmdRetlSource() *cobra.Command {
 			retlSourceImportLog.Debug("importing remote RETL SQL Model to local configuration")
 
 			defer func() {
-				telemetry.TrackCommand("import retl-sources", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "localID", V: localID},
 					{K: "remoteID", V: remoteID},
 					{K: "location", V: location},

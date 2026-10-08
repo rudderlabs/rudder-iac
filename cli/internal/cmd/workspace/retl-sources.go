@@ -25,12 +25,11 @@ func newCmdListRetlSources() *cobra.Command {
 		Use:   "list",
 		Short: "List RETL sources in the workspace",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 
-			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace retl-sources list", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 				}...)
 			}()

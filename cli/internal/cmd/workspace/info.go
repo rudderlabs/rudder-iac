@@ -31,7 +31,7 @@ func NewCmdInfo() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("workspace info", err)
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
 			d, err := app.NewDeps()

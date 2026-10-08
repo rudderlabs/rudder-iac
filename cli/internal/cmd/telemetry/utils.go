@@ -40,43 +40,42 @@ func getCIExecutionContext() map[string]interface{} {
 	return executionContext
 }
 
-// TrackCommand is a variable so tests can observe what a command reports
-// without sending events.
-//
-// Callers report from a deferred call in RunE, which is why those RunE
-// signatures use a named error return: an unnamed return is copied before the
-// defer runs, so the defer would otherwise see nil.
+// TrackCommand is a variable so tests can observe what a command reports.
+// Callers report from a deferred call in RunE, so RunE needs a named error
+// return: an unnamed return is copied before the defer runs.
 var TrackCommand = trackCommand
 
-// reported records whether this invocation already emitted a command event, so
-// TrackUnreportedFailure does not double count one a hook already reported. One
-// invocation is one process, which is why package state is the right scope.
-// Tests that replace TrackCommand bypass it; only Execute reads it.
+// reported is set once any command event is emitted, so the fallback in
+// TrackUnreportedFailure does not count a failure twice.
 var reported atomic.Bool
 
-// TrackUnreportedFailure reports a failure no command reported itself.
+// telemetryReady is a variable so tests can stand in for loaded config.
+var telemetryReady = telemetry.Ready
+
+// CommandName is the command path below the root. Every tracking site derives
+// its name from here, so RunE and PreRunE report the same name by construction.
+func CommandName(cmd *cobra.Command) string {
+	return strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
+}
+
+// TrackUnreportedFailure reports a failure that no hook reported. cobra rejects
+// stray arguments, missing required flags and flag groups outside PreRunE and
+// RunE, so Execute is the only place that sees them.
 //
-// cobra rejects several classes of failure outside the two hooks this package
-// wraps: ValidateArgs and PersistentPreRunE run before PreRunE, and
-// ValidateRequiredFlags and ValidateFlagGroups sit between PreRunE and RunE. A
-// missing required flag, a stray argument, a flag parse error and a mistyped
-// command therefore emitted nothing at all — and those are precisely the
-// drop-off points an adoption funnel needs to see. Execute is the only place
-// outside every hook, so the fallback lives there; args is passed so the
-// command resolves the way cobra resolved it.
+// It reports nothing for flag-parse errors or an unknown command: cobra fails
+// those before the OnInitialize hooks load config and telemetry, and without
+// the config the opt-out setting cannot be honoured.
 func TrackUnreportedFailure(root *cobra.Command, args []string, err error) {
-	if err == nil || reported.Load() {
+	if err == nil || reported.Load() || !telemetryReady() {
 		return
 	}
 
-	// An unresolvable path is a mistyped or unknown command, which is its own
-	// funnel step rather than something to attribute to a command.
-	command := "unknown"
-	if target, _, findErr := root.Find(args); findErr == nil && target != nil {
-		command = strings.TrimPrefix(target.CommandPath(), target.Root().Name()+" ")
+	target, _, findErr := root.Find(args)
+	if findErr != nil || target == nil {
+		return
 	}
 
-	TrackCommand(command, err, KV{K: "stage", V: "unreported"})
+	TrackCommand(CommandName(target), err, KV{K: "stage", V: "unreported"})
 }
 
 func trackCommand(command string, err error, extras ...KV) {
@@ -107,13 +106,9 @@ func trackCommand(command string, err error, extras ...KV) {
 }
 
 // TrackPreRunFailures reports PreRunE failures (auth, workspace lookup, spec
-// loading) across the command tree. Commands track themselves from RunE,
-// which cobra skips when PreRunE fails, so there is no double counting.
-//
-// The name is the command path below the root, which has to match the name the
-// same command passes to TrackCommand from RunE: a command reporting under two
-// names splits into two funnel steps. TestTrackedNamesMatchCommandPaths pins
-// every RunE literal to its path for that reason.
+// loading) across the command tree under the same name RunE uses. Call it once,
+// after every command is registered: a second call wraps each PreRunE again and
+// reports every failure twice.
 func TrackPreRunFailures(cmd *cobra.Command) {
 	for _, sub := range cmd.Commands() {
 		TrackPreRunFailures(sub)
@@ -127,8 +122,7 @@ func TrackPreRunFailures(cmd *cobra.Command) {
 	cmd.PreRunE = func(c *cobra.Command, args []string) error {
 		err := preRunE(c, args)
 		if err != nil {
-			command := strings.TrimPrefix(c.CommandPath(), c.Root().Name()+" ")
-			TrackCommand(command, err, KV{K: "stage", V: "pre_run"})
+			TrackCommand(CommandName(c), err, KV{K: "stage", V: "pre_run"})
 		}
 		return err
 	}

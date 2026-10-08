@@ -84,7 +84,7 @@ func NewCmdApply() *cobra.Command {
 			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
-				telemetry.TrackCommand("apply", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},

@@ -22,12 +22,9 @@ func TestInfoTracksJSONOutputFailureAsErrored(t *testing.T) {
 	calls := telemetrytest.Record(t)
 
 	cmd := NewCmdInfo()
-	cmd.SetArgs([]string{"--json"})
 	cmd.SetOut(failingWriter{})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
 
-	require.Error(t, cmd.Execute())
+	require.Error(t, telemetrytest.Execute(cmd, []string{"workspace"}, []string{"--json"}))
 	assert.Equal(t, []telemetrytest.Call{{
 		Command: "workspace info",
 		Errored: true,

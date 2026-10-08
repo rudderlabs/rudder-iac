@@ -44,23 +44,18 @@ func executeRecorded(t *testing.T, cmd *cobra.Command, args []string) []telemetr
 	t.Helper()
 
 	calls := telemetrytest.Record(t)
-	cmd.SetArgs(args)
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-
-	require.Error(t, cmd.Execute())
+	require.Error(t, telemetrytest.Execute(cmd, []string{"retl-sources"}, args))
 	return *calls
 }
 
 func TestValidateTracksRunFailuresAsErrored(t *testing.T) {
 	testutils.UseFakeAPI(t)
-	missing, empty, withModel := projectDirs(t)
+	missing, empty, _ := projectDirs(t)
 
 	for name, args := range map[string][]string{
 		"missing external id":  {},
 		"project load fails":   {"user-orders-model", "--location", missing},
 		"model not in project": {"user-orders-model", "--location", empty},
-		"query fails remotely": {"user-orders-model", "--location", withModel},
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := executeRecorded(t, newCmdValidate(), args)

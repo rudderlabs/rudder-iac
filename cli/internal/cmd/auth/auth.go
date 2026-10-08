@@ -17,11 +17,9 @@ func NewCmdAuth() *cobra.Command {
 		Use:   "login",
 		Short: "Login with an access token",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("auth login", err)
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
 			err = auth.Login()

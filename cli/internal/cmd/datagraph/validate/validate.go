@@ -87,7 +87,7 @@ func NewCmdValidate() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer func() {
-				telemetry.TrackCommand("data-graphs validate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "all", V: all},
 					{K: "modified", V: modified},

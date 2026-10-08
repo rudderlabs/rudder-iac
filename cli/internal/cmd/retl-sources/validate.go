@@ -39,7 +39,7 @@ func newCmdValidate() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("retl-sources validate", err)
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
 			if len(args) == 0 {

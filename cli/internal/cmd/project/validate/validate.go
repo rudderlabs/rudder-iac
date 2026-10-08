@@ -68,7 +68,7 @@ func NewCmdValidate() *cobra.Command {
 			validateLog.Debug("validate", "location", location)
 
 			defer func() {
-				telemetry.TrackCommand("validate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 				}...)
 			}()

@@ -30,7 +30,7 @@ func NewCmdShowDefaultEvents() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer func() {
-				telemetry.TrackCommand("transformations show-default-events", err)
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
 			if err = testorchestrator.ShowDefaultEvents(); err != nil {

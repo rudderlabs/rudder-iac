@@ -54,7 +54,7 @@ func newCmdGenerate() *cobra.Command {
 		`),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("typer generate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "platform", V: platform},
 					{K: "local", V: local},
 				}...)

@@ -104,10 +104,9 @@ func NewCmdTest() *cobra.Command {
 
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("transformations test", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "all", V: all},
 					{K: "modified", V: modified},

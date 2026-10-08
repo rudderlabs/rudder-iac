@@ -16,12 +16,8 @@ func TestRetlSourceImportTracksRunFailureAsErrored(t *testing.T) {
 	testutils.SetConfig(t, "auth.accessToken", "")
 	calls := telemetrytest.Record(t)
 
-	cmd := NewCmdRetlSource()
-	cmd.SetArgs([]string{"--local-id", "my-model", "--remote-id", "remote-1", "--location", "models"})
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-
-	require.Error(t, cmd.Execute())
+	require.Error(t, telemetrytest.Execute(NewCmdRetlSource(), []string{"import"},
+		[]string{"--local-id", "my-model", "--remote-id", "remote-1", "--location", "models"}))
 	assert.Equal(t, []telemetrytest.Call{{
 		Command: "import retl-sources",
 		Errored: true,

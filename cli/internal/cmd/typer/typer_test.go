@@ -32,12 +32,7 @@ func TestGenerateTracksRunFailuresAsErrored(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			calls := telemetrytest.Record(t)
 
-			cmd := newCmdGenerate()
-			cmd.SetArgs(tc.args)
-			cmd.SilenceUsage = true
-			cmd.SilenceErrors = true
-
-			require.Error(t, cmd.Execute())
+			require.Error(t, telemetrytest.Execute(newCmdGenerate(), []string{"typer"}, tc.args))
 			assert.Equal(t, []telemetrytest.Call{{
 				Command: "typer generate",
 				Errored: true,

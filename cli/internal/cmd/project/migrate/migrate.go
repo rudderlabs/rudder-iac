@@ -62,7 +62,7 @@ func NewCmdMigrate() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer func() {
-				telemetry.TrackCommand("migrate", err, migrateTelemetryExtras(location, confirm)...)
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, migrateTelemetryExtras(location, confirm)...)
 			}()
 
 			m := migrator.New(proj, deps.CompositeProvider())

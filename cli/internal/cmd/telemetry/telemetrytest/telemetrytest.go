@@ -5,6 +5,8 @@ package telemetrytest
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 )
 
@@ -32,4 +34,20 @@ func Record(t *testing.T) *[]Call {
 	t.Cleanup(func() { telemetry.TrackCommand = original })
 
 	return &calls
+}
+
+// Execute runs cmd mounted under a root and the given parent commands, so that
+// telemetry.CommandName resolves the same path it does in the real command tree.
+func Execute(cmd *cobra.Command, parents []string, args []string) error {
+	root := &cobra.Command{Use: "rudder-cli", SilenceUsage: true, SilenceErrors: true}
+	parent := root
+	for _, p := range parents {
+		next := &cobra.Command{Use: p}
+		parent.AddCommand(next)
+		parent = next
+	}
+	parent.AddCommand(cmd)
+
+	root.SetArgs(append(append(append([]string{}, parents...), cmd.Name()), args...))
+	return root.Execute()
 }

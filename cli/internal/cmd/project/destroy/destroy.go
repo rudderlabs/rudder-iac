@@ -55,7 +55,7 @@ func NewCmdDestroy() *cobra.Command {
 			destroyLog.Debug("identifying all resources to destroy")
 
 			defer func() {
-				telemetry.TrackCommand("destroy", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
 				}...)
