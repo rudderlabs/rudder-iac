@@ -599,3 +599,63 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 		})
 	}
 }
+
+// A failure that carries no diagnostics must not render as a clean document:
+// a machine reader treats an empty diagnostics array as "validated clean".
+func TestProject_Load_JSONRendererRecordsAFailureWithoutDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockProvider.GetResourceGraphErr = errors.New("event not found")
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(mockProvider,
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewJSONRenderer(&out)),
+	)
+
+	err := proj.Load("test_dir")
+
+	require.ErrorContains(t, err, "building resource graph: event not found")
+	assert.False(t, errors.Is(err, project.ErrValidationFailed), "the document does not carry the cause of a load error as a validation failure")
+	assert.JSONEq(t, `{
+		"diagnostics": [{
+			"ruleId": "project/load-failed",
+			"severity": "error",
+			"message": "building resource graph: event not found",
+			"file": "",
+			"line": 0,
+			"column": 0
+		}],
+		"summary": {"errors": 1, "warnings": 0}
+	}`, out.String())
+}
+
+// The text renderer prints the returned error itself, so it adds nothing.
+func TestProject_Load_TextRendererAddsNoFailureDiagnostic(t *testing.T) {
+	t.Parallel()
+
+	mockProvider := testutils.NewMockProvider(nil, nil)
+	mockProvider.MatchPatterns = fixtureMatchPatterns
+	mockProvider.GetResourceGraphErr = errors.New("event not found")
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{
+			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
+		}, nil
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(mockProvider,
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewTextRenderer(&out)),
+	)
+
+	require.Error(t, proj.Load("test_dir"))
+	assert.NotContains(t, out.String(), "project/load-failed")
+}

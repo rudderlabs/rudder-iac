@@ -174,6 +174,16 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
+// ErrValidationFailed marks a load that stopped because the specs have errors,
+// all of which were rendered. A caller that prints diagnostics itself uses it
+// to avoid printing the failure a second time.
+var ErrValidationFailed = errors.New("validation failed")
+
+type validationFailed string
+
+func (e validationFailed) Error() string        { return string(e) }
+func (e validationFailed) Is(target error) bool { return target == ErrValidationFailed }
+
 // Load loads the project specifications from the given location using the
 // configured SpecLoader, runs variable substitution if a substitutor is
 // configured, then runs the specs through the validation engine (syntax,
@@ -241,7 +251,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
 			return err
 		}
-		return fmt.Errorf("syntax validation failed")
+		return validationFailed("syntax validation failed")
 	}
 
 	// The syntax phase only stops the load on errors, so its warnings are carried
@@ -250,7 +260,16 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// render exists to fix. The success path folds them into the single render at
 	// the end instead.
 	fail := func(err error) error {
-		if renderErr := p.render(slices.Concat(specDiags, syntaxDiags)); renderErr != nil {
+		carried := slices.Concat(specDiags, syntaxDiags)
+		if failureRenderer, ok := p.renderer.(renderer.FailureRenderer); ok {
+			ui.StopSpinner()
+			carried.Sort()
+			if renderErr := failureRenderer.RenderFailure(carried, err); renderErr != nil {
+				return fmt.Errorf("rendering diagnostics: %w", renderErr)
+			}
+			return err
+		}
+		if renderErr := p.render(carried); renderErr != nil {
 			return renderErr
 		}
 		return err
@@ -308,7 +327,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	if semanticDiags.HasErrors() {
-		return fmt.Errorf("semantic validation failed")
+		return validationFailed("semantic validation failed")
 	}
 
 	return nil

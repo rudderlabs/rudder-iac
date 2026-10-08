@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
@@ -18,8 +19,6 @@ func TestJSONRenderer_Render(t *testing.T) {
 		expected    string
 	}{
 		{
-			// A clean run must still emit a document — a consumer cannot tell
-			// "validated clean" from "crashed before rendering" out of silence.
 			name:        "empty diagnostics still produce a document",
 			diagnostics: validation.Diagnostics{},
 			expected: `{
@@ -85,4 +84,25 @@ func TestJSONRenderer_Render(t *testing.T) {
 			assert.Equal(t, tt.expected, buf.String())
 		})
 	}
+}
+
+func TestJSONRenderer_RenderFailureKeepsCollectedWarnings(t *testing.T) {
+	var buf bytes.Buffer
+	warning := validation.Diagnostic{
+		RuleID:   "datacatalog/properties/deprecated",
+		Severity: rules.Warning,
+		Message:  "property 'user_id' is deprecated",
+		File:     "specs/events.yaml",
+		Position: pathindex.Position{Line: 15, Column: 3},
+	}
+
+	require.NoError(t, NewJSONRenderer(&buf).(FailureRenderer).RenderFailure(validation.Diagnostics{warning}, errors.New("cycle detected")))
+
+	assert.JSONEq(t, `{
+		"diagnostics": [
+			{"ruleId": "datacatalog/properties/deprecated", "severity": "warning", "message": "property 'user_id' is deprecated", "file": "specs/events.yaml", "line": 15, "column": 3},
+			{"ruleId": "project/load-failed", "severity": "error", "message": "cycle detected", "file": "", "line": 0, "column": 0}
+		],
+		"summary": {"errors": 1, "warnings": 1}
+	}`, buf.String())
 }
