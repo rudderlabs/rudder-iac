@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
@@ -107,6 +109,12 @@ func WorkspaceImport(
 		return fmt.Errorf("normalizing for import: %w", err)
 	}
 
+	importEntries = unlinkedEntries(importEntries, targetGraph)
+	if len(entities) == 0 && len(importEntries) == 0 {
+		fmt.Println("Nothing new to import")
+		return nil
+	}
+
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
@@ -194,6 +202,20 @@ func markMatchedWith(
 		return fmt.Errorf("%w: %s", ErrAmbiguousMatch, strings.Join(details, "; "))
 	}
 	return nil
+}
+
+// unlinkedEntries drops entries for local resources that already carry import
+// metadata for the entry's workspace: an existing manifest (or inline metadata)
+// links them, so re-emitting would duplicate their URN across manifest files.
+func unlinkedEntries(entries []importmanifest.ImportEntry, graph *resources.Graph) []importmanifest.ImportEntry {
+	return lo.Reject(entries, func(e importmanifest.ImportEntry, _ int) bool {
+		local, ok := graph.GetResource(e.URN)
+		if !ok {
+			return false
+		}
+		meta := local.ImportMetadata()
+		return meta != nil && meta.WorkspaceId == e.WorkspaceID
+	})
 }
 
 func initNamer(graph *resources.Graph) (namer.Namer, error) {
