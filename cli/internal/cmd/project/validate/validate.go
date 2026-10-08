@@ -40,10 +40,9 @@ func NewCmdValidate() *cobra.Command {
 			$ rudder-cli validate --location </path/to/dir or file>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validation is local-only by design so it can run in CI without
-			// credentials: no token check and no workspace lookup. Without a
-			// workspace ID, workspace-aware import-manifest rules check every
-			// workspace in the manifest instead of only the one apply targets.
+			// With no workspace lookup there is no workspace ID, so
+			// workspace-aware import-manifest rules check every workspace block
+			// instead of only the one apply targets.
 			deps, err = app.NewOfflineDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)

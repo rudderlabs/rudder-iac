@@ -234,10 +234,15 @@ func TestNewOfflineDepsNeedsNoToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// Same providers as the online path, so validate observes the same rules
-	// apply does.
-	c, err := client.New("test-token")
+	// apply does. The online deps are built through the public constructor so
+	// the comparison covers the real NewDeps path.
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "test-token")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	online, err := NewDeps()
 	require.NoError(t, err)
-	online, _, err := composeProviders(c)
-	require.NoError(t, err)
-	assert.ElementsMatch(t, online.SupportedKinds(), offline.CompositeProvider().SupportedKinds())
+
+	assert.ElementsMatch(t,
+		online.CompositeProvider().SupportedKinds(),
+		offline.CompositeProvider().SupportedKinds(),
+	)
 }

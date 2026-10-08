@@ -7,6 +7,3 @@ spec:
     - id: email_address
       name: Email Address
       type: string
-    - id: status_code
-      name: Status Code
-      type: integer

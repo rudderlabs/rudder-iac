@@ -106,7 +106,9 @@ type deps struct {
 
 // Deps defines the dependencies initialized globally for Rudder CLI
 type Deps interface {
-	// Client returns the RudderStack API client instance, configured with authentication and base URL
+	// Client returns the RudderStack API client instance, configured with the base URL.
+	// Deps from NewOfflineDeps carry a placeholder token, so calls through their
+	// client fail authentication.
 	Client() *client.Client
 
 	// Providers returns the initialized Providers struct containing all provider instances
@@ -147,21 +149,7 @@ func NewDeps() (Deps, error) {
 		return nil, err
 	}
 
-	c, err := setupClient(v)
-	if err != nil {
-		return nil, fmt.Errorf("setup client: %w", err)
-	}
-
-	cp, p, err := composeProviders(c)
-	if err != nil {
-		return nil, err
-	}
-
-	return &deps{
-		client:            c,
-		providers:         p,
-		compositeProvider: cp,
-	}, nil
+	return newDeps(config.GetConfig().Auth.AccessToken)
 }
 
 // NewOfflineDeps builds the same providers as NewDeps (so it observes the same
@@ -171,13 +159,13 @@ func NewDeps() (Deps, error) {
 // rejects an empty one; any API call made through it fails auth, which surfaces
 // an accidental network dependency instead of hiding it.
 func NewOfflineDeps() (Deps, error) {
-	cfg := config.GetConfig()
+	return newDeps("offline") // unused: offline commands make no API calls
+}
 
-	c, err := client.New(
-		"offline", // unused: offline commands make no API calls
-		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+v),
-	)
+// newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
+// client option or provider added here reaches both.
+func newDeps(token string) (Deps, error) {
+	c, err := setupClient(token, v)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
@@ -232,10 +220,10 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	return cp, rawProviders, nil
 }
 
-func setupClient(version string) (*client.Client, error) {
+func setupClient(token, version string) (*client.Client, error) {
 	cfg := config.GetConfig()
 	return client.New(
-		cfg.Auth.AccessToken,
+		token,
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
