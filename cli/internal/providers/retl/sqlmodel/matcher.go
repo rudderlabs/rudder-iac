@@ -26,10 +26,12 @@ func matchSQLModel(scope importmatcher.Scope, r *resources.RemoteResource) *reso
 		return nil
 	}
 
+	// A model that references its account holds a PropertyRef under
+	// AccountIDKey, whose remote id is unknown until apply, so it never matches.
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
 		var (
-			displayName = data[DisplayNameKey].(string)
-			accountID   = data[AccountIDKey].(string)
+			displayName  = data[DisplayNameKey].(string)
+			accountID, _ = data[AccountIDKey].(string)
 		)
 		return displayName == remote.Name && accountID == remote.AccountID
 	})

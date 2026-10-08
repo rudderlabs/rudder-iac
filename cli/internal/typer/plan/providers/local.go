@@ -9,7 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
+	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
 
 // LocalCatalogPlanProvider builds a tracking plan from local YAML specs so that

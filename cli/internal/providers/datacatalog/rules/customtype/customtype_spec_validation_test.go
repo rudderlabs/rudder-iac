@@ -525,7 +525,7 @@ func TestCustomTypeSpecSyntaxValidRule_VariantsOnlyForObjectType(t *testing.T) {
 		refs := extractRefs(results)
 		msgs := extractMsgs(results)
 		assert.Contains(t, refs, "/types/0/variants")
-		assert.Contains(t, msgs, "'variants' is not allowed unless 'type object'")
+		assert.Contains(t, msgs, "'variants' is not allowed unless 'type' is object")
 	})
 
 	t.Run("no variants on non-object type is valid", func(t *testing.T) {

@@ -7,9 +7,8 @@ import (
 )
 
 // Source types from integrations-config destinations/s3/db-config.json
-// supportedSourceTypes, restricted to types the CLI event-stream provider owns.
-// sourceTypes is the supported-source-types list (integrations-config
-// supportedSourceTypes ∩ CLI event-stream ownership).
+// supportedSourceTypes, restricted to types the CLI can reach: those the
+// event-stream provider owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -21,6 +20,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -34,6 +34,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // s3Config is the local YAML config model. Field set mirrors integrations-config

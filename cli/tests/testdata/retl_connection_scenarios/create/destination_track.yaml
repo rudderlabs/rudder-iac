@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: e2e-scn-http-track
+spec:
+  id: e2e-scn-http-track
+  display_name: E2E Scenarios HTTP Track
+  type: http
+  enabled: true
+  definition_version: 1
+  config:
+    api_url: https://webhooks.example.com/rudder/e2e-scn-http-track
+    auth: noAuth
+    method: POST
+    format: JSON
+    connection_mode:
+      warehouse: cloud

@@ -12,7 +12,7 @@ spec:
     account: rudder-cli-e2e.us-east-1
     database: RUDDER_E2E_KP_UPD
     warehouse: RUDDER_WH
-    user: RUDDER_CLI_E2E
+    user: "{{ .SNOWFLAKE_KEYPAIR_USER }}"
     role: RUDDER_ROLE
     namespace: rudder_cli_e2e_kp
     use_key_pair_auth: true

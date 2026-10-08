@@ -98,6 +98,30 @@ func TestAPIError_Error(t *testing.T) {
 			},
 			want: `http status code: 400, error code: '', error: 'request validation failed' (details: ["a","b"])`,
 		},
+		{
+			name: "permission 403 names the token fix",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "Insufficient permissions",
+			},
+			want: "permission denied: 'Insufficient permissions': use an access token with the required permissions, or ask a workspace admin to grant them",
+		},
+		{
+			name: "feature-flag 403 names the support fix",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "Feature is not enabled for your account: DATA_GRAPH",
+			},
+			want: "feature not enabled: 'Feature is not enabled for your account: DATA_GRAPH': ask RudderStack support to enable it for your account",
+		},
+		{
+			name: "business-rule 403 keeps the raw rendering",
+			apiError: &client.APIError{
+				HTTPStatusCode: 403,
+				Message:        "tracking plan still connected to sources: src-1",
+			},
+			want: "http status code: 403, error code: '', error: 'tracking plan still connected to sources: src-1'",
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +190,54 @@ func TestAPIError_FeatureFlagNotEnabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, tt.apiError.FeatureFlagNotEnabled())
+		})
+	}
+}
+
+// Each true case is the verbatim message of one control-plane service, because
+// the three wordings share no substring: destination.service.ts and
+// source.service.ts say "active connections", retl/service.ts does not.
+func TestAPIError_BlockedByConnections(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiError *client.APIError
+		want     bool
+	}{
+		{
+			name:     "destination.service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The destination has active connections, please delete those first"},
+			want:     true,
+		},
+		{
+			name:     "source.service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The source has active connections, please delete those first"},
+			want:     true,
+		},
+		{
+			name:     "retl/service.ts",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "The source is connected to some destinations."},
+			want:     true,
+		},
+		{
+			name:     "checks ErrorMessage when Message is empty",
+			apiError: &client.APIError{HTTPStatusCode: 400, ErrorMessage: "The source is connected to some destinations."},
+			want:     true,
+		},
+		{
+			name:     "returns false for an unrelated 400",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "destination is referenced by a running job"},
+			want:     false,
+		},
+		{
+			name:     "returns false when the status is not 400",
+			apiError: &client.APIError{HTTPStatusCode: 500, Message: "The destination has active connections, please delete those first"},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.apiError.BlockedByConnections())
 		})
 	}
 }

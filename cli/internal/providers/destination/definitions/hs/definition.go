@@ -7,7 +7,8 @@ import (
 )
 
 // Source types from integrations-config destinations/hs/db-config.json,
-// restricted to the types the CLI event-stream provider owns.
+// restricted to types the CLI can reach: those the event-stream provider
+// owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -19,6 +20,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +34,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type hsConfig struct {
@@ -92,11 +95,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:    "HS",
 		Version:    1,
 		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "hub_id"},
 		NewConfig: func() any {
 			return &hsConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:          append([]string(nil), sourceTypes...),
+		ConnectionModes:      connectionModes,
+		SupportsVisualMapper: true,
 	}
 }

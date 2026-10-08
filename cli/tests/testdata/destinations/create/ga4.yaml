@@ -11,7 +11,7 @@ spec:
   config:
     api_secret: "{{ .GA4_API_SECRET }}"
     client_type: gtag
-    measurement_id: G-E2ECREATE1
+    measurement_id: "{{ .GA4_MEASUREMENT_ID }}"
     debug_mode: false
     sdk_base_url: https://www.googletagmanager.com
     server_container_url: https://gtm.example.com

@@ -20,13 +20,22 @@ import (
 // — verrs is non-empty and this fails locally, with no CI round-trip needed.
 func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	Initialise("test")
+	// The gen-rule-docs make target defaults the rETL flags on and CI runs it,
+	// so the kinds they register are documented while still experimental. Match
+	// that here.
+	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	prevExp := viper.Get("experimental")
+	// rETL connection support is on so the provider registers the connection
+	// rules its embedded fragments document; the gen-rule-docs workflow sets the
+	// same flag for the generation step.
+	prevExp, prevRetlConnections := viper.Get("experimental"), viper.Get("flags.retlConnectionSupport")
 	viper.Set("experimental", true)
+	viper.Set("flags.retlConnectionSupport", true)
 	t.Cleanup(func() {
 		viper.Set("experimental", prevExp)
+		viper.Set("flags.retlConnectionSupport", prevRetlConnections)
 	})
 
 	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")

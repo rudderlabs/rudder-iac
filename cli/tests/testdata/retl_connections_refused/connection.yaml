@@ -1,0 +1,26 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: orders-to-archive
+spec:
+  connections:
+    - id: orders-to-archive
+      source: "#retl-source-sql-model:orders-model"
+      destination: "#destination:e2e-retl-archive"
+      enabled: true
+      config:
+        sync_behaviour: upsert
+        schedule:
+          type: basic
+          every_minutes: 30
+        identifiers:
+          - from: id
+            to: user_id
+        # Present so the body is one the backend would otherwise accept: without
+        # the create-time guard this connection is created, not rejected, which
+        # is the DEX-917 scenario the "nothing upstream" assertion below pins.
+        mappings:
+          - from: email
+            to: traits.email
+        event:
+          type: identify

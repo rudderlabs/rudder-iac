@@ -27,21 +27,95 @@ var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     AccountResourceType,
 	SpecKind:         AccountSpecKind,
 	SpecMetadataName: AccountMetadataName,
+	// RETL sources reference accounts as "#account:<id>".
+	ReferencedByKind: true,
 }
 
-// registeredAccountSecretKeys maps an account definition to its secret field set — the
-// account-side analogue of a destination definition's SecretKeys(). All other config
-// keys are treated as (non-secret) options by splitConfig. For Snowflake, only the auth
-// mode in play supplies one of the secrets; the others are simply absent from the user's
-// config and the split handles that generically.
+// accountDefinition is what the CLI knows about one account definition.
+//
+// Type is the account's role in the control plane, which for a source account
+// is the name of the source definition it backs ("type" in
+// integrations-config's sources/<type>/accounts/<name>/db-config.json).
+//
+// SecretKeys is its secret field set — the account-side analogue of a
+// destination definition's SecretKeys(). All other config keys are treated as
+// (non-secret) options by splitConfig. For Snowflake, only the auth mode in
+// play supplies one of the secrets; the others are simply absent from the
+// user's config and the split handles that generically.
+type accountDefinition struct {
+	Type       string
+	SecretKeys []string
+}
+
+// registeredAccounts is every account definition the CLI can manage. One entry
+// per definition, so a definition cannot have a type without a secret set or
+// the reverse.
 //
 // ponytail: hardcoded. The real registry fetches secretFields from the control-plane
 // account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
 // here stays a one-line map entry because the split logic below is definition-driven.
-var registeredAccountSecretKeys = map[string][]string{
-	"SOURCE_BIGQUERY":  {"credentials"},
-	"SOURCE_POSTGRES":  {"password"},
-	"SOURCE_SNOWFLAKE": {"password", "privateKey", "privateKeyPassphrase"},
+var registeredAccounts = map[string]accountDefinition{
+	"SOURCE_BIGQUERY":  {Type: "bigquery", SecretKeys: []string{"credentials"}},
+	"SOURCE_POSTGRES":  {Type: "postgres", SecretKeys: []string{"password"}},
+	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
+}
+
+// authModeSecrets maps each auth mode of a discriminated definition to the
+// secrets it uses. A definition absent here has a single mode.
+//
+// ponytail: hardcoded alongside registeredAccounts and goes away with the same
+// DEX-467 move to the control-plane account-definitions API, whose db-config
+// already carries the discriminator ("authenticationType": "key_pair_or_password").
+var authModeSecrets = map[string]map[string][]string{
+	"SOURCE_SNOWFLAKE": {
+		"keyPair":  {"privateKey", "privateKeyPassphrase"},
+		"password": {"password"},
+	},
+}
+
+// absentAuthModes maps a discriminated definition to the mode an account
+// without the discriminator runs in. The Snowflake connector enables key-pair auth only on an explicit "keyPair"
+// (rudder-sources snowflake.NewClient); an absent value predates key-pair
+// support, so it is a password account whatever the form's default says.
+var absentAuthModes = map[string]string{
+	"SOURCE_SNOWFLAKE": "password",
+}
+
+// authMode is the account's auth mode, or "" for a definition with a single mode.
+func authMode(definitionName string, config map[string]any) string {
+	if mode, _ := config["authenticationType"].(string); mode != "" {
+		return mode
+	}
+	return absentAuthModes[definitionName]
+}
+
+// authModeSecretKeys is the subset of a definition's secret keys the account's
+// own config can actually use. The account schema puts each mode's secrets
+// behind an authenticationType branch with additionalProperties false, so the
+// other mode's secret is not merely unused — it is rejected (DEX-958).
+//
+// A mode outside the enum keeps the full set: under-exporting would drop a
+// secret the account needs, and a value the schema does not know is a shape this
+// code should not be guessing at.
+func authModeSecretKeys(definitionName string, config map[string]any, keys []string) []string {
+	if modeKeys, ok := authModeSecrets[definitionName][authMode(definitionName, config)]; ok {
+		return modeKeys
+	}
+	return keys
+}
+
+// DefinitionType returns the type of a registered account definition, e.g.
+// "postgres" for SOURCE_POSTGRES. ok is false for an unregistered definition.
+func DefinitionType(accountDefinitionName string) (string, bool) {
+	d, ok := registeredAccounts[accountDefinitionName]
+	return d.Type, ok
+}
+
+// secretKeys returns the secret field set of a registered account definition.
+// ok is false for an unregistered definition.
+func secretKeys(accountDefinitionName string) ([]string, bool) {
+	d, ok := registeredAccounts[accountDefinitionName]
+	return d.SecretKeys, ok
 }
 
 // AccountStore is the subset of the accounts API client the handler needs;
@@ -75,7 +149,7 @@ func (h *HandlerImpl) NewSpec() *AccountSpec { return &AccountSpec{} }
 // minus the (type, version) registry lookup (account definitions are
 // unversioned).
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map[string]*AccountResource, error) {
-	keys, ok := registeredAccountSecretKeys[spec.AccountDefinitionName]
+	keys, ok := secretKeys(spec.AccountDefinitionName)
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
@@ -145,14 +219,15 @@ func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *AccountResource, 
 }
 
 // MapRemoteToState rebuilds the flat config from the remote options and marks
-// every secret key unknown (the API never returns secret values), so the differ
-// flags them SecretOnly rather than phantom drift — same rule as destinations.
+// the auth mode's secret keys unknown (the API never returns secret values), so
+// the differ flags them SecretOnly rather than phantom drift — same rule as
+// destinations.
 func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResolver) (*AccountResource, *AccountState, error) {
 	if remote.ExternalID == "" {
 		return nil, nil, fmt.Errorf("managed account %s has empty external ID", remote.ID)
 	}
 
-	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
+	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, nil, fmt.Errorf("managed account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -162,10 +237,12 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 		return nil, nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
 	}
 	// The API never returns the secret, so it is absent from remote options. Seed
-	// each secret key so the presence-based WrapUnknownSecrets marks it unknown —
-	// account secrets are unconditional (unlike a destination's optional secrets),
-	// so they must always be present-and-unknown and therefore always re-applied.
-	for _, key := range keys {
+	// the auth mode's secret keys so the presence-based WrapUnknownSecrets marks
+	// them unknown — within its mode an account secret is unconditional (unlike a
+	// destination's optional secrets), so it must always be present-and-unknown
+	// and therefore always re-applied. Wrapping still covers every key, so a
+	// secret of another mode that the API echoed back is never held as plain text.
+	for _, key := range authModeSecretKeys(remote.Definition.Name, config, keys) {
 		if _, ok := config[key]; !ok {
 			config[key] = ""
 		}
@@ -274,7 +351,7 @@ func (h *HandlerImpl) FormatForExport(
 }
 
 func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) (map[string]any, error) {
-	keys, ok := registeredAccountSecretKeys[remote.Definition.Name]
+	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
 	}
@@ -283,9 +360,17 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling options for account %s: %w", remote.ID, err)
 	}
-	// The API omits secrets, so surface each secret key as present-but-empty so
-	// MaskSecrets emits a "{{ .VAR }}" token the user fills via a var file.
-	for _, key := range keys {
+	// The account schema requires the discriminator on every update, so an
+	// account that predates it would be rejected on its first apply. Writing the
+	// mode it already runs in makes that apply add it instead.
+	if mode := authMode(remote.Definition.Name, config); mode != "" {
+		config["authenticationType"] = mode
+	}
+	// The API omits secrets, so surface the auth mode's secret keys as
+	// present-but-empty so MaskSecrets emits a "{{ .VAR }}" token the user fills
+	// via a var file. Masking covers every key, so a secret of another mode that
+	// the API echoed back is never written in plain text.
+	for _, key := range authModeSecretKeys(remote.Definition.Name, config, keys) {
 		if _, exists := config[key]; !exists {
 			config[key] = ""
 		}
@@ -307,7 +392,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 // This is the one account-specific twist over destinations, which keep secrets
 // inside a single config blob.
 func (h *HandlerImpl) splitConfig(data *AccountResource) (json.RawMessage, json.RawMessage, error) {
-	keys, ok := registeredAccountSecretKeys[data.AccountDefinitionName]
+	keys, ok := secretKeys(data.AccountDefinitionName)
 	if !ok {
 		return nil, nil, fmt.Errorf("unsupported account definition %q", data.AccountDefinitionName)
 	}
@@ -371,7 +456,7 @@ func supportedRemoteAccounts(accounts []client.Account) []*RemoteAccount {
 	result := make([]*RemoteAccount, 0, len(accounts))
 	for i := range accounts {
 		a := &accounts[i]
-		if _, ok := registeredAccountSecretKeys[a.Definition.Name]; !ok {
+		if _, ok := registeredAccounts[a.Definition.Name]; !ok {
 			continue
 		}
 		result = append(result, &RemoteAccount{Account: a})
