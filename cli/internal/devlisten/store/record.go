@@ -123,6 +123,11 @@ var keptHeaders = []string{"User-Agent", "Content-Type", "Content-Encoding", "Or
 // maxHeaderValue bounds each kept value, because the sender controls it.
 const maxHeaderValue = 1024
 
+// maxRefusedBody bounds the body kept for a refused request that carries no
+// events. The sender picks its size, and any web page can post to the
+// listener, so keeping a refused 2 MB body lets 32 posts evict every capture.
+const maxRefusedBody = 1024
+
 // firstValues keeps the first value of each header in names, or of every
 // header when names is nil, and counts the values it leaves out.
 func firstValues(h http.Header, names []string) (map[string]string, int) {
@@ -152,6 +157,13 @@ func newRecord(c *ingest.Capture) *Record {
 	if len(body) == 0 {
 		body = nil
 	}
+	bodyComplete := c.BodyComplete
+	// Without events nothing points into the body, so a copy lets the large
+	// array go. BodyBytes still reports the real size.
+	if c.StatusCode >= http.StatusBadRequest && len(c.Events) == 0 && len(body) > maxRefusedBody {
+		body = slices.Clone(body[:maxRefusedBody])
+		bodyComplete = false
+	}
 	responseBody := string(c.ResponseBody)
 	if key.Sha256 != "" {
 		responseBody = strings.ReplaceAll(responseBody, c.WriteKey, key.Key)
@@ -180,7 +192,7 @@ func newRecord(c *ingest.Capture) *Record {
 			DroppedHeaders: dropped,
 			Body:           body,
 			BodyBytes:      len(c.Body),
-			BodyComplete:   c.BodyComplete,
+			BodyComplete:   bodyComplete,
 		},
 		Response: Response{
 			StatusCode: c.StatusCode,

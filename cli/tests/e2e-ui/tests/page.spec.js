@@ -100,12 +100,12 @@ test.describe('acceptance', () => {
     const sent = apiRequests(page, 'events');
     await setText(page, 'Write keys', 'dev, web-key-0123456789');
     await expect(page.locator('#count')).toHaveText('Showing 6 of 6 accepted events');
-    expect(lastList(sent).getAll('writeKey')).toEqual(['dev', 'web-key-0123456789']);
+    await expect.poll(() => lastList(sent)?.getAll('writeKey')).toEqual(['dev', 'web-key-0123456789']);
     await setText(page, 'Write keys', 'web-key-0123456789');
     await expect(page.locator('#count')).toHaveText('Showing 1 of 6 accepted events');
     await setText(page, 'Write keys', '(none)');
     await expect(page.locator('#count')).toHaveText('Showing 0 of 6 accepted events');
-    expect(lastList(sent).getAll('writeKey')).toEqual(['']);
+    await expect.poll(() => lastList(sent)?.getAll('writeKey')).toEqual(['']);
   });
 
   test('a value set by a click keeps its comma when another filter changes', async ({ page, listener }) => {
@@ -118,11 +118,11 @@ test.describe('acceptance', () => {
     await expect(page.locator('#count')).toHaveText('Showing 1 of 2 accepted events');
     await page.getByLabel('track', { exact: true }).check();
     await expect(page.locator('#count')).toHaveText('Showing 1 of 2 accepted events');
-    expect(lastList(sent).getAll('event')).toEqual(['Checkout, completed']);
+    await expect.poll(() => lastList(sent)?.getAll('event')).toEqual(['Checkout, completed']);
 
     await setText(page, 'Event name', 'Checkout\\, completed, Nope');
     await expect(page.locator('#count')).toHaveText('Showing 1 of 2 accepted events');
-    expect(lastList(sent).getAll('event')).toEqual(['Checkout, completed', 'Nope']);
+    await expect.poll(() => lastList(sent)?.getAll('event')).toEqual(['Checkout, completed', 'Nope']);
   });
 
   test('new events show live, and Pause aborts the poll in flight', async ({ page, listener }) => {

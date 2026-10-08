@@ -258,6 +258,33 @@ func TestRecordChargesTheBytesItKeeps(t *testing.T) {
 	require.GreaterOrEqual(t, newRecord(pixel).size, len(body))
 }
 
+func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
+	t.Parallel()
+	huge := strings.Repeat("a", 2_100_000)
+
+	refused := capture("dev", "/v1/track", huge)
+	refused.StatusCode = http.StatusRequestEntityTooLarge
+	refused.BodyComplete = false
+	refused.Decoded = nil
+	refused.Events = nil
+	rec := newRecord(refused)
+
+	require.Equal(t, 2_100_000, rec.Request.BodyBytes)
+	require.Len(t, rec.Request.Body, maxRefusedBody)
+	require.Equal(t, maxRefusedBody, cap(rec.Request.Body), "the copy lets the 2 MB array go")
+	require.False(t, rec.Request.BodyComplete)
+	require.Less(t, rec.size, 8<<10)
+
+	// A refused request that parsed events keeps its body, because the events
+	// point into it.
+	parsed := capture("dev", "/v1/batch", huge)
+	parsed.StatusCode = http.StatusBadRequest
+	require.Len(t, newRecord(parsed).Request.Body, len(huge))
+
+	// An accepted request is captured whole.
+	require.Len(t, newRecord(capture("dev", "/v1/track", huge)).Request.Body, len(huge))
+}
+
 func TestStoreIsSafeForConcurrentUse(t *testing.T) {
 	t.Parallel()
 	const writers, perWriter = 8, 250
