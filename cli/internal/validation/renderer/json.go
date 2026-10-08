@@ -16,8 +16,9 @@ import (
 //
 // One load renders one document. A run that validated clean emits an empty
 // diagnostics array. A run that stopped on an error with no diagnostics of its
-// own (see FailureRenderer) emits an error diagnostic with ruleId
-// project/load-failed, so an empty array always means "validated clean".
+// own (see FailureRenderer), a bad --location included, emits an error
+// diagnostic with ruleId project/load-failed, so an empty array always means
+// "validated clean".
 type JSONRenderer struct {
 	w io.Writer
 }

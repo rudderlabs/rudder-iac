@@ -73,7 +73,7 @@ func TestRun(t *testing.T) {
 			wantStdout: "{doc}",
 		},
 		{
-			name:       "json: a load error stays on the error path",
+			name:       "json: an error the document does not hold stays on the error path",
 			json:       true,
 			loadErr:    errors.New("building resource graph: cycle"),
 			wantErr:    "validating project: building resource graph: cycle",

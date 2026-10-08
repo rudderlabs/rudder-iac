@@ -184,6 +184,32 @@ type validationFailed string
 func (e validationFailed) Error() string        { return string(e) }
 func (e validationFailed) Is(target error) bool { return target == ErrValidationFailed }
 
+// renderedFailure is an error a FailureRenderer already put in its output. It
+// still unwraps to the cause, and matches ErrValidationFailed so that a caller
+// whose renderer owns stdout does not print the same failure again.
+type renderedFailure struct{ err error }
+
+func (e renderedFailure) Error() string        { return e.err.Error() }
+func (e renderedFailure) Unwrap() error        { return e.err }
+func (e renderedFailure) Is(target error) bool { return target == ErrValidationFailed }
+
+// recordFailure hands the cause to a renderer that can record it, next to the
+// diagnostics already collected. A renderer that cannot (the text one) leaves
+// the error to the caller, which prints it.
+func (p *project) recordFailure(carried validation.Diagnostics, cause error) error {
+	failureRenderer, ok := p.renderer.(renderer.FailureRenderer)
+	if !ok {
+		return cause
+	}
+
+	ui.StopSpinner()
+	carried.Sort()
+	if err := failureRenderer.RenderFailure(carried, cause); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
+	return renderedFailure{err: cause}
+}
+
 // Load loads the project specifications from the given location using the
 // configured SpecLoader, runs variable substitution if a substitutor is
 // configured, then runs the specs through the validation engine (syntax,
@@ -196,7 +222,7 @@ func (p *project) Load(location string) error {
 
 	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
-		return fmt.Errorf("failed to load specs using specLoader: %w", err)
+		return p.recordFailure(nil, fmt.Errorf("failed to load specs using specLoader: %w", err))
 	}
 
 	if p.substitutor != nil {
@@ -261,13 +287,8 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// the end instead.
 	fail := func(err error) error {
 		carried := slices.Concat(specDiags, syntaxDiags)
-		if failureRenderer, ok := p.renderer.(renderer.FailureRenderer); ok {
-			ui.StopSpinner()
-			carried.Sort()
-			if renderErr := failureRenderer.RenderFailure(carried, err); renderErr != nil {
-				return fmt.Errorf("rendering diagnostics: %w", renderErr)
-			}
-			return err
+		if _, ok := p.renderer.(renderer.FailureRenderer); ok {
+			return p.recordFailure(carried, err)
 		}
 		if renderErr := p.render(carried); renderErr != nil {
 			return renderErr

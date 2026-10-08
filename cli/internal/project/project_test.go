@@ -623,7 +623,7 @@ func TestProject_Load_JSONRendererRecordsAFailureWithoutDiagnostics(t *testing.T
 	err := proj.Load("test_dir")
 
 	require.ErrorContains(t, err, "building resource graph: event not found")
-	assert.False(t, errors.Is(err, project.ErrValidationFailed), "the document does not carry the cause of a load error as a validation failure")
+	assert.ErrorIs(t, err, project.ErrValidationFailed, "the document holds the cause, so the caller must not print it again")
 	assert.JSONEq(t, `{
 		"diagnostics": [{
 			"ruleId": "project/load-failed",
@@ -658,4 +658,36 @@ func TestProject_Load_TextRendererAddsNoFailureDiagnostic(t *testing.T) {
 
 	require.Error(t, proj.Load("test_dir"))
 	assert.NotContains(t, out.String(), "project/load-failed")
+}
+
+// A loader failure before validation, a bad --location for one, still gets a
+// document, so a consumer never has to treat empty output as a result.
+func TestProject_Load_JSONRendererRecordsALoaderFailure(t *testing.T) {
+	t.Parallel()
+
+	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return nil, errors.New("no such directory")
+	}}
+
+	var out bytes.Buffer
+	proj := project.New(testutils.NewMockProvider(nil, nil),
+		project.WithLoader(mockLoader),
+		project.WithRenderer(renderer.NewJSONRenderer(&out)),
+	)
+
+	err := proj.Load("./typo")
+
+	require.ErrorContains(t, err, "failed to load specs using specLoader: no such directory")
+	assert.ErrorIs(t, err, project.ErrValidationFailed)
+	assert.JSONEq(t, `{
+		"diagnostics": [{
+			"ruleId": "project/load-failed",
+			"severity": "error",
+			"message": "failed to load specs using specLoader: no such directory",
+			"file": "",
+			"line": 0,
+			"column": 0
+		}],
+		"summary": {"errors": 1, "warnings": 0}
+	}`, out.String())
 }

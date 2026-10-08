@@ -67,9 +67,6 @@ func NewCmdValidate() *cobra.Command {
 			}
 			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 
-			// Swap the renderer rather than post-processing text: the engine already
-			// produces structured diagnostics, and the text form is a lossy view of
-			// them.
 			if jsonOutput {
 				projectOpts = append(projectOpts, project.WithRenderer(
 					renderer.NewJSONRenderer(cmd.OutOrStdout()),
@@ -108,9 +105,9 @@ func run(cmd *cobra.Command, p project.Project, location string, jsonOutput bool
 	if err != nil {
 		wrapped := fmt.Errorf("validating project: %w", err)
 		// A failure the document already holds is not printed again on stderr,
-		// which would break consumers that merge the streams. Load and graph
-		// errors are not in the document and keep their stderr message, with
-		// hints such as the missing --var-file.
+		// which would break consumers that merge the streams. What the document
+		// lacks keeps its stderr message, such as the --var-file hint that
+		// accompanies a substitution failure.
 		if jsonOutput && errors.Is(err, project.ErrValidationFailed) {
 			return &cmderrors.SilentError{Err: wrapped}
 		}
