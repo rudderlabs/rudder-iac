@@ -47,6 +47,18 @@ func exampleConfig() map[string]any {
 	return cfg
 }
 
+// wifConfig authenticates through workload identity federation, so it carries
+// no credentials.
+func wifConfig() map[string]any {
+	cfg := copyConfig(minimalConfig())
+	delete(cfg, "credentials")
+	cfg["auth_method"] = "workloadIdentityFederation"
+	cfg["workload_identity_project_number"] = "123456789012"
+	cfg["workload_identity_pool_id"] = "rudderstack-pool"
+	cfg["workload_identity_provider_id"] = "rudderstack-aws"
+	return cfg
+}
+
 func copyConfig(src map[string]any) map[string]any {
 	out := make(map[string]any, len(src))
 	for k, v := range src {
@@ -69,6 +81,17 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, int64(1), registered.Version)
 	assert.Equal(t, []string{"credentials"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
+	assert.Equal(t, map[string]any{
+		"auth_method":                  "serviceAccountKey",
+		"skip_tracks_table":            false,
+		"skip_views":                   false,
+		"skip_users_table":             true,
+		"partition_column":             "_PARTITIONTIME",
+		"partition_type":               "day",
+		"cleanup_object_storage_files": false,
+		"underscore_divide_numbers":    false,
+		"allow_users_context_traits":   false,
+	}, registered.ConfigDefaults())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
@@ -107,6 +130,58 @@ func TestBQConfigValidation(t *testing.T) {
 	t.Run("valid minimal config", func(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, registered.ValidateConfig(minimalConfig()))
+	})
+
+	t.Run("workload identity federation needs no credentials", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(wifConfig()))
+
+		cfg := wifConfig()
+		cfg["workload_identity_target_service_account"] = "rudderstack@my-project.iam.gserviceaccount.com"
+		assert.Empty(t, registered.ValidateConfig(cfg))
+	})
+
+	t.Run("workload identity federation requires its pool fields", func(t *testing.T) {
+		t.Parallel()
+
+		for _, field := range []string{
+			"workload_identity_project_number",
+			"workload_identity_pool_id",
+			"workload_identity_provider_id",
+		} {
+			cfg := wifConfig()
+			delete(cfg, field)
+
+			errors := registered.ValidateConfig(cfg)
+			assertHasPath(t, errors, "/"+field)
+		}
+	})
+
+	// Only workload identity federation exempts credentials: the omitted
+	// default, an explicit serviceAccountKey and an unknown method all require it.
+	t.Run("credentials required unless workload identity federation", func(t *testing.T) {
+		t.Parallel()
+
+		for _, method := range []string{"serviceAccountKey", "oauth"} {
+			cfg := copyConfig(minimalConfig())
+			delete(cfg, "credentials")
+			cfg["auth_method"] = method
+
+			errors := registered.ValidateConfig(cfg)
+			assertHasPath(t, errors, "/credentials")
+		}
+	})
+
+	t.Run("auth_method enum enforced", func(t *testing.T) {
+		t.Parallel()
+
+		for _, method := range []string{"", "oauth"} {
+			cfg := copyConfig(minimalConfig())
+			cfg["auth_method"] = method
+
+			errors := registered.ValidateConfig(cfg)
+			assertHasPath(t, errors, "/auth_method")
+		}
 	})
 
 	t.Run("validated example config", func(t *testing.T) {
@@ -195,6 +270,13 @@ func TestBQConfigValidation(t *testing.T) {
 			{field: "bucket_name", value: "192.168.0.1"},
 			{field: "bucket_name", value: "rudder..bucket"},
 			{field: "bucket_name", value: "BadBucket"},
+			{field: "workload_identity_project_number", value: "my-gcp-project"},
+			{field: "workload_identity_project_number", value: strings.Repeat("1", 21)},
+			{field: "workload_identity_pool_id", value: "gcp-rudderstack"},
+			{field: "workload_identity_pool_id", value: "abc"},
+			{field: "workload_identity_pool_id", value: "Rudderstack-Pool"},
+			{field: "workload_identity_provider_id", value: "gcp-aws"},
+			{field: "workload_identity_target_service_account", value: "rudderstack@my-project.example.com"},
 		}
 
 		for _, tc := range cases {
@@ -207,7 +289,7 @@ func TestBQConfigValidation(t *testing.T) {
 	// A reject pattern is only correct if it is also narrow enough: these values
 	// resemble a blocked shape without being one, and would fail if a reject
 	// branch were widened (goog -> goo, \.\. -> \., a 4-octet IP -> any dotted
-	// digits, or the pg_ prefix matched anywhere rather than at the start).
+	// digits, or the pg_ and gcp- prefixes matched anywhere rather than at the start).
 	t.Run("near miss values are accepted", func(t *testing.T) {
 		t.Parallel()
 
@@ -219,6 +301,8 @@ func TestBQConfigValidation(t *testing.T) {
 			{field: "bucket_name", value: "rudder.bucket"},
 			{field: "bucket_name", value: "1.2.3.4.5"},
 			{field: "namespace", value: "pgx_events"},
+			{field: "workload_identity_pool_id", value: "rudder-gcp-pool"},
+			{field: "workload_identity_provider_id", value: "gcp4"},
 		}
 
 		for _, tc := range cases {
@@ -258,6 +342,7 @@ func TestBQConfigValidation(t *testing.T) {
 			{field: "partition_column", value: "env.BQ_PARTITION_COLUMN"},
 			{field: "partition_type", value: `{{ config.partitionType || day }}`},
 			{field: "partition_type", value: "env.BQ_PARTITION_TYPE"},
+			{field: "workload_identity_pool_id", value: `{{ config.poolId || rudderstack-pool }}`},
 		} {
 			cfg := copyConfig(minimalConfig())
 			cfg[tc.field] = tc.value
@@ -381,6 +466,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"prefix": "rudder/bq/",
 				"namespace": "rudder_e2e",
 				"credentials": "{\"type\":\"service_account\"}",
+				"auth_method": "serviceAccountKey",
 				"sync_frequency": "30",
 				"sync_start_at": "01:00",
 				"exclude_window": {"start_time": "02:00", "end_time": "03:00"},
@@ -401,6 +487,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"prefix": "rudder/bq/",
 				"namespace": "rudder_e2e",
 				"credentials": "{\"type\":\"service_account\"}",
+				"authMethod": "serviceAccountKey",
 				"syncFrequency": "30",
 				"syncStartAt": "01:00",
 				"excludeWindow": {"excludeWindowStartTime": "02:00", "excludeWindowEndTime": "03:00"},
@@ -424,6 +511,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"prefix": "",
 				"namespace": "",
 				"credentials": "{\"type\":\"service_account\"}",
+				"workload_identity_target_service_account": "",
 				"sync_frequency": "180",
 				"sync_start_at": "",
 				"skip_tracks_table": false,
@@ -441,6 +529,7 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"prefix": "",
 				"namespace": "",
 				"credentials": "{\"type\":\"service_account\"}",
+				"workloadIdentityTargetServiceAccount": "",
 				"syncFrequency": "180",
 				"syncStartAt": "",
 				"skipTracksTable": false,
@@ -450,6 +539,29 @@ func TestBQConversionRoundTrip(t *testing.T) {
 				"cleanupObjectStorageFiles": false,
 				"underscoreDivideNumbers": false,
 				"allowUsersContextTraits": false
+			}`,
+		},
+		{
+			Name: "workload identity federation",
+			LocalJSON: `{
+				"project": "rudder-cli-e2e",
+				"bucket_name": "rudder-cli-e2e-bq",
+				"sync_frequency": "180",
+				"auth_method": "workloadIdentityFederation",
+				"workload_identity_project_number": "123456789012",
+				"workload_identity_pool_id": "rudderstack-pool",
+				"workload_identity_provider_id": "rudderstack-aws",
+				"workload_identity_target_service_account": "rudderstack@my-project.iam.gserviceaccount.com"
+			}`,
+			APIJSON: `{
+				"project": "rudder-cli-e2e",
+				"bucketName": "rudder-cli-e2e-bq",
+				"syncFrequency": "180",
+				"authMethod": "workloadIdentityFederation",
+				"workloadIdentityProjectNumber": "123456789012",
+				"workloadIdentityPoolId": "rudderstack-pool",
+				"workloadIdentityProviderId": "rudderstack-aws",
+				"workloadIdentityTargetServiceAccount": "rudderstack@my-project.iam.gserviceaccount.com"
 			}`,
 		},
 		{

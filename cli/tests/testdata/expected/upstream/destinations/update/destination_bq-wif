@@ -1,0 +1,33 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "bq-wif",
+  "name": "E2E BigQuery WIF Updated",
+  "type": "BQ",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "cloud"
+    },
+    "allowUsersContextTraits": false,
+    "authMethod": "workloadIdentityFederation",
+    "bucketName": "rudder-cli-e2e-bq-wif-updated",
+    "cleanupObjectStorageFiles": false,
+    "namespace": "rudder_e2e_wif",
+    "partitionColumn": "_PARTITIONTIME",
+    "partitionType": "day",
+    "project": "rudder-cli-e2e",
+    "skipTracksTable": false,
+    "skipUsersTable": true,
+    "skipViews": false,
+    "syncFrequency": "60",
+    "underscoreDivideNumbers": false,
+    "workloadIdentityPoolId": "rudderstack-pool",
+    "workloadIdentityProjectNumber": "123456789012",
+    "workloadIdentityProviderId": "rudderstack-aws",
+    "workloadIdentityTargetServiceAccount": "rudderstack@rudder-cli-e2e.iam.gserviceaccount.com"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

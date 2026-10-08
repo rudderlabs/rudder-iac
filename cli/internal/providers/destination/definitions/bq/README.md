@@ -10,7 +10,8 @@ In a destination spec:
 
 ## Example
 
-Every config key this destination accepts:
+Every config key this destination accepts, except the workload identity
+federation keys shown under `auth_method` below:
 
 ```yaml
 version: rudder/v1
@@ -29,6 +30,7 @@ spec:
     bucket_name: my-rudder-staging-bucket
     prefix: rudder/events
     namespace: rudder_events
+    auth_method: serviceAccountKey
     credentials: "{{ .BQ_CREDENTIALS }}"
 
     sync_frequency: "180"
@@ -111,13 +113,61 @@ Cannot be changed once the destination exists — the API rejects the update. Th
 CLI does not check this locally: `validate` accepts a change and `apply` sends
 it, failing at the API. Create a new destination instead.
 
-#### `credentials` — string, required, secret
+#### `auth_method` — string, default `serviceAccountKey`
+
+How RudderStack authenticates to BigQuery and the staging bucket:
+
+- `serviceAccountKey` — with the service-account JSON key in `credentials`
+- `workloadIdentityFederation` — through a workload identity pool in your GCP
+  project that trusts RudderStack, so no key is stored
+
+Workload identity federation replaces `credentials` with the
+`workload_identity_*` keys:
+
+```yaml
+auth_method: workloadIdentityFederation
+workload_identity_project_number: "123456789012"
+workload_identity_pool_id: rudderstack-pool
+workload_identity_provider_id: rudderstack-aws
+workload_identity_target_service_account: rudderstack@my-gcp-project.iam.gserviceaccount.com
+```
+
+#### `credentials` — string, secret
 
 GCP service-account JSON key. The account needs BigQuery dataset, table and job
 permissions plus read and write access to the staging bucket.
 
-Supply it as a `{{ .VAR }}` reference rather than a literal — see
-[Secrets](#secrets).
+Required unless `auth_method` is `workloadIdentityFederation`. Supply it as a
+`{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
+
+#### `workload_identity_project_number` — string
+
+Project number of the GCP project that holds the workload identity pool. This
+is the numeric project number, not the project ID in `project`. Written as a
+string, not a number.
+
+Required when `auth_method` is `workloadIdentityFederation`. 1 to 20 digits.
+
+#### `workload_identity_pool_id` — string
+
+ID of the workload identity pool.
+
+Required when `auth_method` is `workloadIdentityFederation`. 4 to 32 lowercase
+letters, digits or hyphens, and must not start with `gcp-`.
+
+#### `workload_identity_provider_id` — string
+
+ID of the AWS provider in the workload identity pool.
+
+Required when `auth_method` is `workloadIdentityFederation`. 4 to 32 lowercase
+letters, digits or hyphens, and must not start with `gcp-`.
+
+#### `workload_identity_target_service_account` — string
+
+Email of the service account RudderStack impersonates, in the form
+`<name>@<project-id>.iam.gserviceaccount.com`. Set it only if you granted access
+through service account impersonation; leave it out if you granted access to the
+federated identities directly.
 
 ### Sync scheduling
 
@@ -298,8 +348,9 @@ BigQuery requires no additional config keys to connect a source of any type.
 
 ## Secrets
 
-`credentials` is the only secret key. Write it as a `{{ .VAR }}` reference and
-supply the value at apply time, either from the environment or from a var file:
+`credentials` is the only secret key, and only `serviceAccountKey` auth uses it.
+Write it as a `{{ .VAR }}` reference and supply the value at apply time, either
+from the environment or from a var file:
 
 ```yaml
 credentials: "{{ .BQ_CREDENTIALS }}"

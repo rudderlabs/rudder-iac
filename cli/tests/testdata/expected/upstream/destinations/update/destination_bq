@@ -11,6 +11,7 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "authMethod": "serviceAccountKey",
     "allowUsersContextTraits": false,
     "bucketName": "rudder-cli-e2e-bq-updated",
     "cleanupObjectStorageFiles": false,

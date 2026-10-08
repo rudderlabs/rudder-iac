@@ -8,8 +8,9 @@ import (
 )
 
 func init() {
-	// schema.json uses negative lookaheads for both namespace and bucket names.
-	// RE2 cannot compile lookaheads, so the disallowed cases live in reject patterns.
+	// schema.json uses negative lookaheads for namespace, bucket names and
+	// workload identity IDs. RE2 cannot compile lookaheads, so the disallowed
+	// cases live in reject patterns.
 	funcs.NewPatternWithReject(
 		"bq_namespace",
 		`^(.{0,64})$`,
@@ -22,6 +23,25 @@ func init() {
 		`^[a-z0-9][a-z0-9-._]{1,61}[a-z0-9]$`,
 		`(^goog)|google|^\d+\.\d+\.\d+\.\d+$|\.\.`,
 		"must be a valid GCS bucket name, must not start with goog, contain google, look like an IP address, or contain consecutive dots",
+	)
+
+	funcs.NewPattern(
+		"bq_wif_project_number",
+		`^[0-9]{1,20}$`,
+		"must be 1 to 20 digits: the project number, not the project ID",
+	)
+
+	funcs.NewPatternWithReject(
+		"bq_wif_id",
+		`^[a-z0-9-]{4,32}$`,
+		`^gcp-`,
+		"must be 4 to 32 lowercase letters, digits or hyphens, and must not start with gcp-",
+	)
+
+	funcs.NewPattern(
+		"bq_wif_service_account",
+		`^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$`,
+		"must be a service account email ending in .iam.gserviceaccount.com",
 	)
 }
 
@@ -67,7 +87,15 @@ type bqConfig struct {
 	BucketName  string `mapstructure:"bucket_name" validate:"required,pattern=bq_bucket_name"`
 	Prefix      string `mapstructure:"prefix" validate:"omitempty,pattern=single_line_100"`
 	Namespace   string `mapstructure:"namespace" validate:"omitempty,pattern=bq_namespace"`
-	Credentials string `mapstructure:"credentials" validate:"required"`
+	Credentials string `mapstructure:"credentials" validate:"required_unless=AuthMethod workloadIdentityFederation"`
+
+	// No omitempty: the default fills an omitted key, so only an explicit ""
+	// reaches validation, and upstream's enum rejects it.
+	AuthMethod                           string `mapstructure:"auth_method" validate:"oneof=serviceAccountKey workloadIdentityFederation" default:"serviceAccountKey"`
+	WorkloadIdentityProjectNumber        string `mapstructure:"workload_identity_project_number" validate:"required_if=AuthMethod workloadIdentityFederation,omitempty,pattern=bq_wif_project_number"`
+	WorkloadIdentityPoolID               string `mapstructure:"workload_identity_pool_id" validate:"required_if=AuthMethod workloadIdentityFederation,omitempty,pattern=bq_wif_id"`
+	WorkloadIdentityProviderID           string `mapstructure:"workload_identity_provider_id" validate:"required_if=AuthMethod workloadIdentityFederation,omitempty,pattern=bq_wif_id"`
+	WorkloadIdentityTargetServiceAccount string `mapstructure:"workload_identity_target_service_account" validate:"omitempty,pattern=bq_wif_service_account"`
 
 	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
@@ -95,6 +123,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("prefix", "prefix"),
 		converter.Simple("namespace", "namespace"),
 		converter.Simple("credentials", "credentials"),
+		converter.Simple("authMethod", "auth_method"),
+		converter.Simple("workloadIdentityProjectNumber", "workload_identity_project_number"),
+		converter.Simple("workloadIdentityPoolId", "workload_identity_pool_id"),
+		converter.Simple("workloadIdentityProviderId", "workload_identity_provider_id"),
+		converter.Simple("workloadIdentityTargetServiceAccount", "workload_identity_target_service_account"),
 		converter.Simple("syncFrequency", "sync_frequency"),
 		converter.Simple("syncStartAt", "sync_start_at"),
 		converter.Simple("excludeWindow.excludeWindowStartTime", "exclude_window.start_time"),
