@@ -51,7 +51,7 @@ func TestDevListenServesTheReviewPage(t *testing.T) {
 	}
 }
 
-// dev --help prints the guide that the listener serves, so an agent reads
+// local event-stream --help prints the guide that the listener serves, so an agent reads
 // the same text from either.
 func TestDevListenHelpIsTheGuide(t *testing.T) {
 	t.Parallel()

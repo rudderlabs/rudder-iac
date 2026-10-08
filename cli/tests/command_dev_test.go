@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The dev group is unhidden and let run only after the root loads the config,
+// The local event-stream group is unhidden and let run only after the root loads the config,
 // so only the binary shows that each way of setting localEventStream reaches it.
 func TestDevListenGate(t *testing.T) {
 	flagFile := filepath.Join(t.TempDir(), "config.json")

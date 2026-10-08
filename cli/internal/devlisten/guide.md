@@ -292,8 +292,8 @@ docker run -d --name dev-listen -p 127.0.0.1:4321:4321 \
 for i in $(seq 100); do curl -fsS http://127.0.0.1:4321/_local/v1/info >/dev/null && break; [ "$(docker inspect -f '{{.State.Running}}' dev-listen)" = true ] || { docker logs dev-listen >&2; exit 1; }; sleep 0.2; done
 ```
 
-The loop stops when the container exits, for example when the image has no dev
-listen or a gate variable is misspelled. Use a tag that has local event-stream serve.
+The loop stops when the container exits, for example when the image has no local
+event-stream serve or a gate variable is misspelled. Use a tag that has it.
 
 The ready line goes to `docker logs dev-listen`. The URL from the host is
 `http://127.0.0.1:4321`: a client on the host sends `127.0.0.1` or `localhost`

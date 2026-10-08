@@ -51,10 +51,10 @@ func TestNewCmdLocalIsHidden(t *testing.T) {
 	require.True(t, NewCmdLocal().Hidden)
 }
 
-func TestDevPrintsHelp(t *testing.T) {
+func TestLocalPrintsHelp(t *testing.T) {
 	t.Parallel()
 
-	for _, args := range [][]string{{"local", "event-stream"}, {"local", "event-stream", "--help"}} {
+	for _, args := range [][]string{{"local", "event-stream"}, {"local", "event-stream", "--help"}, {"local", "event-stream", "events"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Parallel()
 
@@ -67,7 +67,7 @@ func TestDevPrintsHelp(t *testing.T) {
 	}
 }
 
-func TestDevUsageErrors(t *testing.T) {
+func TestLocalUsageErrors(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {

@@ -32,7 +32,7 @@ const (
 
 var log = logger.New("local")
 
-type listenOptions struct {
+type serveOptions struct {
 	port       int
 	bind       string
 	writeKeys  []string
@@ -40,7 +40,7 @@ type listenOptions struct {
 }
 
 func newCmdServe() *cobra.Command {
-	var opts listenOptions
+	var opts serveOptions
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Capture SDK requests on a local endpoint",
@@ -57,8 +57,8 @@ func newCmdServe() *cobra.Command {
 			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that
 			is taken fails at start with port_in_use and exit 1. Use --bind 0.0.0.0 only in a
 			container. By default any write key is accepted, a missing one included. --write-key is an
-			allowlist: it rejects every other key and a missing key with 401. On local event-stream events summary and dev
-			events list, --write-key filters instead.
+			allowlist: it rejects every other key and a missing key with 401. On local event-stream events summary and
+			local event-stream events list, --write-key filters instead.
 
 			Listeners share nothing: captures stay in memory, and there is no state or lock file.
 			rudder-cli local event-stream --help has the whole guide.
@@ -87,7 +87,7 @@ func newCmdServe() *cobra.Command {
 
 			ctx, release := stopOnSignal(cmd.Context())
 			defer release()
-			return runListen(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr(), opts, cmd.Root().Version)
+			return runServe(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr(), opts, cmd.Root().Version)
 		},
 	}
 
@@ -101,7 +101,7 @@ func newCmdServe() *cobra.Command {
 	return cmd
 }
 
-func (o listenOptions) validate() *usageError {
+func (o serveOptions) validate() *usageError {
 	if o.port < 0 || o.port > 65535 {
 		return &usageError{
 			message: fmt.Sprintf("--port must be 0 to 65535, got %d", o.port),
@@ -134,8 +134,8 @@ func (o listenOptions) validate() *usageError {
 	return nil
 }
 
-// runListen serves until ctx ends. The ready line is all it writes on stdout.
-func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions, version string) error {
+// runServe serves until ctx ends. The ready line is all it writes on stdout.
+func runServe(ctx context.Context, stdout, stderr io.Writer, opts serveOptions, version string) error {
 	srv, err := devlisten.Start(devlisten.Config{
 		Port:       opts.port,
 		Bind:       opts.bind,

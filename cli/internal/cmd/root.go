@@ -13,9 +13,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
-	localcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/local"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
+	localcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/local"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
@@ -63,7 +63,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
-	localCmd          *cobra.Command
+	localCmd        *cobra.Command
 	datagraphCmd    *cobra.Command
 )
 

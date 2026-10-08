@@ -155,7 +155,7 @@ func newCmdEventsSummary() *cobra.Command {
 			# A fresh cursor
 			$ rudder-cli local event-stream events summary --url "$url" --json | jq .cursor
 		`),
-		Args: groupArgs,
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
 			defer func() { track("local event-stream events summary", err) }()
 			base, e := opts.listenerURL(cmd)
@@ -309,7 +309,7 @@ func shellWords(values []string) []string {
 	return out
 }
 
-// withURL adds the listener URL to a local event-stream events summary command, so a next runs
+// withURL adds the listener URL to a local event-stream events summary or events list command, so a next runs
 // against the listener the caller read. The server writes next without it.
 func withURL(next, base string) string {
 	if base == "" {

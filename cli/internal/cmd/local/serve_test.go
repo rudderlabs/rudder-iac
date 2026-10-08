@@ -18,7 +18,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 )
 
-func TestListenRejectsBadFlags(t *testing.T) {
+func TestServeRejectsBadFlags(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		args []string
@@ -74,7 +74,7 @@ func TestListenRejectsBadFlags(t *testing.T) {
 
 // A script that starts the listener in the background reads the failure
 // from the last line of its log.
-func TestListenReportsATakenPort(t *testing.T) {
+func TestServeReportsATakenPort(t *testing.T) {
 	t.Parallel()
 	taken, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -108,20 +108,20 @@ type listening struct {
 	ready  map[string]any
 	stderr *bytes.Buffer
 	cancel context.CancelFunc
-	// done is closed when runListen returns err.
+	// done is closed when runServe returns err.
 	done chan struct{}
 	err  error
 }
 
 // listen runs the command body until the test cancels it, and returns once
 // the ready line is out.
-func listen(t *testing.T, opts listenOptions) *listening {
+func listen(t *testing.T, opts serveOptions) *listening {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	stdoutR, stdoutW := io.Pipe()
 	l := &listening{stderr: &bytes.Buffer{}, cancel: cancel, done: make(chan struct{})}
 	go func() {
-		l.err = runListen(ctx, stdoutW, l.stderr, opts, "1.2.3")
+		l.err = runServe(ctx, stdoutW, l.stderr, opts, "1.2.3")
 		_ = stdoutW.Close()
 		close(l.done)
 	}()
@@ -137,9 +137,9 @@ func listen(t *testing.T, opts listenOptions) *listening {
 	return l
 }
 
-func TestListenServesUntilItsContextEnds(t *testing.T) {
+func TestServeServesUntilItsContextEnds(t *testing.T) {
 	t.Parallel()
-	l := listen(t, listenOptions{
+	l := listen(t, serveOptions{
 		bind:       "127.0.0.1",
 		writeKeys:  []string{"fake-write-key-for-tests"},
 		allowHosts: []string{"dev-listen"},
@@ -185,9 +185,9 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 	require.Empty(t, l.stderr.String(), "stderr stays silent when it is not a terminal")
 }
 
-func TestListenWarnsOnAnExposedBind(t *testing.T) {
+func TestServeWarnsOnAnExposedBind(t *testing.T) {
 	t.Parallel()
-	l := listen(t, listenOptions{bind: "0.0.0.0"})
+	l := listen(t, serveOptions{bind: "0.0.0.0"})
 	port := strconv.Itoa(int(l.ready["port"].(float64)))
 
 	require.Equal(t, "http://127.0.0.1:"+port, l.ready["url"])

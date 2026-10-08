@@ -56,7 +56,7 @@ func TestHelpTree(t *testing.T) {
 			require.Nil(t, c.Flags().Lookup(name), "%s --%s", c.CommandPath(), name)
 			require.Nil(t, c.InheritedFlags().Lookup(name), "%s --%s", c.CommandPath(), name)
 		}
-		if c.Name() == "local" || c.Name() == "event-stream" || c.Name() == "events" {
+		if c.HasSubCommands() {
 			return
 		}
 		require.NotEmpty(t, c.Short, c.CommandPath())
