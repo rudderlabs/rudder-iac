@@ -1,13 +1,13 @@
-# local event-stream serve end-to-end coverage
+# dev listen end-to-end coverage
 
-What the end-to-end tests of `rudder-cli local event-stream serve` check, where each one runs, and what no job can check.
+What the end-to-end tests of `rudder-cli dev listen` check, where each one runs, and what no job can check.
 
 ## Runs on every pull request (`dev-listen-e2e.yml`)
 
 | Test | File | What it proves |
 | --- | --- | --- |
 | `TestDevListenRefusesForeignHostsAndCrossSiteReads` | `command_dev_listen_hardening_test.go` | 13 Host forms and 4 `Sec-Fetch-Site` values against the query API and the review page. Ingestion stays open to any Host. |
-| `TestDevListenCORSCoversIngestionOnly` | same | CORS headers appear on ingestion and never on `/_local/v1` or `/_local/ui/`. |
+| `TestDevListenCORSCoversIngestionOnly` | same | CORS headers appear on ingestion and never on `/_dev/v1` or `/_dev/ui/`. |
 | `TestDevListenReviewPageIsLockedDown` | same | CSP without `unsafe-inline`, `nosniff`, `no-store`, and 404 for five path traversal forms. |
 | `TestDevListenMasksTheWriteKey` | same | A key sent by Basic auth, query string and pixel never appears in `/requests`, `/info` or the guide. Cookies are not stored. |
 | `TestDevListenKeepsTheBytesTheSDKSent` | same | Large integers, long decimals, key order, escapes and unicode come back unchanged. |
@@ -17,7 +17,7 @@ What the end-to-end tests of `rudder-cli local event-stream serve` check, where 
 | `TestDevListenCapturesParallelWritersExactly` | same | 150 requests from six writers are all captured, with strictly increasing sequence numbers. |
 | `TestDevListenEvictsOldestRequestsAndSaysSo` | same | After 10,050 requests the store holds at most 10,000 and reports `evicted` and `evictedThrough`. |
 | `TestDevListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. Passes because the record keeps only the first 1 KiB of a refused body that carries no events (`store/record.go`). Accepted requests are still kept whole, so large accepted posts can evict older captures by design. |
-| `hostile events` (3 tests) | `e2e-ui/tests/xss.spec.js` | Seven script and markup payloads in every rendered field never run and never become elements. The page requests nothing outside `/_local/`. |
+| `hostile events` (3 tests) | `e2e-ui/tests/xss.spec.js` | Seven script and markup payloads in every rendered field never run and never become elements. The page requests nothing outside `/_dev/`. |
 
 The Go tests take about 17 s with `-race`. They need no network, account or secret.
 
