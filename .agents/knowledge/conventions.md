@@ -287,3 +287,9 @@
 - Do not make a key `required` so that validation sees a value; declare its schema default instead. Nested defaults still fill only a block the spec carries, so a key inside an omitted block stays absent during validation too.
 - A key that stays required declares no default, even when `schema.json` has one: a default would fill in before validation and switch the requirement off. Registration rejects this only for a bare `required` tag, not for custom required checks. Redshift `use_iam_for_auth`, Snowflake `use_key_pair_auth` and Snowflake `s3.role_based_auth` stay required on purpose.
 - Customer.io `api_version` defaults to `v2`, matching integrations-config #2705, so a spec that omits it requires `user_id_identifier_type`.
+
+## RUD-3185 — Customer.io Device-Mode V2 Validation
+
+- Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
+- Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
+- Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
