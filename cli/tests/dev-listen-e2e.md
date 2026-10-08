@@ -16,7 +16,7 @@ What the end-to-end tests of `rudder-cli local event-stream serve` check, where 
 | `TestDevListenDropsASlowHeader` | same | A header that never ends is closed by the server. |
 | `TestDevListenCapturesParallelWritersExactly` | same | 150 requests from six writers are all captured, with strictly increasing sequence numbers. |
 | `TestDevListenEvictsOldestRequestsAndSaysSo` | same | After 10,050 requests the store holds at most 10,000 and reports `evicted` and `evictedThrough`. |
-| `TestDevListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. **Fails today** because #936 keeps the full body of a refused request. The pull request that adds it stays a draft until #936 truncates refused bodies. |
+| `TestDevListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. Passes because the record keeps only the first 1 KiB of a refused body that carries no events (`store/record.go`). Accepted requests are still kept whole, so large accepted posts can evict older captures by design. |
 | `hostile events` (3 tests) | `e2e-ui/tests/xss.spec.js` | Seven script and markup payloads in every rendered field never run and never become elements. The page requests nothing outside `/_local/`. |
 
 The Go tests take about 17 s with `-race`. They need no network, account or secret.
