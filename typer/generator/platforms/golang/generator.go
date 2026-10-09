@@ -326,8 +326,11 @@ func goType(ctx *GoContext, registry *core.NameRegistry, owner string, types, it
 		return "Null", false, nil
 	}
 	typ, nilable, err := memberType(ctx, registry, owner, values[0], items)
-	if err != nil || len(values) == len(types) {
-		return typ, nilable, err
+	if err != nil {
+		return "", false, err
+	}
+	if len(values) == len(types) {
+		return typ, nilable, nil
 	}
 	ctx.UsesNullable = true
 	return "Nullable[" + typ + "]", false, nil
