@@ -228,12 +228,12 @@ func (p *Provider) MigrateSpec(s *specs.Spec) (*specs.Spec, error) {
 // CheckPlan refuses changes the API would refuse partway through an apply: a
 // connection update that changes config it cannot update in place, and a
 // schema or table change on a source that still has a connection.
-func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
+func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error {
 	if err := connection.CheckImmutableChanges(plan.Diff); err != nil {
 		return err
 	}
 	if th, ok := p.handlers[table.ResourceType].(*table.Handler); ok {
-		return th.CheckPlan(ctx, plan.Diff)
+		return th.CheckPlan(ctx, plan.Diff, st)
 	}
 	return nil
 }

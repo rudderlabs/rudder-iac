@@ -417,7 +417,7 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, graph *resource
 
 // CheckPlan lets each child provider that can refuse a plan do so, in name
 // order so the first refusal is the same on every run.
-func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan) error {
+func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error {
 	names := maps.Keys(p.Providers)
 	sort.Strings(names)
 	for _, name := range names {
@@ -425,8 +425,8 @@ func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan) e
 		if !ok {
 			continue
 		}
-		if err := checker.CheckPlan(ctx, plan); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
+		if err := checker.CheckPlan(ctx, plan, st); err != nil {
+			return fmt.Errorf("checking plan for provider %s: %w", name, err)
 		}
 	}
 	return nil

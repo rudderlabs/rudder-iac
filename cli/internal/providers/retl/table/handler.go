@@ -180,24 +180,29 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 // CheckPlan refuses, before anything is applied, a schema or table change on a
 // source a destination is already syncing from (DEX-960). Checking in Update
 // meant the refusal came mid-apply, after earlier creates and updates, and
-// validate and dry-run stayed clean.
+// dry-run stayed clean.
 //
-// The plan carries the stored and the desired value of every changed key, and
-// the stored remote id, so the diff alone says which sources moved. Updates run
-// before deletes, so a plan that also removes the connection is still refused;
-// the connection has to go in an earlier apply.
-func (h *Handler) CheckPlan(ctx context.Context, diff *differ.Diff) error {
+// The plan holds the stored and the desired value of every changed key, but the
+// stored side is built from the state Input, which has no remote id. The id is
+// read from the state Output. Updates run before deletes, so a plan that also
+// removes the connection is still refused; the connection has to go in an
+// earlier apply.
+func (h *Handler) CheckPlan(ctx context.Context, diff *differ.Diff, st *state.State) error {
 	prefix := ResourceType + ":"
 	for _, urn := range slices.Sorted(maps.Keys(diff.UpdatedResources)) {
 		if !strings.HasPrefix(urn, prefix) {
 			continue
 		}
-		diffs := diff.UpdatedResources[urn].Diffs
-		sourceID, _ := diffs[sqlmodel.IDKey].SourceValue.(string)
+		stored := st.GetResource(urn)
+		if stored == nil {
+			continue
+		}
+		sourceID, _ := stored.Output[sqlmodel.IDKey].(string)
 		if sourceID == "" {
 			continue
 		}
 		var (
+			diffs  = diff.UpdatedResources[urn].Diffs
 			schema = diffs[SchemaKey]
 			table  = diffs[TableKey]
 		)

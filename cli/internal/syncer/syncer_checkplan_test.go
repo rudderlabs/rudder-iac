@@ -21,7 +21,7 @@ type refusingProvider struct {
 	err error
 }
 
-func (p *refusingProvider) CheckPlan(context.Context, *planner.Plan) error { return p.err }
+func (p *refusingProvider) CheckPlan(context.Context, *planner.Plan, *state.State) error { return p.err }
 
 // A provider that refuses the plan stops the run before the plan is shown and
 // before any resource is created, dry run or not.
