@@ -115,8 +115,10 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	adopted, err := apiClient.Accounts.Get(ctx, seededID)
 	require.NoError(t, err, "the seeded account must still exist after apply")
 	assert.NotEmpty(t, adopted.ExternalID, "apply must claim the account with an external id")
-	assert.NotContains(t, string(adopted.Options), rawAccountSecret,
-		"the credential is write-only — it must never come back in options")
+	for _, s := range fixtureAccountSecrets {
+		assert.NotContains(t, string(adopted.Options), s,
+			"the credential is write-only — it must never come back in options")
+	}
 
 	importable, err := apiClient.Accounts.ListAll(ctx, client.WithHasExternalID(false))
 	require.NoError(t, err)
@@ -275,8 +277,10 @@ func assertNoSecretOnDisk(t *testing.T, dir string) {
 		if err != nil {
 			return err
 		}
-		assert.NotContains(t, string(content), rawAccountSecret,
-			"raw secret leaked into %s", strings.TrimPrefix(path, dir))
+		for _, s := range fixtureAccountSecrets {
+			assert.NotContains(t, string(content), s,
+				"raw secret leaked into %s", strings.TrimPrefix(path, dir))
+		}
 		return nil
 	})
 	require.NoError(t, err)
