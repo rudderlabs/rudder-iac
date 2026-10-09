@@ -369,7 +369,10 @@ func arrayType(ctx *GoContext, registry *core.NameRegistry, owner string, items 
 	if err != nil {
 		return "", fmt.Errorf("registering the item union of %s: %w", owner, err)
 	}
-	return "[]" + name, addUnion(ctx, registry, name, fmt.Sprintf("%s is one item of %s", name, owner), "", items, nil)
+	if err := addUnion(ctx, registry, name, fmt.Sprintf("%s is one item of %s", name, owner), "", items, nil); err != nil {
+		return "", fmt.Errorf("mapping the item types of %s: %w", owner, err)
+	}
+	return "[]" + name, nil
 }
 
 // unionMembers are the JSON types a union can hold, in constructor order.
