@@ -214,9 +214,10 @@ func newCmdEventsList() *cobra.Command {
 			--view compact drops the SDK's auto-collected context; --fields PATH keeps only that dotted
 			path (repeat it; it cannot be combined with --view).
 
-			The stream carries no cursor. Take it from the ready line or from local event-stream events summary --json. At
-			most --limit events per page; when more are left, stderr names the --since to continue
-			from. Events of rejected requests are not in the stream: local event-stream events summary counts them.
+			The stream carries no cursor. Take it from the ready line or from
+			local event-stream events summary --json. At most --limit events per page; when more are
+			left, stderr names the --since to continue from. Events of rejected requests are not in
+			the stream: local event-stream events summary counts them.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli local event-stream events list --url http://127.0.0.1:4321 --since 5m

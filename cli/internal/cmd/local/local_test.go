@@ -94,6 +94,19 @@ func TestLocalUsageErrors(t *testing.T) {
 	}
 }
 
+// Without the group's own Args (groupArgs), cobra prints help and exits 0 for
+// an unknown subcommand of local.
+func TestLocalGroupRejectsUnknownSubcommand(t *testing.T) {
+	t.Parallel()
+
+	stdout, stderr, err := execute("local", "nope")
+
+	var silent *cmderrors.SilentError
+	require.ErrorAs(t, err, &silent)
+	require.Empty(t, stdout)
+	require.Equal(t, "Error: unknown command \"nope\" for \"rudder-cli local\"\nNext: rudder-cli local --help\n", stderr)
+}
+
 // Cobra runs only the nearest PersistentPreRunE, so a child with its own
 // would skip the experimental gate.
 func TestNoChildReplacesTheGate(t *testing.T) {

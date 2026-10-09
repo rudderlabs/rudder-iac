@@ -32,7 +32,7 @@ func walk(c *cobra.Command, visit func(*cobra.Command)) {
 	}
 }
 
-func TestDevHelpPrintsTheGuide(t *testing.T) {
+func TestLocalHelpPrintsTheGuide(t *testing.T) {
 	t.Parallel()
 
 	stdout, _, err := execute("local", "event-stream", "--help")
