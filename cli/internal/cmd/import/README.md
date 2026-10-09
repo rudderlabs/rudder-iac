@@ -67,8 +67,9 @@ Two things worth knowing:
 
 - **Your local spec wins.** Linking never overwrites your files. If a linked
   workspace resource differs from your local copy (say a different description),
-  your spec is left as-is and the difference shows up as a normal change the next
-  time you run `apply`.
+  your spec is left as-is and the next `apply` overwrites the workspace resource
+  with it. The plan lists the resource as importable without showing which fields
+  differ, so compare the two before applying.
 - **A diverged project is allowed** with `--merge` (that's the point), with one
   exception — see [Limitations](#limitations).
 
@@ -86,6 +87,7 @@ contents:
 | Property                                 | name, type, and item types      |
 | Event stream source                      | name                            |
 | Destination                              | display name                    |
+| Event stream connection                  | its source and destination      |
 | SQL model (RETL)                         | display name and account        |
 | Transformation                           | name                            |
 | Library                                  | import name                     |
@@ -148,7 +150,7 @@ After a merge import, `apply` uses the manifest:
   workspace resource instead of creating a new one, so there is no duplicate and
   no unique-name collision.
 - **Content differences** between your local spec and the adopted resource are
-  applied as an ordinary update.
+  applied while adopting it, without a field-level preview in the plan.
 - **Everything else** (resources with no workspace counterpart, or imported as
   new) applies exactly as it normally would.
 
@@ -260,3 +262,6 @@ re-running.
   fails rather than guessing which one to link.
 - **Data graph children that exist only in the workspace are skipped** (see
   [Data graphs](#data-graphs)).
+- **A destination links by display name alone.** If the workspace destination is
+  of a different type than your local one, `apply` fails with `destination type
+  change is not supported`; rename one of them or make the types match.
