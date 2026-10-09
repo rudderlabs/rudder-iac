@@ -337,10 +337,12 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 	}
 }
 
-// Null and Nullable are emitted only when the generated types use them, and
-// Null also for an untyped property, which takes Null{} to send null.
+// Each value helper is emitted only when the generated types use it, under a
+// section header emitted only with one of them. trackPlan's fields are
+// optional, so Ptr comes with every type that cannot hold nil. Null also comes
+// with an untyped property, which takes Null{} to send null.
 func TestGenerateValueHelpers(t *testing.T) {
-	type helpers struct{ null, nullable bool }
+	type helpers struct{ header, ptr, null, nullable bool }
 	property := func(name string, types []plan.PropertyType, items ...plan.PropertyType) plan.Property {
 		return plan.Property{Name: name, Types: types, ItemTypes: items}
 	}
@@ -355,6 +357,10 @@ func TestGenerateValueHelpers(t *testing.T) {
 		want       helpers
 	}{
 		{
+			name:       "only types that hold nil",
+			properties: []plan.Property{property("object", []plan.PropertyType{plan.PrimitiveTypeObject})},
+		},
+		{
 			name: "no null, untyped or nullable property",
 			properties: []plan.Property{
 				property("string", []plan.PropertyType{plan.PrimitiveTypeString}),
@@ -365,12 +371,33 @@ func TestGenerateValueHelpers(t *testing.T) {
 				property("union_with_null", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNull}),
 				property("item_union", array, plan.PrimitiveTypeString, plan.PrimitiveTypeInteger),
 			},
+			want: helpers{header: true, ptr: true},
 		},
-		{"null property", []plan.Property{property("null", []plan.PropertyType{plan.PrimitiveTypeNull})}, helpers{null: true}},
-		{"untyped property", []plan.Property{property("any", nil)}, helpers{null: true}},
-		{"null items", []plan.Property{property("nulls", array, plan.PrimitiveTypeNull)}, helpers{null: true}},
-		{"nullable property", []plan.Property{property("nullable", nullable)}, helpers{nullable: true}},
-		{"nullable items", []plan.Property{property("nullable_items", array, nullable...)}, helpers{nullable: true}},
+		{
+			name:       "null property",
+			properties: []plan.Property{property("null", []plan.PropertyType{plan.PrimitiveTypeNull})},
+			want:       helpers{header: true, ptr: true, null: true},
+		},
+		{
+			name:       "untyped property",
+			properties: []plan.Property{property("any", nil)},
+			want:       helpers{header: true, null: true},
+		},
+		{
+			name:       "null items",
+			properties: []plan.Property{property("nulls", array, plan.PrimitiveTypeNull)},
+			want:       helpers{header: true, null: true},
+		},
+		{
+			name:       "nullable property",
+			properties: []plan.Property{property("nullable", nullable)},
+			want:       helpers{header: true, ptr: true, nullable: true},
+		},
+		{
+			name:       "nullable items",
+			properties: []plan.Property{property("nullable_items", array, nullable...)},
+			want:       helpers{header: true, nullable: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -379,9 +406,12 @@ func TestGenerateValueHelpers(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 
+			content := files[0].Content
 			assert.Equal(t, tt.want, helpers{
-				null:     strings.Contains(files[0].Content, "\ntype Null struct{}\n"),
-				nullable: strings.Contains(files[0].Content, "\ntype Nullable[T any] struct {\n"),
+				header:   strings.Contains(content, "\n// --- Value helpers ---\n"),
+				ptr:      strings.Contains(content, "\nfunc Ptr[T any](v T) *T { return &v }\n"),
+				null:     strings.Contains(content, "\ntype Null struct{}\n"),
+				nullable: strings.Contains(content, "\ntype Nullable[T any] struct {\n"),
 			})
 		})
 	}
