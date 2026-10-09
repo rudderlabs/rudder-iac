@@ -10,10 +10,9 @@ import (
 )
 
 // CheckImmutableChanges refuses, from the plan alone, an update that changes a
-// config key the API cannot update in place. Update refuses the same change,
-// but only when the syncer reaches that connection, after the resources ahead
-// of it in the plan are already applied; here it fails before anything is
-// touched and before the plan is shown, so --dry-run reports it too (DEX-1020).
+// config key the API cannot update in place (DEX-1020). Update refuses the same
+// change, but only when the syncer reaches that connection; see
+// provider.PlanChecker for why this check runs at plan time.
 //
 // The differ reports a nested change under the top-level key only, so the
 // check compares the whole stored and desired config instead of looking for

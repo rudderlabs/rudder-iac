@@ -626,13 +626,12 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 
 type planCheckingProvider struct {
 	*testutils.MockProvider
-	err    error
-	gotSt  *state.State
-	called bool
+	err   error
+	gotSt *state.State
 }
 
 func (p *planCheckingProvider) CheckPlan(_ context.Context, _ *planner.Plan, st *state.State) error {
-	p.called, p.gotSt = true, st
+	p.gotSt = st
 	return p.err
 }
 

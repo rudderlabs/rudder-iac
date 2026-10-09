@@ -886,7 +886,7 @@ func TestCheckPlan(t *testing.T) {
 	}
 	connected := func() *fakeStore {
 		store := newFakeStore(remoteSource)
-		store.connections = map[string][]retlClient.RETLConnection{"src-1": {{ID: "conn-1"}}}
+		store.connections = map[string][]retlClient.RETLConnection{"src-1": {{ID: "conn-1"}, {ID: "conn-2", ExternalID: "my-connection"}}}
 		return store
 	}
 
@@ -901,8 +901,10 @@ func TestCheckPlan(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `schema "public" -> "PUBLIC"`)
 		assert.Contains(t, err.Error(), `table "users" -> "OTHER"`)
-		assert.Contains(t, err.Error(), "conn-1", "the message must name the blocking connection")
-		assert.Contains(t, err.Error(), "earlier apply")
+		// A webapp connection has only its id; a managed one is named as the project names it.
+		assert.Contains(t, err.Error(), "connections: conn-1, my-connection)", "the message must name the blocking connections")
+		assert.NotContains(t, err.Error(), "conn-2")
+		assert.Contains(t, err.Error(), "delete the connection first")
 		assert.Equal(t, []string{"list:table:true", "list-connections:src-1"}, store.calls)
 	})
 

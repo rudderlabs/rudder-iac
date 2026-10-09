@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -415,12 +414,10 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, graph *resource
 	return nil
 }
 
-// CheckPlan lets each child provider that can refuse a plan do so, in name
-// order so the first refusal is the same on every run.
+// CheckPlan lets each child provider that can refuse a plan do so, in Order so
+// the first refusal is the same on every run.
 func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error {
-	names := maps.Keys(p.Providers)
-	sort.Strings(names)
-	for _, name := range names {
+	for _, name := range p.Order {
 		checker, ok := p.Providers[name].(PlanChecker)
 		if !ok {
 			continue

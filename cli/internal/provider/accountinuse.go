@@ -9,5 +9,5 @@ import "github.com/rudderlabs/rudder-iac/api/client"
 func ExplainBlockingAccountUsage(err error) error {
 	return explainBlocked(err, (*client.APIError).BlockedByAccountUsage,
 		"other resources still use this account",
-		"Point them at another account or remove them from the project, in the same run if the CLI manages them")
+		"Point them at another account or remove them from the project")
 }

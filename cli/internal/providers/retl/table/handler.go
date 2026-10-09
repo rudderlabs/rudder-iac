@@ -1,6 +1,7 @@
 package table
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -178,15 +179,11 @@ func (h *Handler) Update(ctx context.Context, ID string, data resources.Resource
 }
 
 // CheckPlan refuses, before anything is applied, a schema or table change on a
-// source a destination is already syncing from (DEX-960). Checking in Update
-// meant the refusal came mid-apply, after earlier creates and updates, and
-// dry-run stayed clean.
+// source a destination is already syncing from (DEX-960). See PlanChecker for
+// why this runs at plan time and reads the id from the state Output.
 //
-// The plan holds the stored and the desired value of every changed key, but the
-// stored side is built from the state Input, which has no remote id. The id is
-// read from the state Output. Updates run before deletes, so a plan that also
-// removes the connection is still refused; the connection has to go in an
-// earlier apply.
+// Updates run before deletes, so a plan that also removes the connection is
+// still refused.
 func (h *Handler) CheckPlan(ctx context.Context, diff *differ.Diff, st *state.State) error {
 	prefix := ResourceType + ":"
 	for _, urn := range slices.Sorted(maps.Keys(diff.UpdatedResources)) {
@@ -201,24 +198,21 @@ func (h *Handler) CheckPlan(ctx context.Context, diff *differ.Diff, st *state.St
 		if sourceID == "" {
 			continue
 		}
+		// The diff holds only the keys that changed, so a key it omits stays
+		// empty on both sides and is not a move.
 		var (
-			diffs  = diff.UpdatedResources[urn].Diffs
-			schema = diffs[SchemaKey]
-			table  = diffs[TableKey]
+			diffs   = diff.UpdatedResources[urn].Diffs
+			current = resources.ResourceData{}
+			desired = resources.ResourceData{}
 		)
-		err := h.refuseTableMove(ctx, strings.TrimPrefix(urn, prefix), sourceID,
-			stringOf(schema.SourceValue), stringOf(table.SourceValue),
-			stringOf(schema.TargetValue), stringOf(table.TargetValue))
-		if err != nil {
+		for _, key := range []string{SchemaKey, TableKey} {
+			current[key], desired[key] = diffs[key].SourceValue, diffs[key].TargetValue
+		}
+		if err := h.refuseTableMove(ctx, strings.TrimPrefix(urn, prefix), sourceID, fromData(current), fromData(desired)); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func stringOf(v any) string {
-	s, _ := v.(string)
-	return s
 }
 
 // refuseTableMove errors when a source a destination syncs from changes schema
@@ -230,20 +224,16 @@ func stringOf(v any) string {
 // The connections are read from the API rather than the project, because a
 // connection made in the webapp blocks the edit just as much as one the project
 // manages, and is invisible locally. The call only happens when a source moves.
-func (h *Handler) refuseTableMove(
-	ctx context.Context,
-	ID, sourceID string,
-	currentSchema, currentTable, desiredSchema, desiredTable string,
-) error {
+func (h *Handler) refuseTableMove(ctx context.Context, ID, sourceID string, current, desired TableSpec) error {
 	var moved []string
 	// An empty current value means no value was recorded, as for an s3 source,
 	// which has neither, so there is no move to refuse. A desired value is
 	// compared as is: an unset target on a changed key is also a move.
-	if currentSchema != "" && desiredSchema != currentSchema {
-		moved = append(moved, fmt.Sprintf("schema %q -> %q", currentSchema, desiredSchema))
+	if current.Schema != "" && desired.Schema != current.Schema {
+		moved = append(moved, fmt.Sprintf("schema %q -> %q", current.Schema, desired.Schema))
 	}
-	if currentTable != "" && desiredTable != currentTable {
-		moved = append(moved, fmt.Sprintf("table %q -> %q", currentTable, desiredTable))
+	if current.Table != "" && desired.Table != current.Table {
+		moved = append(moved, fmt.Sprintf("table %q -> %q", current.Table, desired.Table))
 	}
 	if len(moved) == 0 {
 		return nil
@@ -259,10 +249,12 @@ func (h *Handler) refuseTableMove(
 
 	connected := make([]string, 0, len(page.Data))
 	for _, c := range page.Data {
-		connected = append(connected, c.ID)
+		// The external id is the name the user sees in the project, when the
+		// CLI manages the connection; a webapp connection has only its id.
+		connected = append(connected, cmp.Or(c.ExternalID, c.ID))
 	}
 	return fmt.Errorf(
-		"table source %s: %s cannot be changed while the source is connected to a destination (connections: %s); delete the connection in an earlier apply, or create a new source for the new table",
+		"table source %s: %s cannot be changed while the source is connected to a destination (connections: %s); delete the connection first, or create a new source for the new table",
 		ID, strings.Join(moved, " and "), strings.Join(connected, ", "),
 	)
 }
@@ -338,7 +330,7 @@ func (h *Handler) Import(ctx context.Context, ID string, data resources.Resource
 	}
 	// Importing a spec whose table differs would move the source, so it is held
 	// to the same rule as an update.
-	if err := h.refuseTableMove(ctx, ID, remoteID, remote.Schema, remote.Table, local.Schema, local.Table); err != nil {
+	if err := h.refuseTableMove(ctx, ID, remoteID, remote, local); err != nil {
 		return nil, fmt.Errorf("importing RETL source %s: %w", remoteID, err)
 	}
 

@@ -184,9 +184,13 @@ type ConsolidateSyncer interface {
 
 // PlanChecker is implemented by a provider that can refuse a plan. It runs
 // before the plan is shown, so --dry-run and apply fail alike and no resource
-// has been touched. A check may read from the API, but should do so only when
-// the plan makes it necessary. The plan's stored side holds state Input only,
-// so st is how a check reads an Output value such as a remote id.
+// has been touched. A handler that refuses the same change in Update does so
+// only when the syncer reaches that resource, after the resources ahead of it
+// in the plan are already applied.
+//
+// A check may read from the API, but should do so only when the plan makes it
+// necessary. The plan's stored side is built from the state Input only, so st
+// is how a check reads an Output value such as a remote id.
 type PlanChecker interface {
 	CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error
 }
