@@ -14,6 +14,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -620,4 +622,40 @@ func TestCompositeProviderResourceMatchers(t *testing.T) {
 	assert.Equal(t, []string{"alpha", "gamma"}, cp.(*provider.CompositeProvider).Order)
 	// A provider's own matcher order is preserved (parent-before-child).
 	assert.Equal(t, []string{"a1", "a2"}, types)
+}
+
+type planCheckingProvider struct {
+	*testutils.MockProvider
+	err   error
+	gotSt *state.State
+}
+
+func (p *planCheckingProvider) CheckPlan(_ context.Context, _ *planner.Plan, st *state.State) error {
+	p.gotSt = st
+	return p.err
+}
+
+func TestCompositeProvider_CheckPlan(t *testing.T) {
+	t.Parallel()
+
+	t.Run("names the provider that refused and passes the state on", func(t *testing.T) {
+		t.Parallel()
+		refusal := errors.New("refused")
+		a := &planCheckingProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil)}
+		b := &planCheckingProvider{MockProvider: testutils.NewMockProvider([]string{"kindB"}, nil), err: refusal}
+		// c has no PlanChecker and must be skipped.
+		c := testutils.NewMockProvider([]string{"kindC"}, nil)
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": a, "b": b, "c": c})
+		require.NoError(t, err)
+		checker, ok := cp.(provider.PlanChecker)
+		require.True(t, ok)
+		st := state.EmptyState()
+
+		err = checker.CheckPlan(context.Background(), &planner.Plan{}, st)
+
+		assert.EqualError(t, err, "checking plan for provider b: refused")
+		assert.ErrorIs(t, err, refusal)
+		assert.Same(t, st, a.gotSt)
+		assert.Same(t, st, b.gotSt)
+	})
 }

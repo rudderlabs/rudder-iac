@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -179,6 +180,19 @@ type ConsolidateSyncer interface {
 	// For transformations: batch publishes all modified resources
 	// For other providers: no-op (return nil)
 	ConsolidateSync(ctx context.Context, graph *resources.Graph, state *state.State) error
+}
+
+// PlanChecker is implemented by a provider that can refuse a plan. It runs
+// before the plan is shown, so --dry-run and apply fail alike and no resource
+// has been touched. A handler that refuses the same change in Update does so
+// only when the syncer reaches that resource, after the resources ahead of it
+// in the plan are already applied.
+//
+// A check may read from the API, but should do so only when the plan makes it
+// necessary. The plan's stored side is built from the state Input only, so st
+// is how a check reads an Output value such as a remote id.
+type PlanChecker interface {
+	CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error
 }
 
 // ImportManifestLoader receives a single workspace's import metadata after all

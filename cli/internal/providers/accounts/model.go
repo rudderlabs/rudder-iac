@@ -14,10 +14,10 @@ import (
 // display name in the control plane — a distinct field, so it sits beside Config
 // rather than inside it.
 type AccountSpec struct {
-	ID                    string         `mapstructure:"id" validate:"required"`
-	Name                  string         `mapstructure:"name" validate:"required"`
-	AccountDefinitionName string         `mapstructure:"account_definition_name" validate:"required"`
-	Config                map[string]any `mapstructure:"config" validate:"required"`
+	ID                    string         `json:"id" mapstructure:"id" validate:"required"`
+	Name                  string         `json:"name" mapstructure:"name" validate:"required"`
+	AccountDefinitionName string         `json:"account_definition_name" mapstructure:"account_definition_name" validate:"required"`
+	Config                map[string]any `json:"config" mapstructure:"config" validate:"required"`
 }
 
 // AccountResource is the resolved representation the differ compares. Registered
