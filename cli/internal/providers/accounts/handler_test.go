@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -26,6 +28,7 @@ type mockStore struct {
 	updatedID      string
 	externalIDSet  [2]string // {id, externalID}
 	createReturnID string
+	deleteErr      error
 }
 
 func (m *mockStore) Create(_ context.Context, req *client.CreateAccountRequest) (*client.Account, error) {
@@ -36,7 +39,7 @@ func (m *mockStore) Update(_ context.Context, id string, req *client.UpdateAccou
 	m.updated, m.updatedID = req, id
 	return &client.Account{ID: id}, nil
 }
-func (m *mockStore) Delete(context.Context, string) error { return nil }
+func (m *mockStore) Delete(context.Context, string) error { return m.deleteErr }
 func (m *mockStore) Get(context.Context, string) (*client.Account, error) {
 	return &client.Account{ID: "remote-1"}, nil
 }
@@ -244,6 +247,8 @@ func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
 	assert.Equal(t, "{{ .PROD_ANALYTICS_BQ_CREDENTIALS }}", config["credentials"], "secret must export as a var reference")
 	assert.Equal(t, "acme", config["project"])
 	assert.Equal(t, "US", config["location"])
+	assert.Equal(t, "serviceAccountKey", config["authMethod"], "the auth mode goes under BigQuery's own key")
+	assert.NotContains(t, config, "authenticationType")
 	assert.Equal(t, "prod-analytics-bq", specMap["id"])
 	assert.Equal(t, "name-prod-analytics-bq", specMap["name"])
 	assert.Equal(t, "SOURCE_BIGQUERY", specMap["account_definition_name"])
@@ -593,4 +598,29 @@ type mapResolver map[string]string
 func (m mapResolver) Resolve(name string) (string, bool) {
 	v, ok := m[name]
 	return v, ok
+}
+
+// The handler must route its delete failure through the explainer (DEX-959).
+func TestDelete_ExplainsAnInUseRefusal(t *testing.T) {
+	h := &HandlerImpl{store: &mockStore{deleteErr: &client.APIError{
+		HTTPStatusCode: http.StatusConflict,
+		Message:        "This account can't be removed because it is being used by sources: src-1.",
+	}}}
+
+	err := h.Delete(context.Background(), "snf-test", nil, &AccountState{ID: "remote-1"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "src-1", "the backend's reason must survive")
+	assert.Contains(t, err.Error(), "Point them at another account or remove them from the project")
+	assert.NotContains(t, err.Error(), "RUDDERSTACK_", "the message must not mention experimental flags (DEX-959)")
+}
+
+func TestDelete_LeavesOtherFailuresAlone(t *testing.T) {
+	failure := &client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "upstream unavailable"}
+	h := &HandlerImpl{store: &mockStore{deleteErr: failure}}
+
+	err := h.Delete(context.Background(), "snf-test", nil, &AccountState{ID: "remote-1"})
+
+	require.Error(t, err)
+	assert.Same(t, failure, errors.Unwrap(err), "the failure must be wrapped as is, with no note added")
 }
