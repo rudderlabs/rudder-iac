@@ -1,4 +1,4 @@
-// Package ui holds the review page that dev listen serves at /_dev/ui/. The
+// Package ui holds the review page that local event-stream serve serves at /_local/ui/. The
 // page is plain HTML, CSS and JavaScript with no build step. It reads the
 // capture through the query API only.
 package ui

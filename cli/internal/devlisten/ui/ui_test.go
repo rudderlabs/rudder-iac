@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const prefix = "/_dev/ui/"
+const prefix = "/_local/ui/"
 
 func serve(method, target string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
@@ -26,16 +26,16 @@ func TestHandlerServesThePageFiles(t *testing.T) {
 		contentType string
 		contains    string
 	}{
-		{target: "/_dev/ui/", status: 200, contentType: "text/html; charset=utf-8", contains: `<script src="app.js"`},
-		{target: "/_dev/ui/?event=Order+Completed&tab=requests", status: 200, contentType: "text/html; charset=utf-8", contains: "<title>"},
-		{target: "/_dev/ui/index.html", status: 200, contentType: "text/html; charset=utf-8", contains: "<title>"},
-		{target: "/_dev/ui/app.js", status: 200, contentType: "text/javascript; charset=utf-8", contains: "use strict"},
-		{target: "/_dev/ui/app.css", status: 200, contentType: "text/css; charset=utf-8", contains: "prefers-color-scheme: dark"},
-		{target: "/_dev/ui/icon.svg", status: 200, contentType: "image/svg+xml", contains: "<svg"},
-		{target: "/_dev/ui/nope.js", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
-		{target: "/_dev/ui/app.js/", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
-		{target: "/_dev/ui/ui.go", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
-		{target: "/_dev/ui/../v1/info", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
+		{target: "/_local/ui/", status: 200, contentType: "text/html; charset=utf-8", contains: `<script src="app.js"`},
+		{target: "/_local/ui/?event=Order+Completed&tab=requests", status: 200, contentType: "text/html; charset=utf-8", contains: "<title>"},
+		{target: "/_local/ui/index.html", status: 200, contentType: "text/html; charset=utf-8", contains: "<title>"},
+		{target: "/_local/ui/app.js", status: 200, contentType: "text/javascript; charset=utf-8", contains: "use strict"},
+		{target: "/_local/ui/app.css", status: 200, contentType: "text/css; charset=utf-8", contains: "prefers-color-scheme: dark"},
+		{target: "/_local/ui/icon.svg", status: 200, contentType: "image/svg+xml", contains: "<svg"},
+		{target: "/_local/ui/nope.js", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
+		{target: "/_local/ui/app.js/", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
+		{target: "/_local/ui/ui.go", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
+		{target: "/_local/ui/../v1/info", status: 404, contentType: "text/plain; charset=utf-8", contains: "not found"},
 	} {
 		t.Run(tc.target, func(t *testing.T) {
 			t.Parallel()
@@ -55,7 +55,7 @@ func TestHandlerServesThePageFiles(t *testing.T) {
 func TestHandlerPolicyAllowsOnlyThisOrigin(t *testing.T) {
 	t.Parallel()
 
-	w := serve(http.MethodGet, "/_dev/ui/")
+	w := serve(http.MethodGet, "/_local/ui/")
 
 	require.Equal(t, "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 		w.Header().Get("Content-Security-Policy"))
@@ -64,7 +64,7 @@ func TestHandlerPolicyAllowsOnlyThisOrigin(t *testing.T) {
 func TestHandlerAnswersHeadWithoutABody(t *testing.T) {
 	t.Parallel()
 
-	w := serve(http.MethodHead, "/_dev/ui/app.js")
+	w := serve(http.MethodHead, "/_local/ui/app.js")
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "text/javascript; charset=utf-8", w.Header().Get("Content-Type"))

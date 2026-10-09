@@ -5,7 +5,7 @@ on:
       - main
     paths:
       - "cli/internal/devlisten/**"
-      - "cli/internal/cmd/dev/**"
+      - "cli/internal/cmd/local/**"
       - "cli/internal/cmd/root.go"
       - "cli/internal/config/experimental.go"
       - "cli/cmd/rudder-cli/**"
@@ -24,7 +24,7 @@ on:
     # Keep in sync with the push filter above.
     paths:
       - "cli/internal/devlisten/**"
-      - "cli/internal/cmd/dev/**"
+      - "cli/internal/cmd/local/**"
       - "cli/internal/cmd/root.go"
       - "cli/internal/config/experimental.go"
       - "cli/cmd/rudder-cli/**"
@@ -46,14 +46,14 @@ concurrency:
 
 permissions: {}
 
-# The dev listen tests need no account, no secret and no network beyond the
+# The local event-stream serve tests need no account, no secret and no network beyond the
 # runner: every listener runs on loopback or in a local container.
 env:
   RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
 
 jobs:
   cli:
-    name: dev listen e2e and fuzz
+    name: local event-stream serve e2e and fuzz
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -71,7 +71,7 @@ jobs:
           go-version-file: go.mod
       # TestMain builds the binary once. The tests set the gate variables for
       # each listener they start.
-      - name: dev listen e2e
+      - name: local event-stream serve e2e
         run: go test -race -count=1 ./cli/tests -run TestDevListen -v
       - name: fuzz the body reader
         run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzBody$' -fuzztime 30s
@@ -87,7 +87,7 @@ jobs:
           if-no-files-found: ignore
 
   image:
-    name: dev listen in the Docker image
+    name: local event-stream serve in the Docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -106,13 +106,13 @@ jobs:
       # The same build that docker.yml publishes, kept local: nothing is pushed.
       - name: build the image
         run: make docker-build VERSION=dev-listen-e2e
-      - name: run dev listen in the image
+      - name: run local event-stream serve in the image
         env:
           RUDDER_CLI_IMAGE: rudderlabs/rudder-cli:dev-listen-e2e
         run: go test -count=1 ./cli/tests -run TestDevListenInADockerContainer -v
 
   page:
-    name: dev listen review page (Playwright)
+    name: local event-stream serve review page (Playwright)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -154,7 +154,7 @@ jobs:
           if-no-files-found: ignore
 
   sdk:
-    name: dev listen with a fixture app and real SDKs
+    name: local event-stream serve with a fixture app and real SDKs
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

@@ -58,8 +58,8 @@ Read these first when working on HTTP destination onboarding or destination defi
 - `cli/internal/providers/destination/handler.go`: local spec extraction, secret wrapping, API conversion, and remote-to-state conversion boundary for destination definitions.
 - `cli/internal/app/dependencies.go`: destination definition registry wiring and experimental-flag gating for unverified destinations such as HTTP.
 
-## dev listen CI entry
-Read these first when working on the dev listen CI or the container path:
-- `.github/workflows/dev-listen-e2e.yml`: four jobs (e2e plus fuzz, the Docker image, the Playwright page, the fixture app and real SDKs in `cli/tests/e2e-sdk`). It runs only on dev listen paths and needs no secret.
-- `cli/tests/command_dev_listen_container_test.go`: runs the image named by `RUDDER_CLI_IMAGE` and skips without it. The image passes `dev listen` as arguments: `cli/Dockerfile` has no `CMD` on purpose, because a `CMD` changes what a bare `docker run rudderlabs/rudder-cli` does.
+## local event-stream serve CI entry
+Read these first when working on the local event-stream serve CI or the container path:
+- `.github/workflows/dev-listen-e2e.yml`: four jobs (e2e plus fuzz, the Docker image, the Playwright page, the fixture app and real SDKs in `cli/tests/e2e-sdk`). It runs only on local event-stream serve paths and needs no secret.
+- `cli/tests/command_dev_listen_container_test.go`: runs the image named by `RUDDER_CLI_IMAGE` and skips without it. The image passes `local event-stream serve` as arguments: `cli/Dockerfile` has no `CMD` on purpose, because a `CMD` changes what a bare `docker run rudderlabs/rudder-cli` does.
 - `cli/internal/devlisten/api/api.go` (`hostAllowed`): the Host check compares names only, so a host client on a mapped port passes as `localhost` or `127.0.0.1`; a peer container needs `--allow-host`.

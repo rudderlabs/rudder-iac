@@ -1,13 +1,13 @@
-# rudder-cli dev: capture the events an app sends, and check them
+# rudder-cli local event-stream: capture the events an app sends, and check them
 
-`rudder-cli dev listen` runs a local server that answers RudderStack SDKs the way
+`rudder-cli local event-stream serve` runs a local server that answers RudderStack SDKs the way
 the RudderStack data plane does. It keeps every request in memory. You point the
 app's SDK at it, use the app, and read back what arrived: counts, a diagnosis,
 and each event exactly as the SDK sent it. You need no account, no workspace and
 no network. Nothing is delivered to destinations, and no tracking plan is checked.
 
-The dev commands are experimental. This guide is for people, coding agents and CI
-jobs. The same text is at `URL/_dev/v1/guide` on a running listener.
+The local commands are experimental. This guide is for people, coding agents and CI
+jobs. The same text is at `URL/_local/v1/guide` on a running listener.
 
 ## Turn it on
 
@@ -15,7 +15,7 @@ In a CI job or an agent shell, export the two gate variables. The third one stop
 command telemetry (command and flag names only, never values or captured data).
 
 ```sh
-export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_DEV_LISTEN=true
+export RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_LOCAL_EVENT_STREAM=true
 export RUDDERSTACK_CLI_TELEMETRY_DISABLED=true
 ```
 
@@ -23,41 +23,41 @@ At a terminal you can save the flag once instead:
 
 ```sh
 $ export RUDDERSTACK_CLI_EXPERIMENTAL=true
-$ rudder-cli experimental enable devListen
+$ rudder-cli experimental enable localEventStream
 ```
 
 The CLI reads saved flags only while `RUDDERSTACK_CLI_EXPERIMENTAL=true` is
 exported or `"experimental": true` is in `~/.rudder/config.json`. So every later
-shell needs that export too. With the gate off, each dev command exits 1 with
+shell needs that export too. With the gate off, each local command exits 1 with
 `experimental_disabled` and names both variables.
 
 ## The loop
 
-1. Start: `rudder-cli dev listen --port 0 > ready.json &`. It prints one JSON
+1. Start: `rudder-cli local event-stream serve --port 0 > ready.json &`. It prints one JSON
    ready line: `url`, `serverId`, `cursor`, `pid`, `ui` and more.
 2. Point the app's SDK at `url` (see "Point an app at the listener").
 3. Act: click, run the test, run the script.
-4. Read: `rudder-cli dev events --url "$url" --since "$cur" --json` for counts and
-   a diagnosis, then `rudder-cli dev events list` for the events themselves.
+4. Read: `rudder-cli local event-stream events summary --url "$url" --since "$cur" --json` for counts and
+   a diagnosis, then `rudder-cli local event-stream events list` for the events themselves.
 5. Stop: `kill "$pid"`. The listener exits 0, and the captures go with it.
 
 ## The three commands
 
-- `dev listen` is the server. One listener per job, per agent session or per
+- `local event-stream serve` is the server. One listener per job, per agent session or per
   terminal. `--port 0` takes a free port, so parallel runs never collide. A fixed
   port that is taken exits 1 with `port_in_use`. `--bind 0.0.0.0` is for a
   container only: anyone who reaches the port can read the captures. Use
   `--allow-host NAME` when a peer reaches it by a service name.
-- `dev events` prints the summary (about 1 KB): accepted events by name
+- `local event-stream events summary` prints the summary (about 1 KB): accepted events by name
   (`summary.byEvent`), events inside refused requests (`summary.rejected`),
   requests, write keys, SDK bootstrap calls, the diagnosis and the `cursor`.
   `--wait 30s` holds the call until `--min` matching accepted events exist (at most
   110s).
-- `dev events list` prints the accepted events after a cursor. With `--json` it
+- `local event-stream events list` prints the accepted events after a cursor. With `--json` it
   is NDJSON: one event per line, the keys, key order, numbers and strings the SDK
   sent, with nothing added. Without `--json` it is a table.
 
-`--write-key` has two meanings. On `dev listen` it is an allowlist: any other key,
+`--write-key` has two meanings. On `local event-stream serve` it is an allowlist: any other key,
 or a missing key, gets 401. Without it every key is accepted, a missing one
 included. On the read commands it is a filter.
 
@@ -88,21 +88,21 @@ listener with `--write-key`.
 
 Go one step down only when the cheaper step does not settle the question. Pass
 `--since "$cur"` so earlier traffic never counts. Take `$cur` from the ready line
-or from `.cursor` of `dev events --json`.
+or from `.cursor` of `local event-stream events summary --json`.
 
 ```sh
 # 1. the counts and the diagnosis, about 1 KB
-$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --json
+$ rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Order Completed' --json
 # 2. only the named paths, about 110 bytes per event
-$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
+$ rudder-cli local event-stream events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
 # 3. the event without the context the SDK collects on its own, about 0.4 KB
-$ rudder-cli dev events list --url "$url" --since "$cur" --view compact --json
+$ rudder-cli local event-stream events list --url "$url" --since "$cur" --view compact --json
 # 4. the whole event as sent, about 1.5 KB from a browser
-$ rudder-cli dev events list --url "$url" --since "$cur" --json
+$ rudder-cli local event-stream events list --url "$url" --since "$cur" --json
 # 5. the status, outcome and reason of each refused request
-$ curl -fsS "$url/_dev/v1/requests?since=$cur&failed=true&view=compact"
+$ curl -fsS "$url/_local/v1/requests?since=$cur&failed=true&view=compact"
 # 6. the headers and raw body of one request, about 3 KB
-$ curl -fsS "$url/_dev/v1/requests/SEQ"
+$ curl -fsS "$url/_local/v1/requests/SEQ"
 ```
 
 Filters work on both read commands and narrow every count: `--since` (a cursor, a
@@ -112,7 +112,7 @@ flag for OR; different flags combine with AND. Each `--event` name and
 `--write-key` you pass shows in the summary, with 0 when nothing arrived. Names are
 exact and case-sensitive.
 
-`dev events list` returns at most `--limit` events per page (1 to 1,000, default
+`local event-stream events list` returns at most `--limit` events per page (1 to 1,000, default
 100). A page never splits a request. When more is left, stderr says
 `more events: continue with --since N`, and stdout stays pure.
 
@@ -123,11 +123,11 @@ The CLI exits 0 on every successful read, an empty one included. The check is
 
 ```sh
 # exactly one accepted Order Completed
-$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
+$ rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
 # nothing refused: read it without filters, because filters narrow the counts
-$ rudder-cli dev events --url "$url" --since "$cur" --json | jq -e '.summary.requests.failed == 0'
+$ rudder-cli local event-stream events summary --url "$url" --since "$cur" --json | jq -e '.summary.requests.failed == 0'
 # every total is a number; length > 0 fails an empty stream
-$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
+$ rudder-cli local event-stream events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
 ```
 
 Use `-s` on the stream: it makes one array and one verdict. `all()` over zero
@@ -141,7 +141,7 @@ Refused requests never enter the event stream. Their events count under
 refused and control requests included. There is no CLI command for it: use curl
 or the review page at `ui`.
 
-- `GET URL/_dev/v1/requests` lists the records after `since`. Parameters:
+- `GET URL/_local/v1/requests` lists the records after `since`. Parameters:
   `since`, `limit` (0 to 1,000, default 100), `kind` (`ingestion` by default,
   `control` or `all`), `statusCode` (`401`, or a class such as `4xx`), `failed`
   (`true` or `false`), `writeKey` (the literal key), `messageId` (the request that
@@ -154,15 +154,15 @@ or the review page at `ui`.
   When `maxBytes` cuts the page, `truncated.next` is the command to run. A
   record larger than `maxBytes` alone is left out, the cursor passes it, and
   `truncated.next` reads its body.
-- `GET URL/_dev/v1/requests/SEQ` is one record: `statusCode`, `outcome`,
+- `GET URL/_local/v1/requests/SEQ` is one record: `statusCode`, `outcome`,
   `rejection` (stage and reason), the masked write key, six request headers
   (`User-Agent`, `Content-Type`, `Content-Encoding`, `Origin`, `AnonymousId`,
   `X-Forwarded-For`), the raw body, the response, and per event the `enrichment`
   that RudderStack would add: always `receivedAt` and `rudderId`; `messageId`
   when RudderStack replaces it, `request_ip` when the event has none, and `type`
   on a single-event route. `view=full` adds each event as sent. A large body:
-  `curl -fsS "$url/_dev/v1/requests/SEQ?fields=request.body&maxBytes=0"`.
-- `GET URL/_dev/v1/` lists every route with its parameters and an example.
+  `curl -fsS "$url/_local/v1/requests/SEQ?fields=request.body&maxBytes=0"`.
+- `GET URL/_local/v1/` lists every route with its parameters and an example.
 
 Cookies and `Authorization` are never kept. A write key longer than 8 characters
 shows as its first and last 4 characters (`abcd...wxyz`), or its first 4 only
@@ -203,9 +203,9 @@ listener at the URL (`server_unreachable`), another listener at the URL
 stderr with a `next` command that fixes it: one JSON object with `--json`, else an
 `Error:` line and a `Next:` line. The CLI never retries.
 
-The read commands take the URL from `--url`, else from `RUDDERSTACK_DEV_URL`.
-`--timeout` is the client deadline: `--wait` plus 5s on `dev events`, 5s on
-`dev events list`.
+The read commands take the URL from `--url`, else from `RUDDERSTACK_LOCAL_EVENT_STREAM_URL`.
+`--timeout` is the client deadline: `--wait` plus 5s on `local event-stream events summary`, 5s on
+`local event-stream events list`.
 
 ## One shell call (agents)
 
@@ -214,12 +214,12 @@ stop in one call. This loop is for Unix shells.
 
 ```sh
 d=$(mktemp -d)
-rudder-cli dev listen --port 0 >"$d/ready" 2>"$d/log" &
+rudder-cli local event-stream serve --port 0 >"$d/ready" 2>"$d/log" &
 pid=$!; trap 'kill "$pid" 2>/dev/null' EXIT
 until [ -s "$d/ready" ]; do kill -0 "$pid" 2>/dev/null || { cat "$d/log" >&2; exit 1; }; sleep 0.1; done
 url=$(jq -r .url "$d/ready"); cur=$(jq -r .cursor "$d/ready")
 RUDDERSTACK_DATA_PLANE_URL="$url" node smoke.js
-rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --wait 20s --json
+rudder-cli local event-stream events summary --url "$url" --since "$cur" --event 'Order Completed' --wait 20s --json
 ```
 
 The `kill -0` check ends the loop when the listener fails to start; its last
@@ -233,29 +233,29 @@ trap prints the request records to the job log.
 
 ```sh
 d=$(mktemp -d)
-rudder-cli dev listen --port 4321 >"$d/ready" 2>"$d/log" &
+rudder-cli local event-stream serve --port 4321 >"$d/ready" 2>"$d/log" &
 pid=$!
-trap 'rc=$?; [ "$rc" -eq 0 ] || curl -sS "${url:-}/_dev/v1/requests?since=${cur:-0}&kind=all&view=compact" >&2 || true; kill "$pid" 2>/dev/null; exit "$rc"' EXIT
+trap 'rc=$?; [ "$rc" -eq 0 ] || curl -sS "${url:-}/_local/v1/requests?since=${cur:-0}&kind=all&view=compact" >&2 || true; kill "$pid" 2>/dev/null; exit "$rc"' EXIT
 until [ -s "$d/ready" ]; do kill -0 "$pid" 2>/dev/null || { cat "$d/log" >&2; exit 1; }; sleep 0.1; done
 url=$(jq -r .url "$d/ready"); sid=$(jq -r .serverId "$d/ready"); cur=$(jq -r .cursor "$d/ready")
 ./run-purchase-flow
-rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" --event 'Order Completed' --wait 30s --json | jq -e '.timedOut == false and .summary.byEvent["Order Completed"] == 1'
-rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" --json | jq -e --argjson cur "$cur" '.summary.requests.failed == 0 and .evictedThrough <= $cur'
+rudder-cli local event-stream events summary --url "$url" --server-id "$sid" --since "$cur" --event 'Order Completed' --wait 30s --json | jq -e '.timedOut == false and .summary.byEvent["Order Completed"] == 1'
+rudder-cli local event-stream events summary --url "$url" --server-id "$sid" --since "$cur" --json | jq -e --argjson cur "$cur" '.summary.requests.failed == 0 and .evictedThrough <= $cur'
 ```
 
 Put `set -euo pipefail` on the first line of the script, or paste it inline in
 a `run:` step with `shell: bash`. A child script does not inherit the options of
 the shell that calls it, so without that line a failed check still exits 0. A
 test file can ask the listener directly over HTTP:
-`GET URL/_dev/v1/events?view=counts&since=N` is the summary, and
-`GET URL/_dev/v1/events?since=N` is the stream. Call it from the test process,
+`GET URL/_local/v1/events?view=counts&since=N` is the summary, and
+`GET URL/_local/v1/events?since=N` is the stream. Call it from the test process,
 never from inside the page: a request from the app's origin gets 403.
 
 ### GitHub Actions
 
 Set the gate on the job, install a pinned CLI release, and run the script above
 with `bash -euo pipefail`. This recipe is for Linux x86-64 runners. Set
-`RUDDER_CLI_VERSION` to a release that has dev listen.
+`RUDDER_CLI_VERSION` to a release that has local event-stream serve.
 
 ```yaml
 jobs:
@@ -263,7 +263,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUDDERSTACK_CLI_EXPERIMENTAL: "true"
-      RUDDERSTACK_X_DEV_LISTEN: "true"
+      RUDDERSTACK_X_LOCAL_EVENT_STREAM: "true"
       RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
       RUDDER_CLI_VERSION: "<version>"
     steps:
@@ -286,14 +286,14 @@ port on the host's loopback only:
 
 ```sh
 docker run -d --name dev-listen -p 127.0.0.1:4321:4321 \
-  -e RUDDERSTACK_CLI_EXPERIMENTAL=true -e RUDDERSTACK_X_DEV_LISTEN=true \
+  -e RUDDERSTACK_CLI_EXPERIMENTAL=true -e RUDDERSTACK_X_LOCAL_EVENT_STREAM=true \
   -e RUDDERSTACK_CLI_TELEMETRY_DISABLED=true \
-  rudderlabs/rudder-cli:<version> dev listen --bind 0.0.0.0 --port 4321
-for i in $(seq 100); do curl -fsS http://127.0.0.1:4321/_dev/v1/info >/dev/null && break; [ "$(docker inspect -f '{{.State.Running}}' dev-listen)" = true ] || { docker logs dev-listen >&2; exit 1; }; sleep 0.2; done
+  rudderlabs/rudder-cli:<version> local event-stream serve --bind 0.0.0.0 --port 4321
+for i in $(seq 100); do curl -fsS http://127.0.0.1:4321/_local/v1/info >/dev/null && break; [ "$(docker inspect -f '{{.State.Running}}' dev-listen)" = true ] || { docker logs dev-listen >&2; exit 1; }; sleep 0.2; done
 ```
 
-The loop stops when the container exits, for example when the image has no dev
-listen or a gate variable is misspelled. Use a tag that has dev listen.
+The loop stops when the container exits, for example when the image has no local
+event-stream serve or a gate variable is misspelled. Use a tag that has it.
 
 The ready line goes to `docker logs dev-listen`. The URL from the host is
 `http://127.0.0.1:4321`: a client on the host sends `127.0.0.1` or `localhost`
@@ -301,7 +301,7 @@ in `Host`, and the Host check accepts both on any port. For a peer container,
 start the listener on a user-defined network: run `docker network create devnet`,
 then add `--network devnet` to `docker run`. A peer on that network reaches the
 listener at `http://dev-listen:4321`. Add `--allow-host dev-listen`, or the peer
-gets 403 on `/_dev/v1/`. `docker stop dev-listen` exits 0, and the
+gets 403 on `/_local/v1/`. `docker stop dev-listen` exits 0, and the
 captures go with the container. The image has no `curl` or `jq`: run them on the
 host. GitHub Actions `services:` cannot pass a command to the image, so start
 the container in a `run:` step.

@@ -28,7 +28,7 @@ func docker(t *testing.T, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// The published image runs dev listen with the gate set by env, a host
+// The published image runs local event-stream serve with the gate set by env, a host
 // client reaches it through the mapped port, and docker stop exits 0.
 func TestDevListenInADockerContainer(t *testing.T) {
 	image := os.Getenv(devListenImageEnv)
@@ -39,9 +39,9 @@ func TestDevListenInADockerContainer(t *testing.T) {
 
 	id := docker(t, "run", "-d", "-p", "127.0.0.1::4321",
 		"-e", "RUDDERSTACK_CLI_EXPERIMENTAL=true",
-		"-e", "RUDDERSTACK_X_DEV_LISTEN=true",
+		"-e", "RUDDERSTACK_X_LOCAL_EVENT_STREAM=true",
 		"-e", "RUDDERSTACK_CLI_TELEMETRY_DISABLED=true",
-		image, "dev", "listen", "--bind", "0.0.0.0", "--port", "4321")
+		image, "local", "event-stream", "serve", "--bind", "0.0.0.0", "--port", "4321")
 	t.Cleanup(func() { _ = exec.Command("docker", "rm", "-fv", id).Run() })
 
 	// "127.0.0.1:55001", the first line when docker maps IPv4 and IPv6.
@@ -69,9 +69,9 @@ func TestDevListenInADockerContainer(t *testing.T) {
 		Bind     string `json:"bind"`
 		Port     int    `json:"port"`
 	}
-	// An image without dev listen prints an error and exits: fail at once.
+	// An image without local event-stream serve prints an error and exits: fail at once.
 	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(100 * time.Millisecond) {
-		code, body := get("localhost:"+port, "/_dev/v1/info")
+		code, body := get("localhost:"+port, "/_local/v1/info")
 		if code == http.StatusOK && json.Unmarshal(body, &info) == nil {
 			break
 		}
@@ -91,7 +91,7 @@ func TestDevListenInADockerContainer(t *testing.T) {
 		"localhost:" + port: http.StatusOK,
 		"evil.example":      http.StatusForbidden,
 	} {
-		code, _ := get(host, "/_dev/v1/info")
+		code, _ := get(host, "/_local/v1/info")
 		require.Equal(t, want, code, host)
 	}
 
@@ -105,7 +105,7 @@ func TestDevListenInADockerContainer(t *testing.T) {
 	require.NoError(t, resp.Body.Close())
 	require.Equal(t, "ok", string(body))
 
-	code, body := get("localhost:"+port, "/_dev/v1/events?view=counts&serverId="+info.ServerID)
+	code, body := get("localhost:"+port, "/_local/v1/events?view=counts&serverId="+info.ServerID)
 	require.Equal(t, http.StatusOK, code, string(body))
 	var counts struct {
 		Summary struct {

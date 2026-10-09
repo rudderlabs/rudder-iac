@@ -28,8 +28,8 @@ var (
 	errUnknownPath           = gwError{http.StatusNotFound, "unknown path", "route"}
 	errProxyDisabled         = gwError{http.StatusNotImplemented, "Proxy is disabled", "route"}
 
-	// These are dev listen's own memory caps. The pixel answers replace the
-	// GIF, so the sender sees why dev listen refused a pixel query.
+	// These are local event-stream serve's own memory caps. The pixel answers replace the
+	// GIF, so the sender sees why local event-stream serve refused a pixel query.
 	errRequestBodyTooLarge = gwError{http.StatusRequestEntityTooLarge, "request body exceeds 2,048,000 bytes", "size"}
 	errTooManyEvents       = gwError{http.StatusRequestEntityTooLarge, "batch has more than 10,000 events", "size"}
 	errPixelTooManyKeys    = gwError{http.StatusBadRequest, "pixel query has more than 1000 keys", "size"}

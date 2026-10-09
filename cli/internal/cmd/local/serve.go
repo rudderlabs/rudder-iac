@@ -1,4 +1,4 @@
-package dev
+package local
 
 import (
 	"context"
@@ -30,19 +30,19 @@ const (
 	trackTimeout = 2 * time.Second
 )
 
-var log = logger.New("dev")
+var log = logger.New("local")
 
-type listenOptions struct {
+type serveOptions struct {
 	port       int
 	bind       string
 	writeKeys  []string
 	allowHosts []string
 }
 
-func newCmdListen() *cobra.Command {
-	var opts listenOptions
+func newCmdServe() *cobra.Command {
+	var opts serveOptions
 	cmd := &cobra.Command{
-		Use:   "listen",
+		Use:   "serve",
 		Short: "Capture SDK requests on a local endpoint",
 		Long: heredoc.Doc(`
 			Run a local server that answers RudderStack SDK requests like RudderStack ingestion and keeps
@@ -57,21 +57,21 @@ func newCmdListen() *cobra.Command {
 			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that
 			is taken fails at start with port_in_use and exit 1. Use --bind 0.0.0.0 only in a
 			container. By default any write key is accepted, a missing one included. --write-key is an
-			allowlist: it rejects every other key and a missing key with 401. On dev events and dev
-			events list, --write-key filters instead.
+			allowlist: it rejects every other key and a missing key with 401. On local event-stream
+			events summary and local event-stream events list, --write-key filters instead.
 
 			Listeners share nothing: captures stay in memory, and there is no state or lock file.
-			rudder-cli dev --help has the whole guide.
+			rudder-cli local event-stream --help has the whole guide.
 		`),
 		Example: heredoc.Doc(`
 			# Foreground, on a fixed port
-			$ rudder-cli dev listen --port 4321
+			$ rudder-cli local event-stream serve --port 4321
 
 			# Background for an agent or CI job; read url and pid from the ready line
-			$ rudder-cli dev listen --port 0 > ready.json 2> listen.log &
+			$ rudder-cli local event-stream serve --port 0 > ready.json 2> listen.log &
 
 			# Accept only two write keys
-			$ rudder-cli dev listen --port 4321 --write-key web-key --write-key api-key
+			$ rudder-cli local event-stream serve --port 4321 --write-key web-key --write-key api-key
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
@@ -79,7 +79,7 @@ func newCmdListen() *cobra.Command {
 				return fail(cmd, e)
 			}
 			defer func() {
-				track("dev listen", err,
+				track("local event-stream serve", err,
 					telemetry.KV{K: "loopbackBind", V: devlisten.IsLoopback(opts.bind)},
 					telemetry.KV{K: "fixedPort", V: opts.port != 0},
 				)
@@ -87,7 +87,7 @@ func newCmdListen() *cobra.Command {
 
 			ctx, release := stopOnSignal(cmd.Context())
 			defer release()
-			return runListen(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr(), opts, cmd.Root().Version)
+			return runServe(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr(), opts, cmd.Root().Version)
 		},
 	}
 
@@ -101,41 +101,41 @@ func newCmdListen() *cobra.Command {
 	return cmd
 }
 
-func (o listenOptions) validate() *usageError {
+func (o serveOptions) validate() *usageError {
 	if o.port < 0 || o.port > 65535 {
 		return &usageError{
 			message: fmt.Sprintf("--port must be 0 to 65535, got %d", o.port),
-			next:    "rudder-cli dev listen --port 0",
+			next:    "rudder-cli local event-stream serve --port 0",
 		}
 	}
 	if net.ParseIP(o.bind) == nil {
 		return &usageError{
 			message: fmt.Sprintf("--bind must be an IP address such as 127.0.0.1, got %q", o.bind),
-			next:    "rudder-cli dev listen --bind 127.0.0.1",
+			next:    "rudder-cli local event-stream serve --bind 127.0.0.1",
 		}
 	}
 	for _, key := range o.writeKeys {
 		if key == "" {
-			return &usageError{message: "--write-key needs a key", next: "rudder-cli dev listen --help"}
+			return &usageError{message: "--write-key needs a key", next: "rudder-cli local event-stream serve --help"}
 		}
 	}
 	for _, host := range o.allowHosts {
 		if host == "" {
-			return &usageError{message: "--allow-host needs a host name", next: "rudder-cli dev listen --help"}
+			return &usageError{message: "--allow-host needs a host name", next: "rudder-cli local event-stream serve --help"}
 		}
 		// The check compares names only, so a name with a port never matches.
 		if name, _, err := net.SplitHostPort(host); err == nil {
 			return &usageError{
 				message: fmt.Sprintf("--allow-host takes a host name without a port, got %q", host),
-				next:    "rudder-cli dev listen --allow-host " + shellWord(name),
+				next:    "rudder-cli local event-stream serve --allow-host " + shellWord(name),
 			}
 		}
 	}
 	return nil
 }
 
-// runListen serves until ctx ends. The ready line is all it writes on stdout.
-func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions, version string) error {
+// runServe serves until ctx ends. The ready line is all it writes on stdout.
+func runServe(ctx context.Context, stdout, stderr io.Writer, opts serveOptions, version string) error {
 	srv, err := devlisten.Start(devlisten.Config{
 		Port:       opts.port,
 		Bind:       opts.bind,
@@ -145,9 +145,9 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 	})
 	switch {
 	case errors.Is(err, devlisten.ErrPortInUse):
-		return startupError(stderr, "port_in_use", err, "rudder-cli dev listen --port 0")
+		return startupError(stderr, "port_in_use", err, "rudder-cli local event-stream serve --port 0")
 	case err != nil:
-		return startupError(stderr, "listen_failed", err, "rudder-cli dev listen --help")
+		return startupError(stderr, "listen_failed", err, "rudder-cli local event-stream serve --help")
 	}
 
 	ready := srv.Ready()
@@ -159,9 +159,9 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 	line, _ := json.Marshal(ready)
 	fmt.Fprintln(stdout, string(line))
 	if isTerminal(stderr) {
-		fmt.Fprintf(stderr, "dev listen: capturing at %s (pid %d); Ctrl-C to stop.\n", ready.URL, ready.PID)
+		fmt.Fprintf(stderr, "local event-stream serve: capturing at %s (pid %d); Ctrl-C to stop.\n", ready.URL, ready.PID)
 		fmt.Fprintf(stderr, "Review in a browser: %s\n", ready.UI)
-		fmt.Fprintf(stderr, "Read events with: rudder-cli dev events --url %s\n", ready.URL)
+		fmt.Fprintf(stderr, "Read events with: rudder-cli local event-stream events summary --url %s\n", ready.URL)
 	}
 
 	var served error
@@ -178,7 +178,7 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 		log.Warn("shutdown deadline exceeded", "serverId", ready.ServerID, "error", err)
 	}
 	if served != nil {
-		return startupError(stderr, "listen_failed", fmt.Errorf("serving: %w", served), "rudder-cli dev listen --help")
+		return startupError(stderr, "listen_failed", fmt.Errorf("serving: %w", served), "rudder-cli local event-stream serve --help")
 	}
 	return nil
 }

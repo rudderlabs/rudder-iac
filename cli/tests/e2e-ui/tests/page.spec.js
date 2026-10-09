@@ -1,4 +1,4 @@
-// Acceptance and regression tests of the review page at /_dev/ui/. Each test
+// Acceptance and regression tests of the review page at /_local/ui/. Each test
 // drives the built binary through a real browser.
 const fs = require('node:fs');
 const { test, expect, seed, open, apiRequests, lastList } = require('./fixtures');
@@ -257,7 +257,7 @@ test.describe('regressions', () => {
     let held = false;
     let release;
     const released = new Promise((resolve) => { release = resolve; });
-    await page.route('**/_dev/v1/events?**', async (route) => {
+    await page.route('**/_local/v1/events?**', async (route) => {
       const q = new URL(route.request().url()).searchParams;
       if (held || q.get('userId') !== 'u' || !q.has('since') || q.has('wait')) return route.continue();
       held = true;

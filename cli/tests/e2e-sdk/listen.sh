@@ -2,16 +2,16 @@
 # Sourced by driver.sh and sdk.sh. Needs rudder-cli, jq and curl on PATH.
 
 export RUDDERSTACK_CLI_EXPERIMENTAL=true
-export RUDDERSTACK_X_DEV_LISTEN=true
+export RUDDERSTACK_X_LOCAL_EVENT_STREAM=true
 export RUDDERSTACK_CLI_TELEMETRY_DISABLED=true
 
-# start_listener starts dev listen on a free port and sets pid, url, sid and
+# start_listener starts local event-stream serve on a free port and sets pid, url, sid and
 # cur from its ready line. It exits with the listener's log when the listener
 # stops before it is ready.
 start_listener() {
   local d
   d=$(mktemp -d)
-  rudder-cli dev listen --port 0 >"$d/ready" 2>"$d/log" &
+  rudder-cli local event-stream serve --port 0 >"$d/ready" 2>"$d/log" &
   pid=$!
   until [ -s "$d/ready" ]; do
     kill -0 "$pid" 2>/dev/null || { cat "$d/log" >&2; exit 1; }
@@ -28,7 +28,7 @@ start_listener() {
 on_exit() {
   local rc=$?
   if [ "$rc" -ne 0 ] && [ -n "${url:-}" ]; then
-    curl -sS "$url/_dev/v1/requests?since=${cur:-0}&kind=all&view=compact" >&2 || true
+    curl -sS "$url/_local/v1/requests?since=${cur:-0}&kind=all&view=compact" >&2 || true
   fi
   # shellcheck disable=SC2086 # the PIDs split on purpose
   kill ${pid:-} ${web:-} 2>/dev/null || true

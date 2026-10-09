@@ -109,7 +109,7 @@ func TestHostCheck(t *testing.T) {
 		t.Run(tc.bind+" "+tc.host, func(t *testing.T) {
 			t.Parallel()
 			h, _ := newTestHandler(tc.bind, tc.allow...)
-			r := httptest.NewRequest(http.MethodGet, "/_dev/v1/info", nil)
+			r := httptest.NewRequest(http.MethodGet, "/_local/v1/info", nil)
 			r.Host = tc.host
 			w := httptest.NewRecorder()
 
@@ -133,14 +133,14 @@ func TestBrowserOriginCheck(t *testing.T) {
 		header http.Header
 		code   string
 	}{
-		{name: "no fetch metadata", path: "/_dev/v1/info"},
-		{name: "typed in the address bar", path: "/_dev/v1/info", header: http.Header{"Sec-Fetch-Site": {"none"}}},
-		{name: "same origin", path: "/_dev/v1/info", header: http.Header{"Sec-Fetch-Site": {"same-origin"}}},
-		{name: "cross site", path: "/_dev/v1/info", header: http.Header{"Sec-Fetch-Site": {"cross-site"}}, code: "browser_origin"},
-		{name: "same site", path: "/_dev/v1/info", header: http.Header{"Sec-Fetch-Site": {"same-site"}}, code: "browser_origin"},
+		{name: "no fetch metadata", path: "/_local/v1/info"},
+		{name: "typed in the address bar", path: "/_local/v1/info", header: http.Header{"Sec-Fetch-Site": {"none"}}},
+		{name: "same origin", path: "/_local/v1/info", header: http.Header{"Sec-Fetch-Site": {"same-origin"}}},
+		{name: "cross site", path: "/_local/v1/info", header: http.Header{"Sec-Fetch-Site": {"cross-site"}}, code: "browser_origin"},
+		{name: "same site", path: "/_local/v1/info", header: http.Header{"Sec-Fetch-Site": {"same-site"}}, code: "browser_origin"},
 		{
 			name: "cross-site navigation to the api",
-			path: "/_dev/v1/info",
+			path: "/_local/v1/info",
 			header: http.Header{
 				"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"},
 			},
@@ -148,15 +148,15 @@ func TestBrowserOriginCheck(t *testing.T) {
 		},
 		{
 			name: "cross-site navigation to the page",
-			path: "/_dev/ui/",
+			path: "/_local/ui/",
 			header: http.Header{
 				"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"navigate"}, "Sec-Fetch-Dest": {"document"},
 			},
 		},
-		{name: "same-origin script of the page", path: "/_dev/ui/app.js", header: http.Header{"Sec-Fetch-Site": {"same-origin"}}},
+		{name: "same-origin script of the page", path: "/_local/ui/app.js", header: http.Header{"Sec-Fetch-Site": {"same-origin"}}},
 		{
 			name: "cross-site script of the page",
-			path: "/_dev/ui/app.js",
+			path: "/_local/ui/app.js",
 			header: http.Header{
 				"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"no-cors"}, "Sec-Fetch-Dest": {"script"},
 			},
@@ -164,7 +164,7 @@ func TestBrowserOriginCheck(t *testing.T) {
 		},
 		{
 			name:   "cross-site fetch of the page",
-			path:   "/_dev/ui/",
+			path:   "/_local/ui/",
 			header: http.Header{"Sec-Fetch-Site": {"cross-site"}, "Sec-Fetch-Mode": {"cors"}, "Sec-Fetch-Dest": {"empty"}},
 			code:   "browser_origin",
 		},
@@ -201,76 +201,76 @@ func TestErrors(t *testing.T) {
 		allow   string
 	}{
 		{
-			name: "host before browser origin", method: "GET", target: "/_dev/v1/info", host: "evil.example", header: crossSite,
-			status: 403, code: "host_not_allowed", next: "rudder-cli dev events --json",
+			name: "host before browser origin", method: "GET", target: "/_local/v1/info", host: "evil.example", header: crossSite,
+			status: 403, code: "host_not_allowed", next: "rudder-cli local event-stream events summary --json",
 		},
 		{
-			name: "browser origin before shutdown", method: "GET", target: "/_dev/v1/info", header: crossSite, stopped: true,
-			status: 403, code: "browser_origin", next: "rudder-cli dev events --json",
+			name: "browser origin before shutdown", method: "GET", target: "/_local/v1/info", header: crossSite, stopped: true,
+			status: 403, code: "browser_origin", next: "rudder-cli local event-stream events summary --json",
 		},
 		{
-			name: "shutdown before route", method: "GET", target: "/_dev/v1/nope", stopped: true,
-			status: 503, code: "shutting_down", next: "rudder-cli dev listen --help",
+			name: "shutdown before route", method: "GET", target: "/_local/v1/nope", stopped: true,
+			status: 503, code: "shutting_down", next: "rudder-cli local event-stream serve --help",
 		},
 		{
-			name: "unknown route", method: "GET", target: "/_dev/v1/nope",
-			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_dev/v1/requests'",
+			name: "unknown route", method: "GET", target: "/_local/v1/nope",
+			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_local/v1/requests'",
 		},
 		{
-			name: "removed summary route", method: "GET", target: "/_dev/v1/summary",
-			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_dev/v1/requests'",
+			name: "removed summary route", method: "GET", target: "/_local/v1/summary",
+			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_local/v1/requests'",
 		},
 		{
-			name: "route before method", method: "POST", target: "/_dev/v1/nope",
-			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_dev/v1/requests'",
+			name: "route before method", method: "POST", target: "/_local/v1/nope",
+			status: 404, code: "not_found", next: "curl -fsS '" + testURL + "/_local/v1/requests'",
 		},
 		{
-			name: "write method on the page", method: "POST", target: "/_dev/ui/",
-			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "write method on the page", method: "POST", target: "/_local/ui/",
+			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "page host check", method: "GET", target: "/_dev/ui/", host: "evil.example",
-			status: 403, code: "host_not_allowed", next: "rudder-cli dev events --json",
+			name: "page host check", method: "GET", target: "/_local/ui/", host: "evil.example",
+			status: 403, code: "host_not_allowed", next: "rudder-cli local event-stream events summary --json",
 		},
 		{
-			name: "page shutdown", method: "GET", target: "/_dev/ui/", stopped: true,
-			status: 503, code: "shutting_down", next: "rudder-cli dev listen --help",
+			name: "page shutdown", method: "GET", target: "/_local/ui/", stopped: true,
+			status: 503, code: "shutting_down", next: "rudder-cli local event-stream serve --help",
 		},
 		{
-			name: "write method", method: "POST", target: "/_dev/v1/info",
-			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "write method", method: "POST", target: "/_local/v1/info",
+			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "no CORS preflight", method: "OPTIONS", target: "/_dev/v1/info",
-			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "no CORS preflight", method: "OPTIONS", target: "/_local/v1/info",
+			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "method before parameters", method: "DELETE", target: "/_dev/v1/info?x=1",
-			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "method before parameters", method: "DELETE", target: "/_local/v1/info?x=1",
+			status: 405, code: "method_not_allowed", allow: "GET, HEAD", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "unknown parameter", method: "GET", target: "/_dev/v1/info?serverId=x",
-			status: 400, code: "unknown_parameter", param: "serverId", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "unknown parameter", method: "GET", target: "/_local/v1/info?serverId=x",
+			status: 400, code: "unknown_parameter", param: "serverId", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "unknown parameter on the index", method: "GET", target: "/_dev/v1/?view=counts",
-			status: 400, code: "unknown_parameter", param: "view", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "unknown parameter on the index", method: "GET", target: "/_local/v1/?view=counts",
+			status: 400, code: "unknown_parameter", param: "view", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "malformed escape in a value", method: "GET", target: "/_dev/v1/info?x=%zz",
-			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "malformed escape in a value", method: "GET", target: "/_local/v1/info?x=%zz",
+			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "malformed escape in a name", method: "GET", target: "/_dev/v1/info?%zz",
-			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "malformed escape in a name", method: "GET", target: "/_local/v1/info?%zz",
+			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "semicolon separator", method: "GET", target: "/_dev/v1/info?a;b=1",
-			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "semicolon separator", method: "GET", target: "/_local/v1/info?a;b=1",
+			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 		{
-			name: "malformed escape on the index", method: "GET", target: "/_dev/v1/?evnt=%ZZ",
-			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_dev/v1/'",
+			name: "malformed escape on the index", method: "GET", target: "/_local/v1/?evnt=%ZZ",
+			status: 400, code: "invalid_parameter", next: "curl -fsS '" + testURL + "/_local/v1/'",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -307,11 +307,11 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-// No /_dev/ answer may be cached or read by another origin's script.
+// No /_local/ answer may be cached or read by another origin's script.
 func TestEveryAnswerIsPrivate(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestHandler("127.0.0.1")
-	for _, target := range []string{"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/nope", "/_dev/ui/"} {
+	for _, target := range []string{"/_local/v1/", "/_local/v1/info", "/_local/v1/nope", "/_local/ui/"} {
 		w := get(h, target, http.Header{"Origin": {"http://evil.example"}})
 
 		require.Equal(t, "no-store", w.Header().Get("Cache-Control"), target)
@@ -326,12 +326,12 @@ func TestEveryAnswerNamesTheServer(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestHandler("127.0.0.1")
 	for _, target := range []string{
-		"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/events", "/_dev/v1/events?view=counts", "/_dev/v1/nope", "/_dev/v1/events?bogus=1",
-		"/_dev/v1/requests", "/_dev/v1/requests/1", "/_dev/v1/guide",
+		"/_local/v1/", "/_local/v1/info", "/_local/v1/events", "/_local/v1/events?view=counts", "/_local/v1/nope", "/_local/v1/events?bogus=1",
+		"/_local/v1/requests", "/_local/v1/requests/1", "/_local/v1/guide",
 	} {
 		w := get(h, target, nil)
 
-		require.Equal(t, "9f3ac1d2b7e4c601", w.Header().Get("X-Dev-Server-Id"), target)
+		require.Equal(t, "9f3ac1d2b7e4c601", w.Header().Get("X-Local-Server-Id"), target)
 	}
 }
 
@@ -341,7 +341,7 @@ func TestHeadAnswersLikeGet(t *testing.T) {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
-	for _, path := range []string{"/_dev/v1/", "/_dev/v1/info", "/_dev/v1/requests", "/_dev/v1/guide"} {
+	for _, path := range []string{"/_local/v1/", "/_local/v1/info", "/_local/v1/requests", "/_local/v1/guide"} {
 		resp, err := http.Head(srv.URL + path)
 		require.NoError(t, err)
 		body, err := io.ReadAll(resp.Body)
@@ -359,27 +359,27 @@ func TestPagePathWithoutSlashRedirects(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestHandler("127.0.0.1")
 	for target, location := range map[string]string{
-		"/_dev/ui":                    "/_dev/ui/",
-		"/_dev/ui?event=Order*&tab=x": "/_dev/ui/?event=Order*&tab=x",
+		"/_local/ui":                    "/_local/ui/",
+		"/_local/ui?event=Order*&tab=x": "/_local/ui/?event=Order*&tab=x",
 	} {
 		w := get(h, target, nil)
 
 		require.Equal(t, http.StatusFound, w.Code, target)
 		require.Equal(t, location, w.Header().Get("Location"), target)
 	}
-	require.Equal(t, "page /_dev/ui/app.js", get(h, "/_dev/ui/app.js", nil).Body.String())
+	require.Equal(t, "page /_local/ui/app.js", get(h, "/_local/ui/app.js", nil).Body.String())
 }
 
 func TestInfo(t *testing.T) {
 	t.Parallel()
 	h, st := newTestHandler("127.0.0.1")
 
-	w := get(h, "/_dev/v1/info", nil)
+	w := get(h, "/_local/v1/info", nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, `{"ready":true,"apiVersion":"v1","serverId":"9f3ac1d2b7e4c601","url":"http://127.0.0.1:4321",`+
 		`"port":4321,"bind":"127.0.0.1","pid":4242,"startedAt":"2026-09-30T12:00:00Z","writeKey":"dev",`+
 		`"writeKeyPolicy":"any","writeKeys":[],"recordVersion":1,"cursor":0,"exposed":false,"version":"1.2.3",`+
-		`"ui":"http://127.0.0.1:4321/_dev/ui/","store":{"requests":0,"events":0,"control":0,"bytes":0,"evicted":0,`+
+		`"ui":"http://127.0.0.1:4321/_local/ui/","store":{"requests":0,"events":0,"control":0,"bytes":0,"evicted":0,`+
 		`"evictedThrough":0,"maxRequests":10000,"maxBytes":67108864}}`+"\n", w.Body.String())
 
 	st.Capture(&ingest.Capture{
@@ -391,7 +391,7 @@ func TestInfo(t *testing.T) {
 		Cursor uint64      `json:"cursor"`
 		Store  store.Stats `json:"store"`
 	}
-	require.NoError(t, json.Unmarshal(get(h, "/_dev/v1/info", nil).Body.Bytes(), &got))
+	require.NoError(t, json.Unmarshal(get(h, "/_local/v1/info", nil).Body.Bytes(), &got))
 	require.Equal(t, uint64(1), got.Cursor)
 	require.Equal(t, st.Stats(), got.Store)
 	require.Equal(t, 1, got.Store.Requests)
@@ -405,7 +405,7 @@ func TestInfoOnAnExposedBind(t *testing.T) {
 	h := New(store.New(), cfg)
 
 	var got map[string]any
-	require.NoError(t, json.Unmarshal(get(h, "/_dev/v1/info", nil).Body.Bytes(), &got))
+	require.NoError(t, json.Unmarshal(get(h, "/_local/v1/info", nil).Body.Bytes(), &got))
 
 	require.Equal(t, true, got["exposed"])
 	require.Equal(t, "allowlist", got["writeKeyPolicy"])
@@ -417,7 +417,7 @@ func TestIndexListsEveryRoute(t *testing.T) {
 	h, st := newTestHandler("127.0.0.1")
 	track(t, st, `{"userId":"u","event":"e"}`)
 
-	for _, target := range []string{"/_dev/v1/", "/_dev/v1"} {
+	for _, target := range []string{"/_local/v1/", "/_local/v1"} {
 		w := get(h, target, nil)
 		require.Equal(t, http.StatusOK, w.Code, target)
 
@@ -438,12 +438,12 @@ func TestIndexListsEveryRoute(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &idx))
 		require.Equal(t, "v1", idx.APIVersion)
 		require.Equal(t, "9f3ac1d2b7e4c601", idx.ServerID)
-		require.Equal(t, "rudder-cli dev --help", idx.Help)
-		require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/info'", idx.Next)
+		require.Equal(t, "rudder-cli local event-stream --help", idx.Help)
+		require.Equal(t, "curl -fsS '"+testURL+"/_local/v1/info'", idx.Next)
 		require.Equal(t, idx.Next, idx.Curl)
 		require.Equal(t, map[string]string{
 			"events": "events", "counts": "events?view=counts", "requests": "requests", "request": "requests/{seq}",
-			"info": "info", "guide": "guide", "ui": "/_dev/ui/",
+			"info": "info", "guide": "guide", "ui": "/_local/ui/",
 		}, idx.Links)
 
 		var paths []string
@@ -478,7 +478,7 @@ func TestIndexExamplesRunOnAnEmptyStore(t *testing.T) {
 			Example string `json:"example"`
 		} `json:"endpoints"`
 	}
-	require.NoError(t, json.Unmarshal(get(h, "/_dev/v1/", nil).Body.Bytes(), &idx))
+	require.NoError(t, json.Unmarshal(get(h, "/_local/v1/", nil).Body.Bytes(), &idx))
 	require.NotEmpty(t, idx.Endpoints)
 	for _, ep := range idx.Endpoints {
 		target := strings.TrimSuffix(strings.TrimPrefix(ep.Example, "curl -fsS '"+testURL), "'")

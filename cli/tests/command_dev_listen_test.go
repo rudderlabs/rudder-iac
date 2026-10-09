@@ -46,11 +46,11 @@ type listenProcess struct {
 func (p *listenProcess) url() string { return p.ready["url"].(string) }
 
 func devListenCommand(t *testing.T, args ...string) *exec.Cmd {
-	cmd := exec.Command(cliBinPath, append([]string{"dev", "listen"}, args...)...)
+	cmd := exec.Command(cliBinPath, append([]string{"local", "event-stream", "serve"}, args...)...)
 	cmd.Env = append(os.Environ(),
 		"HOME="+t.TempDir(),
 		"RUDDERSTACK_CLI_EXPERIMENTAL=true",
-		"RUDDERSTACK_X_DEV_LISTEN=true",
+		"RUDDERSTACK_X_LOCAL_EVENT_STREAM=true",
 		"RUDDERSTACK_CLI_TELEMETRY_DISABLED=true",
 	)
 	return cmd
@@ -96,7 +96,7 @@ func (p *listenProcess) stop(t *testing.T, sig os.Signal) (int, time.Duration) {
 		p.exited <- nil
 		return p.cmd.ProcessState.ExitCode(), time.Since(began)
 	case <-time.After(10 * time.Second):
-		t.Fatal("dev listen did not stop")
+		t.Fatal("local event-stream serve did not stop")
 		return 0, 0
 	}
 }
@@ -120,7 +120,7 @@ func TestDevListenServesUntilASignal(t *testing.T) {
 			require.NoError(t, resp.Body.Close())
 			require.Equal(t, "ok", string(body))
 
-			resp, err = http.Get(p.url() + "/_dev/v1/info")
+			resp, err = http.Get(p.url() + "/_local/v1/info")
 			require.NoError(t, err)
 			var info map[string]any
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&info))
@@ -179,7 +179,7 @@ func TestDevListenInstancesShareNothing(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(lines[len(lines)-1]), &failure), string(exit.Stderr))
 	require.Equal(t, "port_in_use", failure.Error.Code)
-	require.Equal(t, "rudder-cli dev listen --port 0", failure.Error.Next)
+	require.Equal(t, "rudder-cli local event-stream serve --port 0", failure.Error.Next)
 }
 
 // A DNS-rebinding page reaches a container listener under its own name.
@@ -197,7 +197,7 @@ func TestDevListenChecksTheHostOnAWildcardBind(t *testing.T) {
 		"dev-listen":     http.StatusOK,
 		"localhost:4321": http.StatusOK,
 	} {
-		req, err := http.NewRequest(http.MethodGet, p.url()+"/_dev/v1/info", nil)
+		req, err := http.NewRequest(http.MethodGet, p.url()+"/_local/v1/info", nil)
 		require.NoError(t, err)
 		req.Host = host
 		resp, err := http.DefaultClient.Do(req)

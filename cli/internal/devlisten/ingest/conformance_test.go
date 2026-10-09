@@ -411,7 +411,7 @@ var (
 
 	// sourceConfigDev is the /sourceConfig answer for the key dev, byte for byte.
 	sourceConfigDev = `{"source":{"config":{"statsCollection":{"errors":{"enabled":false},"metrics":{"enabled":false}}},` +
-		`"dataplanes":{},"destinations":[],"enabled":true,"id":"dev-ef260e9aa3c6","name":"rudder-cli dev listen",` +
+		`"dataplanes":{},"destinations":[],"enabled":true,"id":"dev-ef260e9aa3c6","name":"rudder-cli local event-stream serve",` +
 		`"updatedAt":"2026-09-30T12:04:05.123Z","workspaceId":"dev-workspace","writeKey":"dev"},"updatedAt":"2026-09-30T12:04:05.123Z"}`
 
 	jsonHeaders = map[string]string{"Content-Type": "application/json; charset=utf-8", "Vary": "Origin"}

@@ -1,4 +1,4 @@
-// Package api serves the query API under /_dev/v1/: the part of the listener
+// Package api serves the query API under /_local/v1/: the part of the listener
 // that the CLI read commands, the review page and curl use.
 package api
 
@@ -22,11 +22,11 @@ import (
 const (
 	// Prefix is the path space of the query API and the review page. No
 	// RudderStack ingestion path starts with "_".
-	Prefix = "/_dev/"
+	Prefix = "/_local/"
 	// UIPath is the review page.
-	UIPath = "/_dev/ui/"
+	UIPath = "/_local/ui/"
 
-	base          = "/_dev/v1/"
+	base          = "/_local/v1/"
 	recordVersion = 1
 )
 
@@ -55,7 +55,7 @@ type Config struct {
 	AllowHosts []string
 	// Version is the CLI version.
 	Version string
-	// Guide is the Markdown guide that rudder-cli dev --help prints.
+	// Guide is the Markdown guide that rudder-cli local event-stream --help prints.
 	Guide string
 	// UI serves the review page under UIPath, after the same guards as the
 	// query API.
@@ -102,22 +102,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// The read commands trust a 200 only with this header: a dev server
-	// with an HTML fallback also answers 200 on /_dev/v1/events.
-	w.Header().Set("X-Dev-Server-Id", h.cfg.Identity.ServerID)
+	// with an HTML fallback also answers 200 on /_local/v1/events.
+	w.Header().Set("X-Local-Server-Id", h.cfg.Identity.ServerID)
 
 	switch {
 	case !h.hostAllowed(r.Host):
 		h.fail(w, http.StatusForbidden, "host_not_allowed",
 			"Host "+r.Host+" is not allowed. Use a loopback address, the bind address or a name given with --allow-host.",
-			"rudder-cli dev events --json")
+			"rudder-cli local event-stream events summary --json")
 		return
 	case crossSite(r):
 		h.fail(w, http.StatusForbidden, "browser_origin",
-			"The query API refuses requests from other sites.", "rudder-cli dev events --json")
+			"The query API refuses requests from other sites.", "rudder-cli local event-stream events summary --json")
 		return
 	case h.stopped.Err() != nil:
 		h.fail(w, http.StatusServiceUnavailable, "shutting_down", "The listener is shutting down.",
-			"rudder-cli dev listen --help")
+			"rudder-cli local event-stream serve --help")
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 	}{
 		APIVersion:  h.cfg.Identity.APIVersion,
 		ServerID:    h.cfg.Identity.ServerID,
-		Description: "The query API of rudder-cli dev listen. It reads what the listener captured.",
+		Description: "The query API of rudder-cli local event-stream serve. It reads what the listener captured.",
 		Next:        h.curl("info"),
 		Curl:        h.curl("info"),
 		Links: map[string]string{
@@ -255,7 +255,7 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 			{http.MethodGet, base, []string{}, "This index.", h.curl("")},
 			{
 				http.MethodGet, base + "events", eventsParams,
-				"The accepted events as NDJSON, one per line, as the SDK sent them; the cursor is in X-Dev-Cursor. " +
+				"The accepted events as NDJSON, one per line, as the SDK sent them; the cursor is in X-Local-Cursor. " +
 					"view=counts answers the summary: counts, rejected events, a diagnosis and the cursor.",
 				h.curl("events?view=counts"),
 			},
@@ -271,9 +271,9 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 				h.recordExample(),
 			},
 			{http.MethodGet, base + "info", []string{}, "The listener identity, the cursor and the store counts.", h.curl("info")},
-			{http.MethodGet, base + "guide", []string{}, "The guide that rudder-cli dev --help prints, as Markdown.", h.curl("guide")},
+			{http.MethodGet, base + "guide", []string{}, "The guide that rudder-cli local event-stream --help prints, as Markdown.", h.curl("guide")},
 		},
-		Help: "rudder-cli dev --help",
+		Help: "rudder-cli local event-stream --help",
 	})
 }
 
@@ -335,13 +335,13 @@ func (h *Handler) guide(w http.ResponseWriter, r *http.Request) {
 }
 
 // IsLoopback reports whether a bind address takes local connections only.
-// The bind is always an IP address, because dev listen rejects names.
+// The bind is always an IP address, because local event-stream serve rejects names.
 func IsLoopback(bind string) bool {
 	ip := net.ParseIP(bind)
 	return ip != nil && ip.IsLoopback()
 }
 
-// curl is a command a caller can paste; path is relative to /_dev/v1/.
+// curl is a command a caller can paste; path is relative to /_local/v1/.
 func (h *Handler) curl(path string) string {
 	return "curl -fsS '" + h.cfg.Identity.URL + base + path + "'"
 }

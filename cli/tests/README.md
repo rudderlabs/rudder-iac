@@ -22,7 +22,7 @@ Make targets:
 | `make test`     | Unit tests only         |
 | `make test-e2e` | E2E tests only          |
 | `make test-all` | Unit + E2E tests        |
-| `make test-e2e-ui` | Browser tests of the `dev listen` review page |
+| `make test-e2e-ui` | Browser tests of the `local event-stream serve` review page |
 
 Prerequisites:
 
@@ -34,7 +34,7 @@ During execution a detailed log is written to `$HOME/.rudder/cli.log` (log level
 
 ## Review page tests
 
-`cli/tests/e2e-ui/` holds Playwright tests of the page that `dev listen` serves at `/_dev/ui/`. Each test starts its own listener from the built binary, so the tests need no workspace and no token. They need Node 20 or later. `make test-e2e-ui` builds the binary, installs Chromium and runs them. Set `SHOTS_DIR` to a folder to also save the review screenshots.
+`cli/tests/e2e-ui/` holds Playwright tests of the page that `local event-stream serve` serves at `/_local/ui/`. Each test starts its own listener from the built binary, so the tests need no workspace and no token. They need Node 20 or later. `make test-e2e-ui` builds the binary, installs Chromium and runs them. Set `SHOTS_DIR` to a folder to also save the review screenshots.
 
 ## Snapshot Verification
 

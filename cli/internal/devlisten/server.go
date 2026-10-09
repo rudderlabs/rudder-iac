@@ -56,7 +56,7 @@ type Config struct {
 	beforeServe func(*http.Request)
 }
 
-// Ready is the line dev listen prints once it accepts connections. A script
+// Ready is the line local event-stream serve prints once it accepts connections. A script
 // reads the URL, the cursor and the pid from it.
 type Ready struct {
 	Ready bool `json:"ready"`

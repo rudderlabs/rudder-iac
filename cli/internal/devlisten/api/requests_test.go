@@ -56,7 +56,7 @@ type envelope struct {
 
 func requestsOf(t *testing.T, h http.Handler, query string) (envelope, *httptest.ResponseRecorder) {
 	t.Helper()
-	w := get(h, "/_dev/v1/requests?"+query, nil)
+	w := get(h, "/_local/v1/requests?"+query, nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 	var env envelope
@@ -162,7 +162,7 @@ func TestRequestRecord(t *testing.T) {
 	seedRequests(t, st)
 	sum := sha256.Sum256([]byte(longKey))
 
-	w := get(h, "/_dev/v1/requests/4", nil)
+	w := get(h, "/_local/v1/requests/4", nil)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	rec := w.Body.String()
@@ -206,16 +206,16 @@ func TestRequestRecord(t *testing.T) {
 	require.NotContains(t, rec, longKey)
 	require.False(t, gjson.Get(rec, "events.0.message").Exists(), "compact leaves the message out: the body holds it")
 
-	full := get(h, "/_dev/v1/requests/4?view=full", nil).Body.String()
+	full := get(h, "/_local/v1/requests/4?view=full", nil).Body.String()
 	require.Equal(t, `{"userId":"u2","event":"Signed Up","messageId":"m-2"}`, gjson.Get(full, "events.0.message").Raw)
 
-	short := get(h, "/_dev/v1/requests/1", nil).Body.String()
+	short := get(h, "/_local/v1/requests/1", nil).Body.String()
 	shortSum := sha256.Sum256([]byte("dev"))
 	require.Equal(t, "dev", gjson.Get(short, "writeKey").Value())
 	require.Equal(t, gjson.Null, gjson.Get(short, "writeKeySha256").Type)
 	require.Equal(t, "dev-"+hex.EncodeToString(shortSum[:6]), gjson.Get(short, "sourceId").Value())
 
-	rejected := get(h, "/_dev/v1/requests/2", nil).Body.String()
+	rejected := get(h, "/_local/v1/requests/2", nil).Body.String()
 	require.Equal(t, true, gjson.Get(rejected, "failed").Value())
 	require.Equal(t, gjson.Null, gjson.Get(rejected, "events.0.enrichment").Type, "a rejected request has no enrichment")
 }
@@ -230,7 +230,7 @@ func TestRequestRecordFields(t *testing.T) {
 		"fields=statusCode&fields=events.event": `{"seq":4,"request":{"method":"POST"},"statusCode":200,"events":[{"event":"Signed Up"}]}`,
 		"fields=events.message.userId":          `{"seq":4,"request":{"method":"POST"},"events":[{"message":{"userId":"u2"}}]}`,
 	} {
-		w := get(h, "/_dev/v1/requests/4?"+query, nil)
+		w := get(h, "/_local/v1/requests/4?"+query, nil)
 		require.Equal(t, http.StatusOK, w.Code, query)
 		require.Equal(t, want+"\n", w.Body.String(), query)
 	}
@@ -248,14 +248,14 @@ func TestRequestRecordNotFound(t *testing.T) {
 	seedRequests(t, st)
 
 	for _, target := range []string{
-		"/_dev/v1/requests/abc", "/_dev/v1/requests/99", "/_dev/v1/requests/0", "/_dev/v1/requests/1/x",
-		"/_dev/v1/requests/", "/_dev/v1/requests/-1", "/_dev/v1/requests/+1",
+		"/_local/v1/requests/abc", "/_local/v1/requests/99", "/_local/v1/requests/0", "/_local/v1/requests/1/x",
+		"/_local/v1/requests/", "/_local/v1/requests/-1", "/_local/v1/requests/+1",
 	} {
 		w := get(h, target, nil)
 		require.Equal(t, http.StatusNotFound, w.Code, target)
 		e := decodeError(t, w)
 		require.Equal(t, "not_found", e.Error.Code, target)
-		require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/requests'", e.Error.Next)
+		require.Equal(t, "curl -fsS '"+testURL+"/_local/v1/requests'", e.Error.Next)
 	}
 }
 
@@ -273,7 +273,7 @@ func TestRequestsPages(t *testing.T) {
 	require.Equal(t, 5, env.Total)
 	require.Equal(t, 2, env.Returned)
 	require.Equal(t, map[string]any{"next": "requests?limit=2&since=2"}, env.Links)
-	require.Equal(t, `</_dev/v1/requests?limit=2&since=2>; rel="next"`, w.Header().Get("Link"))
+	require.Equal(t, `</_local/v1/requests?limit=2&since=2>; rel="next"`, w.Header().Get("Link"))
 
 	env, _ = requestsOf(t, h, "limit=2&since=2")
 	require.Equal(t, []uint64{3, 4}, seqs(env))
@@ -309,7 +309,7 @@ func TestRequestsMaxBytes(t *testing.T) {
 	require.Equal(t, uint64(kept), env.Cursor, "the cursor is the last kept request")
 	require.Equal(t, map[string]any{
 		"by": "maxBytes", "kept": float64(kept), "matchedAfter": float64(5 - kept),
-		"next": "curl -fsS '" + testURL + "/_dev/v1/requests?maxBytes=5000&since=" + strconv.Itoa(kept) + "&view=full'",
+		"next": "curl -fsS '" + testURL + "/_local/v1/requests?maxBytes=5000&since=" + strconv.Itoa(kept) + "&view=full'",
 	}, env.Truncated)
 
 	env, _ = requestsOf(t, h, "view=full&maxBytes=100")
@@ -318,7 +318,7 @@ func TestRequestsMaxBytes(t *testing.T) {
 	require.Equal(t, uint64(1), env.Cursor, "the cursor passes the request that does not fit")
 	require.Equal(t, "maxBytes", env.Truncated["by"])
 	require.Greater(t, env.Truncated["requestBytes"], float64(1000))
-	require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/requests/1?fields=request.body&maxBytes=0'", env.Truncated["next"])
+	require.Equal(t, "curl -fsS '"+testURL+"/_local/v1/requests/1?fields=request.body&maxBytes=0'", env.Truncated["next"])
 
 	env, _ = requestsOf(t, h, "view=full&maxBytes=10&since=5")
 	require.Empty(t, env.Requests, "an empty page stays whole")
@@ -332,12 +332,12 @@ func TestRequestsMaxBytes(t *testing.T) {
 	require.LessOrEqual(t, w.Body.Len(), 24000, "the default cap")
 	require.Len(t, env.Requests, 5)
 
-	w = get(h, "/_dev/v1/requests/1?view=full&maxBytes=100", nil)
+	w = get(h, "/_local/v1/requests/1?view=full&maxBytes=100", nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	got := w.Body.String()
 	require.Equal(t, []string{"seq", "truncated"}, keys(got))
 	require.Equal(t, []string{"by", "requestBytes", "next"}, keys(gjson.Get(got, "truncated").Raw))
-	require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/requests/1?fields=request.body&maxBytes=0'", gjson.Get(got, "truncated.next").Str)
+	require.Equal(t, "curl -fsS '"+testURL+"/_local/v1/requests/1?fields=request.body&maxBytes=0'", gjson.Get(got, "truncated.next").Str)
 }
 
 // A pager that follows links.next must reach the end, also when one record
@@ -350,7 +350,7 @@ func TestRequestsPagingEndsPastAnOversizeRecord(t *testing.T) {
 
 	env, _ := requestsOf(t, h, "view=full")
 	require.Empty(t, env.Requests)
-	require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/requests/1?fields=request.body&maxBytes=0'", env.Truncated["next"])
+	require.Equal(t, "curl -fsS '"+testURL+"/_local/v1/requests/1?fields=request.body&maxBytes=0'", env.Truncated["next"])
 	var got []uint64
 	for hops := 0; env.HasMore; hops++ {
 		require.Less(t, hops, 3, "links.next must advance the cursor")
@@ -393,9 +393,9 @@ func TestRequestsRenderADeepEvent(t *testing.T) {
 			track(t, st, `{"userId":"u","event":"e","p":`+strings.Repeat("[", depth)+"0"+strings.Repeat("]", depth)+`}`)
 
 			for _, target := range []string{
-				"/_dev/v1/requests/1?view=full&maxBytes=0",
-				"/_dev/v1/requests?view=full&maxBytes=0",
-				"/_dev/v1/requests?fields=events&maxBytes=0",
+				"/_local/v1/requests/1?view=full&maxBytes=0",
+				"/_local/v1/requests?view=full&maxBytes=0",
+				"/_local/v1/requests?fields=events&maxBytes=0",
 			} {
 				w := get(h, target, nil)
 				require.Equal(t, http.StatusOK, w.Code, target)
@@ -418,13 +418,13 @@ func TestRequestsRenderADeepIdentityKey(t *testing.T) {
 				strings.Repeat("[", depth)+strings.Repeat("]", depth)+`}`)
 
 			for _, target := range []string{
-				"/_dev/v1/requests?view=list",
-				"/_dev/v1/requests?view=compact",
-				"/_dev/v1/requests?view=full&maxBytes=0",
-				"/_dev/v1/requests?fields=events&maxBytes=0",
-				"/_dev/v1/requests/1",
-				"/_dev/v1/requests/1?view=full&maxBytes=0",
-				"/_dev/v1/requests/1?fields=events.event&maxBytes=0",
+				"/_local/v1/requests?view=list",
+				"/_local/v1/requests?view=compact",
+				"/_local/v1/requests?view=full&maxBytes=0",
+				"/_local/v1/requests?fields=events&maxBytes=0",
+				"/_local/v1/requests/1",
+				"/_local/v1/requests/1?view=full&maxBytes=0",
+				"/_local/v1/requests/1?fields=events.event&maxBytes=0",
 			} {
 				w := get(h, target, nil)
 				require.Equal(t, http.StatusOK, w.Code, target)
@@ -433,7 +433,7 @@ func TestRequestsRenderADeepIdentityKey(t *testing.T) {
 				require.Contains(t, w.Body.String(), `"seq":1`, target)
 			}
 
-			w := get(h, "/_dev/v1/requests/1?view=full&maxBytes=0", nil)
+			w := get(h, "/_local/v1/requests/1?view=full&maxBytes=0", nil)
 			event := gjson.GetBytes(w.Body.Bytes(), "events.0.event")
 			if depth <= 9_995 {
 				require.True(t, event.IsArray())
@@ -460,7 +460,7 @@ func TestRequestsParameterErrors(t *testing.T) {
 	t.Parallel()
 	h, st := newTestHandler("127.0.0.1")
 	track(t, st, `{"userId":"u","event":"e"}`)
-	index := "curl -fsS '" + testURL + "/_dev/v1/'"
+	index := "curl -fsS '" + testURL + "/_local/v1/'"
 	for _, tc := range []struct {
 		target string
 		code   string
@@ -487,7 +487,7 @@ func TestRequestsParameterErrors(t *testing.T) {
 		{target: "requests/1?since=1", code: "unknown_parameter", param: "since"},
 		{target: "requests/1?view=list", code: "invalid_parameter", param: "view"},
 	} {
-		w := get(h, "/_dev/v1/"+tc.target, nil)
+		w := get(h, "/_local/v1/"+tc.target, nil)
 
 		require.Equal(t, http.StatusBadRequest, w.Code, tc.target)
 		e := decodeError(t, w)
@@ -500,7 +500,7 @@ func TestRequestsParameterErrors(t *testing.T) {
 		require.Equal(t, tc.param, *e.Error.Param, tc.target)
 	}
 
-	e := decodeError(t, get(h, "/_dev/v1/requests?fields=nope.x", nil))
+	e := decodeError(t, get(h, "/_local/v1/requests?fields=nope.x", nil))
 	require.Equal(t, map[string]any{"validRoots": []any{
 		"recordVersion", "serverId", "seq", "kind", "receivedAt", "route", "transport", "statusCode", "failed", "outcome",
 		"writeKey", "writeKeySha256", "sourceId", "rejection", "hint", "request", "response", "events",
@@ -512,26 +512,26 @@ func TestRequestsServerChanged(t *testing.T) {
 	h, st := newTestHandler("127.0.0.1")
 	seedRequests(t, st)
 
-	for _, target := range []string{"/_dev/v1/requests?serverId=0", "/_dev/v1/requests/1?serverId=0"} {
+	for _, target := range []string{"/_local/v1/requests?serverId=0", "/_local/v1/requests/1?serverId=0"} {
 		w := get(h, target, nil)
 		require.Equal(t, http.StatusConflict, w.Code, target)
 		require.Equal(t, "server_changed", decodeError(t, w).Error.Code)
 	}
-	require.Equal(t, http.StatusOK, get(h, "/_dev/v1/requests/1?serverId=9f3ac1d2b7e4c601", nil).Code)
+	require.Equal(t, http.StatusOK, get(h, "/_local/v1/requests/1?serverId=9f3ac1d2b7e4c601", nil).Code)
 }
 
 func TestGuide(t *testing.T) {
 	t.Parallel()
 	cfg := testConfig("127.0.0.1")
-	cfg.Guide = "# The guide\n\nRun `rudder-cli dev listen`.\n"
+	cfg.Guide = "# The guide\n\nRun `rudder-cli local event-stream serve`.\n"
 	h := New(store.New(), cfg)
 
-	w := get(h, "/_dev/v1/guide", nil)
+	w := get(h, "/_local/v1/guide", nil)
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "text/markdown; charset=utf-8", w.Header().Get("Content-Type"))
 	require.Equal(t, cfg.Guide, w.Body.String())
-	require.Equal(t, http.StatusBadRequest, get(h, "/_dev/v1/guide?x=1", nil).Code)
+	require.Equal(t, http.StatusBadRequest, get(h, "/_local/v1/guide?x=1", nil).Code)
 }
 
 // Each query API URL in the guide answers 200, so a reader can paste it.
@@ -543,7 +543,7 @@ func TestGuideURLsAnswer(t *testing.T) {
 	seedRequests(t, st)
 	placeholder := strings.NewReplacer("$cur", "0", "${cur:-0}", "0", "SEQ", "1", "=N", "=0")
 
-	found := regexp.MustCompile("(?:URL|\\$url|\\$\\{url:-\\})(/_dev/v1/[^\"'`\\s]*)").FindAllStringSubmatch(string(guide), -1)
+	found := regexp.MustCompile("(?:URL|\\$url|\\$\\{url:-\\})(/_local/v1/[^\"'`\\s]*)").FindAllStringSubmatch(string(guide), -1)
 	require.Greater(t, len(found), 5)
 	for _, m := range found {
 		target := placeholder.Replace(strings.TrimRight(m[1], ".,"))

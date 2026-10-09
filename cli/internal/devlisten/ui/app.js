@@ -270,8 +270,8 @@
     });
     return {
       rows,
-      cursor: Number(res.headers.get('X-Dev-Cursor')),
-      hasMore: res.headers.get('X-Dev-Has-More') === 'true',
+      cursor: Number(res.headers.get('X-Local-Cursor')),
+      hasMore: res.headers.get('X-Local-Has-More') === 'true',
     };
   }
 

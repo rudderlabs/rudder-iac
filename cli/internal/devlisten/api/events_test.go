@@ -17,7 +17,7 @@ import (
 )
 
 // sdk sends one request through the real ingestion handler, so the records
-// under test are the records dev listen keeps. An empty key sends no
+// under test are the records local event-stream serve keeps. An empty key sends no
 // Authorization header.
 func sdk(t *testing.T, st *store.Store, method, target, key, body string, allow ...string) int {
 	t.Helper()
@@ -60,7 +60,7 @@ func TestStreamPrintsEachAcceptedEventAsSent(t *testing.T) {
 	track(t, st, `{"userId":"u2","event":"Signed Up"}`)
 	require.Equal(t, http.StatusOK, sdk(t, st, http.MethodGet, "/sourceConfig", "dev", ""))
 
-	w := get(h, "/_dev/v1/events", nil)
+	w := get(h, "/_local/v1/events", nil)
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "application/x-ndjson", w.Header().Get("Content-Type"))
@@ -70,9 +70,9 @@ func TestStreamPrintsEachAcceptedEventAsSent(t *testing.T) {
 		`{"type":"page","anonymousId":"a1","name":"Home"}`,
 		`{"userId":"u2","event":"Signed Up"}`,
 	}, lines(w.Body.String()), "a track sent without type prints without type")
-	require.Equal(t, "4", w.Header().Get("X-Dev-Cursor"), "control requests move the cursor too")
-	require.Equal(t, "false", w.Header().Get("X-Dev-Has-More"))
-	require.Equal(t, "9f3ac1d2b7e4c601", w.Header().Get("X-Dev-Server-Id"))
+	require.Equal(t, "4", w.Header().Get("X-Local-Cursor"), "control requests move the cursor too")
+	require.Equal(t, "false", w.Header().Get("X-Local-Has-More"))
+	require.Equal(t, "9f3ac1d2b7e4c601", w.Header().Get("X-Local-Server-Id"))
 	require.Empty(t, w.Header().Get("Link"))
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 }
@@ -81,12 +81,12 @@ func TestStreamOfAnEmptyStoreIsAnEmptyBody(t *testing.T) {
 	t.Parallel()
 	h, _ := newTestHandler("127.0.0.1")
 
-	w := get(h, "/_dev/v1/events?since=7", nil)
+	w := get(h, "/_local/v1/events?since=7", nil)
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Empty(t, w.Body.String())
-	require.Equal(t, "0", w.Header().Get("X-Dev-Cursor"))
-	require.Equal(t, "false", w.Header().Get("X-Dev-Has-More"))
+	require.Equal(t, "0", w.Header().Get("X-Local-Cursor"))
+	require.Equal(t, "false", w.Header().Get("X-Local-Has-More"))
 }
 
 // A page never splits a request, and the cursor of each page continues the
@@ -110,21 +110,21 @@ func TestStreamPages(t *testing.T) {
 		link    string
 	}{
 		{
-			target: "/_dev/v1/events?limit=2&event=e*", events: []string{"e1"}, cursor: "2", hasMore: "true",
-			link: `</_dev/v1/events?event=e%2A&limit=2&since=2>; rel="next"`,
+			target: "/_local/v1/events?limit=2&event=e*", events: []string{"e1"}, cursor: "2", hasMore: "true",
+			link: `</_local/v1/events?event=e%2A&limit=2&since=2>; rel="next"`,
 		},
 		{
-			target: "/_dev/v1/events?event=e*&limit=2&since=2", events: []string{"e2", "e3"}, cursor: "3", hasMore: "true",
-			link: `</_dev/v1/events?event=e%2A&limit=2&since=3>; rel="next"`,
+			target: "/_local/v1/events?event=e*&limit=2&since=2", events: []string{"e2", "e3"}, cursor: "3", hasMore: "true",
+			link: `</_local/v1/events?event=e%2A&limit=2&since=3>; rel="next"`,
 		},
 		{
-			target: "/_dev/v1/events?event=e*&limit=2&since=3", events: []string{"e4"}, cursor: "4", hasMore: "true",
-			link: `</_dev/v1/events?event=e%2A&limit=2&since=4>; rel="next"`,
+			target: "/_local/v1/events?event=e*&limit=2&since=3", events: []string{"e4"}, cursor: "4", hasMore: "true",
+			link: `</_local/v1/events?event=e%2A&limit=2&since=4>; rel="next"`,
 		},
 		{
-			target: "/_dev/v1/events?event=e*&limit=2&since=4", events: []string{"e5", "e6", "e7"}, cursor: "5", hasMore: "false",
+			target: "/_local/v1/events?event=e*&limit=2&since=4", events: []string{"e5", "e6", "e7"}, cursor: "5", hasMore: "false",
 		},
-		{target: "/_dev/v1/events?limit=1000&since=5", cursor: "5", hasMore: "false"},
+		{target: "/_local/v1/events?limit=1000&since=5", cursor: "5", hasMore: "false"},
 	} {
 		w := get(h, tc.target, nil)
 		require.Equal(t, http.StatusOK, w.Code, tc.target)
@@ -136,8 +136,8 @@ func TestStreamPages(t *testing.T) {
 			got = append(got, ev.Event)
 		}
 		require.Equal(t, tc.events, got, tc.target)
-		require.Equal(t, tc.cursor, w.Header().Get("X-Dev-Cursor"), tc.target)
-		require.Equal(t, tc.hasMore, w.Header().Get("X-Dev-Has-More"), tc.target)
+		require.Equal(t, tc.cursor, w.Header().Get("X-Local-Cursor"), tc.target)
+		require.Equal(t, tc.hasMore, w.Header().Get("X-Local-Has-More"), tc.target)
 		require.Equal(t, tc.link, w.Header().Get("Link"), tc.target)
 	}
 }
@@ -150,7 +150,7 @@ func TestStreamHeadSendsThePagingHeaders(t *testing.T) {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 
-	resp, err := http.Head(srv.URL + "/_dev/v1/events?limit=1")
+	resp, err := http.Head(srv.URL + "/_local/v1/events?limit=1")
 	require.NoError(t, err)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -158,10 +158,10 @@ func TestStreamHeadSendsThePagingHeaders(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Empty(t, body)
-	require.Equal(t, "1", resp.Header.Get("X-Dev-Cursor"))
-	require.Equal(t, "true", resp.Header.Get("X-Dev-Has-More"))
-	require.Equal(t, `</_dev/v1/events?limit=1&since=1>; rel="next"`, resp.Header.Get("Link"))
-	require.Equal(t, "9f3ac1d2b7e4c601", resp.Header.Get("X-Dev-Server-Id"))
+	require.Equal(t, "1", resp.Header.Get("X-Local-Cursor"))
+	require.Equal(t, "true", resp.Header.Get("X-Local-Has-More"))
+	require.Equal(t, `</_local/v1/events?limit=1&since=1>; rel="next"`, resp.Header.Get("Link"))
+	require.Equal(t, "9f3ac1d2b7e4c601", resp.Header.Get("X-Local-Server-Id"))
 }
 
 func TestStreamViewsOnlySelectKeys(t *testing.T) {
@@ -199,7 +199,7 @@ func TestStreamViewsOnlySelectKeys(t *testing.T) {
 			want:  []string{`{"properties":{"total":"2","big":1.50e2}}`, `{}`},
 		},
 	} {
-		w := get(h, "/_dev/v1/events?"+tc.query, nil)
+		w := get(h, "/_local/v1/events?"+tc.query, nil)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.Equal(t, tc.want, lines(w.Body.String()), tc.query)
 	}
@@ -233,7 +233,7 @@ func TestStreamFilters(t *testing.T) {
 		{query: "writeKey=web&writeKey=", want: []string{"u1 Order Completed", "u2 Order Refunded", "u1 "}},
 		{query: "userId=u1&type=identify", want: []string{"u1 "}},
 	} {
-		w := get(h, "/_dev/v1/events?"+tc.query, nil)
+		w := get(h, "/_local/v1/events?"+tc.query, nil)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		var got []string
 		for _, line := range lines(w.Body.String()) {
@@ -265,7 +265,7 @@ func TestSinceAsATime(t *testing.T) {
 	at(time.Minute, "newest")        // seq 4
 
 	for _, since := range []string{"5m", "300s", "2026-09-30T12:05:00Z", "2026-09-30T14:05:00%2B02:00"} {
-		w := get(h, "/_dev/v1/events?since="+since, nil)
+		w := get(h, "/_local/v1/events?since="+since, nil)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.Equal(t, []string{`{"userId":"u","event":"new"}`, `{"userId":"u","event":"newest"}`},
 			lines(w.Body.String()), since)
@@ -276,21 +276,21 @@ func TestSinceAsATime(t *testing.T) {
 				Events struct{ Total int } `json:"events"`
 			} `json:"summary"`
 		}
-		require.NoError(t, json.Unmarshal(get(h, "/_dev/v1/events?view=counts&since="+since, nil).Body.Bytes(), &summary))
+		require.NoError(t, json.Unmarshal(get(h, "/_local/v1/events?view=counts&since="+since, nil).Body.Bytes(), &summary))
 		require.Equal(t, uint64(1), summary.Since, "the cursor before the first request in the window")
 		require.Equal(t, 2, summary.Summary.Events.Total)
 	}
 
-	w := get(h, "/_dev/v1/events?since=30s", nil)
+	w := get(h, "/_local/v1/events?since=30s", nil)
 	require.Empty(t, w.Body.String())
-	require.Equal(t, "4", w.Header().Get("X-Dev-Cursor"))
+	require.Equal(t, "4", w.Header().Get("X-Local-Cursor"))
 }
 
 func TestEventsParameterErrors(t *testing.T) {
 	t.Parallel()
 	const (
-		listHelp   = "rudder-cli dev events list --help"
-		eventsHelp = "rudder-cli dev events --help"
+		listHelp   = "rudder-cli local event-stream events list --help"
+		eventsHelp = "rudder-cli local event-stream events summary --help"
 	)
 	for _, tc := range []struct {
 		query string
@@ -326,7 +326,7 @@ func TestEventsParameterErrors(t *testing.T) {
 			t.Parallel()
 			h, _ := newTestHandler("127.0.0.1")
 
-			w := get(h, "/_dev/v1/events?"+tc.query, nil)
+			w := get(h, "/_local/v1/events?"+tc.query, nil)
 
 			require.Equal(t, http.StatusBadRequest, w.Code)
 			require.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
@@ -355,7 +355,7 @@ func TestEventsMessages(t *testing.T) {
 		"wait=1s":                    "wait: applies to view=counts only",
 		"serverId=a&serverId=b&x=%z": "The query string is malformed: invalid URL escape \"%z\".",
 	} {
-		require.Equal(t, want, decodeError(t, get(h, "/_dev/v1/events?"+query, nil)).Error.Message, query)
+		require.Equal(t, want, decodeError(t, get(h, "/_local/v1/events?"+query, nil)).Error.Message, query)
 	}
 }
 
@@ -364,15 +364,15 @@ func TestEventsServerChanged(t *testing.T) {
 	h, _ := newTestHandler("127.0.0.1")
 
 	for _, view := range []string{"", "&view=counts"} {
-		w := get(h, "/_dev/v1/events?serverId=0000000000000000"+view, nil)
+		w := get(h, "/_local/v1/events?serverId=0000000000000000"+view, nil)
 
 		require.Equal(t, http.StatusConflict, w.Code)
 		e := decodeError(t, w)
 		require.Equal(t, "server_changed", e.Error.Code)
-		require.Equal(t, "rudder-cli dev events --json", e.Error.Next)
+		require.Equal(t, "rudder-cli local event-stream events summary --json", e.Error.Next)
 		require.Equal(t, map[string]any{"serverId": "9f3ac1d2b7e4c601", "startedAt": "2026-09-30T12:00:00Z"}, e.Error.Details)
 	}
-	require.Equal(t, http.StatusOK, get(h, "/_dev/v1/events?serverId=9f3ac1d2b7e4c601", nil).Code)
+	require.Equal(t, http.StatusOK, get(h, "/_local/v1/events?serverId=9f3ac1d2b7e4c601", nil).Code)
 }
 
 func TestSummary(t *testing.T) {
@@ -385,7 +385,7 @@ func TestSummary(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, sdk(t, st, http.MethodPost, "/v1/track", "api",
 		`{"event":"Order Completed","channel":"server"}`))
 
-	w := get(h, "/_dev/v1/events?view=counts&event=chatOpened&event=Order+Completed&event=chat*", nil)
+	w := get(h, "/_local/v1/events?view=counts&event=chatOpened&event=Order+Completed&event=chat*", nil)
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
@@ -401,11 +401,11 @@ func TestSummary(t *testing.T) {
 		`"bySource":{"byChannel":{"server":1,"web":1},"bySdk":{"browser":{"requests":1,"control":0},"other":{"requests":1,"control":0}}},`+
 		`"diagnosis":[{"code":"body_rejected","count":1,`+
 		`"message":"1 request was rejected while the body was read: bad gzip, empty body, invalid JSON, wrong batch shape, no identity, or too large. Read rejection.reason.",`+
-		`"next":"curl -fsS 'http://127.0.0.1:4321/_dev/v1/requests?since=0&failed=true&view=compact'"}]},`+
-		`"next":"rudder-cli dev events --since 3 --event chatOpened --event 'Order Completed' --event 'chat*' --json"}`+"\n",
+		`"next":"curl -fsS 'http://127.0.0.1:4321/_local/v1/requests?since=0&failed=true&view=compact'"}]},`+
+		`"next":"rudder-cli local event-stream events summary --since 3 --event chatOpened --event 'Order Completed' --event 'chat*' --json"}`+"\n",
 		w.Body.String())
 
-	unfiltered := get(h, "/_dev/v1/events?view=counts&since=0", nil).Body.String()
+	unfiltered := get(h, "/_local/v1/events?view=counts&since=0", nil).Body.String()
 	require.Contains(t, unfiltered, `"control":{"total":1,"sourceConfig":1,"sourceConfigFailed":0,"preflight":0,"pluginPath":0,"other":0}`)
 	require.Contains(t, unfiltered, `"bySdk":{"browser":{"requests":1,"control":0},"other":{"requests":1,"control":1}}`)
 	require.Contains(t, unfiltered, `"byWriteKey":{"api":{"requests":1,"events":0},"web":{"requests":1,"events":2}}`)
@@ -416,7 +416,7 @@ func TestSummaryWriteKeysAppearWithZero(t *testing.T) {
 	h, st := newTestHandler("127.0.0.1")
 	track(t, st, `{"userId":"u","event":"e"}`)
 
-	w := get(h, "/_dev/v1/events?view=counts&writeKey=worker&writeKey=fake-write-key-for-tests&writeKey=dev", nil)
+	w := get(h, "/_local/v1/events?view=counts&writeKey=worker&writeKey=fake-write-key-for-tests&writeKey=dev", nil)
 
 	require.Contains(t, w.Body.String(),
 		`"byWriteKey":{"dev":{"requests":1,"events":1},"fake...ests":{"requests":0,"events":0},"worker":{"requests":0,"events":0}}`)
@@ -442,7 +442,7 @@ func summaryOf(t *testing.T, h http.Handler, query string) (out struct {
 },
 ) {
 	t.Helper()
-	w := get(h, "/_dev/v1/events?view=counts&"+query, nil)
+	w := get(h, "/_local/v1/events?view=counts&"+query, nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
 	return out
@@ -451,7 +451,7 @@ func summaryOf(t *testing.T, h http.Handler, query string) (out struct {
 // The diagnosis reads the whole window after since, whatever the filters.
 func TestDiagnosis(t *testing.T) {
 	t.Parallel()
-	const url = "http://127.0.0.1:4321/_dev/v1/requests?since="
+	const url = "http://127.0.0.1:4321/_local/v1/requests?since="
 	for _, tc := range []struct {
 		name  string
 		allow []string
@@ -507,7 +507,7 @@ func TestDiagnosis(t *testing.T) {
 			want: []diagnosis{{
 				Code: "nothing_new", Count: 0,
 				Message: "No request after cursor 2; the listener holds 2. The app sent before the cursor, or has not sent yet.",
-				Next:    "rudder-cli dev events --since 0 --json",
+				Next:    "rudder-cli local event-stream events summary --since 0 --json",
 			}},
 		},
 		{
@@ -520,17 +520,17 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "no_browser_traffic", Count: 1,
 					Message: "If the app also runs a browser SDK, the browser did not reach the listener: no browser request, config request or preflight arrived.",
-					Next:    "rudder-cli dev listen --help",
+					Next:    "rudder-cli local event-stream serve --help",
 				},
 				{
 					Code: "all_accepted", Count: 1,
 					Message: "Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
-					Next:    "rudder-cli dev events list --since 0 --event 'order completed' --user-id u --json",
+					Next:    "rudder-cli local event-stream events list --since 0 --event 'order completed' --user-id u --json",
 				},
 				{
 					Code: "filtered_empty", Count: 1,
 					Message: "Requests arrived, but the filters match none. Names are exact and case-sensitive.",
-					Next:    "rudder-cli dev events --since 0 --json",
+					Next:    "rudder-cli local event-stream events summary --since 0 --json",
 				},
 			},
 		},
@@ -549,7 +549,7 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "nothing_new", Count: 0,
 					Message: "No request after cursor 1; the listener holds 1. The app sent before the cursor, or has not sent yet.",
-					Next:    "rudder-cli dev events --since 0 --json",
+					Next:    "rudder-cli local event-stream events summary --since 0 --json",
 				},
 				{
 					Code: "preflight_only", Count: 1,
@@ -589,7 +589,7 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "no_browser_traffic", Count: 2,
 					Message: "If the app also runs a browser SDK, the browser did not reach the listener: no browser request, config request or preflight arrived.",
-					Next:    "rudder-cli dev listen --help",
+					Next:    "rudder-cli local event-stream serve --help",
 				},
 				{
 					Code: "body_rejected", Count: 1,
@@ -618,7 +618,7 @@ func TestDiagnosis(t *testing.T) {
 			require.Equal(t, tc.want, got)
 			// A curl next on the query API runs and finds what it names.
 			for _, d := range got {
-				target, ok := strings.CutPrefix(d.Next, "curl -fsS '"+testURL+"/_dev/")
+				target, ok := strings.CutPrefix(d.Next, "curl -fsS '"+testURL+"/_local/")
 				if !ok {
 					continue
 				}
@@ -637,7 +637,7 @@ func TestSummaryWait(t *testing.T) {
 		h, st := newTestHandler("127.0.0.1")
 		track(t, st, `{"userId":"u","event":"e"}`)
 		answered := make(chan *httptest.ResponseRecorder, 1)
-		go func() { answered <- get(h, "/_dev/v1/events?view=counts&event=e&min=2&wait=10s", nil) }()
+		go func() { answered <- get(h, "/_local/v1/events?view=counts&event=e&min=2&wait=10s", nil) }()
 		// Post only once the read waits, so the posts below are what end it.
 		require.Eventually(t, func() bool { return h.waiters.Load() == 1 }, 5*time.Second, time.Millisecond)
 
@@ -686,7 +686,7 @@ func TestSummaryWait(t *testing.T) {
 		t.Cleanup(cancel)
 		done := make(chan *http.Response)
 		go func() {
-			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/_dev/v1/events?view=counts&wait=60s", nil)
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/_local/v1/events?view=counts&wait=60s", nil)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				close(done)
@@ -716,7 +716,7 @@ func TestStreamFieldsThroughAList(t *testing.T) {
 	h, st := newTestHandler("127.0.0.1")
 	track(t, st, `{"userId":"u","event":"Cart","properties":{"products":[{"sku":"a","n":1},{"n":2},"x",null,3]}}`)
 
-	w := get(h, "/_dev/v1/events?fields=properties.products.sku", nil)
+	w := get(h, "/_local/v1/events?fields=properties.products.sku", nil)
 
 	require.Equal(t, `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`+"\n", w.Body.String(),
 		"an element that is not an object stays as sent")

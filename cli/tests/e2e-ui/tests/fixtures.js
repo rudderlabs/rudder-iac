@@ -11,12 +11,12 @@ const bin = process.env.RUDDER_CLI_BIN || path.resolve(__dirname, '../../../../b
 
 async function startListener() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-listen-page-'));
-  const child = spawn(bin, ['dev', 'listen'], {
+  const child = spawn(bin, ['local', 'event-stream', 'serve'], {
     env: {
       ...process.env,
       HOME: home,
       RUDDERSTACK_CLI_EXPERIMENTAL: 'true',
-      RUDDERSTACK_X_DEV_LISTEN: 'true',
+      RUDDERSTACK_X_LOCAL_EVENT_STREAM: 'true',
       RUDDERSTACK_CLI_TELEMETRY_DISABLED: 'true',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -26,7 +26,7 @@ async function startListener() {
   const exited = new Promise((resolve) => child.once('exit', resolve));
   const line = await Promise.race([
     new Promise((resolve) => readline.createInterface({ input: child.stdout }).once('line', resolve)),
-    exited.then(() => { throw new Error(`dev listen exited before its ready line: ${stderr}`); }),
+    exited.then(() => { throw new Error(`local event-stream serve exited before its ready line: ${stderr}`); }),
     new Promise((_, reject) => setTimeout(() => reject(new Error(`no ready line: ${stderr}`)), 15_000)),
   ]);
   const ready = JSON.parse(line);
@@ -49,7 +49,7 @@ async function startListener() {
       return { status: res.status, text: await res.text() };
     },
     async api(route) {
-      const res = await fetch(ready.url + '/_dev/v1/' + route);
+      const res = await fetch(ready.url + '/_local/v1/' + route);
       if (!res.ok) throw new Error(`${route}: ${res.status} ${await res.text()}`);
       return res;
     },
@@ -121,7 +121,7 @@ function apiRequests(page, route) {
   const seen = [];
   page.on('request', (req) => {
     const url = new URL(req.url());
-    if (url.pathname === '/_dev/v1/' + route) seen.push(url.searchParams);
+    if (url.pathname === '/_local/v1/' + route) seen.push(url.searchParams);
   });
   return seen;
 }
