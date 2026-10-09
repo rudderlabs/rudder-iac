@@ -47,16 +47,10 @@ var HandlerMetadata = handler.HandlerMetadata{
 type accountDefinition struct {
 	Type       string
 	SecretKeys []string
-	// RequiredOptions and RequiredSecrets are the keys the account schema marks
-	// required, so validate can flag a missing one before apply reaches the API
-	// (DEX-994). A discriminated definition's mode-specific secrets live in
-	// authModeRequiredSecrets instead.
+	// RequiredOptions are the config keys the account schema marks required, so
+	// validate can flag a missing one before apply reaches the API (DEX-994).
+	// Required secrets are derived from SecretKeys, see requiredSecrets.
 	RequiredOptions []string
-	RequiredSecrets []string
-	// SecretsNotRequiredWhen lists config values that exempt RequiredSecrets:
-	// the schema requires them only when the key holds some other value or is
-	// absent. BigQuery with workloadIdentityFederation carries no key file.
-	SecretsNotRequiredWhen map[string]string
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -64,17 +58,17 @@ type accountDefinition struct {
 // the reverse.
 //
 // ponytail: hardcoded. The real registry fetches secretFields from the control-plane
-// account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
-// here stays a one-line map entry because the split logic below is definition-driven.
+// account-definitions API (unversioned, name-keyed) — see DEX-467. The split
+// logic below is driven by these definitions, so a new warehouse is a new entry
+// here plus, when it has several auth modes, an entry in authModeRequirements.
 var registeredAccounts = map[string]accountDefinition{
 	"SOURCE_BIGQUERY": {
 		Type: "bigquery", SecretKeys: []string{"credentials"},
-		RequiredOptions: []string{"project"}, RequiredSecrets: []string{"credentials"},
-		SecretsNotRequiredWhen: map[string]string{"authMethod": "workloadIdentityFederation"},
+		RequiredOptions: []string{"project"},
 	},
 	"SOURCE_POSTGRES": {
 		Type: "postgres", SecretKeys: []string{"password"},
-		RequiredOptions: []string{"host", "dbname", "user", "port", "sslMode"}, RequiredSecrets: []string{"password"},
+		RequiredOptions: []string{"host", "dbname", "user", "port", "sslMode"},
 	},
 	"SOURCE_SNOWFLAKE": {
 		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
@@ -82,24 +76,48 @@ var registeredAccounts = map[string]accountDefinition{
 	},
 }
 
-// authModeRequiredSecrets is the required subset of authModeSecrets: the
-// passphrase is optional, the key itself is not.
-var authModeRequiredSecrets = map[string]map[string][]string{
-	"SOURCE_SNOWFLAKE": {
-		"keyPair":  {"privateKey"},
-		"password": {"password"},
-	},
+// optionalSecrets are secret keys an account schema does not require.
+var optionalSecrets = []string{"privateKeyPassphrase"}
+
+// requiredSecrets is keys without the optional ones.
+func requiredSecrets(keys []string) []string {
+	return slices.DeleteFunc(slices.Clone(keys), func(key string) bool {
+		return slices.Contains(optionalSecrets, key)
+	})
 }
 
-// secretsExempt reports whether the config selects an auth mode that needs none
-// of the definition's required secrets.
-func secretsExempt(def accountDefinition, config map[string]any) bool {
-	for key, value := range def.SecretsNotRequiredWhen {
-		if got, _ := config[key].(string); got == value {
-			return true
-		}
-	}
-	return false
+// authModeRequirement is how a definition with several auth modes picks the
+// config keys it requires on top of RequiredOptions.
+type authModeRequirement struct {
+	// Key is the config key that selects the mode, and Absent the mode an
+	// account without it runs in. Absent is empty when the key is itself
+	// required, so a missing one is reported on its own.
+	Key    string
+	Absent string
+	// Required lists the keys each mode needs.
+	Required map[string][]string
+}
+
+// authModeRequirements covers the definitions whose required keys depend on the
+// auth mode. A definition absent here requires all of its non-optional secrets.
+var authModeRequirements = map[string]authModeRequirement{
+	"SOURCE_BIGQUERY": {
+		Key:    "authMethod",
+		Absent: "serviceAccountKey",
+		Required: map[string][]string{
+			"serviceAccountKey": requiredSecrets(registeredAccounts["SOURCE_BIGQUERY"].SecretKeys),
+			// Federation has no key file; the schema requires these three
+			// options instead and wants credentials empty.
+			"workloadIdentityFederation": {"workloadIdentityProjectNumber", "workloadIdentityPoolId", "workloadIdentityProviderId"},
+		},
+	},
+	"SOURCE_SNOWFLAKE": {
+		Key: "authenticationType",
+		Required: map[string][]string{
+			"keyPair":  requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["keyPair"]),
+			"password": requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["password"]),
+		},
+	},
 }
 
 // missingRequiredConfig lists the required config keys an account of this
@@ -112,13 +130,16 @@ func missingRequiredConfig(definitionName string, config map[string]any) []strin
 	}
 
 	required := slices.Clone(def.RequiredOptions)
-	if modeSecrets, discriminated := authModeRequiredSecrets[definitionName]; discriminated {
-		// Without a mode there is no telling which secret is required; the
-		// missing authenticationType is reported on its own.
-		mode, _ := config["authenticationType"].(string)
-		required = append(required, modeSecrets[mode]...)
-	} else if !secretsExempt(def, config) {
-		required = append(required, def.RequiredSecrets...)
+	if modes, discriminated := authModeRequirements[definitionName]; discriminated {
+		// Without a mode there is no telling which keys are required; a
+		// missing discriminator is reported on its own.
+		mode, _ := config[modes.Key].(string)
+		if mode == "" {
+			mode = modes.Absent
+		}
+		required = append(required, modes.Required[mode]...)
+	} else {
+		required = append(required, requiredSecrets(def.SecretKeys)...)
 	}
 
 	var missing []string
@@ -281,9 +302,8 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldD
 	return &AccountState{ID: updated.ID}, nil
 }
 
-// Delete annotates the one refusal the CLI knows more about than the API: an
-// account still in use, where the resource using it is often one this run never
-// loaded (DEX-959). Every other failure passes through untouched.
+// Delete annotates an in-use refusal with what to do about it (DEX-959). Every
+// other failure passes through untouched.
 func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *AccountResource, oldState *AccountState) error {
 	if err := h.store.Delete(ctx, oldState.ID); err != nil {
 		return fmt.Errorf("deleting account %q: %w", oldState.ID, provider.ExplainBlockingAccountUsage(err))

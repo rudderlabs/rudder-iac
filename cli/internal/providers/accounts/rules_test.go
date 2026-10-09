@@ -87,9 +87,27 @@ func TestMissingRequiredConfig_UnregisteredDefinition(t *testing.T) {
 	assert.Empty(t, missingRequiredConfig("SOURCE_UNKNOWN", map[string]any{}))
 }
 
-// The SOURCE_BIGQUERY schema requires credentials only when authMethod is not
-// workloadIdentityFederation, so a hand-written federated account carries none.
-func TestMissingRequiredConfig_BigQueryCredentialsFollowAuthMethod(t *testing.T) {
+// The SOURCE_BIGQUERY schema requires credentials for a key file, and the three
+// workload identity options for federation, where a key file is not sent.
+func TestMissingRequiredConfig_BigQueryKeysFollowAuthMethod(t *testing.T) {
+	federation := func(extra map[string]any) map[string]any {
+		c := map[string]any{
+			"project":                       "p",
+			"authMethod":                    "workloadIdentityFederation",
+			"workloadIdentityProjectNumber": "123",
+			"workloadIdentityPoolId":        "pool",
+			"workloadIdentityProviderId":    "provider",
+		}
+		for k, v := range extra {
+			if v == nil {
+				delete(c, k)
+				continue
+			}
+			c[k] = v
+		}
+		return c
+	}
+
 	tests := []struct {
 		name   string
 		config map[string]any
@@ -97,8 +115,13 @@ func TestMissingRequiredConfig_BigQueryCredentialsFollowAuthMethod(t *testing.T)
 	}{
 		{"key file needs credentials", map[string]any{"project": "p"}, []string{"credentials"}},
 		{"explicit key file method needs credentials", map[string]any{"project": "p", "authMethod": "serviceAccountKey"}, []string{"credentials"}},
-		{"federation needs none", map[string]any{"project": "p", "authMethod": "workloadIdentityFederation"}, nil},
-		{"federation still needs the project", map[string]any{"authMethod": "workloadIdentityFederation"}, []string{"project"}},
+		{"key file with credentials is complete", map[string]any{"project": "p", "credentials": "k"}, nil},
+		{"complete federation needs no credentials", federation(nil), nil},
+		{"federation needs the project", federation(map[string]any{"project": nil}), []string{"project"}},
+		{"federation needs the project number", federation(map[string]any{"workloadIdentityProjectNumber": nil}), []string{"workloadIdentityProjectNumber"}},
+		{"federation needs the pool id", federation(map[string]any{"workloadIdentityPoolId": nil}), []string{"workloadIdentityPoolId"}},
+		{"federation needs the provider id", federation(map[string]any{"workloadIdentityProviderId": nil}), []string{"workloadIdentityProviderId"}},
+		{"federation ignores the key file options of the other mode", federation(map[string]any{"credentials": ""}), nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
