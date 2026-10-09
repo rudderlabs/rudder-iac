@@ -25,14 +25,13 @@ func newCmdListAccounts() *cobra.Command {
 		Use:   "list",
 		Short: "List accounts in the workspace",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			category, _ := cmd.Flags().GetString("category")
 			accountType, _ := cmd.Flags().GetString("type")
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 
-			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace accounts list", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "category", V: category},
 					{K: "type", V: accountType},
 					{K: "json", V: jsonOutput},
@@ -59,8 +58,7 @@ func newCmdListAccounts() *cobra.Command {
 				filters["type"] = accountType
 			}
 
-			err = l.List(cmd.Context(), workspace.AccountResourceType, filters)
-			return err
+			return l.List(cmd.Context(), workspace.AccountResourceType, filters)
 		},
 	}
 
