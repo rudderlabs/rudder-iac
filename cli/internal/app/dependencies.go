@@ -222,7 +222,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := provider.NewCompositeProvider(providerMap)
+	cp, err := provider.NewCompositeProvider(providerMap, providerOrder...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -237,6 +237,34 @@ func setupClient(version string) (*client.Client, error) {
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
+}
+
+// providerOrder is the order the composite aggregates import --merge matchers
+// in. A matcher that consults another provider's matches only finds them if
+// that provider's matchers ran first, so a provider comes after everything it
+// depends on. providerEdges records those dependencies, and a test keeps the
+// two in step: a new cross-provider reference is a one-line addition there.
+var providerOrder = []string{
+	"account",
+	"transformations",
+	"datacatalog",
+	"destination",
+	"datagraph",
+	"eventstream",
+	"retl",
+}
+
+// providerEdges maps each provider to the providers whose matches its
+// matchers consult or whose resources its specs reference.
+var providerEdges = map[string][]string{
+	// transformation: "#transformation:<id>"
+	"destination": {"transformations"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference a tracking plan
+	"eventstream": {"destination", "datacatalog"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference an account: "#account:<id>"
+	"retl": {"destination", "account"},
 }
 
 func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider, error) {
