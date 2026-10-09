@@ -3,6 +3,7 @@ package accounts
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
@@ -27,6 +28,12 @@ func validateAccountSpec(_, _ string, _ map[string]any, spec AccountSpec) []rule
 	}
 
 	var results []rules.ValidationResult
+	if key, allowed, unknown := unknownAuthMode(spec.AccountDefinitionName, spec.Config); unknown {
+		results = append(results, rules.ValidationResult{
+			Reference: "/config/" + key,
+			Message:   fmt.Sprintf("'%s' must be one of %s for %s accounts", key, strings.Join(allowed, ", "), spec.AccountDefinitionName),
+		})
+	}
 	for _, key := range missingRequiredConfig(spec.AccountDefinitionName, spec.Config) {
 		results = append(results, rules.ValidationResult{
 			Reference: "/config/" + key,

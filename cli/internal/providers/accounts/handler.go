@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -89,21 +90,21 @@ func requiredSecrets(keys []string) []string {
 // authModeRequirement is how a definition with several auth modes picks the
 // config keys it requires on top of RequiredOptions.
 type authModeRequirement struct {
-	// Key is the config key that selects the mode, and Absent the mode an
-	// account without it runs in. Absent is empty when the key is itself
-	// required, so a missing one is reported on its own.
-	Key    string
-	Absent string
+	// Key is the config key that selects the mode.
+	Key string
 	// Required lists the keys each mode needs.
 	Required map[string][]string
 }
 
 // authModeRequirements covers the definitions whose required keys depend on the
 // auth mode. A definition absent here requires all of its non-optional secrets.
+//
+// A new definition with several auth modes also needs an entry in
+// authModeSecrets and absentAuthModes, or every secret is sent again on each
+// apply (DEX-958).
 var authModeRequirements = map[string]authModeRequirement{
 	"SOURCE_BIGQUERY": {
-		Key:    "authMethod",
-		Absent: "serviceAccountKey",
+		Key: "authMethod",
 		Required: map[string][]string{
 			"serviceAccountKey": requiredSecrets(registeredAccounts["SOURCE_BIGQUERY"].SecretKeys),
 			// Federation has no key file; the schema requires these three
@@ -120,6 +121,31 @@ var authModeRequirements = map[string]authModeRequirement{
 	},
 }
 
+// given reports whether config sets key to something. A null value, as in
+// "account:" with nothing after it, counts as not set.
+func given(config map[string]any, key string) bool {
+	return config[key] != nil
+}
+
+// requiredConfigKeys lists the keys an account of this definition must set,
+// options first.
+func requiredConfigKeys(definitionName string, def accountDefinition, config map[string]any) []string {
+	required := slices.Clone(def.RequiredOptions)
+	modes, discriminated := authModeRequirements[definitionName]
+	if !discriminated {
+		return append(required, requiredSecrets(def.SecretKeys)...)
+	}
+	// A missing required discriminator and an unknown mode are each reported on
+	// their own, since there is no telling which keys are required.
+	if _, _, unknown := unknownAuthMode(definitionName, config); unknown {
+		return required
+	}
+	if slices.Contains(def.RequiredOptions, modes.Key) && !given(config, modes.Key) {
+		return required
+	}
+	return append(required, modes.Required[authMode(definitionName, config)]...)
+}
+
 // missingRequiredConfig lists the required config keys an account of this
 // definition leaves out, options first. A definition the CLI does not register
 // has no known requirements, so it reports nothing.
@@ -129,26 +155,30 @@ func missingRequiredConfig(definitionName string, config map[string]any) []strin
 		return nil
 	}
 
-	required := slices.Clone(def.RequiredOptions)
-	if modes, discriminated := authModeRequirements[definitionName]; discriminated {
-		// Without a mode there is no telling which keys are required; a
-		// missing discriminator is reported on its own.
-		mode, _ := config[modes.Key].(string)
-		if mode == "" {
-			mode = modes.Absent
-		}
-		required = append(required, modes.Required[mode]...)
-	} else {
-		required = append(required, requiredSecrets(def.SecretKeys)...)
-	}
-
 	var missing []string
-	for _, key := range required {
-		if _, present := config[key]; !present {
+	for _, key := range requiredConfigKeys(definitionName, def, config) {
+		if !given(config, key) {
 			missing = append(missing, key)
 		}
 	}
 	return missing
+}
+
+// unknownAuthMode reports the config key and the allowed values when the
+// account names an auth mode its definition does not have. Without this check
+// an unknown mode requires nothing, so a typo such as "serviceAccount" passes
+// validate and fails at the API (DEX-994). An unset mode is not unknown.
+func unknownAuthMode(definitionName string, config map[string]any) (key string, allowed []string, unknown bool) {
+	modes, discriminated := authModeRequirements[definitionName]
+	if !discriminated || !given(config, modes.Key) {
+		return "", nil, false
+	}
+	if mode, isString := config[modes.Key].(string); isString {
+		if _, known := modes.Required[mode]; known || mode == "" {
+			return "", nil, false
+		}
+	}
+	return modes.Key, slices.Sorted(maps.Keys(modes.Required)), true
 }
 
 // authModeSecrets maps each auth mode of a discriminated definition to the
@@ -169,12 +199,13 @@ var authModeSecrets = map[string]map[string][]string{
 // (rudder-sources snowflake.NewClient); an absent value predates key-pair
 // support, so it is a password account whatever the form's default says.
 var absentAuthModes = map[string]string{
+	"SOURCE_BIGQUERY":  "serviceAccountKey",
 	"SOURCE_SNOWFLAKE": "password",
 }
 
 // authMode is the account's auth mode, or "" for a definition with a single mode.
 func authMode(definitionName string, config map[string]any) string {
-	if mode, _ := config["authenticationType"].(string); mode != "" {
+	if mode, _ := config[authModeRequirements[definitionName].Key].(string); mode != "" {
 		return mode
 	}
 	return absentAuthModes[definitionName]

@@ -129,3 +129,41 @@ func TestMissingRequiredConfig_BigQueryKeysFollowAuthMethod(t *testing.T) {
 		})
 	}
 }
+
+// A null value is how "credentials:" with nothing after it parses, and the API
+// treats it as unset.
+func TestMissingRequiredConfig_NullCountsAsMissing(t *testing.T) {
+	assert.Equal(t, []string{"credentials"}, missingRequiredConfig("SOURCE_BIGQUERY", map[string]any{"project": "p", "credentials": nil}))
+	assert.Equal(t, []string{"project"}, missingRequiredConfig("SOURCE_BIGQUERY", map[string]any{"project": nil, "credentials": "k"}))
+	// A null discriminator is an absent one, so the default mode applies.
+	assert.Equal(t, []string{"credentials"}, missingRequiredConfig("SOURCE_BIGQUERY", map[string]any{"project": "p", "authMethod": nil}))
+	assert.Equal(t, []string{"authenticationType"}, missingRequiredConfig("SOURCE_SNOWFLAKE", map[string]any{
+		"account": "a", "dbname": "d", "warehouse": "w", "user": "u", "authenticationType": nil,
+	}))
+}
+
+// A typo in the mode used to require nothing, so the spec passed validate and
+// failed at the API (DEX-994).
+func TestSpecSyntaxValid_ReportsUnknownAuthMode(t *testing.T) {
+	validate := func(definition string, config map[string]any) []rules.ValidationResult {
+		return NewSpecSyntaxValidRule().Validate(&rules.ValidationContext{
+			Kind: AccountSpecKind, Version: "rudder/v1",
+			Spec: map[string]any{"id": "a", "name": "A", "account_definition_name": definition, "config": config},
+		})
+	}
+
+	bigquery := validate("SOURCE_BIGQUERY", map[string]any{"project": "p", "authMethod": "serviceAccount"})
+	assert.Equal(t, []rules.ValidationResult{{
+		Reference: "/spec/config/authMethod",
+		Message:   "'authMethod' must be one of serviceAccountKey, workloadIdentityFederation for SOURCE_BIGQUERY accounts",
+	}}, bigquery)
+
+	snowflake := validate("SOURCE_SNOWFLAKE", map[string]any{
+		"account": "a", "dbname": "d", "warehouse": "w", "user": "u", "authenticationType": "oauth",
+	})
+	assert.Equal(t, []string{"/spec/config/authenticationType"}, references(snowflake))
+	assert.Contains(t, snowflake[0].Message, "must be one of keyPair, password")
+
+	// A mode that is not a string is unknown too.
+	assert.Equal(t, []string{"/spec/config/authMethod"}, references(validate("SOURCE_BIGQUERY", map[string]any{"project": "p", "authMethod": 1})))
+}
