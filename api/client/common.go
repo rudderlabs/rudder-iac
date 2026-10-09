@@ -31,6 +31,10 @@ var blockedByConnectionsMessages = []string{
 	"connected to some destinations",
 }
 
+// accountInUseMessage is the 409 the public accounts API raises when an account
+// is still used. Only the message identifies it, as APIError.ErrorCode is empty.
+const accountInUseMessage = "can't be removed because it is being used"
+
 type Paging struct {
 	Total int    `json:"total"`
 	Next  string `json:"next"`
@@ -116,6 +120,15 @@ func (e *APIError) BlockedByConnections() bool {
 	}
 
 	return false
+}
+
+// BlockedByAccountUsage reports whether this is the control plane refusing to
+// delete an account because sources, destinations or data graphs still use it.
+func (e *APIError) BlockedByAccountUsage() bool {
+	if e.HTTPStatusCode != http.StatusConflict {
+		return false
+	}
+	return strings.Contains(strings.ToLower(e.Msg()), accountInUseMessage)
 }
 
 func (e *APIError) Msg() string {

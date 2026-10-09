@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
@@ -68,11 +69,15 @@ func TestProviderRuleDocs(t *testing.T) {
 
 	var examples int
 	for _, entry := range p.RuleDocEntries() {
-		// Only the connection fragments run as projects. The SQL model fragments
-		// predate this check (references without /spec, duplicates against
-		// models their files do not carry); DEX-915 fixes them and drops the
-		// filter.
-		if !strings.HasPrefix(entry.RuleID, "retl/connection/") {
+		// The connection fragments run in full. The table and SQL model semantic
+		// fragments run their valid examples only, which is enough to catch an
+		// account that no longer validates (a newly required config key). Their
+		// invalid examples, and the syntax fragments, predate this check
+		// (references without /spec, duplicates against models their files do
+		// not carry); DEX-915 fixes them and drops the filter.
+		connection := strings.HasPrefix(entry.RuleID, "retl/connection/")
+		semantic := slices.Contains([]string{"retl/table/semantic-valid", "retl/sqlmodel/semantic-valid"}, entry.RuleID)
+		if !connection && !semantic {
 			continue
 		}
 		for _, behaviour := range entry.MatchBehavior {
@@ -83,6 +88,9 @@ func TestProviderRuleDocs(t *testing.T) {
 					assert.NoError(t, err)
 					assert.Empty(t, diagnostics, "unexpected diagnostics:\n%s", describe(diagnostics))
 				})
+			}
+			if !connection {
+				continue
 			}
 			for _, example := range behaviour.Invalid {
 				t.Run(example.ExampleID, func(t *testing.T) {
@@ -105,9 +113,10 @@ func loadExample(t *testing.T, registry *definitions.Registry, files map[string]
 	t.Helper()
 
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-		"retl":        retl.New(newDefaultMockClient(), retl.WithConnectionSupport(registry)),
+		"retl":        retl.New(newDefaultMockClient(), retl.WithTableSupport(), retl.WithConnectionSupport(registry)),
 		"eventstream": eventstream.New(source.NewMockSourceClient(), eventstream.WithDestinationRegistry(registry)),
 		"destination": destination.NewProvider(nil, registry),
+		"account":     accounts.NewProvider(nil),
 	})
 	require.NoError(t, err)
 

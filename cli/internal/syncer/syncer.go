@@ -139,6 +139,12 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	ui.StopSpinner()
 
+	if checker, ok := s.provider.(provider.PlanChecker); ok {
+		if err := checker.CheckPlan(ctx, plan, state); err != nil {
+			return []error{err}
+		}
+	}
+
 	s.reporter.ReportPlan(plan)
 
 	if s.dryRun {
