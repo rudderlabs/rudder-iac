@@ -6,13 +6,11 @@ import (
 )
 
 // ResourceMatchers overrides the EmptyProvider default to opt into import
-// --merge smart linking. Destinations are unique by exact name within a
-// workspace (case-sensitive, unlike sources) — the same uniqueness the semantic
-// rule enforces on display_name locally — so a remote destination links to a
-// local destination of the same display name.
-// Type is deliberately not part of the match: a same-named destination of a
-// different type is an upstream collision either way, and linking it surfaces
-// that as the immutable-type error rather than as a duplicate spec.
+// --merge smart linking: a remote destination links to the local destination
+// with the same display name, which is expected to be unique per workspace and
+// is compared case-sensitively. Type stays out of the key, so a same-named
+// destination of another type surfaces as the immutable-type error at apply
+// instead of as a duplicate spec.
 func (p *Provider) ResourceMatchers() []importmatcher.Matcher {
 	return []importmatcher.Matcher{
 		{ResourceType: DestinationResourceType, Match: matchDestination},

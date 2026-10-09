@@ -10,17 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func localDestination(id, displayName, destType string) *resources.Resource {
+func localDestination(id, displayName string) *resources.Resource {
 	return resources.NewResource(id, DestinationResourceType, resources.ResourceData{}, []string{},
-		resources.WithRawData(&DestinationResource{ID: id, DisplayName: displayName, Type: destType}))
+		resources.WithRawData(&DestinationResource{ID: id, DisplayName: displayName, Type: "s3"}))
 }
 
+// remoteDestination is a webhook, a different type from every local fixture.
 func remoteDestination(remoteID, name string) *resources.RemoteResource {
 	return &resources.RemoteResource{
-		ID:         remoteID,
-		ExternalID: "imported-1",
-		Reference:  "#destination:imported-1",
-		Data:       &RemoteDestination{Destination: &client.Destination{ID: remoteID, Name: name}},
+		ID:   remoteID,
+		Data: &RemoteDestination{Destination: &client.Destination{ID: remoteID, Name: name, Type: "WEBHOOK"}},
 	}
 }
 
@@ -40,21 +39,20 @@ func TestDestinationMatcher(t *testing.T) {
 	require.Equal(t, DestinationResourceType, matchers[0].ResourceType)
 	matcher := matchers[0]
 
-	t.Run("matches on display name", func(t *testing.T) {
+	t.Run("matches on display name whatever the type", func(t *testing.T) {
 		t.Parallel()
 
-		scope := destinationScope(localDestination("warehouse", "Prod Warehouse", "s3"))
+		warehouse := localDestination("warehouse", "Prod Warehouse")
 
-		local := matcher.Match(scope, remoteDestination("dest-1", "Prod Warehouse"))
+		local := matcher.Match(destinationScope(warehouse), remoteDestination("dest-1", "Prod Warehouse"))
 
-		require.NotNil(t, local)
-		assert.Equal(t, "warehouse", local.ID())
+		assert.Same(t, warehouse, local)
 	})
 
 	t.Run("no match for different display name", func(t *testing.T) {
 		t.Parallel()
 
-		scope := destinationScope(localDestination("warehouse", "Prod Warehouse", "s3"))
+		scope := destinationScope(localDestination("warehouse", "Prod Warehouse"))
 
 		assert.Nil(t, matcher.Match(scope, remoteDestination("dest-1", "Staging Warehouse")))
 	})
@@ -62,26 +60,15 @@ func TestDestinationMatcher(t *testing.T) {
 	t.Run("no match for a case-variant display name", func(t *testing.T) {
 		t.Parallel()
 
-		scope := destinationScope(localDestination("warehouse", "Prod Warehouse", "s3"))
+		scope := destinationScope(localDestination("warehouse", "Prod Warehouse"))
 
 		assert.Nil(t, matcher.Match(scope, remoteDestination("dest-1", "prod warehouse")))
-	})
-
-	t.Run("matches regardless of type", func(t *testing.T) {
-		t.Parallel()
-
-		scope := destinationScope(localDestination("warehouse", "Prod Warehouse", "postgres"))
-
-		local := matcher.Match(scope, remoteDestination("dest-1", "Prod Warehouse"))
-
-		require.NotNil(t, local)
-		assert.Equal(t, "warehouse", local.ID())
 	})
 
 	t.Run("empty name never matches", func(t *testing.T) {
 		t.Parallel()
 
-		scope := destinationScope(localDestination("warehouse", "", "s3"))
+		scope := destinationScope(localDestination("warehouse", ""))
 
 		assert.Nil(t, matcher.Match(scope, remoteDestination("dest-1", "")))
 	})
