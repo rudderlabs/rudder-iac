@@ -77,7 +77,7 @@ func checkServiceAccountKey(text string) error {
 	case "authorized_user":
 		return errors.New("credentials is a gcloud user credentials file (type authorized_user); use a service account key file")
 	case "external_account":
-		return errors.New("credentials is an external_account file; for workload identity federation set authMethod: workloadIdentityFederation and omit credentials")
+		return errors.New("credentials is an external_account file; for workload identity federation set authMethod: workloadIdentityFederation, omit credentials, and set workloadIdentityProjectNumber, workloadIdentityPoolId and workloadIdentityProviderId")
 	default:
 		return errors.New("credentials is not a service account key file; its type must be service_account")
 	}

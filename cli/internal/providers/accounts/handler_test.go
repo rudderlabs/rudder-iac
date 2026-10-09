@@ -489,10 +489,6 @@ func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
 		s := secret.New(v)
 		return &s
 	}
-	// The config keys other than credentials must reach the resource untouched.
-	wantConfig := func(credentials any) map[string]any {
-		return map[string]any{"project": "acme-analytics-prod", "credentials": credentials}
-	}
 
 	tests := []struct {
 		name        string
@@ -500,11 +496,11 @@ func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
 		wantConfig  map[string]any
 		errContains string
 	}{
-		{name: "service account key JSON", config: withCredentials(validKey), wantConfig: wantConfig(wrapped(validKey))},
+		{name: "service account key JSON", config: withCredentials(validKey), wantConfig: withCredentials(wrapped(validKey))},
 		{
 			name:       "service account key as a map is sent as JSON",
 			config:     withCredentials(map[string]any{"type": "service_account", "private_key": bqPEM, "client_email": "rudder@acme-analytics-prod.iam.gserviceaccount.com"}),
-			wantConfig: wantConfig(wrapped(validKey)),
+			wantConfig: withCredentials(wrapped(validKey)),
 		},
 		{
 			name:       "workload identity federation carries no credentials",
@@ -516,7 +512,7 @@ func TestExtractResourcesFromSpec_BigQueryCredentials(t *testing.T) {
 		{name: "not JSON", config: withCredentials("dummy-key"), errContains: "not valid JSON"},
 		{name: "not a string or map", config: withCredentials(42), errContains: "must be the service account key JSON"},
 		{name: "gcloud user credentials", config: withCredentials(`{"type":"authorized_user","client_id":"x"}`), errContains: "authorized_user"},
-		{name: "external account file", config: withCredentials(`{"type":"external_account"}`), errContains: "authMethod: workloadIdentityFederation"},
+		{name: "external account file", config: withCredentials(`{"type":"external_account"}`), errContains: "workloadIdentityProviderId"},
 		{name: "no type", config: withCredentials(`{"client_email":"a@b.c"}`), errContains: "its type must be service_account"},
 		{name: "no client_email", config: withCredentials(`{"type":"service_account","private_key":"` + strings.ReplaceAll(bqPEM, "\n", `\n`) + `"}`), errContains: "client_email"},
 	}
@@ -581,15 +577,12 @@ func TestExtractResourcesFromSpec_BigQueryAcceptsTheUnquotedImportScaffold(t *te
 			})
 			require.NoError(t, err)
 
-			// Marshalling the map re-orders keys, so compare the JSON, then the rest of the resource.
-			sent, ok := resources["bq"].Config["credentials"].(*secret.String)
-			require.True(t, ok, "credentials must be wrapped as a secret")
-			assert.JSONEq(t, compact, sent.Reveal(), "the key must reach the backend as the JSON it was")
-
-			resources["bq"].Config["credentials"] = nil
+			// json.Marshal sorts map keys and bqKeyJSON marshals a map, so the
+			// key reaches the backend byte for byte as the compact form.
+			want := secret.New(compact)
 			assert.Equal(t, map[string]*AccountResource{"bq": {
 				ID: "bq", Name: "bq", AccountDefinitionName: "SOURCE_BIGQUERY",
-				Config: map[string]any{"project": "acme-analytics-prod", "credentials": nil},
+				Config: map[string]any{"project": "acme-analytics-prod", "credentials": &want},
 			}}, resources)
 		})
 	}
