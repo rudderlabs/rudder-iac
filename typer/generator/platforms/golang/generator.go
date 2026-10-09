@@ -434,8 +434,10 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 		union.Members = append(union.Members, member)
 	}
 
-	last := len(words) - 1
-	zero := "Null is not a member, so the zero value cannot be sent."
+	var (
+		last = len(words) - 1
+		zero = "Null is not a member, so the zero value cannot be sent."
+	)
 	if union.Null {
 		zero = "Null is a member, so the zero value is null."
 	}
