@@ -244,10 +244,16 @@ func unsupportedReason(ps plan.PropertySchema) string {
 		return "arrays of custom types"
 	// A custom type in a union of several non-null types fails generation
 	// instead (addUnion).
-	case slices.ContainsFunc(p.Types, plan.IsCustomType) && len(nonNull(p.Types)) == 1:
+	case slices.ContainsFunc(p.Types, plan.IsCustomType) && !isUnion(p.Types):
 		return "custom types"
 	}
 	return ""
+}
+
+// isUnion reports whether types has two or more non-null types, which Go
+// generates as a union struct.
+func isUnion(types []plan.PropertyType) bool {
+	return len(nonNull(types)) > 1
 }
 
 func nonNull(types []plan.PropertyType) []plan.PropertyType {
@@ -288,7 +294,7 @@ func typeList(types []plan.PropertyType) string {
 // hold nil (slice, map or interface).
 func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property) (bool, error) {
 	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
-	if len(nonNull(prop.Types)) > 1 {
+	if isUnion(prop.Types) {
 		return false, addUnion(ctx, registry, name, lead, prop.Description, prop.Types, prop.ItemTypes)
 	}
 	if len(prop.Types) == 0 {
@@ -352,7 +358,7 @@ func memberType(ctx *GoContext, registry *core.NameRegistry, owner string, t pla
 // more non-null types get the union {owner}Item, registered right after its
 // owner, as a payload's hoisted structs follow the payload.
 func arrayType(ctx *GoContext, registry *core.NameRegistry, owner string, items []plan.PropertyType) (string, error) {
-	if len(nonNull(items)) < 2 {
+	if !isUnion(items) {
 		typ, _, err := goType(ctx, registry, owner, items, nil)
 		return "[]" + typ, err
 	}
