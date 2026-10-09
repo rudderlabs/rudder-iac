@@ -258,6 +258,69 @@ func TestRecordChargesTheBytesItKeeps(t *testing.T) {
 	require.GreaterOrEqual(t, newRecord(pixel).size, len(body))
 }
 
+func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
+	t.Parallel()
+	huge := strings.Repeat("a", 2_100_000)
+
+	refused := capture("dev", "/v1/track", huge)
+	refused.StatusCode = http.StatusRequestEntityTooLarge
+	refused.BodyComplete = false
+	refused.Decoded = nil
+	refused.Events = nil
+	rec := newRecord(refused)
+
+	require.Equal(t, 2_100_000, rec.Request.BodyBytes)
+	require.Len(t, rec.Request.Body, maxRefusedBody)
+	require.Equal(t, maxRefusedBody, cap(rec.Request.Body), "the copy lets the 2 MB array go")
+	require.False(t, rec.Request.BodyComplete)
+	require.Less(t, rec.size, 8<<10)
+
+	// A body refused at the route or auth step never reached the parser, even
+	// though it was read in full.
+	for _, stage := range []string{"route", "auth"} {
+		early := capture("dev", "/x", huge)
+		early.StatusCode = http.StatusNotFound
+		early.Events = nil
+		early.Rejection = &ingest.Rejection{Stage: stage}
+		rec := newRecord(early)
+		require.Len(t, rec.Request.Body, maxRefusedBody, stage)
+		require.False(t, rec.Request.BodyComplete, stage)
+	}
+
+	// A refusal at a parsing step keeps the body, because the events point
+	// into it and the sender needs to see where it broke.
+	parsed := capture("dev", "/v1/batch", huge)
+	parsed.StatusCode = http.StatusBadRequest
+	parsed.Rejection = &ingest.Rejection{Stage: "identity"}
+	require.Len(t, newRecord(parsed).Request.Body, len(huge))
+
+	// A body that was read in full but failed the parser keeps its bytes, so
+	// the sender can see where the JSON broke.
+	broken := capture("dev", "/v1/track", huge)
+	broken.StatusCode = http.StatusBadRequest
+	broken.Events = nil
+	broken.Rejection = &ingest.Rejection{Stage: "parse"}
+	require.Len(t, newRecord(broken).Request.Body, len(huge))
+
+	// An accepted request is captured whole.
+	require.Len(t, newRecord(capture("dev", "/v1/track", huge)).Request.Body, len(huge))
+}
+
+func TestRecordCapsTheTarget(t *testing.T) {
+	t.Parallel()
+	long := "/pixel/v1/track?x=" + strings.Repeat("a", 512<<10)
+
+	// An accepted pixel request keeps its whole query, the only raw copy of
+	// what the SDK sent.
+	require.Len(t, newRecord(capture("dev", long, "")).Request.Target, len(long))
+
+	refused := capture("dev", long, "")
+	refused.Rejection = &ingest.Rejection{Stage: "identity"}
+	rec := newRecord(refused)
+	require.Len(t, rec.Request.Target, maxTarget)
+	require.True(t, strings.HasPrefix(rec.Request.Target, "/pixel/v1/track?x="))
+}
+
 func TestStoreIsSafeForConcurrentUse(t *testing.T) {
 	t.Parallel()
 	const writers, perWriter = 8, 250

@@ -123,6 +123,16 @@ var keptHeaders = []string{"User-Agent", "Content-Type", "Content-Encoding", "Or
 // maxHeaderValue bounds each kept value, because the sender controls it.
 const maxHeaderValue = 1024
 
+// maxRefusedBody bounds the body kept for a request refused before parsing,
+// such as one over the size cap or with a corrupt gzip stream. The sender
+// picks its size, and any web page can post to the listener, so keeping a
+// refused 2 MB body lets 32 posts evict every capture.
+const maxRefusedBody = 1024
+
+// maxTarget bounds the kept request target. The sender controls the query,
+// and the route is in the first bytes.
+const maxTarget = 1024
+
 // firstValues keeps the first value of each header in names, or of every
 // header when names is nil, and counts the values it leaves out.
 func firstValues(h http.Header, names []string) (map[string]string, int) {
@@ -143,6 +153,12 @@ func firstValues(h http.Header, names []string) (map[string]string, int) {
 	return out, dropped
 }
 
+// refusedBeforeParsing reports a refusal at a step that never reads the body,
+// such as an unknown route or a write key the allowlist rejects.
+func refusedBeforeParsing(r *ingest.Rejection) bool {
+	return r != nil && (r.Stage == "route" || r.Stage == "auth")
+}
+
 func newRecord(c *ingest.Capture) *Record {
 	key := MaskWriteKey(c.WriteKey)
 	body := c.Decoded
@@ -151,6 +167,16 @@ func newRecord(c *ingest.Capture) *Record {
 	}
 	if len(body) == 0 {
 		body = nil
+	}
+	bodyComplete := c.BodyComplete
+	// A body that was not read or decoded in full, or that was refused at the
+	// route or auth step, never reached the parser. No event points into it, so
+	// a copy lets the large array go. A body that parsed and failed, such as
+	// truncated JSON, stays whole so the sender can see where it broke.
+	// BodyBytes still reports the real size.
+	if (!c.BodyComplete || refusedBeforeParsing(c.Rejection)) && len(body) > maxRefusedBody {
+		body = slices.Clone(body[:maxRefusedBody])
+		bodyComplete = false
 	}
 	responseBody := string(c.ResponseBody)
 	if key.Sha256 != "" {
@@ -164,6 +190,12 @@ func newRecord(c *ingest.Capture) *Record {
 	}
 	requestHeaders, dropped := firstValues(c.Request.Header, keptHeaders)
 	responseHeaders, _ := firstValues(c.Header, nil)
+	target := maskQuery(c.Request.RequestURI)
+	// A pixel request has no body, so its query is the only raw copy of what
+	// the SDK sent. Only a refused request gets the cap.
+	if c.Rejection != nil {
+		target = target[:min(len(target), maxTarget)]
+	}
 	// Method, target and route are slices of the whole request line, so the
 	// record keeps copies.
 	rec := &Record{
@@ -174,13 +206,13 @@ func newRecord(c *ingest.Capture) *Record {
 		WriteKey:   key,
 		Request: Request{
 			Method:         strings.Clone(c.Request.Method),
-			Target:         strings.Clone(maskQuery(c.Request.RequestURI)),
+			Target:         strings.Clone(target),
 			RemoteAddr:     c.Request.RemoteAddr,
 			Headers:        requestHeaders,
 			DroppedHeaders: dropped,
 			Body:           body,
 			BodyBytes:      len(c.Body),
-			BodyComplete:   c.BodyComplete,
+			BodyComplete:   bodyComplete,
 		},
 		Response: Response{
 			StatusCode: c.StatusCode,
