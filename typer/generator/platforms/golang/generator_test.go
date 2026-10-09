@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -32,8 +33,7 @@ var referenceWarnings = []string{
 	`skipping property "active" (custom:active) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "addresses" (custom:address_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "age" (custom:age) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "array_with_null_items" (array of null|string) of track event "User Signed Up": Go generation does not support array item types yet`,
-	`skipping property "contacts" (array of custom:email) of track event "User Signed Up": Go generation does not support array item types yet`,
+	`skipping property "contacts" (array of custom:email) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
 	`skipping property "context" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "custom_null_field" (custom:null_type) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "device_type" (string) of track event "User Signed Up": Go generation does not support enums yet`,
@@ -43,21 +43,14 @@ var referenceWarnings = []string{
 	`skipping property "enabled" (boolean) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "feature_config" (custom:feature_config) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "mixed_value" (any) of track event "User Signed Up": Go generation does not support enums yet`,
-	`skipping property "multi_type_array" (array of integer|string) of track event "User Signed Up": Go generation does not support array item types yet`,
-	`skipping property "multi_type_field" (boolean|integer|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
-	`skipping property "multi_type_with_null" (integer|null|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
 	`skipping property "nested_empty_object" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "nested_empty_object_no_additional_props" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
-	`skipping property "null_field" (null) of track event "User Signed Up": Go generation does not support the null type yet`,
-	`skipping property "number_or_null" (null|number) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
-	`skipping property "phone_numbers" (array of custom:phone_number) of track event "User Signed Up": Go generation does not support array item types yet`,
+	`skipping property "phone_numbers" (array of custom:phone_number) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
 	`skipping property "priority" (integer) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "profile" (custom:user_profile) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "profile_list" (custom:profile_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "rating" (number) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "status" (custom:status) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "string_or_null" (null|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
-	`skipping property "tags" (array of string) of track event "User Signed Up": Go generation does not support array item types yet`,
 	`skipping property "unicode_custom_type" (custom:типы_данных) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "unicode_enum_field" (string) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "user_access" (custom:user_access) of track event "User Signed Up": Go generation does not support custom types yet`,
@@ -256,4 +249,170 @@ func captureWarnings(t *testing.T) *[]string {
 	core.Warn = func(msg string) { warnings = append(warnings, msg) }
 	t.Cleanup(func() { core.Warn = original })
 	return &warnings
+}
+
+// trackPlan is a plan with one track event, "Some Event", declaring properties.
+func trackPlan(properties ...plan.Property) *plan.TrackingPlan {
+	schema := plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
+	for _, p := range properties {
+		schema.Properties[p.Name] = plan.PropertySchema{Property: p}
+	}
+	return &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema:  schema,
+	}}}
+}
+
+// A custom type cannot be a union member, as in Kotlin and Swift, whether the
+// union holds the property or its array items. With one non-null type it is a
+// nullable custom type, or an array of them, left out until custom types are
+// generated.
+func TestGenerateCustomTypeInUnion(t *testing.T) {
+	var (
+		email = plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
+		array = []plan.PropertyType{plan.PrimitiveTypeArray}
+	)
+
+	tests := []struct {
+		name         string
+		types        []plan.PropertyType
+		items        []plan.PropertyType
+		wantErr      string
+		wantWarnings []string
+	}{
+		{
+			name:    "union member",
+			types:   []plan.PropertyType{plan.PrimitiveTypeString, email},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:    "union member next to null",
+			types:   []plan.PropertyType{email, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNull},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:    "union member with custom item types",
+			types:   []plan.PropertyType{plan.PrimitiveTypeArray, email},
+			items:   []plan.PropertyType{email},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:    "item union member",
+			types:   array,
+			items:   []plan.PropertyType{plan.PrimitiveTypeString, email},
+			wantErr: `mapping property "contact": mapping the item types of PropertyContact: custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:         "nullable custom type",
+			types:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
+			wantWarnings: []string{`skipping property "contact" (custom:email|null) of track event "Some Event": Go generation does not support custom types yet`},
+		},
+		{
+			name:         "custom item type",
+			types:        array,
+			items:        []plan.PropertyType{email},
+			wantWarnings: []string{`skipping property "contact" (array of custom:email) of track event "Some Event": Go generation does not support arrays of custom types yet`},
+		},
+		{
+			name:         "nullable custom item type",
+			types:        array,
+			items:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
+			wantWarnings: []string{`skipping property "contact" (array of custom:email|null) of track event "Some Event": Go generation does not support arrays of custom types yet`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := captureWarnings(t)
+
+			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantWarnings, *warnings)
+		})
+	}
+}
+
+// Each value helper is emitted only when the generated types use it, under a
+// section header emitted only with one of them. trackPlan's fields are
+// optional, so Ptr comes with every type that cannot hold nil. Null also comes
+// with an untyped property, which takes Null{} to send null.
+func TestGenerateValueHelpers(t *testing.T) {
+	type helpers struct{ header, ptr, null, nullable bool }
+	property := func(name string, types []plan.PropertyType, items ...plan.PropertyType) plan.Property {
+		return plan.Property{Name: name, Types: types, ItemTypes: items}
+	}
+	var (
+		array    = []plan.PropertyType{plan.PrimitiveTypeArray}
+		nullable = []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull}
+	)
+
+	tests := []struct {
+		name       string
+		properties []plan.Property
+		want       helpers
+	}{
+		{
+			name:       "only types that hold nil",
+			properties: []plan.Property{property("object", []plan.PropertyType{plan.PrimitiveTypeObject})},
+		},
+		{
+			name: "no null, untyped or nullable property",
+			properties: []plan.Property{
+				property("string", []plan.PropertyType{plan.PrimitiveTypeString}),
+				property("object", []plan.PropertyType{plan.PrimitiveTypeObject}),
+				property("untyped_items", array),
+				property("union", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger}),
+				// A union's null member is its zero value, not Null.
+				property("union_with_null", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNull}),
+				property("item_union", array, plan.PrimitiveTypeString, plan.PrimitiveTypeInteger),
+			},
+			want: helpers{header: true, ptr: true},
+		},
+		{
+			name:       "null property",
+			properties: []plan.Property{property("null", []plan.PropertyType{plan.PrimitiveTypeNull})},
+			want:       helpers{header: true, ptr: true, null: true},
+		},
+		{
+			name:       "untyped property",
+			properties: []plan.Property{property("any", nil)},
+			want:       helpers{header: true, null: true},
+		},
+		{
+			name:       "null items",
+			properties: []plan.Property{property("nulls", array, plan.PrimitiveTypeNull)},
+			want:       helpers{header: true, null: true},
+		},
+		{
+			name:       "nullable property",
+			properties: []plan.Property{property("nullable", nullable)},
+			want:       helpers{header: true, ptr: true, nullable: true},
+		},
+		{
+			name:       "nullable items",
+			properties: []plan.Property{property("nullable_items", array, nullable...)},
+			want:       helpers{header: true, nullable: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := (&golang.Generator{}).Generate(trackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			content := files[0].Content
+			assert.Equal(t, tt.want, helpers{
+				header:   strings.Contains(content, "\n// --- Value helpers ---\n"),
+				ptr:      strings.Contains(content, "\nfunc Ptr[T any](v T) *T { return &v }\n"),
+				null:     strings.Contains(content, "\ntype Null struct{}\n"),
+				nullable: strings.Contains(content, "\ntype Nullable[T any] struct {\n"),
+			})
+		})
+	}
 }

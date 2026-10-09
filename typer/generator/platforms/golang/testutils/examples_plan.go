@@ -54,6 +54,18 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			track("User", "", false, map[string]plan.PropertySchema{
 				"user": optional(property("user", "", plan.PrimitiveTypeString)),
 			}),
+			// Multi-type, nullable and array shapes the reference plan lacks.
+			// The providers keep item types only when array is listed first.
+			track("Some Multi Type Event", "", false, map[string]plan.PropertySchema{
+				"someMultiType": optional(property("someMultiType", "",
+					plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean,
+					plan.PrimitiveTypeObject, plan.PrimitiveTypeArray, plan.PrimitiveTypeNull)),
+				"stringOrStrings":          required(items(property("stringOrStrings", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeString), plan.PrimitiveTypeString)),
+				"someArrayOrNull":          optional(items(property("someArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString)),
+				"someObjectOrNull":         required(property("someObjectOrNull", "", plan.PrimitiveTypeObject, plan.PrimitiveTypeNull)),
+				"someArrayOfMultipleTypes": optional(items(property("someArrayOfMultipleTypes", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean)),
+				"matrix":                   required(items(property("matrix", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeArray)),
+			}),
 		},
 	}
 }
@@ -68,6 +80,11 @@ func track(name, description string, allowUnplanned bool, properties map[string]
 
 func property(name, description string, types ...plan.PropertyType) plan.Property {
 	return plan.Property{Name: name, Description: description, Types: types}
+}
+
+func items(p plan.Property, types ...plan.PropertyType) plan.Property {
+	p.ItemTypes = types
+	return p
 }
 
 func required(p plan.Property) plan.PropertySchema {

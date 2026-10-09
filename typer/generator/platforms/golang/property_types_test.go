@@ -75,10 +75,49 @@ func TestPropertyTypeOrder(t *testing.T) {
 
 	// Ordered by name, then signature ("number" < "string"); one type per
 	// (name, signature), described by the first rule in rule-key order.
-	assert.Equal(t, []GoTypeAlias{
-		{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"},
-		{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"},
-		{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"},
-		{Name: "PropertyUserID1", Doc: "PropertyUserID1 represents the property \"user_id\".", Type: "string"},
+	assert.Equal(t, []GoPropertyType{
+		{Alias: &GoTypeAlias{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"}},
+		{Alias: &GoTypeAlias{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"}},
+		{Alias: &GoTypeAlias{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"}},
+		{Alias: &GoTypeAlias{Name: "PropertyUserID1", Doc: "PropertyUserID1 represents the property \"user_id\".", Type: "string"}},
+	}, ctx.PropertyTypes)
+}
+
+// An item union is registered right after its owner, so it keeps
+// {Owner}Item and a property sorted later that pascal-cases to the same name
+// takes the suffix.
+func TestItemUnionNameOrder(t *testing.T) {
+	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"foo": {Property: plan.Property{
+				Name:      "foo",
+				Types:     []plan.PropertyType{plan.PrimitiveTypeArray},
+				ItemTypes: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger},
+			}},
+			"fooItem": {Property: plan.Property{Name: "fooItem", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+		}},
+	}}}
+
+	rules, err := trackRules(p)
+	require.NoError(t, err)
+	ctx := &GoContext{}
+	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	require.NoError(t, err)
+
+	assert.Equal(t, []GoPropertyType{
+		{Union: &GoUnion{
+			Name: "PropertyFooItem",
+			Doc: "PropertyFooItem is one item of PropertyFoo: a string or integer.\n" +
+				"Build it with one of the NewPropertyFooItem* functions.\n" +
+				"Null is not a member, so the zero value cannot be sent.",
+			Members: []GoUnionMember{
+				{Name: "NewPropertyFooItemString", Doc: "returns a string value.", Type: "string"},
+				{Name: "NewPropertyFooItemInteger", Doc: "returns an integer value.", Type: "int64"},
+			},
+		}},
+		{Alias: &GoTypeAlias{Name: "PropertyFoo", Doc: "PropertyFoo represents the property \"foo\".", Type: "[]PropertyFooItem"}},
+		{Alias: &GoTypeAlias{Name: "PropertyFooItem1", Doc: "PropertyFooItem1 represents the property \"fooItem\".", Type: "string"}},
 	}, ctx.PropertyTypes)
 }

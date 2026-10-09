@@ -10,18 +10,50 @@ type GoContext struct {
 	PlanID             string
 	PlanVersion        int
 	UsesPtr            bool
+	UsesNull           bool
+	UsesNullable       bool
 	UsesWithAdditional bool
 	// QuickStart is the method the package doc calls; nil when there is none.
 	QuickStart    *GoMethod
-	PropertyTypes []GoTypeAlias
+	PropertyTypes []GoPropertyType
 	Payloads      []*GoPayload
 	Methods       []GoMethod
+}
+
+// GoPropertyType is one declaration of the property types section: an alias
+// or a union.
+type GoPropertyType struct {
+	Alias *GoTypeAlias
+	Union *GoUnion
 }
 
 // GoTypeAlias is a `type Name = Type` declaration.
 type GoTypeAlias struct {
 	Name string
 	Doc  string
+	Type string
+}
+
+// GoUnion is a struct holding one value of its member JSON types, which only
+// its constructors can set.
+type GoUnion struct {
+	Name    string
+	Doc     string
+	Members []GoUnionMember
+	// HasNull is set when null is a member, so the zero value is null;
+	// otherwise the zero value cannot be sent.
+	HasNull bool
+}
+
+// GoUnionMember is the constructor of one union member.
+type GoUnionMember struct {
+	// Name is the candidate New{Union}{Member} until addConstructors replaces
+	// it with the registered name, after every type name is registered.
+	Name string
+	// Doc follows Name in the constructor's doc comment.
+	Doc string
+	// Type is the parameter type; empty for the null member, whose
+	// constructor takes no argument.
 	Type string
 }
 

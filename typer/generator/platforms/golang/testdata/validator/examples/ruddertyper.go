@@ -116,6 +116,33 @@ func WithMessageID(id string) Option {
 // Ptr returns a pointer to v. Use it to set optional fields.
 func Ptr[T any](v T) *T { return &v }
 
+// Null serializes as JSON null.
+type Null struct{}
+
+func (Null) wireValue() (any, error) { return nil, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
+// Nullable holds either a value of T or JSON null. The zero value is null.
+type Nullable[T any] struct {
+	Value T
+	Valid bool
+}
+
+// NewNullable returns a Nullable holding v.
+func NewNullable[T any](v T) Nullable[T] { return Nullable[T]{Value: v, Valid: true} }
+
+func (n Nullable[T]) wireValue() (any, error) {
+	if !n.Valid {
+		return nil, nil
+	}
+	return n.Value, nil
+}
+
+// MarshalJSON implements json.Marshaler.
+func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
+
 // --- Property types ---
 
 // Property1stPlace represents the property "1st_place".
@@ -146,6 +173,9 @@ type PropertyBoolean = bool
 // PropertyInteger represents the property "integer".
 type PropertyInteger = int64
 
+// PropertyMatrix represents the property "matrix".
+type PropertyMatrix = [][]any
+
 // PropertyNumber represents the property "number".
 type PropertyNumber = float64
 
@@ -161,6 +191,51 @@ type PropertyProductID = string
 // PropertyProductName represents the property "productName".
 type PropertyProductName = string
 
+// PropertySomeArrayOfMultipleTypesItem is one item of PropertySomeArrayOfMultipleTypes: a string, integer, number or boolean.
+// Build it with one of the NewPropertySomeArrayOfMultipleTypesItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertySomeArrayOfMultipleTypesItem struct{ value any }
+
+// NewPropertySomeArrayOfMultipleTypesItemString returns a string value.
+func NewPropertySomeArrayOfMultipleTypesItemString(v string) PropertySomeArrayOfMultipleTypesItem {
+	return PropertySomeArrayOfMultipleTypesItem{value: v}
+}
+
+// NewPropertySomeArrayOfMultipleTypesItemInteger returns an integer value.
+func NewPropertySomeArrayOfMultipleTypesItemInteger(v int64) PropertySomeArrayOfMultipleTypesItem {
+	return PropertySomeArrayOfMultipleTypesItem{value: v}
+}
+
+// NewPropertySomeArrayOfMultipleTypesItemNumber returns a number value.
+func NewPropertySomeArrayOfMultipleTypesItemNumber(v float64) PropertySomeArrayOfMultipleTypesItem {
+	return PropertySomeArrayOfMultipleTypesItem{value: v}
+}
+
+// NewPropertySomeArrayOfMultipleTypesItemBoolean returns a boolean value.
+func NewPropertySomeArrayOfMultipleTypesItemBoolean(v bool) PropertySomeArrayOfMultipleTypesItem {
+	return PropertySomeArrayOfMultipleTypesItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertySomeArrayOfMultipleTypesItem) Value() any { return u.value }
+
+func (u PropertySomeArrayOfMultipleTypesItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertySomeArrayOfMultipleTypesItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertySomeArrayOfMultipleTypesItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertySomeArrayOfMultipleTypes represents the property "someArrayOfMultipleTypes".
+type PropertySomeArrayOfMultipleTypes = []PropertySomeArrayOfMultipleTypesItem
+
+// PropertySomeArrayOrNull represents the property "someArrayOrNull".
+type PropertySomeArrayOrNull = Nullable[[]string]
+
 // PropertySomeBoolean represents the property "someBoolean".
 //
 // some boolean property
@@ -171,6 +246,55 @@ type PropertySomeBoolean = bool
 // some integer property
 type PropertySomeInteger = int64
 
+// PropertySomeMultiType represents the property "someMultiType": a string, integer, number, boolean, object, array or null.
+// Build it with one of the NewPropertySomeMultiType* functions.
+// Null is a member, so the zero value is null.
+type PropertySomeMultiType struct{ value any }
+
+// NewPropertySomeMultiTypeString returns a string value.
+func NewPropertySomeMultiTypeString(v string) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeInteger returns an integer value.
+func NewPropertySomeMultiTypeInteger(v int64) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeNumber returns a number value.
+func NewPropertySomeMultiTypeNumber(v float64) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeBoolean returns a boolean value.
+func NewPropertySomeMultiTypeBoolean(v bool) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeObject returns an object value; nil is sent as {}.
+func NewPropertySomeMultiTypeObject(v map[string]any) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeArray returns an array value; nil is sent as [].
+func NewPropertySomeMultiTypeArray(v []any) PropertySomeMultiType {
+	return PropertySomeMultiType{value: v}
+}
+
+// NewPropertySomeMultiTypeNull returns the null value.
+func NewPropertySomeMultiTypeNull() PropertySomeMultiType { return PropertySomeMultiType{} }
+
+// Value returns the held value; nil means null.
+func (u PropertySomeMultiType) Value() any { return u.value }
+
+func (u PropertySomeMultiType) wireValue() (any, error) { return u.value, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (u PropertySomeMultiType) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertySomeObjectOrNull represents the property "someObjectOrNull".
+type PropertySomeObjectOrNull = Nullable[map[string]any]
+
 // PropertySomeString represents the property "someString".
 //
 // some string property
@@ -178,6 +302,35 @@ type PropertySomeString = string
 
 // PropertyString represents the property "string".
 type PropertyString = string
+
+// PropertyStringOrStrings represents the property "stringOrStrings": a string or array.
+// Build it with one of the NewPropertyStringOrStrings* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyStringOrStrings struct{ value any }
+
+// NewPropertyStringOrStringsString returns a string value.
+func NewPropertyStringOrStringsString(v string) PropertyStringOrStrings {
+	return PropertyStringOrStrings{value: v}
+}
+
+// NewPropertyStringOrStringsArray returns an array value; nil is sent as [].
+func NewPropertyStringOrStringsArray(v []string) PropertyStringOrStrings {
+	return PropertyStringOrStrings{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyStringOrStrings) Value() any { return u.value }
+
+func (u PropertyStringOrStrings) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyStringOrStrings is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyStringOrStrings) MarshalJSON() ([]byte, error) { return marshal(u) }
 
 // PropertyToProperties represents the property "toProperties".
 type PropertyToProperties = string
@@ -301,6 +454,44 @@ func (v TrackNameCollisionsProperties) MarshalJSON() ([]byte, error) {
 
 // TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties holds the properties of "Some Empty Track Event With Additional Properties". The tracking plan declares no properties and allows any.
 type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = map[string]any
+
+// TrackSomeMultiTypeEventProperties holds the properties of "Some Multi Type Event".
+type TrackSomeMultiTypeEventProperties struct {
+	Matrix                   PropertyMatrix                   // required
+	SomeArrayOfMultipleTypes PropertySomeArrayOfMultipleTypes // optional
+	SomeArrayOrNull          *PropertySomeArrayOrNull         // optional
+	SomeMultiType            *PropertySomeMultiType           // optional
+	SomeObjectOrNull         PropertySomeObjectOrNull         // required
+	StringOrStrings          PropertyStringOrStrings          // required
+}
+
+func (v TrackSomeMultiTypeEventProperties) toMap() map[string]any {
+	m := map[string]any{
+		"matrix":           v.Matrix,
+		"someObjectOrNull": v.SomeObjectOrNull,
+		"stringOrStrings":  v.StringOrStrings,
+	}
+	if v.SomeArrayOfMultipleTypes != nil {
+		m["someArrayOfMultipleTypes"] = v.SomeArrayOfMultipleTypes
+	}
+	if v.SomeArrayOrNull != nil {
+		m["someArrayOrNull"] = *v.SomeArrayOrNull
+	}
+	if v.SomeMultiType != nil {
+		m["someMultiType"] = *v.SomeMultiType
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeMultiTypeEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeMultiTypeEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
 
 // TrackSomeOpenTrackEventProperties holds the properties of "Some Open Track Event".
 type TrackSomeOpenTrackEventProperties struct {
@@ -455,6 +646,15 @@ func (r *RudderTyperAnalytics) TrackSomeEmptyTrackEventWithAdditionalProperties(
 // TrackSomeEmptyTrackEvent sends the track event "Some Empty Track Event", which has no properties.
 func (r *RudderTyperAnalytics) TrackSomeEmptyTrackEvent(identity Identity, opts ...Option) error {
 	return r.track(identity, "Some Empty Track Event", nil, opts)
+}
+
+// TrackSomeMultiTypeEvent sends the track event "Some Multi Type Event".
+func (r *RudderTyperAnalytics) TrackSomeMultiTypeEvent(identity Identity, props TrackSomeMultiTypeEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Multi Type Event", p, opts)
 }
 
 // TrackSomeOpenTrackEvent sends the track event "Some Open Track Event".
