@@ -4,13 +4,11 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 ---
 
-## Destination types
+## Destination config
 
-Breaking changes to destination `config`, by release. Each entry's details and what to do are in [cli/internal/providers/destination/definitions/BREAKING_CHANGES.md](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md).
+Breaking changes to destination `config`, by release:
 
-- **v0.28.0:** [Re-import destinations that already have a Reverse ETL connection](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#re-import-destinations-that-already-have-a-reverse-etl-connection). Applies to 17 types, from `active_campaign` to `webhook`.
-- **v0.26.0:** [Re-import HTTP Webhook destinations that already have a Reverse ETL connection](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#re-import-http-webhook-destinations-that-already-have-a-reverse-etl-connection).
-- **v0.26.0:** [`use_native_sdk` removed from ActiveCampaign](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#use_native_sdk-removed-from-activecampaign).
+- **v0.26.0:** [Key removal: ActiveCampaign `use_native_sdk`](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#key-removal-activecampaign-use_native_sdk).
 
 ## Upcoming (unreleased)
 
