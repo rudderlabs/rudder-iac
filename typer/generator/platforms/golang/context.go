@@ -47,6 +47,8 @@ type GoUnion struct {
 
 // GoUnionMember is the constructor of one union member.
 type GoUnionMember struct {
+	// Name is the candidate New{Union}{Member} until addConstructors replaces
+	// it with the registered name, after every type name is registered.
 	Name string
 	// Doc follows Name in the constructor's doc comment.
 	Doc string
