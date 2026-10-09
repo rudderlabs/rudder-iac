@@ -392,7 +392,7 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 	}
 
 	var (
-		union = &GoUnion{Name: name}
+		union = &GoUnion{Name: name, Null: slices.Contains(types, plan.PropertyType(plan.PrimitiveTypeNull))}
 		// The doc lists the member types: "a string, integer or null".
 		article string
 		words   []string
@@ -408,9 +408,7 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 			Name: "New" + name + m.name,
 			Doc:  fmt.Sprintf("returns %s %s value%s.", m.article, m.typ, m.nilNote),
 		}
-		if m.typ == plan.PrimitiveTypeNull {
-			union.Null = true
-		} else {
+		if m.typ != plan.PrimitiveTypeNull {
 			var err error
 			if member.Type, _, err = memberType(ctx, registry, name, m.typ, items); err != nil {
 				return err
