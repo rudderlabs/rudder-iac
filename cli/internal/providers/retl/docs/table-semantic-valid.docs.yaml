@@ -24,6 +24,7 @@ match_behavior:
                 dbname: analytics
                 user: rudder
                 port: "5432"
+                sslMode: require
                 password: "{{ .PG_PASSWORD }}"
           spec.yaml: |
             version: rudder/v1
@@ -56,6 +57,7 @@ match_behavior:
                 dbname: analytics
                 user: rudder
                 port: "5432"
+                sslMode: require
                 password: "{{ .PG_PASSWORD }}"
           spec.yaml: |
             version: rudder/v1
