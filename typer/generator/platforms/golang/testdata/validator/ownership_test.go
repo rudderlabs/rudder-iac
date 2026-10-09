@@ -1,7 +1,9 @@
 package validator
 
 import (
+	"fmt"
 	"net"
+	"sync"
 	"testing"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
@@ -126,4 +128,38 @@ func TestSDKSendsInputsAsPassed(t *testing.T) {
 		"properties": {"list": ["x"]},
 		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},
 		"integrations": {"Amplitude": {"key": "v"}}}`, wire[1])
+}
+
+// The goroutines also share one option, as callers that build their options
+// once do, so -race reports any call that writes to what it shares.
+func TestConcurrentSends(t *testing.T) {
+	const n = 100
+	wire, _ := capture(t, func(client analytics.Client) {
+		var (
+			rt  = ruddertyper.New(client)
+			opt = ruddertyper.WithAnalyticsContext(analytics.Context{Extra: map[string]any{"app": "validator"}})
+			wg  sync.WaitGroup
+		)
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				assert.NoError(t, rt.TrackEmptyEventWithAdditionalProps(
+					ruddertyper.Identity{UserID: fmt.Sprint("user-", i)}, map[string]any{"n": i}, opt,
+				))
+			}(i)
+		}
+		wg.Wait()
+	})
+
+	require.Len(t, wire, n)
+	byUser := make(map[any]map[string]any, n)
+	for _, msg := range wire {
+		byUser[msg["userId"]] = msg
+	}
+	for i := 0; i < n; i++ {
+		assertMessage(t, fmt.Sprintf(`{"type": "track", "channel": "server", "event": "Empty Event With Additional Props",
+			"userId": "user-%d", "properties": {"n": %d},
+			"context": {"app": "validator", "ruddertyper": %s}}`, i, i, refMeta), byUser[fmt.Sprint("user-", i)])
+	}
 }
