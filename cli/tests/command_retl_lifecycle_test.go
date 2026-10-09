@@ -120,6 +120,20 @@ func TestRETLLifecycle(t *testing.T) {
 		assert.Contains(t, string(out), `sync_behaviour is immutable ("upsert" -> "full")`)
 	})
 
+	// A destination syncs from the table source, so the webapp refuses a table
+	// move, and the plan-time check has to say so before anything is applied
+	// (DEX-960). The unit tests reach the check through Provider.CheckPlan; this
+	// step proves the CLI runs it on a real plan.
+	t.Run("a dry run refuses a table change on the connected source", func(t *testing.T) {
+		out, err := executor.Execute(cliBinPath, "apply", "--dry-run", "-l", step("table_move"),
+			"--var-file", credentials, "--confirm=false")
+		require.Error(t, err, "dry-run should refuse a table change on a connected source, got: %s", out)
+		assert.Contains(t, string(out), `table "users" -> "users_archive" cannot be changed while the source is connected to a destination`)
+		assert.Contains(t, string(out), lifecycleConnectionExternalID)
+
+		assert.Equal(t, tableID, assertLifecycleTable(t), "the table source must be untouched")
+	})
+
 	// "Refused" is about the table source, not about the whole apply: the
 	// handler errors inside Update, by which point the graph has already created
 	// the Snowflake account the new definition needs. That account is what the
