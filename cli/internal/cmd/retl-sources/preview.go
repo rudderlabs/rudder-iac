@@ -30,26 +30,24 @@ func newCmdPreview() *cobra.Command {
 			$ rudder-cli retl-sources preview my-model --json
 			$ rudder-cli retl-sources preview my-model --var-file prod.vars.yaml
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("retl-source external id is required")
-			}
-			externalID := args[0]
-
-			var err error
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("retl-sources preview", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 					{K: "interactive", V: interactive},
 					{K: "limit", V: limit},
 				}...)
 			}()
 
+			if len(args) == 0 {
+				return fmt.Errorf("retl-source external id is required")
+			}
+			externalID := args[0]
+
 			// The request carries limit unchanged while the SQL uses max(limit, 1),
 			// so a negative value would disagree; checked below the defer so it is tracked.
 			if limit < 0 {
-				err = fmt.Errorf("--limit cannot be negative, got %d", limit)
-				return err
+				return fmt.Errorf("--limit cannot be negative, got %d", limit)
 			}
 
 			d, err := app.NewDeps()
