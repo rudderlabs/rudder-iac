@@ -113,6 +113,12 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		}
 	}
 
+	// Functions named from plan data register after every type name, so they
+	// can never take a type's name.
+	if err := addConstructors(ctx, registry); err != nil {
+		return nil, err
+	}
+
 	for _, payload := range ctx.Payloads {
 		ctx.UsesWithAdditional = ctx.UsesWithAdditional || payload.Open
 		ctx.UsesPtr = ctx.UsesPtr || slices.ContainsFunc(payload.Fields, func(f GoField) bool { return f.Pointer })
@@ -236,16 +242,18 @@ func unsupportedReason(ps plan.PropertySchema) string {
 		return "nested object schemas"
 	case p.Config != nil && len(p.Config.Enum) > 0:
 		return "enums"
-	case len(p.Types) > 1:
-		return "multi-type properties"
-	case len(p.ItemTypes) > 0:
-		return "array item types"
-	case len(p.Types) == 1 && plan.IsCustomType(p.Types[0]):
+	case slices.ContainsFunc(p.ItemTypes, plan.IsCustomType):
+		return "arrays of custom types"
+	// A custom type in a union of several non-null types fails generation
+	// instead (addUnion).
+	case len(nonNull(p.Types)) == 1 && plan.IsCustomType(nonNull(p.Types)[0]):
 		return "custom types"
-	case len(p.Types) == 1 && p.Types[0] == plan.PrimitiveTypeNull:
-		return "the null type"
 	}
 	return ""
+}
+
+func nonNull(types []plan.PropertyType) []plan.PropertyType {
+	return slices.DeleteFunc(slices.Clone(types), func(t plan.PropertyType) bool { return t == plan.PrimitiveTypeNull })
 }
 
 func declaredTypes(p plan.Property) string {
@@ -276,13 +284,54 @@ func typeList(types []plan.PropertyType) string {
 	return strings.Join(names, "|")
 }
 
-// goType maps a type the skip check lets through to Go, and reports whether
-// that Go type can hold nil (slice, map or interface).
-func goType(p plan.Property) (string, bool, error) {
-	if len(p.Types) == 0 {
-		return "any", true, nil
+// addPropertyType adds the type of prop under its registered name: a union
+// for two or more non-null types, else an alias. It reports whether the type
+// can hold nil (slice, map or interface).
+func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property) (bool, error) {
+	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
+	if len(nonNull(prop.Types)) > 1 {
+		return false, addUnion(ctx, registry, name, lead, prop.Description, prop.Types, prop.ItemTypes)
 	}
-	switch p.Types[0] {
+	if len(prop.Types) == 0 {
+		// Callers send an explicit null in an any as Null{}.
+		ctx.UsesNull = true
+	}
+	typ, nilable, err := goType(ctx, registry, name, prop.Types, prop.ItemTypes)
+	if err != nil {
+		return false, err
+	}
+	ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Alias: &GoTypeAlias{
+		Name: name,
+		Doc:  withDescription(lead+".", prop.Description),
+		Type: typ,
+	}})
+	return nilable, nil
+}
+
+// goType maps a type list with at most one non-null type to Go, and reports
+// whether the Go type can hold nil. owner names the union that array items of
+// several types need.
+func goType(ctx *GoContext, registry *core.NameRegistry, owner string, types, items []plan.PropertyType) (string, bool, error) {
+	values := nonNull(types)
+	switch {
+	case len(types) == 0:
+		return "any", true, nil
+	case len(values) == 0:
+		ctx.UsesNull = true
+		return "Null", false, nil
+	}
+	typ, nilable, err := memberType(ctx, registry, owner, values[0], items)
+	if err != nil || len(values) == len(types) {
+		return typ, nilable, err
+	}
+	ctx.UsesNullable = true
+	return "Nullable[" + typ + "]", false, nil
+}
+
+// memberType maps one non-null JSON type to Go, and reports whether the Go
+// type can hold nil.
+func memberType(ctx *GoContext, registry *core.NameRegistry, owner string, t plan.PropertyType, items []plan.PropertyType) (string, bool, error) {
+	switch t {
 	case plan.PrimitiveTypeString:
 		return "string", false, nil
 	case plan.PrimitiveTypeInteger:
@@ -291,15 +340,115 @@ func goType(p plan.Property) (string, bool, error) {
 		return "float64", false, nil
 	case plan.PrimitiveTypeBoolean:
 		return "bool", false, nil
-	case plan.PrimitiveTypeArray:
-		return "[]any", true, nil
 	case plan.PrimitiveTypeObject:
 		return "map[string]any", true, nil
+	case plan.PrimitiveTypeArray:
+		typ, err := arrayType(ctx, registry, owner, items)
+		return typ, true, err
 	}
-	return "", false, fmt.Errorf("unsupported type %v of property %q", p.Types[0], p.Name)
+	return "", false, fmt.Errorf("unsupported type %v", t)
 }
 
-// addPropertyTypes adds one Property{Name} alias per (name, type signature)
+// arrayType maps an array with the given item types to Go. Items of two or
+// more non-null types get the union {owner}Item, registered right after its
+// owner, as a payload's hoisted structs follow the payload.
+func arrayType(ctx *GoContext, registry *core.NameRegistry, owner string, items []plan.PropertyType) (string, error) {
+	if len(nonNull(items)) < 2 {
+		typ, _, err := goType(ctx, registry, owner, items, nil)
+		return "[]" + typ, err
+	}
+	name, err := registry.RegisterName("item:"+owner, packageScope, owner+"Item")
+	if err != nil {
+		return "", fmt.Errorf("registering the item union of %s: %w", owner, err)
+	}
+	return "[]" + name, addUnion(ctx, registry, name, fmt.Sprintf("%s is one item of %s", name, owner), "", items, nil)
+}
+
+// unionMembers are the JSON types a union can hold, in constructor order.
+var unionMembers = []struct {
+	typ     plan.PrimitiveType
+	name    string
+	article string
+	nilNote string
+}{
+	{plan.PrimitiveTypeString, "String", "a", ""},
+	{plan.PrimitiveTypeInteger, "Integer", "an", ""},
+	{plan.PrimitiveTypeNumber, "Number", "a", ""},
+	{plan.PrimitiveTypeBoolean, "Boolean", "a", ""},
+	{plan.PrimitiveTypeObject, "Object", "an", "; nil is sent as {}"},
+	{plan.PrimitiveTypeArray, "Array", "an", "; nil is sent as []"},
+	{plan.PrimitiveTypeNull, "Null", "the", ""},
+}
+
+// addUnion adds the union name of two or more non-null types, after any union
+// its array member's items need. lead starts its doc comment. Its constructor
+// names are registered later, by addConstructors.
+func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, description string, types, items []plan.PropertyType) error {
+	for _, t := range types {
+		if ct := plan.AsCustomType(t); ct != nil {
+			return fmt.Errorf("custom type %q cannot be a member of a multi-type union", ct.Name)
+		}
+	}
+
+	var (
+		union = &GoUnion{Name: name}
+		// The doc lists the member types: "a string, integer or null".
+		article string
+		words   []string
+	)
+	for _, m := range unionMembers {
+		if !slices.Contains(types, plan.PropertyType(m.typ)) {
+			continue
+		}
+		article = cmp.Or(article, m.article)
+		words = append(words, string(m.typ))
+
+		member := GoUnionMember{Name: "New" + name + m.name}
+		member.Doc = fmt.Sprintf("%s returns %s %s value%s.", member.Name, m.article, m.typ, m.nilNote)
+		if m.typ == plan.PrimitiveTypeNull {
+			union.Null = true
+		} else {
+			var err error
+			if member.Type, _, err = memberType(ctx, registry, name, m.typ, items); err != nil {
+				return err
+			}
+		}
+		union.Members = append(union.Members, member)
+	}
+
+	last := len(words) - 1
+	zero := "Null is not a member, so the zero value cannot be sent."
+	if union.Null {
+		zero = "Null is a member, so the zero value is null."
+	}
+	union.Doc = withDescription(fmt.Sprintf("%s: %s %s or %s.\nBuild it with one of the New%s* functions.\n%s",
+		lead, article, strings.Join(words[:last], ", "), words[last], name, zero), description)
+	ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Union: union})
+	return nil
+}
+
+// addConstructors registers the union constructors. It is the second
+// registration pass, for the functions and constants named from plan data,
+// and runs after every type name is registered.
+func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
+	for _, pt := range ctx.PropertyTypes {
+		if pt.Union == nil {
+			continue
+		}
+		for i := range pt.Union.Members {
+			m := &pt.Union.Members[i]
+			name, err := registry.RegisterName("constructor:"+m.Name, packageScope, m.Name)
+			if err != nil {
+				return fmt.Errorf("registering %s: %w", m.Name, err)
+			}
+			// A suffixed name replaces the base name that starts the doc.
+			m.Doc, m.Name = name+strings.TrimPrefix(m.Doc, m.Name), name
+		}
+	}
+	return nil
+}
+
+// addPropertyTypes adds one Property{Name} type per (name, type signature)
 // that an emitted field references, ordered and registered by name, then
 // signature. Descriptions come from the first field that references them.
 func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegistry) (map[propertyKey]propertyType, error) {
@@ -329,16 +478,10 @@ func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegi
 		if err != nil {
 			return nil, fmt.Errorf("registering property %q: %w", prop.Name, err)
 		}
-		typ, nilable, err := goType(prop)
+		nilable, err := addPropertyType(ctx, registry, name, prop)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("mapping property %q: %w", prop.Name, err)
 		}
-
-		ctx.PropertyTypes = append(ctx.PropertyTypes, GoTypeAlias{
-			Name: name,
-			Doc:  withDescription(fmt.Sprintf("%s represents the property %s.", name, strconv.Quote(prop.Name)), prop.Description),
-			Type: typ,
-		})
 		types[k] = propertyType{name: name, nilable: nilable}
 	}
 	return types, nil

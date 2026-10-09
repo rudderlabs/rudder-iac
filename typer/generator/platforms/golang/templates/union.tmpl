@@ -1,0 +1,34 @@
+{{ comment .Doc }}
+type {{ .Name }} struct{ value any }
+{{- range .Members }}
+
+{{ comment .Doc }}
+{{- if .Type }}
+func {{ .Name }}(v {{ .Type }}) {{ $.Name }} {
+	return {{ $.Name }}{value: v}
+}
+{{- else }}
+func {{ .Name }}() {{ $.Name }} { return {{ $.Name }}{} }
+{{- end }}
+{{- end }}
+
+// Value returns the held value{{ if .Null }}; nil means null{{ end }}.
+func (u {{ .Name }}) Value() any { return u.value }
+{{- if .Null }}
+
+func (u {{ .Name }}) wireValue() (any, error) { return u.value, nil }
+
+// MarshalJSON implements json.Marshaler.
+{{- else }}
+
+func (u {{ .Name }}) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: {{ .Name }} is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+{{- end }}
+func (u {{ .Name }}) MarshalJSON() ([]byte, error) { return marshal(u) }

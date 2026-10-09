@@ -75,10 +75,10 @@ func TestPropertyTypeOrder(t *testing.T) {
 
 	// Ordered by name, then signature ("number" < "string"); one type per
 	// (name, signature), described by the first rule in rule-key order.
-	assert.Equal(t, []GoTypeAlias{
-		{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"},
-		{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"},
-		{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"},
-		{Name: "PropertyUserID1", Doc: "PropertyUserID1 represents the property \"user_id\".", Type: "string"},
+	assert.Equal(t, []GoPropertyType{
+		{Alias: &GoTypeAlias{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"}},
+		{Alias: &GoTypeAlias{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"}},
+		{Alias: &GoTypeAlias{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"}},
+		{Alias: &GoTypeAlias{Name: "PropertyUserID1", Doc: "PropertyUserID1 represents the property \"user_id\".", Type: "string"}},
 	}, ctx.PropertyTypes)
 }

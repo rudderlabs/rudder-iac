@@ -116,6 +116,14 @@ func WithMessageID(id string) Option {
 // Ptr returns a pointer to v. Use it to set optional fields.
 func Ptr[T any](v T) *T { return &v }
 
+// Null serializes as JSON null.
+type Null struct{}
+
+func (Null) wireValue() (any, error) { return nil, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
 // --- Property types ---
 
 // Property1stPlace represents the property "1st_place".
