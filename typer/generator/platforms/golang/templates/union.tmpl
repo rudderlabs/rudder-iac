@@ -19,6 +19,7 @@ func (u {{ .Name }}) Value() any { return u.value }
 func (u {{ .Name }}) wireValue() (any, error) { return u.value, nil }
 
 // MarshalJSON implements json.Marshaler.
+func (u {{ .Name }}) MarshalJSON() ([]byte, error) { return marshal(u) }
 {{- else }}
 
 func (u {{ .Name }}) wireValue() (any, error) {
@@ -30,5 +31,5 @@ func (u {{ .Name }}) wireValue() (any, error) {
 
 // MarshalJSON implements json.Marshaler. It fails for the zero value, because
 // null is not a member.
-{{- end }}
 func (u {{ .Name }}) MarshalJSON() ([]byte, error) { return marshal(u) }
+{{- end }}
