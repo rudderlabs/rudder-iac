@@ -23,9 +23,11 @@ func (c *fakeClient) Enqueue(msg analytics.Message) error {
 
 func (c *fakeClient) Close() error { return nil }
 
-// sendAndChange sends two events through client and changes everything it
-// passed in as soon as each call returns.
+// sendAndChange changes each input right after the call that took it. Both
+// ownership tests run it, so the deterministic fake-client check and the
+// -race check against the real SDK cover the same inputs.
 func sendAndChange(t *testing.T, client analytics.Client) {
+	t.Helper()
 	var (
 		unicode = "a"
 		props   = ruddertyper.TrackUserSignedUpProperties{
@@ -130,10 +132,11 @@ func TestSDKSendsInputsAsPassed(t *testing.T) {
 		"integrations": {"Amplitude": {"key": "v"}}}`, wire[1])
 }
 
-// The goroutines also share one option, as callers that build their options
-// once do, so -race reports any call that writes to what it shares.
+// The goroutines share one wrapper and one option, as callers that build them
+// once do, so -race reports any call that writes to shared state.
 func TestConcurrentSends(t *testing.T) {
 	const n = 100
+	userID := func(i int) string { return fmt.Sprint("user-", i) }
 	wire, _ := capture(t, func(client analytics.Client) {
 		var (
 			rt  = ruddertyper.New(client)
@@ -145,7 +148,7 @@ func TestConcurrentSends(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				assert.NoError(t, rt.TrackEmptyEventWithAdditionalProps(
-					ruddertyper.Identity{UserID: fmt.Sprint("user-", i)}, map[string]any{"n": i}, opt,
+					ruddertyper.Identity{UserID: userID(i)}, map[string]any{"n": i}, opt,
 				))
 			}(i)
 		}
@@ -159,7 +162,7 @@ func TestConcurrentSends(t *testing.T) {
 	}
 	for i := 0; i < n; i++ {
 		assertMessage(t, fmt.Sprintf(`{"type": "track", "channel": "server", "event": "Empty Event With Additional Props",
-			"userId": "user-%d", "properties": {"n": %d},
-			"context": {"app": "validator", "ruddertyper": %s}}`, i, i, refMeta), byUser[fmt.Sprint("user-", i)])
+			"userId": %q, "properties": {"n": %d},
+			"context": {"app": "validator", "ruddertyper": %s}}`, userID(i), i, refMeta), byUser[userID(i)])
 	}
 }
