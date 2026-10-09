@@ -153,6 +153,12 @@ func firstValues(h http.Header, names []string) (map[string]string, int) {
 	return out, dropped
 }
 
+// refusedBeforeParsing reports a refusal at a step that never reads the body,
+// such as an unknown route or a write key the allowlist rejects.
+func refusedBeforeParsing(r *ingest.Rejection) bool {
+	return r != nil && (r.Stage == "route" || r.Stage == "auth")
+}
+
 func newRecord(c *ingest.Capture) *Record {
 	key := MaskWriteKey(c.WriteKey)
 	body := c.Decoded
@@ -163,11 +169,12 @@ func newRecord(c *ingest.Capture) *Record {
 		body = nil
 	}
 	bodyComplete := c.BodyComplete
-	// A body that was not read or decoded in full never reached the parser, so
-	// no event points into it and a copy lets the large array go. A body that
-	// parsed and failed, such as truncated JSON, stays whole so the sender can
-	// see where it broke. BodyBytes still reports the real size.
-	if !c.BodyComplete && c.StatusCode >= http.StatusBadRequest && len(c.Events) == 0 && len(body) > maxRefusedBody {
+	// A body that was not read or decoded in full, or that was refused at the
+	// route or auth step, never reached the parser. No event points into it, so
+	// a copy lets the large array go. A body that parsed and failed, such as
+	// truncated JSON, stays whole so the sender can see where it broke.
+	// BodyBytes still reports the real size.
+	if (!c.BodyComplete || refusedBeforeParsing(c.Rejection)) && len(body) > maxRefusedBody {
 		body = slices.Clone(body[:maxRefusedBody])
 		bodyComplete = false
 	}
@@ -184,7 +191,11 @@ func newRecord(c *ingest.Capture) *Record {
 	requestHeaders, dropped := firstValues(c.Request.Header, keptHeaders)
 	responseHeaders, _ := firstValues(c.Header, nil)
 	target := maskQuery(c.Request.RequestURI)
-	target = target[:min(len(target), maxTarget)]
+	// A pixel request has no body, so its query is the only raw copy of what
+	// the SDK sent. Only a refused request gets the cap.
+	if c.Rejection != nil {
+		target = target[:min(len(target), maxTarget)]
+	}
 	// Method, target and route are slices of the whole request line, so the
 	// record keeps copies.
 	rec := &Record{

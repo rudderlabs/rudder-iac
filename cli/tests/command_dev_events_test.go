@@ -65,6 +65,9 @@ func post(t *testing.T, url, body string) int {
 	req.SetBasicAuth("dev", "")
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	// Draining the body lets the client reuse the connection.
+	_, err = io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
 	return resp.StatusCode
 }

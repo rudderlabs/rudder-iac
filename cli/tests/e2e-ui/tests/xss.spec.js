@@ -1,6 +1,8 @@
 // Any web page can post to a local listener, so every string the review page
 // shows is attacker-controlled. This test puts a hostile payload into every
-// field the page renders and fails if any of them runs or becomes markup.
+// rendered field a sender controls and fails if any of them runs or becomes
+// markup. The event type stays "track", because the listener refuses an
+// unknown type before it stores the event.
 const fs = require('node:fs');
 const { test, expect, open } = require('./fixtures');
 
@@ -24,11 +26,13 @@ async function postHostile(listener, payload) {
     properties: { [payload]: payload, nested: { list: [payload] } },
     context: { library: { name: payload, version: payload }, page: { path: payload, url: payload } },
   };
-  await listener.send('/v1/batch', { batch: [event] }, payload);
-  await listener.send('/v1/track?x=' + encodeURIComponent(payload), event, payload);
-  // A refused request keeps the payload only in its body. The rejection
+  // The request detail renders the kept headers, and AnonymousId is one.
+  const headers = { AnonymousId: payload };
+  await listener.send('/v1/batch', { batch: [event] }, payload, headers);
+  await listener.send('/v1/track?x=' + encodeURIComponent(payload), event, payload, headers);
+  // A refused request keeps the payload in its body and header. The rejection
   // reason is a fixed string and the target is the plain /v1/track.
-  await listener.send('/v1/track', '{"event":"' + payload.replace(/"/g, '\\"') + '","userId":');
+  await listener.send('/v1/track', '{"event":"' + payload.replace(/"/g, '\\"') + '","userId":', 'dev', headers);
 }
 
 test.describe('hostile events', () => {
@@ -47,7 +51,13 @@ test.describe('hostile events', () => {
       await expect(rows.first()).toBeVisible();
       const count = await rows.count();
       expect(count).toBeGreaterThanOrEqual(PAYLOADS.length * 2);
-      for (let i = 0; i < count; i++) await rows.nth(i).click();
+      for (let i = 0; i < count; i++) {
+        await rows.nth(i).click();
+        // showRequest loads the record async and drops the result when the
+        // next click lands. Wait for each load, so the checks below run after
+        // the last detail has rendered.
+        await expect(page.locator('#detail').getByText('Reading…')).toHaveCount(0);
+      }
     }
 
     expect(dialog, 'no alert, confirm or prompt').toBeNull();

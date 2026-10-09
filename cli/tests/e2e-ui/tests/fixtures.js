@@ -35,14 +35,16 @@ async function startListener() {
     ready,
     url: ready.url,
     ui: ready.ui,
-    // send posts one SDK request with a basic-auth write key.
-    async send(route, body, key = 'dev') {
+    // send posts one SDK request with a basic-auth write key. Extra headers
+    // are added to the request.
+    async send(route, body, key = 'dev', headers = {}) {
       const res = await fetch(ready.url + route, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 page-test',
           Authorization: 'Basic ' + Buffer.from(key + ':').toString('base64'),
+          ...headers,
         },
         body: typeof body === 'string' ? body : JSON.stringify(body),
       });

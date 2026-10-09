@@ -15,8 +15,8 @@ What the end-to-end tests of `rudder-cli dev listen` check, where each one runs,
 | `TestDevListenCapsInFlightRequests` | same | Eight stalled uploads fill the slots, the ninth request gets 503, the query API still answers, and the slots return within 20 s. |
 | `TestDevListenDropsASlowHeader` | same | A header that never ends is closed by the server. |
 | `TestDevListenCapturesParallelWritersExactly` | same | 150 requests from six writers are all captured, with strictly increasing sequence numbers. |
-| `TestDevListenEvictsOldestRequestsAndSaysSo` | same | After 10,050 requests the store holds at most 10,000 and reports `evicted` and `evictedThrough`. |
-| `TestDevListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. Passes because the record keeps only the first 1 KiB of a body refused before parsing, such as one over the size cap (`store/record.go`). A body that parsed and failed, such as truncated JSON, is kept whole. Accepted requests are still kept whole, so large accepted posts can evict older captures by design. |
+| `TestDevListenEvictsOldestRequestsAndSaysSo` | same | After 10,050 requests the store holds exactly 10,000 and reports `evicted` and `evictedThrough`. |
+| `TestDevListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. Passes because the record keeps only the first 1 KiB of a body that never reached the parser, such as one over the size cap, one with a corrupt gzip stream, or one refused at the route or auth step (`store/record.go`). A body that parsed and failed, such as truncated JSON, is kept whole. Accepted requests are still kept whole, so large accepted posts can evict older captures by design. |
 | `hostile events` (3 tests) | `e2e-ui/tests/xss.spec.js` | Seven script and markup payloads in every rendered field never run and never become elements. The page requests nothing outside `/_dev/`. |
 
 The Go tests take about 17 s with `-race`. They need no network, account or secret.

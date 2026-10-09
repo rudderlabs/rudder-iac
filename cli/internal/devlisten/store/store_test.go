@@ -275,10 +275,23 @@ func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
 	require.False(t, rec.Request.BodyComplete)
 	require.Less(t, rec.size, 8<<10)
 
-	// A refused request that parsed events keeps its body, because the events
-	// point into it.
+	// A body refused at the route or auth step never reached the parser, even
+	// though it was read in full.
+	for _, stage := range []string{"route", "auth"} {
+		early := capture("dev", "/x", huge)
+		early.StatusCode = http.StatusNotFound
+		early.Events = nil
+		early.Rejection = &ingest.Rejection{Stage: stage}
+		rec := newRecord(early)
+		require.Len(t, rec.Request.Body, maxRefusedBody, stage)
+		require.False(t, rec.Request.BodyComplete, stage)
+	}
+
+	// A refusal at a parsing step keeps the body, because the events point
+	// into it and the sender needs to see where it broke.
 	parsed := capture("dev", "/v1/batch", huge)
 	parsed.StatusCode = http.StatusBadRequest
+	parsed.Rejection = &ingest.Rejection{Stage: "identity"}
 	require.Len(t, newRecord(parsed).Request.Body, len(huge))
 
 	// A body that was read in full but failed the parser keeps its bytes, so
@@ -286,6 +299,7 @@ func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
 	broken := capture("dev", "/v1/track", huge)
 	broken.StatusCode = http.StatusBadRequest
 	broken.Events = nil
+	broken.Rejection = &ingest.Rejection{Stage: "parse"}
 	require.Len(t, newRecord(broken).Request.Body, len(huge))
 
 	// An accepted request is captured whole.
@@ -294,10 +308,17 @@ func TestRecordKeepsLittleOfARefusedBody(t *testing.T) {
 
 func TestRecordCapsTheTarget(t *testing.T) {
 	t.Parallel()
-	rec := newRecord(capture("dev", "/v1/track?x="+strings.Repeat("a", 512<<10), "{}"))
+	long := "/pixel/v1/track?x=" + strings.Repeat("a", 512<<10)
 
+	// An accepted pixel request keeps its whole query, the only raw copy of
+	// what the SDK sent.
+	require.Len(t, newRecord(capture("dev", long, "")).Request.Target, len(long))
+
+	refused := capture("dev", long, "")
+	refused.Rejection = &ingest.Rejection{Stage: "identity"}
+	rec := newRecord(refused)
 	require.Len(t, rec.Request.Target, maxTarget)
-	require.True(t, strings.HasPrefix(rec.Request.Target, "/v1/track?x="))
+	require.True(t, strings.HasPrefix(rec.Request.Target, "/pixel/v1/track?x="))
 }
 
 func TestStoreIsSafeForConcurrentUse(t *testing.T) {

@@ -76,14 +76,16 @@ func TestDevListenRefusesForeignHostsAndCrossSiteReads(t *testing.T) {
 	port := strings.TrimPrefix(p.url(), "http://127.0.0.1:")
 
 	hosts := map[string]int{
-		"evil.example":              http.StatusForbidden,
-		"evil.example:" + port:      http.StatusForbidden,
-		"localhost.evil.example":    http.StatusForbidden,
-		"127.0.0.1.:" + port:        http.StatusForbidden,
-		"2130706433:" + port:        http.StatusForbidden,
-		"0x7f.1:" + port:            http.StatusForbidden,
-		"127.1:" + port:             http.StatusForbidden,
-		"0.0.0.0:" + port:           http.StatusForbidden,
+		"evil.example":           http.StatusForbidden,
+		"evil.example:" + port:   http.StatusForbidden,
+		"localhost.evil.example": http.StatusForbidden,
+		"127.0.0.1.:" + port:     http.StatusForbidden,
+		"2130706433:" + port:     http.StatusForbidden,
+		"0x7f.1:" + port:         http.StatusForbidden,
+		"127.1:" + port:          http.StatusForbidden,
+		"0.0.0.0:" + port:        http.StatusForbidden,
+		// '@' is not a valid Host byte, so Go's client sends an empty Host
+		// and this row tests an empty Host, not the userinfo form.
 		"127.0.0.1@evil.example:80": http.StatusForbidden,
 		"127.0.0.1:" + port:         http.StatusOK,
 		"localhost:" + port:         http.StatusOK,
@@ -207,20 +209,20 @@ func TestDevListenMasksTheWriteKey(t *testing.T) {
 
 	// A stored Authorization header holds the key as base64, not as plain text.
 	encoded := base64.StdEncoding.EncodeToString([]byte(key + ":"))
-	for _, path := range []string{
-		"/_dev/v1/requests?kind=all&view=full&limit=1000",
-		"/_dev/v1/info",
-		"/_dev/v1/guide",
-	} {
-		resp := devDo(t, http.MethodGet, p.url()+path, nil, nil)
-		assert.NotContains(t, resp.body, key, path)
-		assert.NotContains(t, resp.body, encoded, "%s: the key as a Basic auth value", path)
+	const fullPath = "/_dev/v1/requests?kind=all&view=full&limit=1000"
+	var full string
+	for _, path := range []string{fullPath, "/_dev/v1/info", "/_dev/v1/guide"} {
+		got := curl(t, p.url()+path)
+		if path == fullPath {
+			full = got
+		}
+		assert.NotContains(t, got, key, path)
+		assert.NotContains(t, got, encoded, "%s: the key as a Basic auth value", path)
 	}
-	full := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?kind=all&view=full&limit=1000", nil, nil)
-	assert.NotContains(t, full.body, "session="+key, "cookie headers must not be stored")
-	assert.NotContains(t, strings.ToLower(full.body), "cookie")
-	assert.NotContains(t, strings.ToLower(full.body), "authorization", "credential headers must not be stored")
-	assert.Contains(t, full.body, "test...kkkk", "the masked form stays recognizable")
+	assert.NotContains(t, full, "session="+key, "cookie headers must not be stored")
+	assert.NotContains(t, strings.ToLower(full), "cookie")
+	assert.NotContains(t, strings.ToLower(full), "authorization", "credential headers must not be stored")
+	assert.Contains(t, full, "test...kkkk", "the masked form stays recognizable")
 }
 
 // Bytes the SDK sent are the contract. Numbers, key order, duplicate keys and
@@ -238,8 +240,8 @@ func TestDevListenKeepsTheBytesTheSDKSent(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.status, payload)
 	}
 
-	got := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?event=bytes", nil, nil)
-	lines := strings.Split(strings.TrimSpace(got.body), "\n")
+	got := curl(t, p.url()+"/_dev/v1/events?event=bytes")
+	lines := strings.Split(strings.TrimSpace(got), "\n")
 	assert.Equal(t, payloads, lines)
 }
 
@@ -303,13 +305,15 @@ func TestDevListenCapsInFlightRequests(t *testing.T) {
 	p := startListen(t)
 	addr := strings.TrimPrefix(p.url(), "http://")
 
+	// All nine are stalled uploads, so no probe can take a slot. The server
+	// refuses the one that finds the eight slots full.
 	var stalled []net.Conn
 	t.Cleanup(func() {
 		for _, c := range stalled {
 			_ = c.Close()
 		}
 	})
-	for range 8 {
+	for range 9 {
 		conn, err := net.Dial("tcp", addr)
 		require.NoError(t, err)
 		_, err = io.WriteString(conn, "POST /v1/track HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Basic ZGV2Og==\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{\"userId\"")
@@ -317,19 +321,29 @@ func TestDevListenCapsInFlightRequests(t *testing.T) {
 		stalled = append(stalled, conn)
 	}
 
-	// The server takes a moment to reach the handler of each stalled
-	// connection, so poll until the ninth request is refused.
+	// The refused handler answers at once while the others wait for their
+	// body, so poll until one connection carries a 503.
 	require.Eventually(t, func() bool {
-		resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON)
-		return err == nil && resp.status == http.StatusServiceUnavailable
-	}, 10*time.Second, 50*time.Millisecond)
+		buf := make([]byte, 64)
+		for _, c := range stalled {
+			if err := c.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
+				return false
+			}
+			n, _ := c.Read(buf)
+			if strings.HasPrefix(string(buf[:n]), "HTTP/1.1 503") {
+				return true
+			}
+		}
+		return false
+	}, 8*time.Second, 50*time.Millisecond, "one of nine stalled uploads should be refused")
 	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).status,
 		"the query API must not share the ingestion cap")
 	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/ui/", nil, nil).status)
 
 	// The body must arrive within 10 s, so the slots come back on their own.
 	require.Eventually(t, func() bool {
-		return devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON).status == http.StatusOK
+		resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"x"}`), postJSON)
+		return err == nil && resp.status == http.StatusOK
 	}, 20*time.Second, 500*time.Millisecond)
 }
 
@@ -363,37 +377,30 @@ func TestDevListenCapturesParallelWritersExactly(t *testing.T) {
 			defer wg.Done()
 			for i := range each {
 				payload := fmt.Sprintf(`{"userId":"w%d","event":"parallel","properties":{"i":%d}}`, w, i)
-				for {
-					resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON)
-					if !assert.NoError(t, err) {
-						return
-					}
-					if resp.status == http.StatusServiceUnavailable {
-						time.Sleep(5 * time.Millisecond)
-						continue
-					}
-					assert.Equal(t, http.StatusOK, resp.status)
-					break
+				resp, err := tryDo(http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON)
+				if !assert.NoError(t, err) {
+					return
 				}
+				assert.Equal(t, http.StatusOK, resp.status)
 			}
 		}(w)
 	}
 	wg.Wait()
 
-	resp := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?limit=1000&view=compact", nil, nil)
+	body := curl(t, p.url()+"/_dev/v1/requests?limit=1000&view=compact")
 	var list struct {
 		Total    int `json:"total"`
 		Requests []struct {
 			Seq int `json:"seq"`
 		} `json:"requests"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(resp.body), &list))
+	require.NoError(t, json.Unmarshal([]byte(body), &list))
 	assert.Equal(t, writers*each, list.Total)
 	for i := 1; i < len(list.Requests); i++ {
 		require.Greater(t, list.Requests[i].Seq, list.Requests[i-1].Seq)
 	}
-	events := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?event=parallel&limit=1000", nil, nil)
-	assert.Equal(t, writers*each, len(strings.Split(strings.TrimSpace(events.body), "\n")))
+	events := curl(t, p.url()+"/_dev/v1/events?event=parallel&limit=1000")
+	assert.Equal(t, writers*each, len(strings.Split(strings.TrimSpace(events), "\n")))
 }
 
 // The store is bounded. Past 10,000 requests the oldest go, and the listener
@@ -404,19 +411,11 @@ func TestDevListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 	const total = 10050
 
 	// One request at a time stays far below the in-flight cap, so none is
-	// refused. Reusing one connection keeps 10,000 posts from exhausting ports.
-	client := &http.Client{Transport: &http.Transport{MaxIdleConnsPerHost: 1}}
-	t.Cleanup(client.CloseIdleConnections)
+	// refused. post drains each body, so the default client reuses one
+	// connection and 10,000 posts do not exhaust ports.
+	t.Cleanup(http.DefaultClient.CloseIdleConnections)
 	for range total {
-		req, err := http.NewRequest(http.MethodPost, p.url()+"/v1/track", strings.NewReader(`{"userId":"u","event":"flood"}`))
-		require.NoError(t, err)
-		req.SetBasicAuth("dev", "")
-		resp, err := client.Do(req)
-		require.NoError(t, err)
-		_, err = io.Copy(io.Discard, resp.Body)
-		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, http.StatusOK, post(t, p.url()+"/v1/track", `{"userId":"u","event":"flood"}`))
 	}
 
 	var info struct {
@@ -428,14 +427,14 @@ func TestDevListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 			MaxRequests    int `json:"maxRequests"`
 		} `json:"store"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).body), &info))
+	require.NoError(t, json.Unmarshal([]byte(curl(t, p.url()+"/_dev/v1/info")), &info))
 	assert.Equal(t, total, info.Cursor)
 	assert.Equal(t, info.Store.MaxRequests, info.Store.Requests, "a full store holds exactly its cap")
 	assert.Equal(t, total-info.Store.Requests, info.Store.Evicted)
 	assert.Equal(t, info.Store.Evicted, info.Store.EvictedThrough)
 
-	list := devDo(t, http.MethodGet, p.url()+"/_dev/v1/requests?since=0&limit=1&view=compact", nil, nil)
-	assert.Contains(t, list.body, fmt.Sprintf(`"evictedThrough":%d`, info.Store.EvictedThrough))
+	list := curl(t, p.url()+"/_dev/v1/requests?since=0&limit=1&view=compact")
+	assert.Contains(t, list, fmt.Sprintf(`"evictedThrough":%d`, info.Store.EvictedThrough))
 }
 
 // Any page open in the developer's browser can post to the listener. A page
