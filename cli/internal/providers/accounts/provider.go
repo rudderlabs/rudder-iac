@@ -3,6 +3,8 @@ package accounts
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts/docs"
+	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -25,4 +27,16 @@ func NewProvider(store AccountStore) *Provider {
 // are new — no legacy versions), scoping the gatekeeper rules to it.
 func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	return prules.V1VersionPatterns(AccountSpecKind)
+}
+
+// SyntacticRules registers the account spec rule.
+func (p *Provider) SyntacticRules() []vrules.Rule {
+	return []vrules.Rule{NewSpecSyntaxValidRule()}
+}
+
+// RuleDocEntries returns the authored documentation fragments embedded with
+// the accounts provider.
+func (p *Provider) RuleDocEntries() []vdocs.RuleDocEntry {
+	entries, _ := vdocs.LoadRuleDocEntries(docs.FragmentsFS, ".")
+	return entries
 }

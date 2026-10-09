@@ -64,3 +64,26 @@ match_behavior:
             reference: "/spec/workspaces/0/resources/0/urn"
             severity: "error"
             message_contains: "urn is required in manifests (local_id not supported)"
+      - example_id: "manifest-spec-valid-urn-with-local-id"
+        title: "Resource with both urn and local_id"
+        description: >
+          A resource names itself by urn. Setting local_id as well is rejected
+          because the two are mutually exclusive.
+        files:
+          import-manifest.yaml: |
+            version: rudder/v1
+            kind: import-manifest
+            metadata:
+              name: import-manifest
+            spec:
+              workspaces:
+                - workspace_id: "ws-1"
+                  resources:
+                    - urn: "event-stream-source:my-source"
+                      local_id: "my-source"
+                      remote_id: "src_remote_456"
+        expected_diagnostics:
+          - file: "import-manifest.yaml"
+            reference: "/spec/workspaces/0/resources/0/local_id"
+            severity: "error"
+            message_contains: "urn and local_id are mutually exclusive"

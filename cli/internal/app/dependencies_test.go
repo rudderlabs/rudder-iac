@@ -241,3 +241,14 @@ func modelsConnectionMode(def *definitions.RegisteredDefinition) bool {
 	}
 	return true
 }
+
+func TestNewOfflineDepsNeedsNoToken(t *testing.T) {
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	_, err := NewDeps()
+	require.ErrorContains(t, err, "access token is required")
+
+	_, err = NewOfflineDeps()
+	require.NoError(t, err)
+}
