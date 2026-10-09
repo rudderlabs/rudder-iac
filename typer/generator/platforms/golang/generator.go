@@ -404,8 +404,10 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 		article = cmp.Or(article, m.article)
 		words = append(words, string(m.typ))
 
-		member := GoUnionMember{Name: "New" + name + m.name}
-		member.Doc = fmt.Sprintf("%s returns %s %s value%s.", member.Name, m.article, m.typ, m.nilNote)
+		member := GoUnionMember{
+			Name: "New" + name + m.name,
+			Doc:  fmt.Sprintf("returns %s %s value%s.", m.article, m.typ, m.nilNote),
+		}
 		if m.typ == plan.PrimitiveTypeNull {
 			union.Null = true
 		} else {
@@ -442,8 +444,7 @@ func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
 			if err != nil {
 				return fmt.Errorf("registering %s: %w", m.Name, err)
 			}
-			// A suffixed name replaces the base name that starts the doc.
-			m.Doc, m.Name = name+strings.TrimPrefix(m.Doc, m.Name), name
+			m.Name = name
 		}
 	}
 	return nil

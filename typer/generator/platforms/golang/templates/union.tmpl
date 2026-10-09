@@ -2,7 +2,7 @@
 type {{ .Name }} struct{ value any }
 {{- range .Members }}
 
-{{ comment .Doc }}
+// {{ .Name }} {{ .Doc }}
 {{- if .Type }}
 func {{ .Name }}(v {{ .Type }}) {{ $.Name }} {
 	return {{ $.Name }}{value: v}

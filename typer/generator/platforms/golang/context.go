@@ -48,7 +48,8 @@ type GoUnion struct {
 // GoUnionMember is the constructor of one union member.
 type GoUnionMember struct {
 	Name string
-	Doc  string
+	// Doc follows Name in the constructor's doc comment.
+	Doc string
 	// Type is the parameter type; empty for the null member, whose
 	// constructor takes no argument.
 	Type string
