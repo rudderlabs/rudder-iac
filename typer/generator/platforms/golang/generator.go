@@ -246,7 +246,7 @@ func unsupportedReason(ps plan.PropertySchema) string {
 		return "arrays of custom types"
 	// A custom type in a union of several non-null types fails generation
 	// instead (addUnion).
-	case len(nonNull(p.Types)) == 1 && plan.IsCustomType(nonNull(p.Types)[0]):
+	case slices.ContainsFunc(p.Types, plan.IsCustomType) && len(nonNull(p.Types)) == 1:
 		return "custom types"
 	}
 	return ""
