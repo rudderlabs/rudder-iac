@@ -4,15 +4,15 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 ---
 
+## Destination types
+
+Breaking changes to destination `config`, by release. Each entry's details and what to do are in [cli/internal/providers/destination/definitions/BREAKING_CHANGES.md](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md).
+
+- **v0.28.0:** [Re-import destinations that already have a Reverse ETL connection](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#re-import-destinations-that-already-have-a-reverse-etl-connection). Applies to 17 types, from `active_campaign` to `webhook`.
+- **v0.26.0:** [Re-import HTTP Webhook destinations that already have a Reverse ETL connection](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#re-import-http-webhook-destinations-that-already-have-a-reverse-etl-connection).
+- **v0.26.0:** [`use_native_sdk` removed from ActiveCampaign](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#use_native_sdk-removed-from-activecampaign).
+
 ## Upcoming (unreleased)
-
-### Re-import destinations that already have an rETL connection
-
-**Scope:** spec
-
-**Why:** the CLI now maps `connectionMode.warehouse` and `consentManagement.warehouse` on active_campaign, am, attentive_tag, braze, bqstream, customerio, facebook_conversions, facebook_pixel, ga4, gcs, hs, iterable, mp, posthog, s3, tiktok_ads and webhook destinations. Before, it dropped them. The webapp writes these keys when you connect a warehouse source, so specs imported earlier don't have them.
-
-For those destinations, `plan` now shows an update that removes the keys, and `apply` strips them along with any warehouse consent settings. To avoid this, re-import the affected destinations with `rudder-cli import workspace` before your next `apply`.
 
 ### Spec format upgrade: `rudder/0.1` → `rudder/v1`
 
