@@ -297,8 +297,8 @@ func typeList(types []plan.PropertyType) string {
 
 // addPropertyType adds the type of prop under its registered name: a union
 // for two or more non-null types, else an alias. Either follows the union its
-// array items need, as in the spec's listing. It reports whether the type can
-// hold nil (slice, map or interface).
+// array items need, so the file declares an item type before the type that
+// holds it. It reports whether the type can hold nil (slice, map or interface).
 func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property) (bool, error) {
 	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
 	if isUnion(prop.Types) {
