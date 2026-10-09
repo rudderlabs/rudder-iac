@@ -43,6 +43,9 @@ jobs:
   # below skip on its answer.
   changes:
     name: "detect code changes"
+    # A push run has already passed the workflow-level filter. With this job skipped,
+    # its output is empty and the test jobs below still run.
+    if: github.event_name == 'pull_request'
     runs-on: "ubuntu-24.04"
     permissions:
       pull-requests: read
@@ -54,8 +57,9 @@ jobs:
         with:
           egress-policy: audit
 
-      # A push run has already passed the workflow-level filter, so it always tests.
-      # The patterns mirror that filter; keep the two in sync.
+      # The files API lists a rename under its new path only, so the old path is
+      # checked too: moving a Go file under docs/ still runs the tests. The patterns
+      # mirror the push filter; keep the two in sync.
       - name: list changed files
         id: filter
         env:
@@ -63,16 +67,9 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ -z "$PR" ]; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
-          if grep -qvE '(\.md$|^docs/|^\.claude/|^\.agents/)' <<< "$files"; then
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          fi
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+          grep -qvE '(\.md$|^docs/|^\.claude/|^\.agents/)' <<< "$files" && code=true || code=false
+          echo "code=$code" >> "$GITHUB_OUTPUT"
 
   unit:
     name: "unit tests"
