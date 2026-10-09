@@ -88,9 +88,26 @@ func TestManifestSpecSyntaxValidRule_Validate(t *testing.T) {
 					"resources":    []any{map[string]any{"local_id": "src-1", "remote_id": "r1"}},
 				},
 			}),
+			// Without a urn, only the urn error applies; the mutual-exclusion
+			// message would be false.
 			expected: []vrules.ValidationResult{{
 				Reference: "/spec/workspaces/0/resources/0/urn",
 				Message:   "urn is required in manifests (local_id not supported)",
+			}},
+		},
+		{
+			// Validate no longer broadcasts the manifest, so this rule is what
+			// catches an entry apply would reject as mutually exclusive.
+			name: "urn together with local_id is rejected",
+			ctx: ctxForSpec([]any{
+				map[string]any{
+					"workspace_id": "ws-1",
+					"resources":    []any{map[string]any{"urn": "source:src-1", "local_id": "src-1", "remote_id": "r1"}},
+				},
+			}),
+			expected: []vrules.ValidationResult{{
+				Reference: "/spec/workspaces/0/resources/0/local_id",
+				Message:   "urn and local_id are mutually exclusive (local_id not supported for manifests)",
 			}},
 		},
 		{
