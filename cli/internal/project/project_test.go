@@ -2,6 +2,7 @@ package project_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -383,6 +384,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 		substitutor varsubst.Substitutor
 		rawSpecs    map[string][]byte
 		wantErr     string // empty when Load should succeed
+		wantMatches bool   // the document holds the failure, so ErrValidationFailed applies
 		wantSpecs   map[string]*specs.Spec
 	}{
 		{
@@ -432,8 +434,9 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: \"{{ .1A }}\"\nspec:\n  k: v"),
 			},
-			wantErr:   "variable substitution failed",
-			wantSpecs: map[string]*specs.Spec{},
+			wantErr:     "variable substitution failed",
+			wantMatches: true,
+			wantSpecs:   map[string]*specs.Spec{},
 		},
 		{
 			name:        "nil substitutor leaves spec untouched",
@@ -487,6 +490,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			err := proj.Load("test_dir")
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
+				assert.Equal(t, tc.wantMatches, errors.Is(err, project.ErrValidationFailed))
 			} else {
 				require.NoError(t, err)
 			}
@@ -600,94 +604,110 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 	}
 }
 
-// A failure that carries no diagnostics must not render as a clean document:
-// a machine reader treats an empty diagnostics array as "validated clean".
-func TestProject_Load_JSONRendererRecordsAFailureWithoutDiagnostics(t *testing.T) {
-	t.Parallel()
-
-	mockProvider := testutils.NewMockProvider(nil, nil)
-	mockProvider.MatchPatterns = fixtureMatchPatterns
-	mockProvider.GetResourceGraphErr = errors.New("event not found")
-	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
-		return map[string]*specs.RawSpec{
-			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
-		}, nil
-	}}
-
-	var out bytes.Buffer
-	proj := project.New(mockProvider,
-		project.WithLoader(mockLoader),
-		project.WithRenderer(renderer.NewJSONRenderer(&out)),
-	)
-
-	err := proj.Load("test_dir")
-
-	require.ErrorContains(t, err, "building resource graph: event not found")
-	assert.ErrorIs(t, err, project.ErrValidationFailed, "the document holds the cause, so the caller must not print it again")
-	assert.JSONEq(t, `{
-		"diagnostics": [{
-			"ruleId": "project/load-failed",
-			"severity": "error",
-			"message": "building resource graph: event not found",
-			"file": "",
-			"line": 0,
-			"column": 0
-		}],
-		"summary": {"errors": 1, "warnings": 0}
-	}`, out.String())
+// providerWithErrorRules adds a syntactic and a semantic rule that fail the
+// fixture spec named after them, so Load stops on real engine diagnostics.
+type providerWithErrorRules struct {
+	*testutils.MockProvider
 }
 
-// The text renderer prints the returned error itself, so it adds nothing.
-func TestProject_Load_TextRendererAddsNoFailureDiagnostic(t *testing.T) {
-	t.Parallel()
-
-	mockProvider := testutils.NewMockProvider(nil, nil)
-	mockProvider.MatchPatterns = fixtureMatchPatterns
-	mockProvider.GetResourceGraphErr = errors.New("event not found")
-	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
-		return map[string]*specs.RawSpec{
-			"spec.yaml": {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: abc\nspec:\n  k: v")},
-		}, nil
-	}}
-
-	var out bytes.Buffer
-	proj := project.New(mockProvider,
-		project.WithLoader(mockLoader),
-		project.WithRenderer(renderer.NewTextRenderer(&out)),
-	)
-
-	require.Error(t, proj.Load("test_dir"))
-	assert.NotContains(t, out.String(), "project/load-failed")
+func failOnSpecNamed(name string) func(string, string, map[string]any, map[string]any) []rules.ValidationResult {
+	return func(_ string, _ string, metadata map[string]any, _ map[string]any) []rules.ValidationResult {
+		if metadata["name"] != name {
+			return nil
+		}
+		return []rules.ValidationResult{{Message: "broken spec"}}
+	}
 }
 
-// A loader failure before validation, a bad --location for one, still gets a
-// document, so a consumer never has to treat empty output as a result.
-func TestProject_Load_JSONRendererRecordsALoaderFailure(t *testing.T) {
+func (p *providerWithErrorRules) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/syntactic-error", rules.Error, "fails the syntactic fixture spec", rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, failOnSpecNamed("syntactic_source")),
+	)}
+}
+
+func (p *providerWithErrorRules) SemanticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/semantic-error", rules.Error, "fails the semantic fixture spec", rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, failOnSpecNamed("semantic_source")),
+	)}
+}
+
+// Under the JSON renderer every failed load must leave one document on stdout,
+// and the returned error must match ErrValidationFailed so the caller does not
+// print the failure again. An empty diagnostics array has to mean "validated
+// clean", so a failure with no diagnostics of its own gets a load-failed one.
+func TestProject_Load_JSONRendererRecordsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
-		return nil, errors.New("no such directory")
-	}}
+	oneSource := map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("abc")}
 
-	var out bytes.Buffer
-	proj := project.New(testutils.NewMockProvider(nil, nil),
-		project.WithLoader(mockLoader),
-		project.WithRenderer(renderer.NewJSONRenderer(&out)),
-	)
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]*specs.RawSpec
+		loadErr   error
+		graphErr  error
+		wantErr   string
+		wantRules []string
+	}{
+		{
+			name:      "loader failure before validation",
+			loadErr:   errors.New("no such directory"),
+			wantErr:   "failed to load specs using specLoader: no such directory",
+			wantRules: []string{"project/load-failed"},
+		},
+		{
+			name:      "failure after the syntax gate carries no diagnostics",
+			rawSpecs:  oneSource,
+			graphErr:  errors.New("event not found"),
+			wantErr:   "building resource graph: event not found",
+			wantRules: []string{"project/load-failed"},
+		},
+		{
+			name:      "syntax rule error",
+			rawSpecs:  map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("syntactic_source")},
+			wantErr:   "syntax validation failed",
+			wantRules: []string{"test/syntactic-error"},
+		},
+		{
+			name:      "semantic rule error",
+			rawSpecs:  map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("semantic_source")},
+			wantErr:   "semantic validation failed",
+			wantRules: []string{"test/semantic-error"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	err := proj.Load("./typo")
+			mockProvider := &providerWithErrorRules{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockProvider.GetResourceGraphErr = tc.graphErr
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				return tc.rawSpecs, tc.loadErr
+			}}
 
-	require.ErrorContains(t, err, "failed to load specs using specLoader: no such directory")
-	assert.ErrorIs(t, err, project.ErrValidationFailed)
-	assert.JSONEq(t, `{
-		"diagnostics": [{
-			"ruleId": "project/load-failed",
-			"severity": "error",
-			"message": "failed to load specs using specLoader: no such directory",
-			"file": "",
-			"line": 0,
-			"column": 0
-		}],
-		"summary": {"errors": 1, "warnings": 0}
-	}`, out.String())
+			var out bytes.Buffer
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithRenderer(renderer.NewJSONRenderer(&out)),
+			)
+
+			err := proj.Load("test_dir")
+
+			require.EqualError(t, err, tc.wantErr)
+			assert.ErrorIs(t, err, project.ErrValidationFailed)
+
+			var doc struct {
+				Diagnostics []struct {
+					RuleID string `json:"ruleId"`
+				} `json:"diagnostics"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+			var got []string
+			for _, d := range doc.Diagnostics {
+				got = append(got, d.RuleID)
+			}
+			assert.Equal(t, tc.wantRules, got)
+		})
+	}
 }

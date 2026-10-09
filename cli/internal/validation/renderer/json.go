@@ -19,6 +19,10 @@ import (
 // own (see FailureRenderer), a bad --location included, emits an error
 // diagnostic with ruleId project/load-failed, so an empty array always means
 // "validated clean".
+//
+// Failures that happen before a project exists, such as an unreadable
+// --var-file or a failed workspace fetch, have no renderer to record them.
+// Stdout stays empty and the error goes to stderr with a non-zero exit code.
 type JSONRenderer struct {
 	w io.Writer
 }

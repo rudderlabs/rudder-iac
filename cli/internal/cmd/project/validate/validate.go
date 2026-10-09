@@ -29,7 +29,6 @@ func NewCmdValidate() *cobra.Command {
 		deps       app.Deps
 		p          project.Project
 		workspace  *client.Workspace
-		err        error
 		location   string
 		varFiles   []string
 		jsonOutput bool
@@ -47,7 +46,7 @@ func NewCmdValidate() *cobra.Command {
 			$ rudder-cli validate --location </path/to/dir or file>
 			$ rudder-cli validate --json
 		`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -76,11 +75,11 @@ func NewCmdValidate() *cobra.Command {
 			p = deps.NewProject(projectOpts...)
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			validateLog.Debug("validate", "location", location, "json", jsonOutput)
 
 			defer func() {
-				telemetry.TrackCommand("validate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "json", V: jsonOutput},
 				}...)
