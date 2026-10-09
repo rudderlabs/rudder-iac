@@ -243,6 +243,8 @@ func TestToExportSpecMap_TokenizesSecret(t *testing.T) {
 	assert.Equal(t, "{{ .PROD_ANALYTICS_BQ_CREDENTIALS }}", config["credentials"], "secret must export as a var reference")
 	assert.Equal(t, "acme", config["project"])
 	assert.Equal(t, "US", config["location"])
+	assert.Equal(t, "serviceAccountKey", config["authMethod"], "the auth mode goes under BigQuery's own key")
+	assert.NotContains(t, config, "authenticationType")
 	assert.Equal(t, "prod-analytics-bq", specMap["id"])
 	assert.Equal(t, "name-prod-analytics-bq", specMap["name"])
 	assert.Equal(t, "SOURCE_BIGQUERY", specMap["account_definition_name"])

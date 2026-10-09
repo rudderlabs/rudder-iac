@@ -488,7 +488,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 	// account that predates it would be rejected on its first apply. Writing the
 	// mode it already runs in makes that apply add it instead.
 	if mode := authMode(remote.Definition.Name, config); mode != "" {
-		config["authenticationType"] = mode
+		config[authModeRequirements[remote.Definition.Name].Key] = mode
 	}
 	// The API omits secrets, so surface the auth mode's secret keys as
 	// present-but-empty so MaskSecrets emits a "{{ .VAR }}" token the user fills
