@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -248,4 +249,111 @@ func captureWarnings(t *testing.T) *[]string {
 	core.Warn = func(msg string) { warnings = append(warnings, msg) }
 	t.Cleanup(func() { core.Warn = original })
 	return &warnings
+}
+
+// trackPlan is a plan with one track event, "Some Event", declaring properties.
+func trackPlan(properties ...plan.Property) *plan.TrackingPlan {
+	schema := plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
+	for _, p := range properties {
+		schema.Properties[p.Name] = plan.PropertySchema{Property: p}
+	}
+	return &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema:  schema,
+	}}}
+}
+
+// A custom type cannot be a union member, as in Kotlin and Swift. With one
+// non-null type it is a nullable custom type, left out until custom types
+// are generated.
+func TestGenerateCustomTypeInUnion(t *testing.T) {
+	email := plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
+
+	tests := []struct {
+		name         string
+		types        []plan.PropertyType
+		wantErr      string
+		wantWarnings []string
+	}{
+		{
+			name:    "union member",
+			types:   []plan.PropertyType{plan.PrimitiveTypeString, email},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:    "union member next to null",
+			types:   []plan.PropertyType{email, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNull},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:         "nullable custom type",
+			types:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
+			wantWarnings: []string{`skipping property "contact" (custom:email|null) of track event "Some Event": Go generation does not support custom types yet`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := captureWarnings(t)
+
+			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types}), core.GenerateOptions{}, nil)
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantWarnings, *warnings)
+		})
+	}
+}
+
+// Null and Nullable are emitted only when the generated types use them, and
+// Null also for an untyped property, which takes Null{} to send null.
+func TestGenerateValueHelpers(t *testing.T) {
+	type helpers struct{ null, nullable bool }
+	property := func(name string, types []plan.PropertyType, items ...plan.PropertyType) plan.Property {
+		return plan.Property{Name: name, Types: types, ItemTypes: items}
+	}
+	var (
+		array    = []plan.PropertyType{plan.PrimitiveTypeArray}
+		nullable = []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull}
+	)
+
+	tests := []struct {
+		name       string
+		properties []plan.Property
+		want       helpers
+	}{
+		{
+			name: "no null, untyped or nullable property",
+			properties: []plan.Property{
+				property("string", []plan.PropertyType{plan.PrimitiveTypeString}),
+				property("object", []plan.PropertyType{plan.PrimitiveTypeObject}),
+				property("untyped_items", array),
+				property("union", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger}),
+				// A union's null member is its zero value, not Null.
+				property("union_with_null", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNull}),
+				property("item_union", array, plan.PrimitiveTypeString, plan.PrimitiveTypeInteger),
+			},
+		},
+		{"null property", []plan.Property{property("null", []plan.PropertyType{plan.PrimitiveTypeNull})}, helpers{null: true}},
+		{"untyped property", []plan.Property{property("any", nil)}, helpers{null: true}},
+		{"null items", []plan.Property{property("nulls", array, plan.PrimitiveTypeNull)}, helpers{null: true}},
+		{"nullable property", []plan.Property{property("nullable", nullable)}, helpers{nullable: true}},
+		{"nullable items", []plan.Property{property("nullable_items", array, nullable...)}, helpers{nullable: true}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := (&golang.Generator{}).Generate(trackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			assert.Equal(t, tt.want, helpers{
+				null:     strings.Contains(files[0].Content, "\ntype Null struct{}\n"),
+				nullable: strings.Contains(files[0].Content, "\ntype Nullable[T any] struct {\n"),
+			})
+		})
+	}
 }
