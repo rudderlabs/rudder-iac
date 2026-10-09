@@ -127,7 +127,7 @@ func assertPlain(t *testing.T, v any) {
 			assertPlain(t, e)
 		}
 	default:
-		t.Errorf("snapshot holds %T %v", v, v)
+		assert.Failf(t, "snapshot holds a non-plain value", "%T %v", v, v)
 	}
 }
 
@@ -154,8 +154,9 @@ func TestTrackWire(t *testing.T) {
 		name    string
 		call    func() error
 		want    string
-		err     error
-		payload any // when set, json.Marshal(payload) must equal the properties sent
+		err     error // the call must return exactly this error
+		errIs   error // the call must return an error wrapping this one
+		payload any   // when set, json.Marshal(payload) must equal the properties sent
 	}{
 		{
 			name:    "a set optional field sends its value, even false",
@@ -203,7 +204,8 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
-			// productId is required, so the properties are never empty.
+			// productId is required, so the open rule's empty case cannot be reached. The
+			// collision pair's closed structs below show the SDK omitting an empty map instead.
 			name: "the open rule's struct with nothing set sends only its required key",
 			call: func() error { return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{}) },
 			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
@@ -211,7 +213,8 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
-			name: "amount as a number sends under amount, and AdditionalProperties sends undeclared keys as plain values, even ints and generated types, and ignores declared ones",
+			// amount as a number: half of the same-name, different-type pair with Name Collisions.
+			name: "AdditionalProperties: undeclared keys pass as plain values, declared ones ignored",
 			call: func() error {
 				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{
 					ProductID: "p1",
@@ -261,13 +264,13 @@ func TestTrackWire(t *testing.T) {
 			name: "options send integrations, originalTimestamp and messageId",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id,
-					examples.WithIntegrations(analytics.Integrations{"All": false, "Amplitude": true}),
+					examples.WithIntegrations(analytics.Integrations{"All": false, "Amplitude": map[string]any{"sessionId": 1}}),
 					examples.WithTimestamp(time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)),
 					examples.WithMessageID("msg-1"),
 				)
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
-				"integrations": {"All": false, "Amplitude": true},
+				"integrations": {"All": false, "Amplitude": {"sessionId": 1}},
 				"originalTimestamp": "2026-09-29T10:00:00Z",
 				"messageId": "msg-1",
 				"context": {"ruddertyper": ` + exMeta + `}}`,
@@ -277,12 +280,12 @@ func TestTrackWire(t *testing.T) {
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id, examples.WithAnalyticsContext(analytics.Context{
 					Locale: "en-US",
-					Traits: analytics.Traits{"plan": "pro"},
+					Traits: analytics.Traits{"plan": "pro", "seats": 2},
 					Extra:  map[string]any{"custom": 1, "ruddertyper": "overwritten"},
 				}))
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
-				"context": {"locale": "en-US", "traits": {"plan": "pro"}, "custom": 1, "ruddertyper": ` + exMeta + `}}`,
+				"context": {"locale": "en-US", "traits": {"plan": "pro", "seats": 2}, "custom": 1, "ruddertyper": ` + exMeta + `}}`,
 		},
 		{
 			name: "a later option overrides an earlier one and nil options are skipped",
@@ -315,35 +318,35 @@ func TestTrackWire(t *testing.T) {
 				m["self"] = m
 				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, m)
 			},
-			err: examples.ErrInvalidValue,
+			errIs: examples.ErrInvalidValue,
 		},
 		{
 			name: "NaN in the payload is invalid",
 			call: func() error {
 				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{Amount: examples.Ptr(math.NaN())})
 			},
-			err: examples.ErrInvalidValue,
+			errIs: examples.ErrInvalidValue,
 		},
 		{
 			name: "NaN in WithIntegrations is invalid",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id, examples.WithIntegrations(analytics.Integrations{"x": math.NaN()}))
 			},
-			err: examples.ErrInvalidValue,
+			errIs: examples.ErrInvalidValue,
 		},
 		{
 			name: "NaN in WithAnalyticsContext is invalid",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id, examples.WithAnalyticsContext(analytics.Context{Extra: map[string]any{"x": math.NaN()}}))
 			},
-			err: examples.ErrInvalidValue,
+			errIs: examples.ErrInvalidValue,
 		},
 		{
 			name: "a WithTimestamp after year 9999 is invalid",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id, examples.WithTimestamp(time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)))
 			},
-			err: examples.ErrInvalidValue,
+			errIs: examples.ErrInvalidValue,
 		},
 	}
 
@@ -355,31 +358,54 @@ func TestTrackWire(t *testing.T) {
 		}
 	})
 
+	var sent int
+	for _, tt := range tests {
+		if tt.want != "" {
+			sent++
+		}
+	}
+	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none")
+	require.Len(t, succeeded, sent)
+
 	for i, tt := range tests {
+		// Taking the row's message here, not in the subtest, keeps rows and
+		// messages paired when -run skips a subtest.
+		var msg map[string]any
+		if tt.want != "" {
+			msg, wire = wire[0], wire[1:]
+		}
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.err != nil {
-				assert.ErrorIs(t, errs[i], tt.err)
-				return
-			}
-			require.NoError(t, errs[i])
-			require.NotEmpty(t, wire)
-			msg := wire[0]
-			wire = wire[1:]
-			assertMessage(t, tt.want, msg)
-			if tt.payload != nil {
-				want, err := json.Marshal(tt.payload)
-				require.NoError(t, err)
-				got, err := json.Marshal(msg["properties"])
-				require.NoError(t, err)
-				assert.JSONEq(t, string(want), string(got))
+			switch {
+			case tt.err != nil:
+				assert.Equal(t, tt.err, errs[i])
+			case tt.errIs != nil:
+				assert.ErrorIs(t, errs[i], tt.errIs)
+			default:
+				require.NoError(t, errs[i])
+				assertMessage(t, tt.want, msg)
+				if tt.payload != nil {
+					want, err := json.Marshal(tt.payload)
+					require.NoError(t, err)
+					got, err := json.Marshal(msg["properties"])
+					require.NoError(t, err)
+					assert.JSONEq(t, string(want), string(got))
+				}
 			}
 		})
 	}
-	assert.Empty(t, wire, "a call that failed sent a message")
 
 	// Config.Callback receives the snapshot itself, so its Go value types show
-	// what the wire JSON cannot.
+	// what the wire JSON cannot. context.ruddertyper is skipped: it is generated
+	// constant metadata, not caller data, and the spec writes its
+	// trackingPlanVersion as an untyped constant, a Go int.
 	for _, msg := range succeeded {
-		assertPlain(t, map[string]any(msg.(analytics.Track).Properties))
+		require.IsType(t, analytics.Track{}, msg)
+		track := msg.(analytics.Track)
+		require.NotNil(t, track.Context)
+		extra := maps.Clone(track.Context.Extra)
+		delete(extra, "ruddertyper")
+		for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
+			assertPlain(t, m)
+		}
 	}
 }
