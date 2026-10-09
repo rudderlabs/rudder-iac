@@ -1,12 +1,10 @@
 package validate
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -28,7 +26,6 @@ func NewCmdValidate() *cobra.Command {
 	var (
 		deps       app.Deps
 		p          project.Project
-		workspace  *client.Workspace
 		location   string
 		varFiles   []string
 		jsonOutput bool
@@ -47,24 +44,18 @@ func NewCmdValidate() *cobra.Command {
 			$ rudder-cli validate --json
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			deps, err = app.NewDeps()
+			// With no workspace lookup there is no workspace ID, so
+			// workspace-aware import-manifest rules check every workspace block
+			// instead of only the one apply targets.
+			deps, err = app.NewOfflineDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
-			}
-
-			// Resolve the active workspace so validation scopes workspace-aware
-			// rules (e.g. import-manifest orphaned-urn) to the same workspace apply
-			// targets.
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
 			}
-			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 
 			if jsonOutput {
 				projectOpts = append(projectOpts, project.WithRenderer(
