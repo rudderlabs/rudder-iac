@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -460,8 +461,7 @@ func TestImportedAbsentModeAccount_AddsDiscriminatorOnce(t *testing.T) {
 	}
 }
 
-// The handler must route its delete failure through the explainer, so the
-// refusal names the flag that would let this run see the dependent (DEX-959).
+// The handler must route its delete failure through the explainer (DEX-959).
 func TestDelete_ExplainsAnInUseRefusal(t *testing.T) {
 	h := &HandlerImpl{store: &mockStore{deleteErr: &client.APIError{
 		HTTPStatusCode: http.StatusConflict,
@@ -472,17 +472,16 @@ func TestDelete_ExplainsAnInUseRefusal(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "src-1", "the backend's reason must survive")
-	assert.Contains(t, err.Error(), "still use this account")
+	assert.Contains(t, err.Error(), "Point them at another account or remove them from the project")
 	assert.NotContains(t, err.Error(), "RUDDERSTACK_", "the message must not mention experimental flags (DEX-959)")
 }
 
 func TestDelete_LeavesOtherFailuresAlone(t *testing.T) {
-	h := &HandlerImpl{store: &mockStore{deleteErr: &client.APIError{
-		HTTPStatusCode: http.StatusInternalServerError, Message: "upstream unavailable",
-	}}}
+	failure := &client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "upstream unavailable"}
+	h := &HandlerImpl{store: &mockStore{deleteErr: failure}}
 
 	err := h.Delete(context.Background(), "snf-test", nil, &AccountState{ID: "remote-1"})
 
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL")
+	assert.Same(t, failure, errors.Unwrap(err), "the failure must be wrapped as is, with no note added")
 }

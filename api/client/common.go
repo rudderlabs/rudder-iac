@@ -31,16 +31,8 @@ var blockedByConnectionsMessages = []string{
 	"connected to some destinations",
 }
 
-// accountInUseMessage is the refusal the control plane raises when an account
-// still backs a source, destination or data graph. Matching on prose is
-// fragile, but ConflictError carries a message and a status and nothing else,
-// so APIError.ErrorCode is empty on this path.
-//
-//	AccountService.deleteAccountByIdAndWorkspaceId   the public accounts API
-//
-// The CLI calls only the public accounts API, which throws ConflictError (409)
-// with "is being used by". The webapp's legacy routes word it differently and
-// are not reachable from the CLI.
+// accountInUseMessage is the 409 the public accounts API raises when an account
+// is still used. Only the message identifies it, as APIError.ErrorCode is empty.
 const accountInUseMessage = "can't be removed because it is being used"
 
 type Paging struct {
