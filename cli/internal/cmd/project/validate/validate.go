@@ -23,7 +23,6 @@ func NewCmdValidate() *cobra.Command {
 	var (
 		deps     app.Deps
 		p        project.Project
-		err      error
 		location string
 		varFiles []string
 	)
@@ -39,7 +38,7 @@ func NewCmdValidate() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli validate --location </path/to/dir or file>
 		`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
 			// With no workspace lookup there is no workspace ID, so
 			// workspace-aware import-manifest rules check every workspace block
 			// instead of only the one apply targets.
@@ -56,11 +55,11 @@ func NewCmdValidate() *cobra.Command {
 			p = deps.NewProject(projectOpts...)
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			validateLog.Debug("validate", "location", location)
 
 			defer func() {
-				telemetry.TrackCommand("validate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 				}...)
 			}()

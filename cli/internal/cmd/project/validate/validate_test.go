@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,15 +71,13 @@ spec:
 
 	cases := []struct {
 		name     string
-		token    string
 		location string
 		wantErr  bool
 	}{
-		{name: "no token, valid project", token: "", location: "testdata/valid"},
-		{name: "invalid token, valid project", token: "not-a-real-token", location: "testdata/valid"},
-		{name: "no token, invalid project fails locally", token: "", location: invalidDir, wantErr: true},
-		{name: "no token, orphan in another workspace block", token: "", location: orphanDir, wantErr: true},
-		{name: "no token, urn with local_id", token: "", location: urnAndLocalIDDir, wantErr: true},
+		{name: "no token, valid project", location: "testdata/valid"},
+		{name: "no token, invalid project fails locally", location: invalidDir, wantErr: true},
+		{name: "no token, orphan in another workspace block", location: orphanDir, wantErr: true},
+		{name: "no token, urn with local_id", location: urnAndLocalIDDir, wantErr: true},
 	}
 
 	for _, tc := range cases {
@@ -89,7 +90,7 @@ spec:
 			}))
 			t.Cleanup(server.Close)
 
-			t.Setenv("RUDDERSTACK_ACCESS_TOKEN", tc.token)
+			t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
 			t.Setenv("RUDDERSTACK_API_URL", server.URL)
 			t.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", "true")
 			// The import-manifest kind is gated; enabling it exercises the
@@ -111,4 +112,19 @@ spec:
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestValidateTracksRunFailureAsErrored(t *testing.T) {
+	testutils.UseFakeAPI(t)
+	calls := telemetrytest.Record(t)
+	location := filepath.Join(t.TempDir(), "missing")
+
+	err := telemetrytest.Execute(NewCmdValidate(), nil, []string{"--location", location})
+
+	require.Error(t, err)
+	assert.Equal(t, []telemetrytest.Call{{
+		Command: "validate",
+		Errored: true,
+		Extras:  []telemetry.KV{{K: "location", V: location}},
+	}}, *calls)
 }
