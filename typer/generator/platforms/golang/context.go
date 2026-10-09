@@ -40,9 +40,9 @@ type GoUnion struct {
 	Name    string
 	Doc     string
 	Members []GoUnionMember
-	// Null is set when null is a member, so the zero value is null; otherwise
-	// the zero value cannot be sent.
-	Null bool
+	// HasNull is set when null is a member, so the zero value is null;
+	// otherwise the zero value cannot be sent.
+	HasNull bool
 }
 
 // GoUnionMember is the constructor of one union member.

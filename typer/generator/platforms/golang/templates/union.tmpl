@@ -12,9 +12,9 @@ func {{ .Name }}() {{ $.Name }} { return {{ $.Name }}{} }
 {{- end }}
 {{- end }}
 
-// Value returns the held value{{ if .Null }}; nil means null{{ end }}.
+// Value returns the held value{{ if .HasNull }}; nil means null{{ end }}.
 func (u {{ .Name }}) Value() any { return u.value }
-{{- if .Null }}
+{{- if .HasNull }}
 
 func (u {{ .Name }}) wireValue() (any, error) { return u.value, nil }
 

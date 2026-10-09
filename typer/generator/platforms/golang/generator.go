@@ -409,7 +409,7 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 	}
 
 	var (
-		union = &GoUnion{Name: name, Null: slices.Contains(types, plan.PropertyType(plan.PrimitiveTypeNull))}
+		union = &GoUnion{Name: name, HasNull: slices.Contains(types, plan.PropertyType(plan.PrimitiveTypeNull))}
 		// The doc lists the member types: "a string, integer or null".
 		article string
 		words   []string
@@ -438,7 +438,7 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 		last = len(words) - 1
 		zero = "Null is not a member, so the zero value cannot be sent."
 	)
-	if union.Null {
+	if union.HasNull {
 		zero = "Null is a member, so the zero value is null."
 	}
 	union.Doc = withDescription(fmt.Sprintf("%s: %s %s or %s.\nBuild it with one of the New%s* functions.\n%s",
