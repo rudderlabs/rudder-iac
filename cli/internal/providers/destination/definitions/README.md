@@ -35,9 +35,64 @@ Use the `type` value in YAML. Every type below takes `definition_version: 1`.
 | [TikTok Ads](tiktok_ads/README.md) | `tiktok_ads` |
 | [Webhook](webhook/README.md) | `webhook` |
 
-These are the verified definitions, which Rudder CLI always registers. The other definitions in this directory register only behind the `unverifiedDestinations` experimental flag and aren't documented here. Any other `type` fails validation.
+These are the verified definitions, which Rudder CLI always registers. The [unverified destination types](#unverified-destination-types) register only behind an experimental flag. Any other `type` fails validation.
 
 To start from a destination already configured in the dashboard, run `rudder-cli import workspace` — the imported YAML uses the same keys the READMEs document.
+
+## Unverified destination types
+
+The types below have definitions in Rudder CLI that aren't verified yet. Rudder CLI registers them only when the `unverifiedDestinations` experimental flag is on; without it, a spec using one of these types fails validation.
+
+Turn the flag on with environment variables:
+
+```bash
+export RUDDERSTACK_CLI_EXPERIMENTAL=true
+export RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true
+```
+
+Or persist it in `~/.rudder/config.json`:
+
+```json
+{
+  "experimental": true,
+  "flags": {
+    "unverifiedDestinations": true
+  }
+}
+```
+
+`rudder-cli experimental enable unverifiedDestinations` writes only the flag. Set `experimental` as well, or the flag is ignored.
+
+| Destination | Type |
+| :-----| :-----|
+| [Adjust](adj/README.md) | `adj` |
+| [Adobe Analytics](adobe_analytics/README.md) | `adobe_analytics` |
+| [Amazon Kinesis](kinesis/README.md) | `kinesis` |
+| [Apache Kafka](kafka/README.md) | `kafka` |
+| [BingAds Offline Conversions](bingads_offline_conversions/README.md) | `bingads_offline_conversions` |
+| [Confluent Cloud](confluent_cloud/README.md) | `confluent_cloud` |
+| [Customer.io Audience](customerio_audience/README.md) | `customerio_audience` |
+| [Firebase](firebase/README.md) | `firebase` |
+| [Google Ads Offline Conversions](google_adwords_offline_conversions/README.md) | `google_adwords_offline_conversions` |
+| [Google Analytics](ga/README.md) | `ga` |
+| [Google Cloud Pub/Sub](googlepubsub/README.md) | `googlepubsub` |
+| [Google Sheets](googlesheets/README.md) | `googlesheets` |
+| [Google Tag Manager](gtm/README.md) | `gtm` |
+| [Intercom](intercom/README.md) | `intercom` |
+| [LinkedIn Ads](linkedin_ads/README.md) | `linkedin_ads` |
+| [LinkedIn Insight Tag](linkedin_insight_tag/README.md) | `linkedin_insight_tag` |
+| [Marketo](marketo/README.md) | `marketo` |
+| [Qualtrics](qualtrics/README.md) | `qualtrics` |
+| [Redis](redis/README.md) | `redis` |
+| [Salesforce](salesforce/README.md) | `salesforce` |
+| [Sentry](sentry/README.md) | `sentry` |
+| [Slack](slack/README.md) | `slack` |
+| [Snowflake Streaming](snowpipe_streaming/README.md) | `snowpipe_streaming` |
+| [Statsig](statsig/README.md) | `statsig` |
+| [VWO](vwo/README.md) | `vwo` |
+| [Zendesk](zendesk/README.md) | `zendesk` |
+
+Every unverified type takes `definition_version: 1`, and the [config key rules](#config-key-rules) apply to them as they do to verified types.
 
 ## Config key rules
 
