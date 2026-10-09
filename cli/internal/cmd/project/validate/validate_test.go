@@ -10,7 +10,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,12 +71,12 @@ spec:
 	cases := []struct {
 		name     string
 		location string
-		wantErr  bool
+		wantErr  string
 	}{
 		{name: "no token, valid project", location: "testdata/valid"},
-		{name: "no token, invalid project fails locally", location: invalidDir, wantErr: true},
-		{name: "no token, orphan in another workspace block", location: orphanDir, wantErr: true},
-		{name: "no token, urn with local_id", location: urnAndLocalIDDir, wantErr: true},
+		{name: "no token, invalid project fails locally", location: invalidDir, wantErr: "syntax validation failed"},
+		{name: "no token, orphan in another workspace block", location: orphanDir, wantErr: "semantic validation failed"},
+		{name: "no token, urn with local_id", location: urnAndLocalIDDir, wantErr: "syntax validation failed"},
 	}
 
 	for _, tc := range cases {
@@ -104,9 +103,8 @@ spec:
 			cmd.SilenceUsage = true
 
 			err := cmd.Execute()
-			if tc.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), "validating project")
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
 				return
 			}
 			require.NoError(t, err)
@@ -115,7 +113,9 @@ spec:
 }
 
 func TestValidateTracksRunFailureAsErrored(t *testing.T) {
-	testutils.UseFakeAPI(t)
+	// Validate runs offline, so no API stand-in is needed; only config.
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	calls := telemetrytest.Record(t)
 	location := filepath.Join(t.TempDir(), "missing")
 

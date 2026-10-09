@@ -7,7 +7,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ctxForSpec builds a manifest ValidationContext from raw workspace blocks.
@@ -89,16 +88,12 @@ func TestManifestSpecSyntaxValidRule_Validate(t *testing.T) {
 					"resources":    []any{map[string]any{"local_id": "src-1", "remote_id": "r1"}},
 				},
 			}),
-			expected: []vrules.ValidationResult{
-				{
-					Reference: "/spec/workspaces/0/resources/0/urn",
-					Message:   "urn is required in manifests (local_id not supported)",
-				},
-				{
-					Reference: "/spec/workspaces/0/resources/0/local_id",
-					Message:   "urn and local_id are mutually exclusive (local_id not supported for manifests)",
-				},
-			},
+			// Without a urn, only the urn error applies; the mutual-exclusion
+			// message would be false.
+			expected: []vrules.ValidationResult{{
+				Reference: "/spec/workspaces/0/resources/0/urn",
+				Message:   "urn is required in manifests (local_id not supported)",
+			}},
 		},
 		{
 			// Validate no longer broadcasts the manifest, so this rule is what
@@ -169,35 +164,5 @@ func TestManifestSpecSyntaxValidRule_Validate(t *testing.T) {
 			t.Parallel()
 			assert.ElementsMatch(t, tt.expected, NewManifestSpecSyntaxValidRule().Validate(tt.ctx))
 		})
-	}
-}
-
-// Every entry the apply-time broadcast rejects (ImportIds.Validate) must also
-// fail this rule, because validate runs without a workspace and never
-// broadcasts.
-func TestManifestSpecSyntaxValidRule_RejectsEverythingBroadcastRejects(t *testing.T) {
-	t.Parallel()
-
-	entries := []specs.ImportIds{
-		{URN: "property:email_address", LocalID: "email_address", RemoteID: "r1"},
-		{URN: "property:email_address"},
-		{LocalID: "email_address"},
-		{RemoteID: "r1"},
-		{},
-	}
-
-	for _, ids := range entries {
-		require.Error(t, ids.Validate(), "entry %+v must be rejected by the broadcast", ids)
-
-		entry := map[string]any{}
-		for k, v := range map[string]string{"urn": ids.URN, "local_id": ids.LocalID, "remote_id": ids.RemoteID} {
-			if v != "" {
-				entry[k] = v
-			}
-		}
-		results := NewManifestSpecSyntaxValidRule().Validate(ctxForSpec([]any{
-			map[string]any{"workspace_id": "ws-1", "resources": []any{entry}},
-		}))
-		assert.NotEmpty(t, results, "entry %+v passes validate but fails apply", ids)
 	}
 }

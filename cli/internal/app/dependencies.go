@@ -197,7 +197,7 @@ func newDeps(token string) (Deps, error) {
 func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
 	d, err := NewOfflineDeps()
 	if err != nil {
-		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
+		return docs.DocumentedRules{}, nil, fmt.Errorf("building offline deps: %w", err)
 	}
 
 	return ruledoc.Build(d.CompositeProvider(), GetVersion(), generatedAt)

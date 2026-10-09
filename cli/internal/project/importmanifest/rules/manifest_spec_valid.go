@@ -79,6 +79,8 @@ func validateWorkspace(i int, workspace specs.WorkspaceImportMetadata) []vrules.
 // The local_id check mirrors ImportIds.Validate, which rejects an entry with
 // both urn and local_id. Validate runs offline and no longer broadcasts the
 // manifest, so this rule is the only place that mismatch surfaces before apply.
+// Without a urn the "urn is required" error already says local_id is not
+// supported, so the mutual-exclusion error is added only when both are set.
 func validateResource(i, j int, resource specs.ImportIds) []vrules.ValidationResult {
 	base := fmt.Sprintf("/spec/workspaces/%d/resources/%d", i, j)
 	var results []vrules.ValidationResult
@@ -89,7 +91,7 @@ func validateResource(i, j int, resource specs.ImportIds) []vrules.ValidationRes
 			Message:   "urn is required in manifests (local_id not supported)",
 		})
 	}
-	if resource.LocalID != "" {
+	if resource.URN != "" && resource.LocalID != "" {
 		results = append(results, vrules.ValidationResult{
 			Reference: base + "/local_id",
 			Message:   "urn and local_id are mutually exclusive (local_id not supported for manifests)",
