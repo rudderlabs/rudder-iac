@@ -153,9 +153,9 @@ func TestTrackWire(t *testing.T) {
 	tests := []struct {
 		name    string
 		call    func() error
-		want    string // the message sent, compared by assertMessage
-		err     error  // the error returned instead, matched with errors.Is
-		payload any    // when set, json.Marshal(payload) must equal the properties sent
+		want    string
+		err     error
+		payload any // when set, json.Marshal(payload) must equal the properties sent
 	}{
 		{
 			name:    "a set optional field sends its value, even false",
@@ -211,27 +211,19 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
-			name: "AdditionalProperties sends undeclared keys and ignores declared ones",
+			name: "amount as a number sends under amount, and AdditionalProperties sends undeclared keys as plain values, even ints and generated types, and ignores declared ones",
 			call: func() error {
 				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{
-					ProductID:            "p1",
-					AdditionalProperties: map[string]any{"coupon": "SAVE", "productId": "override", "productName": "fill"},
+					ProductID: "p1",
+					Amount:    examples.Ptr(9.5),
+					AdditionalProperties: map[string]any{
+						"coupon": "SAVE", "productId": "override", "productName": "fill",
+						"count": 3, "user": examples.TrackUserProperties{User: examples.Ptr("u")},
+					},
 				})
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
-				"properties": {"productId": "p1", "coupon": "SAVE"},
-				"context": {"ruddertyper": ` + exMeta + `}}`,
-		},
-		{
-			name: "caller ints and generated values are sent as plain values",
-			call: func() error {
-				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, map[string]any{
-					"count": 3,
-					"user":  examples.TrackUserProperties{User: examples.Ptr("u")},
-				})
-			},
-			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event With Additional Properties", "userId": "user-123",
-				"properties": {"count": 3, "user": {"user": "u"}},
+				"properties": {"productId": "p1", "amount": 9.5, "coupon": "SAVE", "count": 3, "user": {"user": "u"}},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
@@ -248,15 +240,6 @@ func TestTrackWire(t *testing.T) {
 				return ex.TrackEventWithNameCamelCase1(id, examples.TrackEventWithNameCamelCaseProperties1{})
 			},
 			want: `{"type": "track", "channel": "server", "event": "eventWithNameCamelCase", "userId": "user-123",
-				"context": {"ruddertyper": ` + exMeta + `}}`,
-		},
-		{
-			name: "amount as a number sends under amount",
-			call: func() error {
-				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{ProductID: "p1", Amount: examples.Ptr(9.5)})
-			},
-			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
-				"properties": {"productId": "p1", "amount": 9.5},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
