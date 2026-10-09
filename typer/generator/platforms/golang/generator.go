@@ -113,8 +113,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		}
 	}
 
-	// Functions named from plan data register after every type name, so they
-	// can never take a type's name.
 	if err := addConstructors(ctx, registry); err != nil {
 		return nil, err
 	}
@@ -429,8 +427,9 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 }
 
 // addConstructors registers the union constructors. It is the second
-// registration pass, for the functions and constants named from plan data,
-// and runs after every type name is registered.
+// registration pass, for the functions and constants named from plan data: it
+// runs after every type name is registered, so none of them can take a type's
+// name.
 func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
 	for _, pt := range ctx.PropertyTypes {
 		if pt.Union == nil {
