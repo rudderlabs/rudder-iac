@@ -267,19 +267,27 @@ func (h *HandlerImpl) Metadata() handler.HandlerMetadata { return HandlerMetadat
 func (h *HandlerImpl) NewSpec() *AccountSpec { return &AccountSpec{} }
 
 // ExtractResourcesFromSpec resolves the account definition's secret keys and
-// wraps them in Config as *secret.String — mirrors the destination handler,
+// wraps them in Config as *secret.String, mirroring the destination handler
 // minus the (type, version) registry lookup (account definitions are
-// unversioned).
+// unversioned). For BigQuery it also refuses credentials that are not a
+// service account key and rewrites a YAML-parsed key back to its JSON string.
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map[string]*AccountResource, error) {
 	keys, ok := secretKeys(spec.AccountDefinitionName)
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
+	config := spec.Config
+	if spec.AccountDefinitionName == "SOURCE_BIGQUERY" {
+		var err error
+		if config, err = normalizeBigQueryCredentials(config); err != nil {
+			return nil, fmt.Errorf("validating account %q: %w", spec.ID, err)
+		}
+	}
 	resource := &AccountResource{
 		ID:                    spec.ID,
 		Name:                  spec.Name,
 		AccountDefinitionName: spec.AccountDefinitionName,
-		Config:                secret.WrapKnownSecrets(spec.Config, keys),
+		Config:                secret.WrapKnownSecrets(config, keys),
 	}
 	return map[string]*AccountResource{spec.ID: resource}, nil
 }
