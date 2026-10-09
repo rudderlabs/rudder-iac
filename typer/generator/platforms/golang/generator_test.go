@@ -264,15 +264,20 @@ func trackPlan(properties ...plan.Property) *plan.TrackingPlan {
 	}}}
 }
 
-// A custom type cannot be a union member, as in Kotlin and Swift. With one
-// non-null type it is a nullable custom type, left out until custom types
-// are generated.
+// A custom type cannot be a union member, as in Kotlin and Swift, whether the
+// union holds the property or its array items. With one non-null type it is a
+// nullable custom type, or an array of them, left out until custom types are
+// generated.
 func TestGenerateCustomTypeInUnion(t *testing.T) {
-	email := plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
+	var (
+		email = plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
+		array = []plan.PropertyType{plan.PrimitiveTypeArray}
+	)
 
 	tests := []struct {
 		name         string
 		types        []plan.PropertyType
+		items        []plan.PropertyType
 		wantErr      string
 		wantWarnings []string
 	}{
@@ -287,9 +292,33 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
 		},
 		{
+			name:    "union member with custom item types",
+			types:   []plan.PropertyType{plan.PrimitiveTypeArray, email},
+			items:   []plan.PropertyType{email},
+			wantErr: `mapping property "contact": custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
+			name:    "item union member",
+			types:   array,
+			items:   []plan.PropertyType{plan.PrimitiveTypeString, email},
+			wantErr: `mapping property "contact": mapping the item types of PropertyContact: custom type "email" cannot be a member of a multi-type union`,
+		},
+		{
 			name:         "nullable custom type",
 			types:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
 			wantWarnings: []string{`skipping property "contact" (custom:email|null) of track event "Some Event": Go generation does not support custom types yet`},
+		},
+		{
+			name:         "custom item type",
+			types:        array,
+			items:        []plan.PropertyType{email},
+			wantWarnings: []string{`skipping property "contact" (array of custom:email) of track event "Some Event": Go generation does not support arrays of custom types yet`},
+		},
+		{
+			name:         "nullable custom item type",
+			types:        array,
+			items:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
+			wantWarnings: []string{`skipping property "contact" (array of custom:email|null) of track event "Some Event": Go generation does not support arrays of custom types yet`},
 		},
 	}
 
@@ -297,7 +326,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			warnings := captureWarnings(t)
 
-			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types}), core.GenerateOptions{}, nil)
+			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return

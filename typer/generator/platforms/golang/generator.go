@@ -240,11 +240,13 @@ func unsupportedReason(ps plan.PropertySchema) string {
 		return "nested object schemas"
 	case p.Config != nil && len(p.Config.Enum) > 0:
 		return "enums"
+	// A union with a custom member, of the property's types or of its item
+	// types, fails generation instead (addUnion).
+	case customUnion(p.Types), customUnion(p.ItemTypes):
+		return ""
 	case slices.ContainsFunc(p.ItemTypes, plan.IsCustomType):
 		return "arrays of custom types"
-	// A custom type in a union of several non-null types fails generation
-	// instead (addUnion).
-	case slices.ContainsFunc(p.Types, plan.IsCustomType) && !isUnion(p.Types):
+	case slices.ContainsFunc(p.Types, plan.IsCustomType):
 		return "custom types"
 	}
 	return ""
@@ -254,6 +256,11 @@ func unsupportedReason(ps plan.PropertySchema) string {
 // generates as a union struct.
 func isUnion(types []plan.PropertyType) bool {
 	return len(nonNull(types)) > 1
+}
+
+// customUnion reports whether types is a union with a custom type as a member.
+func customUnion(types []plan.PropertyType) bool {
+	return isUnion(types) && slices.ContainsFunc(types, plan.IsCustomType)
 }
 
 func nonNull(types []plan.PropertyType) []plan.PropertyType {
