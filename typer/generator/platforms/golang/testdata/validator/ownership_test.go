@@ -1,7 +1,9 @@
 package validator
 
 import (
+	"fmt"
 	"net"
+	"sync"
 	"testing"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
@@ -21,9 +23,11 @@ func (c *fakeClient) Enqueue(msg analytics.Message) error {
 
 func (c *fakeClient) Close() error { return nil }
 
-// The golden's own event methods are called, so the test covers the whole
-// generated call path: payload conversion, options and the send helper.
-func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
+// sendAndChange changes each input right after the call that took it. Both
+// ownership tests run it, so the deterministic fake-client check and the
+// -race check against the real SDK cover the same inputs.
+func sendAndChange(t *testing.T, client analytics.Client) {
+	t.Helper()
 	var (
 		unicode = "a"
 		props   = ruddertyper.TrackUserSignedUpProperties{
@@ -39,21 +43,20 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			Traits: analytics.Traits{"plan": []any{"pro"}},
 		}
 		integrations = analytics.Integrations{"Amplitude": map[string]any{"key": "v"}}
-		client       = &fakeClient{}
 		rt           = ruddertyper.New(client)
 		identity     = ruddertyper.Identity{UserID: "user-123"}
 		opts         = []ruddertyper.Option{nil, ruddertyper.WithAnalyticsContext(ctx), ruddertyper.WithIntegrations(integrations)}
 	)
 
 	require.NoError(t, rt.TrackUserSignedUp(identity, props, opts...))
-	require.NoError(t, rt.TrackEmptyEventWithAdditionalProps(identity, open, opts...))
-
 	unicode = "changed"
 	props.ArrayOfAny[0] = "changed"
 	props.ArrayOfAny[1].([]any)[0] = "changed"
 	props.ObjectProperty["nested"].(map[string]any)["k"] = "changed"
 	props.ObjectProperty["added"] = true
 	props.PropertyOfAny.([]string)[0] = "changed"
+
+	require.NoError(t, rt.TrackEmptyEventWithAdditionalProps(identity, open, opts...))
 	open["list"].([]any)[0] = "changed"
 	open["added"] = true
 	ctx.IP[0] = 10
@@ -61,6 +64,13 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 	ctx.Traits["plan"].([]any)[0] = "changed"
 	integrations["Amplitude"].(map[string]any)["key"] = "changed"
 	integrations["All"] = false
+}
+
+// The golden's own event methods are called, so the test covers the whole
+// generated call path: payload conversion, options and the send helper.
+func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
+	client := &fakeClient{}
+	sendAndChange(t, client)
 
 	context := func() *analytics.Context {
 		return &analytics.Context{
@@ -98,4 +108,61 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
 	}, client.messages)
+}
+
+// The real SDK serializes each message on its own goroutine right after
+// Enqueue, so the changes race with it unless the call copied its inputs,
+// and -race reports that.
+func TestSDKSendsInputsAsPassed(t *testing.T) {
+	wire, _ := capture(t, func(client analytics.Client) { sendAndChange(t, client) })
+
+	require.Len(t, wire, 2)
+	assertMessage(t, `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
+		"properties": {
+			"array_of_any": ["x", ["y"]],
+			"mixed_unicode": "a",
+			"object_property": {"nested": {"k": "v"}},
+			"property_of_any": ["z"]
+		},
+		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},
+		"integrations": {"Amplitude": {"key": "v"}}}`, wire[0])
+	assertMessage(t, `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
+		"properties": {"list": ["x"]},
+		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},
+		"integrations": {"Amplitude": {"key": "v"}}}`, wire[1])
+}
+
+// The goroutines share one wrapper and one option, as callers that build them
+// once do, so -race reports any call that writes to shared state.
+func TestConcurrentSends(t *testing.T) {
+	const n = 100
+	userID := func(i int) string { return fmt.Sprint("user-", i) }
+	wire, _ := capture(t, func(client analytics.Client) {
+		var (
+			rt  = ruddertyper.New(client)
+			opt = ruddertyper.WithAnalyticsContext(analytics.Context{Extra: map[string]any{"app": "validator"}})
+			wg  sync.WaitGroup
+		)
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				assert.NoError(t, rt.TrackEmptyEventWithAdditionalProps(
+					ruddertyper.Identity{UserID: userID(i)}, map[string]any{"n": i}, opt,
+				))
+			}(i)
+		}
+		wg.Wait()
+	})
+
+	require.Len(t, wire, n)
+	byUser := make(map[any]map[string]any, n)
+	for _, msg := range wire {
+		byUser[msg["userId"]] = msg
+	}
+	for i := 0; i < n; i++ {
+		assertMessage(t, fmt.Sprintf(`{"type": "track", "channel": "server", "event": "Empty Event With Additional Props",
+			"userId": %q, "properties": {"n": %d},
+			"context": {"app": "validator", "ruddertyper": %s}}`, userID(i), i, refMeta), byUser[userID(i)])
+	}
 }
