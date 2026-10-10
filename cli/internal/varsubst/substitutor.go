@@ -43,7 +43,9 @@ func IsValidVariableName(name string) bool {
 //     special characters, or content that parses as a different YAML type
 //     (`true`, `123`, `null`, sequences) can change the document's semantics.
 //     Callers that need to force a string should quote at the call site:
-//     `flag: "{{ .FLAG }}"`.
+//     `flag: "{{ .FLAG }}"`. Double quotes break on a value containing `"` or
+//     `\`; single quotes (`'{{ .FLAG }}'`, which import generates) break on a
+//     value containing `'`, which must be doubled in the variable.
 type Substitutor interface {
 	SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 }

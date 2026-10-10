@@ -331,3 +331,61 @@ func TestYAMLFormatter_Format_PreservesNodeHeadComment(t *testing.T) {
 	assert.Contains(t, string(out), "generated — do not edit")
 	assert.Contains(t, string(out), `kind: "import-manifest"`)
 }
+
+// A secret nested under spec.config, as in a real account spec, with a
+// pretty-printed value whose closing brace lands at column 0.
+func TestYAMLFormatter_NestedJSONSecretSlotParsesAsString(t *testing.T) {
+	t.Parallel()
+
+	generated, err := YAMLFormatter{}.Format(map[string]any{
+		"spec": map[string]any{"config": map[string]any{"credentials": "{{ .BQ_CREDENTIALS }}"}},
+	})
+	require.NoError(t, err)
+
+	//nolint:gosec // fixture, not a credential
+	const key = "{\n  \"type\": \"service_account\",\n  \"project_id\": \"demo\"\n}"
+	substituted, errs := varsubst.NewSubstitutor(mapResolver{"BQ_CREDENTIALS": key}).SubstituteBytes(generated)
+	require.Empty(t, errs)
+
+	var parsed struct {
+		Spec struct {
+			Config struct {
+				Credentials any `yaml:"credentials"`
+			} `yaml:"config"`
+		} `yaml:"spec"`
+	}
+	require.NoError(t, yaml.Unmarshal(substituted, &parsed))
+
+	// A single-quoted scalar folds its line breaks into spaces, which is
+	// harmless between JSON tokens, so the value is compared as JSON.
+	creds, ok := parsed.Spec.Config.Credentials.(string)
+	require.True(t, ok, "credentials must parse as a string, got %T", parsed.Spec.Config.Credentials)
+	assert.JSONEq(t, key, creds)
+}
+
+// Single-quoted slots break on a value containing a single quote, and work when
+// each one is doubled. The var file header and the README say so; this pins it.
+func TestYAMLFormatter_SingleQuoteInSecretMustBeDoubled(t *testing.T) {
+	t.Parallel()
+
+	generated, err := YAMLFormatter{}.Format(map[string]any{"password": "{{ .PW }}"})
+	require.NoError(t, err)
+
+	resolve := func(value string) (string, error) {
+		substituted, errs := varsubst.NewSubstitutor(mapResolver{"PW": value}).SubstituteBytes(generated)
+		require.Empty(t, errs)
+
+		var parsed map[string]string
+		if err := yaml.Unmarshal(substituted, &parsed); err != nil {
+			return "", err
+		}
+		return parsed["password"], nil
+	}
+
+	_, err = resolve("it's-a-secret")
+	assert.Error(t, err, "an undoubled single quote ends the scalar early")
+
+	got, err := resolve("it''s-a-secret")
+	require.NoError(t, err)
+	assert.Equal(t, "it's-a-secret", got)
+}
