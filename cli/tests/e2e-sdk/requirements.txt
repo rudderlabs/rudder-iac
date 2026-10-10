@@ -1,0 +1,14 @@
+# The Python SDK under test and its dependencies, pinned. Install with
+# pip install -r requirements.txt.
+backoff==2.2.1
+certifi==2026.7.22
+charset-normalizer==3.5.2
+deprecation==2.1.0
+idna==3.20
+packaging==26.3
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.4
+requests==2.34.2
+rudder-sdk-python==2.1.9
+six==1.17.0
+urllib3==2.8.0
