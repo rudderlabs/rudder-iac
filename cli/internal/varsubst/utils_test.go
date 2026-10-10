@@ -87,6 +87,18 @@ func TestSingleQuoteTokens(t *testing.T) {
 			in:   `accessKey: {{ .ACCESS_KEY }}`,
 			want: `accessKey: {{ .ACCESS_KEY }}`,
 		},
+		{
+			// The quote before the token is an escape inside a longer string,
+			// so there is no whole scalar to rewrite.
+			name: "token after an escaped quote keeps quotes",
+			in:   `a: "x\"{{ .X }}"`,
+			want: `a: "x\"{{ .X }}"`,
+		},
+		{
+			name: "several scalars on one line",
+			in:   `a: ["{{ .A }}", "{{ .B }}"]`,
+			want: `a: ['{{ .A }}', '{{ .B }}']`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

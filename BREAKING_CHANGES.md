@@ -14,6 +14,18 @@ This document lists breaking changes between releases of `rudder-cli`. It is sep
 
 For those destinations, `plan` now shows an update that removes the keys, and `apply` strips them along with any warehouse consent settings. To avoid this, re-import the affected destinations with `rudder-cli import workspace` before your next `apply`.
 
+### Secret references in imported specs are single-quoted
+
+**Scope:** spec, var file
+
+**Why:** `import workspace` used to write secret fields as a bare `{{ .VAR }}`. Substitution rewrites the file before YAML parsing, so a JSON secret, such as a Google service account key, parsed as a mapping and was sent to the control plane as an empty string, which failed with a 400. Import now writes `'{{ .VAR }}'`, in single quotes.
+
+What to do:
+
+- A project imported earlier keeps its bare slots, and re-import is refused once resources are managed. Change a JSON secret's reference by hand, for example `credentials: '{{ .BQ_CREDENTIALS }}'`. Apply already repairs BigQuery account credentials in bare slots (#951), but destination JSON secrets are not covered.
+- A secret that contains a single quote must have each one doubled in the var file, and written without quotes there: for the password `it's-a-secret`, write `PW: it''s-a-secret`. An undoubled quote now fails with an error that names the variable.
+- JSON values are single-quoted in the var file. Double quotes turn `\n` escapes into real newlines and break a private key.
+
 ### Spec format upgrade: `rudder/0.1` → `rudder/v1`
 
 `rudder/v1` is a comprehensive redesign of the original `rudder/0.1` spec format. It improves consistency across resource kinds, replaces ambiguous field names, adopts snake_case conventions, and moves to compact URN-style references throughout. All changes below must be applied when upgrading from `rudder/0.1` to `rudder/v1`.
