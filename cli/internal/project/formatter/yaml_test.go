@@ -364,28 +364,36 @@ func TestYAMLFormatter_NestedJSONSecretSlotParsesAsString(t *testing.T) {
 }
 
 // Single-quoted slots break on a value containing a single quote, and work when
-// each one is doubled. The var file header and the README say so; this pins it.
+// each one is doubled. The substitution names the variable instead of leaving a
+// YAML parse error far from it; the var file header and the README say how to
+// write the value.
 func TestYAMLFormatter_SingleQuoteInSecretMustBeDoubled(t *testing.T) {
 	t.Parallel()
 
 	generated, err := YAMLFormatter{}.Format(map[string]any{"password": "{{ .PW }}"})
 	require.NoError(t, err)
 
-	resolve := func(value string) (string, error) {
+	resolve := func(value string) (string, []varsubst.SubstitutionError, error) {
 		substituted, errs := varsubst.NewSubstitutor(mapResolver{"PW": value}).SubstituteBytes(generated)
-		require.Empty(t, errs)
+		if len(errs) > 0 {
+			return "", errs, nil
+		}
 
 		var parsed map[string]string
 		if err := yaml.Unmarshal(substituted, &parsed); err != nil {
-			return "", err
+			return "", nil, err
 		}
-		return parsed["password"], nil
+		return parsed["password"], nil, nil
 	}
 
-	_, err = resolve("it's-a-secret")
-	assert.Error(t, err, "an undoubled single quote ends the scalar early")
-
-	got, err := resolve("it''s-a-secret")
+	_, errs, err := resolve("it's-a-secret")
 	require.NoError(t, err)
+	require.Len(t, errs, 1)
+	assert.ErrorIs(t, &errs[0], varsubst.ErrUnescapedSingleQuote)
+	assert.Equal(t, "PW", errs[0].Name)
+
+	got, errs, err := resolve("it''s-a-secret")
+	require.NoError(t, err)
+	require.Empty(t, errs)
 	assert.Equal(t, "it's-a-secret", got)
 }
