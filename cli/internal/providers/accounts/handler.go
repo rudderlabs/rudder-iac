@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -12,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -45,6 +48,10 @@ var HandlerMetadata = handler.HandlerMetadata{
 type accountDefinition struct {
 	Type       string
 	SecretKeys []string
+	// RequiredOptions are the config keys the account schema marks required, so
+	// validate can flag a missing one before apply reaches the API (DEX-994).
+	// Required secrets are derived from SecretKeys, see requiredSecrets.
+	RequiredOptions []string
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -52,12 +59,126 @@ type accountDefinition struct {
 // the reverse.
 //
 // ponytail: hardcoded. The real registry fetches secretFields from the control-plane
-// account-definitions API (unversioned, name-keyed) — see DEX-467. Adding a warehouse
-// here stays a one-line map entry because the split logic below is definition-driven.
+// account-definitions API (unversioned, name-keyed) — see DEX-467. The split
+// logic below is driven by these definitions, so a new warehouse is a new entry
+// here plus, when it has several auth modes, an entry in authModeRequirements.
 var registeredAccounts = map[string]accountDefinition{
-	"SOURCE_BIGQUERY":  {Type: "bigquery", SecretKeys: []string{"credentials"}},
-	"SOURCE_POSTGRES":  {Type: "postgres", SecretKeys: []string{"password"}},
-	"SOURCE_SNOWFLAKE": {Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"}},
+	"SOURCE_BIGQUERY": {
+		Type: "bigquery", SecretKeys: []string{"credentials"},
+		RequiredOptions: []string{"project"},
+	},
+	"SOURCE_POSTGRES": {
+		Type: "postgres", SecretKeys: []string{"password"},
+		RequiredOptions: []string{"host", "dbname", "user", "port", "sslMode"},
+	},
+	"SOURCE_SNOWFLAKE": {
+		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
+		RequiredOptions: []string{"account", "dbname", "warehouse", "user", "authenticationType"},
+	},
+}
+
+// optionalSecrets are secret keys an account schema does not require.
+var optionalSecrets = []string{"privateKeyPassphrase"}
+
+// requiredSecrets is keys without the optional ones.
+func requiredSecrets(keys []string) []string {
+	return slices.DeleteFunc(slices.Clone(keys), func(key string) bool {
+		return slices.Contains(optionalSecrets, key)
+	})
+}
+
+// authModeRequirement is how a definition with several auth modes picks the
+// config keys it requires on top of RequiredOptions.
+type authModeRequirement struct {
+	// Key is the config key that selects the mode.
+	Key string
+	// Required lists the keys each mode needs.
+	Required map[string][]string
+}
+
+// authModeRequirements covers the definitions whose required keys depend on the
+// auth mode. A definition absent here requires all of its non-optional secrets.
+//
+// A new definition with several auth modes also needs an entry in
+// authModeSecrets and absentAuthModes, or every secret is sent again on each
+// apply (DEX-958).
+var authModeRequirements = map[string]authModeRequirement{
+	"SOURCE_BIGQUERY": {
+		Key: "authMethod",
+		Required: map[string][]string{
+			"serviceAccountKey": requiredSecrets(registeredAccounts["SOURCE_BIGQUERY"].SecretKeys),
+			// Federation has no key file; the schema requires these three
+			// options instead and wants credentials empty.
+			"workloadIdentityFederation": {"workloadIdentityProjectNumber", "workloadIdentityPoolId", "workloadIdentityProviderId"},
+		},
+	},
+	"SOURCE_SNOWFLAKE": {
+		Key: "authenticationType",
+		Required: map[string][]string{
+			"keyPair":  requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["keyPair"]),
+			"password": requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["password"]),
+		},
+	},
+}
+
+// given reports whether config sets key to something. A null value, as in
+// "account:" with nothing after it, counts as not set.
+func given(config map[string]any, key string) bool {
+	return config[key] != nil
+}
+
+// requiredConfigKeys lists the keys an account of this definition must set,
+// options first.
+func requiredConfigKeys(definitionName string, def accountDefinition, config map[string]any) []string {
+	required := slices.Clone(def.RequiredOptions)
+	modes, discriminated := authModeRequirements[definitionName]
+	if !discriminated {
+		return append(required, requiredSecrets(def.SecretKeys)...)
+	}
+	// A missing required discriminator and an unknown mode are each reported on
+	// their own, since there is no telling which keys are required.
+	if _, _, unknown := unknownAuthMode(definitionName, config); unknown {
+		return required
+	}
+	if slices.Contains(def.RequiredOptions, modes.Key) && !given(config, modes.Key) {
+		return required
+	}
+	return append(required, modes.Required[authMode(definitionName, config)]...)
+}
+
+// missingRequiredConfig lists the required config keys an account of this
+// definition leaves out, options first. A definition the CLI does not register
+// has no known requirements, so it reports nothing.
+func missingRequiredConfig(definitionName string, config map[string]any) []string {
+	def, ok := registeredAccounts[definitionName]
+	if !ok {
+		return nil
+	}
+
+	var missing []string
+	for _, key := range requiredConfigKeys(definitionName, def, config) {
+		if !given(config, key) {
+			missing = append(missing, key)
+		}
+	}
+	return missing
+}
+
+// unknownAuthMode reports the config key and the allowed values when the
+// account names an auth mode its definition does not have. Without this check
+// an unknown mode requires nothing, so a typo such as "serviceAccount" passes
+// validate and fails at the API (DEX-994). An unset mode is not unknown.
+func unknownAuthMode(definitionName string, config map[string]any) (key string, allowed []string, unknown bool) {
+	modes, discriminated := authModeRequirements[definitionName]
+	if !discriminated || !given(config, modes.Key) {
+		return "", nil, false
+	}
+	if mode, isString := config[modes.Key].(string); isString {
+		if _, known := modes.Required[mode]; known || mode == "" {
+			return "", nil, false
+		}
+	}
+	return modes.Key, slices.Sorted(maps.Keys(modes.Required)), true
 }
 
 // authModeSecrets maps each auth mode of a discriminated definition to the
@@ -78,12 +199,13 @@ var authModeSecrets = map[string]map[string][]string{
 // (rudder-sources snowflake.NewClient); an absent value predates key-pair
 // support, so it is a password account whatever the form's default says.
 var absentAuthModes = map[string]string{
+	"SOURCE_BIGQUERY":  "serviceAccountKey",
 	"SOURCE_SNOWFLAKE": "password",
 }
 
 // authMode is the account's auth mode, or "" for a definition with a single mode.
 func authMode(definitionName string, config map[string]any) string {
-	if mode, _ := config["authenticationType"].(string); mode != "" {
+	if mode, _ := config[authModeRequirements[definitionName].Key].(string); mode != "" {
 		return mode
 	}
 	return absentAuthModes[definitionName]
@@ -145,19 +267,27 @@ func (h *HandlerImpl) Metadata() handler.HandlerMetadata { return HandlerMetadat
 func (h *HandlerImpl) NewSpec() *AccountSpec { return &AccountSpec{} }
 
 // ExtractResourcesFromSpec resolves the account definition's secret keys and
-// wraps them in Config as *secret.String — mirrors the destination handler,
+// wraps them in Config as *secret.String, mirroring the destination handler
 // minus the (type, version) registry lookup (account definitions are
-// unversioned).
+// unversioned). For BigQuery it also refuses credentials that are not a
+// service account key and rewrites a YAML-parsed key back to its JSON string.
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map[string]*AccountResource, error) {
 	keys, ok := secretKeys(spec.AccountDefinitionName)
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
+	config := spec.Config
+	if spec.AccountDefinitionName == "SOURCE_BIGQUERY" {
+		var err error
+		if config, err = normalizeBigQueryCredentials(config); err != nil {
+			return nil, fmt.Errorf("validating account %q: %w", spec.ID, err)
+		}
+	}
 	resource := &AccountResource{
 		ID:                    spec.ID,
 		Name:                  spec.Name,
 		AccountDefinitionName: spec.AccountDefinitionName,
-		Config:                secret.WrapKnownSecrets(spec.Config, keys),
+		Config:                secret.WrapKnownSecrets(config, keys),
 	}
 	return map[string]*AccountResource{spec.ID: resource}, nil
 }
@@ -211,9 +341,11 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldD
 	return &AccountState{ID: updated.ID}, nil
 }
 
+// Delete annotates an in-use refusal with what to do about it (DEX-959). Every
+// other failure passes through untouched.
 func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *AccountResource, oldState *AccountState) error {
 	if err := h.store.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting account %q: %w", oldState.ID, err)
+		return fmt.Errorf("deleting account %q: %w", oldState.ID, provider.ExplainBlockingAccountUsage(err))
 	}
 	return nil
 }
@@ -364,7 +496,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 	// account that predates it would be rejected on its first apply. Writing the
 	// mode it already runs in makes that apply add it instead.
 	if mode := authMode(remote.Definition.Name, config); mode != "" {
-		config["authenticationType"] = mode
+		config[authModeRequirements[remote.Definition.Name].Key] = mode
 	}
 	// The API omits secrets, so surface the auth mode's secret keys as
 	// present-but-empty so MaskSecrets emits a "{{ .VAR }}" token the user fills

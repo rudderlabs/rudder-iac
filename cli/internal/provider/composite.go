@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -408,6 +409,21 @@ func (p *CompositeProvider) ConsolidateSync(ctx context.Context, graph *resource
 	for name, provider := range p.Providers {
 		if err := provider.ConsolidateSync(ctx, graph, st); err != nil {
 			return fmt.Errorf("consolidate sync for provider %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// CheckPlan lets each child provider that can refuse a plan do so, in Order so
+// the first refusal is the same on every run.
+func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error {
+	for _, name := range p.Order {
+		checker, ok := p.Providers[name].(PlanChecker)
+		if !ok {
+			continue
+		}
+		if err := checker.CheckPlan(ctx, plan, st); err != nil {
+			return fmt.Errorf("checking plan for provider %s: %w", name, err)
 		}
 	}
 	return nil
