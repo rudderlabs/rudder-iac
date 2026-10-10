@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.28.1](https://github.com/rudderlabs/rudder-iac/compare/v0.28.0...v0.28.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **accounts:** refuse BigQuery credentials that are not a service account key ([#951](https://github.com/rudderlabs/rudder-iac/issues/951)) ([26a5cb5](https://github.com/rudderlabs/rudder-iac/commit/26a5cb590986c97c21539b64698ab32edf0a3e09))
+* **ci:** skip the test jobs, not the workflow, on docs-only pull requests ([#958](https://github.com/rudderlabs/rudder-iac/issues/958)) ([dc8a4f0](https://github.com/rudderlabs/rudder-iac/commit/dc8a4f030e95adcfc2ee874e68d51db38444cc7f))
+* **cli:** run validate offline without credentials ([#905](https://github.com/rudderlabs/rudder-iac/issues/905)) ([b8abcd8](https://github.com/rudderlabs/rudder-iac/commit/b8abcd8607f9ec737aa0cdbe942cbb0074c15ac3))
+* **import:** run import --merge matchers in a fixed provider dependency order ([#950](https://github.com/rudderlabs/rudder-iac/issues/950)) ([173ae9f](https://github.com/rudderlabs/rudder-iac/commit/173ae9fcf879f8a24c9f63fcdc4d885b429016fe))
+* **import:** single-quote generated secret template slots ([#955](https://github.com/rudderlabs/rudder-iac/issues/955)) ([7d274ce](https://github.com/rudderlabs/rudder-iac/commit/7d274cefff5c508892dc28ca322b56b6d56aec87))
+* **retl:** close validation gaps found in QA (DEX-960, 994, 995, 1020, 959) ([#937](https://github.com/rudderlabs/rudder-iac/issues/937)) ([dabdf75](https://github.com/rudderlabs/rudder-iac/commit/dabdf752ca73ca5a415d8e581277f35c11549472))
+* **telemetry:** report command failures accurately and track pre-run errors ([#858](https://github.com/rudderlabs/rudder-iac/issues/858)) ([fa072c9](https://github.com/rudderlabs/rudder-iac/commit/fa072c9689aceed4f58acbf980696ac1f7191ccc))
+
 ## [0.28.0](https://github.com/rudderlabs/rudder-iac/compare/v0.27.0...v0.28.0) (2026-10-08)
 
 
