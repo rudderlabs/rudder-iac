@@ -93,8 +93,11 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				// Continuation lines are indented to align under the text after "Warning: ".
 				ui.PrintWarning(`Secrets are not imported from the remote workspace.
          Add any required secret fields to the exported specs using
-         variable substitution ({{ .VAR }}), and pass them with
-         --var-file to apply and to later imports.`)
+         variable substitution, written as '{{ .VAR }}' in single
+         quotes, and pass them with --var-file to apply and to later
+         imports. Wrap JSON values, such as a service account key, in
+         single quotes in the var file too, and double any single
+         quote inside a value.`)
 				ui.PrintSuccess("Done")
 			}
 

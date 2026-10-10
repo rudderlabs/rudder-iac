@@ -26,6 +26,23 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 #
 # An unfilled (null) entry makes apply fail rather than silently sending an
 # empty secret; to deliberately send an empty value, use KEY: "".
+#
+# Generated specs write each reference as '{{ .VAR }}', in single quotes, and
+# the value is inserted as is.
+#
+# For a JSON value (such as a service account key), wrap it in single quotes
+# here:
+#   KEY: '{"private_key": "...", ...}'
+# Double quotes turn the \n escapes inside the key into real newlines, which
+# breaks the private key.
+#
+# A value that contains a single quote needs each one doubled, and is written
+# without quotes in this file. For the password it's-a-secret, write:
+#   KEY: it''s-a-secret
+#
+# A multi-line PEM value written as a | block reaches the spec with its line
+# breaks folded into spaces. Some consumers rebuild the key from that and
+# others may not, so check the field with a dry run before relying on it.
 `
 
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every

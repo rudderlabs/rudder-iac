@@ -43,7 +43,9 @@ func IsValidVariableName(name string) bool {
 //     special characters, or content that parses as a different YAML type
 //     (`true`, `123`, `null`, sequences) can change the document's semantics.
 //     Callers that need to force a string should quote at the call site:
-//     `flag: "{{ .FLAG }}"`.
+//     `flag: "{{ .FLAG }}"`. Double quotes break on a value containing `"` or
+//     `\`; single quotes (`'{{ .FLAG }}'`, which import generates) break on a
+//     value containing `'`, which must be doubled in the variable.
 type Substitutor interface {
 	SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 }
@@ -127,6 +129,11 @@ func (s *substitutor) SubstituteBytes(data []byte) ([]byte, []SubstitutionError)
 			}
 		}
 
+		if hasLoneSingleQuote(resolved) && inSingleQuotedScalar(data, matchStart) {
+			rawErrors = append(rawErrors, rawError{name: varName, offset: matchStart, err: ErrUnescapedSingleQuote})
+			continue
+		}
+
 		if resolved == "" && !isAdjacentToQuote(data, matchStart, matchEnd) {
 			resolved = `""`
 		}
@@ -199,6 +206,58 @@ func isInComment(data []byte, matchStart int) bool {
 		}
 	}
 
+	return false
+}
+
+// inSingleQuotedScalar reports whether matchStart sits inside a single-quoted
+// scalar that opens earlier on the same line. A scalar that spans lines is not
+// detected, which leaves the existing behavior for it.
+func inSingleQuotedScalar(data []byte, matchStart int) bool {
+	lineStart := matchStart
+	for lineStart > 0 && data[lineStart-1] != '\n' {
+		lineStart--
+	}
+
+	var inSingle, inDouble bool
+	for i := lineStart; i < matchStart; i++ {
+		switch data[i] {
+		case '\\':
+			if inDouble && i+1 < matchStart {
+				i++
+			}
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '#':
+			if !inSingle && !inDouble {
+				return false
+			}
+		}
+	}
+
+	return inSingle
+}
+
+// hasLoneSingleQuote reports whether value holds a run of single quotes of odd
+// length. Inside a single-quoted scalar an even run is a valid escape (`''`
+// reads as one quote), and an odd run leaves one quote that ends the scalar.
+func hasLoneSingleQuote(value string) bool {
+	run := 0
+	for i := 0; i <= len(value); i++ {
+		if i < len(value) && value[i] == '\'' {
+			run++
+			continue
+		}
+		if run%2 == 1 {
+			return true
+		}
+		run = 0
+	}
 	return false
 }
 
