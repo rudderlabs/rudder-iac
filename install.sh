@@ -1,0 +1,135 @@
+#!/bin/sh
+# Installs rudder-cli from the GitHub releases of rudderlabs/rudder-iac.
+#
+#   curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh | sh
+#
+# Environment variables:
+#   RUDDER_CLI_VERSION      release to install, such as 0.28.0 or v0.28.0 (default: latest)
+#   RUDDER_CLI_INSTALL_DIR  directory to install into (default: $HOME/.local/bin)
+#
+# The script checks the archive against the release's checksums file and refuses
+# to install on a mismatch. It never uses sudo.
+
+set -eu
+
+REPO="rudderlabs/rudder-iac"
+BIN="rudder-cli"
+RELEASES="https://github.com/$REPO/releases"
+
+fail() {
+  echo "rudder-cli install: $*" >&2
+  exit 1
+}
+
+has() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# download URL FILE
+download() {
+  if has curl; then
+    curl -fsL --retry 3 -o "$2" "$1"
+  else
+    wget -q -O "$2" "$1" 2>/dev/null
+  fi
+}
+
+# Prints the tag that releases/latest redirects to, such as v0.28.0.
+latest_tag() {
+  if has curl; then
+    url=$(curl -fsLI -o /dev/null -w '%{url_effective}' "$RELEASES/latest") || return 1
+  else
+    url=$(wget -S --spider "$RELEASES/latest" 2>&1 | tr -d '\r' | sed -n 's/^ *[Ll]ocation: *\([^ ]*\).*/\1/p' | tail -n 1)
+  fi
+  echo "${url##*/}"
+}
+
+has curl || has wget || fail "curl or wget is required"
+
+# The archive names follow name_template in cli/.goreleaser.yaml.
+os=$(uname -s)
+case "$os" in
+  Darwin | Linux) ;;
+  MINGW* | MSYS* | CYGWIN* | Windows_NT)
+    fail "this script does not support Windows; download the .zip for your CPU from $RELEASES/latest"
+    ;;
+  *) fail "unsupported operating system: $os" ;;
+esac
+
+arch=$(uname -m)
+case "$arch" in
+  x86_64 | amd64) arch="x86_64" ;;
+  arm64 | aarch64) arch="arm64" ;;
+  i386 | i486 | i586 | i686) arch="i386" ;;
+  *) fail "unsupported CPU architecture: $arch" ;;
+esac
+
+version="${RUDDER_CLI_VERSION:-latest}"
+if [ "$version" = "latest" ]; then
+  tag=$(latest_tag) || tag=""
+  case "$tag" in
+    v[0-9]*) ;;
+    *) fail "could not resolve the latest release from $RELEASES/latest" ;;
+  esac
+else
+  tag="v${version#v}"
+fi
+
+archive="${BIN}_${os}_${arch}.tar.gz"
+checksums="${BIN}_${tag#v}_checksums.txt"
+dir="${RUDDER_CLI_INSTALL_DIR:-$HOME/.local/bin}"
+
+tmp=$(mktemp -d) || fail "could not create a temporary directory"
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 1' INT TERM
+
+echo "Installing $BIN $tag ($os $arch) into $dir"
+{ mkdir -p "$dir" && [ -w "$dir" ]; } 2>/dev/null ||
+  fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+
+download "$RELEASES/download/$tag/$checksums" "$tmp/$checksums" ||
+  fail "could not download $RELEASES/download/$tag/$checksums; check that release $tag exists at $RELEASES"
+
+want=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/$checksums")
+[ -n "$want" ] || fail "release $tag has no $archive for $os $arch; see $RELEASES/tag/$tag"
+
+download "$RELEASES/download/$tag/$archive" "$tmp/$archive" ||
+  fail "could not download $RELEASES/download/$tag/$archive"
+
+if has sha256sum; then
+  got=$(sha256sum "$tmp/$archive" | cut -d ' ' -f 1)
+elif has shasum; then
+  got=$(shasum -a 256 "$tmp/$archive" | cut -d ' ' -f 1)
+else
+  fail "sha256sum or shasum is required to verify the download"
+fi
+[ "$got" = "$want" ] || fail "checksum mismatch for $archive (expected $want, got $got); not installing"
+
+tar -xzf "$tmp/$archive" -C "$tmp" "$BIN" 2>/dev/null || fail "could not extract $BIN from $archive"
+
+# Copy next to the target first so the final rename never leaves a partial binary.
+{ cp "$tmp/$BIN" "$dir/.$BIN.tmp" && chmod 755 "$dir/.$BIN.tmp" && mv -f "$dir/.$BIN.tmp" "$dir/$BIN"; } 2>/dev/null ||
+  fail "could not write $dir/$BIN; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+
+installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run"
+echo "Installed $installed at $dir/$BIN"
+
+case ":$PATH:" in
+  *":$dir:"*)
+    found=$(command -v "$BIN" || true)
+    if [ "$found" != "$dir/$BIN" ]; then
+      echo
+      echo "Warning: $found comes earlier on your PATH, so '$BIN' runs that copy. Remove it or move $dir ahead of it."
+    fi
+    ;;
+  *)
+    case "${SHELL:-}" in
+      */zsh) profile="$HOME/.zshrc" ;;
+      */bash) profile="$HOME/.bashrc" ;;
+      *) profile="$HOME/.profile" ;;
+    esac
+    echo
+    echo "$dir is not on your PATH. Add this line to $profile, then open a new terminal:"
+    echo "  export PATH=\"$dir:\$PATH\""
+    ;;
+esac
