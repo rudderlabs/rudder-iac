@@ -9,6 +9,7 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/agentinit"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
@@ -91,6 +92,7 @@ func init() {
 	rootCmd.AddCommand(validate.NewCmdValidate())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(migrate.NewCmdMigrate())
+	rootCmd.AddCommand(agentinit.NewCmdInit())
 
 	debugCmd = d.NewCmdDebug()
 	experimentalCmd = experimental.NewCmdExperimental()
@@ -151,6 +153,7 @@ var trackedCommands = []string{
 	"destroy",
 	"import retl-sources",
 	"import workspace",
+	"init",
 	"migrate",
 	"retl-sources preview",
 	"retl-sources validate",
