@@ -168,6 +168,21 @@ func TestRunWarnsWhenTheTokenIsNotInTheEnvironment(t *testing.T) {
 	assert.Contains(t, stdout.String(), "skipped    .git (git is not installed)")
 }
 
+func TestRunWarnsWhenTheGitCheckFails(t *testing.T) {
+	stubLookPath(t, map[string]string{"git": fakeGit(t)})
+	t.Setenv("FAKE_GIT_STDOUT", "")
+	t.Setenv("FAKE_GIT_STDERR", "fatal: detected dubious ownership in repository at '/srv/app'\n")
+	t.Setenv("FAKE_GIT_EXIT", "128")
+	t.Setenv(accessTokenEnv, "set")
+
+	var stdout, stderr bytes.Buffer
+	require.NoError(t, run(context.Background(), testWorkspace(), options{location: t.TempDir()}, &stdout, &stderr))
+
+	assert.Contains(t, stdout.String(), "skipped    .git (git rev-parse failed: fatal: detected dubious ownership in repository at '/srv/app')")
+	assert.NotContains(t, stdout.String(), "created    .git\n")
+	assert.Contains(t, stderr.String(), "init did not run git init (git rev-parse failed: fatal: detected dubious ownership in repository at '/srv/app')")
+}
+
 // fakeNpx writes a script that prints its arguments and working directory and
 // exits with $FAKE_NPX_EXIT, so the skills step runs without npm or a network.
 func fakeNpx(t *testing.T) string {

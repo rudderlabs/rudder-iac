@@ -80,7 +80,7 @@ func NewCmdInit() *cobra.Command {
 			  AGENTS.md          the workspace and the rules the agent follows
 			  CLAUDE.md          an @AGENTS.md import
 
-			It runs git init when the directory is not in a git work tree. It never
+			It runs git init when the directory is not in a git repository. It never
 			changes the workspace, and a second run changes nothing.
 
 			--skills installs the RudderStack agent skills with npx. Set %s
@@ -166,8 +166,8 @@ func run(ctx context.Context, workspace *client.Workspace, opts options, stdout,
 		return err
 	}
 
-	if slices.Contains(actions, fileAction{Path: gitDir, Action: actionSkipped, Note: gitMissingNote}) {
-		fmt.Fprintln(stderr, ui.Warning("git is not installed, so init did not run git init. Run it yourself so you can revert the agent's changes."))
+	if i := slices.IndexFunc(actions, func(a fileAction) bool { return a.Path == gitDir && a.Action == actionSkipped }); i >= 0 {
+		fmt.Fprintln(stderr, ui.Warning(gitSkippedWarning(actions[i].Note)))
 	}
 
 	// Claude Code expands ${RUDDERSTACK_ACCESS_TOKEN} in .mcp.json from the
@@ -197,6 +197,13 @@ func run(ctx context.Context, workspace *client.Workspace, opts options, stdout,
 
 	fmt.Fprintln(stdout, "Ready. "+nextStep)
 	return nil
+}
+
+func gitSkippedWarning(note string) string {
+	if note == gitMissingNote {
+		return "git is not installed, so init did not run git init. Run it yourself so you can revert the agent's changes."
+	}
+	return fmt.Sprintf("init did not run git init (%s). If the directory is not in a git repository, run git init yourself so you can revert the agent's changes.", note)
 }
 
 func summarize(workspace *client.Workspace) workspaceSummary {

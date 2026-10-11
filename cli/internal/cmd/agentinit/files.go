@@ -121,7 +121,6 @@ func prepare(ctx context.Context, dir, workspaceID, workspaceName string) ([]fil
 		{gitignoreFile, addGitignoreLine},
 		{mcpFile, mergeMCPServer(workspaceID)},
 		{agentsFile, upsertAgentsBlock(agentsBlock(workspaceID, workspaceName))},
-		{claudeFile, importAgents},
 	}
 	for _, e := range edits {
 		a, err := editFile(dir, e.path, e.edit)
@@ -131,26 +130,64 @@ func prepare(ctx context.Context, dir, workspaceID, workspaceName string) ([]fil
 		actions = append(actions, a)
 	}
 
+	claude, err := ensureClaudeImport(dir)
+	if err != nil {
+		return actions, err
+	}
+	actions = append(actions, claude)
+
 	return actions, nil
 }
 
-// ensureGitRepo runs git init in dir unless dir is already in a git work tree,
-// so the user can revert whatever the agent does next with git.
+// ensureGitRepo runs git init in dir when git says dir is not in a repository,
+// so the user can revert whatever the agent does next with git. Any other
+// failure of the check skips git init. In a repository git refuses to read, for
+// example one with dubious ownership, git init would succeed and init would
+// report a .git it did not create.
 func ensureGitRepo(ctx context.Context, dir string) (fileAction, error) {
-	if _, err := lookPath("git"); err != nil {
+	git, err := lookPath("git")
+	if err != nil {
 		return fileAction{Path: gitDir, Action: actionSkipped, Note: gitMissingNote}, nil
 	}
 
-	out, err := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--is-inside-work-tree").Output()
-	if err == nil && strings.TrimSpace(string(out)) == "true" {
+	check := exec.CommandContext(ctx, git, "-C", dir, "rev-parse", "--is-inside-work-tree")
+	// git translates its messages, and notInRepository reads the English one.
+	check.Env = append(os.Environ(), "LC_ALL=C")
+	out, err := check.Output()
+	switch {
+	case err == nil && strings.TrimSpace(string(out)) == "true":
 		return fileAction{Path: gitDir, Action: actionUnchanged, Note: "already in a git work tree"}, nil
+	case err == nil:
+		return fileAction{Path: gitDir, Action: actionSkipped, Note: "in a git directory but not in a work tree"}, nil
+	case !notInRepository(err):
+		return fileAction{Path: gitDir, Action: actionSkipped, Note: "git rev-parse failed: " + gitError(err)}, nil
 	}
 
-	if out, err := exec.CommandContext(ctx, "git", "-C", dir, "init").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, git, "-C", dir, "init").CombinedOutput(); err != nil {
 		return fileAction{}, fmt.Errorf("running git init in %s: %w: %s", dir, err, strings.TrimSpace(string(out)))
 	}
 
 	return fileAction{Path: gitDir, Action: actionCreated, Note: "git init"}, nil
+}
+
+// notInRepository reports whether err is git rev-parse saying the directory is
+// not in a git repository: exit code 128 and "not a git repository" on stderr.
+func notInRepository(err error) bool {
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == 128 &&
+		bytes.Contains(exitErr.Stderr, []byte("not a git repository"))
+}
+
+// gitError returns the first line git wrote to stderr, or err itself when git
+// wrote nothing or did not run.
+func gitError(err error) string {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if line, _, _ := strings.Cut(strings.TrimSpace(string(exitErr.Stderr)), "\n"); line != "" {
+			return line
+		}
+	}
+	return err.Error()
 }
 
 func ensureSpecDir(dir string) (fileAction, error) {
@@ -263,8 +300,10 @@ func mergeMCPServer(workspaceID string) editFunc {
 			return nil, "", errors.New("it is not a JSON object; fix or remove it and run init again")
 		}
 
+		// A missing mcpServers and "mcpServers": null both have type Null and
+		// count as no servers. sjson replaces a null with the object it sets.
 		servers := gjson.GetBytes(doc, "mcpServers")
-		if servers.Exists() && !servers.IsObject() {
+		if servers.Type != gjson.Null && !servers.IsObject() {
 			return nil, "", errors.New("mcpServers is not a JSON object; fix or remove it and run init again")
 		}
 
@@ -327,6 +366,25 @@ func upsertAgentsBlock(block string) editFunc {
 		next := text[:begin] + strings.TrimSuffix(block, "\n") + text[end:]
 		return []byte(next), "replaced the RudderStack block", nil
 	}
+}
+
+// ensureClaudeImport adds the @AGENTS.md import to CLAUDE.md. When CLAUDE.md and
+// AGENTS.md are one file, through a symlink in either direction or a hard
+// link, Claude Code already reads the RudderStack block, and the import would
+// make the file import itself.
+func ensureClaudeImport(dir string) (fileAction, error) {
+	if sameFile(filepath.Join(dir, agentsFile), filepath.Join(dir, claudeFile)) {
+		return fileAction{Path: claudeFile, Action: actionUnchanged, Note: "same file as " + agentsFile}, nil
+	}
+	return editFile(dir, claudeFile, importAgents)
+}
+
+// sameFile reports whether a and b both exist and are the same file after
+// following symlinks.
+func sameFile(a, b string) bool {
+	infoA, errA := os.Stat(a)
+	infoB, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(infoA, infoB)
 }
 
 // importAgents makes Claude Code, which reads CLAUDE.md and not AGENTS.md,
