@@ -56,22 +56,21 @@ and `apply` again.
 
 ## Where the specs go
 
-Use this layout at the project root:
+Keep every spec under one `rudderstack/` directory at the project root and pass
+`-l ./rudderstack` to every command:
 
 ```
-sources/<id>.yaml          kind: event-stream-source
-destinations/<id>.yaml     kind: destination
-connections.yaml           kind: event-stream-connections
+rudderstack/sources/<id>.yaml          kind: event-stream-source
+rudderstack/destinations/<id>.yaml     kind: destination
+rudderstack/connections.yaml           kind: event-stream-connections
 ```
 
 **The CLI loads every `.yaml` and `.yml` file under the `-l` directory, recursively, and
 rejects any file that is not a RudderStack spec.** It does not skip `node_modules` or dot
-directories. In an application repository, `-l ./` therefore fails on `.github/workflows/*.yml`,
+directories. In an application repository, `-l .` therefore fails on `.github/workflows/*.yml`,
 `docker-compose.yaml` and YAML inside `node_modules`, with errors named
-`project/spec-syntax-parse-valid`. Files ending in `.vars.yaml` or `.vars.yml` are skipped.
-
-If `validate` reports that error for files that are not specs, move the three locations above
-under one directory such as `rudderstack/` and pass `-l ./rudderstack` to every command.
+`project/spec-syntax-parse-valid`. Files ending in `.vars.yaml` or `.vars.yml` are skipped, so
+`secrets.vars.yaml` can sit at the project root and be passed with `--var-file`.
 Pointing `-l` at a single file also works.
 
 ## Spec shape
@@ -92,11 +91,11 @@ spec:
 
 | File | `kind` | Common mistake |
 |---|---|---|
-| `sources/<id>.yaml` | `event-stream-source` | `source` |
-| `destinations/<id>.yaml` | `destination` | |
-| `connections.yaml` | `event-stream-connections` | `connection`, singular |
+| `rudderstack/sources/<id>.yaml` | `event-stream-source` | `source` |
+| `rudderstack/destinations/<id>.yaml` | `destination` | |
+| `rudderstack/connections.yaml` | `event-stream-connections` | `connection`, singular |
 
-`connections.yaml` holds a list under `spec.connections`. A second destination is a second entry
+`rudderstack/connections.yaml` holds a list under `spec.connections`. A second destination is a second entry
 in that list, not a second file. Each entry has `id`, `source`, `destination` and `enabled`.
 There is no `config` key on a connection. Connection settings live on the destination.
 
