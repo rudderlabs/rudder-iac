@@ -34,6 +34,21 @@ download() {
   fi
 }
 
+# exists URL: succeeds when URL answers with a success status.
+exists() {
+  if has curl; then
+    curl -fsLI -o /dev/null "$1"
+  else
+    wget -q --spider "$1" 2>/dev/null
+  fi
+}
+
+# The release-please workflow publishes a release before goreleaser uploads its
+# assets, so for a few minutes after a release, the release exists without them.
+not_uploaded() {
+  fail "release $tag has no asset $1 yet (it may still be uploading); try again in a few minutes"
+}
+
 # Prints the tag that releases/latest redirects to, such as v0.28.0.
 latest_tag() {
   if has curl; then
@@ -77,24 +92,42 @@ fi
 
 archive="${BIN}_${os}_${arch}.tar.gz"
 checksums="${BIN}_${tag#v}_checksums.txt"
-dir="${RUDDER_CLI_INSTALL_DIR:-$HOME/.local/bin}"
+dir="${RUDDER_CLI_INSTALL_DIR:-}"
+if [ -z "$dir" ]; then
+  [ -n "${HOME:-}" ] || fail "HOME is not set; set RUDDER_CLI_INSTALL_DIR to the directory to install into"
+  dir="$HOME/.local/bin"
+fi
 
 tmp=$(mktemp -d) || fail "could not create a temporary directory"
-trap 'rm -rf "$tmp"' EXIT
-trap 'exit 1' INT TERM
+partial=""
+cleanup() {
+  rm -rf "$tmp"
+  if [ -n "$partial" ]; then rm -f "$partial"; fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 
-echo "Installing $BIN $tag ($os $arch) into $dir"
-{ mkdir -p "$dir" && [ -w "$dir" ]; } 2>/dev/null ||
-  fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
-
-download "$RELEASES/download/$tag/$checksums" "$tmp/$checksums" ||
+# Check the release before touching the install directory, so a version that
+# does not exist leaves nothing behind.
+download "$RELEASES/download/$tag/$checksums" "$tmp/$checksums" || {
+  exists "$RELEASES/tag/$tag" && not_uploaded "$checksums"
   fail "could not download $RELEASES/download/$tag/$checksums; check that release $tag exists at $RELEASES"
+}
 
 want=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/$checksums")
 [ -n "$want" ] || fail "release $tag has no $archive for $os $arch; see $RELEASES/tag/$tag"
 
-download "$RELEASES/download/$tag/$archive" "$tmp/$archive" ||
+{ mkdir -p "$dir" && [ -w "$dir" ]; } 2>/dev/null ||
+  fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+# An absolute path, without a trailing slash, for the PATH check and the PATH line below.
+dir=$(CDPATH='' cd -- "$dir" && pwd) ||
+  fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+
+echo "Installing $BIN $tag ($os $arch) into $dir"
+download "$RELEASES/download/$tag/$archive" "$tmp/$archive" || {
+  exists "$RELEASES/download/$tag/$archive" || not_uploaded "$archive"
   fail "could not download $RELEASES/download/$tag/$archive"
+}
 
 if has sha256sum; then
   got=$(sha256sum "$tmp/$archive" | cut -d ' ' -f 1)
@@ -108,28 +141,36 @@ fi
 tar -xzf "$tmp/$archive" -C "$tmp" "$BIN" 2>/dev/null || fail "could not extract $BIN from $archive"
 
 # Copy next to the target first so the final rename never leaves a partial binary.
-{ cp "$tmp/$BIN" "$dir/.$BIN.tmp" && chmod 755 "$dir/.$BIN.tmp" && mv -f "$dir/.$BIN.tmp" "$dir/$BIN"; } 2>/dev/null ||
+# The EXIT trap removes the copy if a step fails or the script is interrupted.
+partial="$dir/.$BIN.tmp"
+{ cp "$tmp/$BIN" "$partial" && chmod 755 "$partial" && mv -f "$partial" "$dir/$BIN"; } 2>/dev/null ||
   fail "could not write $dir/$BIN; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+partial=""
 
-installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run"
+# rudder-cli prints startup errors, such as a missing HOME, on stdout.
+installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run${installed:+: $installed}"
 echo "Installed $installed at $dir/$BIN"
 
+# A PATH entry may end in a slash, and then some shells print the binary as dir//rudder-cli.
 case ":$PATH:" in
-  *":$dir:"*)
+  *":$dir:"* | *":$dir/:"*)
     found=$(command -v "$BIN" || true)
-    if [ "$found" != "$dir/$BIN" ]; then
-      echo
-      echo "Warning: $found comes earlier on your PATH, so '$BIN' runs that copy. Remove it or move $dir ahead of it."
-    fi
+    case "$found" in
+      "$dir/$BIN" | "$dir//$BIN") ;;
+      *)
+        echo
+        echo "Warning: $found comes earlier on your PATH, so '$BIN' runs that copy. Remove it or move $dir ahead of it."
+        ;;
+    esac
     ;;
   *)
     case "${SHELL:-}" in
-      */zsh) profile="$HOME/.zshrc" ;;
-      */bash) profile="$HOME/.bashrc" ;;
-      *) profile="$HOME/.profile" ;;
+      */zsh) profile=".zshrc" ;;
+      */bash) profile=".bashrc" ;;
+      *) profile=".profile" ;;
     esac
     echo
-    echo "$dir is not on your PATH. Add this line to $profile, then open a new terminal:"
+    echo "$dir is not on your PATH. Add this line to ~/$profile, then open a new terminal:"
     echo "  export PATH=\"$dir:\$PATH\""
     ;;
 esac

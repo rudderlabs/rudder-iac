@@ -39,7 +39,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # macos-latest is arm64; macos-15-intel runs the Darwin_x86_64 archive.
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -76,4 +77,4 @@ jobs:
             echo "install.sh exited 0 for a release that does not exist"
             exit 1
           fi
-          test ! -e "$RUDDER_CLI_INSTALL_DIR/rudder-cli"
+          test ! -e "$RUDDER_CLI_INSTALL_DIR"
