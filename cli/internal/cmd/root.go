@@ -151,6 +151,7 @@ var rootCmd = &cobra.Command{
 		  2  validation failed — correct the specs and retry
 		  3  not authenticated, or the token lacks permission
 		  4  the API rejected or could not serve the request
+		  5  changes were not applied because confirmation was declined or unavailable; pass --confirm=false
 	`),
 	SilenceUsage:  true,
 	SilenceErrors: true, // We will handle errors directly in Execute

@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -14,6 +15,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 )
+
+// ErrNotConfirmed is returned when the plan has changes and the confirmation
+// step did not approve them. Nothing was applied. The confirmation is declined
+// without a prompt when there is no terminal to ask on, so a caller that means
+// to apply unattended has to pass --confirm=false. Returning nil here would
+// report a plan that was never applied as a success.
+var ErrNotConfirmed = errors.New("changes were not applied: confirmation was declined or no terminal is available to ask. Pass --confirm=false to apply without a prompt")
 
 type ProjectSyncer struct {
 	provider        SyncProvider
@@ -154,7 +162,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		}
 
 		if !confirm {
-			return nil
+			return []error{ErrNotConfirmed}
 		}
 	}
 
