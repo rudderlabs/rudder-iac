@@ -831,13 +831,13 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 		ct := c.ct
 		lead := fmt.Sprintf("%s represents the custom type %s", c.name, strconv.Quote(ct.Name))
 		if c.variant != nil {
-			if _, err := addVariant(ctx, registry, propertyTypes, c.name, lead, ct.Description, c.variant, false); err != nil {
+			if _, err := addVariant(ctx, registry, propertyTypes, c.name, lead, ct.Description, c.variant, ""); err != nil {
 				return err
 			}
 			continue
 		}
 		if c.schema != nil {
-			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
+			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, ""); err != nil {
 				return err
 			}
 			continue
@@ -910,14 +910,14 @@ func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[prop
 		return nil, fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
 	}
 	if r.variant != nil {
-		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s", name, strconv.Quote(event.Name)), "", r.variant, true)
+		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s", name, strconv.Quote(event.Name)), "", r.variant, "Properties")
 		if err != nil {
 			return nil, err
 		}
 		return &GoStruct{Name: name, Variant: v}, nil
 	}
 	if len(schema.Properties) > 0 {
-		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
+		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, "Properties")
 	}
 	payload := &GoStruct{
 		Name:     name,
@@ -932,8 +932,9 @@ func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[prop
 // hoisted fields need, depth-first in wire-key order, so each follows its
 // parent. Fields are named in byte order of their wire keys, after the names
 // the struct's own methods and its AdditionalProperties field already hold.
-// A payload struct also has ToProperties.
-func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload bool) (*GoStruct, error) {
+// A payload struct, whose payload is Properties or Traits, also has
+// To{payload}.
+func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload string) (*GoStruct, error) {
 	st := &GoStruct{Name: name, Doc: doc, Payload: payload, Open: s.open, DeclaredKeys: s.declared}
 	ctx.add(GoDecl{Struct: st})
 	ctx.UsesWithAdditional = ctx.UsesWithAdditional || s.open
@@ -942,8 +943,8 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 		scope    = "struct:" + name + ":fields"
 		reserved = []string{"MarshalJSON"}
 	)
-	if payload {
-		reserved = append(reserved, "ToProperties")
+	if payload != "" {
+		reserved = append(reserved, "To"+payload)
 	}
 	if s.open {
 		reserved = append(reserved, "AdditionalProperties")
@@ -1014,7 +1015,7 @@ func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 			return "", fmt.Errorf("mapping %s.%s: %w", parent, field, err)
 		}
 	}
-	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, false); err != nil {
+	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, ""); err != nil {
 		return "", err
 	}
 

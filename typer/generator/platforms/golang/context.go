@@ -54,8 +54,9 @@ type GoVariant struct {
 	// (value T, ok bool) when the discriminator is optional.
 	Result           string
 	DiscriminatorDoc string
-	// Payload interfaces also list ToProperties.
-	Payload bool
+	// Payload is set on payload interfaces, which also list To{Payload}, as
+	// GoStruct.Payload.
+	Payload string
 	// Implementations are the structs, in file order.
 	Implementations []string
 }
@@ -124,8 +125,10 @@ type GoStruct struct {
 	Name     string
 	Doc      string
 	MapAlias bool
-	// Payload structs also have ToProperties.
-	Payload bool
+	// Payload is set on event payloads: Properties, or Traits for identify
+	// and group. It names the To{Payload} method of a payload struct and the
+	// analytics map type it returns.
+	Payload string
 	// Open structs carry undeclared keys in AdditionalProperties.
 	Open bool
 	// DeclaredKeys are the wire keys the schema declares, which

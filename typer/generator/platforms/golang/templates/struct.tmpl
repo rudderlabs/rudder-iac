@@ -50,10 +50,10 @@ func (v {{ .Name }}) toMap() map[string]any {
 {{- end }}
 	return m
 }
-{{- if .Payload }}
+{{- with .Payload }}
 
-// ToProperties returns a deep copy of the properties as sent on the wire.
-func (v {{ .Name }}) ToProperties() (analytics.Properties, error) {
+// To{{ . }} returns a deep copy of the {{ lower . }} as sent on the wire.
+func (v {{ $.Name }}) To{{ . }}() (analytics.{{ . }}, error) {
 	return snapshot(v)
 }
 {{- end }}

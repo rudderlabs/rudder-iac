@@ -276,8 +276,9 @@ func isVariant(p plan.Property) bool {
 // addVariant adds the interface name of v, then the structs implementing it,
 // each followed by the types it hoists: the structs the base schema hoists,
 // Absent, the cases in match order, and Default. lead starts the interface's
-// doc comment; a payload interface also lists ToProperties.
-func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload bool) (*GoVariant, error) {
+// doc comment; a payload interface, whose payload is Properties or Traits,
+// also lists To{payload}.
+func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload string) (*GoVariant, error) {
 	iface := &GoVariant{Name: name, Key: v.key, Payload: payload}
 	ctx.add(GoDecl{Variant: iface})
 
