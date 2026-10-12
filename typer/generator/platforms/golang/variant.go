@@ -87,14 +87,10 @@ func (d matchDomain) allows(value any, text string) bool {
 	return slices.ContainsFunc(d.enum.values, func(v GoEnumValue) bool { return v.Text == text })
 }
 
-// coveredBy reports whether matched, the Go literals of the match values,
-// leaves no value for a Default: both booleans, or every value of an enum, of
-// a discriminator that cannot be null, which no case can match.
-func (d matchDomain) coveredBy(matched map[string]bool) bool {
-	switch {
-	case d.nullable:
-		return false
-	case d.enum != nil:
+// exhausts reports whether matched, the Go literals of the match values,
+// holds every non-null value: both booleans, or every value of an enum.
+func (d matchDomain) exhausts(matched map[string]bool) bool {
+	if d.enum != nil {
 		return !slices.ContainsFunc(d.enum.values, func(v GoEnumValue) bool { return !matched[v.Text] })
 	}
 	return slices.Equal(d.types, []plan.PropertyType{plan.PrimitiveTypeBoolean}) && matched["true"] && matched["false"]
@@ -160,7 +156,8 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 		}
 	}
 
-	if !d.coveredBy(matched) {
+	// No case can match null.
+	if d.nullable || !d.exhausts(matched) {
 		var err error
 		if v.dflt, err = res.branch(s, cmp.Or(vr.DefaultSchema, &plan.ObjectSchema{}), "the default schema", where); err != nil {
 			return nil, err
@@ -360,25 +357,33 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	return iface, nil
 }
 
-// defaultDocs returns the doc comment of the Default struct dflt and the note
-// on its discriminator field, naming the values it stands for: the enum
-// values no case matches, or any value but the matches.
-func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, dflt string) (doc, note string) {
-	if v.domain.enum == nil {
-		texts := make([]string, len(v.cases))
-		for i, c := range v.cases {
-			texts[i] = c.text
+// defaultDocs returns the doc comment of the Default struct defaultName and
+// the note on its discriminator field, naming the values it stands for: the
+// enum values no case matches, or any value but the matches, and null when
+// the discriminator is nullable.
+func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, defaultName string) (doc, note string) {
+	matched := map[string]bool{}
+	for _, c := range v.cases {
+		matched[c.text] = true
+	}
+	if v.domain.enum == nil && !v.domain.exhausts(matched) {
+		texts := slices.Sorted(maps.Keys(matched))
+		doc = fmt.Sprintf("%s is the default case of %s, for any %s other than %s", defaultName, name, v.key, joinList(texts, "and"))
+		note = "not " + joinList(texts, "or")
+		if v.domain.nullable {
+			doc, note = doc+", or null", note+", or null"
 		}
-		slices.Sort(texts)
-		return fmt.Sprintf("%s is the default case of %s, for any %s other than %s.", dflt, name, v.key, joinList(texts, "and")),
-			"not " + joinList(texts, "or")
+		return doc + ".", note
 	}
 
+	// Without an enum, the cases match both booleans, so only null is left.
 	var rest []string
-	for _, e := range v.domain.enum.values {
-		if !slices.ContainsFunc(v.cases, func(c variantCase) bool { return c.text == e.Text }) {
-			value, _ := spell(decls, typ, nil, e.Text)
-			rest = append(rest, value)
+	if v.domain.enum != nil {
+		for _, e := range v.domain.enum.values {
+			if !matched[e.Text] {
+				value, _ := spell(decls, typ, nil, e.Text)
+				rest = append(rest, value)
+			}
 		}
 	}
 	if v.domain.nullable {
@@ -388,7 +393,7 @@ func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, df
 	if len(rest) == 1 {
 		what = "the only value no case covers"
 	}
-	return fmt.Sprintf("%s is the default case of %s: %s is %s, %s.", dflt, name, v.key, joinList(rest, "or"), what),
+	return fmt.Sprintf("%s is the default case of %s: %s is %s, %s.", defaultName, name, v.key, joinList(rest, "or"), what),
 		"only " + joinList(rest, "or")
 }
 

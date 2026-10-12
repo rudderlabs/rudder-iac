@@ -196,45 +196,77 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 }
 
 // Default is left out only when the cases match every value the
-// discriminator can take, which a nullable one never allows.
+// discriminator can take, which a nullable one never allows. Its
+// discriminator's note names the values it stands for.
 func TestGenerateVariantDefault(t *testing.T) {
 	tests := []struct {
 		name    string
 		kind    plan.Property
 		matches [][]any
 		want    []string
+		note    string
 	}{
-		{"string", typed(onlyString...), [][]any{{"a"}, {"b"}}, []string{"CaseA", "CaseB", "Default"}},
-		{"boolean with both values matched", typed(plan.PrimitiveTypeBoolean), [][]any{{true}, {false}}, []string{"CaseTrue", "CaseFalse"}},
-		{"boolean with one value matched", typed(plan.PrimitiveTypeBoolean), [][]any{{true}}, []string{"CaseTrue", "Default"}},
-		{"nullable boolean with both values matched", typed(nullable(plan.PrimitiveTypeBoolean)...), [][]any{{true, false}}, []string{"CaseTrue", "CaseFalse", "Default"}},
+		{"string", typed(onlyString...), [][]any{{"a"}, {"b"}}, []string{"CaseA", "CaseB", "Default"}, `not "a" or "b"`},
+		{"nullable string", typed(nullable(plan.PrimitiveTypeString)...), [][]any{{"a"}}, []string{"CaseA", "Default"}, `not "a", or null`},
+		{"boolean with both values matched", typed(plan.PrimitiveTypeBoolean), [][]any{{true}, {false}}, []string{"CaseTrue", "CaseFalse"}, ""},
+		{"boolean with one value matched", typed(plan.PrimitiveTypeBoolean), [][]any{{true}}, []string{"CaseTrue", "Default"}, "not true"},
+		{
+			"nullable boolean with both values matched",
+			typed(nullable(plan.PrimitiveTypeBoolean)...),
+			[][]any{{true, false}},
+			[]string{"CaseTrue", "CaseFalse", "Default"},
+			"only null",
+		},
 		{
 			"boolean custom type with both values matched",
 			typed(plan.CustomType{Name: "flag", Type: plan.PrimitiveTypeBoolean}),
 			[][]any{{false}, {true}},
 			[]string{"CaseFalse", "CaseTrue"},
+			"",
 		},
-		{"enum with every value matched", enumProperty("kind", onlyString, "a", "b"), [][]any{{"b"}, {"a"}}, []string{"CaseB", "CaseA"}},
-		{"enum with a value left", enumProperty("kind", onlyString, "a", "b"), [][]any{{"a"}}, []string{"CaseA", "Default"}},
-		{"integer enum matched as written otherwise", enumProperty("kind", onlyInteger, 1, 2), [][]any{{json.Number("2.0"), 1.0}}, []string{"Case2", "Case1"}},
+		{"enum with every value matched", enumProperty("kind", onlyString, "a", "b"), [][]any{{"b"}, {"a"}}, []string{"CaseB", "CaseA"}, ""},
+		{"enum with a value left", enumProperty("kind", onlyString, "a", "b"), [][]any{{"a"}}, []string{"CaseA", "Default"}, "only PropertyKindB"},
+		{"integer enum matched as written otherwise", enumProperty("kind", onlyInteger, 1, 2), [][]any{{json.Number("2.0"), 1.0}}, []string{"Case2", "Case1"}, ""},
 		{
 			"enum custom type with every value matched",
 			typed(plan.CustomType{Name: "status", Type: plan.PrimitiveTypeString, Config: &plan.PropertyConfig{Enum: []any{"on", "off"}}}),
 			[][]any{{"on"}, {"off"}},
 			[]string{"CaseOn", "CaseOff"},
+			"",
 		},
-		{"nullable enum with every other value matched", enumProperty("kind", nullable(plan.PrimitiveTypeString), "a", nil), [][]any{{"a"}}, []string{"CaseA", "Default"}},
-		{"boolean and string union with both booleans matched", typed(plan.PrimitiveTypeBoolean, plan.PrimitiveTypeString), [][]any{{true}, {false}}, []string{"CaseTrue", "CaseFalse", "Default"}},
+		{
+			"nullable enum with every other value matched",
+			enumProperty("kind", nullable(plan.PrimitiveTypeString), "a", nil),
+			[][]any{{"a"}},
+			[]string{"CaseA", "Default"},
+			"only null",
+		},
+		{
+			"boolean and string union with both booleans matched",
+			typed(plan.PrimitiveTypeBoolean, plan.PrimitiveTypeString),
+			[][]any{{true}, {false}},
+			[]string{"CaseTrue", "CaseFalse", "Default"},
+			"not false or true",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			variant, _ := someEventVariant(t, variantPlan(tt.kind, discriminate(tt.matches...)))
-			got := make([]string, len(variant.Implementations))
+			variant, structs := someEventVariant(t, variantPlan(tt.kind, discriminate(tt.matches...)))
+			var (
+				got  = make([]string, len(variant.Implementations))
+				note string
+			)
 			for i, name := range variant.Implementations {
 				got[i] = strings.TrimPrefix(name, "TrackSomeEventProperties")
 			}
+			for _, st := range structs {
+				if st.Name == "TrackSomeEventPropertiesDefault" {
+					note = st.Fields[0].Note // the discriminator, its only field
+				}
+			}
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.note, note)
 		})
 	}
 }
