@@ -200,13 +200,18 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 	slices.SortStableFunc(all, func(a, b trackRule) int { return strings.Compare(a.key, b.key) })
 
 	var (
-		res   = &resolver{customTypes: map[string]*customType{}}
-		rules []trackRule
+		res    = &resolver{customTypes: map[string]*customType{}}
+		cycles = &cycleCheck{visited: map[string]bool{}}
+		rules  []trackRule
 	)
 	for _, r := range all {
-		// Names are checked before the skip check, so a rule or field left out
-		// for now still fails generation on a name no Go identifier can carry.
+		// Names and cycles are checked before the skip check, so a rule or
+		// field left out for now still fails generation on a name no Go
+		// identifier can carry or on a custom type that refers to itself.
 		if err := validateNames(r.rule); err != nil {
+			return nil, nil, err
+		}
+		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
@@ -245,8 +250,6 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 // custom types they reference, resolving each custom type once per name.
 type resolver struct {
 	customTypes map[string]*customType
-	// resolving holds the custom types being resolved, outermost first.
-	resolving []string
 }
 
 // schema returns the fields of s that pass the skip check, resolving the
@@ -306,16 +309,12 @@ func (res *resolver) unsupportedReason(p plan.Property) (string, error) {
 }
 
 // customType resolves ct, or returns the custom type of that name already
-// resolved. A custom type that refers to itself fails, naming the cycle.
+// resolved. The cycle check has rejected every custom type that refers to
+// itself, so the recursion ends.
 func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 	if c, ok := res.customTypes[ct.Name]; ok {
 		return c, nil
 	}
-	if i := slices.Index(res.resolving, ct.Name); i >= 0 {
-		return nil, fmt.Errorf("custom type %q refers to itself: %s → %s", ct.Name, strings.Join(res.resolving[i:], " → "), ct.Name)
-	}
-	res.resolving = append(res.resolving, ct.Name)
-	defer func() { res.resolving = res.resolving[:len(res.resolving)-1] }()
 
 	var (
 		c   = &customType{ct: ct}
@@ -383,6 +382,80 @@ func validateSchemaNames(schema plan.ObjectSchema, where string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// cycleCheck rejects a custom type that refers to itself, reached through
+// any rule, variant, nested schema or array item, and fails with the first
+// cycle in rule-key and wire-key order. Every rule shares one check, so each
+// custom type is visited once.
+type cycleCheck struct {
+	// path holds the custom types being visited, outermost first.
+	path    []string
+	visited map[string]bool
+}
+
+func (c *cycleCheck) rule(rule *plan.EventRule) error {
+	if err := c.schema(&rule.Schema); err != nil {
+		return err
+	}
+	return c.variants(rule.Variants)
+}
+
+func (c *cycleCheck) schema(s *plan.ObjectSchema) error {
+	if s == nil {
+		return nil
+	}
+	for _, wireKey := range slices.Sorted(maps.Keys(s.Properties)) {
+		ps := s.Properties[wireKey]
+		for _, t := range slices.Concat(ps.Property.Types, ps.Property.ItemTypes) {
+			if err := c.customType(plan.AsCustomType(t)); err != nil {
+				return err
+			}
+		}
+		if err := c.schema(ps.Schema); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *cycleCheck) variants(variants []plan.Variant) error {
+	for _, v := range variants {
+		for i := range v.Cases {
+			if err := c.schema(&v.Cases[i].Schema); err != nil {
+				return err
+			}
+		}
+		if err := c.schema(v.DefaultSchema); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// customType checks ct, when it is set, and the custom types it refers to.
+func (c *cycleCheck) customType(ct *plan.CustomType) error {
+	if ct == nil || c.visited[ct.Name] {
+		return nil
+	}
+	if i := slices.Index(c.path, ct.Name); i >= 0 {
+		return fmt.Errorf("custom type %q refers to itself: %s → %s", ct.Name, strings.Join(c.path[i:], " → "), ct.Name)
+	}
+	c.path = append(c.path, ct.Name)
+	if err := c.schema(ct.Schema); err != nil {
+		return err
+	}
+	if err := c.variants(ct.Variants); err != nil {
+		return err
+	}
+	if err := c.customType(plan.AsCustomType(ct.ItemType)); err != nil {
+		return err
+	}
+	c.path = c.path[:len(c.path)-1]
+	// Only a custom type checked to the end is skipped later: one still on
+	// the path is the cycle.
+	c.visited[ct.Name] = true
 	return nil
 }
 

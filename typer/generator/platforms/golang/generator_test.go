@@ -321,7 +321,8 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 
 // A custom type that refers to itself, through any path, fails generation
 // with an error naming the cycle, found by the first reference in rule-key and
-// wire-key order.
+// wire-key order. Cycles are checked before the skip check, so one that only
+// a rule or field left out for now reaches fails too.
 func TestGenerateRejectsRecursiveCustomTypes(t *testing.T) {
 	object := func(name string) *plan.CustomType {
 		return &plan.CustomType{Name: name, Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}}
@@ -332,6 +333,10 @@ func TestGenerateRejectsRecursiveCustomTypes(t *testing.T) {
 	}
 	typed := func(types ...plan.PropertyType) plan.PropertySchema {
 		return plan.PropertySchema{Property: plan.Property{Types: types}}
+	}
+	schema := func(key string, ps plan.PropertySchema) *plan.ObjectSchema {
+		ps.Property.Name = key
+		return &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{key: ps}}
 	}
 
 	tests := []struct {
@@ -380,6 +385,39 @@ func TestGenerateRejectsRecursiveCustomTypes(t *testing.T) {
 				items.Property.Name, items.Property.ItemTypes = "items", []plan.PropertyType{a}
 				nested.Schema.Properties["items"] = items
 				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{a}})
+			},
+			wantErr: `custom type "a" refers to itself: a → a`,
+		},
+		{
+			name: "only from an identify rule",
+			plan: func() *plan.TrackingPlan {
+				a, b := object("a"), object("b")
+				refer(a, "b", typed(b))
+				refer(b, "a", typed(a))
+				p := golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{a}})
+				p.Rules[0].Event, p.Rules[0].Section = plan.Event{EventType: plan.EventTypeIdentify}, plan.IdentitySectionTraits
+				return p
+			},
+			wantErr: `custom type "a" refers to itself: a → b → a`,
+		},
+		{
+			name: "through a variant custom type",
+			plan: func() *plan.TrackingPlan {
+				a, kind := object("a"), object("kind")
+				kind.Variants = []plan.Variant{{Discriminator: "type", Cases: []plan.VariantCase{{Match: []any{"x"}, Schema: *schema("a", typed(a))}}}}
+				refer(a, "kind", typed(kind))
+				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{kind}})
+			},
+			wantErr: `custom type "kind" refers to itself: kind → a → kind`,
+		},
+		{
+			name: "only from a rule's variant",
+			plan: func() *plan.TrackingPlan {
+				a := object("a")
+				refer(a, "self", typed(a))
+				p := golang.TrackPlan()
+				p.Rules[0].Variants = []plan.Variant{{Discriminator: "type", DefaultSchema: schema("value", typed(a))}}
+				return p
 			},
 			wantErr: `custom type "a" refers to itself: a → a`,
 		},
