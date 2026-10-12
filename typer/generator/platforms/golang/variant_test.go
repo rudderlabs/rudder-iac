@@ -76,6 +76,12 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			"meta": object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}}),
 		}}))
 		defaultConflict = variantPlan(typed(onlyString...), discriminate([]any{"a"}))
+		variantType     = plan.CustomType{Name: "meta", Type: plan.PrimitiveTypeObject, Variants: []plan.Variant{discriminate([]any{"a"})}, Schema: &plan.ObjectSchema{
+			Properties: map[string]plan.PropertySchema{
+				"$$":   {Property: plan.Property{Name: "$$", Types: onlyString}},
+				"kind": {Property: plan.Property{Name: "kind", Types: onlyString}, Required: true},
+			},
+		}}
 	)
 	nestedConflict.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
 	defaultConflict.Rules[0].Variants[0].DefaultSchema = &plan.ObjectSchema{Properties: redefine(typed(onlyInteger...)).Properties}
@@ -165,6 +171,18 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			name:    "two variants entries",
 			plan:    variantPlan(typed(plan.PrimitiveTypeBoolean), discriminate([]any{true}), discriminate([]any{false})),
 			wantErr: `mapping the variants of track event "Some Event": found 2 variants entries; a rule or custom type may have one`,
+		},
+		{
+			name: "a case property without words",
+			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"$$": {Property: plan.Property{Name: "$$", Types: onlyString}},
+			}})),
+			wantErr: `naming property "$$" of case ["a"] of the variants of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			name:    "a variant custom type's base property without words",
+			plan:    trackPlan(plan.Property{Name: "meta", Types: []plan.PropertyType{variantType}}),
+			wantErr: `naming property "$$" of custom type "meta": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
 			name:         "an open case under a closed base",

@@ -207,6 +207,26 @@ func sameDefinition(a, b plan.PropertySchema) bool {
 	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema)
 }
 
+// validateVariantNames checks the names in the case and default schemas of
+// variants, which belong to where, as validateSchemaNames does in a base
+// schema.
+func validateVariantNames(variants []plan.Variant, where string) error {
+	for _, vr := range variants {
+		for _, vc := range vr.Cases {
+			if err := validateSchemaNames(vc.Schema, fmt.Sprintf("case %s of the variants of %s", jsonText(vc.Match), where)); err != nil {
+				return err
+			}
+		}
+		if vr.DefaultSchema == nil {
+			continue
+		}
+		if err := validateSchemaNames(*vr.DefaultSchema, "the default schema of the variants of "+where); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func withoutField(fields []ruleField, key string) []ruleField {
 	return slices.DeleteFunc(slices.Clone(fields), func(f ruleField) bool { return f.wireKey == key })
 }

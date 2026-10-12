@@ -327,6 +327,13 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 			where = fmt.Sprintf("custom type %q", ct.Name)
 			s     = cmp.Or(ct.Schema, &plan.ObjectSchema{})
 		)
+		// Names are checked first, as in rules.
+		if err := validateSchemaNames(*s, where); err != nil {
+			return nil, err
+		}
+		if err := validateVariantNames(ct.Variants, where); err != nil {
+			return nil, err
+		}
 		base, err := res.schema(s, where, "")
 		if err != nil {
 			return nil, err
@@ -365,7 +372,11 @@ func validateNames(rule *plan.EventRule) error {
 			return fmt.Errorf("naming %s event %q: %w", event.EventType, event.Name, err)
 		}
 	}
-	return validateSchemaNames(rule.Schema, fmt.Sprintf("%s event %q", event.EventType, event.Name))
+	where := fmt.Sprintf("%s event %q", event.EventType, event.Name)
+	if err := validateSchemaNames(rule.Schema, where); err != nil {
+		return err
+	}
+	return validateVariantNames(rule.Variants, where)
 }
 
 // validateSchemaNames checks the properties of schema, which belongs to where,
