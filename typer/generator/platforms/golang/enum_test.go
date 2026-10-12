@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -175,17 +176,21 @@ func TestEnumConstantNames(t *testing.T) {
 }
 
 // Enum constants and {Type}Values functions are registered after every type
-// name, {Type}Values first, so only they take collision suffixes.
+// name, and every {Type}Values before any constant, so a colliding constant
+// takes the suffix.
 func TestEnumNameCollisions(t *testing.T) {
-	status := func(values ...GoEnumValue) GoPropertyType {
+	stringEnum := func(name, property string, values ...GoEnumValue) GoPropertyType {
 		return GoPropertyType{Enum: &GoEnum{
-			Name:       "PropertyStatus",
-			Doc:        `PropertyStatus represents the property "status".`,
+			Name:       name,
+			Doc:        name + " represents the property " + strconv.Quote(property) + ".",
 			Base:       "string",
-			ConstDoc:   "Allowed values of PropertyStatus.",
-			ValuesFunc: "PropertyStatusValues",
+			ConstDoc:   "Allowed values of " + name + ".",
+			ValuesFunc: name + "Values",
 			Values:     values,
 		}}
+	}
+	status := func(values ...GoEnumValue) GoPropertyType {
+		return stringEnum("PropertyStatus", "status", values...)
 	}
 	tests := []struct {
 		name       string
@@ -220,6 +225,17 @@ func TestEnumNameCollisions(t *testing.T) {
 					Doc:  `PropertyStatusActive represents the property "statusActive".`,
 					Type: "string",
 				}},
+			},
+		},
+		{
+			name: "a value named like another enum's Values function",
+			properties: []plan.Property{
+				enumProperty("a", stringType, "bValues"),
+				enumProperty("aB", stringType, "x"),
+			},
+			want: []GoPropertyType{
+				stringEnum("PropertyA", "a", GoEnumValue{Name: "PropertyABValues1", Text: `"bValues"`, Expr: `"bValues"`}),
+				stringEnum("PropertyAB", "aB", GoEnumValue{Name: "PropertyABX", Text: `"x"`, Expr: `"x"`}),
 			},
 		},
 	}

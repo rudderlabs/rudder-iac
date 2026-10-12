@@ -121,7 +121,7 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		}
 	}
 
-	if err := addConstructors(ctx, registry); err != nil {
+	if err := registerValueNames(ctx, registry); err != nil {
 		return nil, err
 	}
 
@@ -419,7 +419,7 @@ var unionMembers = []struct {
 
 // addUnion adds the union name of two or more non-null types, after any union
 // its array member's items need. lead starts its doc comment. Its constructor
-// names are registered later, by addConstructors.
+// names are registered later, by registerValueNames.
 func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, description string, types, items []plan.PropertyType) error {
 	for _, t := range types {
 		if ct := plan.AsCustomType(t); ct != nil {
@@ -466,12 +466,12 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 	return nil
 }
 
-// addConstructors registers the union constructors, and each enum's
-// {Type}Values function before its constants or value functions. It is the
-// second registration pass, for the functions and constants named from plan
-// data: it runs after every type name is registered, so none of them can take
-// a type's name.
-func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
+// registerValueNames is the second registration pass, for the functions and
+// constants named from plan data: every enum's {Type}Values function, then the
+// union constructors and enum constants or value functions. It runs after
+// every type name is registered, so none of them can take a type's name, and
+// a constant cannot take another enum's {Type}Values.
+func registerValueNames(ctx *GoContext, registry *core.NameRegistry) error {
 	register := func(id string, name *string) error {
 		registered, err := registry.RegisterName(id, packageScope, *name)
 		if err != nil {
@@ -479,6 +479,13 @@ func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
 		}
 		*name = registered
 		return nil
+	}
+	for _, pt := range ctx.PropertyTypes {
+		if e := pt.Enum; e != nil {
+			if err := register("values:"+e.Name, &e.ValuesFunc); err != nil {
+				return err
+			}
+		}
 	}
 	for _, pt := range ctx.PropertyTypes {
 		if u := pt.Union; u != nil {
@@ -489,9 +496,6 @@ func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
 			}
 		}
 		if e := pt.Enum; e != nil {
-			if err := register("values:"+e.Name, &e.ValuesFunc); err != nil {
-				return err
-			}
 			for i := range e.Values {
 				if err := register(fmt.Sprintf("value:%s:%d", e.Name, i), &e.Values[i].Name); err != nil {
 					return err

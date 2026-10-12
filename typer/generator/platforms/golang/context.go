@@ -48,7 +48,7 @@ type GoUnion struct {
 
 // GoUnionMember is the constructor of one union member.
 type GoUnionMember struct {
-	// Name is the candidate New{Union}{Member} until addConstructors replaces
+	// Name is the candidate New{Union}{Member} until registerValueNames replaces
 	// it with the registered name, after every type name is registered.
 	Name string
 	// Doc follows Name in the constructor's doc comment.
@@ -67,7 +67,7 @@ type GoEnum struct {
 	Base string
 	// ConstDoc heads the constants.
 	ConstDoc string
-	// ValuesFunc is the candidate {Name}Values until addConstructors replaces
+	// ValuesFunc is the candidate {Name}Values until registerValueNames replaces
 	// it with the registered name.
 	ValuesFunc string
 	Values     []GoEnumValue
@@ -75,7 +75,7 @@ type GoEnum struct {
 
 // GoEnumValue is the constant, or the value function, of one enum value.
 type GoEnumValue struct {
-	// Name is the candidate {Enum}{Value} until addConstructors replaces it
+	// Name is the candidate {Enum}{Value} until registerValueNames replaces it
 	// with the registered name.
 	Name string
 	// Text is the value as Go source writes it: "a", 1, 2.5 or true.
