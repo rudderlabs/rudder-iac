@@ -40,7 +40,7 @@ props := ruddertyper.TrackSomeTrackEventProperties{
 
 - A property that is one type or `null` is a `Nullable[T]`, whose zero value is `null`. Build a value with `NewNullable[T](v)` and write `T` out: `NewNullable(1)` is a `Nullable[int]`, not a `Nullable[int64]` ([Nullable Types][spec], [Discriminator Values][spec]).
 - Multi-type values come from their `New{Type}{Member}` constructors ([Multi-Type Properties][spec]), and enum values from their typed constants, or for a mixed enum from its value functions ([Enums][spec]).
-- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. The `Default` struct takes any other discriminator value ([Custom Type with Variants][spec], [Event Rule with Variants][spec]).
+- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. When generated, the `Default` struct takes any other discriminator value; a boolean or enum discriminator whose cases cover every value gets none ([Variant Rules][spec], [Custom Type with Variants][spec], [Event Rule with Variants][spec]).
 
 ```go
 err := rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesCaseMobile{OsVersion: "17.1", AppVersion: "2.0"})
@@ -72,7 +72,7 @@ func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
 
 ## Options
 
-- Every method ends in `opts ...Option`: `WithAnalyticsContext`, `WithIntegrations`, `WithTimestamp`, `WithMessageID` and `WithCategory`. They apply in order, so a later option overrides an earlier one of the same kind ([Call Options][spec]).
+- Every method ends in `opts ...Option`: `WithAnalyticsContext` sets the event context, `WithIntegrations` selects destinations, `WithTimestamp` sets `originalTimestamp`, `WithMessageID` sets `messageId`, and `WithCategory` sets the page or screen category. They apply in order, so a later option overrides an earlier one of the same kind ([Call Options][spec]).
 
 ```go
 // Category + name + properties + options
