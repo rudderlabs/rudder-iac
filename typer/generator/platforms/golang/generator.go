@@ -250,6 +250,11 @@ func unsupportedReason(ps plan.PropertySchema) string {
 	switch {
 	case ps.Schema != nil:
 		return "nested object schemas"
+	// With an enum, a union with a custom member waits for custom types: the
+	// enum beats the declared types, so addUnion would not reject the member,
+	// and the effective enum would drop the values only the custom type allows.
+	case customUnion(p.Types) && p.Config != nil && len(p.Config.Enum) > 0:
+		return "custom types"
 	// A union with a custom member, of the property's types or of its item
 	// types, fails generation instead (addUnion).
 	case customUnion(p.Types), customUnion(p.ItemTypes):

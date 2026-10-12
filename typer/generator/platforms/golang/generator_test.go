@@ -245,7 +245,8 @@ func captureWarnings(t *testing.T) *[]string {
 // A custom type cannot be a union member, as in Kotlin and Swift, whether the
 // union holds the property or its array items. With one non-null type it is a
 // nullable custom type, or an array of them, left out until custom types are
-// generated.
+// generated. So is a union with a custom member and an enum, whose effective
+// enum depends on the custom type.
 func TestGenerateCustomTypeInUnion(t *testing.T) {
 	var (
 		email = plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
@@ -256,6 +257,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		name         string
 		types        []plan.PropertyType
 		items        []plan.PropertyType
+		config       *plan.PropertyConfig
 		wantErr      string
 		wantWarnings []string
 	}{
@@ -282,6 +284,12 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 			wantErr: `mapping property "contact": mapping the item types of PropertyContact: custom type "email" cannot be a member of a multi-type union`,
 		},
 		{
+			name:         "union member with an enum",
+			types:        []plan.PropertyType{plan.PrimitiveTypeInteger, email},
+			config:       &plan.PropertyConfig{Enum: []any{"x@y", 1}},
+			wantWarnings: []string{`skipping property "contact" (custom:email|integer) of track event "Some Event": Go generation does not support custom types yet`},
+		},
+		{
 			name:         "nullable custom type",
 			types:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
 			wantWarnings: []string{`skipping property "contact" (custom:email|null) of track event "Some Event": Go generation does not support custom types yet`},
@@ -304,7 +312,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			warnings := captureWarnings(t)
 
-			_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
+			_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items, Config: tt.config}), core.GenerateOptions{}, nil)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return
