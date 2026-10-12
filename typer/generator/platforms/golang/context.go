@@ -13,6 +13,8 @@ type GoContext struct {
 	UsesNull           bool
 	UsesNullable       bool
 	UsesWithAdditional bool
+	// UsesRequired is set when a struct has a required variant field.
+	UsesRequired bool
 	// QuickStart is the method the package doc calls; nil when there is none.
 	QuickStart *GoMethod
 	// The type sections, in file order. Each type is followed by the types it
@@ -23,16 +25,39 @@ type GoContext struct {
 	Methods       []GoMethod
 	// out is the section that add appends to.
 	out *[]GoDecl
+	// afterValueNames finish the variant code that spells enum constants and
+	// union constructors, once registerValueNames has named them. Each gets
+	// the aliases, enums and unions by name.
+	afterValueNames []func(decls map[string]GoDecl)
 }
 
 func (ctx *GoContext) add(d GoDecl) { *ctx.out = append(*ctx.out, d) }
 
-// GoDecl is one type declaration: an alias, a union, an enum or a struct.
+// GoDecl is one type declaration: an alias, a union, an enum, a struct or a
+// variant interface.
 type GoDecl struct {
-	Alias  *GoTypeAlias
-	Union  *GoUnion
-	Enum   *GoEnum
-	Struct *GoStruct
+	Alias   *GoTypeAlias
+	Union   *GoUnion
+	Enum    *GoEnum
+	Struct  *GoStruct
+	Variant *GoVariant
+}
+
+// GoVariant is the sealed interface of a discriminated union, which only its
+// case, Absent and Default structs implement.
+type GoVariant struct {
+	Name string
+	Doc  string
+	// Key is the discriminator's wire key.
+	Key string
+	// Result is what Discriminator returns: the discriminator's type, or
+	// (value T, ok bool) when the discriminator is optional.
+	Result           string
+	DiscriminatorDoc string
+	// Payload interfaces also list ToProperties.
+	Payload bool
+	// Implementations are the structs, in file order.
+	Implementations []string
 }
 
 // GoTypeAlias is a `type Name = Type` declaration.
@@ -107,6 +132,17 @@ type GoStruct struct {
 	// AdditionalProperties can never supply, including those of skipped fields.
 	DeclaredKeys []string
 	Fields       []GoField
+	// Variant is the interface that a case, Absent or Default struct
+	// implements. A method's payload that is a variant interface is a
+	// GoStruct naming it, with Variant set to it.
+	Variant *GoVariant
+	// DiscriminatorDoc documents the Discriminator method, which returns
+	// Returns.
+	DiscriminatorDoc string
+	Returns          string
+	// Sends is the discriminator value a case's toMap writes; empty for
+	// Absent, which sends none, and Default, whose field holds it.
+	Sends string
 }
 
 // GoField is a struct field, in byte order of its wire key.
@@ -118,6 +154,11 @@ type GoField struct {
 	Type     string
 	Required bool
 	Pointer  bool
+	// Variant fields hold a variant interface, whose nil and typed-nil
+	// values toMap must catch itself.
+	Variant bool
+	// Note follows "required" or "optional" in the field's comment.
+	Note string
 }
 
 // GoMethod is an event method on RudderTyperAnalytics.

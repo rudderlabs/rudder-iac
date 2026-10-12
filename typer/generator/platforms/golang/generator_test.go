@@ -23,15 +23,7 @@ var referenceWarnings = []string{
 	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
 	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
 	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-	`ignoring the variants of track event "Event With Variants": Go generation does not support variants yet`,
-	`skipping property "page_context" (custom:page_context) of track event "Event With Variants": Go generation does not support variants yet`,
-	`skipping property "feature_config" (custom:feature_config) of track event "User Signed Up": Go generation does not support variants yet`,
-	`skipping property "user_access" (custom:user_access) of track event "User Signed Up": Go generation does not support variants yet`,
 }
-
-// variantType is a custom type the generator leaves out until it supports
-// variants, and every field that needs it with it.
-var variantType = plan.CustomType{Name: "kind", Type: plan.PrimitiveTypeObject, Variants: []plan.Variant{{Discriminator: "type"}}}
 
 func TestGenerateGoldens(t *testing.T) {
 	wantWarnings := map[string][]string{
@@ -85,17 +77,16 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		return map[string]plan.PropertySchema{name: p}
 	}
 	var (
-		stringSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		skippedSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{variantType}}}
-		customSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
-		nestedSchema  = plan.PropertySchema{
+		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
+		nestedSchema = plan.PropertySchema{
 			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
 			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
 		}
 		objectSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{
 			Name:   "profile",
 			Type:   plan.PrimitiveTypeObject,
-			Schema: &plan.ObjectSchema{Properties: property("$$", skippedSchema)},
+			Schema: &plan.ObjectSchema{Properties: property("$$", stringSchema)},
 		}}}}
 	)
 
@@ -128,11 +119,6 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
-			"skipped property without words",
-			trackEvent("Some Event", property("$$", skippedSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
-		},
-		{
 			"custom type without words",
 			trackEvent("Some Event", property("kind", customSchema)),
 			`naming custom type "!!!" of property "kind": name "!!!" has no letters or digits to build a Go identifier from`,
@@ -158,10 +144,7 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 }
 
 func TestGenerateQuickStart(t *testing.T) {
-	var (
-		stringProperty  = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		skippedProperty = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{variantType}}}
-	)
+	stringProperty := plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
 	rule := func(event string, properties map[string]plan.PropertySchema) plan.EventRule {
 		return plan.EventRule{
 			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
@@ -169,6 +152,8 @@ func TestGenerateQuickStart(t *testing.T) {
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}
 	}
+	variantRule := rule("A", map[string]plan.PropertySchema{"name": {Property: stringProperty.Property, Required: true}})
+	variantRule.Variants = []plan.Variant{{Discriminator: "name", Cases: []plan.VariantCase{{Match: []any{"on"}}}}}
 
 	tests := []struct {
 		name  string
@@ -176,13 +161,13 @@ func TestGenerateQuickStart(t *testing.T) {
 		want  string
 	}{
 		{
-			"payload that declares only skipped properties before one with an emitted field",
-			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": skippedProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
-			"//\terr := rt.TrackA(\n",
+			"variant payload, built from the first struct implementing it",
+			[]plan.EventRule{variantRule, rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			"//\terr := rt.TrackA(\n//\t\truddertyper.Identity{UserID: \"user-123\"},\n//\t\truddertyper.TrackAPropertiesCaseOn{ /* ... */ },\n",
 		},
 		{
 			"payload that declares a property before one without properties",
-			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": skippedProperty})},
+			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
 			"//\terr := rt.TrackB(\n",
 		},
 		{
@@ -203,62 +188,6 @@ func TestGenerateQuickStart(t *testing.T) {
 			assert.Contains(t, files[0].Content, tt.want)
 		})
 	}
-}
-
-// A skipped property is still declared, so AdditionalProperties cannot supply it.
-func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
-	warnings := captureWarnings(t)
-	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
-		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
-		Section: plan.IdentitySectionProperties,
-		Schema: plan.ObjectSchema{
-			AdditionalProperties: true,
-			Properties: map[string]plan.PropertySchema{
-				"name": {Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
-				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{variantType}}},
-			},
-		},
-	}}}
-
-	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-
-	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
-	assert.Equal(t, []string{`skipping property "kind" (custom:kind) of track event "Some Event": Go generation does not support variants yet`}, *warnings)
-}
-
-// The skip check applies at every level, and the warning names where the
-// field lives. An array custom type needs what its items need.
-func TestGenerateSkipsUnsupportedFieldsAtEveryLevel(t *testing.T) {
-	warnings := captureWarnings(t)
-	var (
-		kind   = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{variantType}}}
-		object = func(name string, properties map[string]plan.PropertySchema) plan.PropertySchema {
-			return plan.PropertySchema{
-				Property: plan.Property{Name: name, Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
-				Schema:   &plan.ObjectSchema{Properties: properties},
-			}
-		}
-		profile = plan.CustomType{Name: "profile", Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": kind}}}
-		kinds   = plan.CustomType{Name: "kinds", Type: plan.PrimitiveTypeArray, ItemType: variantType}
-	)
-	p := golang.TrackPlan(
-		plan.Property{Name: "profile", Types: []plan.PropertyType{profile}},
-		plan.Property{Name: "kinds", Types: []plan.PropertyType{kinds}},
-	)
-	p.Rules[0].Schema.Properties["context"] = object("context", map[string]plan.PropertySchema{
-		"inner": object("inner", map[string]plan.PropertySchema{"kind": kind}),
-	})
-
-	_, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{
-		`skipping property "context.inner.kind" (custom:kind) of track event "Some Event": Go generation does not support variants yet`,
-		`skipping property "kinds" (custom:kinds) of track event "Some Event": Go generation does not support variants yet`,
-		`skipping property "kind" (custom:kind) of custom type "profile": Go generation does not support variants yet`,
-	}, *warnings)
 }
 
 func captureWarnings(t *testing.T) *[]string {

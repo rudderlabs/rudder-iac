@@ -58,6 +58,8 @@ type trackRule struct {
 	key    string
 	rule   *plan.EventRule
 	schema *objectSchema
+	// variant is set when the rule has variants; schema is then their base.
+	variant *variantSchema
 }
 
 // objectSchema is an object schema with the fields that pass the skip check,
@@ -79,6 +81,9 @@ type ruleField struct {
 	// nested is the field's object schema when it is hoisted into a struct of
 	// its own; nil when the field takes its Property{Name} type.
 	nested *objectSchema
+	// hoisted is the type a variant's base schema has already hoisted from
+	// nested, which a branch shares.
+	hoisted string
 }
 
 // customType is a custom type that a kept field references.
@@ -87,6 +92,8 @@ type customType struct {
 	name string
 	// schema is set for an object custom type generated as a struct.
 	schema *objectSchema
+	// variant is set for a custom type with variants instead.
+	variant *variantSchema
 	// reason names the construct the custom type needs that the generator
 	// does not support yet; empty when it can be generated.
 	reason string
@@ -144,9 +151,15 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		if c.schema != nil {
 			schemas = append(schemas, c.schema)
 		}
+		if c.variant != nil {
+			schemas = append(schemas, c.variant.schemas()...)
+		}
 	}
 	for _, r := range rules {
 		schemas = append(schemas, r.schema)
+		if r.variant != nil {
+			schemas = append(schemas, r.variant.schemas()...)
+		}
 	}
 
 	propertyTypes, err := addPropertyTypes(ctx, schemas, registry)
@@ -167,6 +180,7 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	if err := registerValueNames(ctx, registry); err != nil {
 		return nil, err
 	}
+	finishVariants(ctx)
 
 	ctx.QuickStart = quickStart(ctx.Methods)
 	return ctx, nil
@@ -224,12 +238,12 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 			core.Warn(fmt.Sprintf("skipping track event %q: section %q is not valid for track events", event.Name, r.rule.Section))
 			continue
 		}
-		if len(r.rule.Variants) > 0 {
-			core.Warn(fmt.Sprintf("ignoring the variants of track event %q: Go generation does not support variants yet", event.Name))
-		}
 
 		var err error
 		if r.schema, err = res.schema(&r.rule.Schema, fmt.Sprintf("track event %q", event.Name), ""); err != nil {
+			return nil, nil, err
+		}
+		if r.variant, err = res.variant(&r.rule.Schema, r.schema, r.rule.Variants, fmt.Sprintf("track event %q", event.Name)); err != nil {
 			return nil, nil, err
 		}
 		rules = append(rules, r)
@@ -322,7 +336,17 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 	)
 	switch {
 	case len(ct.Variants) > 0:
-		c.reason = "variants"
+		var (
+			where = fmt.Sprintf("custom type %q", ct.Name)
+			s     = cmp.Or(ct.Schema, &plan.ObjectSchema{})
+		)
+		base, err := res.schema(s, where, "")
+		if err != nil {
+			return nil, err
+		}
+		if c.variant, err = res.variant(s, base, ct.Variants, where); err != nil {
+			return nil, err
+		}
 	case ct.Type == plan.PrimitiveTypeArray:
 		if c.reason, err = res.unsupportedReason(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
 			return nil, err
@@ -585,8 +609,9 @@ func memberType(ctx *GoContext, registry *core.NameRegistry, owner string, t pla
 		if err != nil {
 			return "", false, err
 		}
-		// Array custom types are slices, and object ones without a struct maps.
-		nilable := ct.Type == plan.PrimitiveTypeArray || ct.Type == plan.PrimitiveTypeObject && !isStruct(ct.Schema)
+		// Array custom types are slices, object ones without a struct maps, and
+		// ones with variants interfaces.
+		nilable := ct.Type == plan.PrimitiveTypeArray || ct.Type == plan.PrimitiveTypeObject && !isStruct(ct.Schema) || len(ct.Variants) > 0
 		return name, nilable, nil
 	}
 	switch t {
@@ -807,6 +832,12 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 	for _, c := range customTypes {
 		ct := c.ct
 		lead := fmt.Sprintf("%s represents the custom type %s", c.name, strconv.Quote(ct.Name))
+		if c.variant != nil {
+			if _, err := addVariant(ctx, registry, propertyTypes, c.name, lead, ct.Description, c.variant, false); err != nil {
+				return err
+			}
+			continue
+		}
 		if c.schema != nil {
 			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
 				return err
@@ -852,6 +883,8 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 		summary = fmt.Sprintf("%s sends the track event %s, which has no properties.", method, strconv.Quote(event.Name))
 	case payload.MapAlias:
 		summary += " props may be nil; it is copied, so it can be reused after the call."
+	case payload.Variant != nil:
+		summary += " props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload."
 	}
 	ctx.Methods = append(ctx.Methods, GoMethod{
 		Name:    method,
@@ -877,6 +910,10 @@ func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[prop
 	name, err := registry.RegisterName("payload:"+r.key, packageScope, "Track"+base+"Properties")
 	if err != nil {
 		return nil, fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
+	}
+	if r.variant != nil {
+		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s", name, strconv.Quote(event.Name)), "", r.variant, true)
+		return &GoStruct{Name: name, Variant: v}, err
 	}
 	if len(schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
@@ -927,6 +964,9 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 		}
 
 		pt := propertyTypes[keyOf(f)]
+		if f.hoisted != "" {
+			f.nested, pt = nil, propertyType{name: f.hoisted}
+		}
 		if f.nested != nil {
 			typ, err := addNested(ctx, registry, propertyTypes, name, field, f)
 			if err != nil {
@@ -935,7 +975,8 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 			// A hoisted struct, a Nullable of one and a union cannot be nil.
 			pt = propertyType{name: typ}
 		}
-		goField := GoField{Name: field, Key: f.wireKey, Type: pt.name, Required: f.ps.Required}
+		goField := GoField{Name: field, Key: f.wireKey, Type: pt.name, Required: f.ps.Required, Variant: isVariant(f.ps.Property)}
+		ctx.UsesRequired = ctx.UsesRequired || goField.Variant && goField.Required
 		// Optional fields need an absent state; slices, maps and interfaces
 		// already have one in nil.
 		if !f.ps.Required && !pt.nilable {
