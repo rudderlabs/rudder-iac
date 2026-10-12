@@ -151,16 +151,18 @@ func TestGenerateEventTypes(t *testing.T) {
 			want:  []string{"type PageProductPageProperties struct", method("PageProductPage(identity Identity, name string, props *PageProductPageProperties, opts ...Option)")},
 		},
 		{
-			name: "two identify rules, one per section: the second in rule-key order takes the suffix",
+			// The shapes differ so that the row fails if the suffix follows
+			// the plan's order instead.
+			name: "two identify rules, one per section: traits, second in rule-key order, takes the suffix",
 			rules: append(
-				declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits)),
+				open(rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits)),
 				declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionContextTraits))...,
 			),
 			want: []string{
 				"type IdentifyTraits struct",
-				"type IdentifyTraits1 struct",
+				"type IdentifyTraits1 = map[string]any",
 				method("Identify(identity Identity, traits *IdentifyTraits, opts ...Option)"),
-				method("Identify1(identity Identity, traits *IdentifyTraits1, opts ...Option)"),
+				method("Identify1(identity Identity, traits IdentifyTraits1, opts ...Option)"),
 			},
 		},
 		{
