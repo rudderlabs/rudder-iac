@@ -112,11 +112,13 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"statusActive": optional(property("statusActive", "", plan.PrimitiveTypeBoolean)),
 			}),
 			// Custom type shapes the reference plan lacks. grid's items are a
-			// custom array type, whose alias resolves through another alias.
+			// custom array type, whose alias resolves through another alias,
+			// and items' an object custom type.
 			track("Some Custom Type Event", "", false, map[string]plan.PropertySchema{
 				"someObject":  required(property("someObject", "", someObjectType)),
 				"userProfile": optional(property("userProfile", "", userProfile)),
 				"grid":        optional(items(property("grid", "", plan.PrimitiveTypeArray), row)),
+				"items":       optional(items(property("items", "", plan.PrimitiveTypeArray), someObjectType)),
 				// Without a nested schema here, address keeps its Property type.
 				"address": optional(property("address", "", object)),
 			}),

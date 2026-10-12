@@ -254,6 +254,9 @@ type PropertyGrid = []CustomTypeRow
 // PropertyInteger represents the property "integer".
 type PropertyInteger = int64
 
+// PropertyItems represents the property "items".
+type PropertyItems = []CustomTypeSomeObjectType
+
 // PropertyLat represents the property "lat".
 type PropertyLat = float64
 
@@ -645,6 +648,7 @@ func (v TrackNameCollisionsProperties) MarshalJSON() ([]byte, error) {
 type TrackSomeCustomTypeEventProperties struct {
 	Address     PropertyAddress      // optional
 	Grid        PropertyGrid         // optional
+	Items       PropertyItems        // optional
 	SomeObject  PropertySomeObject   // required
 	UserProfile *PropertyUserProfile // optional
 }
@@ -658,6 +662,9 @@ func (v TrackSomeCustomTypeEventProperties) toMap() map[string]any {
 	}
 	if v.Grid != nil {
 		m["grid"] = v.Grid
+	}
+	if v.Items != nil {
+		m["items"] = v.Items
 	}
 	if v.UserProfile != nil {
 		m["userProfile"] = *v.UserProfile
