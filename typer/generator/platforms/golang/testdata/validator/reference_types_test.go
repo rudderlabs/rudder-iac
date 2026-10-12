@@ -30,6 +30,15 @@ func TestReferenceTypesWire(t *testing.T) {
 			want: signedUp(""),
 		},
 		{
+			name: "any: Null{} on an optional any sends null",
+			call: func() error {
+				p := base
+				p.PropertyOfAny = ruddertyper.Null{}
+				return ref.TrackUserSignedUp(id, p)
+			},
+			want: signedUp(`, "property_of_any": null`),
+		},
+		{
 			name: "enum: an integer constant sends a JSON number",
 			call: func() error {
 				p := base

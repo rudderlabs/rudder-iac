@@ -157,10 +157,11 @@ func TestExamplesTypesWire(t *testing.T) {
 			name: "union: the Integer constructor sends an integer",
 			call: func() error {
 				p := multi
-				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeInteger(7))
+				// 2^53+1 has no float64, so a constructor storing a float sends a different number.
+				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeInteger(9007199254740993))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": 7}`),
+			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": 9007199254740993}`),
 		},
 		{
 			name: "union: the Number constructor sends a number",
