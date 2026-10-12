@@ -18,9 +18,9 @@ func enumProperty(name string, types []plan.PropertyType, values ...any) plan.Pr
 }
 
 var (
-	stringType  = []plan.PropertyType{plan.PrimitiveTypeString}
-	integerType = []plan.PropertyType{plan.PrimitiveTypeInteger}
-	numberType  = []plan.PropertyType{plan.PrimitiveTypeNumber}
+	onlyString  = []plan.PropertyType{plan.PrimitiveTypeString}
+	onlyInteger = []plan.PropertyType{plan.PrimitiveTypeInteger}
+	onlyNumber  = []plan.PropertyType{plan.PrimitiveTypeNumber}
 )
 
 func TestResolveEnum(t *testing.T) {
@@ -29,10 +29,10 @@ func TestResolveEnum(t *testing.T) {
 		property plan.Property
 		want     *effectiveEnum
 	}{
-		{name: "no enum", property: plan.Property{Types: stringType}},
+		{name: "no enum", property: plan.Property{Types: onlyString}},
 		{
 			name:     "strings",
-			property: enumProperty("p", stringType, "a", "b"),
+			property: enumProperty("p", onlyString, "a", "b"),
 			want: &effectiveEnum{base: "string", signature: `["a","b"]`, values: []GoEnumValue{
 				{Name: "A", Text: `"a"`, Expr: `"a"`},
 				{Name: "B", Text: `"b"`, Expr: `"b"`},
@@ -40,7 +40,7 @@ func TestResolveEnum(t *testing.T) {
 		},
 		{
 			name:     "integral numbers with integer declared",
-			property: enumProperty("p", integerType, 200, -1),
+			property: enumProperty("p", onlyInteger, 200, -1),
 			want: &effectiveEnum{base: "int64", signature: "[200,-1]", values: []GoEnumValue{
 				{Name: "200", Text: "200", Expr: "int64(200)"},
 				{Name: "Neg1", Text: "-1", Expr: "int64(-1)"},
@@ -56,7 +56,7 @@ func TestResolveEnum(t *testing.T) {
 		},
 		{
 			name:     "numbers with number declared",
-			property: enumProperty("p", numberType, 1.5, 5.0),
+			property: enumProperty("p", onlyNumber, 1.5, 5.0),
 			want: &effectiveEnum{base: "float64", signature: "[1.5,5]", values: []GoEnumValue{
 				{Name: "1_5", Text: "1.5", Expr: "1.5"},
 				{Name: "5", Text: "5", Expr: "float64(5)"},
@@ -109,14 +109,14 @@ func TestResolveEnum(t *testing.T) {
 		},
 		{
 			name:     "values the declared types do not allow are left out",
-			property: enumProperty("p", integerType, "a", nil, 1.5, 1, true),
+			property: enumProperty("p", onlyInteger, "a", nil, 1.5, 1, true),
 			want: &effectiveEnum{base: "int64", signature: "[1]", values: []GoEnumValue{
 				{Name: "1", Text: "1", Expr: "int64(1)"},
 			}},
 		},
 		{
 			name:     "equal values deduplicated after normalization, keeping the first",
-			property: enumProperty("p", numberType, 1, 2.5, 1.0, json.Number("1e0"), int64(1), json.Number("2.50")),
+			property: enumProperty("p", onlyNumber, 1, 2.5, 1.0, json.Number("1e0"), int64(1), json.Number("2.50")),
 			want: &effectiveEnum{base: "float64", signature: "[1,2.5]", values: []GoEnumValue{
 				{Name: "1", Text: "1", Expr: "float64(1)"},
 				{Name: "2_5", Text: "2.5", Expr: "2.5"},
@@ -124,7 +124,7 @@ func TestResolveEnum(t *testing.T) {
 		},
 		{
 			name:     "integers keep their precision",
-			property: enumProperty("p", integerType, json.Number("9007199254740993"), json.Number("9007199254740992")),
+			property: enumProperty("p", onlyInteger, json.Number("9007199254740993"), json.Number("9007199254740992")),
 			want: &effectiveEnum{base: "int64", signature: "[9007199254740993,9007199254740992]", values: []GoEnumValue{
 				{Name: "9007199254740993", Text: "9007199254740993", Expr: "int64(9007199254740993)"},
 				{Name: "9007199254740992", Text: "9007199254740992", Expr: "int64(9007199254740992)"},
@@ -148,19 +148,19 @@ func TestEnumConstantNames(t *testing.T) {
 		types []plan.PropertyType
 		want  string
 	}{
-		{"GET", stringType, "GET"},
-		{"smartTV", stringType, "SmartTV"},
-		{"IoT-Device", stringType, "IoTDevice"},
-		{"активный", stringType, "Активный"},
-		{"已完成", stringType, "已完成"},
-		{"🎯", stringType, "U1F3AF"},
-		{"!!!", stringType, "U21U21U21"},
-		{"", stringType, "Empty"},
-		{200, integerType, "200"},
-		{-1, integerType, "Neg1"},
-		{1.5, numberType, "1_5"},
-		{5.0, numberType, "5"},
-		{-0.25, numberType, "Neg0_25"},
+		{"GET", onlyString, "GET"},
+		{"smartTV", onlyString, "SmartTV"},
+		{"IoT-Device", onlyString, "IoTDevice"},
+		{"активный", onlyString, "Активный"},
+		{"已完成", onlyString, "已完成"},
+		{"🎯", onlyString, "U1F3AF"},
+		{"!!!", onlyString, "U21U21U21"},
+		{"", onlyString, "Empty"},
+		{200, onlyInteger, "200"},
+		{-1, onlyInteger, "Neg1"},
+		{1.5, onlyNumber, "1_5"},
+		{5.0, onlyNumber, "5"},
+		{-0.25, onlyNumber, "Neg0_25"},
 		{true, nil, "True"},
 		{false, nil, "False"},
 	}
@@ -199,7 +199,7 @@ func TestEnumNameCollisions(t *testing.T) {
 	}{
 		{
 			name:       "values with the same name",
-			properties: []plan.Property{enumProperty("status", stringType, "Active", "active")},
+			properties: []plan.Property{enumProperty("status", onlyString, "Active", "active")},
 			want: []GoPropertyType{status(
 				GoEnumValue{Name: "PropertyStatusActive", Text: `"Active"`, Expr: `"Active"`},
 				GoEnumValue{Name: "PropertyStatusActive1", Text: `"active"`, Expr: `"active"`},
@@ -207,7 +207,7 @@ func TestEnumNameCollisions(t *testing.T) {
 		},
 		{
 			name:       "a value named values",
-			properties: []plan.Property{enumProperty("status", stringType, "values")},
+			properties: []plan.Property{enumProperty("status", onlyString, "values")},
 			want: []GoPropertyType{status(
 				GoEnumValue{Name: "PropertyStatusValues1", Text: `"values"`, Expr: `"values"`},
 			)},
@@ -215,8 +215,8 @@ func TestEnumNameCollisions(t *testing.T) {
 		{
 			name: "a property type named like a constant",
 			properties: []plan.Property{
-				enumProperty("status", stringType, "active"),
-				{Name: "statusActive", Types: stringType},
+				enumProperty("status", onlyString, "active"),
+				{Name: "statusActive", Types: onlyString},
 			},
 			want: []GoPropertyType{
 				status(GoEnumValue{Name: "PropertyStatusActive1", Text: `"active"`, Expr: `"active"`}),
@@ -230,8 +230,8 @@ func TestEnumNameCollisions(t *testing.T) {
 		{
 			name: "a value named like another enum's Values function",
 			properties: []plan.Property{
-				enumProperty("a", stringType, "bValues"),
-				enumProperty("aB", stringType, "x"),
+				enumProperty("a", onlyString, "bValues"),
+				enumProperty("aB", onlyString, "x"),
 			},
 			want: []GoPropertyType{
 				stringEnum("PropertyA", "a", GoEnumValue{Name: "PropertyABValues1", Text: `"bValues"`, Expr: `"bValues"`}),
@@ -257,12 +257,12 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 	}{
 		{
 			name:     "no value of the declared types",
-			property: enumProperty("kind", stringType, 1, 2),
+			property: enumProperty("kind", onlyString, 1, 2),
 			wantErr:  `mapping property "kind" of track event "Some Event": no enum value has a declared type (string)`,
 		},
 		{
 			name:     "no integral value for an integer enum",
-			property: enumProperty("kind", integerType, 1.5),
+			property: enumProperty("kind", onlyInteger, 1.5),
 			wantErr:  `mapping property "kind" of track event "Some Event": no enum value has a declared type (integer)`,
 		},
 		{
@@ -277,17 +277,17 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 		},
 		{
 			name:     "NaN",
-			property: enumProperty("kind", numberType, math.NaN()),
+			property: enumProperty("kind", onlyNumber, math.NaN()),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum value NaN is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "infinity",
-			property: enumProperty("kind", numberType, math.Inf(1)),
+			property: enumProperty("kind", onlyNumber, math.Inf(1)),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum value +Inf is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "two values one float64 represents",
-			property: enumProperty("kind", numberType, json.Number("9007199254740992"), json.Number("9007199254740993")),
+			property: enumProperty("kind", onlyNumber, json.Number("9007199254740992"), json.Number("9007199254740993")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740993 are the same float64`,
 		},
 		{
@@ -297,12 +297,12 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 		},
 		{
 			name:     "integer beyond int64",
-			property: enumProperty("kind", integerType, json.Number("9223372036854775808")),
+			property: enumProperty("kind", onlyInteger, json.Number("9223372036854775808")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum value 9223372036854775808 does not fit in int64`,
 		},
 		{
 			name:     "number beyond float64",
-			property: enumProperty("kind", numberType, json.Number("1e400")),
+			property: enumProperty("kind", onlyNumber, json.Number("1e400")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum value 1e400 does not fit in float64`,
 		},
 	}
