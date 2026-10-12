@@ -140,17 +140,24 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 	return m
 }
 
+// The categoryMode constants of the generated code.
+const (
+	categoryDeclared = "categoryDeclared"
+	categoryOpen     = "categoryOpen"
+	categoryClosed   = "categoryClosed"
+)
+
 // categoryModeOf returns the categoryMode constant of a page or screen
 // payload schema with the declared keys: whether it declares category, as a
 // field or a discriminator, and otherwise whether it is open.
 func categoryModeOf(declared []string, open bool) string {
 	switch {
 	case slices.Contains(declared, "category"):
-		return "categoryDeclared"
+		return categoryDeclared
 	case open:
-		return "categoryOpen"
+		return categoryOpen
 	}
-	return "categoryClosed"
+	return categoryClosed
 }
 
 // categoryNote tells a page or screen method's caller what WithCategory does
@@ -159,9 +166,9 @@ func categoryNote(t plan.EventType, mode string, payload *GoStruct) string {
 	switch {
 	case payload != nil && payload.Variant != nil:
 		return "WithCategory is checked against the schema of the struct in props, or the base schema when props is nil."
-	case mode == "categoryOpen":
+	case mode == categoryOpen:
 		return fmt.Sprintf("Use WithCategory to set the %s category.", t)
-	case mode == "categoryDeclared":
+	case mode == categoryDeclared:
 		return "This rule declares a category, so set it in props; WithCategory must equal it."
 	}
 	return "This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict."
