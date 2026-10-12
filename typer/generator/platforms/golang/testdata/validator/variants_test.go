@@ -293,7 +293,9 @@ func TestVariantsWire(t *testing.T) {
 	assertWireRows(t, func(client analytics.Client) {
 		ex, ref = examples.New(client), ruddertyper.New(client)
 	}, rows)
+}
 
+func TestVariantsDiscriminator(t *testing.T) {
 	// Discriminator() is never sent on its own, so its values are compared
 	// directly. methodOK pairs the two results of an optional discriminator.
 	methodOK := func(v examples.PropertyMethod, ok bool) []any { return []any{v, ok} }
