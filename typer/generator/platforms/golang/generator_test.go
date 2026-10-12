@@ -389,6 +389,16 @@ func TestGenerateValueHelpers(t *testing.T) {
 			properties: []plan.Property{property("nullable_items", array, nullable...)},
 			want:       helpers{header: true, nullable: true},
 		},
+		{
+			name:       "enum whose only value is null",
+			properties: []plan.Property{{Name: "null_enum", Types: nullable, Config: &plan.PropertyConfig{Enum: []any{nil}}}},
+			want:       helpers{header: true, ptr: true, null: true},
+		},
+		{
+			name:       "nullable enum",
+			properties: []plan.Property{{Name: "nullable_enum", Types: nullable, Config: &plan.PropertyConfig{Enum: []any{"a", nil}}}},
+			want:       helpers{header: true, ptr: true, nullable: true},
+		},
 	}
 
 	for _, tt := range tests {
